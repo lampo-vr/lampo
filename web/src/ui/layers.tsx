@@ -39,6 +39,7 @@ import {
   type MenuChoice,
   type MenuEntry,
   type MenuItem,
+  type MenuSub,
   type ModalProps,
   type PopoverProps,
   type TriggerHandlers,
@@ -249,7 +250,27 @@ function Choice({ P, choice }: { P: Parts; choice: MenuChoice['choice'] }) {
   );
 }
 
-function menuItems(P: Parts, items: MenuEntry[]) {
+/**
+ * A menu on a phone is a sheet (mobile.css): a submenu opens in its place there — its row leads back — rather than as a
+ * second sheet over the first, and the sheet stays as short as the list it shows. `shown` is what the sheet lists now;
+ * `drill` opens a submenu by its label (null: back), absent where submenus open beside the menu.
+ */
+function useDrill(items: MenuEntry[], open: boolean): { shown: MenuEntry[]; drill: ((label: string | null) => void) | null } {
+  const phone = usePhone();
+  const [inside, setInside] = useState<string | null>(null);
+  // a menu opens at its top, whichever submenu it showed when it closed (kept while it closes: no jump on the way out)
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setInside(null);
+  }
+  // the submenu as the menu has it now (its items can change while it is open)
+  const sub = phone && inside ? items.find((it): it is MenuSub => !!it && it !== 'sep' && 'sub' in it && it.sub.label === inside)?.sub : undefined;
+  const back: MenuItem = { label: sub?.label ?? '', icon: 'back', keep: true, onClick: () => setInside(null) };
+  return { shown: sub ? [back, 'sep', ...sub.items] : items, drill: phone ? setInside : null };
+}
+
+function menuItems(P: Parts, items: MenuEntry[], drill: ((label: string | null) => void) | null): ReactNode[] {
   return tidy(items).map((it, i) =>
     it === 'sep' ? (
       // biome-ignore lint/suspicious/noArrayIndexKey: separators have no identity of their own
@@ -260,9 +281,36 @@ function menuItems(P: Parts, items: MenuEntry[]) {
       <P.Label key={`head-${it.heading}`} className="menu-label">
         {it.heading}
       </P.Label>
+    ) : 'sub' in it ? (
+      drill ? (
+        <Item key={`sub-${it.sub.label}`} P={P} it={{ label: it.sub.label, icon: it.sub.icon, keep: true, onClick: () => drill(it.sub.label) }} opens />
+      ) : (
+        <Sub key={`sub-${it.sub.label}`} P={P} sub={it.sub} />
+      )
     ) : (
       <Item key={it.label} P={P} it={it} />
     ),
+  );
+}
+
+/** A submenu: its row names it and points the way it opens (→, or ← when there is no room to the right). */
+function Sub({ P, sub }: { P: Parts; sub: MenuSub['sub'] }) {
+  return (
+    <P.Sub>
+      <P.SubTrigger asChild>
+        <button type="button" className="menu-sub">
+          {sub.icon ? <I name={sub.icon} size={15} /> : <span className="menu-icon-gap" />}
+          <span className="grow">{sub.label}</span>
+          <I name="right" size={14} className="menu-sub-arrow" />
+        </button>
+      </P.SubTrigger>
+      <P.Portal>
+        {/* beside the menu's edge (its row sits inside 4 px of padding and a 1 px line), its first row level with this one */}
+        <P.SubContent className="menu menu-subs" sideOffset={5} alignOffset={-5} collisionPadding={8} onClick={stop}>
+          {menuItems(P, sub.items, null)}
+        </P.SubContent>
+      </P.Portal>
+    </P.Sub>
   );
 }
 
@@ -282,7 +330,8 @@ if (typeof window !== 'undefined')
 const ghostTap = () => clicked && press.touch && !press.onMenu && performance.now() - press.at < GHOST_MS;
 const GHOST_MS = 800;
 
-function Item({ P, it }: { P: Parts; it: MenuItem }) {
+/** `opens`: the row opens a submenu in the sheet's place (a phone's), and says so with its arrow. */
+function Item({ P, it, opens = false }: { P: Parts; it: MenuItem; opens?: boolean }) {
   const select = (e: Event) => {
     const ghost = ghostTap();
     clicked = false;
@@ -299,11 +348,12 @@ function Item({ P, it }: { P: Parts; it: MenuItem }) {
     if ((e.currentTarget as Element).closest('[data-state=closed]')) e.preventDefault();
   };
   const face = (
-    <button type="button" className={it.danger ? 'danger' : ''} onClickCapture={click}>
+    <button type="button" className={it.danger ? 'danger' : opens ? 'menu-sub' : ''} onClickCapture={click}>
       {it.mark ?? (it.icon ? <I name={it.icon} size={15} /> : <span className="menu-icon-gap" />)}
       <span className="grow">{it.label}</span>
       {it.shortcut && <kbd className="menu-kbd">{it.shortcut}</kbd>}
       {it.checked !== undefined && <I name="check" size={14} className="menu-tick" />}
+      {opens && <I name="right" size={14} className="menu-sub-arrow" />}
     </button>
   );
   if (it.checked !== undefined)
@@ -373,6 +423,7 @@ export function MenuLayer({
   align: 'start' | 'end';
   sideOffset: number;
 }) {
+  const { shown, drill } = useDrill(items, open);
   return (
     <DropdownMenu.Root open={open} onOpenChange={onOpenChange} modal={false}>
       <DropdownMenu.Trigger asChild>
@@ -392,7 +443,7 @@ export function MenuLayer({
           {...{ onOpenAutoFocus: (e: Event) => via.current === 'keyboard' && focusFirstItem(e) }}
           onCloseAutoFocus={closeFocus(via, anchor)}
         >
-          {menuItems(DropdownMenu, items)}
+          {menuItems(DropdownMenu, shown, drill)}
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
@@ -400,8 +451,14 @@ export function MenuLayer({
 }
 
 export function ContextMenuLayer({ anchor, onOpenChange, items }: { anchor: AnchorLink; onOpenChange: (open: boolean) => void; items: MenuEntry[] }) {
+  const [open, setOpen] = useState(false);
+  const { shown, drill } = useDrill(items, open);
+  const change = (o: boolean) => {
+    setOpen(o);
+    onOpenChange(o);
+  };
   return (
-    <ContextMenuPrimitive.Root onOpenChange={onOpenChange} modal={false}>
+    <ContextMenuPrimitive.Root onOpenChange={change} modal={false}>
       <ContextMenuPrimitive.Trigger asChild>
         <Anchor link={anchor} />
       </ContextMenuPrimitive.Trigger>
@@ -413,7 +470,7 @@ export function ContextMenuLayer({ anchor, onOpenChange, items }: { anchor: Anch
           onCloseAutoFocus={keepTakenFocus}
           data-testid="context-menu"
         >
-          {menuItems(ContextMenuPrimitive, items)}
+          {menuItems(ContextMenuPrimitive, shown, drill)}
         </ContextMenuPrimitive.Content>
       </ContextMenuPrimitive.Portal>
     </ContextMenuPrimitive.Root>

@@ -139,6 +139,22 @@
   flex: none;
   color: var(--fg);
 }
+/* a submenu's row: the arrow says it opens one, and the row stays lit while it is open (the pointer is over there) */
+.menu-sub > .menu-sub-arrow {
+  flex: none;
+  margin-right: calc(-1 * var(--sp-0_5));
+  color: var(--muted);
+}
+.menu .menu-sub[data-state='open'] {
+  background: var(--float-sel);
+  color: var(--fg);
+}
+.menu .menu-sub[data-state='open'] > .icon {
+  color: var(--fg);
+}
+.menu-subs {
+  min-width: 160px;
+}
 /* what can't be undone reads as danger before the pointer gets there, and its row lights in the danger colour */
 .menu :is([role='menuitem'], [role='menuitemcheckbox']).danger,
 .menu :is([role='menuitem'], [role='menuitemcheckbox']).danger > .icon {

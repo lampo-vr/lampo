@@ -135,16 +135,23 @@ export interface MenuChoice {
 export interface MenuHeading {
   heading: string;
 }
+/**
+ * Items one step further in ("Download another version ›"): a menu of their own beside this one. On a phone, where a
+ * menu is a sheet, they take the sheet's place, their label leading back (ui/layers.tsx). Shown only with items.
+ */
+export interface MenuSub {
+  sub: { label: string; icon?: IconName; items: MenuEntry[] };
+}
 /** Items in order; 'sep' draws a line; false/null/undefined are skipped, so `cond && {...}` reads naturally. */
-export type MenuEntry = MenuItem | MenuChoice | MenuHeading | 'sep' | false | null | undefined;
-type Shown = MenuItem | MenuChoice | MenuHeading | 'sep';
+export type MenuEntry = MenuItem | MenuChoice | MenuHeading | MenuSub | 'sep' | false | null | undefined;
+type Shown = MenuItem | MenuChoice | MenuHeading | MenuSub | 'sep';
 
-// Separators only between groups that have items; headings only over items.
+// Separators only between groups that have items; headings only over items; a submenu only with items in it.
 export function tidy(items: MenuEntry[]): Shown[] {
   const out: Shown[] = [];
   const bare = (x: Shown | undefined) => x !== undefined && x !== 'sep' && 'heading' in x;
   for (const it of items) {
-    if (!it) continue;
+    if (!it || (it !== 'sep' && 'sub' in it && !tidy(it.sub.items).length)) continue;
     if ((it === 'sep' || 'heading' in it) && bare(out.at(-1))) out.pop();
     if (it === 'sep' && (!out.length || out.at(-1) === 'sep')) continue;
     out.push(it);
