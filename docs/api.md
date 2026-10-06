@@ -1026,7 +1026,8 @@ answers `429` with `Retry-After`. The events:
 What they allow and why: [sharing.md](sharing.md). A link's settings are `{label, comment, approve, notes: own | all,
 versions: latest | all, download: off | preview | original, expires: ISO | null, password: string | null, embed?}`.
 `embed: true` makes an Embed link (one video's player for another site): watch only whatever else is sent, never on a
-folder and never with a password (`400` with the reason); `embed: false` makes it a review link again. By default
+folder and never with a password (`400` with the reason). A link is an embed from when it is made or never: a `PATCH`
+whose `embed` would change that is a `400` ("make a new link"); the same value changes nothing. By default
 a link takes notes and decisions, shows each visitor their own notes and only the newest version, has no downloads and
 no expiry, and is labelled "Review link". A label is 80 characters at most, a password at least 4. Visitors see a
 link's label only when it was given one (`label` is `""` in `/api/g/…` otherwise).
@@ -1072,8 +1073,8 @@ summed up from the link's records.
 | `POST /api/g/:token/comments/:id/replies` | `{name, text}` on a note the link shows |
 | `POST /api/g/:token/comments/:id/check` | `{name, verdict: confirm \| reopen, text?}` on a note marked fixed |
 | `POST /api/g/:token/approval` | the client's decision (below) → `{approval}` |
-| `GET /api/g/:token/embed` | Embed links: what the player at `/e/<token>` plays (`EmbedResponse`: `title`, `slug`, `v`, `fps`, `frames`, `width`, `height`, `duration`, `media`, `preparing?`, `busy?`, `poster`, `sprite`, `chapters` `[{frame, title}]`, `captions` URL or `null`, `captions_lang?`, `badge`); `404` for any other link, `410` expired |
-| `GET /api/g/:token/captions/:id?v=` | Embed links: the transcript's lines as WebVTT; `404` when the version wasn't heard |
+| `GET /api/g/:token/embed` | Embed links: what the player at `/e/<token>` plays (`EmbedResponse`: `title`, `slug`, `v`, `fps`, `frames`, `width`, `height`, `duration`, `media`, `preparing?`, `busy?`, `poster`, `sprite`, `chapters` `[{frame, title}]`, `captions` URL or `null`, `captions_lang?`, `badge`; `chapters` as read when the version arrived); `404` for any other link, `410` expired, `429` when one address asks too often |
+| `GET /api/g/:token/captions/:id?v=` | Embed links: the transcript's lines as WebVTT; `404` when the version wasn't heard, `429` as above |
 | `GET /oembed?url=&format=json&maxwidth=&maxheight=` | oEmbed for an Embed link's `/e/<token>` or `/g/<token>` address on this server: `{version, type: video, title, html, width, height, thumbnail_url, thumbnail_width, thumbnail_height, provider_name?, provider_url?}`; `404` for anything else, `501` for another format; any origin may ask |
 
 Details:
@@ -1088,7 +1089,9 @@ Details:
   operator's pages, [configuration.md → Legal pages](configuration.md#legal-pages)), the permissions and the videos.
   A password link answers `locked: true` and no videos until it is unlocked; until then every other route answers
   `401`. `404` when unknown or revoked; `410` with `{error, by, expired}` when it expired (whom to ask, and since
-  when). `reviewer_avatar` is reserved: pictures are for signed-in people.
+  when). `reviewer_avatar` is reserved: pictures are for signed-in people. An Embed link's token is in other sites'
+  pages, so its answers name nobody: `label` `""`, `reviewer` and `org` `null` (here and in the video's answer), no
+  video's `updated`, no `by` when it expired, and none of the visitors' notes or decisions.
 - **Visits and watching.** A visit counts once per visitor and half hour, never for the team checking its own link (the
   owner's machine, or a signed-in account). `visitor` is the random id the page keeps, `name` what the visitor typed,
   if anything. 60 visits a minute per link and address, then `429`. Progress: `seen` is 25 hex digits (`lib/watch.ts`),

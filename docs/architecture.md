@@ -300,7 +300,8 @@ after the first screenful), and no heading loses the tops or tails of its letter
   (a Content-Security-Policy with the theme script's hash, `frame-ancestors 'none'`, `nosniff`; the one page another
   site may frame is an Embed link's player, `/e/<token>`: `frame-ancestors *` and no `X-Frame-Options`). Media, frames,
   posters, screenshots and API answers (`/api/`, `/media/`, `/data/`, review links' own included) carry
-  `Cross-Origin-Resource-Policy: same-origin`, so no other site's page can load them as an image or a video.
+  `Cross-Origin-Resource-Policy: same-origin`, so no other site's page can load them as an image or a video — but for
+  an Embed link's poster, its oEmbed thumbnail, which says `cross-origin`.
 - **On your machine.** Only requests from the machine itself, with no proxy headers, are the owner without signing in.
   On Linux that is the app's own OS account (or root): the connecting socket's row in `/proc/net/tcp` names it
   (`peerUidFrom` in `server/auth.ts`). macOS and Windows can't tell accounts apart, so there every account on the

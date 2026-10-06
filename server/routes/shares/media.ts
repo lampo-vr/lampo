@@ -60,6 +60,9 @@ export function guestMediaRoutes(ctx: ServerContext): Router {
     const ver = review.versions.at(-1) as Version;
     const out = await poster(() => versionBytes(review, ver), ver, review.meta);
     res.setHeader('Cache-Control', 'private, max-age=86400');
+    // An embed's poster is its oEmbed thumbnail: other sites show it as an <img>. Only that picture may leave the app's
+    // own pages; every other answer of a link stays same-origin (server/guard.ts).
+    if (share.embed) res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     sendInternal(res, out);
   });
 

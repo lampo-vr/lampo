@@ -13,11 +13,13 @@ format stays backwards compatible throughout.
   frames, frame steps and the player's keys, the render's chapters on its timeline, captions from its transcript, full
   screen, and options to start muted, loop or show the picture alone. It shows the video and nothing else, sets no
   cookie, and stops wherever it is the moment the link is revoked or expires. Sites that embed from an address find it
-  through oEmbed.
+  through oEmbed (on your own machine through its public tunnel too), with the poster as a thumbnail they may show. A
+  link is an embed from when it is made: an existing link doesn't become one, nor an embed another kind of link.
 
 ### Fixed
 - An account deleted, disabled or given a new password while someone signs in to it gets no session and sends no
-  sign-in email: the answer is the same as for any wrong sign-in.
+  sign-in email: the answer is the same as for any wrong sign-in. The same holds while someone takes an invite with
+  it: it joins no workspace, and nobody is signed in.
 - Save and Send in the note composer stay where they are when the video's agent is assigned, starts waiting or is
   unassigned while you write: only which of the two is the main action changes, so a click meant for Save never lands
   on Send.

@@ -57,7 +57,7 @@ and offers the one action that changes it:
 ## What a link allows
 
 The share dialog shows every setting under the kinds, one row each; *Change link* in a link's ⋯ menu opens the link
-as its own page with the same rows:
+as its own page with the same rows (an *Embed* link keeps its kind: [below](#embedding-a-video)):
 
 | Setting | Choices |
 |---|---|
@@ -239,6 +239,9 @@ badge ([For the visitor](#for-the-visitor)), the player hides it too.
   `https://app.example.com/e/1rT9cQ…?autoplay=1&loop=1&controls=0`.
 - **It shows the video and nothing else**: no notes, no names, no other versions, no downloads. Its title is the
   video's file name, as a *Watch only* visitor reads it.
+- **A link is an embed from the start, or never.** Its address sits in the pages it is on, for anyone to read, so
+  *Embed* is offered only when a link is made: an existing link doesn't become one, and an embed doesn't become
+  another kind of link (*Change link* changes its name and expiry). For another kind, make a new link.
 - **Revoking** the link stops every page it is on at once (the frame then says "This video isn't available"), and so
   does its expiry. An embed has no password: it plays for anyone who sees the page it is on.
 - **What it records** is what a *Watch only* link records ([What a link records](#what-a-link-records)), counted when
@@ -249,7 +252,9 @@ badge ([For the visitor](#for-the-visitor)), the player hides it too.
 **oEmbed.** Sites and tools that embed from an address (WordPress, Notion and others) find the player through
 [oEmbed](https://oembed.com): both the player's address and the link's watch page name it in their head, and
 `GET /oembed?url=<address>&format=json` answers with the player's `<iframe>`, its size (scaled down to `maxwidth` and
-`maxheight` when given), the video's title and its poster. Any other link, address or format is a 404 (501 for XML).
+`maxheight` when given), the video's title and its poster, which other sites may show as a picture. On your own
+machine it answers at the tunnel's address too, the one the pages name. Any other link, address or format is a 404
+(501 for XML).
 
 ## Downloads
 
@@ -290,10 +295,11 @@ files home).
   strangers with the address can neither guess it quickly nor lock the client out.
 - **Writes must come from the review page itself**, and what visitors write is limited per visitor and per link, by
   the minute and by the day ([below](#details)).
-- Through the local tunnel only review links answer. On a hosted server they are the only thing reachable without
-  signing in.
+- Through the local tunnel only review links answer (and oEmbed, which speaks of embeds alone). On a hosted server
+  they are the only thing reachable without signing in.
 - **Only an embed's player may sit in another site's frame.** `/e/<token>` answers with `frame-ancestors *` and no
-  `X-Frame-Options`; every other page and answer of the app, review pages included, refuses to be framed.
+  `X-Frame-Options`; every other page and answer of the app, review pages included, refuses to be framed. Likewise
+  only an embed's poster (its oEmbed thumbnail) may be shown as a picture on another site's page.
 
 ## Webhooks
 

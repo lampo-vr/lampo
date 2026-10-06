@@ -4453,6 +4453,7 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Embed code copied · {reach}': 'Einbettungscode kopiert · {reach}',
   'Embed code copied · reachable by {reach}': 'Einbettungscode kopiert · erreichbar für {reach}',
   'Plays for anyone who sees it': 'Läuft für alle, die es sehen',
+  'An embed stays one. For another kind of link, create a new one.': 'Eine Einbettung bleibt eine. Für eine andere Art von Link erstell einen neuen.',
 };
 
 export const de: Record<Key, string> = { ...owner, ...client };

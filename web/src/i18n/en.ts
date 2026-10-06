@@ -696,6 +696,7 @@ export const EN = [
   'An app asks to work with your reviews. Sign in, then decide what it may do.',
   'An email when your account signs in from a browser or vr it hasn’t been used with before.',
   'An email with the link went to <0>{email}</0>. It works once, until {until}; whoever opens it first chooses a name and password and is in as {x}.',
+  'An embed stays one. For another kind of link, create a new one.',
   'An EU VAT ID starts with its country’s letters ({prefix}), then 8 to 12 digits or letters.',
   'An idea, and the agent’s answer',
   'An illustration, not your data',

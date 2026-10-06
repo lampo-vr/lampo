@@ -194,6 +194,15 @@ export async function waveform(src: MediaSource, ver: Pick<Version, 'hash' | 'sa
   );
 }
 
+/**
+ * A render's chapters as read before (when it arrived, or with its analysis: server/background.ts), or null until they
+ * are: what a visitor's request reads — reading them there could fetch the whole original from remote storage.
+ */
+export function cachedChapters(ver: Pick<Version, 'hash' | 'sample'>): Chapter[] | null {
+  const hit = readJson<Chapter[]>(cacheFile('chapters', renderKey(ver), '.json'));
+  return Array.isArray(hit) ? hit : null;
+}
+
 /** The most chapters a render's markers give an embed's timeline, and the longest title kept of each. */
 export const CHAPTER_LIMITS = { count: 100, title: 80 } as const;
 
@@ -205,8 +214,8 @@ export const CHAPTER_LIMITS = { count: 100, title: 80 } as const;
  */
 export async function chapters(src: MediaSource, ver: Pick<Version, 'hash' | 'sample' | 'fps' | 'frames'>): Promise<Chapter[]> {
   const out = cacheFile('chapters', renderKey(ver), '.json');
-  const hit = readJson<Chapter[]>(out);
-  if (Array.isArray(hit)) return hit;
+  const hit = cachedChapters(ver);
+  if (hit) return hit;
   return once(out, () =>
     slot(async () => {
       const file = await fileOf(src);

@@ -60,13 +60,11 @@ function inputOf(d: Draft, editing: boolean): ShareInput {
     download: d.download,
     // The end of the chosen day, in the owner's time zone.
     expires: d.expires ? new Date(`${d.expires}T23:59:59`).toISOString() : null,
-    embed: d.embed,
+    // the kind is chosen when a link is made: an existing link stays an embed, or never becomes one (the server refuses)
+    ...(editing ? {} : { embed: d.embed }),
   };
-  // an embed never has a password: a link changed into one loses the one it had
-  if (d.embed) {
-    if (editing) out.password = null;
-    return out;
-  }
+  // an embed never has a password
+  if (d.embed) return out;
   if (!editing) out.password = d.passwordAction === 'set' && d.password ? d.password : undefined;
   else if (d.passwordAction === 'remove') out.password = null;
   else if (d.passwordAction === 'set' && d.password) out.password = d.password;
@@ -241,20 +239,30 @@ export function ShareModal({
       : t('Share folder {folder}', { folder })
     : t('Share {name}', { name: name ?? '' });
   const empty = !!d && !d.shares.length;
-  // an embed plays one video on someone else's page: a folder's links are the first three kinds
-  const offered = here === 'video' ? PRESETS : PRESETS.filter((p) => p.id !== 'embed');
-  const kinds = (of: Draft, change: (p: Partial<Draft>) => void) => (
-    <Segmented
-      label={t('Kind of link')}
-      value={presetOf(of)}
-      onChange={(v) => {
-        const p = PRESETS.find((x) => x.id === v);
-        // an embed has no password: one being set goes with the kind (an existing link's is removed on save)
-        if (p) change(p.set.embed ? { ...p.set, password: '', passwordAction: 'keep' } : p.set);
-      }}
-      options={offered.map((p) => ({ value: p.id, label: p.label() }))}
-    />
-  );
+  // An embed plays one video on someone else's page: a folder's links are the first three kinds. A link is an embed from
+  // the moment it is made or never (its token is in other sites' pages), so a link being changed keeps its side: an
+  // embed is offered no kinds, any other link the first three.
+  const kinds = (of: Draft, change: (p: Partial<Draft>) => void, existing = false) => {
+    if (existing && of.embed)
+      return (
+        <p className="link-intro" data-testid="link-kind-fixed">
+          {t('An embed stays one. For another kind of link, create a new one.')}
+        </p>
+      );
+    const offered = here === 'video' && !existing ? PRESETS : PRESETS.filter((p) => p.id !== 'embed');
+    return (
+      <Segmented
+        label={t('Kind of link')}
+        value={presetOf(of)}
+        onChange={(v) => {
+          const p = PRESETS.find((x) => x.id === v);
+          // an embed has no password: one being set goes with the kind
+          if (p) change(p.set.embed ? { ...p.set, password: '', passwordAction: 'keep' } : p.set);
+        }}
+        options={offered.map((p) => ({ value: p.id, label: p.label() }))}
+      />
+    );
+  };
 
   const creator = (
     // biome-ignore lint/a11y/noStaticElementInteractions: ⌘↵ for the block; the field and the buttons are the controls
@@ -434,7 +442,7 @@ export function ShareModal({
                 onChange={(e) => setEditing({ ...editing, d: { ...editing.d, label: e.target.value } })}
               />
             </div>
-            <div className="link-kind">{kinds(editing.d, (p) => setEditing((x) => x && { ...x, d: { ...x.d, ...p } }))}</div>
+            <div className="link-kind">{kinds(editing.d, (p) => setEditing((x) => x && { ...x, d: { ...x.d, ...p } }), true)}</div>
             <LinkSettings
               key={editing.token}
               d={editing.d}

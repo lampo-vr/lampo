@@ -529,7 +529,8 @@ The folders, listed so that empty ones survive. A video's own folder is `folder`
 - **Settings.** `comment`, `approve`, `notes` (`own` or `all`), `versions` (`latest` or `all`), `download` (`off`,
   `preview` or `original`) and `expires`. `password` (a scrypt hash) and `password_v` are present on protected links;
   revoking adds a `revoked` time. `embed: true` marks an Embed link (one video's player for another site): it plays the
-  newest version only, whatever the other settings say, and never has a password. Every field after `by` is optional:
+  newest version only, whatever the other settings say, never has a password, is set when the link is made, and shows
+  no visitor's notes or decisions, whatever came in under it. Every field after `by` is optional:
   entries without them (links from before these settings) mean comment and approve, their own notes, the newest
   version, no downloads and no expiry. What each setting does: [sharing.md](sharing.md).
 - **Per workspace.** Each workspace has its own `shares.json`, and `data/links.json` says which workspace a link

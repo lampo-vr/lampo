@@ -230,6 +230,12 @@ export function guestRoutes(ctx: ServerContext): Router {
     if (ws === DEFAULT_WORKSPACE) return cfg.org_name || null;
     return workspaceNamed(ws) ? getWorkspace(ws)?.name || null : null;
   };
+  /**
+   * Whose link it is, as its visitors read it: its name, who shared it, the team. An embed's token is in other sites'
+   * pages for anyone to read, so whichever of these routes it asks (its watch page's), it names nobody.
+   */
+  const whose = (share: ShareWithToken): Pick<GuestLinkResponse, 'label' | 'reviewer' | 'org'> =>
+    share.embed ? { label: '', reviewer: null, org: null } : { label: guestLabel(share), reviewer: sharerName(share), org: orgOf() };
   // the team opening its own link to check it isn't counted (access.ts)
   const isTeam = (req: Request) => isTeamOf(ctx, req);
   const remember = (share: ShareWithToken, req: Request, name: string | undefined) => {
@@ -277,7 +283,8 @@ export function guestRoutes(ctx: ServerContext): Router {
       notes: notes.length,
       open: notes.filter((c) => c.status === 'open').length,
       check: notes.filter((c) => c.status === 'fixed').length,
-      updated: review.updated || ver.registered,
+      // when the team last changed it: an embed doesn't say (whose)
+      ...(share.embed ? {} : { updated: review.updated || ver.registered }),
     };
   }
 
@@ -286,9 +293,7 @@ export function guestRoutes(ctx: ServerContext): Router {
     const locked = !isUnlocked(share, req.headers.cookie);
     const badge = await badgeShown(ctx);
     const out: GuestLinkResponse = {
-      label: guestLabel(share),
-      reviewer: sharerName(share),
-      org: orgOf(),
+      ...whose(share),
       kind: share.folder ? 'folder' : 'video',
       // nothing of what it shares before the password (docs/sharing.md), its folder's name included
       folder: locked ? null : ownName(share),
@@ -531,11 +536,9 @@ export function guestRoutes(ctx: ServerContext): Router {
     // What the player plays (see ./media.ts): a copy unless the link offers the original; none while it's being made.
     const play = p.download === 'original' ? playback.playable(review, ver) : playback.preview(review, ver);
     return {
-      label: guestLabel(share),
+      ...whose(share),
       slug: id,
       name: path.basename(review.video),
-      reviewer: sharerName(share),
-      org: orgOf(),
       v: ver.v,
       latest: latest.v,
       fps: ver.fps,

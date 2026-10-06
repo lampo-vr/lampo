@@ -2545,7 +2545,8 @@ export interface GuestVideo {
   open: number;
   /** Marked fixed, waiting for the client to confirm. */
   check: number;
-  updated: string;
+  /** When the video last changed; absent on an Embed link's answers (they name nothing of the team's work). */
+  updated?: string;
 }
 
 /** GET /api/g/<token>: the link itself. Locked links (password) only say so. */

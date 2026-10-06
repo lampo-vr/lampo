@@ -7,22 +7,28 @@ import path from 'node:path';
 import type { Request, Router } from 'express';
 import { z } from 'zod';
 import { BRAND_NAME, SITE_URL } from '../../../lib/brand.ts';
-import { chapters } from '../../../lib/media.ts';
+import { cachedChapters } from '../../../lib/media.ts';
 import { inWorkspace, slugify } from '../../../lib/paths.ts';
+import { RateLimit } from '../../../lib/rateLimit.ts';
 import { guestId, linkWorkspace, resolveShare } from '../../../lib/shares.ts';
 import { SPRITE_VERSION } from '../../../lib/sprite.ts';
-import { toVtt } from '../../../lib/transcript.ts';
-import { cachedTranscript } from '../../../lib/transcripts.ts';
-import type { Chapter, EmbedResponse, OEmbedResponse, Review, ShareWithToken, Version } from '../../../lib/types.ts';
+import { captionsMemory, captionsOf, captionsVtt } from '../../../lib/transcripts.ts';
+import type { EmbedResponse, OEmbedResponse, Review, ShareWithToken, Version } from '../../../lib/types.ts';
 import { suspensionOf } from '../../../lib/workspaces.ts';
 import type { ServerContext } from '../../context.ts';
 import { requestHost } from '../../guard.ts';
-import { versionBytes } from '../../helpers.ts';
 import { fail, query, router, VersionQuery } from '../../http.ts';
-import { badgeShown, embedOf, target, version } from './access.ts';
+import { badgeShown, embedOf, ipOf, keptInMemory, target, tooMany, version } from './access.ts';
 
 /** The tokens' shape (lib/shares.ts resolveShare). */
 const TOKEN = /^[A-Za-z0-9_-]{20,40}$/;
+
+/**
+ * What one address (`ipOf`: IPv6 by its /64) may ask of the player's data and captions in a minute, together. Every
+ * view of a page an embed sits on asks once per player; a page with a wall of films, viewed again and again from one
+ * office, stays well under it — a loop asking as fast as it can doesn't.
+ */
+export const EMBED_ASKS = { perMinute: 600 } as const;
 
 const OEmbedQuery = z.object({
   url: z.string().max(2000),
@@ -77,12 +83,6 @@ function videoOf(share: ShareWithToken): { review: Review; ver: Version; id: str
   return { review, ver, id: guestId(share, slugify(review.video)) };
 }
 
-/** The captions of a version: its transcript's lines, when it was heard and something is said (never heard here). */
-const heard = (ver: Version) => {
-  const t = cachedTranscript(ver);
-  return t?.lines.length ? t : null;
-};
-
 /** `w` × `h` scaled down to fit `maxW` × `maxH`, never up; whole pixels. */
 function fit(w: number, h: number, maxW: number, maxH: number): { width: number; height: number } {
   const k = Math.min(1, maxW / w, maxH / h);
@@ -111,17 +111,28 @@ export function discoveryTag(ctx: ServerContext, req: Request, token: string, ki
 export function embedRoutes(ctx: ServerContext): Router {
   const r = router();
   const { playback } = ctx;
+  // Keyed by addresses: bounded, and listed with what the other link routes keep. The captions' memory is the
+  // transcripts' own (lib/transcripts.ts), listed here because visitors reach it through these routes.
+  const embedAsks = new RateLimit(EMBED_ASKS.perMinute, 60_000);
+  keptInMemory(ctx, { embedAsks, ...captionsMemory });
+  /** One more ask from this address, or 429 past its share of the minute. */
+  const asked = (req: Request) => {
+    const ip = ipOf(req);
+    if (!embedAsks.take(ip)) throw tooMany('Too many requests, please wait a moment.', embedAsks.retryAfter(ip));
+  };
 
   // What the player plays and shows. A view isn't counted here: the page an embed sits on loads it for every visitor of
   // that page, watching or not — the player counts its visit on the first play (POST /api/g/:token/visit with the video).
+  // Asked on every view of that page, so it reads nothing heavy: chapters as read when the version arrived
+  // (server/background.ts; a part's own file holds a stretch of the video, not its chapters), captions from memory.
   r.get('/api/g/:token/embed', async (req, res) => {
+    asked(req);
     const share = embedOf(req.params.token);
     const { review, ver, id } = videoOf(share);
     const play = playback.preview(review, ver);
     const token = share.token;
-    // a part's own file holds a stretch of the video, not its chapters
-    const marks: Chapter[] = ver.part ? [] : await chapters(() => versionBytes(review, ver), ver).catch(() => []);
-    const words = heard(ver);
+    const marks = ver.part ? [] : (cachedChapters(ver) ?? []);
+    const words = captionsOf(ver);
     const out: EmbedResponse = {
       title: path.basename(review.video),
       slug: id,
@@ -138,7 +149,7 @@ export function embedRoutes(ctx: ServerContext): Router {
       sprite: `/api/g/${token}/sprite/${id}?v=${ver.v}&s=${SPRITE_VERSION}`,
       chapters: marks,
       captions: words ? `/api/g/${token}/captions/${id}?v=${ver.v}` : null,
-      ...(words ? { captions_lang: /^[a-z]{2,3}$/.test(words.language) ? words.language : null } : {}),
+      ...(words ? { captions_lang: words.lang } : {}),
       badge: await badgeShown(ctx),
     };
     res.setHeader('Cache-Control', 'no-store');
@@ -147,13 +158,14 @@ export function embedRoutes(ctx: ServerContext): Router {
 
   // The captions: what is said in the newest version, as WebVTT (the transcript's lines; never its engine or hash).
   r.get('/api/g/:token/captions/:slug', (req, res) => {
+    asked(req);
     const share = embedOf(req.params.token);
     const review = target(share, req.params.slug);
     const ver = version(share, review, query(VersionQuery, req).v);
-    const words = heard(ver);
-    if (!words) throw fail(404, 'This video has no captions.');
+    const vtt = captionsVtt(ver);
+    if (!vtt) throw fail(404, 'This video has no captions.');
     res.setHeader('Cache-Control', 'no-cache');
-    res.type('text/vtt').send(toVtt(words));
+    res.type('text/vtt').send(vtt);
   });
 
   // oEmbed (https://oembed.com): a site given an Embed link's address (its player or its watch page) gets the player's

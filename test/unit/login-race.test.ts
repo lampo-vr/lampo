@@ -43,6 +43,7 @@ function holdNextCheck(): { reached: Promise<void>; release: () => void } {
 }
 
 const auth = await import('../../lib/auth.ts');
+const workspaces = await import('../../lib/workspaces.ts');
 const { deleteAccount } = await import('../../lib/deletion.ts');
 const { readOutbox } = await import('../../lib/mail/index.ts');
 type User = import('../../lib/auth.ts').User;
@@ -163,4 +164,83 @@ test('`vr login` for an account deleted while its password is checked: no token,
   assert.equal(r.json().token, undefined);
   assert.deepEqual(auth.listTokens(zoe.id), []);
   assert.deepEqual(await mailTo('zoe@example.com'), []);
+});
+
+// Taking an invite with an existing account, on a server with workspaces (lib/auth.ts acceptInvite's hold mode), checks
+// the password in its own code. The account must still be the one checked once the check is done — the same id, the
+// same password, not disabled —, or the answer is the one every address that doesn't join now gets ({held: true}, no
+// session) and nobody joins. It used to join the account as it was read before the check: a password changed meanwhile
+// still joined the workspace, and a disabled or deleted account got a session cookie that worked nowhere.
+let team: { id: string; cookie: string } | null = null;
+/** The session cookie an answer sets, ready to send. */
+const sessionOf = (r: Reply): string =>
+  [r.headers['set-cookie']]
+    .flat()
+    .filter(Boolean)
+    .map((c) => String(c).split(';')[0])
+    .filter((c) => c.startsWith('vr_session='))
+    .join('; ');
+/** An invite into the owner's second workspace (made by the first call: the store has workspaces from then on). */
+async function inviteLink(): Promise<{ token: string; ws: string }> {
+  if (!team) {
+    const owner = await signIn('owner@example.com');
+    assert.equal(owner.status, 200, owner.text);
+    const made = await request('POST', '/api/workspaces', { body: { name: 'Side project' }, headers: { ...somewhere(), Cookie: sessionOf(owner) } });
+    assert.equal(made.status, 200, made.text);
+    team = { id: made.json().workspace.id, cookie: sessionOf(made) };
+  }
+  const r = await request('POST', '/api/admin/invites', { body: { role: 'member' }, headers: { ...somewhere(), Cookie: team.cookie } });
+  assert.equal(r.status, 200, r.text);
+  return { token: String(r.json().url).split('/#/invite/')[1] as string, ws: team.id };
+}
+const accept = (token: string, email: string) =>
+  request('POST', '/api/auth/invite/accept', { body: { token, name: 'Invited', email, password: PASSWORD }, headers: somewhere() });
+/** What an address that doesn't join now is told: an address nobody has, taking an invite. */
+let told0: ReturnType<typeof told> | null = null;
+const heldAnswer = async () => {
+  told0 ??= told(await accept((await inviteLink()).token, 'nobody-invited@example.com'));
+  return told0;
+};
+
+test('an account taking an invite while its password is changed doesn’t join: the answer every address gets, no session', async () => {
+  const held = await heldAnswer();
+  assert.deepEqual(held.body, { held: true });
+  assert.ok(!held.cookies.includes('vr_session'), 'nobody is signed in');
+  // not raced, an account with its password joins at once (so the ones below fail for the race, not for the setup)
+  const ctl = await person('joins@example.com', 'Joins');
+  const into = await inviteLink();
+  const fine = await accept(into.token, 'joins@example.com');
+  assert.equal(fine.status, 200, fine.text);
+  assert.ok(told(fine).cookies.includes('vr_session'));
+  assert.equal(workspaces.roleIn(into.ws, ctl.id), 'member');
+
+  const pat = await person('pat@example.com', 'Pat');
+  const invite = await inviteLink();
+  const r = await raced(
+    () => accept(invite.token, 'pat@example.com'),
+    () => auth.updateUser(pat.id, { password: 'a brand new password' }),
+  );
+  assert.deepEqual(told(r), held, r.text);
+  assert.equal(workspaces.roleIn(invite.ws, pat.id), null, 'the old password joined nothing');
+});
+
+test('an account disabled or deleted while it takes an invite: the held answer, not a session cookie that works nowhere', async () => {
+  const held = await heldAnswer();
+  const dee = await person('dee@example.com', 'Dee');
+  const one = await inviteLink();
+  const disabled = await raced(
+    () => accept(one.token, 'dee@example.com'),
+    () => auth.updateUser(dee.id, { disabled: true }),
+  );
+  assert.deepEqual(told(disabled), held, disabled.text);
+  assert.equal(workspaces.roleIn(one.ws, dee.id), null);
+
+  const del = await person('del@example.com', 'Del');
+  const two = await inviteLink();
+  const deleted = await raced(
+    () => accept(two.token, 'del@example.com'),
+    () => deleteAccount(del.id, 'self'),
+  );
+  assert.equal(auth.getUser(del.id), null, 'the account is gone');
+  assert.deepEqual(told(deleted), held, deleted.text);
 });

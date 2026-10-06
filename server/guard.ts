@@ -46,6 +46,12 @@ const machineHosts = (): Set<string> =>
 /** A one-time upload URL: its ticket is its own credential (server/uploadTickets.ts). */
 const TICKET_PATH = /^\/api\/uploads\/direct\/[\w-]+$/;
 /**
+ * oEmbed (server/routes/shares/embed.ts): it says of an Embed link only what the link's player shows, and an embed's
+ * pages name it at the address they were reached by — on the machine, the tunnel's, whose name changes every time.
+ * So, like a review link, it answers on any host there, identifying nobody.
+ */
+const oEmbedAsked = (req: Request): boolean => req.path === '/oembed' && (req.method === 'GET' || req.method === 'HEAD');
+/**
  * Reachable without signing in: the app shell asks these before it knows who you are, and what an emailed link or a
  * signed-out person asks (sign-up, confirming an address, forgot password, a reset): each checks its own token or
  * answers alike for every address (server/routes/account.ts).
@@ -250,10 +256,11 @@ export function createGuard(opts: GuardOptions) {
   function refusal(req: Request, res: Response): [number, string] | null {
     if (req.path === '/healthz') return null;
     // Review links answer on any host the machine is reached by (the tunnel's name changes every time), and so do the
-    // upload URLs a link hands its visitors for files: the ticket is the credential, so nobody is identified there.
+    // upload URLs a link hands its visitors for files (the ticket is the credential) and an embed's oEmbed: nobody is
+    // identified there.
     const guest = GUEST_PATH.test(req.path);
     if (!hostOk(hostOf(req))) {
-      if (!machine || !(guest || TICKET_PATH.test(req.path))) return [421, 'unknown host'];
+      if (!machine || !(guest || TICKET_PATH.test(req.path) || oEmbedAsked(req))) return [421, 'unknown host'];
       if (!guest) return null;
     }
     if (guest) {

@@ -458,13 +458,25 @@ export function createShare(target: string | Target, { label, by = USER, byId, .
   return withToken(token, share);
 }
 
+/**
+ * Why a link's change is refused for its kind, or null. A link is an embed from the moment it is made or never: an embed's
+ * token is published in other sites' pages, so a review link that became one would show anyone what its visitors wrote,
+ * and an embed that became a review link would take notes and approvals from anyone who read a page's source.
+ */
+export function kindRefusal(s: Pick<Share, 'embed'>, input: Pick<ShareInput, 'embed'>): string | null {
+  if (input.embed === undefined || !!input.embed === !!s.embed) return null;
+  return s.embed ? 'An embed stays an embed: for another kind of link, make a new link.' : 'A link can’t become an embed: make a new link for it.';
+}
+
 export function updateShare(token: string, input: ShareInput): ShareWithToken | null {
   let out: ShareWithToken | null = null;
   change((all) => {
     const s = all[tokenKey(token)];
     if (!s || s.revoked) return false;
+    // thrown before anything is written (and so is embedRefusal's below): the file is read afresh for every change
+    const kind = kindRefusal(s, input);
+    if (kind) throw new LinkRefusedError(kind);
     applyInput(s, input);
-    // thrown before anything is written: the file is read afresh for every change
     const refused = embedRefusal(s);
     if (refused) throw new LinkRefusedError(refused);
     s.updated = isoLocal();
@@ -926,8 +938,13 @@ function onlyLinkEver(s: ShareWithToken, review: Review): () => boolean {
   };
 }
 
-/** The client notes a link shows: its own (or every client note with notes: 'all'), older ones by onlyLinkEver. */
+/**
+ * The client notes a link shows: its own (or every client note with notes: 'all'), older ones by onlyLinkEver. An embed
+ * shows none, whatever came in through it (a store edited by hand, or from before a link's kind was fixed when it was
+ * made): its token is in other sites' pages — and so none of their screenshots or references (the routes ask this).
+ */
 export function visibleNotes(s: ShareWithToken, review: Review) {
+  if (s.embed) return [];
   const id = shareId(s);
   const all = settingsOf(s).notes === 'all';
   const legacyIsOurs = onlyLinkEver(s, review);
@@ -940,6 +957,8 @@ export function visibleNotes(s: ShareWithToken, review: Review) {
  * be a lie to this one); with 'all', every client's. A withdrawal without a link applies to every link.
  */
 export function visibleVerdicts(s: ShareWithToken, review: Review): ApprovalEntry[] {
+  // an embed asks nobody for a decision and shows nobody's (visibleNotes)
+  if (s.embed) return [];
   const history = approvalsOf(review);
   if (settingsOf(s).notes === 'all') return history;
   const id = shareId(s);
