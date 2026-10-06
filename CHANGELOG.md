@@ -14,8 +14,15 @@ format stays backwards compatible throughout.
   screen, and options to start muted, loop or show the picture alone. It shows the video and nothing else, sets no
   cookie, and stops wherever it is the moment the link is revoked or expires. Sites that embed from an address find it
   through oEmbed.
+- **Suggestions waiting in a playbook further down are no longer out of sight.** A project's playbook (and the House's)
+  says when agents' suggestions wait in its folders — "Reels · 5 suggestions waiting" — and one click opens that
+  playbook on them; the folder's Playbook tab counts them too.
 
 ### Changed
+- **Several suggestions for the same part of a playbook** (the brief, the rules, one skill) stand together, the newest
+  first and marked, with a line that says how they relate. Once one is accepted, or someone changed that part by hand,
+  the others say so straight away and their diff shows what accepting them now would replace; *Accept anyway* does it
+  on purpose, where before they could only be rejected. The inbox's preview says the same.
 - **The skill dialog is a place to write.** The instructions start twelve lines high and grow with the text until the
   dialog is full, then scroll inside while the name, the files and the actions stay put; Write and Preview are one box,
   so switching moves nothing; on a phone the dialog takes the whole screen. Import and Copy sit together under
@@ -30,6 +37,9 @@ format stays backwards compatible throughout.
 - On a phone, a long note keeps the line you are typing above the pinned Save and Send, and that bar sits flush with
   the bottom of the notes sheet instead of letting the note show beneath it.
 - The skill dialog's instructions field was one line high until you typed.
+- A playbook opened on its suggestions (the inbox's *Open the playbook*) put the focus on Reject, so Enter opened the
+  reject form instead of accepting: Accept has it now, on the suggestion the inbox showed.
+- A suggestion for a skill no longer ends its diff with an empty line taken out.
 
 ## [0.1.0] - 2026-10-06
 

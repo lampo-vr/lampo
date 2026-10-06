@@ -57,7 +57,7 @@ export const when = (iso: string) => {
  */
 export function openHref(i: ForYouItem, at?: { v: number; f: number; newest: boolean }): string {
   // a suggestion for a playbook opens that playbook on its suggestions
-  if (i.kind === 'playbook') return `${playbookHref(i.scope ?? '')}?tab=suggestions`;
+  if (i.kind === 'playbook') return `${playbookHref(i.scope ?? '')}?tab=suggestions${i.proposal ? `&id=${enc(i.proposal)}` : ''}`;
   // a failed post opens its composer on the player
   if (i.kind === 'post') return `#/v/${enc(i.slug)}?publish=${enc(i.post?.id ?? '1')}`;
   const q = new URLSearchParams();

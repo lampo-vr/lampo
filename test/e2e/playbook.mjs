@@ -1,16 +1,20 @@
 #!/usr/bin/env node
 // covers: web/src/playbook/ web/src/settings/Playbook.tsx web/src/styles/playbook.css server/routes/playbooks.ts
-// covers: lib/playbook*.ts
+// covers: lib/playbook*.ts web/src/inbox/PlaybookPreview.tsx
 // Browser end-to-end test of playbooks on a local store: a real server (temp store, free port) + headless Chrome. The
 // playbook is one document (brief, rules, skills, references, each written in place) beside what agents read, live:
 // a first run gets useful in a click (starter rules saved one at a time or all at once, the brief written where it
 // will be read, what agents read changing as it's typed); a folder inherits the House (shown as a line of playbooks
 // and folded under its own) and writes its own rules one line at a time, from what the notes keep asking for; a rule
-// comes out with Undo; a skill is written as SKILL.md; an agent's suggestion waits inside the section it changes (and
-// in the inbox, accepted there), another is rejected with a reason the history keeps; one a person overtook can't be
-// accepted and says why; two people saving the same section see both versions; the history keeps every change; a
-// render that arrives afterwards is stamped with the revisions in force. Phones get what agents read and the history as
-// dialogs. Fits every width in both themes.
+// comes out with Undo; a skill is written as SKILL.md in a dialog to write in (twelve lines at least, growing until the
+// dialog is full, then scrolling; Write and Preview one box); an agent's suggestion waits inside the section it changes
+// (and in the inbox, accepted there), another is rejected with a reason the history keeps; one a person overtook says
+// so before anyone clicks and is accepted only on purpose; a project's page points to the suggestions waiting in its
+// folders, and the link lands on Accept; several suggestions for one skill stand together, the newest first, and
+// accepting one makes the others say what they would replace (the inbox too); the inbox lists every playbook's; two
+// people saving the same section see both versions; the history keeps every change; a render that arrives afterwards
+// is stamped with the revisions in force. Phones get what agents read and the history as dialogs, a skill on the whole
+// screen. Fits every width in both themes.
 import path from 'node:path';
 import { age, makeVideo } from '../lib/helpers.ts';
 import { dataTheme, layoutMatrix } from './layout.mjs';
@@ -279,6 +283,8 @@ try {
     const proposal = await suggest('- Everything in 16:9', 'The client asked for wide once.');
     await open(`#/playbook/${e(FOLDER)}?tab=suggestions`);
     await page.waitForSelector('[data-testid=pb-suggestion] [data-testid=pb-reject]');
+    // the link lands on the decision with Accept in focus: Enter accepts, it never opens the reject form
+    await page.waitForFunction(() => document.activeElement?.getAttribute('data-testid') === 'pb-accept', { timeout: 8000 });
     await page.click('[data-testid=pb-suggestion] [data-testid=pb-reject]');
     await page.type('[data-testid=pb-suggestion] .pb-prop-reject textarea', 'Reels stay vertical');
     await page.click('[data-testid=pb-reject-send]');
@@ -310,26 +316,118 @@ try {
     await page.waitForSelector('[data-testid=pb-agent-pane]');
   });
 
-  await check('a suggestion someone overtook: Accept says who changed the rules since, the diff shows what it would replace, Reject stays', async () => {
-    const proposal = await suggest('- Everything at most 30 s', 'Shorter reels do better.');
-    await open(`#/playbook/${e(FOLDER)}?tab=suggestions`);
-    await page.waitForSelector('[data-testid=pb-suggestion] [data-testid=pb-accept]');
-    // Someone changes the rules while the suggestion is on screen.
-    const mine = `${(await book(FOLDER)).rules}\n- Music licensed for social only`;
-    await api('/api/playbook/text', 'PUT', { folder: FOLDER, section: 'rules', content: mine });
-    const rev = (await book(FOLDER)).rev;
-    await page.click('[data-testid=pb-suggestion] [data-testid=pb-accept]');
-    await page.waitForSelector('[data-testid=pb-overtaken]');
-    const why = await text('[data-testid=pb-overtaken]');
-    assert(why.startsWith(`Sam changed this in r${rev}, after the suggestion was made`) && why.includes('Reject it'), `why ${why}`);
-    assert(!(await page.$('[data-testid=pb-suggestion] [data-testid=pb-accept]')), 'no Accept that would fail again');
-    await until(async () => (await text('[data-testid=pb-suggestion] .pb-diff')).includes('Music licensed'), 'the diff against the rules now');
-    assert((await api(`/api/playbook/proposals/${proposal.id}`)).status === 'pending', 'still waiting');
-    assert((await book(FOLDER)).rules === mine, 'the person’s rules stand');
-    await shot('overtaken');
-    await page.click('[data-testid=pb-suggestion] [data-testid=pb-reject]');
-    await page.click('[data-testid=pb-reject-send]');
-    await until(async () => (await api(`/api/playbook/proposals/${proposal.id}`)).status === 'rejected', 'rejected');
+  await check(
+    'a suggestion someone overtook says so before anyone clicks: who changed the rules since, the diff shows what it would replace, Accept anyway',
+    async () => {
+      const proposal = await suggest('- Everything at most 30 s', 'Shorter reels do better.');
+      await open(`#/playbook/${e(FOLDER)}?tab=suggestions`);
+      await page.waitForSelector('[data-testid=pb-suggestion] [data-testid=pb-accept]');
+      // Someone changes the rules while the suggestion is on screen.
+      const mine = `${(await book(FOLDER)).rules}\n- Music licensed for social only`;
+      await api('/api/playbook/text', 'PUT', { folder: FOLDER, section: 'rules', content: mine });
+      const rev = (await book(FOLDER)).rev;
+      await page.waitForSelector('[data-testid=pb-suggestion] [data-testid=pb-overtaken]');
+      const why = await text('[data-testid=pb-overtaken]');
+      assert(why.startsWith(`Sam changed the rules in r${rev}, after this suggestion was made`), `why ${why}`);
+      assert(!(await page.$('[data-testid=pb-suggestion] [data-testid=pb-accept]')), 'no plain Accept: replacing is a choice');
+      assert(await page.$('[data-testid=pb-suggestion] [data-testid=pb-accept-anyway]'), 'Accept anyway');
+      await until(async () => (await text('[data-testid=pb-suggestion] .pb-diff')).includes('Music licensed'), 'the diff against the rules now');
+      assert((await api(`/api/playbook/proposals/${proposal.id}`)).status === 'pending', 'still waiting');
+      assert((await book(FOLDER)).rules === mine, 'the person’s rules stand');
+      await shot('overtaken');
+      await page.click('[data-testid=pb-suggestion] [data-testid=pb-reject]');
+      await page.click('[data-testid=pb-reject-send]');
+      await until(async () => (await api(`/api/playbook/proposals/${proposal.id}`)).status === 'rejected', 'rejected');
+    },
+  );
+
+  await check('suggestions waiting inside a project: its page names the folder, the tab counts them, one click opens them', async () => {
+    const proposal = await suggest(`${(await book(FOLDER)).rules}\n- End card at least 2 s`, 'Two notes asked for a longer end card.');
+    await open(`#/playbook/${e('Acme')}`);
+    await page.waitForSelector('[data-testid=pb-below]');
+    assert((await text('[data-testid=pb-below]')) === 'Reels · 1 suggestion waiting', `the line: ${await text('[data-testid=pb-below]')}`);
+    await until(async () => (await text('[data-testid=folder-tab-playbook]')).endsWith('1'), 'the project’s tab counts it');
+    await shot('waiting-inside');
+    await page.click('[data-testid=pb-below]');
+    await page.waitForSelector(`[data-testid=playbook][data-scope="${FOLDER}"][aria-busy=false]`);
+    assert(/^#\/playbook\/Acme%2FReels\?tab=suggestions$/.test(await page.evaluate(() => location.hash)), 'that playbook, on its suggestions');
+    // the decision has the focus: Accept, not Reject (a key press must not open the reject form)
+    await page.waitForFunction(() => document.activeElement?.getAttribute('data-testid') === 'pb-accept', { timeout: 8000 });
+    await open('#/settings/playbook');
+    assert((await text('[data-testid=pb-below]')) === 'Acme/Reels · 1 suggestion waiting', 'the House names the path');
+    await api(`/api/playbook/proposals/${proposal.id}/reject`, 'POST', {});
+  });
+
+  await check(
+    'several suggestions for one skill: together, the newest first and marked; accepting it makes the others say what they would replace',
+    async () => {
+      const md = (steps) => `---\nname: reels-export\ndescription: Export a reel for Instagram and TikTok\n---\n\n1. Render the Reel_Master comp\n${steps}`;
+      const skill = (content, reason, by) => api('/api/playbook/proposals', 'POST', { folder: FOLDER, section: 'skill', content, reason, by });
+      const a = await skill(md('2. -14 LUFS\n3. H.264, 16 Mbit/s'), 'The bitrate.', 'agent:promo-edit');
+      const b = await skill(md('2. -14 LUFS\n3. H.264, 16 Mbit/s\n4. acme_<cut>_v<n>.mp4'), 'And the file name.', 'agent:promo-edit');
+      const c = await skill(md('2. -14 LUFS\n3. H.265, 12 Mbit/s\n4. acme_<cut>_v<n>.mp4'), 'Smaller files.', 'agent:Anthropic-ClaudeAI');
+      await open(`#/playbook/${e(FOLDER)}`);
+      const set = '[data-testid=pb-skills] [data-testid=pb-suggest-set]';
+      await page.waitForSelector(set);
+      assert((await text(`${set} .pb-suggest-say`)).startsWith('3 suggestions for the skill reels-export, the newest first'), 'one line for the three');
+      assert(
+        JSON.stringify(await page.$$eval(`${set} [data-testid=pb-proposal]`, (els) => els.map((el) => el.dataset.id))) === JSON.stringify([c.id, b.id, a.id]),
+        'the newest first',
+      );
+      assert((await text(`${set} [data-testid=pb-proposal][data-id=${c.id}] [data-testid=pb-newest]`)) === 'Newest of 3', 'marked');
+      assert((await page.$$(`${set} [data-testid=pb-newest]`)).length === 1, 'only the newest');
+      await shot('same-skill');
+      const rev = (await book(FOLDER)).rev;
+      await page.click(`${set} [data-testid=pb-proposal][data-id=${c.id}] [data-testid=pb-accept]`);
+      await until(async () => (await book(FOLDER)).skills.find((s) => s.name === 'reels-export')?.body.includes('H.265'), 'the newest accepted');
+      const said = `Sam accepted another suggestion for the skill reels-export in r${rev + 1}`;
+      await until(async () => (await page.$$(`${set} [data-testid=pb-overtaken]`)).length === 2, 'both others say it');
+      for (const id of [a.id, b.id]) {
+        const card = `${set} [data-testid=pb-proposal][data-id=${id}]`;
+        assert((await text(`${card} [data-testid=pb-overtaken]`)).startsWith(said), 'who and when');
+        assert((await text(`${card} .pb-diff`)).includes('H.265'), 'the diff against the accepted one: what it would replace');
+        assert(!(await page.$(`${card} [data-testid=pb-accept]`)) && (await page.$(`${card} [data-testid=pb-accept-anyway]`)), 'Accept anyway only');
+      }
+      await shot('same-skill-after');
+      // the inbox's preview says the same of the older one, and it is decided there on purpose
+      await page.goto(`${BASE}/#/inbox`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('[data-testid=inbox-row-playbook]');
+      const rows = await page.$$('[data-testid=inbox-row-playbook]');
+      for (const r of rows) if ((await r.evaluate((el) => el.innerText)).includes('And the file name.')) await r.click();
+      const pv = '[data-testid=inbox-playbook-preview]';
+      await page.waitForSelector(`${pv} [data-testid=pb-proposal][data-id=${b.id}] [data-testid=pb-overtaken]`);
+      assert(
+        (await text(`${pv} [data-testid=pb-same-section]`)).startsWith('2 suggestions for the skill reels-export are waiting, this one the newest'),
+        'and how it relates',
+      );
+      await page.click(`${pv} [data-testid=pb-accept-anyway]`);
+      await until(async () => (await api(`/api/playbook/proposals/${b.id}`)).status === 'accepted', 'accepted on purpose');
+      assert((await book(FOLDER)).skills.find((s) => s.name === 'reels-export')?.body.includes('H.264, 16 Mbit/s\n4. acme_'), 'its text replaced the other');
+      await api(`/api/playbook/proposals/${a.id}/reject`, 'POST', { reason: 'Covered' });
+    },
+  );
+
+  await check('the inbox lists every playbook’s suggestions: the House’s, a project’s, a folder’s', async () => {
+    const made = [
+      await api('/api/playbook/proposals', 'POST', { section: 'rules', content: '- Grain at 3 %', reason: 'House', by: 'agent:promo-edit' }),
+      await api('/api/playbook/proposals', 'POST', {
+        folder: 'Acme',
+        section: 'brief',
+        content: 'Acme makes kitchens.',
+        reason: 'Project',
+        by: 'agent:promo-edit',
+      }),
+      await suggest(`${(await book(FOLDER)).rules}\n- Hook in the first second`, 'Folder'),
+    ];
+    await page.goto('about:blank');
+    await page.goto(`${BASE}/#/inbox`, { waitUntil: 'domcontentloaded' });
+    await until(async () => (await page.$$('[data-testid=inbox-row-playbook]')).length === 3, 'three rows');
+    // grouped by playbook, like videos
+    const groups = await page.$$eval('[data-testid=inbox-vgroup]:has([data-testid=inbox-row-playbook])', (els) =>
+      els.map((el) => el.getAttribute('aria-label')).sort(),
+    );
+    assert(JSON.stringify(groups) === JSON.stringify(['Acme', 'Acme/Reels', 'House']), `one group per playbook: ${groups}`);
+    for (const p of made) await api(`/api/playbook/proposals/${p.id}/reject`, 'POST', {});
   });
 
   await check('two people save the same section: both versions side by side — keep theirs, or save yours over it', async () => {

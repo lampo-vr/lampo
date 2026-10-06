@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { before, test } from 'node:test';
+import type { PlaybookProposal, PlaybookRevision } from '../../lib/types.ts';
 import { startApp } from '../lib/app.ts';
 import { age, isolatedEnv, makeVideo, slugOf } from '../lib/helpers.ts';
 
@@ -412,4 +413,105 @@ test('HTTP: accepting a suggestion someone overtook answers 409 with who and whi
   assert.equal(acc.json().changed_rev, edit.json().rev.rev);
   assert.equal(playbooks.loadPlaybook(scope).rules, '- Grain at 2 %');
   assert.equal((await request('POST', `/api/playbook/proposals/${prop.json().id}/reject`, { body: {} })).status, 200);
+});
+
+test('HTTP: two suggestions for the same section — accepting one makes the other show what it would replace; the person may then accept it on purpose; other sections never wait', async () => {
+  folders.createFolder('Initech');
+  const scope = 'Initech';
+  const suggest = async (section: string, content: string, by: string) => {
+    const r = await request('POST', '/api/playbook/proposals', { body: { folder: scope, section, content, reason: 'From the notes', by } });
+    assert.equal(r.status, 201, r.text);
+    return r.json() as { id: string; base_rev: number };
+  };
+  const older = await suggest('rules', '- Logo bottom right', 'agent:claude-code');
+  const newer = await suggest('rules', '- Logo bottom right, at most 8 %', 'agent:Anthropic-ClaudeAI');
+  const brief = await suggest('brief', 'Spots for the spring campaign.', 'agent:claude-code');
+  assert.deepEqual([older.base_rev, newer.base_rev, brief.base_rev], [0, 0, 0]);
+  const accept = (id: string, body: Record<string, unknown> = {}) => request('POST', `/api/playbook/proposals/${id}/accept`, { body });
+
+  // the newest first, with the revision on the person's screen
+  const first = await accept(newer.id, { base_rev: 0 });
+  assert.equal(first.status, 200, first.text);
+  // another section made on the same revision goes through, the screen's revision as old as it may be
+  assert.equal((await accept(brief.id, { base_rev: 0 })).status, 200, 'the brief is not blocked by the rules');
+  assert.equal(playbooks.loadPlaybook(scope).rev, 2);
+
+  // the older one for the rules: refused without a look at what it would replace, saying it was a suggestion accepted
+  const blind = await accept(older.id);
+  assert.equal(blind.status, 409, blind.text);
+  assert.equal(blind.json().changed_rev, 1);
+  assert.equal(blind.json().proposal, newer.id, 'it was another suggestion, accepted');
+  assert.equal(blind.json().by, 'tester');
+  assert.match(blind.json().error, /accept it with base_rev 2 to replace it on purpose/);
+  // a screen from before that change is refused too: the diff on it didn't show what would go
+  const stale = await accept(older.id, { base_rev: 0 });
+  assert.equal(stale.status, 409, stale.text);
+  assert.equal(playbooks.loadPlaybook(scope).rules, '- Logo bottom right, at most 8 %', 'nothing replaced so far');
+  // the diff against the rules as they are now, then Accept anyway: replaced on purpose
+  const view = (await request('GET', `/api/playbook?folder=${enc(scope)}`)).json();
+  assert.equal(view.playbook.rev, 2);
+  const anyway = await accept(older.id, { base_rev: view.playbook.rev });
+  assert.equal(anyway.status, 200, anyway.text);
+  const now = playbooks.loadPlaybook(scope);
+  const last = now.history.at(-1);
+  assert.equal(now.rules, '- Logo bottom right');
+  assert.deepEqual(
+    { by: last?.by, accepted_by: last?.accepted_by, before: last?.before, proposal: last?.proposal },
+    { by: 'agent:claude-code', accepted_by: 'tester', before: '- Logo bottom right, at most 8 %', proposal: older.id },
+  );
+  // a revision a client says it saw beyond the newest counts as the newest
+  const again = await suggest('rules', '- Logo bottom left', 'agent:claude-code');
+  assert.equal((await request('PUT', '/api/playbook/text', { body: { folder: scope, section: 'rules', content: '- Logo top left' } })).status, 200);
+  assert.equal((await accept(again.id, { base_rev: 999 })).status, 200, 'capped at the playbook’s revision: nothing changed after it');
+});
+
+test('the newest of several suggestions for a section: by time, and within one second by the order they came in', () => {
+  const at = '2026-10-06T10:00:00+02:00';
+  const p = (id: string, section: 'rules' | 'brief', when = at): PlaybookProposal => ({
+    id,
+    scope: 'x',
+    at: when,
+    by: 'agent:a',
+    section,
+    content: id,
+    reason: 'r',
+    evidence: [],
+    base_rev: 0,
+    status: 'pending',
+  });
+  const list = [p('a', 'rules'), p('b', 'rules'), p('c', 'brief'), p('d', 'rules', '2026-10-06T09:59:59+02:00')];
+  assert.deepEqual(
+    text.waitingFor(list, 'rules').map((x) => x.id),
+    ['b', 'a', 'd'],
+  );
+  const history: PlaybookRevision[] = [{ rev: 1, at, by: 'Sam', message: 'm', section: 'brief', before: null, after: 'x' }];
+  assert.equal(text.changedSince({ rev: 1, history }, { base_rev: 0, section: 'rules' }), null, 'another section replaces nothing');
+  assert.equal(text.changedSince({ rev: 1, history }, { base_rev: 0, section: 'brief' })?.rev, 1);
+  assert.equal(text.changedSince({ rev: 1, history }, { base_rev: 0, section: 'brief' }, 1), null, 'seen on the screen: nothing after it');
+});
+
+test('HTTP: a playbook names the playbooks inside it with suggestions waiting, for people who may decide', async () => {
+  folders.createFolder('Umbrella');
+  folders.createFolder('Umbrella/Spots');
+  folders.createFolder('Umbrella/Spots/Cutdowns');
+  for (const [folder, section] of [
+    ['Umbrella/Spots', 'brief'],
+    ['Umbrella/Spots', 'rules'],
+    ['Umbrella/Spots/Cutdowns', 'rules'],
+  ]) {
+    const r = await request('POST', '/api/playbook/proposals', { body: { folder, section, content: `${folder} ${section}`, reason: 'r', by: 'agent:x' } });
+    assert.equal(r.status, 201, r.text);
+  }
+  const below = (folder: string, token?: string) => request('GET', `/api/playbook?folder=${enc(folder)}`, { token }).then((r) => r.json().below);
+  assert.deepEqual(await below('Umbrella'), [
+    { scope: 'Umbrella/Spots', pending: 2 },
+    { scope: 'Umbrella/Spots/Cutdowns', pending: 1 },
+  ]);
+  assert.deepEqual(await below('Umbrella/Spots'), [{ scope: 'Umbrella/Spots/Cutdowns', pending: 1 }], 'not its own');
+  assert.deepEqual(await below('Umbrella/Spots/Cutdowns'), []);
+  assert.ok(
+    (await below('')).some((b: { scope: string }) => b.scope === 'Umbrella/Spots'),
+    'the House: every folder’s',
+  );
+  assert.equal(await below('Umbrella', reviewer), undefined, 'reviewers don’t decide');
 });

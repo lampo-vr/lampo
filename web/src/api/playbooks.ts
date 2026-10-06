@@ -1,14 +1,13 @@
 // Playbooks on the server (lib/playbooks.ts): one query per playbook, the list for badges, one suggestion; every
 // write answers with the playbook as it now stands, which goes straight into the cache (the stream settles the rest).
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { NoteRef, Playbook, PlaybookProposalView, PlaybookRevision, PlaybookSkillView, PlaybookSummary, PlaybookView } from '../../../lib/types.ts';
+import type { NoteRef, Playbook, PlaybookRevision, PlaybookSkillView, PlaybookSummary, PlaybookView } from '../../../lib/types.ts';
 import { api, enc } from './client.ts';
 import { keys } from './queries.ts';
 
 export const playbookKeys = {
   all: ['playbook'] as const,
   one: (scope: string) => ['playbook', 'scope', scope] as const,
-  proposal: (id: string) => ['playbook', 'proposal', id] as const,
   list: ['playbooks'] as const,
 };
 
@@ -26,9 +25,6 @@ export const useSkill = (scope: string, name: string | null) =>
     queryFn: () => api<PlaybookSkillView>(`/api/playbook/skill?folder=${enc(scope)}&name=${enc(name || '')}`),
     enabled: !!name,
   });
-
-export const useProposal = (id: string | null) =>
-  useQuery({ queryKey: playbookKeys.proposal(id || ''), queryFn: () => api<PlaybookProposalView>(`/api/playbook/proposals/${enc(id || '')}`), enabled: !!id });
 
 /** A file as base64 (the API takes small files inline). */
 export async function base64(file: Blob): Promise<string> {
@@ -87,9 +83,10 @@ export function usePlaybookActions(scope: string) {
     addFrame: (video: string, frame: number, v?: number, caption?: string) =>
       api<Saved & { ref: NoteRef }>('/api/playbook/refs', { method: 'POST', body: { folder: scope, kind: 'frame', video, frame, v, caption } }).then(keep),
     removeRef: (id: string) => api<Saved>(`/api/playbook/refs?folder=${enc(scope)}&id=${enc(id)}`, { method: 'DELETE' }).then(keep),
-    // Refused (someone changed that section since it was made): the diff is read again against what it says now.
-    accept: (id: string, message?: string) =>
-      api(`/api/playbook/proposals/${enc(id)}/accept`, { method: 'POST', body: message ? { message } : {} }).then(decided, (e: unknown) => {
+    // base_rev: the playbook's revision the diff on screen was made against. Refused (that section changed after it):
+    // the playbook is read again, and the diff with it.
+    accept: (id: string, o: { message?: string; base_rev?: number } = {}) =>
+      api(`/api/playbook/proposals/${enc(id)}/accept`, { method: 'POST', body: o }).then(decided, (e: unknown) => {
         decided();
         throw e;
       }),

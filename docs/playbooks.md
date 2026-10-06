@@ -21,8 +21,9 @@ itself.
 A playbook is one document, *Brief · Rules · Skills · References*, beside *What agents read*: the merged text exactly
 as agents get it, this playbook's own lines lit and what it inherits quieter. The line under the title says where it
 stands: the playbooks it inherits, from the House down, each a link with what it holds ("House r9 · brief · 12 rules ·
-3 skills"), this one last (it wins), and, only when there are some, the suggestions waiting and *History*. On a narrow
-screen *What agents read* and the history open as dialogs.
+3 skills"), this one last (it wins), and, only when there are some, the suggestions waiting, the ones waiting in its
+folders ("Reels · 5 suggestions waiting": a project's page is where people look first; the folder's tab counts them
+too) and *History*. On a narrow screen *What agents read* and the history open as dialogs.
 
 - **Everything is written where it is read.** An empty brief is a field to type in (or *Start from an outline*); a
   written one turns into its editor in place (*Edit*). While you type, *What agents read* already shows the text where
@@ -72,8 +73,10 @@ notes behind it.
 2. A person **accepts** it (it becomes the next revision: "by promo-edit · accepted by Sam") or **rejects** it with a
    reason. The agent reads the decision and the reason back.
 
-If someone changed the same section after the suggestion was made, it can't be accepted any more: accepting it would
-silently replace their change. Reject it, or ask the agent for a new one.
+Several suggestions for the same part (the brief, the rules, one skill) stand together, the newest first and marked.
+Once one is accepted, or someone changed that part by hand, the others say so before anyone clicks, and their diff
+shows what accepting them now would replace. Nothing is replaced silently: *Accept anyway* replaces it on purpose, or
+reject it. A change to another section never holds a suggestion up.
 
 **From the notes to a rule.** When three or more of your team's notes in a folder carry the same tag and no rule
 mentions it yet, the *Rules* section shows it: "The notes keep asking for: logo 3×". A click starts the *Add a rule*

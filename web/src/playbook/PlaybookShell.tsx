@@ -16,6 +16,9 @@ export const tabFromHash = (): Focus => {
   return m?.[1] === 'suggestions' || m?.[1] === 'history' ? m[1] : 'playbook';
 };
 
+/** The suggestion a link names (the inbox's "Open the playbook": `?tab=suggestions&id=pp_…`), or null. */
+export const suggestionFromHash = (): string | null => /[?&]id=(pp_[a-f0-9]{12})\b/.exec(location.hash)?.[1] ?? null;
+
 /** What a suggestion changes, in words: "the rules", "the skill export-reels". */
 export function sectionWords(section: string): string {
   if (section === 'brief') return t('the brief');

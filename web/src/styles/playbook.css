@@ -152,6 +152,10 @@ a.pb-layer-chip:focus-visible {
   .pb-meta {
     grid-template-columns: minmax(0, 1fr);
   }
+  /* one row of links: this playbook's own suggestions first; the ones further down are in the inbox and on the tab */
+  .pb-meta-link.waiting ~ .pb-meta-link.below {
+    display: none;
+  }
   .pb-meta-note,
   .pb-meta-when {
     display: none;
@@ -194,6 +198,28 @@ a.pb-layer-chip:focus-visible {
 }
 .pb-meta-link.waiting .kg {
   color: var(--claude);
+}
+/* suggestions waiting in a playbook further down ("Reels · 5 suggestions waiting →"): quieter than this one's own */
+.pb-meta-link.below {
+  min-width: 0;
+  color: var(--fg-2);
+  text-decoration: none;
+}
+.pb-below-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: var(--fw-strong);
+}
+.pb-below-n {
+  flex: none;
+}
+.pb-below-go {
+  flex: none;
+  color: var(--muted);
+}
+.pb-meta-link.below:hover .pb-below-go {
+  color: var(--fg);
 }
 .pb-meta-when {
   color: var(--muted);
@@ -620,6 +646,26 @@ a.pb-layer-chip:focus-visible {
   box-shadow: 0 0 0 1px var(--line-2);
   scroll-margin: var(--sp-16);
 }
+/* several for the same part (the brief, the rules, one skill): together, under one line that says how they relate */
+.pb-suggest-set {
+  display: grid;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.pb-suggest-say {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: 0;
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+}
+.pb-suggest-key {
+  flex: none;
+  color: var(--claude);
+  transform: translateY(1px);
+}
 
 /* markdown as people read it */
 .md-text {
@@ -1030,6 +1076,46 @@ a.pb-layer-chip:focus-visible {
   display: flex;
   justify-content: flex-end;
   gap: var(--sp-2);
+}
+/* the newest of several suggestions for the same part */
+.pb-prop-tag {
+  flex: none;
+  align-self: flex-start;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  height: var(--h-xs);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-full);
+  border: 1px solid var(--line-2);
+  font-size: var(--fs-xs);
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+/* what the person deciding should know first: others wait for the same part; the part changed since */
+.pb-prop-note {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: 0;
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+}
+.pb-prop-note-key {
+  flex: none;
+  color: var(--claude);
+  transform: translateY(1px);
+}
+.pb-prop-note.changed {
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r);
+  background: var(--ink-0);
+  box-shadow: 0 0 0 1px var(--line-2);
+  color: var(--fg);
+}
+.pb-prop-note.changed .pb-prop-note-key {
+  color: var(--fg-2);
 }
 .pb-prop-reject {
   display: grid;

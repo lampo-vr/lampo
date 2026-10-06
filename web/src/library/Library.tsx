@@ -247,11 +247,14 @@ interface Totals {
 }
 
 /** Where you are, the title, and the tally (null: on its way). The title comes from the route, so it is there at once. */
-/** A folder's two sides: its videos (how many is beside the title), and its playbook (with the suggestions waiting on it). */
+/**
+ * A folder's two sides: its videos (how many is beside the title), and its playbook, with the suggestions waiting on
+ * it and on the playbooks of folders inside it (its page points to those).
+ */
 function FolderTabs({ folder, playbook, pending }: { folder: string; playbook: boolean; pending: boolean }) {
-  const books = usePlaybooks(!pending);
-  const mine = books.data?.playbooks.find((p) => p.scope === folder);
-  const waiting = mine?.pending || 0;
+  const books = usePlaybooks(!pending).data?.playbooks ?? [];
+  const own = books.find((p) => p.scope === folder)?.pending || 0;
+  const waiting = books.filter((p) => p.scope === folder || p.scope.startsWith(`${folder}/`)).reduce((n, p) => n + p.pending, 0);
   return (
     <div className="hero-tabs-row">
       <div className="tabs hero-tabs" role="tablist" aria-label={t('Folder')}>
@@ -277,7 +280,14 @@ function FolderTabs({ folder, playbook, pending }: { folder: string; playbook: b
           <I name="playbook" size={14} />
           {t('Playbook')}
           {waiting > 0 && (
-            <span className="n q" title={t('{n} suggestion waiting|{n} suggestions waiting', { n: waiting })}>
+            <span
+              className="n q"
+              title={
+                own === waiting
+                  ? t('{n} suggestion waiting|{n} suggestions waiting', { n: waiting })
+                  : t('{n} suggestion waiting here and in folders inside|{n} suggestions waiting here and in folders inside', { n: waiting })
+              }
+            >
               {waiting}
             </span>
           )}
