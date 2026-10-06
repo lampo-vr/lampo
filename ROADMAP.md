@@ -173,6 +173,10 @@ website's clips.
 
 ## Later
 
+- **Embeds, next** (an Embed link plays one video on any site: docs/sharing.md, "Embedding a video"): a list of the
+  sites a link may be framed by (its own `frame-ancestors` instead of `*`); chapters set in the app for a render that
+  has no markers of its own; a folder's embed as a playlist; a poster sharper than the 640 px one for a page's large
+  hero before it plays (it rests on the decoded poster frame meanwhile).
 - **Generation that lands in the review.** Not one more model hub, but generation whose result goes where the review
   is (a reference on a note, a fix preview, the next version) with its cost, approval, model, prompt and provenance
   recorded.

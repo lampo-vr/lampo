@@ -7,6 +7,14 @@ format stays backwards compatible throughout.
 
 ## [Unreleased]
 
+### Added
+- **Embed a video on your own site.** A new kind of link, *Embed*: Share → Embed copies the code for one `<iframe>`
+  that keeps the video's shape, and the video plays on any site in Lampo's own frame-exact player — the timecode with
+  frames, frame steps and the player's keys, the render's chapters on its timeline, captions from its transcript, full
+  screen, and options to start muted, loop or show the picture alone. It shows the video and nothing else, sets no
+  cookie, and stops wherever it is the moment the link is revoked or expires. Sites that embed from an address find it
+  through oEmbed.
+
 ## [0.1.0] - 2026-10-06
 
 The first public release: what it has first, then everything that changed while it was made, newest first.

@@ -116,8 +116,8 @@ top-level entry is a project, anything inside it a folder) · *Version* for each
 a noun, never "v2"; "render" may stay in agent/CLI text) · *Note* (never "comment") · *Approve* / *Request changes* /
 *Final* (not "verdict", "sign-off") · a fix is *checked*: "Fixes to check", *Looks right* / *Still wrong*, "check
 mode" (never "verify" in the UI; the data status stays `verified`) · *Agent*, *Assign agent…* (not "session", "hand
-to") · *Copy for an agent* · *Review link*, its kinds *Review* · *Watch only* · *Delivery* (watch and download) · the
-stages read … → *Approved* → *Out for review* → *Approved via link* → *Final* (data: `with_client`, `client_approved`);
+to") · *Copy for an agent* · *Review link*, its kinds *Review* · *Watch only* · *Delivery* (watch and download) ·
+*Embed* (one video's player on another site, German *Einbettung*; its code is the "embed code") · the stages read … → *Approved* → *Out for review* → *Approved via link* → *Final* (data: `with_client`, `client_approved`);
 whoever reviews through a link is never "client" in UI text: the link's name, "via review link", "visitors"
 ("reviewer" is a workspace role) · *Inbox* only for the person's to-do list · counted musts are "must-fix" · a range is
 a "section".
