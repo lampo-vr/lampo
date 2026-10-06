@@ -135,9 +135,12 @@ export const ROUTE_ACTIONS: [string, string, Rule][] = [
   ['GET', '/api/shares/:token/qr', 'share'],
   ['GET', '/api/folder-shares', 'share'],
   ['POST', '/api/folder-shares', 'share'],
-  // Whole folders as a zip: more than watching (reviewers see and comment, they don't take the renders home).
+  // Taking the renders home — whole folders as a zip, or one version's own file — is more than watching: reviewers see
+  // and comment, they don't take the renders home. One rule for both.
   ['GET', '/api/folders/download', 'download'],
   ['GET', '/api/folders/download/info', 'download'],
+  ['GET', '/api/review/:slug/download', 'download'],
+  ['GET', '/api/review/:slug/download/info', 'download'],
   // MCP: connecting needs 'view'; every tool then checks its own action against the same table (mcp/core.ts allowed()).
   ['*', '/mcp', 'view'],
   // Your own devices' notifications; "Got it" in For you only hides things for you.

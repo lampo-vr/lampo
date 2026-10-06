@@ -1129,6 +1129,16 @@ export interface ArchiveInfo {
   resumable: boolean;
 }
 
+/** One version's own file, before the team downloads it (GET /api/review/:slug/download/info?v=). */
+export interface VersionDownload {
+  v: number;
+  /** The file's name as it lands: "spot V3.mp4". */
+  name: string;
+  bytes: number;
+  /** Where the file is: the app's own route, which streams it or sends the browser on to a signed URL. */
+  url: string;
+}
+
 export interface ShareDownloadRecord {
   at: string;
   /** The visitor's name, or "client". */

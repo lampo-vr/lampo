@@ -55,11 +55,12 @@ export function mediaRoutes(ctx: ServerContext): Router {
       file = null;
     }
     if (!file) throw fail(410, 'this file is gone');
-    if (typeof claims.n === 'string') res.setHeader('Content-Disposition', attachment(claims.n));
+    const download = typeof claims.n === 'string';
+    if (download) res.setHeader('Content-Disposition', attachment(claims.n as string));
     // The app's pages may read it too (a warm-up fetch); the URL is the credential, never a cookie.
     if (ctx.cfg.public_url) res.setHeader('Access-Control-Allow-Origin', new URL(ctx.cfg.public_url).origin);
     const left = Math.max(0, claims.e - Math.floor(Date.now() / 1000));
-    streamFile(req, res, file, { cache: `private, max-age=${left}, immutable` });
+    streamFile(req, res, file, { cache: `private, max-age=${left}, immutable`, whole: download });
   });
 
   r.get('/media/:slug/v:v', async (req, res) => {

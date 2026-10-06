@@ -14,8 +14,14 @@ format stays backwards compatible throughout.
   screen, and options to start muted, loop or show the picture alone. It shows the video and nothing else, sets no
   cookie, and stops wherever it is the moment the link is revoked or expires. Sites that embed from an address find it
   through oEmbed.
+- **Download a video from its ⋯ menu**, in the player and on its card in the library: *Download V3* saves the version
+  on screen (on a card, the newest) as it was rendered, named `spot V3.mp4`, and *Download another version* lists the
+  others. A version in a codec browsers can't play downloads as itself, not as the copy the player shows. Members,
+  admins and owners may download, as for whole folders; reviewers watch and leave notes.
 
 ### Fixed
+- A download that breaks off and picks up again — a video from the library, or a file from a Delivery link — now gets
+  the whole rest of the file, not just the next piece of it.
 - An account deleted, disabled or given a new password while someone signs in to it gets no session and sends no
   sign-in email: the answer is the same as for any wrong sign-in.
 - Save and Send in the note composer stay where they are when the video's agent is assigned, starts waiting or is

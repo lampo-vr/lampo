@@ -17,7 +17,7 @@ import { SIGNED_URL_SECONDS, storage } from '../lib/storage/index.ts';
 import * as store from '../lib/store.ts';
 import type { MediaInfo, MediaMeta, Review, Version } from '../lib/types.ts';
 import type { Broadcast } from './events.ts';
-import { GUEST_PATH, queryOr } from './http.ts';
+import { attachment, fail, GUEST_PATH, queryOr } from './http.ts';
 
 /** How soon a copy the full job queue had no room for is asked for again, and how long the wait may grow (tests lower it). */
 export const COPY_RETRY = { firstMs: 5000, maxMs: 60_000 };
@@ -223,7 +223,7 @@ export function createPlayback(broadcast: Broadcast): Playback {
     if (!store.versionAvailable(review, ver.v)) return GONE;
     if (ver.part) return partPlayable(review, ver);
     const s = storage();
-    const src: Source = { key: store.versionKey(slugify(review.video), ver.v, path.extname(review.video)), file: store.versionFile(review, ver.v) };
+    const src = versionOriginal(review, ver);
     if (!BROWSER_CODECS.has(review.meta?.codec || 'h264')) {
       const key = `proxies/${renderKey(ver)}.mp4`;
       if (s.has(key)) return { main: copy(key), ready: true, proxy: true, scrub: 'ready' };
@@ -299,10 +299,40 @@ export async function sendMedia(req: Request, res: Response, src: Source, { immu
   streamFile(req, res, file, { immutable });
 }
 
+/** A version's own bytes, as they were uploaded or linked: what an original's download hands out, whatever the player plays. */
+export const versionOriginal = (review: Review, ver: Version): Source => ({
+  key: store.versionKey(slugify(review.video), ver.v, path.extname(review.video)),
+  file: store.versionFile(review, ver.v),
+});
+
+/**
+ * A download named `filename`: a redirect to a signed storage URL when the store has one (the app's own media host
+ * names the file there; a bucket's URL keeps its key's name), else the local file with ranges, so it can resume. The
+ * URL lives `seconds` — minutes: the store checks it when a download starts, so one in progress runs on, and asking
+ * again goes through the app, which checks who asks again.
+ */
+export async function sendDownload(req: Request, res: Response, src: Source, filename: string, seconds: number): Promise<void> {
+  const url = storage().url(src.key, seconds, filename);
+  if (url) {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.redirect(302, url);
+  }
+  const file = src.file || (await storage().ensureLocal(src.key));
+  if (!file) throw fail(410, 'the bytes of this version are gone');
+  res.setHeader('Content-Disposition', attachment(filename));
+  streamFile(req, res, file, { cache: 'private, no-cache', whole: true });
+}
+
 // HTTP range streaming with bounded chunks: the browser asks for the rest when it needs it, so a paused video never
 // pins one of the 6 HTTP/1.1 connections per host (the SSE stream already takes one per tab).
-// `cache`: the Cache-Control to send instead (a signed URL is good until it ends).
-export function streamFile(req: Request, res: Response, file: string, { immutable = false, cache }: { immutable?: boolean; cache?: string } = {}): void {
+// `cache`: the Cache-Control to send instead (a signed URL is good until it ends). `whole`: a download, which gets
+// every byte a range asks for (one that picks up where it broke off wants the rest, not a player's next chunk).
+export function streamFile(
+  req: Request,
+  res: Response,
+  file: string,
+  { immutable = false, cache, whole = false }: { immutable?: boolean; cache?: string; whole?: boolean } = {},
+): void {
   const st = fs.statSync(file);
   const ext = path.extname(file).toLowerCase();
   res.setHeader('Content-Type', ext === '.webm' ? 'video/webm' : ext === '.mkv' ? 'video/x-matroska' : ext === '.m4a' ? 'audio/mp4' : 'video/mp4');
@@ -317,7 +347,7 @@ export function streamFile(req: Request, res: Response, file: string, { immutabl
   let start = range[1] === '' ? st.size - Number(range[2]) : Number(range[1]);
   let end = range[1] !== '' && range[2] !== '' ? Number(range[2]) : st.size - 1;
   start = Math.max(0, start);
-  end = Math.min(end, st.size - 1, start + 8 * 1024 * 1024 - 1);
+  end = Math.min(end, st.size - 1, whole ? Number.POSITIVE_INFINITY : start + 8 * 1024 * 1024 - 1);
   if (start > end || start >= st.size) {
     res.status(416).setHeader('Content-Range', `bytes */${st.size}`);
     res.end();

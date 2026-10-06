@@ -64,10 +64,12 @@ export function safeSegment(raw: string, fallback = '_', max = 120): string {
   return RESERVED.test(cut) ? `_${cut}` : cut;
 }
 
+/** A file's extension, plain (letters and digits, lower case), else `.mp4`. */
+const plainExt = (ext: string): string => (/^\.[a-z0-9]{1,8}$/i.test(ext) ? ext.toLowerCase() : '.mp4');
+
 /** `<top>/<folders…>/<base>_v<N><ext>`: every segment safe, the extension plain, the whole name short enough. */
 export function entryName(top: string, folders: string[], base: string, v: number, ext: string): string {
-  const cleanExt = /^\.[a-z0-9]{1,8}$/i.test(ext) ? ext.toLowerCase() : '.mp4';
-  const file = `${safeSegment(base, 'video', 100)}_v${v}${cleanExt}`;
+  const file = `${safeSegment(base, 'video', 100)}_v${v}${plainExt(ext)}`;
   const dirs = [safeSegment(top, 'Review', 60), ...folders.map((s) => safeSegment(s))];
   // Deep folder trees: shorten the folders (never the file), evenly, down to 12 characters each.
   let each = 120;
@@ -274,6 +276,15 @@ export function listingPin(listing: ArchiveListing): string {
 /** Size of a listing without touching remote storage (entries whose size isn't known yet count as 0). */
 export function listingBytes(listing: ArchiveListing): number {
   return listing.items.reduce((n, it) => n + (sourceOf(it)?.size ?? 0), 0);
+}
+
+/**
+ * One version downloaded on its own: "spot V3.mp4" — the video's name (safe on every file system), its version as the
+ * app writes it, and the extension it was rendered with.
+ */
+export function versionFileName(video: string, v: number): string {
+  const ext = path.extname(video);
+  return `${safeSegment(path.basename(video, ext), 'video', 120)} V${v}${plainExt(ext)}`;
 }
 
 /** "Reels – 2026-09-28.zip" */

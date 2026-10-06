@@ -9,13 +9,13 @@ import { poster, waveform } from '../../../lib/media.ts';
 import { reviewDir, slugify } from '../../../lib/paths.ts';
 import { Recent } from '../../../lib/rateLimit.ts';
 import { guestName, recordDownload, settingsOf, shareId, visibleNotes } from '../../../lib/shares.ts';
-import { SIGNED_URL_SECONDS, storage } from '../../../lib/storage/index.ts';
+import { SIGNED_URL_SECONDS } from '../../../lib/storage/index.ts';
 import * as store from '../../../lib/store.ts';
 import type { Version } from '../../../lib/types.ts';
 import type { ServerContext } from '../../context.ts';
 import { sendSprite, versionBytes } from '../../helpers.ts';
-import { attachment, fail, query, router, sendInternal, VersionQuery } from '../../http.ts';
-import { type Playable, type Source, sendMedia, streamFile } from '../../playback.ts';
+import { fail, query, router, sendInternal, VersionQuery } from '../../http.ts';
+import { type Playable, type Source, sendDownload, sendMedia, versionOriginal } from '../../playback.ts';
 
 /** A download through a link: which file (the original, else the copy made for playing) and the name typed on the page. */
 const DownloadQuery = z.object({ kind: z.enum(['preview', 'original']).optional(), name: z.string().max(200).optional() });
@@ -95,7 +95,7 @@ export function guestMediaRoutes(ctx: ServerContext): Router {
     if (kind === 'original') {
       if (!store.versionAvailable(review, ver.v)) throw fail(410, 'the bytes of this version are gone');
       ext = path.extname(review.video) || '.mp4';
-      src = { key: store.versionKey(slug, ver.v, path.extname(review.video)), file: store.versionFile(review, ver.v) };
+      src = versionOriginal(review, ver);
     } else {
       const p = playback.preview(review, ver);
       if (!p.ready || !p.main) throw notYet(p, 'The preview is still being prepared. Try again in a minute.');
@@ -103,7 +103,6 @@ export function guestMediaRoutes(ctx: ServerContext): Router {
       ext = path.extname(src.key) || '.mp4';
     }
     const filename = `${base}-v${ver.v}${kind === 'preview' ? '-preview' : ''}${ext}`;
-    res.setHeader('Content-Disposition', attachment(filename));
     // Counted when a download starts from the first byte (a resumed range isn't a new download), once per visitor,
     // file and half hour, so retries don't inflate it.
     const first = !/^bytes=[1-9]/.test(String(req.headers.range || ''));
@@ -115,7 +114,8 @@ export function guestMediaRoutes(ctx: ServerContext): Router {
       recordDownload(share.token, { name, what: filename, files: 1, bytes, kind });
       store.logEvent({ type: 'download', by: `guest:${name}`, review, v: ver.v, text: `downloaded ${filename}`, share: shareId(share), files: 1, bytes });
     }
-    await sendDownload(req, res, src, filename);
+    // minutes: asking again goes through the link, which is checked again
+    await sendDownload(req, res, src, filename, SIGNED_URL_SECONDS.guest);
   });
 
   return r;
@@ -124,20 +124,4 @@ export function guestMediaRoutes(ctx: ServerContext): Router {
 /** A copy still being made: 425 and when to ask again; one that can't be made (or bytes that are gone): 410. */
 function notYet(p: Playable, message = 'preparing'): Error {
   return p.preparing ? Object.assign(fail(425, message), { retryAfter: 5 }) : fail(410, p.error || 'This version cannot be played.');
-}
-
-/**
- * A download: a signed storage URL when the store has one, else the local file (with ranges, so it can resume). The
- * URL lives minutes (SIGNED_URL_SECONDS.guest): the store checks it when a download starts, so one in progress runs
- * on, and asking again goes through the link. The app's own media host names the file as this answer would.
- */
-async function sendDownload(req: Request, res: Response, src: Source, filename: string): Promise<void> {
-  const url = storage().url(src.key, SIGNED_URL_SECONDS.guest, filename);
-  if (url) {
-    res.setHeader('Cache-Control', 'no-store');
-    return res.redirect(302, url);
-  }
-  const file = src.file || (await storage().ensureLocal(src.key));
-  if (!file) throw fail(410, 'the bytes of this version are gone');
-  streamFile(req, res, file);
 }

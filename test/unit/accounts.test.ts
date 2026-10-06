@@ -206,6 +206,8 @@ test('reviewers: allowed to watch, comment, confirm and approve — and nothing 
     ['POST', `/api/qa/${slug}/dismiss`, { key: 'x' }],
     ['GET', '/api/folders/download?folder=Acme'],
     ['GET', '/api/folders/download/info?folder=Acme'],
+    ['GET', `/api/review/${slug}/download`],
+    ['GET', `/api/review/${slug}/download/info`],
     ['GET', '/api/admin/users'],
     ['GET', '/api/admin/invites'],
     ['POST', '/api/admin/invites', { role: 'reviewer' }],
