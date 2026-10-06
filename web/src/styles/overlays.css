@@ -100,7 +100,8 @@
    not written: the button's name stays its words. */
 /* the last primary in the actions: the one ⌘↵ presses */
 .modal-foot .btn:is(.primary, .danger-fill):not([data-keys], :disabled, :has(~ .btn:is(.primary, .danger-fill)))::after,
-.btn[data-keys]::after {
+.btn[data-keys]::after,
+.btn[data-keys-room]::after {
   content: '⌘↵' / '';
   margin-right: calc(-1 * var(--sp-1));
   padding: 0 var(--sp-1);
@@ -114,10 +115,17 @@
 .btn[data-keys]::after {
   content: attr(data-keys) / '';
 }
+/* Two buttons that trade which one is raised (the composer's Save and Send): the quiet one keeps the room of the key
+   cap it doesn't show, so neither moves when they trade. */
+.btn[data-keys-room]::after {
+  content: attr(data-keys-room) / '';
+  visibility: hidden;
+}
 /* no keyboard, no key caps: nothing hovers, or the pointer is a finger (either one: mobile.css) */
 @media (hover: none), (pointer: coarse) {
   .modal-foot .btn:is(.primary, .danger-fill)::after,
-  .btn[data-keys]::after {
+  .btn[data-keys]::after,
+  .btn[data-keys-room]::after {
     display: none;
   }
 }

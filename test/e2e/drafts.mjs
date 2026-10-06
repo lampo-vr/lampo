@@ -12,7 +12,9 @@
 // agent could be started), and Send all (⇧⌘↵) sends the rest in one. Screenshots (VR_SHOTS) at 1440 and 390, dark and
 // light. On a video with an agent the composer keeps notes by default (⌘↵ saves, Send is the quiet way to send now):
 // three stay drafts the waiting agent never hears, "Send 3 to <agent>" brings them in one answer, the line under it
-// says the agent is waiting, the toast that it got them; a reply still reaches it at once.
+// says the agent is waiting, the toast that it got them; a reply still reaches it at once. Save and Send keep one order
+// and one place whatever the agent does while a note is written (assigned, waiting, unassigned; 1440, and 390 with a
+// note long enough to pin the foot): only which one is raised changes.
 import fs from 'node:fs';
 import path from 'node:path';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
@@ -238,8 +240,8 @@ try {
       await sleep(500);
       assert(runs().length === 1, 'started once');
       await api(`/api/review/${enc(slug)}/session`, 'PUT', {});
-      // unassigned: the page hears it (the live stream) before the next note is written. Save and Send swap places when
-      // the agent goes, and a click aimed at Save before then lands on Send.
+      // unassigned: the page hears it (the live stream) before the next note is written. Save is raised (⌘↵ saves) until
+      // then, and the next check's notes are about a video without an agent.
       await page.waitForFunction(() => document.querySelector('[data-testid=agent-button]')?.getAttribute('aria-label') === 'Agent', {
         polling: 100,
         timeout: 20000,
@@ -609,6 +611,74 @@ try {
     await videoReady();
   };
 
+  // Save and Send as they stand: each one's box, in the order they come, and which is raised.
+  const footButtons = () =>
+    page.$$eval('.composer-send .btn', (bs) =>
+      bs.map((b) => {
+        const r = b.getBoundingClientRect();
+        return { id: b.dataset.testid, x: r.x, y: r.y, w: r.width, h: r.height, raised: b.classList.contains('primary') };
+      }),
+    );
+  const raisedIs = (id) =>
+    page.waitForFunction((t) => document.querySelector(`[data-testid=${t}]`)?.classList.contains('primary'), { polling: 100, timeout: 20000 }, id);
+  const where = (bs) => bs.map((b) => `${b.id}${b.raised ? '*' : ''}@${b.x.toFixed(1)},${b.y.toFixed(1)} ${b.w.toFixed(1)}×${b.h.toFixed(1)}`).join(' ');
+  const samePlaces = (a, b, what) =>
+    assert(
+      a.length === 2 && b.length === 2 && a.every((x, i) => x.id === b[i].id && ['x', 'y', 'w', 'h'].every((k) => Math.abs(x[k] - b[i][k]) < 0.5)),
+      `${what}: ${where(a)} → ${where(b)}`,
+    );
+
+  await check(
+    'Save and Send keep their places while a note is written and the agent comes, waits and goes: only which one is raised changes (1440; 390 with the foot pinned)',
+    async () => {
+      const LONG = Array.from({ length: 12 }, (_, i) => `Line ${i + 1}: the cut to the product shot feels rushed.`).join(' ');
+      for (const [w, h, phone] of [
+        [1440, 900, false],
+        [390, 844, true],
+      ]) {
+        await page.setViewport({ width: w, height: h, deviceScaleFactor: SHOTS ? 2 : 1, ...(phone ? { isMobile: true, hasTouch: true } : {}) });
+        await open3();
+        if (phone) {
+          // a note this long pins the foot to the sheet's bottom, where a line coming in it would lift the buttons: flush
+          // with the bottom edge, the line being written just above it
+          await page.click('[data-testid=new-note]');
+          await page.waitForSelector('.composer textarea');
+          await page.type('.composer .composer-text', LONG);
+          const pin = await page.evaluate(() => {
+            const list = document.querySelector('.nsheet .side-scroll');
+            const foot = document.querySelector('.composer-foot').getBoundingClientRect();
+            const text = document.querySelector('.composer-text');
+            const end = text.getBoundingClientRect().bottom - Number.parseFloat(getComputedStyle(text).paddingBottom);
+            return { scrolls: list.scrollHeight > list.clientHeight + 1, below: list.getBoundingClientRect().bottom - foot.bottom, under: end - foot.top };
+          });
+          assert(pin.scrolls && Math.abs(pin.below) < 1 && pin.under <= 1, `the foot pinned flush, the note's end above it: ${JSON.stringify(pin)}`);
+        } else await write(30, 'Hold the title until the beat', slug3);
+        const alone = await footButtons();
+        assert(alone.map((b) => `${b.id}${b.raised ? '*' : ''}`).join(' ') === 'composer-save composer-send*', `Save, then Send raised: ${where(alone)}`);
+        // the agent is assigned (Save is raised), then waits (an open wait_for_feedback: the line under the buttons)
+        await api(`/api/review/${enc(slug3)}/session`, 'PUT', { name: 'drafts-agent', sessionId: 'mcp-drafts-agent', agent: 'mcp' });
+        await raisedIs('composer-save');
+        samePlaces(alone, await footButtons(), `${w}: the agent assigned moves neither`);
+        const stop = new AbortController();
+        mcp
+          .callTool({ name: 'wait_for_feedback', arguments: { video: slug3, since: await cursor3(), timeout_s: 120 } }, { signal: stop.signal })
+          .catch(() => {});
+        await page.waitForSelector('.composer [data-testid=agent-waiting]', { timeout: 40_000 });
+        samePlaces(alone, await footButtons(), `${w}: the agent waiting moves neither`);
+        await shot(`composer-agent-${w}`, phone ? null : '.side');
+        // unassigned while the note is still being written
+        await api(`/api/review/${enc(slug3)}/session`, 'PUT', {});
+        await raisedIs('composer-send');
+        await page.waitForSelector('.composer [data-testid=agent-waiting]', { hidden: true, timeout: 20000 });
+        samePlaces(alone, await footButtons(), `${w}: the agent gone moves neither`);
+        stop.abort();
+        await page.click('.composer-close');
+        await composerGone();
+      }
+      assert((await drafts3()).length === 0 && (await notes3()).length === 0, 'nothing kept, nothing sent');
+    },
+  );
+
   await check(
     'an agent’s video keeps notes: ⌘↵ and the main button save three as drafts the waiting agent never hears, "Send 3 to drafts-agent" brings all three in one answer; a reply still goes at once',
     async () => {
@@ -630,7 +700,7 @@ try {
       const buttons = await page.$$eval('.composer-send .btn', (bs) =>
         bs.map((b) => `${b.dataset.testid}:${b.classList.contains('primary') ? 'primary' : 'quiet'}:${b.dataset.keys ?? ''}`),
       );
-      assert(buttons.join(' ') === 'composer-send:quiet: composer-save:primary:⌘↵', `Send quiet, then Save raised with ⌘↵: ${buttons}`);
+      assert(buttons.join(' ') === 'composer-save:primary:⌘↵ composer-send:quiet:', `Save raised with ⌘↵, then Send quiet: ${buttons}`);
       await shots3('1440-composer');
       await page.keyboard.down(MOD);
       await page.keyboard.press('Enter');

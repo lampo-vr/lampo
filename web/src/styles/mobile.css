@@ -871,6 +871,11 @@
   .nsheet.composing .side-scroll > :not(.composer) {
     display: none;
   }
+  /* the line being written stays above the pinned foot (its row and its padding, below, and a step of air), never
+     under it */
+  .nsheet.composing .side-scroll {
+    scroll-padding-bottom: calc(var(--h-touch) + var(--sp-2) + var(--sp-3) + var(--sp-1));
+  }
   /* the head holds the where-menu and the range's action at a thumb's size; the × (Cancel) too, in its corner */
   .nsheet .composer-head {
     min-height: var(--h-touch);
@@ -885,12 +890,18 @@
   }
   .nsheet .composer-foot {
     position: sticky;
-    bottom: -12px;
+    /* pinned flush with the sheet's bottom: down by the list's own padding (.nsheet .side-scroll), or the note shows
+       under it */
+    bottom: calc(-1 * var(--sp-6));
     z-index: 2;
     margin: 0 calc(-1 * var(--sp-3)) calc(-1 * var(--sp-3));
     padding: var(--sp-2) var(--sp-3) var(--sp-3);
     background: var(--ink-3);
     border-top: 1px solid var(--line);
+  }
+  /* the line under it starts where the pinned foot's padding ends, never under it */
+  .nsheet .composer-wait {
+    margin-top: 0;
   }
   .mic.rec {
     background: var(--must-bg);

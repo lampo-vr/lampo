@@ -1084,10 +1084,42 @@ button.c-tc:hover {
 .composer-send .btn.ghost:hover {
   color: var(--fg);
 }
-/* the agent waits for these notes: a footnote to the buttons, on a line of its own */
+/* Save and Send keep their places whichever is raised: each is as wide as its raised self — its words in the strong
+   weight (::before, unseen) beside the key cap (::after; the quiet one keeps only its room, data-keys-room) — and the
+   quiet one's words sit in the middle of that room. A spinner takes the words' place while it saves. */
+.composer-act {
+  display: inline-grid;
+  grid-template-columns: auto auto;
+}
+.composer-act::before {
+  content: attr(data-label) / '';
+  grid-area: 1 / 1;
+  font-weight: var(--fw-strong);
+  visibility: hidden;
+}
+.composer-act::after {
+  grid-area: 1 / 2;
+}
+.composer-act > :is(.composer-act-words, .spinner) {
+  grid-area: 1 / 1;
+  justify-self: center;
+}
+.composer-act.ghost > :is(.composer-act-words, .spinner) {
+  grid-column: 1 / -1;
+}
+.composer-act:has(> .spinner) > .composer-act-words {
+  visibility: hidden;
+}
+/* no key caps (overlays.css): the words alone */
+@media (hover: none), (pointer: coarse) {
+  .composer-act {
+    grid-template-columns: auto;
+  }
+}
+/* the agent waits for these notes: a footnote to the buttons, the composer's last line (after the foot, as close to the
+   buttons as the foot's rows are to each other) */
 .composer-wait {
-  flex-basis: 100%;
-  margin: 0;
+  margin: calc(var(--sp-2) - var(--sp-3)) 0 0;
   padding-left: var(--sp-1);
   text-wrap: pretty;
 }
