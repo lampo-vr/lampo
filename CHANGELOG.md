@@ -7,6 +7,15 @@ format stays backwards compatible throughout.
 
 ## [Unreleased]
 
+### Fixed
+- An account deleted, disabled or given a new password while someone signs in to it gets no session and sends no
+  sign-in email: the answer is the same as for any wrong sign-in.
+- Save and Send in the note composer stay where they are when the video's agent is assigned, starts waiting or is
+  unassigned while you write: only which of the two is the main action changes, so a click meant for Save never lands
+  on Send.
+- On a phone, a long note keeps the line you are typing above the pinned Save and Send, and that bar sits flush with
+  the bottom of the notes sheet instead of letting the note show beneath it.
+
 ## [0.1.0] - 2026-10-06
 
 The first public release: what it has first, then everything that changed while it was made, newest first.

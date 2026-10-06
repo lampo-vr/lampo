@@ -5,7 +5,8 @@
 // quiet toolbar — severity, tags (or "#" in the text), the paperclip, voice — and the two ways out: Save (⌘S) keeps
 // the note as a draft only you see, Send (⌘↵, as before) sends it with every draft you kept here ("Send 3"). On a video
 // with an agent (`batch`) the main action is Save (⌘↵): the agent starts on the first note it gets, so notes are kept
-// and go together from "not sent yet" (drafts/Unsent.tsx); Send (⇧⌘↵) still sends this one with them now. The
+// and go together from "not sent yet" (drafts/Unsent.tsx); Send (⇧⌘↵) still sends this one with them now. Only the
+// emphasis moves between them, never the buttons: an agent can come or go while a note is written. The
 // drawing tools are on the picture (DrawBar.tsx, the player's), not here. Cancel is the card's × (Esc). 1–4 set the
 // severity while you aren't typing.
 import { useEffect, useId, useRef, useState } from 'react';
@@ -227,6 +228,8 @@ export function Composer({
 
   const { recording, busy } = voice;
   const chips = tags.length > 0 || shapeCount > 0 || !!voiceId;
+  const saveWord = t('Save');
+  const sendWord = unsent ? t('Send {n}', { n: unsent + 1 }) : t('Send');
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: ⌘↵ sends (saves on an agent's video, ⇧⌘↵ sends), ⌘S saves and Esc cancels from anywhere inside the composer
     <div
@@ -475,73 +478,53 @@ export function Composer({
           again={t('Record the voice note again')}
           tip={whisper ? t('Voice note, transcribed on this server') : t('Voice note (no speech-to-text available: audio only)')}
         />
-        {/* The main action at the end, raised, with ⌘↵; the other quiet beside it. On an agent's video they trade places:
-            Save keeps the note with the others, Send (⇧⌘↵) sends it and them now. */}
+        {/* Save, then Send, always in that order and place: the main one is raised and takes ⌘↵ — Send, or on an agent's
+            video Save (notes are kept and go to it together; Send, ⇧⌘↵, sends this one and the others now). An agent
+            assigned or unassigned while a note is written changes only which is raised: each button is as wide as its
+            raised self (.composer-act), so neither moves under the pointer. */}
         <div className="composer-send">
-          {batch ? (
-            <>
-              <Tip content={unsent ? t('Sends this note and {n} more not sent yet', { n: unsent }) : t('Send it now')} shortcut="⇧⌘↵">
-                <button
-                  type="button"
-                  className="btn sm ghost"
-                  onClick={() => save('send')}
-                  disabled={!!saving || recording || busy}
-                  data-testid="composer-send"
-                >
-                  {saving === 'send' && <Spinner />}
-                  {unsent ? t('Send {n}', { n: unsent + 1 }) : t('Send')}
-                </button>
-              </Tip>
-              <Tip content={t('Keep it as a draft: only you see it until you send it')}>
-                <button
-                  type="button"
-                  className="btn sm primary"
-                  onClick={() => save('draft')}
-                  disabled={!!saving || recording || busy}
-                  data-keys="⌘↵"
-                  data-testid="composer-save"
-                >
-                  {saving === 'draft' && <Spinner />}
-                  {t('Save')}
-                </button>
-              </Tip>
-            </>
-          ) : (
-            <>
-              <Tip content={t('Keep it as a draft: only you see it until you send it')} shortcut="⌘S">
-                <button
-                  type="button"
-                  className="btn sm ghost"
-                  onClick={() => save('draft')}
-                  disabled={!!saving || recording || busy}
-                  data-testid="composer-save"
-                >
-                  {saving === 'draft' && <Spinner />}
-                  {t('Save')}
-                </button>
-              </Tip>
-              <Tip content={unsent ? t('Sends this note and {n} more not sent yet', { n: unsent }) : null}>
-                <button
-                  type="button"
-                  className="btn sm primary"
-                  onClick={() => save('send')}
-                  disabled={!!saving || recording || busy}
-                  data-keys="⌘↵"
-                  data-testid="composer-send"
-                >
-                  {saving === 'send' && <Spinner />}
-                  {unsent ? t('Send {n}', { n: unsent + 1 }) : t('Send')}
-                </button>
-              </Tip>
-            </>
-          )}
+          <Tip content={t('Keep it as a draft: only you see it until you send it')} shortcut={batch ? undefined : '⌘S'}>
+            <button
+              type="button"
+              className={batch ? 'btn sm primary composer-act' : 'btn sm ghost composer-act'}
+              onClick={() => save('draft')}
+              disabled={!!saving || recording || busy}
+              data-keys={batch ? '⌘↵' : undefined}
+              data-keys-room={batch ? undefined : '⌘↵'}
+              data-label={saveWord}
+              data-testid="composer-save"
+            >
+              {saving === 'draft' && <Spinner />}
+              <span className="composer-act-words">{saveWord}</span>
+            </button>
+          </Tip>
+          <Tip
+            content={unsent ? t('Sends this note and {n} more not sent yet', { n: unsent }) : batch ? t('Send it now') : null}
+            shortcut={batch ? '⇧⌘↵' : undefined}
+          >
+            <button
+              type="button"
+              className={batch ? 'btn sm ghost composer-act' : 'btn sm primary composer-act'}
+              onClick={() => save('send')}
+              disabled={!!saving || recording || busy}
+              data-keys={batch ? undefined : '⌘↵'}
+              data-keys-room={batch ? '⌘↵' : undefined}
+              data-label={sendWord}
+              data-testid="composer-send"
+            >
+              {saving === 'send' && <Spinner />}
+              <span className="composer-act-words">{sendWord}</span>
+            </button>
+          </Tip>
         </div>
-        {waiting && (
-          <p className="composer-hint composer-wait" data-testid="agent-waiting">
-            {t('{name} is waiting · gets your notes when you send', { name: waiting })}
-          </p>
-        )}
       </div>
+      {/* under the foot, not in it: on a phone the foot is pinned to the sheet's bottom, and a line coming or going in it
+          would lift Save and Send */}
+      {waiting && (
+        <p className="composer-hint composer-wait" data-testid="agent-waiting">
+          {t('{name} is waiting · gets your notes when you send', { name: waiting })}
+        </p>
+      )}
     </div>
   );
 }
