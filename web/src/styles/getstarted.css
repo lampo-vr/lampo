@@ -1,0 +1,248 @@
+/* ---------------------------------------------------------------- inside Get started's panes (onboarding/GetStarted.tsx)
+   Loaded with Get started's own code. Every step's pane is built the same way: the headline, the line under it, what
+   the step needs, its actions, what it says back — the words at most a measure wide — and the step's picture beside
+   them where the card is wide enough (pictures.tsx StepPic, lighttable.css). One rhythm in every step: 12 between the
+   headline, its line and what follows, 16 before the actions. No browser margins anywhere inside. */
+.ob-gs-do :is(h3, p, ul, ol, fieldset) {
+  margin: 0;
+}
+.ob-gs-do {
+  display: grid;
+  grid-template-columns: minmax(0, 600px) auto;
+  justify-content: space-between;
+  align-items: start;
+  column-gap: var(--sp-8);
+  min-width: 0;
+}
+.ob-gs-text {
+  display: grid;
+  gap: var(--sp-3);
+  align-content: start;
+  min-width: 0;
+}
+.ob-gs-h {
+  font: var(--fw-strong) var(--fs-2xl) / 1.15 var(--display);
+  font-stretch: 87.5%;
+  letter-spacing: var(--track-title);
+  text-wrap: balance;
+}
+.ob-gs-h.ob-with-mark {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.ob-gs-h .ob-mk {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--h);
+  height: var(--h);
+  border-radius: var(--r);
+  background: var(--ink-2);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  color: var(--fg);
+}
+.ob-gs-lede {
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.ob-gs-text code {
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  font-stretch: 87.5%;
+  padding: 1px var(--sp-1);
+  border-radius: var(--r-sm);
+  background: var(--sel);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+.ob-gs-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  margin-top: var(--sp-1);
+}
+.ob-gs-acts .ob-fine {
+  margin: 0;
+}
+/* what a step says back: done, with its keyframe */
+.ob-gs-done-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+/* the glyph in a box one line tall: it stays on the first line's middle when the note wraps */
+.ob-gs-done-g {
+  flex: none;
+  display: grid;
+  place-items: center;
+  height: calc(var(--fs-md) * var(--lh-body));
+  color: var(--ok);
+}
+.ob-gs-done-note .kg {
+  --kg-size: 12px;
+}
+.ob-gs-err {
+  color: var(--must);
+}
+/* the picture beside the words: only where the words keep a measure of their own beside it */
+.ob-gs-pic {
+  display: none;
+}
+@container lib (min-width: 960px) {
+  .ob-gs-pane .ob-gs-pic {
+    display: block;
+  }
+}
+
+@container lib (max-width: 959px) {
+  .ob-gs-do {
+    grid-template-columns: minmax(0, 600px);
+  }
+}
+
+/* the agent's picks */
+.ob-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--sp-1) + var(--sp-0_5));
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+.ob-picks button {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--sp-1) + var(--sp-0_5));
+  height: var(--h-sm);
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-full);
+  background: var(--ink-2);
+  color: var(--fg-2);
+  font: var(--fw-ui) var(--fs-sm) / 1 var(--ui);
+  cursor: pointer;
+}
+.ob-picks button:hover {
+  border-color: var(--line-3);
+  color: var(--fg);
+}
+/* the connect block, without its own box and head: the pane is its box, the headline its head */
+.ob-gs-text .ob-connect {
+  gap: var(--sp-3);
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+.ob-gs-text .ob-said {
+  padding-left: calc(var(--sp-4) + var(--sp-0_5) + 1px);
+}
+.ob-gs-text .ob-said > .kg {
+  left: 0;
+}
+/* the machine's files to link, one line each */
+.ob-gs-files {
+  display: grid;
+  max-width: 460px;
+  padding: 0;
+  list-style: none;
+  border-radius: var(--r);
+  background: var(--ink-2);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  overflow: hidden;
+}
+.ob-gs-files li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: var(--h-lg);
+  padding: 0 calc(var(--sp-1) + var(--sp-0_5)) 0 var(--sp-3);
+  border-top: 1px solid var(--line);
+}
+.ob-gs-files li:first-child {
+  border-top: 0;
+}
+.ob-gs-files .icon {
+  color: var(--muted);
+}
+.ob-gs-files b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--fw-ui);
+  color: var(--fg);
+}
+/* the invite: the app's own field and select, the onboarding's button, one row */
+.ob-gs-invite {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: 520px;
+  margin-top: var(--sp-1);
+}
+.ob-gs-invite .ob-gs-email {
+  flex: 1;
+  min-width: 0;
+}
+.ob-gs-invite .input.select,
+.ob-gs-invite .ob-btn {
+  flex: none;
+}
+.ob-gs-shake {
+  animation: ob-gs-shake 420ms var(--ease-out);
+}
+@keyframes ob-gs-shake {
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(5px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(1px);
+  }
+}
+
+/* a phone's pane: the headline a step smaller, the sample's keys left to the sample itself; the invite's field over
+   its role and button, all three a finger's height */
+@container lib (max-width: 580px) {
+  .ob-gs-h {
+    font-size: var(--fs-xl);
+  }
+  .ob-gs-text .ob-smp-keys {
+    display: none;
+  }
+  .ob-gs-invite {
+    flex-wrap: wrap;
+  }
+  .ob-gs-invite .ob-gs-email {
+    flex-basis: 100%;
+  }
+}
+@media (hover: none) and (pointer: coarse) {
+  .ob-gs-invite .ob-btn,
+  .ob-gs-invite .input.select {
+    height: var(--h-touch);
+  }
+}
+/* the agent's live status under the headline: a line of its own, not a box */
+.ob-gs-text .ob-live,
+.ob-gs-text .ob-live.ob-compact,
+.ob-gs-text .ob-live[data-state='connected'] {
+  grid-template-columns: auto auto minmax(0, 1fr);
+  min-height: var(--h-xs);
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+.ob-gs-text .ob-live .ob-live-sub {
+  justify-self: start;
+  text-align: left;
+}

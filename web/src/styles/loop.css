@@ -1,0 +1,473 @@
+/* ---------------------------------------------------------------- the fast loop */
+
+.stage-overlay {
+  grid-area: stage;
+  position: relative;
+  pointer-events: none;
+  z-index: 6;
+}
+.stage-overlay > * {
+  pointer-events: auto;
+}
+.walkie {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: 36px;
+  padding: 0 var(--sp-4) 0 var(--sp-3);
+  border-radius: var(--r-full);
+  background: rgba(10, 10, 11, 0.86);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 69, 58, 0.5);
+  box-shadow: var(--shadow-float);
+  font-weight: var(--fw-ui);
+  white-space: nowrap;
+  animation: toast 0.25s var(--ease);
+}
+.walkie .muted {
+  font: var(--fw-ui) var(--fs-xs) var(--ui);
+}
+.rec-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--r-full);
+  background: var(--must);
+  box-shadow: 0 0 0 4px rgba(255, 69, 58, 0.2);
+  animation: blink 1s infinite;
+}
+.meter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-0_5);
+  height: 16px;
+}
+.meter i {
+  width: 3px;
+  height: 16px;
+  border-radius: var(--r-sm);
+  background: var(--fg);
+  transform-origin: center;
+  transition: transform 0.08s;
+}
+.verify {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  width: min(620px, calc(100% - 32px));
+  display: grid;
+  /* the card's width decides, never its widest row (an auto column grows to its content on a narrow phone) */
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-3);
+  border-radius: var(--r-lg);
+  background: rgba(19, 19, 20, 0.94);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(61, 220, 151, 0.4);
+  box-shadow: var(--shadow);
+  animation: pop 0.25s var(--ease);
+}
+.verify-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.verify-body {
+  display: grid;
+  gap: var(--sp-2);
+}
+.verify-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+/* Still wrong's reason, typed or said: the field gives way to its microphone and Reopen on a narrow card */
+.verify-reason .input {
+  min-width: 0;
+}
+.verify-preview {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-2);
+  border-radius: var(--r);
+  background: var(--ink-3);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.verify-preview > .icon {
+  flex: none;
+  color: var(--ok);
+}
+.verify-preview .grow {
+  display: grid;
+  gap: var(--sp-0_5);
+  min-width: 0;
+}
+.verify-preview b {
+  color: var(--fg);
+  font-weight: var(--fw-strong);
+}
+.verify-preview .grow span {
+  color: var(--muted);
+}
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: 26px;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r);
+  border: 1.5px solid currentColor;
+  background: transparent;
+  font: var(--fw-strong) var(--fs-xs) var(--ui);
+  white-space: nowrap;
+  cursor: pointer;
+  transform: rotate(-2deg);
+}
+.stamp.approved {
+  color: var(--ok);
+}
+.stamp.changes {
+  color: var(--should);
+}
+.split {
+  display: inline-flex;
+}
+.split > .btn:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.split > .btn:last-child {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 0;
+  width: 24px;
+}
+.agent-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: 24px;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-full);
+  background: var(--claude-bg);
+  color: var(--claude-3);
+  font: var(--fw-ui) var(--fs-xs) var(--ui);
+  font-stretch: 87.5%;
+  max-width: 260px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.agent-status .spinner {
+  width: 11px;
+  height: 11px;
+  border-color: color-mix(in srgb, var(--claude) 25%, transparent);
+  border-top-color: var(--claude);
+}
+.claude-pop {
+  min-width: 360px;
+  gap: var(--sp-1);
+}
+/* The player's one agent control (player/ClaudeMenu.tsx): the agent's state, mark and name, or "Agent". */
+.agent-btn {
+  gap: var(--sp-1);
+  max-width: 200px;
+}
+.agent-btn .agent-name {
+  min-width: 0;
+}
+.agent-btn.none .spark {
+  color: var(--claude-2);
+}
+/* While the agent works the button says the step it is on, in the name's place: one width for any step, so the bar
+ * doesn't shift with every new one (the bar's 150/200 px cap still holds). */
+.agent-btn.now {
+  width: 200px;
+}
+.agent-btn .agent-step {
+  flex: 1;
+  text-align: left;
+  font-weight: var(--fw-text);
+  color: var(--fg-2);
+}
+/* its popover: where the agent stands, then what you can ask, copy or change */
+.am {
+  display: grid;
+  gap: var(--sp-1);
+}
+.am-status {
+  display: grid;
+  gap: var(--sp-0_5);
+  padding: var(--sp-1) var(--sp-2) var(--sp-2);
+}
+.am-who {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.am-sub {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+/* An agent that doesn't listen: the one command (or sentence) that starts it, to copy (sessions/listening.tsx). Also
+ * in the agent's hover card and on Settings → Connected agents. */
+.listen-how {
+  display: grid;
+  gap: var(--sp-1);
+  min-width: 0;
+  margin-top: var(--sp-1);
+  padding: var(--sp-2);
+  border-radius: var(--r);
+  background: var(--ink-3);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.listen-how-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+.listen-how-text {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+/* a command is copied whole: in the code face, never broken after its "/" or ":" */
+.listen-how-text.cmd {
+  font-family: var(--mono);
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+.am-sep {
+  height: 1px;
+  margin: var(--sp-1) 0;
+  background: var(--line);
+}
+/* Ask the agent: what people ask most as quiet answers (the notes panel's .choices), the field, and the quick check
+ * as a smaller option under them — no accent: the popover needs none. */
+.am-ask {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-2) 0;
+  border-top: 1px solid var(--line);
+}
+.am-ask .label {
+  margin: 0;
+}
+.am-ask .choices {
+  gap: var(--sp-1);
+}
+.cm-row.am-quick {
+  padding: var(--sp-1);
+  margin-inline: calc(-1 * var(--sp-1));
+  width: calc(100% + 2 * var(--sp-1));
+  font-size: var(--fs-sm);
+}
+.cm-row.am-quick .icon {
+  color: var(--muted);
+}
+.cm-row.am-quick b {
+  color: var(--fg-2);
+  font-weight: var(--fw-text);
+}
+.cm-row.am-quick:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+/* the quiet foot: copy the notes, assign another agent */
+.am-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  margin-top: var(--sp-1);
+  padding: var(--sp-2) var(--sp-1) 0;
+  border-top: 1px solid var(--line);
+}
+.am-foot .btn {
+  color: var(--fg-2);
+}
+/* "Show all 11": under the three lines of the log, where its times stand */
+.am-more {
+  justify-self: start;
+  margin-left: var(--sp-4);
+}
+.am-back {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+.am-back .label {
+  margin: 0;
+}
+/* starting an agent that isn't running: the question (send and start, or only send) and the run Lampo started */
+.wake-ask {
+  flex: 1 1 100%;
+  min-width: 0;
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  border-radius: var(--r);
+  background: var(--ink-3);
+}
+.wake-ask-quote {
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+.wake-ask p {
+  display: grid;
+  gap: var(--sp-0_5);
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.wake-ask p b {
+  color: var(--fg);
+  font-weight: var(--fw-ui);
+}
+.wake-ask p span {
+  overflow-wrap: anywhere;
+}
+.wake-ask-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+/* Live: what the agent is doing now, the last actions with their times, a run's tokens (sessions/Live.tsx) */
+.am-live {
+  display: grid;
+  gap: var(--sp-1);
+  padding: 0 var(--sp-2) var(--sp-1);
+}
+.am-live .label {
+  margin: 0;
+}
+.am-now {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-width: 0;
+  font-size: var(--fs-md);
+  color: var(--fg);
+}
+.am-now .kg {
+  align-self: center;
+}
+.am-now-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.am-when {
+  flex: none;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.am-timeline {
+  display: grid;
+  gap: var(--sp-0_5);
+  margin: 0;
+  padding: 0 0 0 var(--sp-4);
+  list-style: none;
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.am-timeline li {
+  display: flex;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.am-timeline time {
+  flex: none;
+  min-width: 5ch;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+/* the run's own line (Stop, Log) under its timeline: the head's keyframe already says it works */
+.am-live .wake-run {
+  padding-left: var(--sp-4);
+}
+.am-live .wake-run .kg {
+  display: none;
+}
+.am-use {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-3);
+  padding-left: var(--sp-4);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.wake-run {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--h-sm);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+/* the one way to how agents get their notes, in the picker's foot */
+.how-agents {
+  color: var(--fg-2);
+  text-decoration: underline;
+  text-decoration-color: var(--line-3);
+  text-underline-offset: 2px;
+}
+.how-agents:hover {
+  color: var(--fg);
+}
+.cm-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: var(--sp-2) var(--sp-2);
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--fg-2);
+  text-align: left;
+  cursor: pointer;
+}
+.cm-row:hover {
+  background: var(--ink-4);
+  color: var(--fg);
+}
+.cm-row .icon {
+  margin-top: var(--sp-0_5);
+}
+.cm-row b {
+  display: block;
+  color: var(--fg);
+  font-weight: var(--fw-ui);
+}
+.cm-row span > span {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.badge.delta {
+  background: color-mix(in srgb, var(--fg) 10%, transparent);
+  color: var(--fg);
+}
+.badge.delta:hover {
+  background: color-mix(in srgb, var(--fg) 18%, transparent);
+}
+.walkie:has(.walkie-busy) {
+  height: auto;
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--r-lg);
+}
+.walkie-busy {
+  display: grid;
+  gap: var(--sp-2);
+}

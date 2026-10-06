@@ -1,0 +1,15 @@
+Subject: You already have a Lampo account
+
+You already have an account
+
+Someone, hopefully you, tried to sign up on review.example.com with this address. It already has an account, so nothing new was made.
+
+Sign in:
+https://review.example.com/
+
+Forgot your password? Choose a new one:
+https://review.example.com/#/forgot
+
+--
+You get this because this address was used to sign up on review.example.com.
+Lampo · review.example.com

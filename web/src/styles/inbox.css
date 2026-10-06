@@ -1,0 +1,1163 @@
+/* ---------------------------------------------------------------- inbox: the bell, its popover / sheet, the preview,
+   the inbox view of the library. Colours are theme tokens only (light mode swaps the tokens). */
+
+.inbox-bell {
+  position: relative;
+  /* room for the count on its shoulder, always (so a count arriving moves nothing beside it) */
+  margin-right: var(--sp-2);
+}
+.inbox-count {
+  position: absolute;
+  /* on the bell's shoulder, not over it, with a cut-out ring in the top bar's colour, so "14" or "99+" never hides the
+     bell. Anchored to the glyph in the button's middle (where a desk's 26 px button has its corner), not to the box:
+     a phone's 44 px box put it at the bar's top edge, away from the bell. */
+  top: calc(50% - var(--h-sm) / 2);
+  left: calc(50% + var(--h-sm) / 2);
+  transform: translate(-38%, -38%);
+  min-width: 15px;
+  height: 15px;
+  padding: 0 calc(var(--sp-1) * 0.75);
+  border-radius: var(--r-full);
+  box-shadow: 0 0 0 2px var(--ink-1);
+  display: grid;
+  place-items: center;
+  background: var(--claude);
+  color: var(--ink-0);
+  font: var(--fw-strong) var(--fs-xs) / var(--lh-tight) var(--mono);
+  pointer-events: none;
+}
+.inbox-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* desktop and tablet: a popover under the bell, list only or list + preview */
+.inbox-pop {
+  z-index: var(--z-inbox);
+  width: min(420px, calc(100vw - 16px));
+  /* the list alone is as tall as its items (scrolling past the cap); with the preview beside it, a fixed size */
+  max-height: min(640px, calc(100dvh - 72px));
+  display: flex;
+  background: var(--float-bg);
+  border: 1px solid var(--float-line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-float);
+  overflow: hidden;
+  /* grows out of the bell like the other popovers (ui.css) */
+  transform-origin: var(--radix-popover-content-transform-origin);
+  animation: float-in var(--dur) var(--ease-out);
+}
+.inbox-pop .btn.ghost:hover {
+  background: var(--float-sel);
+}
+.inbox-pop.two {
+  width: min(1000px, calc(100vw - 16px));
+  height: min(760px, calc(100dvh - 72px));
+}
+/* the preview alone (a tablet): a fixed height too — the preview fills its pane, it isn't as tall as its content */
+.inbox-pop.one {
+  height: min(720px, calc(100dvh - 72px));
+}
+
+/* phone: a sheet from the bottom edge */
+.inbox-backdrop {
+  z-index: var(--z-overlay);
+}
+.inbox-sheet {
+  position: fixed;
+  z-index: var(--z-sheet);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(100dvh - 24px - env(safe-area-inset-top));
+  display: flex;
+  background: var(--float-bg);
+  border-top: 1px solid var(--float-line);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  box-shadow: var(--shadow-up);
+  padding-bottom: env(safe-area-inset-bottom);
+  animation: sheet-up var(--dur-slow) var(--ease-out);
+  overflow: hidden;
+}
+
+.inbox-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+}
+.inbox-panel.stack {
+  grid-template-columns: minmax(0, 1fr);
+}
+.inbox-panel.split {
+  grid-template-columns: minmax(0, 1fr);
+}
+.inbox-panel.split.with-preview {
+  grid-template-columns: minmax(0, 400px) minmax(0, 1fr);
+}
+.inbox-panel.split.with-preview .inbox-list-pane {
+  border-right: 1px solid var(--line);
+}
+
+.inbox-list-pane,
+.inbox-preview {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.inbox-head,
+.inbox-pv-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4);
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+.inbox-head b,
+.inbox-pv-title b {
+  display: block;
+  font-size: var(--fs-md);
+}
+.inbox-head .mono,
+.inbox-pv-sub > .ellipsis {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+/* the stage chip's height with or without the chip, so the picture under the head starts at one place for every item */
+.inbox-pv-sub {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  min-height: var(--h-xs);
+  margin-top: var(--sp-0_5);
+}
+.inbox-pv-sub .sbadge {
+  flex: none;
+}
+.inbox-pv-head {
+  padding-left: var(--sp-1);
+}
+.inbox-pv-title {
+  min-width: 0;
+}
+.inbox-sa {
+  flex: 1 1 auto;
+}
+.inbox-list {
+  padding: var(--sp-1) var(--sp-1) var(--sp-3);
+  outline: none;
+}
+.inbox-loading {
+  padding: var(--sp-2);
+}
+.inbox-loading .sk-row {
+  border: 0;
+  background: transparent;
+  padding: var(--sp-2) var(--sp-1);
+}
+/* the list keeps focus while ↑/↓ move through it (aria-activedescendant): a hairline ring on the row the keys are on */
+.inbox-list:focus-visible .inbox-row.active {
+  box-shadow: inset 0 0 0 1.5px var(--line-3);
+}
+/* A group's name over its rows: small and quiet, like the sidebar's section names; the count beside it. */
+.inbox-group-h {
+  padding: var(--sp-3) var(--sp-2) var(--sp-1);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+  color: var(--muted);
+}
+.inbox-group-h span {
+  margin-left: var(--sp-0_5);
+  font-weight: var(--fw-text);
+  color: var(--muted);
+}
+/* Stalled videos come last, a step quieter: they wait on others (or on nobody), not on you — a line above them, their
+   pictures toned down, the words as they are (a heading in --faint was under AA). */
+.inbox-group.g-stalled {
+  margin-top: var(--sp-2);
+  border-top: 1px solid var(--line);
+}
+.inbox-row.k-stalled .inbox-thumb {
+  opacity: 0.7;
+}
+
+/* A row, the same for every kind: the picture; the video and when; what happened; what was said (two lines at most). */
+.inbox-row {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: var(--sp-3);
+  align-items: start;
+  padding: var(--sp-2);
+  border-radius: var(--r);
+  cursor: pointer;
+  position: relative;
+}
+/* One quiet system for a row's states, flat in both themes: under the pointer or the keys a faint fill (--sel); the
+   item in the preview and the ones picked for the bar a step deeper (--sel-on), picked ones with their check filled.
+   Never lifted, never the orange. */
+.inbox-row:hover,
+.inbox-row.active {
+  background: var(--sel);
+}
+.inbox-row.picked,
+.inbox-row.checked {
+  background: var(--sel-on);
+}
+/* while rows are picked for the bar, the item in the preview steps back to the pointer's fill: the filled rows are the
+   bar's, and "2 selected" never shows three */
+.inbox-list.selecting .inbox-row.picked:not(.checked) {
+  background: var(--sel);
+}
+/* a row waiting for the list (InboxRowsPending): the row's boxes, nothing to act on */
+.inbox-row.pending {
+  cursor: default;
+  pointer-events: none;
+}
+.inbox-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--r);
+  overflow: hidden;
+  background: var(--ink-0);
+  display: grid;
+  place-items: center;
+  color: var(--faint);
+}
+.inbox-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* as tall as the picture beside it, the lines centred: a row with words and one without are one height */
+.inbox-row-body {
+  display: grid;
+  gap: var(--sp-0_5);
+  min-width: 0;
+  min-height: 48px;
+  align-content: center;
+}
+.inbox-row-top {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-width: 0;
+  min-height: var(--h-xs);
+}
+/* what happened, on its line: the words give way with an ellipsis, the timecode at its end never does (WhatLine) */
+.what-line {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+}
+.what-line > .ellipsis {
+  min-width: 0;
+}
+.what-at {
+  flex: none;
+  white-space: pre;
+}
+.inbox-row-name {
+  flex: 1 1 auto;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-strong);
+  color: var(--fg);
+}
+/* when, at the row's end; the row's own actions (Done, Looks right / Still wrong, Got it, Later) take its place while
+   the pointer or the keys are on the row — they stand over it, so nothing moves */
+.inbox-row-end {
+  flex: none;
+  display: grid;
+  justify-items: end;
+  align-items: center;
+}
+.inbox-row-end > * {
+  grid-area: 1 / 1;
+}
+.inbox-when {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.inbox-row-acts {
+  display: flex;
+  gap: var(--sp-0_5);
+  margin: calc(-1 * var(--sp-1)) calc(-1 * var(--sp-1)) calc(-1 * var(--sp-1)) 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.inbox-row:is(:hover, :focus-within) .inbox-row-acts,
+.inbox-list:focus-visible .inbox-row.active .inbox-row-acts {
+  opacity: 1;
+  pointer-events: auto;
+}
+.inbox-row:is(:hover, :focus-within) .inbox-row-end:has(.inbox-row-acts) .inbox-when,
+.inbox-list:focus-visible .inbox-row.active .inbox-row-end:has(.inbox-row-acts) .inbox-when {
+  visibility: hidden;
+}
+/* touch: the time stays, the ⋯ beside it */
+.inbox-row-end:has(.inbox-row-more) {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+.inbox-row-more .btn {
+  margin: calc(-1 * var(--sp-1)) calc(-1 * var(--sp-1)) calc(-1 * var(--sp-1)) 0;
+}
+/* by video the group's head names the video: the row's first line is what happened, a step quieter than a name */
+.inbox-row-name.what {
+  font-weight: var(--fw-ui);
+  color: var(--fg-2);
+}
+.inbox-row-name.what .mono {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-text);
+  color: var(--muted);
+}
+/* picked for the selection bar: the checkbox on the picture, the row tinted */
+.inbox-thumb {
+  position: relative;
+}
+/* a ring on the picture, as in a photo library (the thumbnail is a dark island: light ring, dimmed inside, a dark halo
+   so it reads on a bright frame too); picked, it fills */
+.inbox-check {
+  position: absolute;
+  top: var(--sp-1);
+  left: var(--sp-1);
+  width: var(--h-xs);
+  height: var(--h-xs);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1.5px solid var(--fg);
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--ink-0) 35%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink-0) 30%, transparent);
+  color: transparent;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+}
+.inbox-row:hover .inbox-check,
+.inbox-list.selecting .inbox-check,
+.inbox-list:focus-visible .inbox-row.active .inbox-check {
+  opacity: 1;
+  pointer-events: auto;
+}
+.inbox-row.checked .inbox-check {
+  background: var(--fg);
+  color: var(--ink-0);
+}
+/* "Still wrong", said in the row: the reason (typed or said), then the buttons — beside it while the row has room,
+   under it when it hasn't */
+.inbox-row-ask {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  align-items: center;
+  margin-top: var(--sp-1);
+  cursor: default;
+}
+.inbox-row-ask .input {
+  flex: 1 1 14em;
+  min-width: 0;
+}
+/* the microphone and the two buttons wrap together, never one by one */
+.inbox-row-ask-acts {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-left: auto;
+}
+/* by kind, what happened follows the video's name on its line, quieter */
+.inbox-row-what,
+.inbox-row-name.by-kind :is(.what-text, .what-at) {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-text);
+  color: var(--muted);
+}
+.inbox-row-what .mono,
+.inbox-row-name.by-kind .what-at .mono {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+/* one line of what was said (the preview has it whole) */
+.inbox-row-text {
+  font-size: var(--fs-md);
+  line-height: var(--lh-ui);
+  color: var(--fg-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+/* the empty state (ui/system.tsx EmptyState) fills the popover and sits in its middle; what was put aside under it */
+.inbox-empty {
+  flex: 1;
+  place-content: center;
+}
+.inbox-zero {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.inbox-zero .inbox-later {
+  align-self: center;
+  width: 100%;
+  max-width: 560px;
+  padding: 0 var(--sp-2) var(--sp-3);
+}
+
+/* ---------------------------------------------------------------- by video (Rows.tsx)
+   One group per video: its head (poster, name, project and what it holds; ⋯ for the whole video), its rows under it.
+   A hairline between videos; a folded one (popover, sheet) shows its most urgent row and "n more". */
+.inbox-group.g-video {
+  padding-bottom: var(--sp-1);
+}
+.inbox-group.g-video + .inbox-group.g-video,
+.inbox-groups > .inbox-group.g-video + .inbox-group.g-video {
+  border-top: 1px solid var(--line);
+  padding-top: var(--sp-1);
+}
+/* one height, loading or loaded (the rows under it start at one place) */
+.inbox-vhead {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  box-sizing: border-box;
+  height: calc(var(--h) + var(--sp-2));
+  padding: var(--sp-2) var(--sp-1) 0 var(--sp-2);
+}
+/* the video's name: a link to the player (underlined when pointed at; a ring only for the keyboard) */
+/* the name keeps its room (up to 70 %), the summary gives way first */
+.inbox-vhead-name {
+  flex: 0 0 auto;
+  max-width: 70%;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-strong);
+  color: var(--fg);
+  text-decoration: none;
+  border-radius: var(--r-sm);
+}
+a.inbox-vhead-name:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--line-4);
+  text-underline-offset: 3px;
+}
+a.inbox-vhead-name:focus {
+  outline: none;
+}
+a.inbox-vhead-name:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+.inbox-vhead-sum {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+/* its menu: where the rows' times end, shown while the pointer is on the video (always on touch screens) */
+.inbox-vhead-more.btn {
+  flex: none;
+  opacity: 0;
+  transition: opacity 0.15s var(--ease);
+}
+.inbox-group:hover .inbox-vhead-more.btn,
+.inbox-vhead-more.btn:focus-visible,
+.inbox-vhead-more.btn[data-state='open'] {
+  opacity: 1;
+}
+@media (hover: none) {
+  .inbox-vhead-more.btn {
+    opacity: 1;
+  }
+}
+.inbox-vmore {
+  display: block;
+  margin: 0 0 var(--sp-1) calc(var(--sp-12) + var(--sp-3) + var(--sp-2));
+  padding: var(--sp-1) 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.inbox-vmore:hover {
+  color: var(--fg);
+}
+
+/* under the list: "n later" (the keys are in the inbox view's header, beside By video · By kind) */
+.inbox-foot {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-2) var(--sp-3);
+}
+.hero-row .inbox-keys.btn {
+  flex: none;
+  margin-left: auto;
+  align-self: center;
+  color: var(--muted);
+}
+.hero-row .inbox-keys.btn + .inbox-mode {
+  margin-left: var(--sp-2);
+}
+.inbox-later {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.inbox-later-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-height: var(--h-sm);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.inbox-later-toggle:hover {
+  color: var(--fg);
+}
+.inbox-later-toggle .muted::before {
+  content: '·';
+  margin-right: var(--sp-1);
+}
+.inbox-later.open .inbox-later-toggle svg:last-child {
+  transform: rotate(180deg);
+}
+.inbox-later-list {
+  display: grid;
+  gap: var(--sp-0_5);
+  margin-top: var(--sp-1);
+}
+.inbox-later-row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  gap: var(--sp-2);
+  align-items: center;
+  padding: var(--sp-1) 0;
+}
+.inbox-later-row .inbox-thumb {
+  width: 32px;
+  height: 32px;
+  opacity: 0.7;
+}
+.inbox-later-body {
+  display: grid;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.inbox-later-body .muted {
+  color: var(--muted);
+}
+.inbox-later-all.btn {
+  justify-self: start;
+}
+
+/* Several picked: their actions float over the list's foot, centred, in the material every float wears — sticky to the
+   bottom of what scrolls, so the bar stays in view however long the list; at the column's foot in the inbox view. */
+.inbox-selbar {
+  position: sticky;
+  bottom: var(--sp-3);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-0_5);
+  width: fit-content;
+  max-width: calc(100% - 2 * var(--sp-2));
+  /* its room at the end of what scrolls: a gap above, its height, the gap it floats at below */
+  margin: var(--sp-3) auto var(--sp-3);
+  padding: var(--sp-1);
+  border: 1px solid var(--float-line);
+  border-radius: var(--r-lg);
+  background: var(--float-bg);
+  box-shadow: var(--shadow-float);
+  --float-y: var(--sp-2);
+  animation: float-in var(--dur) var(--ease-out);
+}
+/* how many, then a hairline, then what to do with them */
+.inbox-selbar-n {
+  flex: none;
+  margin-right: var(--sp-1);
+  padding: 0 var(--sp-3) 0 var(--sp-2);
+  border-right: 1px solid var(--line);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-ui);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.inbox-selbar .btn.ghost:hover {
+  background: var(--float-sel);
+}
+.inbox-selbar-x.btn {
+  color: var(--muted);
+}
+/* in the inbox view the list's column is a flex column: the bar takes the column's foot while the list is short */
+.inbox-view-list > .inbox-selbar {
+  flex: none;
+  align-self: center;
+  margin: auto 0 0;
+}
+/* the row the keys bring into view stops above the bar, not under it */
+.inbox-view-list:has(> .inbox-selbar),
+.inbox-sa .sa-viewport:has(.inbox-selbar) {
+  scroll-padding-bottom: calc(var(--h-lg) + var(--sp-6));
+}
+/* the column's soft bottom edge would fade the bar out: none under it while it floats there */
+.inbox-view-list.more-b:has(> .inbox-selbar) {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+.inbox-view-list.more-t.more-b:has(> .inbox-selbar) {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, var(--fg) var(--sp-6));
+  mask-image: linear-gradient(to bottom, transparent, var(--fg) var(--sp-6));
+}
+
+/* the inbox's keys (?) */
+.inbox-help {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sp-2) var(--sp-4);
+  align-items: baseline;
+  font-size: var(--fs-md);
+}
+.inbox-help kbd {
+  justify-self: start;
+  white-space: nowrap;
+}
+
+/* By video · By kind, across from the title */
+.hero-row .inbox-mode {
+  margin-left: auto;
+  align-self: center;
+}
+@media (max-width: 639px) {
+  .hero-row .inbox-mode {
+    width: 100%;
+    margin-left: 0;
+    order: 3;
+  }
+  .inbox-mode > * {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+/* ---------------------------------------------------------------- the preview
+   A column that fills its pane (a size container its insides measure against), one layout for every kind of item and
+   every shape of picture: the head, the player on top in a dark band of one height, then the item's side — who did
+   what, what was said — and its action always at the bottom. */
+.inbox-preview {
+  overflow: hidden;
+  /* its size is the pane's (a flex or grid item there), never its content's: what is inside measures against it */
+  container: inbox-pv / size;
+}
+.inbox-open.btn {
+  flex: none;
+}
+.inbox-pv-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  /* the player as tall as its picture needs, the side the rest (its action at the pane's bottom) */
+  grid-template-rows: auto minmax(0, 1fr);
+}
+/* nothing to play (a question asked on a folder before any render): the side is all of it */
+.inbox-pv-main.bare {
+  grid-template-rows: minmax(0, 1fr);
+}
+/* who gets the answer now: the asking agent, running or not — at the row's start, the action keeps the end */
+.inbox-act-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  margin-right: auto;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+/* what was said at a reading width, however wide the pane */
+.inbox-pv-body > * {
+  max-width: 64ch;
+}
+/* The small player: the stage box takes what its row leaves; the picture in it as large as it fits in its own shape
+   (a stage box is a size container too), on the dark stage every player has; the timeline and the controls under it. */
+.inbox-player {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto auto;
+  gap: var(--sp-1);
+  padding: var(--sp-3) var(--sp-3) var(--sp-2);
+  container: inbox-player / inline-size;
+}
+/* Above the side: the picture's own height at the player's width (100cqw), leaving the pane (100cqh, the preview) room
+   for its head, the controls and what was said with its action. */
+.inbox-stage-box {
+  /* one band for every item and every shape: a 16:9 picture's height at the player's width, never more than 42 % of
+     the pane — a reel stands in the middle of it, a wide render fills it; the video never moves between items */
+  height: clamp(150px, 42cqh, calc(100cqw * 0.5625));
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  background: var(--ink-0);
+  border-radius: var(--r);
+  overflow: hidden;
+  container: inbox-stage / size;
+}
+.inbox-stage {
+  position: relative;
+  width: min(100cqw, calc(100cqh * var(--ar, 1.7778)));
+  aspect-ratio: var(--ar, 1.7778);
+  background: var(--ink-0);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.inbox-stage-hit {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+}
+.inbox-stage-hit video,
+.inbox-stage-hit img,
+.inbox-marks {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.inbox-still,
+.inbox-marks {
+  pointer-events: none;
+}
+/* "Open in player" on the picture: in its corner while the pointer is over it (always on touch screens) */
+.inbox-stage-open.btn {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  opacity: 0;
+  transition: opacity 0.15s var(--ease);
+}
+.inbox-stage:hover .inbox-stage-open,
+.inbox-stage-open:focus-visible {
+  opacity: 1;
+}
+/* while it loads: the stage's box and the controls' row */
+.inbox-pv-sk-stage {
+  width: 100%;
+  height: 100% !important;
+}
+.inbox-pv-sk-controls {
+  height: calc(var(--h-xs) + var(--h-sm) + var(--sp-1));
+}
+
+/* the timeline: a hairline track, the played part, the item's moment (its keyframe, a range's band), the playhead */
+.inbox-scrub {
+  position: relative;
+  height: var(--h-xs);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;
+  outline: none;
+}
+.inbox-scrub-track {
+  position: relative;
+  width: 100%;
+  height: var(--sp-1);
+  border-radius: var(--r-full);
+  background: var(--line-2);
+}
+.inbox-scrub:focus-visible .inbox-scrub-track {
+  box-shadow: var(--focus-ring);
+}
+.inbox-scrub-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--muted);
+}
+.inbox-scrub-range {
+  position: absolute;
+  top: calc(-1 * var(--sp-0_5));
+  bottom: calc(-1 * var(--sp-0_5));
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--claude) 40%, transparent);
+}
+.inbox-scrub-mark {
+  position: absolute;
+  top: 50%;
+  width: var(--sp-3);
+  height: var(--sp-3);
+  transform: translate(-50%, -50%);
+  background: var(--fg-2);
+  -webkit-mask: var(--kg-diamond) center / contain no-repeat;
+  mask: var(--kg-diamond) center / contain no-repeat;
+  pointer-events: none;
+}
+.inbox-scrub-mark.k-question {
+  background: var(--claude);
+}
+.inbox-scrub-mark.k-verify {
+  background: var(--ok);
+}
+.inbox-scrub-head {
+  position: absolute;
+  top: 50%;
+  width: var(--sp-3);
+  height: var(--sp-3);
+  border-radius: var(--r-full);
+  transform: translate(-50%, -50%);
+  background: var(--fg);
+  box-shadow: 0 0 0 2px var(--ink-2);
+  pointer-events: none;
+}
+/* the frame under the pointer, from the sprite, with its timecode */
+.inbox-scrub-tip {
+  position: absolute;
+  bottom: calc(100% + var(--sp-1));
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1);
+  border-radius: var(--r);
+  background: var(--ink-3);
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow-float);
+  pointer-events: none;
+  z-index: var(--z-inbox);
+}
+.inbox-scrub-frame {
+  display: block;
+  height: 72px;
+  border-radius: var(--r-sm);
+  background-repeat: no-repeat;
+  background-color: var(--ink-0);
+}
+.inbox-scrub-tip .mono {
+  font-size: var(--fs-xs);
+  color: var(--fg-2);
+}
+
+.inbox-transport {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-0_5);
+  min-width: 0;
+}
+/* play/pause: the one filled control of the row */
+.inbox-play.btn {
+  background: var(--raise-sheen), var(--ink-3);
+  box-shadow: var(--raise);
+}
+.inbox-tc {
+  margin-left: var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.inbox-transport .btn.ghost:not(.on) {
+  color: var(--fg-2);
+}
+/* a narrow player keeps the icons and names them in their tooltips */
+@container inbox-player (max-width: 420px) {
+  .inbox-around-word,
+  .inbox-tc-v {
+    display: none;
+  }
+}
+/* The item's side: who did what, what was said (it scrolls when long), and the action at the bottom. Under a wide
+   picture it takes what the player leaves; beside a tall one, the pane's height. */
+.inbox-pv-side {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+}
+.inbox-pv-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  gap: var(--sp-2);
+  align-content: start;
+  padding: var(--sp-3) var(--sp-4) var(--sp-2);
+}
+.inbox-pv-who {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.inbox-pv-what {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--fg-2);
+  font-weight: var(--fw-strong);
+}
+.inbox-pv-what .mono {
+  font-weight: var(--fw-text);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.inbox-pv-ago {
+  flex: none;
+  color: var(--muted);
+}
+.inbox-pv-text {
+  margin: 0;
+  font-size: var(--fs-lg);
+  line-height: var(--lh-body);
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+.inbox-pv-quote {
+  margin: 0;
+  padding-left: var(--sp-3);
+  border-left: 2px solid var(--line-2);
+  font-size: var(--fs-md);
+  color: var(--muted);
+}
+.inbox-pv-changed {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r);
+  background: var(--sel);
+  font-size: var(--fs-md);
+  color: var(--fg-2);
+}
+.inbox-pv-changed-h {
+  font-weight: var(--fw-strong);
+  color: var(--ok);
+}
+.inbox-replies {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--sp-1);
+  font-size: var(--fs-md);
+  color: var(--fg-2);
+}
+.inbox-replies b {
+  color: var(--fg);
+  font-weight: var(--fw-strong);
+}
+/* what a render to review brings: a sentence, then the facts as label and value */
+.inbox-pv-render {
+  display: grid;
+  gap: var(--sp-3);
+}
+.inbox-pv-facts {
+  margin: 0;
+  display: grid;
+  gap: var(--sp-1);
+  font-size: var(--fs-md);
+}
+.inbox-pv-facts > div {
+  display: grid;
+  grid-template-columns: 7.5em minmax(0, 1fr);
+  gap: var(--sp-3);
+}
+.inbox-pv-facts dt {
+  color: var(--muted);
+}
+.inbox-pv-facts dd {
+  margin: 0;
+  color: var(--fg-2);
+}
+.inbox-pv-facts .num {
+  font-variant-numeric: tabular-nums;
+}
+/* a part's seam that jumps, a full render that differs from an approved part: what asks for something */
+.inbox-pv-facts .ask {
+  color: var(--should);
+}
+/* the action: the same place for every kind — the pane's bottom edge */
+.inbox-pv-act {
+  flex: none;
+  padding: var(--sp-2) var(--sp-4) var(--sp-3);
+}
+.inbox-act {
+  display: grid;
+  gap: var(--sp-2);
+}
+/* a field lifted off the pane, not a hole in it (a sunk fill reads as disabled) */
+.inbox-answer.textarea {
+  min-height: 64px;
+  font-size: var(--fs-md);
+  background: var(--ink-3);
+}
+.inbox-act-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+.inbox-act-row a.btn,
+.inbox-pv-head a.btn,
+.inbox-head a.btn {
+  text-decoration: none;
+}
+
+/* ---------------------------------------------------------------- the inbox view (InboxView.tsx, #/inbox)
+   In the library's page under its header. Wide screens: the list and the preview side by side, each its own column
+   as tall as the window leaves (library.css keeps the page from scrolling), the list scrolling inside; narrower: the
+   cards (foryou.css), one under the other, and the page scrolls. */
+.inbox-view {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-4);
+  margin-top: var(--sp-6);
+}
+/* the cards keep a reading width: a tablet stretched them across 720 px, their actions far off at the right */
+.inbox-view.cards {
+  max-width: 640px;
+}
+.inbox-view.split {
+  grid-template-columns: clamp(320px, 36%, 440px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: var(--sp-4);
+  align-items: stretch;
+}
+.inbox-view-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* room for the keyboard's ring on a row at the edge */
+  padding: var(--sp-0_5) var(--sp-1) var(--sp-4) var(--sp-0_5);
+}
+/* a soft edge where the list goes on above or below (useScrollEdges('y') in InboxView.tsx) */
+.inbox-view-list.more-t {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, var(--fg) var(--sp-6));
+  mask-image: linear-gradient(to bottom, transparent, var(--fg) var(--sp-6));
+}
+.inbox-view-list.more-b {
+  -webkit-mask-image: linear-gradient(to top, transparent, var(--fg) var(--sp-6));
+  mask-image: linear-gradient(to top, transparent, var(--fg) var(--sp-6));
+}
+.inbox-view-list.more-t.more-b {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, var(--fg) var(--sp-6), var(--fg) calc(100% - var(--sp-6)), transparent);
+  mask-image: linear-gradient(to bottom, transparent, var(--fg) var(--sp-6), var(--fg) calc(100% - var(--sp-6)), transparent);
+}
+.inbox-view .inbox-list {
+  padding: 0;
+}
+.inbox-view .inbox-group:first-child .inbox-group-h {
+  padding-top: 0;
+}
+.inbox-view-preview {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.inbox-view-preview > .inbox-preview {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* no way back to a list that is right beside it: the title starts at the edge */
+.inbox-view .inbox-pv-head {
+  padding-left: var(--sp-4);
+}
+/* nothing waits: the empty state in the middle, this device's notifications under it at a reading width */
+.inbox-view.caught-up .fy-notify {
+  justify-self: center;
+  width: 100%;
+  max-width: 560px;
+}
+
+/* phones: thumb-sized targets, inputs that don't zoom on focus */
+@media (hover: none) and (pointer: coarse) {
+  .inbox-act-row .btn,
+  .inbox-transport .btn {
+    min-height: var(--h-touch);
+  }
+  .inbox-transport .btn.icon-only {
+    min-width: var(--h-touch);
+  }
+  /* like the phone player's tools row: quiet icons at thumb size, one row, the timecode giving way first */
+  .inbox-transport {
+    gap: 0;
+  }
+  .inbox-tc {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .inbox-scrub {
+    height: var(--h-touch);
+  }
+  .inbox-scrub-head {
+    width: var(--sp-4);
+    height: var(--sp-4);
+  }
+  /* no pointer to rest on the picture or a row: "Open in player" in the head, a row's actions behind its ⋯ */
+  .inbox-stage-open.btn,
+  .inbox-row-acts {
+    display: none;
+  }
+  .inbox-row:hover .inbox-check {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .inbox-list.selecting .inbox-check {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .inbox-vmore,
+  .inbox-later-toggle,
+  .inbox-selbar .btn {
+    min-height: var(--h-touch);
+  }
+  .inbox-selbar .btn.icon-only {
+    min-width: var(--h-touch);
+  }
+  .inbox-answer.textarea {
+    font-size: var(--fs-touch);
+  }
+}
+
+/* a playbook suggestion in the preview (inbox/PlaybookPreview.tsx): the card with its diff and the decision */
+.inbox-pv-playbook {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  min-width: 0;
+}

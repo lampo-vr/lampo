@@ -1,0 +1,816 @@
+/* ---------------------------------------------------------------- the way in (ui/Entrance.tsx)
+   Every screen in front of the app — a review link's password, a link that ended, the owner's setup, sign-in, sign-up,
+   the emailed links, an invite, an app asking to connect — is one split page: on the left a panel with the logo and the
+   brand film, on the right the form (its fields and the way in: entry-form.css). Narrow windows and phones stack them:
+   a slim still band of the picture, then the logo and the form. Tokens throughout: a white mat and white film on a clean
+   paper ground in the light theme, dark film over a faint warm lamp in the dark (--film-*, base.css). */
+
+.entrance {
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  background: var(--ink-1);
+  color: var(--fg);
+}
+/* a wide screen gives the picture a little more */
+@media (min-width: 1600px) {
+  .entrance {
+    grid-template-columns: minmax(0, 11fr) minmax(0, 9fr);
+  }
+}
+
+/* ---------------------------------------------------------------- the panel: the logo, the film, its caption */
+.ent-film {
+  position: relative;
+  margin: var(--sp-2) 0 var(--sp-2) var(--sp-2);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  isolation: isolate;
+  background: radial-gradient(120% 95% at 58% 52%, var(--film-a), var(--film-b));
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+/* the room's own light, from the top left */
+.ent-film::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(70% 55% at 18% 12%, var(--film-hi), transparent 70%);
+}
+.ent-film-logo {
+  position: absolute;
+  z-index: 2;
+  left: clamp(24px, 2.4vw, 40px);
+  top: clamp(20px, 2.2vw, 32px);
+}
+.ent-film-logo .brand-logo {
+  height: 26px;
+}
+.ent-film-cap {
+  position: absolute;
+  left: clamp(24px, 2.4vw, 40px);
+  bottom: clamp(20px, 2vw, 32px);
+  right: var(--sp-8);
+  margin: 0;
+  font-size: var(--fs-md);
+  color: var(--muted);
+}
+
+/* the picture: a 640 × 520 drawing, fitted to the panel by one scale (--s, set by the script on resize only) */
+.ent-pic {
+  position: absolute;
+  left: 50%;
+  top: 49%;
+  width: 640px;
+  height: 520px;
+  margin: -260px 0 0 -320px;
+  transform: scale(var(--s, 1));
+}
+.ent-pic-glow {
+  position: absolute;
+  left: 320px;
+  top: 210px;
+  width: 720px;
+  height: 460px;
+  margin: -230px 0 0 -360px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--film-glow), transparent);
+}
+/* the frame playing: a mat with the frame's number and timecode, the shot inside, dissolving frame into frame */
+.ent-frame {
+  position: absolute;
+  left: 40px;
+  top: 66px;
+  width: 560px;
+  height: 266px;
+  border-radius: var(--r);
+  background: var(--film-mat);
+  box-shadow:
+    inset 0 0 0 1px var(--film-edge),
+    inset 0 1px 0 var(--film-top),
+    var(--shadow-film);
+}
+.ent-frame-labels {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: 9px;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  font: var(--fw-ui) var(--fs-2xs) / 1 var(--mono);
+  font-stretch: 87.5%;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--film-label);
+}
+.ent-frame-labels b,
+.ent-readout b {
+  font-weight: var(--fw-ui);
+  color: var(--brand-deep);
+}
+.ent-view {
+  position: absolute;
+  left: 12px;
+  top: 26px;
+  width: 536px;
+  height: 228px;
+  border-radius: calc(var(--r-sm) - 1px);
+  overflow: hidden;
+  background: var(--film-view);
+}
+/* The still's own tones from the first paint: a few pixels of it (brand-film/poster-lq.webp, inlined into this sheet),
+   soft, until the still is decoded and fades in over them. A black box over an empty strip was the first look of the
+   product (the still is asked for only once the form has painted: Entrance.tsx). */
+.ent-view::before {
+  content: '';
+  position: absolute;
+  inset: -12px;
+  background: url('../assets/brand-film/poster-lq.webp') center / 100% 100% no-repeat;
+  filter: blur(6px);
+}
+.ent-view::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--film-view-edge);
+}
+/* two frames, one over the other: the script sets their pictures (the poster, or a frame on its sheet) and the top
+   one's opacity; the still fades in once it is decoded */
+.ent-layer {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  opacity: 0;
+  transition: opacity var(--dur-slow) var(--ease-out);
+}
+.ent-film[data-still] .ent-layer:not(.top) {
+  opacity: 1;
+}
+.ent-layer.top {
+  transition: none;
+  will-change: opacity;
+}
+/* the strip of the same frames, gliding through the gate under the playhead */
+.ent-link {
+  position: absolute;
+  left: 319.25px;
+  top: 332px;
+  width: 1.5px;
+  height: 36px;
+  background: linear-gradient(to bottom, transparent, var(--brand));
+  opacity: 0.8;
+}
+.ent-strip {
+  position: absolute;
+  left: -480px;
+  top: 372px;
+  width: 1600px;
+  height: 72px;
+  overflow: hidden;
+  -webkit-mask: linear-gradient(90deg, transparent, #000 24%, #000 76%, transparent);
+  mask: linear-gradient(90deg, transparent, #000 24%, #000 76%, transparent);
+}
+.ent-reel {
+  position: absolute;
+  top: 0;
+  height: 72px;
+  background:
+    var(--film-perf) 0 3px / 16px 8px repeat-x,
+    var(--film-perf) 0 61px / 16px 8px repeat-x,
+    var(--film-stock);
+  box-shadow:
+    inset 0 1px 0 var(--film-stock-edge),
+    inset 0 -1px 0 var(--film-stock-edge);
+}
+.ent-th {
+  position: absolute;
+  top: 14px;
+  width: 104px;
+  height: 44px;
+  overflow: hidden;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px var(--film-view-edge);
+}
+/* each thumbnail's tones at once (brand-film/strip-lq.webp, soft), the sharp strip fading in over them once decoded;
+   both take the thumbnail's place on the sheet from its own background-position (Entrance.tsx thumbAt) */
+.ent-th::before,
+.ent-th::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-position: inherit;
+  background-size: 1000% 600%;
+}
+.ent-th::before {
+  background-image: url('../assets/brand-film/strip-lq.webp');
+  filter: blur(2px);
+}
+.ent-th::after {
+  border-radius: inherit;
+  background-image: var(--film-strip, none);
+  box-shadow: inset 0 0 0 1px var(--film-view-edge);
+  opacity: 0;
+  transition: opacity var(--dur-slow) var(--ease-out);
+}
+.ent-film[data-still] .ent-th::after {
+  opacity: 1;
+}
+.ent-gate {
+  position: absolute;
+  left: 264px;
+  top: 382px;
+  width: 112px;
+  height: 52px;
+  border-radius: var(--r-sm);
+  border: 1.5px solid var(--brand);
+  box-shadow: var(--shadow-gate);
+}
+/* the playhead's head over the gate */
+.ent-gate::before {
+  content: '';
+  position: absolute;
+  top: -13px;
+  left: 50%;
+  border: 5px solid transparent;
+  border-top: 6px solid var(--brand);
+  transform: translateX(-50%);
+}
+.ent-readout {
+  position: absolute;
+  left: 320px;
+  top: 456px;
+  display: flex;
+  gap: var(--sp-3);
+  font: var(--fw-ui) var(--fs-2xs) / 1 var(--mono);
+  font-stretch: 87.5%;
+  font-variant-numeric: tabular-nums;
+  color: var(--film-label);
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+/* ---------------------------------------------------------------- the form's side: the theme at the top, the form, the foot */
+.ent-side {
+  position: relative;
+  min-width: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll) transparent;
+}
+.ent-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: calc(env(safe-area-inset-top, 0px) + var(--sp-4)) var(--sp-3) 0 var(--sp-8);
+}
+/* the logo is the panel's here; it comes back where the panel is a band (phones) */
+.ent-top-logo {
+  display: flex;
+  visibility: hidden;
+}
+.ent-top-logo .brand-logo {
+  height: 26px;
+}
+.ent-top .ent-theme.btn {
+  position: relative;
+  color: var(--muted);
+}
+/* phones: the button keeps its size beside the logo, a finger's room around it (mobile.css grows a .btn instead) */
+@media (max-width: 639px) {
+  .ent-top .ent-theme.btn {
+    min-width: var(--h);
+    min-height: var(--h);
+  }
+  .ent-top .ent-theme.btn::after {
+    content: '';
+    position: absolute;
+    inset: calc((var(--h) - var(--h-touch)) / 2);
+  }
+}
+/* The column starts at the top of its room, and the script holds it in the middle (Entrance.tsx useHeldColumn: centred
+   when a screen opens, then what grows in it grows downward); --ent-hold: 0 leaves it at the top. */
+.ent-main {
+  --ent-hold: 1;
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  padding: var(--sp-8);
+}
+.ent-col {
+  width: min(100%, 384px);
+  display: grid;
+  gap: var(--sp-6);
+}
+.ent-foot {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: var(--sp-1);
+  min-height: calc(var(--h-touch) + env(safe-area-inset-bottom, 0px));
+  padding: 0 var(--sp-4) env(safe-area-inset-bottom, 0px);
+}
+/* the way in worked: what isn't the form steps back while the next screen comes */
+.entrance[data-opening] .ent-col > :not(form) {
+  opacity: 0.55;
+  transition: opacity var(--dur-slow);
+}
+
+/* words held in their place while they are on the way (the foot's version and source, "Forgot password?") */
+.ent-wait {
+  visibility: hidden;
+}
+/* a screen's loading state is the screen (auth/AuthScreens.tsx Frame `busy`): its parts stay the column's own */
+.ent-busy {
+  display: contents;
+}
+/* the way on, while it is decided (a link being confirmed) */
+.ent-go-sk {
+  display: block;
+}
+
+/* ---------------------------------------------------------------- the column's parts */
+/* who shared the review or who invites, a hairline under it */
+.ent-from {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+  padding-bottom: var(--sp-6);
+  border-bottom: 1px solid var(--line);
+}
+.ent-from-t {
+  display: grid;
+  min-width: 0;
+  line-height: var(--lh-ui);
+}
+.ent-from-t > b {
+  font-weight: var(--fw-strong);
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+.ent-from-t > b span {
+  font-weight: var(--fw-ui);
+  color: var(--muted);
+}
+.ent-from-t > span {
+  color: var(--muted);
+}
+.ent-from-t > span b {
+  font-weight: var(--fw-ui);
+  color: var(--fg-2);
+}
+.ent-head {
+  display: grid;
+  gap: var(--sp-2);
+}
+.ent-tile {
+  width: var(--h-lg);
+  height: var(--h-lg);
+  margin-bottom: var(--sp-2);
+  display: grid;
+  place-items: center;
+  border-radius: var(--r);
+  background: var(--ink-2);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  color: var(--fg-2);
+}
+.ent-head h1 {
+  margin: 0;
+  font: var(--fw-strong) var(--fs-2xl) / var(--lh-tight) var(--display);
+  font-stretch: 87.5%;
+  letter-spacing: var(--track-title);
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  color: var(--fg);
+}
+.ent-lede {
+  margin: 0;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+/* the address a link went to, who invites: read first in the sentence */
+.ent-lede b {
+  font-weight: var(--fw-ui);
+  color: var(--fg-2);
+  overflow-wrap: anywhere;
+}
+.ent-lede code {
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  color: var(--fg-2);
+  overflow-wrap: anywhere;
+}
+
+/* the fine print: one short line at the foot of the form, the rest behind a ? or a disclosure */
+.ent-fine {
+  display: grid;
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--line);
+}
+/* a form keeps a little more room after it than the column's step */
+.ent-col > form {
+  margin-bottom: var(--sp-3);
+}
+.ent-fine-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2) var(--sp-4);
+}
+.ent-fine p {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.ent-fine p + p {
+  flex-basis: 100%;
+}
+.ent-fine a,
+.ent-fine .ent-link-btn,
+.ent-col .terms a {
+  color: var(--fg-2);
+  text-decoration: underline;
+  text-decoration-color: var(--line-3);
+  text-underline-offset: 2px;
+}
+/* a link-like button inside a sentence ("use another address", "sign out") */
+.ent-link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+.ent-fine a:hover,
+.ent-fine .ent-link-btn:hover,
+.ent-col .terms a:hover {
+  color: var(--fg);
+  text-decoration-color: currentColor;
+}
+.ent-fine a:focus-visible,
+.ent-link-btn:focus-visible,
+.ent-col .terms a:focus-visible {
+  outline: none;
+  border-radius: var(--r-sm);
+  box-shadow: var(--focus-ring);
+}
+/* the terms under the way in, quieter still */
+.ent-col .terms {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.ent-col .terms a {
+  color: inherit;
+  text-decoration-color: var(--line-2);
+}
+
+/* A finger's room around the fine print's quiet links and buttons (the setup holds itself to 44 px; these were 15–24):
+   an invisible area over each, as tall as a finger, as wide as the words ("Forgot password?": entry-form.css). */
+@media (pointer: coarse) {
+  :is(.ent-fine a, .ent-fine .ent-link-btn, .ent-disc, .ent-copy, .ent-foot-line a, .ent-col .terms a) {
+    position: relative;
+  }
+  :is(.ent-fine a, .ent-fine .ent-link-btn, .ent-disc, .ent-copy, .ent-foot-line a, .ent-col .terms a)::after {
+    content: '';
+    position: absolute;
+    inset: min(0px, calc(50% - var(--h-touch) / 2));
+  }
+}
+
+/* a ? that opens one sentence: what the short line leaves out */
+.ent-qm {
+  position: relative;
+  display: inline-flex;
+  vertical-align: middle;
+}
+.ent-qm-b {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-full);
+  background: var(--sel);
+  color: var(--muted);
+  font: var(--fw-strong) var(--fs-2xs) / 1 var(--ui);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast),
+    color var(--dur-fast);
+}
+.ent-qm-b:hover,
+.ent-qm-b[aria-expanded='true'] {
+  background: color-mix(in srgb, var(--fg) 14%, transparent);
+  color: var(--fg);
+}
+/* a finger's room around the small round button */
+@media (pointer: coarse) {
+  .ent-qm-b::after {
+    content: '';
+    position: absolute;
+    inset: -14px;
+  }
+}
+.ent-qm-p {
+  position: absolute;
+  z-index: 5;
+  right: calc(-1 * var(--sp-2));
+  bottom: calc(100% + var(--sp-2));
+  width: max-content;
+  max-width: 240px;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r);
+  background: var(--float-bg);
+  border: 1px solid var(--float-line);
+  box-shadow: var(--shadow-float);
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-text);
+  line-height: var(--lh-ui);
+  text-align: left;
+  animation: ent-pop var(--dur) var(--ease-out);
+}
+.ent-qm.start .ent-qm-p {
+  right: auto;
+  left: calc(-1 * var(--sp-2));
+}
+@keyframes ent-pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/* Sign in an agent: a disclosure that opens a light command line */
+.ent-disc {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--sp-1) + var(--sp-0_5));
+  height: var(--h-xs);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: var(--fw-ui) var(--fs-sm) / 1 var(--ui);
+  cursor: pointer;
+}
+.ent-disc:hover,
+.ent-disc[aria-expanded='true'] {
+  color: var(--fg);
+}
+.ent-disc-chev {
+  transition: transform var(--dur) var(--ease-out);
+}
+.ent-disc[aria-expanded='true'] .ent-disc-chev {
+  transform: rotate(180deg);
+}
+.ent-disc-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--dur-slow) var(--ease-out);
+}
+.ent-disc-body.open {
+  grid-template-rows: 1fr;
+}
+.ent-disc-body > div {
+  min-height: 0;
+  overflow: hidden;
+  /* closed, nothing in it can be reached: hidden once the fold has closed */
+  visibility: hidden;
+  transition: visibility 0s linear var(--dur-slow);
+}
+.ent-disc-body.open > div {
+  visibility: visible;
+  transition-delay: 0s;
+}
+.ent-disc-body .ent-cmd {
+  margin-top: var(--sp-3);
+}
+
+/* a command to copy, like the app's Code but light: a tinted line, never a black block */
+.ent-cmd {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  height: var(--h);
+  padding: 0 calc(var(--sp-0_5) + 1px) 0 var(--sp-3);
+  border-radius: var(--r);
+  background: var(--sel);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.ent-cmd code {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  font: var(--fw-ui) var(--fs-xs) / 1.6 var(--mono);
+  font-stretch: 87.5%;
+  color: var(--fg-2);
+  scrollbar-width: none;
+}
+.ent-cmd code::-webkit-scrollbar {
+  display: none;
+}
+.ent-cmd code b {
+  font-weight: var(--fw-ui);
+  color: var(--fg);
+}
+.ent-copy {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: 24px;
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--muted);
+  font: var(--fw-ui) var(--fs-xs) / 1 var(--ui);
+  cursor: pointer;
+}
+.ent-copy:hover {
+  background: var(--sel);
+  color: var(--fg);
+}
+.ent-copy.done {
+  color: var(--ok);
+}
+
+/* "Sent again": said once under the button that sent it, its line kept */
+.ent-status {
+  margin: 0;
+  min-height: var(--h-xs);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-md);
+  color: var(--fg-2);
+}
+.ent-status .kg {
+  color: var(--ok);
+}
+
+/* the quiet line at the foot of the owner's screens: which server, its version, its source */
+.ent-foot-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1) var(--sp-2);
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.ent-foot-line i {
+  font-style: normal;
+}
+.ent-foot-line a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--line-2);
+  text-underline-offset: 2px;
+}
+.ent-foot-line a:hover {
+  color: var(--fg-2);
+}
+
+/* a review link's foot (guest/PoweredBy.tsx): the owner's quiet line's size and colour, its links plain words.
+   "Powered by Lampo" holds the middle and the source offer hangs beside it, so the line doesn't slide when the offer
+   arrives (an ended link asks /api/info for it) */
+.ent-foot .g-foot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  width: 100%;
+  gap: var(--sp-1) var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.ent-foot .g-foot .g-powered {
+  grid-column: 2;
+}
+.ent-foot .g-foot :is(.g-foot-dot, .g-source) {
+  grid-row: 1;
+  grid-column: 3;
+  justify-self: start;
+}
+/* after the dot, in the same cell */
+.ent-foot .g-foot .g-source {
+  margin-left: calc(var(--sp-2) + 0.4em);
+}
+.ent-foot .g-foot a {
+  height: auto;
+  padding: 0;
+  border-radius: var(--r-sm);
+}
+.ent-foot .g-foot a:hover {
+  background: none;
+  color: var(--fg-2);
+}
+.ent-foot .g-foot .g-powered b,
+.ent-foot .g-foot .brand-mark {
+  color: var(--muted);
+}
+.ent-foot .g-foot .g-source {
+  text-decoration: underline;
+  text-decoration-color: var(--line-2);
+  text-underline-offset: 2px;
+}
+/* the operator's imprint and privacy policy: a line of their own under the badge, centred (the badge hidden: the one
+   line, the source offer first) */
+.ent-foot .g-foot .g-legal {
+  grid-column: 1 / -1;
+  justify-self: center;
+}
+.ent-foot .g-foot .g-legal .g-source {
+  margin-left: 0;
+}
+.ent-foot .g-foot .g-legal a {
+  text-decoration: underline;
+  text-decoration-color: var(--line-2);
+  text-underline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ent-layer,
+  .ent-th::after,
+  .ent-disc-chev,
+  .ent-disc-body {
+    transition: none;
+  }
+}
+
+/* ---------------------------------------------------------------- narrow windows and phones: stacked, a slim band of
+   the picture on top, then the logo and the form */
+@media (max-width: 820px) {
+  .entrance {
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+  }
+  .ent-film {
+    flex: none;
+    height: calc(188px + env(safe-area-inset-top, 0px));
+    margin: 0;
+    border-radius: 0 0 var(--r-lg) var(--r-lg);
+  }
+  .ent-film-cap,
+  .ent-film-logo {
+    display: none;
+  }
+  /* the band draws the picture at under half its size: its frame number and timecode would be 4 px specks */
+  .ent-frame-labels,
+  .ent-readout {
+    display: none;
+  }
+  .ent-pic {
+    top: calc(50% + env(safe-area-inset-top, 0px) / 2);
+  }
+  .ent-side {
+    flex: 1 0 auto;
+    overflow: visible;
+  }
+  .ent-top {
+    padding: var(--sp-4) var(--sp-3) 0 var(--sp-6);
+  }
+  .ent-top-logo {
+    visibility: visible;
+  }
+  .ent-top-logo .brand-logo {
+    height: 24px;
+  }
+  .ent-main {
+    padding: var(--sp-6) var(--sp-6) var(--sp-4);
+  }
+  /* a tablet: the column at a reading width in the middle of the room under the band (stretched to 720 px, its fields
+     and buttons read as a phone's blown up, and short screens hung in the top third) */
+  .ent-col {
+    width: min(100%, 440px);
+  }
+}
+@media (max-width: 560px) {
+  /* a phone: the column the screen's width, right under the logo */
+  .ent-main {
+    --ent-hold: 0;
+    justify-items: stretch;
+  }
+  .ent-col {
+    width: 100%;
+  }
+  .ent-cmd {
+    height: 36px;
+  }
+}

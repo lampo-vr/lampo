@@ -1,0 +1,16 @@
+Subject: Setze dein Passwort für Lampo zurück
+
+Passwort zurücksetzen
+
+Hallo Mia,
+
+Jemand, hoffentlich du, möchte das Passwort deines Kontos auf review.example.com zurücksetzen.
+
+Neues Passwort wählen:
+https://review.example.com/#/reset/rt_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+
+Der Link funktioniert einmal, 60 Minuten lang. Ein neues Passwort meldet dich auf allen anderen Geräten ab. Wenn du das nicht warst, ignoriere diese E-Mail: Dein Passwort bleibt, wie es ist.
+
+--
+Du bekommst diese E-Mail, weil du ein Konto auf review.example.com hast.
+Lampo · review.example.com

@@ -1,0 +1,349 @@
+/* ---------------------------------------------------------------- uploads */
+
+/* The tray (uploads/UploadTray.tsx): bottom left, above the page, below toasts — in the float material every popover
+   and menu wears. A head with the whole upload's progress (a ring, the share in numbers), then a row per video. */
+.up-tray {
+  position: fixed;
+  left: var(--sp-4);
+  bottom: calc(var(--sp-4) + env(safe-area-inset-bottom));
+  z-index: var(--z-uploads);
+  width: 360px;
+  max-width: calc(100vw - 2 * var(--sp-4));
+  border-radius: var(--r-lg);
+  border: 1px solid var(--float-line);
+  background: var(--float-bg);
+  box-shadow: var(--shadow-float);
+  overflow: hidden;
+  --float-y: var(--sp-2);
+  animation: float-in var(--dur-slow) var(--ease-out) both;
+}
+.up-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1);
+}
+.up-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: var(--h);
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  font: var(--fw-ui) var(--fs-md) / var(--lh-ui) var(--ui);
+  color: var(--fg);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+.up-title:hover {
+  background: var(--float-sel);
+}
+/* the keyboard's ring only: a click never leaves one behind (the head takes no focus from a pointer) */
+.up-title:focus {
+  outline: none;
+}
+.up-title:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+/* the whole upload: a ring that fills, a check once through, a cross when something failed */
+.up-state {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--ic);
+  height: var(--ic);
+  color: var(--muted);
+}
+.up-state.ok {
+  color: var(--ok);
+}
+.up-state.err {
+  color: var(--must);
+}
+.up-ring {
+  display: block;
+  transform: rotate(-90deg);
+}
+.up-ring circle {
+  fill: none;
+  stroke-width: 2;
+}
+.up-ring-track {
+  stroke: var(--line-2);
+}
+.up-ring-fill {
+  stroke: var(--fg);
+  stroke-linecap: round;
+  transition: stroke-dasharray var(--dur-slow) var(--ease-out);
+}
+.up-ring-spin {
+  width: var(--ic-sm);
+  height: var(--ic-sm);
+}
+.up-pct {
+  flex: none;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.up-chev {
+  flex: none;
+  color: var(--faint);
+  transition: transform var(--dur) var(--ease-out);
+}
+.up-flip {
+  transform: rotate(180deg);
+}
+.up-clear.btn {
+  flex: none;
+}
+.up-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  max-height: min(46vh, 380px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-top: 1px solid var(--line);
+}
+.up-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+}
+.up-row + .up-row {
+  border-top: 1px solid var(--line);
+}
+/* what it is, on a small tile: a film while it goes, a check once in, a cross when it failed */
+.up-tile {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--h);
+  height: var(--h);
+  border-radius: var(--r);
+  background: var(--sel);
+  color: var(--muted);
+}
+.up-row.done .up-tile {
+  color: var(--ok);
+  background: var(--ok-bg);
+}
+.up-row.failed .up-tile {
+  color: var(--must);
+  background: var(--must-bg);
+}
+.up-row.interrupted .up-tile {
+  color: var(--should);
+  background: var(--should-bg);
+}
+.up-row.canceled {
+  opacity: 0.55;
+}
+/* waiting for room on the plan: calm, a hollow keyframe in the should colour (nothing failed) */
+.up-row.room .up-tile {
+  color: var(--should);
+  background: var(--should-bg);
+}
+.up-sub.up-room {
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-2);
+}
+.up-room-acts {
+  flex-basis: 100%;
+  display: flex;
+  gap: var(--sp-1);
+  /* ghost buttons on a line of their own: their words start where the sentence does */
+  margin-left: calc(-1 * var(--sp-2));
+}
+.up-main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-1);
+}
+.up-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.up-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: var(--fw-ui);
+}
+.up-num {
+  flex: none;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.up-sub {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+/* sent of what, the speed, the time left: the UI's face, figures that don't dance */
+.up-stats {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.up-sub.ok {
+  color: var(--ok);
+}
+.up-sub.err {
+  color: var(--must-2);
+}
+.up-sub .spinner {
+  width: var(--sp-3);
+  height: var(--sp-3);
+}
+.up-bar.progress {
+  height: 3px;
+  margin: var(--sp-0_5) 0;
+}
+
+/* phones: across the bottom, clear of the home indicator */
+@media (max-width: 639px) {
+  .up-tray {
+    left: var(--sp-2);
+    right: var(--sp-2);
+    bottom: calc(var(--sp-2) + env(safe-area-inset-bottom));
+    width: auto;
+    max-width: none;
+  }
+}
+@media (hover: none) and (pointer: coarse) {
+  .up-title {
+    height: var(--h-touch);
+  }
+}
+
+/* the upload dialog: where the videos go */
+.up-where {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-2);
+}
+.up-where-note {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+/* dropping files onto the window */
+.drop-veil {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-top);
+  display: grid;
+  place-items: center;
+  background: var(--veil);
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+  animation: veil-in 0.18s ease-out both;
+}
+@keyframes veil-in {
+  from {
+    opacity: 0;
+  }
+}
+.drop-frame {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-16) var(--sp-20) var(--sp-12);
+  border-radius: var(--r);
+  background: var(--well);
+  box-shadow:
+    0 0 0 1px var(--line-3),
+    var(--shadow-float);
+  transform: rotate(-1.5deg);
+  animation: drop-lift 0.4s var(--ease) both;
+}
+.drop-frame::before,
+.drop-frame::after {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  height: 10px;
+  background: var(--ruler) repeat-x center;
+}
+.drop-frame::before {
+  top: 8px;
+}
+.drop-frame::after {
+  bottom: 8px;
+}
+@keyframes drop-lift {
+  from {
+    transform: rotate(-1.5deg) scale(0.96);
+    opacity: 0;
+  }
+}
+.drop-frame .icon {
+  color: var(--fg);
+}
+.drop-frame h2 {
+  margin: var(--sp-1) 0 0;
+  font: var(--fw-strong) semi-condensed var(--fs-3xl) / var(--lh-tight) var(--display);
+  letter-spacing: var(--track-title);
+}
+.drop-frame p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-md);
+}
+
+/* the upload dialog's file list */
+.up-files {
+  display: grid;
+  gap: 1px;
+  max-height: 220px;
+  overflow: auto;
+  border-radius: var(--r);
+  background: var(--line);
+  border: 1px solid var(--line-2);
+}
+/* on the dialog's own surface, in the same hairline box as the project picker under it */
+.up-file {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--h-lg);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--float-bg);
+  font-size: var(--fs-md);
+}
+.up-file .icon {
+  color: var(--fg-2);
+}
+.up-file .mono {
+  font-size: var(--fs-xs);
+}
+.up-file.bad {
+  color: var(--muted);
+}
+.up-file.bad .icon {
+  color: var(--must);
+}
+.up-why {
+  color: var(--must-2);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}

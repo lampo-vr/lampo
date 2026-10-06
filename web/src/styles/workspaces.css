@@ -1,0 +1,30 @@
+/* Workspaces (auth/Workspaces.tsx): the mark in the switcher and Settings → Workspace, and the "New workspace" dialog.
+   A hosted server only. Tokens only. */
+
+/* a workspace's mark: its first letter on a quiet tile */
+.ws-mark {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: var(--ic);
+  height: var(--ic);
+  border-radius: var(--r-sm);
+  background: var(--ink-3);
+  border: 1px solid var(--line-2);
+  color: var(--fg-2);
+  font: var(--fw-strong) var(--fs-xs) / 1 var(--ui);
+  letter-spacing: 0;
+}
+.ws-mark.md {
+  width: var(--h-xs);
+  height: var(--h-xs);
+  font-size: var(--fs-sm);
+}
+
+/* the dialog (its field and button: ui/EntryForm.tsx) */
+.ws-new-lede {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+}

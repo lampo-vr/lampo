@@ -1,0 +1,425 @@
+/* ---------------------------------------------------------------- recorded feedback (player/record/)
+   The bar over the picture while recording (a dark island like the walkie-talkie's, where the mic being live is always
+   shown), the Record button beside + Note, and the drafts in the notes panel: composer-like cards, text first. */
+
+.rec-bar {
+  position: absolute;
+  top: var(--sp-4);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: calc(100% - var(--sp-8));
+  height: var(--h-lg);
+  padding: 0 var(--sp-1) 0 var(--sp-4);
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--ink-1) 90%, transparent);
+  border: 1px solid color-mix(in srgb, var(--must) 55%, transparent);
+  box-shadow: var(--shadow-float);
+  color: var(--fg);
+  white-space: nowrap;
+  backdrop-filter: blur(10px);
+  animation: toast 0.25s var(--ease);
+}
+.rec-bar.paused {
+  border-color: var(--line-3);
+}
+.rec-bar.paused .rec-dot {
+  animation: none;
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--must);
+}
+.rec-live {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-weight: var(--fw-ui);
+}
+.rec-time {
+  min-width: 4ch;
+  font: var(--fw-ui) var(--fs-md) var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-2);
+}
+/* the microphone's level, written into --lvl by the recorder: five bars, the middle ones the tallest */
+.rec-meter {
+  --lvl: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-0_5);
+  height: var(--sp-4);
+  padding-inline: var(--sp-1);
+}
+.rec-meter i {
+  width: var(--sp-0_5);
+  height: var(--sp-4);
+  border-radius: var(--r-sm);
+  background: var(--fg-2);
+  transform: scaleY(calc(0.18 + var(--lvl) * 1.6));
+  transition: transform 0.08s linear;
+}
+.rec-meter i:nth-child(2),
+.rec-meter i:nth-child(4) {
+  transform: scaleY(calc(0.18 + var(--lvl) * 2.4));
+}
+.rec-meter i:nth-child(3) {
+  transform: scaleY(calc(0.2 + var(--lvl) * 3.2));
+}
+.rec-bar.paused .rec-meter i {
+  transform: scaleY(0.18);
+}
+.rec-tools,
+.rec-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-0_5);
+}
+.rec-tools {
+  padding-left: var(--sp-2);
+  border-left: 1px solid var(--line-2);
+}
+.rec-tools .btn.on {
+  background: var(--raise-sheen), var(--ink-4);
+  box-shadow: var(--raise);
+  color: var(--fg);
+}
+.rec-actions {
+  padding-left: var(--sp-2);
+  border-left: 1px solid var(--line-2);
+}
+.rec-actions > .btn.ghost {
+  color: var(--fg-2);
+}
+
+/* the Record button in the notes panel's head */
+.rec-btn .rec-glyph {
+  color: var(--must);
+}
+.rec-btn .rec-glyph.off {
+  color: var(--faint);
+}
+.rec-btn[aria-disabled='true'] {
+  color: var(--muted);
+}
+.rec-btn.on {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--must) 55%, transparent);
+}
+.rec-btn.on .rec-glyph {
+  animation: blink 1s infinite;
+}
+
+/* ---------------------------------------------------------------- not sent yet (player/drafts/Unsent.tsx)
+   One holding area for every note not sent: the ones saved in the composer and what a recording said. It is the quiet
+   material of a keyframe still to come — a dashed outline, no fill of its own, hollow keyframes — so it never reads as
+   a sent note (solid, on ink) and says so without colour. The cards inside are the composer's, still open to change. */
+.unsent {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  border: 1px dashed var(--line-3);
+  border-radius: var(--r-lg);
+}
+/* The head (and the question a Send asked) stays pinned at the top of the notes while the drafts scroll under it, until
+   the area has scrolled past. Pinned, it stands on the panel's own ground, grain and all, with the panel's soft edge
+   below it — the cards fade under it, never a line or a shadow — and it never reaches the filters above the list. */
+.unsent-pin {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+.unsent-top {
+  position: sticky;
+  /* a pinned box keeps clear of its scroller's padding: up by the notes list's own (notes.css .side-scroll), flush
+     under the filters */
+  top: calc(-1 * var(--sp-3));
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-2);
+  /* out to the area's dashed edge, so what scrolls under it never shows beside it */
+  margin: calc(-1 * var(--sp-2)) calc(-1 * var(--sp-2)) 0;
+  padding: var(--sp-2) var(--sp-2) 0;
+}
+.unsent-top[data-stuck] {
+  background: var(--ink-2);
+}
+.unsent-top[data-stuck]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: var(--grain);
+  opacity: var(--grain-o);
+  pointer-events: none;
+}
+.unsent-top[data-stuck]::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: var(--sp-6);
+  background: linear-gradient(var(--ink-2), transparent);
+  pointer-events: none;
+}
+/* stacked under the picture the page scrolls (notes.css): pinned to the window's top */
+@media (max-width: 820px) {
+  .side:not(.nsheet) .unsent-top {
+    top: 0;
+  }
+}
+/* a draft brought into view under the pinned head (the keyboard going on to the next one) clears it */
+.unsent .draft,
+.unsent .draft :is(button, textarea) {
+  scroll-margin-top: calc(var(--h-touch) + var(--sp-6));
+}
+.unsent-send {
+  flex: none;
+}
+/* "Send 3 to <agent>": the words keep their room, the agent's name gives way (ellipsis) on a narrow panel */
+.unsent-send:has(.unsent-send-label) {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.unsent-send-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.unsent-agent {
+  display: inline-block;
+  max-width: 11em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+.unsent-head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--h-sm);
+  padding-left: var(--sp-1);
+}
+.unsent-kg {
+  --kg-size: 11px;
+  color: var(--fg-2);
+}
+.unsent-title {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--fw-strong) var(--fs-md) / var(--lh-ui) var(--ui);
+  color: var(--fg);
+}
+.unsent-title .unsent-n {
+  font-family: var(--mono);
+  font-weight: var(--fw-ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.unsent-note {
+  margin: calc(-1 * var(--sp-1)) 0 0;
+  padding-left: var(--sp-6);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-ui);
+  /* a narrow panel breaks the line before a word is left alone on the next */
+  text-wrap: pretty;
+}
+/* sending: the keyframes turn to the hourglass (time passing) and the cards hold still */
+.draft[aria-busy='true'] {
+  opacity: 0.7;
+}
+/* Sent: the keyframe is set and the card leaves — it fades as its room closes, one card (its own Send) or every card
+   at once (Send all), and the whole area with them when nothing is left (useUnsent.ts keeps them in place meanwhile,
+   card.ts gives the room a height to close from). */
+.unsent[data-going='leaving'],
+.unsent .draft[data-going='leaving'],
+.unsent .drafts[data-going='leaving'] {
+  overflow: hidden;
+  pointer-events: none;
+  animation: draft-leave var(--dur) var(--ease-in) forwards;
+}
+@keyframes draft-leave {
+  to {
+    height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-top-width: 0;
+    border-bottom-width: 0;
+    /* the gap after it closes too */
+    margin-bottom: calc(-1 * var(--sp-2));
+    opacity: 0;
+  }
+}
+/* a recording's drafts inside the holding area: a group with its own head, no second box around it */
+.unsent .drafts {
+  padding: var(--sp-1) 0 0;
+  border: 0;
+  border-top: 1px dashed var(--line-2);
+  border-radius: 0;
+  background: none;
+}
+.unsent-note + .drafts {
+  border-top: 0;
+}
+.drafts-discard {
+  color: var(--muted);
+}
+/* every draft: a hollow keyframe in its head, as on the timeline before a key is set */
+.draft-kg {
+  --kg-size: 10px;
+  color: var(--fg-2);
+}
+.note-draft .draft-where.overall {
+  cursor: default;
+}
+
+/* drafts in the notes panel */
+.drafts {
+  display: grid;
+  /* the column shrinks to the panel: an implicit one grows to its widest content */
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border-radius: var(--r-lg);
+  border: 1px solid color-mix(in srgb, var(--must) 35%, var(--line-2));
+  background: var(--ink-2);
+}
+.drafts-head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-md);
+}
+.drafts-head .rec-dot {
+  width: var(--sp-2);
+  height: var(--sp-2);
+  animation: none;
+  box-shadow: none;
+}
+.drafts[aria-busy='true'] .drafts-head .rec-dot {
+  animation: blink 1s infinite;
+}
+.drafts-len {
+  font: var(--fw-ui) var(--fs-sm) var(--mono);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.drafts-note {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+}
+.drafts-note.busy {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+.drafts-note.busy > span {
+  min-width: 0;
+}
+.draft {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border-radius: var(--r);
+  border: 1px solid var(--line-2);
+  background: var(--ink-3);
+  box-shadow: var(--shadow-raise);
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+.draft:hover,
+.draft:focus-within {
+  border-color: var(--line-3);
+}
+.draft-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--h-sm);
+}
+.draft-where {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draft-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.draft .draft-text {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--fg);
+  font-size: var(--fs-lg);
+  line-height: var(--lh-body);
+  resize: none;
+}
+.draft .draft-text:focus {
+  outline: none;
+  box-shadow: none;
+}
+.draft-heard {
+  display: flex;
+  gap: var(--sp-1);
+  align-items: baseline;
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+}
+.draft-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+.draft-foot > .btn.ghost {
+  color: var(--muted);
+}
+.draft-foot > .btn.ghost:hover {
+  color: var(--fg);
+}
+/* the card's own Send, at the foot's end as in the composer: a step above Delete beside it */
+.draft-foot > .btn.ghost.draft-send:not(:disabled) {
+  color: var(--fg-2);
+}
+.draft-foot > .btn.ghost.draft-send:not(:disabled):hover {
+  color: var(--fg);
+}
+.draft-tag {
+  gap: var(--sp-1);
+}
+.drafts-head b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

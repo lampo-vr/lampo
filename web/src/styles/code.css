@@ -1,0 +1,64 @@
+/* ---------------------------------------------------------------- a snippet to paste (settings/parts.tsx Code)
+   Its own sheet: Settings and the sign-in screen (Agents sign in with vr login …) both show one. */
+
+/* the label and its one Copy on top, the text below (no label: the Copy beside it); lines break at spaces only, never
+   inside a token, a URL or a path, and what still doesn't fit scrolls sideways with a soft edge */
+.set-code {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--sp-2);
+  border-radius: var(--r);
+  background: var(--ink-0);
+  box-shadow: 0 0 0 1px var(--line-2);
+}
+.set-code-label {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  padding: var(--sp-1) 0 0 var(--sp-3);
+  overflow: hidden;
+  font: var(--fw-ui) var(--fs-xs) var(--ui);
+  color: var(--muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.set-copy {
+  grid-column: 2;
+  grid-row: 1;
+  margin: var(--sp-1) var(--sp-1) 0 0;
+}
+.set-code pre {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  margin: 0;
+  padding: var(--sp-1) var(--sp-3) var(--sp-3);
+  overflow-x: auto;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  white-space: pre-wrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  color: var(--fg);
+  scrollbar-width: thin;
+}
+/* a command's --header "…" or --token -: kept together, on a line of its own once the line is full */
+.set-code-arg {
+  display: inline-block;
+}
+/* a run of non-spaces (a token, a URL, a path): never broken, not even after its - or / */
+.set-code-w {
+  white-space: nowrap;
+}
+.set-code.bare pre {
+  grid-column: 1;
+  grid-row: 1;
+  padding: var(--sp-2) var(--sp-3);
+}
+.set-code.bare .set-copy {
+  margin: 0 var(--sp-1) 0 0;
+}
+/* a config (JSON, TOML) keeps its lines; a long one scrolls sideways */
+.set-code.lines pre {
+  white-space: pre;
+}

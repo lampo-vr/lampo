@@ -1,0 +1,469 @@
+{
+  "about": "Natural-language B-roll requests with their right answers. rel = the shots that answer: photo keys (sources.json) plus, when given, the camera move, aspect, minimum length, burned-in text ('none' = no text at all, also none in the picture) and what is said. tags say what makes a query hard.",
+  "sets": {
+    "on_white": [
+      "phone_black_white",
+      "succulent_white",
+      "daisy_white",
+      "pencils_white",
+      "flatlay_white",
+      "perfume_pink",
+      "coffee_white",
+      "phone_white",
+      "salad_white",
+      "peonies",
+      "x_burger_5",
+      "x_perfume_0",
+      "x_perfume_6",
+      "x_backpack_1"
+    ]
+  },
+  "queries": [
+    {
+      "id": "q01",
+      "q": "product close-up on white, slow push-in, ≥ 2 s, 9:16, no text",
+      "tags": ["motion", "aspect", "duration", "no-text"],
+      "rel": {
+        "set": "on_white",
+        "motion": ["push-in"],
+        "aspect": "9:16",
+        "minSec": 2,
+        "text": "none"
+      }
+    },
+    {
+      "id": "q02",
+      "q": "product close-up on a white background, slow push-in, at least 2 seconds, no text",
+      "tags": ["motion", "duration", "no-text"],
+      "rel": {
+        "set": "on_white",
+        "motion": ["push-in"],
+        "minSec": 2,
+        "text": "none"
+      }
+    },
+    {
+      "id": "q03",
+      "q": "static shot of a perfume bottle on a light background, no text",
+      "tags": ["motion", "no-text", "similar"],
+      "rel": {
+        "keys": ["perfume_pink"],
+        "motion": ["static"],
+        "text": "none"
+      }
+    },
+    {
+      "id": "q04",
+      "q": "the perfume shot with the words NEW SCENT",
+      "tags": ["text"],
+      "rel": {
+        "keys": ["perfume_pink"],
+        "text": "NEW SCENT"
+      }
+    },
+    {
+      "id": "q05",
+      "q": "someone pouring milk into a cup of coffee",
+      "tags": ["visual"],
+      "rel": {
+        "keys": ["pour_milk", "latte_pour", "x_pouring_coffee_1"]
+      }
+    },
+    {
+      "id": "q06",
+      "q": "barista pouring water from a kettle for pour-over coffee",
+      "tags": ["visual"],
+      "rel": {
+        "keys": ["pour_kettle", "pour_white_kettle", "x_pouring_coffee_5"]
+      }
+    },
+    {
+      "id": "q07",
+      "q": "espresso machine filling a white cup",
+      "tags": ["visual"],
+      "rel": {
+        "keys": ["espresso"]
+      }
+    },
+    {
+      "id": "q08",
+      "q": "latte art next to a laptop, top view",
+      "tags": ["visual", "similar"],
+      "rel": {
+        "keys": ["latte_laptop"]
+      }
+    },
+    {
+      "id": "q09",
+      "q": "latte art with a croissant on a wooden table",
+      "tags": ["visual", "similar"],
+      "rel": {
+        "keys": ["latte_croissant"]
+      }
+    },
+    {
+      "id": "q10",
+      "q": "hand holding a cup of black coffee, vertical 9:16",
+      "tags": ["visual", "aspect", "similar"],
+      "rel": {
+        "keys": ["coffee_hand", "x_coffee_cup_4"],
+        "aspect": "9:16"
+      }
+    },
+    {
+      "id": "q11",
+      "q": "white sneakers on asphalt seen from above",
+      "tags": ["visual"],
+      "rel": {
+        "keys": ["sneaker_feet_top"]
+      }
+    },
+    {
+      "id": "q12",
+      "q": "someone tying their shoelaces",
+      "tags": ["visual"],
+      "rel": {
+        "keys": ["lace_bench", "lace_city"]
+      }
+    },
+    {
+      "id": "q13",
+      "q": "runner on an empty road at sunset, static shot",
+      "tags": ["motion", "similar"],
+      "rel": {
+        "keys": ["runner_road"],
+        "motion": ["static"]
+      }
+    },
+    {
+      "id": "q14",
+      "q": "runner on an empty road at sunset, slow push-in",
+      "tags": ["motion", "similar"],
+      "rel": {
+        "keys": ["runner_road"],
+        "motion": ["push-in"]
+      }
+    },
+    {
+      "id": "q15",
+      "q": "people jogging across a bridge",
+      "tags": ["visual"],
+      "rel": {
+        "keys": ["runners_bridge"]
+      }
+    },
+    {
+      "id": "q16",
+      "q": "sprinter at the starting line on a running track",
+      "tags": ["visual"],
+      "rel": {
+        "keys": ["sprinter"]
+      }
+    },
+    {
+      "id": "q17",
+      "q": "the sneaker shot that says FREE SHIPPING",
+      "tags": ["text", "similar"],
+      "rel": {
+        "keys": ["sneaker_flatlay"],
+        "text": "FREE SHIPPING"
+      }
+    },
+    {
+      "id": "q18",
+      "q": "luxury wristwatch close-up",
+      "tags": ["visual"],
+      "rel": {
+        "keys": ["watch_rings", "watch_dark"]
+      }
+    },
+    {
+      "id": "q19",
+      "q": "where the voice-over says the battery lasts all week",
+      "tags": ["said"],
+      "rel": {
+        "said": "battery lasts all week"
+      }
+    },
+    {
+      "id": "q20",
+      "q": "wo die Sprecherin „in zehn Minuten fertig“ sagt",
+      "tags": ["said", "german"],
+      "rel": {
+        "said": "In zehn Minuten fertig"
+      }
+    },
+    {
+      "id": "q21",
+      "q": "hands typing on a laptop keyboard, at least 5 seconds",
+      "tags": ["visual", "duration", "similar"],
+      "rel": {
+        "keys": ["typing_close", "typing_dim"],
+        "minSec": 5
+      }
+    },
+    {
+      "id": "q22",
+      "q": "two women talking at a table by a window",
+      "tags": ["visual"],
+      "rel": {
+        "keys": ["meeting_window"]
+      }
+    },
+    {
+      "id": "q23",
+      "q": "team meeting in a conference room",
+      "tags": ["visual"],
+      "rel": {
+        "keys": ["meeting_room", "x_meeting_0", "x_meeting_1", "x_meeting_2", "x_meeting_7"]
+      }
+    },
+    {
+      "id": "q24",
+      "q": "sticky notes in a brainstorming session",
+      "tags": ["visual"],
+      "rel": {
+        "keys": ["brainstorm"]
+      }
+    },
+    {
+      "id": "q25",
+      "q": "chef plating food in a restaurant kitchen",
+      "tags": ["visual"],
+      "rel": {
+        "keys": ["chef_plating"]
+      }
+    },
+    {
+      "id": "q26",
+      "q": "vegetables cooking in a frying pan",
+      "tags": ["visual"],
+      "rel": {
+        "keys": ["pan_tomatoes"]
+      }
+    },
+    {
+      "id": "q27",
+      "q": "bell peppers splashing into water on black",
+      "tags": ["visual"],
+      "rel": {
+        "keys": ["peppers_splash"]
+      }
+    },
+    {
+      "id": "q28",
+      "q": "juicy burger in front of bokeh lights",
+      "tags": ["visual", "similar"],
+      "rel": {
+        "keys": ["burger_dark", "burger_dark2"]
+      }
+    },
+    {
+      "id": "q29",
+      "q": "busy street crossing at night with neon signs",
+      "tags": ["visual"],
+      "rel": {
+        "keys": ["crossing_night"]
+      }
+    },
+    {
+      "id": "q30",
+      "q": "the STREET CLOSED sign",
+      "tags": ["text"],
+      "rel": {
+        "keys": ["street_closed"]
+      }
+    },
+    {
+      "id": "q31",
+      "q": "city skyline at night reflected in the water, panning",
+      "tags": ["visual", "motion"],
+      "rel": {
+        "keys": ["skyline_night", "x_skyline_6"],
+        "motion": ["pan-left", "pan-right"]
+      }
+    },
+    {
+      "id": "q32",
+      "q": "highway light trails at dusk, pull-out, longer than 8 seconds",
+      "tags": ["motion", "duration", "similar"],
+      "rel": {
+        "keys": ["highway_dusk"],
+        "motion": ["pull-out"],
+        "minSec": 8
+      }
+    },
+    {
+      "id": "q33",
+      "q": "waves crashing on the shore",
+      "tags": ["visual"],
+      "rel": {
+        "keys": ["wave_break", "beach_wave", "x_ocean_waves_3", "x_ocean_waves_7"]
+      }
+    },
+    {
+      "id": "q34",
+      "q": "aerial view of a winding road through the forest",
+      "tags": ["visual"],
+      "rel": {
+        "keys": ["aerial_road"]
+      }
+    },
+    {
+      "id": "q35",
+      "q": "mountain lake with reflections, panning right",
+      "tags": ["visual", "motion"],
+      "rel": {
+        "keys": ["lake_reflection", "x_mountains_0"],
+        "motion": ["pan-right"]
+      }
+    },
+    {
+      "id": "q36",
+      "q": "misty pine forest, tilt up",
+      "tags": ["motion", "similar"],
+      "rel": {
+        "keys": ["misty_forest", "x_forest_1", "x_forest_3", "x_mountains_5"],
+        "motion": ["tilt-up"]
+      }
+    },
+    {
+      "id": "q37",
+      "q": "handheld shot of a fruit and vegetable market",
+      "tags": ["motion", "similar"],
+      "rel": {
+        "keys": ["market", "x_vegetables_1"],
+        "motion": ["handheld"]
+      }
+    },
+    {
+      "id": "q38",
+      "q": "golden retriever on a white background",
+      "tags": ["visual"],
+      "rel": {
+        "keys": ["dog_white"]
+      }
+    },
+    {
+      "id": "q39",
+      "q": "pug wrapped in a blanket",
+      "tags": ["visual"],
+      "rel": {
+        "keys": ["pug_blanket", "x_dog_0"]
+      }
+    },
+    {
+      "id": "q40",
+      "q": "photographer pointing a camera at us",
+      "tags": ["visual"],
+      "rel": {
+        "keys": ["photographer", "x_camera_5"]
+      }
+    },
+    {
+      "id": "q41",
+      "q": "woman doing yoga on the beach, 16:9",
+      "tags": ["visual", "aspect", "similar"],
+      "rel": {
+        "keys": ["yoga_beach"],
+        "aspect": "16:9"
+      }
+    },
+    {
+      "id": "q42",
+      "q": "pizza and red wine from above",
+      "tags": ["visual"],
+      "rel": {
+        "keys": ["pizza_wine"]
+      }
+    },
+    {
+      "id": "q43",
+      "q": "bouquet of tulips, pull-out",
+      "tags": ["visual", "motion"],
+      "rel": {
+        "keys": ["tulips", "x_plant_5"],
+        "motion": ["pull-out"]
+      }
+    },
+    {
+      "id": "q44",
+      "q": "smartphone lying on a white background, no text",
+      "tags": ["visual", "no-text", "similar"],
+      "rel": {
+        "keys": ["phone_black_white", "phone_white", "phone_laptop_white"],
+        "text": "none"
+      }
+    },
+    {
+      "id": "q45",
+      "q": "the lower third with the name Anna Berg",
+      "tags": ["text"],
+      "rel": {
+        "keys": ["meeting_window"]
+      }
+    }
+  ],
+  "german": [
+    {
+      "id": "g05",
+      "like": "q05",
+      "q": "jemand gießt Milch in eine Tasse Kaffee"
+    },
+    {
+      "id": "g11",
+      "like": "q11",
+      "q": "weiße Sneaker auf Asphalt von oben"
+    },
+    {
+      "id": "g12",
+      "like": "q12",
+      "q": "jemand bindet sich die Schnürsenkel"
+    },
+    {
+      "id": "g16",
+      "like": "q16",
+      "q": "Sprinter am Start auf einer Laufbahn"
+    },
+    {
+      "id": "g23",
+      "like": "q23",
+      "q": "Teambesprechung in einem Konferenzraum"
+    },
+    {
+      "id": "g25",
+      "like": "q25",
+      "q": "Koch richtet Essen in einer Restaurantküche an"
+    },
+    {
+      "id": "g27",
+      "like": "q27",
+      "q": "Paprika fällt vor schwarzem Hintergrund ins Wasser"
+    },
+    {
+      "id": "g33",
+      "like": "q33",
+      "q": "Wellen brechen am Strand"
+    },
+    {
+      "id": "g34",
+      "like": "q34",
+      "q": "Luftaufnahme einer kurvigen Straße durch den Wald"
+    },
+    {
+      "id": "g38",
+      "like": "q38",
+      "q": "Golden Retriever vor weißem Hintergrund"
+    },
+    {
+      "id": "g39",
+      "like": "q39",
+      "q": "Mops in eine Decke gewickelt"
+    },
+    {
+      "id": "g42",
+      "like": "q42",
+      "q": "Pizza und Rotwein von oben"
+    }
+  ]
+}

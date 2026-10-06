@@ -1,0 +1,13 @@
+{
+  "name": "lampo-footage-bench",
+  "private": true,
+  "description": "Benchmark dependencies for bench/footage (embedding runtimes and vector stores). Not app dependencies: install with npm install --prefix bench/footage.",
+  "type": "module",
+  "dependencies": {
+    "@huggingface/tokenizers": "0.2.0",
+    "@huggingface/transformers": "4.3.0",
+    "@lancedb/lancedb": "0.39.0",
+    "onnxruntime-node": "1.30.0",
+    "sqlite-vec": "0.1.9"
+  }
+}

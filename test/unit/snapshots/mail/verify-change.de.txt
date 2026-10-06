@@ -1,0 +1,16 @@
+Subject: Bestätige deine neue E-Mail-Adresse für Lampo
+
+Bestätige deine neue Adresse
+
+Hallo Mia,
+
+Du möchtest dich auf review.example.com ab jetzt mit mia@studio.example anmelden. Bestätige, dass die Adresse dir gehört, dann wird sie übernommen.
+
+Neue Adresse bestätigen:
+https://review.example.com/#/verify/vt_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+Bis dahin meldest du dich weiter mit deiner bisherigen Adresse an. Der Link funktioniert einmal, 24 Stunden lang. Nicht von dir? Dann ignoriere diese E-Mail.
+
+--
+Du bekommst diese E-Mail, weil diese Adresse für ein Konto auf review.example.com eingetragen wurde.
+Lampo · review.example.com

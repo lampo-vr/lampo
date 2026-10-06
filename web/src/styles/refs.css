@@ -1,0 +1,262 @@
+/* ---------------------------------------------------------------- references on notes (web/src/refs/) */
+
+/* One fixed box per reference (16:10), whatever it shows: nothing moves when a still arrives. */
+.refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: var(--sp-0_5) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.ref {
+  position: relative;
+  display: grid;
+  gap: var(--sp-0_5);
+  width: 76px;
+  min-width: 0;
+}
+.ref-box {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: var(--sp-0_5);
+  width: 76px;
+  aspect-ratio: 16 / 10;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--ink-0);
+  box-shadow: 0 0 0 1px var(--line-2);
+  color: var(--fg-2);
+  cursor: zoom-in;
+  text-decoration: none;
+  transition: box-shadow var(--dur) var(--ease-out);
+}
+.ref-link .ref-box {
+  cursor: pointer;
+  background: var(--ink-3);
+}
+.ref-box:hover {
+  box-shadow: 0 0 0 1px var(--line-3);
+}
+.ref-box:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+.ref-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ref-site {
+  max-width: 68px;
+  overflow: hidden;
+  font-size: var(--fs-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* What it is, in the corner: clip length, a moment, an image. */
+.ref-mark {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-0_5);
+  height: 16px;
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--ink-0) 78%, transparent);
+  color: var(--fg);
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  pointer-events: none;
+}
+.ref-link .ref-mark {
+  display: none;
+}
+.ref-cap,
+.ref-cap-edit {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ref-cap-edit {
+  height: 22px;
+  padding: 0 var(--sp-1);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: var(--ink-1);
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--fs-xs);
+}
+/* Over the tile's corner: the button family's sizes would make it an oval here. */
+.ref .ref-remove.btn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  min-height: 0;
+  padding: 0;
+  border-radius: var(--r-full);
+  background: var(--ink-1);
+  box-shadow: 0 0 0 1px var(--line-2);
+}
+.msg .refs,
+.act .refs {
+  margin-left: var(--sp-6);
+}
+
+/* the viewer */
+.ref-view {
+  display: grid;
+  gap: var(--sp-3);
+}
+.ref-view > img,
+.ref-view > video,
+.ref-frames img {
+  display: block;
+  width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  background: var(--ink-0);
+}
+.ref-frames.two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-2);
+}
+.ref-view-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- the composer's references */
+
+.composer-refs {
+  display: grid;
+  gap: var(--sp-2);
+}
+.ref-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1);
+}
+.ref-pending {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ref-pending .ref-box {
+  cursor: default;
+}
+.ref-pending .ref-progress {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  left: 4px;
+}
+.ref-drop {
+  outline: 2px dashed var(--line-3);
+  outline-offset: -4px;
+}
+/* a link typed under the composer's text */
+.ref-link-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  margin-top: calc(-1 * var(--sp-1));
+  color: var(--muted);
+}
+.ref-link-row .input {
+  flex: 1;
+  min-width: 0;
+  height: var(--h-sm);
+  font-size: var(--fs-sm);
+}
+.ref-link-form {
+  display: grid;
+  gap: var(--sp-2);
+  width: min(340px, calc(100vw - 32px));
+}
+
+/* the frame picker */
+.fpick {
+  display: grid;
+  gap: var(--sp-3);
+}
+.fpick-list {
+  display: grid;
+  gap: var(--sp-1);
+  max-height: 180px;
+  overflow: auto;
+}
+.fpick-video {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 40px;
+  padding: var(--sp-1) var(--sp-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+}
+.fpick-video:hover,
+.fpick-video.on {
+  background: var(--ink-3);
+}
+.fpick-video img,
+.fpick-poster {
+  width: 56px;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  background: var(--ink-0);
+}
+.fpick-video span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fpick-stage {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--ink-0);
+}
+.fpick-stage img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.fpick-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.fpick-row input[type='range'] {
+  flex: 1 1 200px;
+}

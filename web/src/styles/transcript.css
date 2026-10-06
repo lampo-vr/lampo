@@ -1,0 +1,267 @@
+/* The transcript tab (player/Transcript.tsx): what is said, line by line in time. Reading first — the words in the body
+   face at the notes' size, the line being heard brighter, the word being heard lit; a timecode per line to go there;
+   words picked (selected like text) wait in the bar at the bottom to be played or changed. */
+
+/* under the head: search, and the comparison with another version (the notes' filters' place and height) */
+.tr-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.tr-search {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+.tr-search .icon {
+  position: absolute;
+  left: var(--sp-2);
+  top: 50%;
+  translate: 0 -50%;
+  color: var(--faint);
+  pointer-events: none;
+}
+.tr-search .input {
+  width: 100%;
+  padding-left: var(--sp-8);
+}
+.tr-tools .btn {
+  flex: none;
+}
+
+/* the list scrolls under a bar that stays at its bottom (at the panel's foot, however short the list) */
+.tr-scroll.side-scroll {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+.tr-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-2);
+  align-content: start;
+  min-width: 0;
+}
+.tr-lines {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-1);
+  min-width: 0;
+}
+.tr-line {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: var(--sp-1) var(--sp-1);
+  border-radius: var(--r);
+  min-width: 0;
+}
+.tr-line[data-here] {
+  background: var(--ink-1);
+}
+.tr-tc {
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  font-stretch: 87.5%;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  padding: var(--sp-0_5) var(--sp-1);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  user-select: none;
+  white-space: nowrap;
+}
+button.tr-tc {
+  cursor: pointer;
+}
+button.tr-tc:hover,
+.tr-line[data-here] .tr-tc {
+  color: var(--fg);
+  background: var(--ink-4);
+}
+button.tr-tc:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.tr-words {
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.tr-line[data-here] .tr-words {
+  color: var(--fg);
+}
+/* a word: a place to go on click, its timecode on hover; the padding is taken back so lighting one moves nothing */
+.tr-words [data-w] {
+  padding: 0.05em 0.15em;
+  margin: 0 -0.15em;
+  border-radius: var(--r-sm);
+  box-decoration-break: clone;
+  cursor: pointer;
+}
+.tr-words [data-w]:hover {
+  background: var(--ink-3);
+}
+.tr-words [data-w][data-now] {
+  color: var(--fg);
+  background: var(--ink-4);
+  box-shadow: 0 0 0 1px var(--line-3);
+}
+.tr-words .tr-hit {
+  color: var(--fg);
+  background: var(--should-bg);
+}
+/* a note already asks for other words here */
+.tr-words .tr-ed {
+  text-decoration: underline dashed var(--must);
+  text-underline-offset: 0.25em;
+}
+/* picked, while the browser's own selection is gone (a click on the video) */
+.tr-words .tr-sel {
+  background: var(--float-sel);
+  color: var(--fg);
+}
+
+/* what this version says differently */
+.tr-diff del {
+  color: var(--fg-2);
+  text-decoration: line-through;
+  text-decoration-color: var(--must);
+  background: var(--must-bg);
+  border-radius: var(--r-sm);
+  padding: 0 0.15em;
+}
+.tr-diff ins {
+  color: var(--fg);
+  text-decoration: none;
+  background: var(--ok-bg);
+  border-radius: var(--r-sm);
+  padding: 0 0.15em;
+}
+.tr-status {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0 var(--sp-1);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+/* under the lines: what heard them and in which language (the timing's caveat behind its ⓘ), captions to download,
+   hearing it again — detected, or in a language picked because detection got it wrong */
+.tr-foot {
+  display: grid;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+  padding: var(--sp-3) var(--sp-1) var(--sp-4);
+  border-top: 1px solid var(--line);
+}
+.tr-heard {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-height: var(--h-xs);
+  margin: 0;
+  min-width: 0;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-ui);
+  color: var(--muted);
+}
+.tr-heard > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tr-heard-info {
+  flex: none;
+  display: inline-flex;
+  border-radius: var(--r-sm);
+  cursor: help;
+}
+.tr-heard-info:hover {
+  color: var(--fg-2);
+}
+.tr-heard-info:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.tr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+/* Listen again (the language detected) | ▾ (another one): one control in two halves */
+.tr-again {
+  flex: none;
+  display: inline-flex;
+}
+.tr-again > .btn:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.tr-again > .btn:last-child {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 0;
+}
+
+/* The words picked (or the line under the playhead), to play or to change: what they are and where on top, the words,
+   the two actions. One height while the playhead moves on (the line in one row, the hint in the same room); a selection
+   shows up to two rows of its words. In the list's flow at its end, so the last lines scroll clear of it. */
+/* Words picked: a small bar floating right above them (Transcript.tsx SelectionBar) */
+.tr-body {
+  position: relative;
+}
+.tr-float {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1);
+  border: 1px solid var(--float-line);
+  border-radius: var(--r);
+  background: var(--float-bg);
+  box-shadow: var(--shadow-float);
+  white-space: nowrap;
+}
+/* The actions on a line: play it, change its words — on the line you are at or point at, their room always kept */
+.tr-line {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+.tr-line-acts {
+  display: flex;
+  gap: var(--sp-0_5);
+  align-self: center;
+  visibility: hidden;
+  user-select: none;
+}
+.tr-line:hover .tr-line-acts,
+.tr-line:focus-within .tr-line-acts,
+.tr-line[data-here] .tr-line-acts {
+  visibility: visible;
+}
+@media (hover: none) {
+  .tr-line:hover:not([data-here]) .tr-line-acts {
+    visibility: hidden;
+  }
+}
+.tr-hint {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+/* more lines below: the list fades out at the panel's foot while it goes on (useScrollEdges' more-b), not at its end */
+.tr-scroll.more-b {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--sp-12)), transparent);
+}

@@ -1,0 +1,9 @@
+Subject: Your trial has ended
+
+The trial has ended
+
+The workspace is on the free plan now.
+
+--
+You get this because you have a workspace on review.example.com.
+Lampo · review.example.com

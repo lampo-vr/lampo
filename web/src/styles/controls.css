@@ -1,0 +1,532 @@
+/* ---------------------------------------------------------------- controls */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  height: var(--h);
+  padding: 0 var(--sp-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-2);
+  background: var(--ink-3);
+  color: var(--fg);
+  cursor: pointer;
+  white-space: nowrap;
+  font-weight: var(--fw-ui);
+  /* a link dressed as a button is a button: no underline */
+  text-decoration: none;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    transform 0.1s;
+}
+.btn:hover {
+  background: var(--ink-4);
+  border-color: var(--line-3);
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
+}
+/* The raised material (base.css --raise*) in the brand's colour: the one action a view is for, in both themes the
+   same orange button the client's invitation opens with. Selected and active states keep the neutral material.
+   Hover lights it (its glow) rather than lightening it: a lighter fill would take the white label under AA. */
+.btn.primary {
+  background: var(--raise-sheen), var(--brand-deep);
+  border-color: var(--brand-deep);
+  color: var(--on-brand);
+  font-weight: var(--fw-strong);
+  box-shadow: var(--raise);
+}
+.btn.primary:hover {
+  background: var(--raise-sheen), var(--brand-deep);
+  border-color: var(--brand-deep);
+  box-shadow: var(--raise-edge), var(--shadow-brand);
+}
+.btn.primary:not(:disabled):active {
+  box-shadow: var(--press);
+}
+.icon.spark {
+  color: var(--claude);
+}
+.btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--fg-2);
+}
+.btn.ghost:hover {
+  background: var(--ink-3);
+  color: var(--fg);
+}
+.btn.ok {
+  background: var(--ok-bg);
+  border-color: color-mix(in srgb, var(--ok) 35%, transparent);
+  color: var(--ok);
+}
+.btn.ok:hover {
+  background: color-mix(in srgb, var(--ok) 18%, transparent);
+}
+.btn.danger:hover {
+  color: var(--must);
+  border-color: color-mix(in srgb, var(--must) 45%, transparent);
+}
+.btn.sm {
+  height: var(--h-sm);
+  padding: 0 var(--sp-2);
+  font-size: var(--fs-sm);
+  gap: var(--sp-1);
+}
+.btn.icon-only {
+  width: var(--h);
+  padding: 0;
+}
+.btn.sm.icon-only {
+  width: var(--h-sm);
+}
+/* Pressed toggles (Compare while comparing, a drawing tool in use): the raised material, surface tone. */
+.btn.on {
+  background: var(--raise-sheen), var(--ink-3);
+  border-color: var(--line-2);
+  color: var(--fg);
+  box-shadow: var(--raise);
+}
+/* a toggle that is on stays on under the pointer (a ghost's hover would flatten it right after the click) */
+.btn.on:hover {
+  background: var(--raise-sheen), var(--ink-3);
+  color: var(--fg);
+}
+/* The voice button while the microphone is live (ui/VoiceButton.tsx): in the must colour, not the pressed material */
+.btn.voice-btn.on,
+.btn.voice-btn.on:hover {
+  background: var(--must-bg);
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--must);
+}
+kbd {
+  font: var(--fw-ui) var(--fs-xs) / var(--lh-tight) var(--keys);
+  padding: var(--sp-0_5) var(--sp-1) 1px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  border-bottom-width: 2px;
+  background: var(--ink-2);
+  color: var(--muted);
+}
+.btn.ok kbd {
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+  border-color: color-mix(in srgb, var(--ok) 30%, transparent);
+  color: var(--ok);
+}
+.btn.primary kbd {
+  background: color-mix(in srgb, var(--on-brand) 14%, transparent);
+  border-color: color-mix(in srgb, var(--on-brand) 30%, transparent);
+  color: var(--on-brand);
+}
+.input {
+  height: var(--h);
+  padding: 0 var(--sp-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-2);
+  background: var(--ink-0);
+  outline: none;
+  min-width: 0;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.input:hover {
+  border-color: var(--line-3);
+}
+.input:focus,
+.textarea:focus {
+  border-color: var(--fg-2);
+  box-shadow: var(--focus-ring);
+}
+/* Text fields grow with what is typed (where the browser can size fields to their content) up to a limit, instead of a
+ * resize handle in the corner. */
+textarea {
+  resize: none;
+  field-sizing: content;
+  max-height: 40vh;
+}
+.textarea {
+  width: 100%;
+  min-height: 74px;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-2);
+  background: var(--ink-0);
+  outline: none;
+  line-height: var(--lh-body);
+}
+.textarea::placeholder,
+.input::placeholder {
+  color: var(--faint);
+}
+.select.sm {
+  height: var(--h-sm);
+  font-size: var(--fs-sm);
+}
+select.input {
+  padding-right: var(--sp-6);
+  appearance: none;
+  background-image: var(--chevron);
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  cursor: pointer;
+}
+/* A sunken track; the chosen item is lifted out of it (the raised material, surface tone). */
+.seg {
+  display: inline-flex;
+  padding: var(--sp-0_5);
+  gap: var(--sp-0_5);
+  border-radius: var(--r);
+  background: var(--ink-0);
+  border: 1px solid var(--line);
+  box-shadow: var(--sunk);
+}
+.seg button {
+  /* the group is one control: its outer height is --h (2 px padding and a 1 px border each side) */
+  height: calc(var(--h) - 6px);
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-ui);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+.seg button:hover {
+  color: var(--fg);
+}
+.seg button.on {
+  background: var(--raise-sheen), var(--ink-3);
+  color: var(--fg);
+  box-shadow: var(--raise);
+}
+/* Tabs are a segmented track too: one look for every "choose one of these". */
+.tabs {
+  display: inline-flex;
+  padding: var(--sp-0_5);
+  gap: var(--sp-0_5);
+  border-radius: var(--r);
+  background: var(--ink-0);
+  border: 1px solid var(--line);
+  box-shadow: var(--sunk);
+}
+.tabs button {
+  position: relative;
+  height: calc(var(--h) - 6px);
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-ui);
+  display: inline-flex;
+  gap: var(--sp-1);
+  align-items: center;
+  white-space: nowrap;
+}
+/* A count in a chip, a segment or a tab (here, the lanes' .seg-count, the tags' .tagf .n): a quiet second word — the
+   UI's face a step smaller than the label, tabular figures, muted. The mono face at 11 px stood as tall as the 12 px
+   label beside it and sat on its own baseline: the numbers read bigger than the words. */
+.tabs button .n {
+  font: var(--fw-ui) var(--fs-xs) / 1 var(--ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.tabs button .n.ok {
+  color: var(--ok);
+}
+.tabs button .n.idea {
+  color: var(--idea);
+}
+.tabs button .n.q {
+  color: var(--claude-2);
+}
+.tabs button:hover {
+  color: var(--fg);
+}
+.tabs button.on {
+  color: var(--fg);
+  background: var(--raise-sheen), var(--ink-3);
+  box-shadow: var(--raise);
+}
+.tabs button.on .n {
+  color: var(--fg-2);
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: var(--h-xs);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-full);
+  border: 1px solid var(--line-2);
+  background: transparent;
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  transition: all 0.12s;
+}
+button.chip {
+  cursor: pointer;
+}
+button.chip:hover {
+  border-color: var(--line-3);
+  color: var(--fg);
+}
+/* A chosen chip: the raised material, strong tone (the same 3D look as a primary button). */
+.chip.on {
+  background: var(--raise-sheen), var(--fg);
+  border-color: var(--fg);
+  color: var(--on-fg);
+  font-weight: var(--fw-ui);
+  box-shadow: var(--raise);
+}
+.chip.love.on {
+  background: var(--raise-sheen), var(--ok);
+  border-color: var(--ok);
+  color: var(--on-ok);
+}
+/* Status marks in lists: keyframe glyphs (ui/KeyGlyph.tsx), shape by meaning. .dot is the same for markup that
+   isn't a component (the settings' agent list). */
+.nav-kg {
+  --kg-size: 8px;
+  color: var(--faint);
+}
+.nav-kg.must {
+  color: var(--must);
+}
+.nav-kg.ok {
+  color: var(--ok);
+}
+.nav-kg.live {
+  color: var(--claude);
+  animation: kg-turn 3.2s var(--ease-in-out) infinite;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  background: var(--faint);
+  -webkit-mask: var(--kg-outline) center / contain no-repeat;
+  mask: var(--kg-outline) center / contain no-repeat;
+}
+.dot.must {
+  background: var(--must);
+  -webkit-mask-image: var(--kg-diamond);
+  mask-image: var(--kg-diamond);
+}
+.dot.ok {
+  background: var(--ok);
+  -webkit-mask-image: var(--kg-half);
+  mask-image: var(--kg-half);
+}
+/* An agent at work: the easy-ease hourglass, turning slowly like a render in progress. */
+.dot.live {
+  background: var(--claude);
+  -webkit-mask-image: var(--kg-ease);
+  mask-image: var(--kg-ease);
+  animation: kg-turn 3.2s var(--ease-in-out) infinite;
+}
+@keyframes kg-turn {
+  0%,
+  40% {
+    transform: rotate(0);
+  }
+  60%,
+  100% {
+    transform: rotate(180deg);
+  }
+}
+.sev {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font: var(--fw-strong) var(--fs-xs) / var(--lh-tight) var(--ui);
+}
+/* Severity by keyframe shape (ui/glyphs.ts): must solid, should half, nice hollow, an idea a circle. */
+.sev::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  flex: none;
+  background: currentColor;
+  -webkit-mask: var(--kg, var(--kg-diamond)) center / contain no-repeat;
+  mask: var(--kg, var(--kg-diamond)) center / contain no-repeat;
+}
+.sev.must {
+  color: var(--must);
+}
+.sev.should {
+  --kg: var(--kg-half);
+  color: var(--should);
+}
+.sev.nice {
+  --kg: var(--kg-outline);
+  color: var(--nice);
+}
+/* An idea is optional: the auto-bezier circle. */
+.sev.idea {
+  --kg: var(--kg-circle);
+  color: var(--idea);
+}
+/* Not feedback at all: agent-coloured; a question waits (the hourglass), an info note just is (hold). */
+.sev.question,
+.sev.info,
+.sev.agent {
+  color: var(--claude-2);
+}
+.sev.question,
+.sev.agent {
+  --kg: var(--kg-ease);
+}
+.sev.info {
+  --kg: var(--kg-hold);
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: 20px;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-sm);
+  font: var(--fw-ui) var(--fs-xs) var(--ui);
+  font-stretch: 87.5%;
+  background: var(--ink-4);
+  color: var(--fg-2);
+  white-space: nowrap;
+  border: 0;
+}
+button.badge {
+  cursor: pointer;
+}
+.badge.ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.badge.warn {
+  background: var(--should-bg);
+  color: var(--should);
+}
+.badge.idea {
+  background: var(--idea-bg);
+  color: var(--idea);
+}
+.badge.danger {
+  background: var(--must-bg);
+  color: var(--must);
+}
+.badge.accent,
+.badge.claude {
+  background: var(--claude-bg);
+  color: var(--claude-3);
+}
+
+/* loading */
+.spinner {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: var(--r-full);
+  border: 1.75px solid color-mix(in srgb, var(--fg) 16%, transparent);
+  border-top-color: var(--fg);
+  animation: spin 0.75s linear infinite;
+}
+.btn.primary .spinner {
+  border-color: color-mix(in srgb, var(--on-brand) 30%, transparent);
+  border-top-color: var(--on-brand);
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* icons only (Segmented iconOnly): square buttons, the words are in the tooltip */
+.seg.icons button {
+  width: 28px;
+  padding: 0;
+  justify-content: center;
+}
+.seg.icons button:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 1px;
+}
+
+/* A text field that grows with its text (ui/controls.tsx AutoTextarea sets its height): no inner scrollbar, no cap. */
+.textarea.autotext {
+  min-height: 0;
+  max-height: none;
+  overflow: hidden;
+  font: inherit;
+  font-size: var(--fs-md);
+}
+
+/* Slider (ui/controls.tsx) */
+.slider {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 20px;
+  touch-action: none;
+  user-select: none;
+  cursor: pointer;
+}
+.slider-track {
+  position: relative;
+  flex: 1;
+  height: 3px;
+  border-radius: var(--r-sm);
+  background: var(--line-3);
+}
+.slider-range {
+  position: absolute;
+  height: 100%;
+  border-radius: var(--r-sm);
+  background: var(--fg-2);
+}
+.slider-thumb {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--r-full);
+  background: var(--fg);
+  box-shadow: var(--raise-drop);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.slider-thumb:hover {
+  transform: scale(1.12);
+}
+.slider-thumb:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+
+/* A sideways strip with more to one side (lib/hooks.ts useScrollEdges): a soft edge there, none at its ends, so an
+   item cut by the screen's edge reads as "scroll for more", not as broken. */
+.more-r {
+  mask-image: linear-gradient(to right, #000 calc(100% - var(--sp-8)), transparent);
+}
+.more-l {
+  mask-image: linear-gradient(to left, #000 calc(100% - var(--sp-8)), transparent);
+}
+.more-l.more-r {
+  mask-image: linear-gradient(to right, transparent, #000 var(--sp-8), #000 calc(100% - var(--sp-8)), transparent);
+}

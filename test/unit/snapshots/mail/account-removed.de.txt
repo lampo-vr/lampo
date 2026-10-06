@@ -1,0 +1,13 @@
+Subject: Dein Konto bei Lampo wurde gelöscht
+
+Dein Konto wurde gelöscht
+
+Hallo Mia,
+
+Ein Admin von review.example.com hat dein Konto gelöscht. Du kannst dich dort nicht mehr anmelden; deine Notizen bleiben beim Team, mit deinem Namen.
+
+Fragen? Wende dich an die Person, die review.example.com betreibt.
+
+--
+Du bekommst diese E-Mail, weil du ein Konto auf review.example.com hast.
+Lampo · review.example.com

@@ -1,0 +1,11 @@
+/home/alex/work/demo/export/cutdown.mp4  (FILE MISSING)
+folder Demo/Cutdowns · project work/demo · v1 · 160×90 · 25 fps · 25 frames · 1s
+session - · open 1 (must 1) · fixed 0 · verified 0 · wontfix 0
+stage changes · Changes requested on V1 (team): Fix the audio pop first
+Frames are 0-based at the file fps; timecode is mm:ss:ff; drawings are in video pixels.
+frames: get_note <id> shows a note in full (its frames and files)
+
+c_6d58d9 OPEN MUST 00:00:15 f15 v1 [audio]
+  Audio pops at the cut
+
+as of <now>

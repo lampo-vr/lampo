@@ -1,0 +1,744 @@
+/* The checkout step (billing/Checkout.tsx, conversion SPEC §5): its own step inside Settings → Billing, the form beside
+   the sticky order; one column inside a limit sheet. One control scale with the app's entry fields and Stripe's frames:
+   40 px fields with 12 px labels above (44 px / 16 px on touch). Information is --muted, never --faint. */
+.co {
+  container: co / inline-size;
+  display: grid;
+  gap: var(--sp-3);
+}
+.co.page {
+  animation: rise 360ms var(--ease-out) both;
+}
+/* the step sets its own rhythm: no browser margins on its headings, paragraphs and lists */
+.co :is(h1, h2, h3, p, dl, dd) {
+  margin: 0;
+}
+.co-crumb {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.co-crumb .btn-link {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.co-crumb .btn-link:hover {
+  color: var(--fg);
+}
+.co-crumb b {
+  font-weight: var(--fw-ui);
+  color: var(--fg-2);
+}
+.co-head {
+  display: grid;
+  gap: var(--sp-1);
+}
+.co-title {
+  font: var(--fw-strong) var(--fs-3xl) / var(--lh-tight) var(--display);
+  font-stretch: semi-condensed;
+  letter-spacing: var(--track-title);
+  outline: none;
+}
+.co-head p {
+  color: var(--muted);
+}
+.co-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  gap: var(--sp-12);
+  align-items: start;
+  margin-top: var(--sp-4);
+}
+.co-form {
+  display: grid;
+  gap: var(--sp-8);
+  max-width: 560px;
+}
+.co-failed {
+  display: grid;
+  justify-items: start;
+  gap: var(--sp-2);
+}
+/* the payment form not allowed in the cookie settings (billing/PaymentsConsent.tsx): what it needs, the ways on */
+.co-consent {
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.co-consent p {
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+.co-consent-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+/* receipts: where invoices go, and its Change */
+.co-mail {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--h-lg);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.co-mail > span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.co-mail b {
+  font-weight: var(--fw-ui);
+  color: var(--fg);
+}
+.co-mail small {
+  color: var(--muted);
+}
+.co-mail > .icon {
+  color: var(--muted);
+}
+.co-lk {
+  font-size: var(--fs-sm);
+  text-decoration: underline;
+  text-decoration-color: var(--line-3);
+}
+.co-mail-f {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: end;
+  gap: var(--sp-2);
+}
+
+/* the form's two numbered parts */
+.co-sec {
+  display: grid;
+  gap: var(--sp-3);
+}
+.co-sec h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding-bottom: var(--sp-1);
+  font: var(--fw-strong) var(--fs-lg) / var(--lh-tight) var(--ui);
+}
+.co-n {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--ink-4);
+  font: var(--fw-strong) var(--fs-xs) / 1 var(--mono);
+}
+.co-chk {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--h);
+  font-size: var(--fs-md);
+  color: var(--fg-2);
+  cursor: pointer;
+}
+.co-chk input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--fg);
+}
+/* the business box: optional, its second line says what it is for */
+.co-chk.co-biz {
+  align-items: flex-start;
+  padding: var(--sp-2) 0;
+}
+.co-chk.co-biz input {
+  margin-top: 1px;
+}
+.co-chk-t {
+  display: grid;
+  gap: var(--sp-0_5);
+}
+.co-chk-t small {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  text-wrap: pretty;
+}
+/* "Cancel contracts here" (billing/Cancel.tsx): how, as two choices in the business box's form */
+.co-radios {
+  display: grid;
+  gap: var(--sp-2);
+}
+.co-chk.co-radio {
+  align-items: flex-start;
+  padding: var(--sp-3);
+  border-radius: var(--r);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.co-chk.co-radio.on {
+  background: var(--sel);
+  box-shadow: inset 0 0 0 1px var(--line-3);
+}
+.co-chk.co-radio input {
+  margin-top: 1px;
+}
+.co .input.co-in.co-reason {
+  height: auto;
+  min-height: calc(var(--h-lg) * 2);
+  padding: var(--sp-2) var(--sp-3);
+  resize: vertical;
+}
+.co-facts.one {
+  grid-template-columns: minmax(0, 1fr);
+}
+/* under the plan's own hairline: one line between them, not two */
+.co-plan + .co-facts.one > div:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+/* above the order button: a consumer's express start (§ 356(4) / § 357a BGB), then the terms line */
+.co-chk.co-start {
+  align-items: flex-start;
+  min-height: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-ui);
+  text-wrap: pretty;
+}
+.co-chk.co-start input {
+  margin-top: var(--sp-0_5);
+}
+.co-chk.co-start.miss {
+  box-shadow: inset 0 0 0 1px var(--must);
+}
+.co-terms {
+  font-size: var(--fs-xs);
+  line-height: var(--lh-ui);
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.co-terms a {
+  color: var(--fg-2);
+  text-decoration: underline;
+  text-decoration-color: var(--line-3);
+  text-underline-offset: 2px;
+}
+.co-terms a:hover {
+  color: var(--fg);
+}
+
+/* our own fields on the page take the frames' size */
+.co-f {
+  display: grid;
+  gap: calc(var(--sp-1) + var(--sp-0_5));
+  min-width: 0;
+}
+.co-l {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-ui);
+  line-height: 1.3;
+  color: var(--fg-2);
+}
+.co .input.co-in {
+  width: 100%;
+  height: var(--h-lg);
+  padding: 0 var(--sp-3);
+  border-radius: var(--r);
+  font-size: var(--fs-md);
+}
+.co .btn.lg {
+  border-radius: var(--r);
+}
+/* the business's name and VAT ID in fields of our own (no reverse charge, so no Stripe Tax ID Element): side by side
+   like Stripe's tax ID pair, stacked where that would be too narrow */
+.co-biz-f {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  align-items: start;
+  gap: var(--sp-3);
+}
+.co-biz-f .bill-error {
+  font-size: var(--fs-xs);
+}
+@container co (max-width: 480px) {
+  .co-biz-f {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* one of Stripe's elements: its slots (its room while it loads) and its frame share a cell. The slots copy what real
+   Stripe.js draws with our appearance (measured in this grid, desktop and touch, 358–560 px; Stripe's wrapper's -4 px
+   margins stay inside the cell): 12 px labels on a 15.6 px line (17.6 on touch) 6 px above 40 px fields (44), rows
+   12 px apart; below 450 px the tax ID's type and number stack and the card's terms take a third line. */
+.co-el {
+  container: coel / inline-size;
+  position: relative;
+  display: grid;
+}
+.co-el > * {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+.co-el:not(.ready) > .co-el-frame,
+.co-el.ready > .co-slots {
+  visibility: hidden;
+}
+/* until ready, the frame's own first guess at its height (Stripe's frames start taller) mustn't stretch the room */
+.co-el:not(.ready) > .co-el-frame {
+  position: absolute;
+  inset: 0 0 auto;
+}
+.co-slots {
+  display: grid;
+  align-content: start;
+  gap: var(--sp-3);
+}
+.co-slot-f {
+  display: grid;
+  gap: calc(var(--sp-1) + var(--sp-0_5));
+  min-width: 0;
+}
+.co-slot-l {
+  overflow: hidden;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-ui);
+  line-height: 1.3;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.co-slot-box {
+  height: var(--h-lg);
+  border-radius: var(--r);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.co-slot-2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--sp-3);
+}
+.co-slot-terms {
+  height: 22.83px;
+}
+/* a setup's or a payment's terms are longer: three lines from 358 px up */
+.co-slot-terms.intent {
+  height: 37.68px;
+}
+@container coel (max-width: 449.98px) {
+  .co-slot-2.stack {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .co-slot-terms {
+    height: 37.68px;
+  }
+}
+
+/* the order */
+.co-sum {
+  position: sticky;
+  top: var(--sp-4);
+  display: grid;
+  gap: var(--sp-3);
+}
+.co-sum.panel {
+  padding: calc(var(--sp-4) + var(--sp-1));
+}
+.co-plan {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--line);
+}
+.co-plan-t {
+  flex: 1;
+  display: grid;
+  min-width: 0;
+}
+.co-plan-t b {
+  font: var(--fw-strong) var(--fs-xl) / var(--lh-tight) var(--ui);
+}
+.co-plan-t span {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.co-lines {
+  display: grid;
+  margin: 0;
+}
+.co-lines > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: calc(var(--sp-1) + var(--sp-0_5)) 0;
+  font-variant-numeric: tabular-nums;
+}
+.co-lines dt {
+  display: grid;
+  min-width: 0;
+  color: var(--fg-2);
+}
+.co-lines dt small {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.co-lines dd {
+  margin: 0;
+  white-space: nowrap;
+}
+.co-lines > .muted dt,
+.co-lines > .muted dd {
+  color: var(--muted);
+}
+.co-lines > .disc dd {
+  color: var(--ok);
+}
+.co-lines > .co-total {
+  margin-top: var(--sp-1);
+  padding-top: calc(var(--sp-2) + var(--sp-0_5));
+  border-top: 1px solid var(--line-2);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-strong);
+}
+.co-lines > .co-total dt {
+  color: var(--fg);
+}
+.co-lines > .co-promo {
+  display: grid;
+  gap: var(--sp-1);
+  padding: var(--sp-1) 0 var(--sp-2);
+}
+.co-promo-open {
+  justify-self: start;
+  font-size: var(--fs-sm);
+}
+.co-promo-f {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-2);
+}
+.co-promo-on {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--h-lg);
+  padding: var(--sp-1) var(--sp-1) var(--sp-1) var(--sp-3);
+  border-radius: var(--r);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  font-size: var(--fs-sm);
+}
+.co-promo-on > .icon {
+  color: var(--ok);
+}
+.co-promo-on b {
+  font: var(--fw-strong) var(--fs-xs) / 1 var(--mono);
+}
+.co-promo-on span {
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.co-promo-x {
+  width: var(--h);
+}
+.co-due {
+  display: grid;
+  gap: var(--sp-1);
+  padding: var(--sp-3);
+  border-radius: var(--r);
+  background: var(--ok-bg);
+}
+.co-due > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  font-weight: var(--fw-strong);
+  color: var(--ok);
+  font-variant-numeric: tabular-nums;
+}
+.co-due p,
+.co-ends {
+  font-size: var(--fs-xs);
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+.co-go {
+  display: grid;
+  gap: var(--sp-2);
+}
+.co-safe {
+  font-size: var(--fs-xs);
+  line-height: var(--lh-ui);
+  color: var(--muted);
+  text-align: center;
+  text-wrap: balance;
+}
+.co-safe .icon {
+  display: inline-block;
+  margin-right: var(--sp-1);
+  vertical-align: -2px;
+}
+.co-bar {
+  display: none;
+}
+
+/* a new card or an open invoice (billing/Pay.tsx IntentForm), inside the account panel's box */
+.co-intent {
+  display: grid;
+  gap: var(--sp-3);
+}
+.co-intent-acts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}
+
+/* done: calm, the plan named, four facts */
+.co.done {
+  max-width: 680px;
+}
+.co-paid {
+  container: copaid / inline-size;
+  display: grid;
+  gap: var(--sp-4);
+}
+.co-paid.panel {
+  padding: var(--sp-8);
+}
+/* the trial's ruler fills in one sweep of light: the days to come one after another, the playhead runs off the end,
+   the end keyframe pops to solid --ok; without motion it simply stands full */
+.co-paid-ruler {
+  position: relative;
+}
+.co-paid-ruler .bill-ruler.sweep .bill-ruler-cells i {
+  background: var(--fg-2);
+}
+.co-paid-ruler .bill-ruler.sweep .bill-ruler-cells i[style] {
+  animation: co-fill 600ms var(--ease-out) both;
+  animation-delay: calc(200ms + var(--i, 0) * 40ms);
+}
+.co-paid-ruler .bill-ruler.sweep .bill-ruler-ph {
+  opacity: 0;
+  animation: co-run 1.1s 200ms var(--ease-in-out) both;
+}
+.co-paid-ruler .bill-ruler.sweep .bill-ruler-end.kg {
+  color: var(--ok);
+  animation: kg-pop var(--dur-slow) 1.05s var(--ease-spring) both;
+}
+.co-paid-ruler::after {
+  content: '';
+  position: absolute;
+  inset: calc(-1 * var(--sp-2)) auto calc(-1 * var(--sp-2)) 0;
+  width: 30%;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--hi) 22%, transparent), transparent);
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  opacity: 0;
+  animation: co-light 1.3s 250ms var(--ease-in-out) both;
+}
+@keyframes co-fill {
+  from {
+    background: var(--line-2);
+  }
+}
+@keyframes co-run {
+  from {
+    opacity: 1;
+  }
+  to {
+    inset-inline-start: 100%;
+    opacity: 0;
+  }
+}
+@keyframes co-light {
+  from {
+    opacity: 1;
+    transform: translateX(-100%);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(380%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .co-paid-ruler *,
+  .co-paid-ruler::after {
+    animation: none !important;
+  }
+}
+.co-paid-h {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.co-paid-h .kg {
+  color: var(--ok);
+}
+.co-paid-h h2 {
+  font: var(--fw-strong) var(--fs-2xl) / var(--lh-tight) var(--display);
+  font-stretch: semi-condensed;
+  letter-spacing: var(--track-title);
+  outline: none;
+}
+.co-paid-l {
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+.co-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--sp-6);
+  margin: 0;
+}
+.co-facts > div {
+  display: grid;
+  gap: var(--sp-0_5);
+  padding: var(--sp-3) 0;
+  border-top: 1px solid var(--line);
+}
+.co-facts dt {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.co-facts dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: var(--fw-ui);
+  font-variant-numeric: tabular-nums;
+}
+.co-fine {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.co-paid-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
+}
+.co-paid-acts .btn-link:not(:hover) {
+  text-decoration: none;
+}
+@container copaid (max-width: 520px) {
+  .co-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* a sheet: the card, then the order, one column */
+.co.sheet .co-sum {
+  position: static;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+/* narrower columns: the order narrows, then goes under the form */
+@container co (max-width: 900px) {
+  .co-grid {
+    grid-template-columns: minmax(0, 1fr) 296px;
+    gap: var(--sp-6);
+  }
+}
+@container co (max-width: 680px) {
+  .co-grid {
+    grid-template-columns: minmax(0, 1fr);
+    margin-top: var(--sp-2);
+  }
+  .co-form {
+    max-width: none;
+  }
+  .co-sum {
+    position: static;
+  }
+  .co-mail-f {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .co-mail-f .co-f {
+    grid-column: 1 / -1;
+  }
+}
+
+/* touch: the touch size, on the page as in Stripe's frames */
+@media (pointer: coarse) {
+  .co .input.co-in,
+  .co .btn.lg,
+  .co-slot-box {
+    height: var(--h-touch);
+  }
+  .co-slot-l {
+    line-height: 1.4667;
+  }
+  .co .input.co-in {
+    font-size: var(--fs-touch);
+  }
+}
+
+/* phones: the order's button moves into a bar at the bottom, with what is due */
+@media (max-width: 639px) {
+  .co-title {
+    font-size: var(--fs-2xl);
+  }
+  .co-paid.panel {
+    padding: calc(var(--sp-4) + var(--sp-1));
+  }
+  .co.page .co-sum .co-go .btn {
+    display: none;
+  }
+  .co-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin: var(--sp-2) calc(-1 * var(--sp-4)) 0;
+    padding: var(--sp-3) var(--sp-4) calc(var(--sp-3) + var(--safe-bottom, 0px));
+    border-top: 1px solid var(--line);
+    background: var(--ink-1);
+    box-shadow: var(--shadow-fade-up);
+  }
+  .co-bar-t {
+    flex: 1;
+    display: grid;
+    min-width: 0;
+  }
+  .co-bar-t b,
+  .co-bar-t small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .co-bar-t b {
+    font-weight: var(--fw-strong);
+    color: var(--ok);
+  }
+  .co-bar-t small {
+    font-size: var(--fs-xs);
+    color: var(--muted);
+  }
+  .co-bar.loading .co-bar-t {
+    display: none;
+  }
+  .co-bar.loading .btn {
+    flex: 1;
+  }
+  .co-bar .btn {
+    flex: none;
+    height: var(--h-touch);
+  }
+}

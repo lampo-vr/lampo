@@ -1,0 +1,690 @@
+/* Publishing a final version (publish/Publishing.tsx) and Settings → Publishing (settings/Publishing.tsx). Calm: the
+ * platform's mark says where, a counter sits beside the field it bounds, what blocks is said under its field. */
+
+.pub {
+  display: grid;
+  gap: var(--sp-4);
+  container-type: inline-size;
+  min-width: 0;
+}
+
+/* the platforms: a segmented track, each with its mark and where its post stands */
+.pub-tabs {
+  display: flex;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.pub-tabs button {
+  flex: 1 1 0;
+  justify-content: center;
+  min-width: max-content;
+}
+.pub-tabs button .platform-mark {
+  color: var(--fg-2);
+}
+.pub-tab-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.pub-tab-state.s-posted,
+.pub-state.s-posted {
+  color: var(--ok);
+}
+.pub-tab-state.s-failed,
+.pub-state.s-failed {
+  color: var(--must);
+}
+/* sent, the platform never said whether it arrived: neither out nor failed */
+.pub-tab-state.s-sent,
+.pub-state.s-sent {
+  color: var(--should);
+}
+.pub-tab-state.s-scheduled,
+.pub-tab-state.s-queued,
+.pub-tab-state.s-uploading,
+.pub-state.s-scheduled,
+.pub-state.s-queued,
+.pub-state.s-uploading {
+  color: var(--fg-2);
+}
+
+.pub-note,
+.pub-hint,
+.pub-line {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+}
+.pub-hint a,
+.pub-line a {
+  color: var(--fg);
+}
+.pub-warn {
+  margin: 0;
+  color: var(--should);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+}
+.pub-warn a {
+  color: inherit;
+}
+
+.pub-panel {
+  min-width: 0;
+}
+.pub-pending {
+  display: grid;
+  gap: var(--sp-3);
+  padding: var(--sp-4) 0;
+}
+
+.pub-start {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-8) var(--sp-4);
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-lg);
+  text-align: center;
+}
+.pub-start p {
+  margin: 0;
+  color: var(--muted);
+}
+.pub-start-mark {
+  color: var(--fg-2);
+}
+
+/* the form: the words on the left, how and when on the right (one column where the dialog is narrow) */
+.pub-form {
+  display: grid;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+.pub-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: var(--sp-6);
+}
+/* a phone: three tabs side by side, each post's state as its glyph (the word stays for screen readers) */
+@container (max-width: 560px) {
+  .pub-tab-word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+@container (max-width: 640px) {
+  .pub-cols {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-4);
+  }
+}
+.pub-col {
+  display: grid;
+  gap: var(--sp-4);
+  align-content: start;
+  min-width: 0;
+}
+.pub-field {
+  display: grid;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+.pub-label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-ui);
+  color: var(--fg-2);
+  line-height: var(--lh-ui);
+}
+.pub-label > :first-child {
+  min-width: 0;
+}
+.pub-label-hint {
+  color: var(--muted);
+  font-weight: var(--fw-text);
+}
+.pub-count {
+  margin-left: auto;
+  flex: none;
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.pub-count.over {
+  color: var(--must);
+}
+.pub-field .input:not(.pub-time) {
+  width: 100%;
+}
+.pub-desc {
+  min-height: 120px;
+}
+.pub-where {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.pub-where .input.select {
+  min-width: 160px;
+  max-width: 100%;
+}
+.pub-as {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.pub-seg {
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+.pub-when {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.pub-time {
+  min-width: 0;
+}
+.pub-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+
+/* the cover: the frame as it will show, its timecode, the ways to change it */
+.pub-cover {
+  display: flex;
+  gap: var(--sp-3);
+  align-items: flex-start;
+  min-width: 0;
+}
+.pub-cover-frame {
+  flex: none;
+  width: 112px;
+  max-height: 160px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--r-sm);
+  background: var(--well);
+  box-shadow: 0 0 0 1px var(--line);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  text-align: center;
+}
+.pub-cover-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.pub-cover-frame > span {
+  padding: var(--sp-1);
+}
+.pub-cover-side {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  align-content: flex-start;
+  min-width: 0;
+}
+/* a long label (German) wraps inside its button rather than out of the column */
+.pub-cover-side .btn {
+  max-width: 100%;
+  height: auto;
+  min-height: var(--h-sm);
+  padding-block: var(--sp-1);
+  white-space: normal;
+  text-align: left;
+}
+.pub-cover-tc {
+  flex-basis: 100%;
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+
+/* what a post breaks (block) or is near (warn), under its field */
+.pub-problems {
+  display: grid;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pub-problems li {
+  display: flex;
+  gap: var(--sp-1);
+  align-items: flex-start;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+}
+.pub-problems li .icon {
+  flex: none;
+  margin-top: var(--sp-0_5);
+}
+.pub-problems li.block {
+  color: var(--must);
+}
+.pub-problems li.warn {
+  color: var(--should);
+}
+
+.pub-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--line);
+}
+.pub-foot-who {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.pub-go {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}
+.pub-needs {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.pub-confirm {
+  display: grid;
+  gap: var(--sp-2);
+}
+.pub-confirm p {
+  margin: 0;
+}
+
+/* where a post stands */
+.pub-status {
+  display: grid;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.pub-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.pub-state > span {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--fg-2);
+  overflow-wrap: anywhere;
+}
+.pub-state b {
+  color: var(--fg);
+  font-weight: var(--fw-strong);
+}
+.pub-progress {
+  max-width: 420px;
+}
+.pub-locked,
+.pub-failed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  border-radius: var(--r);
+  background: var(--should-bg);
+  color: var(--fg);
+}
+.pub-failed {
+  background: var(--must-bg);
+}
+.pub-locked p,
+.pub-failed p {
+  flex: 1 1 260px;
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+}
+.pub-facts {
+  display: grid;
+  gap: var(--sp-1);
+  margin: 0;
+}
+.pub-facts > div {
+  display: grid;
+  grid-template-columns: minmax(0, 9em) minmax(0, 1fr);
+  gap: var(--sp-3);
+  font-size: var(--fs-sm);
+}
+.pub-facts dt {
+  color: var(--muted);
+}
+.pub-facts dd {
+  margin: 0;
+  color: var(--fg-2);
+  overflow-wrap: anywhere;
+}
+
+.pub-history,
+.pub-earlier {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.pub-history summary,
+.pub-earlier summary {
+  cursor: pointer;
+  color: var(--fg-2);
+}
+.pub-history ol,
+.pub-earlier ul {
+  display: grid;
+  gap: var(--sp-1);
+  margin: var(--sp-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.pub-history li,
+.pub-earlier li {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: baseline;
+  min-width: 0;
+}
+.pub-history li > span,
+.pub-earlier li > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.pub-earlier li a {
+  margin-left: auto;
+  color: var(--fg-2);
+}
+
+/* the publish kit */
+.pub-kit {
+  display: grid;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  border-radius: var(--r);
+  background: var(--ink-1);
+  box-shadow: 0 0 0 1px var(--line);
+}
+.pub-kit-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.pub-kit-head > .icon {
+  flex: none;
+  color: var(--fg-2);
+}
+.pub-kit-text {
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--fs-sm);
+}
+.pub-kit-text > span {
+  color: var(--muted);
+}
+.pub-kit-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pub-kit-size {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+@container (max-width: 520px) {
+  .pub-kit-head {
+    flex-wrap: wrap;
+  }
+}
+
+/* picking the cover on the player: the composer steps aside, this bar stays at the top */
+.pub-pick {
+  position: fixed;
+  top: var(--sp-16);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-float);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  max-width: calc(100vw - var(--sp-8));
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4);
+  border-radius: var(--r-lg);
+  background: var(--float-bg);
+  box-shadow: var(--shadow-float);
+  border: 1px solid var(--float-line);
+}
+.pub-pick-text {
+  display: grid;
+  min-width: 0;
+  font-size: var(--fs-sm);
+}
+.pub-pick-text > span {
+  color: var(--muted);
+}
+.pub-pick-tc {
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 560px) {
+  .pub-pick {
+    top: auto;
+    bottom: calc(var(--sp-4) + env(safe-area-inset-bottom));
+    flex-wrap: wrap;
+    width: calc(100vw - var(--sp-8));
+  }
+}
+
+/* Settings → Publishing */
+.pubset-marks {
+  display: inline-flex;
+  gap: var(--sp-1);
+  color: var(--fg-2);
+  flex: none;
+}
+.pubset-marks.faint {
+  color: var(--faint);
+}
+.pubset-row {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  background: var(--ink-1);
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+.pubset-row:first-child {
+  border-top: 0;
+}
+.pubset-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  min-width: 0;
+}
+/* the name takes the room; the actions keep one line beside it, or go under it together where it is narrow */
+.pubset-row-main {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.pubset-row-main b {
+  font-weight: var(--fw-strong);
+}
+.pubset-acts {
+  display: flex;
+  flex: none;
+  gap: var(--sp-2);
+  justify-content: flex-end;
+  margin-left: auto;
+}
+.pubset-state {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  line-height: var(--lh-body);
+}
+.pubset-state .kg {
+  margin-top: var(--sp-1);
+}
+.pubset-state.ready {
+  color: var(--fg-2);
+}
+.pubset-state.ready .kg {
+  color: var(--ok);
+}
+.pubset-state.error {
+  color: var(--must);
+}
+.pubset-state.locked {
+  color: var(--should);
+}
+.pubset-audit {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.pubset-kinds {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--sp-3);
+}
+.pubset-kind {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sp-1) var(--sp-3);
+  align-items: start;
+  align-content: start;
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r);
+  border: 1px solid var(--line-2);
+  background: var(--ink-1);
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+}
+.pubset-kind:hover {
+  border-color: var(--line-3);
+}
+.pubset-kind.on {
+  background: var(--raise-sheen), var(--ink-3);
+  box-shadow: var(--raise);
+  border-color: transparent;
+}
+.pubset-kind > .pubset-marks {
+  grid-row: span 2;
+  padding-top: var(--sp-0_5);
+}
+.pubset-kind > span:last-child {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.pubset-steps {
+  display: grid;
+  gap: var(--sp-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pubset-steps > li {
+  display: grid;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.pubset-steps p {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  line-height: var(--lh-body);
+}
+.pubset-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border-radius: var(--r);
+  font-size: var(--fs-sm);
+  background: var(--ok-bg);
+  color: var(--fg);
+}
+.pubset-banner.bad {
+  background: var(--must-bg);
+}
+.pubset-banner .icon {
+  flex: none;
+  margin-top: var(--sp-0_5);
+}
+.pubset-banner span {
+  flex: 1 1 auto;
+}
+.pubset-how {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  line-height: var(--lh-body);
+}
+.pubset-how li {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: flex-start;
+}
+.pubset-how .platform-mark {
+  flex: none;
+  margin-top: var(--sp-0_5);
+  color: var(--fg-2);
+}
+
+/* A finger needs 44 × 44 px: the platform tabs grow to it, the switches keep their look and get an invisible tap area
+   (as mobile.css gives compact controls) */
+@media (hover: none) and (pointer: coarse) {
+  .pub-tabs button,
+  .pub-cover-side .btn {
+    min-height: var(--h-touch);
+  }
+  .pub-switch .switch::after,
+  .pubset-audit .switch::after {
+    content: '';
+    position: absolute;
+    inset: min(0px, calc(50% - 22px));
+  }
+}

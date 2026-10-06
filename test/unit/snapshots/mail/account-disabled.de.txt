@@ -1,0 +1,13 @@
+Subject: Dein Konto bei Lampo wurde deaktiviert
+
+Dein Konto wurde deaktiviert
+
+Hallo Mia,
+
+Ein Admin von review.example.com hat dein Konto deaktiviert: Du bist überall abgemeldet und kannst dich erst wieder anmelden, wenn es wieder aktiviert ist.
+
+Fragen? Wende dich an die Person, die review.example.com betreibt.
+
+--
+Du bekommst diese E-Mail, weil du ein Konto auf review.example.com hast.
+Lampo · review.example.com

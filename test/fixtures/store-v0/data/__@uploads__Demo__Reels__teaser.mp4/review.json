@@ -1,0 +1,241 @@
+{
+  "video": "/@uploads/Demo/Reels/teaser.mp4",
+  "source": {
+    "kind": "upload",
+    "name": "teaser.mp4"
+  },
+  "project": "Demo/Reels",
+  "fps": 25,
+  "width": 160,
+  "height": 90,
+  "duration": 1,
+  "versions": [
+    {
+      "v": 1,
+      "hash": "2ac27b5131b25feec8428e9409075710db8e6028",
+      "mtime": "2026-09-28T07:58:00.000Z",
+      "size": 8492,
+      "frames": 25,
+      "fps": 25,
+      "width": 160,
+      "height": 90,
+      "duration": 1,
+      "registered": "2026-09-28T10:00:00+02:00",
+      "by": "alex"
+    },
+    {
+      "v": 2,
+      "hash": "494e702401cc579cddc9bd8d6ff3312e1e88b100",
+      "mtime": "2026-09-28T09:29:00.000Z",
+      "size": 8666,
+      "frames": 25,
+      "fps": 25,
+      "width": 160,
+      "height": 90,
+      "duration": 1,
+      "registered": "2026-09-28T11:30:00+02:00",
+      "by": "alex"
+    }
+  ],
+  "comments": [
+    {
+      "id": "c_1d55b9",
+      "v": 1,
+      "frame": 12,
+      "timecode": "00:00:12",
+      "t": 0.48,
+      "range": null,
+      "text": "Logo comes in too early, let it land on the beat",
+      "tags": [
+        "logo",
+        "timing"
+      ],
+      "severity": "must",
+      "drawing": [
+        {
+          "type": "box",
+          "x": 96,
+          "y": 14,
+          "w": 52,
+          "h": 40
+        }
+      ],
+      "shots": {
+        "clean": "c_1d55b9_clean.png",
+        "marked": "c_1d55b9_marked.png"
+      },
+      "voice": null,
+      "status": "fixed",
+      "author": "alex",
+      "created": "2026-09-28T10:05:12+02:00",
+      "replies": [
+        {
+          "by": "agent:fixture-edit",
+          "text": "Logo now lands on the beat at 00:00:16",
+          "status": "fixed",
+          "at": "2026-09-28T11:35:00+02:00",
+          "fixed_in_v": 2
+        },
+        {
+          "by": "alex",
+          "text": "Better. Checking it on the big screen next",
+          "at": "2026-09-28T12:11:45+02:00"
+        }
+      ],
+      "check_again": false,
+      "carried_to": 2,
+      "fixed_in_v": 2
+    },
+    {
+      "id": "c_b3d2f0",
+      "v": 1,
+      "frame": 3,
+      "timecode": "00:00:03",
+      "t": 0.12,
+      "range": {
+        "in": 3,
+        "out": 9
+      },
+      "text": "Hold the title a little longer",
+      "tags": [],
+      "severity": "should",
+      "drawing": [],
+      "shots": {
+        "clean": "c_b3d2f0_clean.png",
+        "marked": "c_b3d2f0_marked.png"
+      },
+      "voice": null,
+      "status": "open",
+      "author": "alex",
+      "created": "2026-09-28T10:06:40+02:00",
+      "replies": [],
+      "check_again": true,
+      "carried_to": 2
+    },
+    {
+      "id": "c_a5b4dc",
+      "v": 1,
+      "frame": 20,
+      "timecode": "00:00:20",
+      "t": 0.8,
+      "range": null,
+      "text": "Warmer grade at the end?",
+      "tags": [
+        "color"
+      ],
+      "severity": "nice",
+      "drawing": [],
+      "shots": {
+        "clean": "c_a5b4dc_clean.png",
+        "marked": "c_a5b4dc_marked.png"
+      },
+      "voice": {
+        "file": "c_a5b4dc.m4a",
+        "transcript": "maybe a warmer grade at the end"
+      },
+      "status": "open",
+      "author": "alex",
+      "created": "2026-09-28T10:08:05+02:00",
+      "replies": [
+        {
+          "by": "agent:fixture-edit",
+          "text": "Will try a warmer LUT in v3",
+          "at": "2026-09-28T11:37:30+02:00"
+        }
+      ],
+      "check_again": true,
+      "carried_to": 2
+    },
+    {
+      "id": "c_0f9b87",
+      "v": 1,
+      "frame": 18,
+      "timecode": "00:00:18",
+      "t": 0.72,
+      "range": null,
+      "text": "Typo in the lower third: \"Teh\"",
+      "tags": [
+        "text"
+      ],
+      "severity": "should",
+      "drawing": [],
+      "shots": {
+        "clean": "c_0f9b87_clean.png",
+        "marked": "c_0f9b87_marked.png"
+      },
+      "voice": null,
+      "status": "verified",
+      "author": "alex",
+      "created": "2026-09-28T10:09:30+02:00",
+      "replies": [
+        {
+          "by": "agent:fixture-edit",
+          "text": "Typo corrected",
+          "status": "fixed",
+          "at": "2026-09-28T11:36:10+02:00",
+          "fixed_in_v": 2
+        },
+        {
+          "by": "alex",
+          "text": "",
+          "status": "verified",
+          "at": "2026-09-28T12:10:00+02:00"
+        }
+      ],
+      "check_again": false,
+      "carried_to": 2,
+      "fixed_in_v": 2
+    },
+    {
+      "id": "c_260bfe",
+      "v": 2,
+      "frame": 8,
+      "timecode": "00:00:08",
+      "t": 0.32,
+      "range": null,
+      "text": "Can the music start a little later?",
+      "tags": [],
+      "severity": "should",
+      "drawing": [],
+      "shots": {
+        "clean": "c_260bfe_clean.png",
+        "marked": "c_260bfe_marked.png"
+      },
+      "voice": null,
+      "status": "open",
+      "author": "guest:Mia",
+      "created": "2026-09-28T14:03:00+02:00",
+      "replies": []
+    }
+  ],
+  "session": {
+    "name": "fixture-edit",
+    "id": "0f0f0f0f-0000-4000-8000-00000000fe01",
+    "cwd": "/home/alex/work/demo",
+    "assigned": "2026-09-28T10:01:20+02:00",
+    "by": "alex"
+  },
+  "folder": "Demo/Reels",
+  "added": "2026-09-28T10:00:00+02:00",
+  "added_by": "alex",
+  "frames": 25,
+  "meta": {
+    "codec": "h264",
+    "pix_fmt": "yuv420p",
+    "color_space": null,
+    "color_range": null,
+    "audio": {
+      "codec": "aac",
+      "sample_rate": 44100,
+      "channels": 1
+    }
+  },
+  "updated": "2026-09-28T14:05:00+02:00",
+  "approval": {
+    "status": "approved",
+    "v": 2,
+    "by": "guest:Mia",
+    "at": "2026-09-28T14:05:00+02:00",
+    "note": "Looks good to us"
+  }
+}

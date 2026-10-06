@@ -1,0 +1,343 @@
+/* ---------------------------------------------------------------- Auto-check (player/AutoCheck.tsx) */
+
+/* The chip in the notes panel's head: quiet when only minor findings (or none) are left, the problem colour when
+   something looks like one, a spinner while it runs. Hover changes its ground, never its size. */
+.ac-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex: none;
+  height: var(--h-sm);
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--muted);
+  font: var(--fw-ui) var(--fs-sm) / var(--lh-tight) var(--ui);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.ac-chip:hover,
+.ac-chip[data-state='open'] {
+  background: var(--sel);
+  color: var(--fg-2);
+}
+.ac-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-chip-ok {
+  color: var(--ok);
+}
+.ac-chip-sep {
+  color: var(--faint);
+}
+.ac-chip-num {
+  display: none;
+  font-variant-numeric: tabular-nums;
+}
+.ac-chip.problems {
+  background: var(--should-bg);
+  color: var(--should);
+}
+.ac-chip.problems:hover,
+.ac-chip.problems[data-state='open'] {
+  background: color-mix(in srgb, var(--should) 20%, transparent);
+  color: var(--should);
+}
+.ac-chip .spinner {
+  width: var(--ic-sm);
+  height: var(--ic-sm);
+}
+/* A narrower head says less, never wraps or pushes + Note away: the name goes first (it is in the chip's label), then
+   the words, leaving the glyph and the number. A phone's sheet has it in the tags' line, where there is room. */
+@container notes-head (max-width: 380px) {
+  .ac-chip-name,
+  .ac-chip-sep {
+    display: none;
+  }
+}
+@container notes-head (max-width: 340px) {
+  .ac-chip-n {
+    display: none;
+  }
+  .ac-chip-num {
+    display: inline;
+  }
+}
+.nsheet :is(.ac-chip-name, .ac-chip-sep, .ac-chip-n) {
+  display: inline;
+}
+.nsheet .ac-chip-num {
+  display: none;
+}
+
+/* The findings, in the chip's popover (a sheet on a phone, mobile.css): the head with Run again, the list that scrolls,
+   the spelling line as the foot. */
+.popover.ac-pop {
+  width: 440px;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+.autocheck {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  max-height: min(72vh, 680px);
+  min-width: 0;
+}
+.ac-pop-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  min-height: var(--h-lg);
+  padding: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-3);
+  border-bottom: 1px solid var(--float-line);
+}
+.ac-pop-head b {
+  flex: none;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-strong);
+}
+.ac-icon {
+  flex: none;
+  color: var(--claude-2);
+}
+.autocheck.clear .ac-icon {
+  color: var(--ok);
+}
+.ac-summary {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ac-rerun {
+  flex: none;
+  color: var(--fg-2);
+}
+.ac-body {
+  display: grid;
+  align-content: start;
+  gap: var(--sp-2);
+  min-height: 0;
+  padding: var(--sp-2) var(--sp-2) var(--sp-3);
+  overflow: auto;
+}
+.ac-about {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-top: 1px solid var(--float-line);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-body);
+  color: var(--muted);
+}
+.ac-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-0_5);
+}
+/* A finding: its picture (a click plays it), then what · where, the guess, and — opened — why and the two ways out. */
+.ac-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sp-1) var(--sp-3);
+  align-items: start;
+  /* the same gutter all round: an opened finding is a card, and its words keep clear of its edge */
+  padding: var(--sp-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.ac-row:hover {
+  background: var(--float-sel);
+}
+.ac-row.open,
+.ac-row.active {
+  background: var(--float-sel);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 18%, transparent);
+}
+/* The frame it is about, at the picture's own shape inside one box (a reel stands, a wide render lies). */
+.ac-thumb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 40px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: var(--ink-0);
+  box-shadow: 0 0 0 1px var(--line-2);
+  color: var(--faint);
+  cursor: pointer;
+}
+.ac-thumb img {
+  height: 100%;
+  max-width: 100%;
+  aspect-ratio: var(--ar, 16 / 9);
+  object-fit: cover;
+}
+.ac-thumb:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+.ac-thumb-play {
+  position: absolute;
+  inset: auto var(--sp-1) var(--sp-1) auto;
+  display: grid;
+  place-items: center;
+  width: var(--sp-4);
+  height: var(--sp-4);
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--ink-0) 70%, transparent);
+  color: var(--fg);
+  opacity: 0.85;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.ac-row:hover .ac-thumb-play,
+.ac-thumb:focus-visible .ac-thumb-play {
+  opacity: 1;
+}
+.ac-main {
+  display: grid;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+.ac-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 var(--sp-2);
+  min-width: 0;
+}
+/* The kind, its icon tinted by how much it matters. */
+.ac-label {
+  --k: var(--nice);
+  display: inline-flex;
+  white-space: nowrap;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+  color: var(--fg-2);
+}
+.ac-label > svg {
+  color: var(--k);
+}
+.ac-label[data-severity='must'] {
+  --k: var(--must);
+}
+.ac-label[data-severity='should'] {
+  --k: var(--should);
+}
+.ac-label[data-severity='idea'] {
+  --k: var(--idea);
+}
+/* beside the kind while there is room, else under it; the length goes under the timecodes before anything breaks */
+.ac-where {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0 0.5em;
+  min-width: 0;
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  font-stretch: 87.5%;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.ac-where > span {
+  white-space: nowrap;
+}
+.ac-what {
+  font-size: var(--fs-md);
+  line-height: var(--lh-ui);
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+.ac-quote {
+  display: block;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The guess: a keyframe glyph and a few words; opened, the sentence it rests on. */
+.ac-verdict {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-1);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-ui);
+  color: var(--muted);
+}
+.ac-verdict .kg {
+  flex: none;
+  transform: translateY(-1px);
+}
+.ac-verdict.problem .kg {
+  color: var(--should);
+}
+.ac-verdict.intended .kg {
+  color: var(--ok);
+}
+.ac-why {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--muted);
+}
+.ac-holds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+.ac-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-top: var(--sp-1);
+  cursor: default;
+}
+/* ▸ 5 minor findings: folds the minor ones in and out */
+.ac-more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  justify-self: start;
+  min-height: var(--h-sm);
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.ac-more:hover {
+  color: var(--fg);
+}
+.ac-more:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-more-chev {
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.ac-more-chev.open {
+  transform: rotate(90deg);
+}
+.ac-clear {
+  margin: 0;
+  padding: var(--sp-1) var(--sp-1) 0;
+  font-size: var(--fs-sm);
+  color: var(--ok);
+}

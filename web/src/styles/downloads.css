@@ -1,0 +1,27 @@
+/* "Download all" in a review room: under the tally, full width on phones. */
+.g-download {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  margin-top: var(--sp-4);
+}
+.g-download .btn {
+  gap: var(--sp-2);
+  text-decoration: none;
+}
+.g-download-size {
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  opacity: 0.75;
+}
+.g-download-hint {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+@media (max-width: 639px) {
+  .g-download .btn {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+  }
+}

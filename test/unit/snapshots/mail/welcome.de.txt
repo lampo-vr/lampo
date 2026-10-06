@@ -1,0 +1,14 @@
+Subject: Willkommen bei Lampo
+
+Willkommen, Mia
+
+Deine Adresse ist bestätigt, dein Konto auf review.example.com ist bereit. Lade ein Video hoch, setze Notizen auf exakte Frames, und deine Agenten greifen sie auf.
+
+Lampo öffnen:
+https://review.example.com/
+
+Agenten verbinden sich mit vr login https://review.example.com oder als MCP-Server: Einstellungen → Agent verbinden zeigt, wie.
+
+--
+Du bekommst diese E-Mail, weil du ein Konto auf review.example.com hast.
+Lampo · review.example.com

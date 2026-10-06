@@ -1,0 +1,20 @@
+/@uploads/Demo/Reels/teaser.mp4
+folder Demo/Reels · project Demo/Reels · v2 · 160×90 · 25 fps · 25 frames · 1s
+session fixture-edit · open 3 (must 0) · fixed 1 · verified 1 · wontfix 0
+stage client_approved · Client approved V2 (Mia) · 3 notes still open
+Frames are 0-based at the file fps; timecode is mm:ss:ff; drawings are in video pixels.
+frames: get_note <id> shows a note in full (its frames and files)
+
+c_b3d2f0 OPEN SHOULD 00:00:03 f3 range 3-9 v1 [-] · CHECK AGAIN in v2
+  Hold the title a little longer
+  range: 00:00:03 → 00:00:09 (f3–f9, 0.28 s)
+
+c_260bfe OPEN SHOULD 00:00:08 f8 v2 [-] · CLIENT: they read your replies and fix note as written
+  Can the music start a little later?
+
+c_a5b4dc OPEN NICE 00:00:20 f20 v1 [color] · CHECK AGAIN in v2
+  Warmer grade at the end?
+  voice: maybe a warmer grade at the end
+  ↳ agent:fixture-edit: Will try a warmer LUT in v3
+
+as of <now>

@@ -1,0 +1,93 @@
+/* ---------------------------------------------------------------- client links, guest page, print sheet */
+
+.guest {
+  height: 100%;
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  grid-template-rows: 54px 1fr auto;
+  grid-template-areas: 'top top' 'stage side' 'dock side';
+}
+.guest > .topbar {
+  grid-area: top;
+  gap: var(--sp-3);
+}
+@media (max-width: 820px) {
+  .guest {
+    grid-template-columns: 1fr;
+    grid-template-rows: 54px 58vh auto auto;
+    grid-template-areas: 'top' 'stage' 'dock' 'side';
+    height: auto;
+  }
+}
+.sheet {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: var(--sp-8) var(--sp-8) var(--sp-20);
+  color: #111;
+  background: #fff;
+  font: var(--fs-md) / var(--lh-body) var(--ui);
+}
+.sheet header {
+  border-bottom: 2px solid #111;
+  padding-bottom: var(--sp-4);
+  margin-bottom: var(--sp-6);
+}
+.sheet h1 {
+  font: var(--fw-strong) semi-condensed var(--fs-2xl) / var(--lh-tight) var(--display);
+  margin: var(--sp-1) 0 var(--sp-2);
+}
+.sheet-eyebrow,
+.sheet-id {
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  letter-spacing: var(--track-eyebrow);
+  text-transform: uppercase;
+  color: #777;
+}
+.sheet-meta {
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  color: #444;
+}
+.sheet-note {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: var(--sp-4);
+  padding: var(--sp-4) 0;
+  border-bottom: 1px solid #e3e3e3;
+  break-inside: avoid;
+}
+.sheet-note img {
+  width: 150px;
+  border-radius: var(--r-sm);
+  border: 1px solid #ddd;
+}
+.sheet-line {
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  color: #333;
+}
+.sheet-note p {
+  font-size: var(--fs-lg);
+  margin: var(--sp-1) 0 var(--sp-2);
+}
+.sheet-reply {
+  font-size: var(--fs-sm);
+  color: #444;
+  padding-left: var(--sp-2);
+  border-left: 2px solid #ddd;
+  margin: var(--sp-0_5) 0;
+}
+.sheet .sev::before {
+  box-shadow: none;
+}
+.sheet-actions {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+}
+@media print {
+  .sheet-actions {
+    display: none;
+  }
+  .sheet {
+    padding: 0;
+  }
+}

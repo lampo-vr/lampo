@@ -1,0 +1,251 @@
+/* The review card in the app's language: ink, ivory, film edges, mono timecodes. Fonts are the host's (no network).
+   It follows the host's light or dark theme (main.ts); the film frame stays dark in both. */
+:root {
+  --ink: #0b0b0c;
+  --ink-2: #141416;
+  --ink-3: #1d1d20;
+  --line: #2a2a2e;
+  --fg: #eeebe4;
+  --muted: #8f8b83;
+  --must: #ff453a;
+  --should: #ffc043;
+  --nice: #5ac8fa;
+  --idea: #bf5af2;
+  --ok: #3ddc97;
+  --claude: #d97757;
+  --on-fg: #111;
+  --film: #000;
+  --film-perf: #1d1d20;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --serif: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  color-scheme: dark;
+}
+:root[data-theme='light'] {
+  --ink: #f2efe7;
+  --ink-2: #fffdf8;
+  --ink-3: #e8e4da;
+  --line: #d4cec2;
+  --fg: #1c1b19;
+  --muted: #69645b;
+  --must: #b31434;
+  --should: #9a4f04;
+  --nice: #00679a;
+  --idea: #8b2db8;
+  --ok: #157548;
+  --claude: #a3461f;
+  --on-fg: #f7f4ec;
+  color-scheme: light;
+}
+:root[data-theme='light'] .frame {
+  --fg: #eeebe4;
+  --muted: #8f8b83;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--fg);
+  font:
+    14px / 1.45 system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+}
+.card {
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+.card.loading {
+  color: var(--muted);
+}
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+h1 {
+  margin: 0;
+  font: italic 400 22px var(--serif);
+}
+.meta,
+.by {
+  color: var(--muted);
+  font: 11.5px var(--mono);
+}
+/* The frame sits between perforated film edges. */
+.frame {
+  margin: 0;
+  background: var(--film);
+  border-radius: 8px;
+  padding: 12px 0;
+  background-image: radial-gradient(circle, var(--film-perf) 2.2px, transparent 2.6px), radial-gradient(circle, var(--film-perf) 2.2px, transparent 2.6px);
+  background-size:
+    14px 12px,
+    14px 12px;
+  background-position:
+    0 0,
+    0 100%;
+  background-repeat: repeat-x;
+}
+.frame img {
+  display: block;
+  max-width: 100%;
+  max-height: 60vh;
+  margin: 0 auto;
+}
+.frame figcaption {
+  text-align: center;
+  padding-top: 6px;
+  font: 11.5px var(--mono);
+  color: var(--muted);
+}
+.frame figcaption b {
+  color: var(--fg);
+  font-weight: 600;
+}
+.transport,
+.actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.grow {
+  flex: 1;
+}
+.btn {
+  font: 600 12px var(--mono);
+  color: var(--fg);
+  background: var(--ink-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.btn:hover:not(:disabled) {
+  border-color: var(--muted);
+}
+.btn:focus-visible,
+.note-head:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+.btn.primary {
+  background: var(--fg);
+  color: var(--on-fg);
+  border-color: var(--fg);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.notes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.note {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--ink-2);
+}
+.note.open {
+  border-color: var(--muted);
+}
+.note-head {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.sev-must .dot {
+  background: var(--must);
+}
+.sev-should .dot {
+  background: var(--should);
+}
+.sev-nice .dot {
+  background: var(--nice);
+}
+.sev-idea .dot {
+  background: var(--idea);
+}
+.sev-question .dot {
+  background: var(--claude);
+}
+.note.fixed .dot {
+  background: var(--ok);
+}
+.tc {
+  font: 600 12px var(--mono);
+}
+.text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.note.open .text {
+  white-space: normal;
+}
+.tag {
+  font: 10.5px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.note-body {
+  padding: 0 10px 10px;
+  display: grid;
+  gap: 6px;
+}
+.note-body p {
+  margin: 0;
+}
+.reply {
+  font-size: 13px;
+  color: var(--muted);
+}
+.reply b {
+  color: var(--fg);
+  font-weight: 600;
+}
+textarea {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
+  color: var(--fg);
+  background: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+.empty {
+  color: var(--muted);
+  margin: 0;
+}

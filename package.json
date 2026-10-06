@@ -1,0 +1,109 @@
+{
+  "name": "video-review",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Frame-exact video review for AI video agents: notes pinned to exact frames, delivered as plain files, a CLI and an MCP server. Local-first, or self-hosted as a server.",
+  "license": "AGPL-3.0-only",
+  "homepage": "https://lampo.video",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lampo-vr/lampo.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lampo-vr/lampo/issues"
+  },
+  "keywords": [
+    "video",
+    "review",
+    "frame-accurate",
+    "feedback",
+    "ai-agents",
+    "claude-code",
+    "mcp",
+    "ffmpeg",
+    "video-editing",
+    "self-hosted"
+  ],
+  "type": "module",
+  "bin": {
+    "vr": "bin/vr",
+    "vr-mcp": "bin/vr-mcp"
+  },
+  "scripts": {
+    "prestart": "node scripts/node-check.mjs",
+    "start": "node server/index.ts",
+    "predev": "node scripts/node-check.mjs",
+    "dev": "node server/index.ts --dev",
+    "prelan": "node scripts/node-check.mjs",
+    "lan": "node server/index.ts --lan",
+    "build": "vite build web && vite build web/mcp-app",
+    "predemo": "node scripts/node-check.mjs",
+    "demo": "node scripts/demo.ts",
+    "screenshots": "node scripts/screenshots.ts",
+    "i18n": "node scripts/i18n.ts",
+    "icons": "node scripts/icons.ts",
+    "mcp": "node mcp/server.ts",
+    "link": "node scripts/link.mjs",
+    "pretest": "node scripts/node-check.mjs",
+    "test": "node --test ${VR_TEST_JOBS:+--test-concurrency=$VR_TEST_JOBS} 'test/unit/*.test.ts'",
+    "pretest:changed": "node scripts/node-check.mjs",
+    "test:changed": "node scripts/test-changed.ts",
+    "test:qa": "node --test test/qa-smoke.ts",
+    "test:mcp": "node test/mcp-e2e.ts",
+    "test:e2e": "node test/e2e/lib/suites.mjs",
+    "test:e2e:parallel": "node test/e2e/lib/suites.mjs --jobs auto",
+    "test:webkit": "node test/e2e/webkit.mjs",
+    "test:quality": "node test/e2e/lib/suites.mjs --only quality,quality-load",
+    "test:perf": "node test/e2e/perf.mjs",
+    "webkit:install": "PLAYWRIGHT_BROWSERS_PATH=cache/playwright playwright-core install webkit",
+    "chrome:install": "browsers install chrome-headless-shell@stable --path \"$PWD/cache/chrome\" && browsers install chrome@stable --path \"$PWD/cache/chrome\"",
+    "test:all": "npm run build && npm test && npm run test:qa && npm run test:mcp && npm run test:e2e -- --perf",
+    "typecheck": "tsc -p tsconfig.json && tsc -p web/tsconfig.json",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "check": "npm run typecheck && npm run lint"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "dependencies": {
+    "@huggingface/tokenizers": "0.2.0",
+    "@modelcontextprotocol/ext-apps": "^2.0.0",
+    "@modelcontextprotocol/node": "^2.1.0",
+    "@modelcontextprotocol/server": "^2.1.0",
+    "@resvg/resvg-js": "^2.6.2",
+    "@tus/file-store": "^2.1.1",
+    "@tus/server": "^2.4.5",
+    "express": "^5.2.1",
+    "qrcode": "^1.5.4",
+    "tus-js-client": "^4.3.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.14",
+    "@fontsource-variable/instrument-sans": "^5.3.0",
+    "@fontsource-variable/martian-mono": "^5.3.0",
+    "@modelcontextprotocol/client": "^2.1.0",
+    "@modelcontextprotocol/sdk": "^1.30.1",
+    "@tanstack/react-query": "^5.104.0",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.19.0",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "lucide-react": "^1.48.0",
+    "playwright-core": "^1.63.0",
+    "puppeteer-core": "^25.12.0",
+    "radix-ui": "^1.6.7",
+    "react": "^19.3.0",
+    "react-day-picker": "^9.14.0",
+    "react-dom": "^19.3.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1"
+  },
+  "optionalDependencies": {
+    "onnxruntime-node": "1.30.0",
+    "transcribe-cpp": "^0.2.4"
+  }
+}

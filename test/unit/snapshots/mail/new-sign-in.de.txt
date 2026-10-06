@@ -1,0 +1,14 @@
+Subject: Neue Anmeldung bei Lampo
+
+Eine neue Anmeldung bei deinem Konto
+
+Hallo Mia,
+
+Bei deinem Konto auf review.example.com hat sich Safari on iPhone am 2. Oktober 2026, 09:30 UTC angemeldet.
+
+Wenn du das warst, musst du nichts tun. Wenn nicht, wähle jetzt ein neues Passwort:
+https://review.example.com/#/forgot
+
+--
+Du bekommst diese E-Mails, weil Anmelde-Hinweise an sind. Ausschalten kannst du sie unter Einstellungen → Benachrichtigungen.
+Lampo · review.example.com

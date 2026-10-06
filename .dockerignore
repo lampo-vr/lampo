@@ -1,0 +1,32 @@
+.git
+.github
+.claude
+node_modules
+web/dist
+web/dist-mcp
+data
+versions
+cache
+*-versions
+.venv*
+__pycache__
+config.json
+# private (as in .gitignore): local working files, the private cloud module and status page
+BRIEF.md
+**/*.local.md
+**/*.local.md.bak-*
+cloud
+status
+audits
+bench
+test
+test-output
+docs
+# a site/ folder kept inside a checkout (not part of the app) never goes into the image
+site
+# the logo's font licence goes into the build's third-party notices (scripts/licenses.ts)
+!docs/brand/OFL-Norican.txt
+*.log
+.DS_Store
+.env
+.env.*

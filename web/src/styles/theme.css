@@ -1,0 +1,144 @@
+/* ---------------------------------------------------------------- the theme switch (web/src/ui/ThemeSwitch.tsx) */
+
+.seg.theme-switch.icons button {
+  width: 28px;
+  padding: 0;
+  justify-content: center;
+}
+.seg.theme-switch button:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 1px;
+}
+
+/* the language switch (web/src/ui/LangSwitch.tsx): EN · DE beside the theme, the full words in Settings */
+.seg.lang-switch.short button {
+  min-width: 30px;
+  padding: 0 var(--sp-2);
+  justify-content: center;
+  font: var(--fw-strong) var(--fs-xs) var(--mono);
+}
+.seg.lang-switch button:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 1px;
+}
+
+/* inside a menu: a label and three choices side by side */
+.menu-sep {
+  height: 1px;
+  margin: var(--sp-1) calc(-1 * var(--sp-1));
+  background: var(--float-line);
+}
+.menu-label {
+  padding: var(--sp-1) var(--sp-2) var(--sp-1);
+  font: var(--fw-strong) var(--fs-xs) var(--ui);
+  color: var(--muted);
+}
+.menu-theme {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-0_5);
+  padding: 0 var(--sp-0_5) var(--sp-0_5);
+}
+.menu .menu-theme button {
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-1) var(--sp-1);
+  font-size: var(--fs-sm);
+  text-align: center;
+  justify-content: center;
+  color: var(--muted);
+  outline: none;
+}
+.menu .menu-theme button[data-highlighted] {
+  background: var(--ink-5);
+  color: var(--fg);
+}
+.menu .menu-theme button.on {
+  background: var(--ink-4);
+  color: var(--fg);
+  box-shadow: inset 0 0 0 1px var(--line-3);
+}
+
+/* the library sidebar's foot: Settings, a row like the ones above it (on a phone the drawer's way in) */
+.nav:has(> .nav-foot) {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+.nav-foot {
+  padding: var(--sp-2) var(--sp-2) calc(var(--sp-2) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+}
+/* the trial's line above Settings (conversion/Trial.tsx, in a chunk after the first paint): its box is drawn here, so the
+   room it holds from the first paint (when the plan this browser kept says a trial runs) is exactly what it takes */
+.nav:has(> .nav-trial-wrap) {
+  grid-template-rows: minmax(0, 1fr) auto auto;
+}
+.nav-trial-wrap {
+  padding: var(--sp-2) var(--sp-2) 0;
+  border-top: 1px solid var(--line);
+}
+.nav-trial-wrap + .nav-foot {
+  border-top-color: transparent;
+}
+.nav-trial {
+  display: grid;
+  align-content: center;
+  gap: var(--sp-2);
+  width: 100%;
+  height: 54px;
+  padding: 0 var(--sp-2);
+}
+.nav-settings {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: var(--h);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r);
+  color: var(--muted);
+  font: var(--fw-ui) var(--fs-sm) / var(--lh-ui) var(--ui);
+  text-decoration: none;
+  transition:
+    background var(--dur-fast),
+    color var(--dur-fast);
+}
+.nav-settings:hover,
+.nav-settings:focus-visible {
+  background: var(--ink-3);
+  color: var(--fg);
+}
+.nav-settings .kbd {
+  color: var(--muted);
+}
+@media (hover: none) {
+  .nav-settings {
+    height: var(--h-touch);
+  }
+  .nav-settings .kbd {
+    display: none;
+  }
+}
+
+/* sign-in, setup, invite and consent: next to the host line */
+.auth-foot:has(.theme-switch) {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+.auth-foot .theme-switch,
+.auth-foot .lang-switch {
+  margin-left: auto;
+}
+.auth-foot .lang-switch + .theme-switch {
+  margin-left: calc(-1 * var(--sp-1));
+}
+
+/* Settings → Profile */
+.set-theme,
+.set-lang {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}

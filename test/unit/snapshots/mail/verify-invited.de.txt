@@ -1,0 +1,16 @@
+Subject: Bestätige deine E-Mail-Adresse für Lampo
+
+Bestätige deine E-Mail-Adresse
+
+Hallo Jürgen,
+
+Du bist jetzt auf review.example.com. Bestätige, dass juergen@example.com dir gehört, damit dich Passwort-Links und Hinweise erreichen.
+
+Adresse bestätigen:
+https://review.example.com/#/verify/vt_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+Der Link funktioniert einmal, 24 Stunden lang.
+
+--
+Du bekommst diese E-Mail, weil du ein Konto auf review.example.com hast.
+Lampo · review.example.com

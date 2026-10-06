@@ -1,0 +1,4 @@
+[
+  { "video": "/path/to/project/export/episode01_no-music.mp4", "words": "/path/to/project/src/data/words.json", "format": "words", "tag": "clean" },
+  { "video": "/path/to/project/export/episode02.mp4", "words": "/path/to/project/src/data/timeline.json", "format": "timeline", "tag": "music" }
+]

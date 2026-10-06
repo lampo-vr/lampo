@@ -1,0 +1,846 @@
+/* ---------------------------------------------------------------- the operator's pages (web/src/operator/)
+   Their layout is Settings' (settings.css, imported with them): its section list is the pages' tab line (Funnel ·
+   Workspaces · Accounts), a row of tabs on a narrow screen. Everything below is their own. The column is a size
+   container, so the funnel's figures and the lists' columns follow the room the column has, not the window. */
+
+.op-who {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.op-page {
+  container: oppage / inline-size;
+  max-width: 1040px;
+}
+.op-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+}
+.op-fine {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+/* the four figures */
+.op-figures {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sp-3);
+}
+.op-figure {
+  display: grid;
+  gap: var(--sp-1);
+  align-content: start;
+}
+.op-figure-k {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.op-figure-v {
+  font: var(--fw-strong) var(--fs-3xl) / 1.05 var(--ui);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.op-figure-s {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+/* the funnel: one ink, the bars' ends 4 px round, the row on hover or focus lifted to the selection fill */
+.op-fn,
+.op-fn-list {
+  display: grid;
+  gap: var(--sp-0_5);
+}
+.op-fn-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.op-fn-item {
+  position: relative;
+}
+/* a step is a button: its detail opens on hover, focus or a press */
+button.op-fn-row {
+  width: 100%;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+.op-fn-row {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr) 64px 72px 112px;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: 38px;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r);
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+.op-fn-row:focus-visible {
+  box-shadow: 0 0 0 2px var(--fg-2);
+}
+.op-fn-row.on {
+  background: var(--sel);
+}
+.op-fn-head {
+  min-height: 26px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.op-fn-head span:nth-child(n + 3) {
+  text-align: right;
+}
+.op-fn-l {
+  color: var(--fg-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.op-fn-row.on .op-fn-l {
+  color: var(--fg);
+}
+.op-fn-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: 20px;
+  min-width: 0;
+  border-left: 1px solid var(--line-3);
+}
+.op-fn-bar i {
+  flex: none;
+  height: 18px;
+  min-width: 2px;
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  background: var(--line-4);
+  transition: background var(--dur-fast);
+}
+.op-fn-row.on .op-fn-bar i {
+  background: var(--fg);
+}
+.op-fn-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-xs);
+  color: var(--fg-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.op-fn-flag::before {
+  content: '';
+  flex: none;
+  width: 14px;
+  height: 1px;
+  background: var(--line-4);
+}
+.op-fn-n,
+.op-fn-p,
+.op-fn-c {
+  text-align: right;
+}
+.op-fn-n {
+  font-weight: var(--fw-ui);
+}
+.op-fn-p,
+.op-fn-c {
+  color: var(--fg-2);
+}
+.op-fn-c small {
+  margin-left: var(--sp-1);
+  color: var(--muted);
+}
+.op-fn-tip {
+  position: absolute;
+  z-index: 5;
+  left: 176px;
+  bottom: calc(100% + 4px);
+  display: grid;
+  gap: var(--sp-0_5);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r);
+  background: var(--tip-bg);
+  color: var(--tip-fg);
+  box-shadow: var(--shadow-float);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.op-fn-tip b {
+  font-weight: var(--fw-strong);
+  font-size: var(--fs-sm);
+}
+
+/* by sign-up week: each cell a share, one ink ramp; the weeks in their trial hatched */
+.op-table-wrap {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.op-cohort {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 2px;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-sm);
+}
+.op-cohort th {
+  padding: var(--sp-1) var(--sp-2);
+  font-weight: var(--fw-ui);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  text-align: right;
+}
+/* a step's name may take two lines over its column of shares; the weeks stay on one */
+.op-cohort thead th {
+  vertical-align: bottom;
+  min-width: 52px;
+  line-height: 1.25;
+}
+.op-cohort tbody th {
+  white-space: nowrap;
+}
+.op-cohort thead th:first-child,
+.op-cohort tbody th {
+  text-align: left;
+}
+.op-cohort tbody th {
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+}
+.op-cohort tbody th small {
+  margin-left: var(--sp-1);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-text);
+  color: var(--muted);
+}
+.op-cohort td {
+  height: 34px;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-sm);
+  text-align: right;
+  white-space: nowrap;
+}
+.op-ch-n {
+  color: var(--fg);
+  font-weight: var(--fw-ui);
+}
+.op-ch {
+  background: color-mix(in srgb, var(--fg) calc(var(--s) * 0.82%), var(--ink-1));
+  color: var(--fg-2);
+}
+.op-ch.hi {
+  color: var(--ink-1);
+  font-weight: var(--fw-ui);
+}
+.op-ch-none {
+  color: var(--muted);
+}
+.op-ch-run {
+  background: repeating-linear-gradient(-45deg, var(--ink-3) 0 4px, transparent 4px 8px);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+/* what is counted, and what never is */
+.op-privacy-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-4) var(--sp-8);
+}
+.op-privacy-cols > div {
+  display: grid;
+  align-content: start;
+  gap: var(--sp-2);
+}
+.op-k {
+  margin: 0;
+  font: var(--fw-ui) var(--fs-xs) / 1.2 var(--ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.op-list {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.op-list li {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.op-list li > :first-child {
+  translate: 0 1px;
+}
+.op-ok {
+  color: var(--ok);
+}
+.op-list.never li > :first-child {
+  color: var(--muted);
+}
+.op-keep {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+@container oppage (max-width: 900px) {
+  .op-figures {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .op-fn-row {
+    grid-template-columns: 120px minmax(0, 1fr) 52px 52px;
+  }
+  .op-fn-c,
+  .op-fn-head span:last-child {
+    display: none;
+  }
+  .op-fn-tip {
+    left: 132px;
+  }
+}
+@container oppage (max-width: 560px) {
+  .op-fn-head {
+    display: none;
+  }
+  .op-fn-row {
+    grid-template-columns: 112px minmax(0, 1fr) 52px;
+  }
+  .op-fn-p,
+  .op-fn-head span:nth-child(4),
+  .op-fn-flag {
+    display: none;
+  }
+  .op-privacy-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .op-fn-tip {
+    left: var(--sp-2);
+    white-space: normal;
+    max-width: calc(100% - var(--sp-4));
+  }
+}
+@media (pointer: coarse) {
+  .op-fn-row {
+    min-height: var(--h-touch);
+  }
+}
+/* a wide window: the column stands in the middle of the page rather than at its left edge */
+@media (min-width: 1596px) {
+  .op-page {
+    margin-inline: auto;
+  }
+}
+/* anyone else: no such page, said in the middle of the window */
+.op-missing {
+  flex: 1;
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  padding: var(--sp-12) var(--sp-4);
+  overflow: auto;
+}
+.op-missing > * {
+  width: min(100%, 640px);
+}
+
+/* ---------------------------------------------------------------- the lists (Workspaces.tsx, Accounts.tsx)
+   Settings' rows (.set-rows / .set-row), laid out as columns: each row a link to its page, the columns' names above in
+   the same grid. Hover and focus are a flat fill; nothing is raised and nothing wears the orange. */
+.op-page.op-wide {
+  max-width: 1200px;
+}
+.op-page.op-narrow {
+  max-width: 820px;
+}
+/* one row while the column is wide: the chips give way first and scroll (a soft edge where there are more) */
+.op-toolbar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  min-width: 0;
+}
+.op-toolbar .op-search {
+  flex: 0 0 280px;
+  min-width: 0;
+}
+/* the chips take the room the row has left and scroll sideways in it, like the library's */
+.op-chips {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.op-chips::-webkit-scrollbar {
+  display: none;
+}
+.op-toolbar > .op-sort {
+  flex: none;
+}
+.op-toolbar > .grow {
+  flex: 1 1 0;
+}
+.op-rows {
+  margin-top: calc(-1 * var(--sp-1));
+}
+.op-rows > .op-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 64px 132px 56px 84px 92px;
+  grid-template-areas: 'mark main members storage videos created active';
+  align-items: center;
+  column-gap: var(--sp-3);
+  min-height: var(--h-xl);
+  padding: var(--sp-2) var(--sp-3);
+  color: inherit;
+  text-decoration: none;
+}
+.op-rows > .op-row.op-plans {
+  grid-template-columns: 28px minmax(0, 1fr) 184px 64px 132px 56px 84px 92px;
+  grid-template-areas: 'mark main plan members storage videos created active';
+}
+.op-rows > .op-row.op-acc {
+  grid-template-columns: 28px minmax(0, 1.2fr) minmax(0, 1fr) 84px 104px;
+  grid-template-areas: 'mark main spaces created active';
+}
+.op-c-mark {
+  grid-area: mark;
+  display: grid;
+  place-items: center;
+}
+/* two lines a row, set close: the name, and who it is or whose */
+.op-c-main {
+  grid-area: main;
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  line-height: var(--lh-ui);
+}
+.op-c-main b {
+  font-weight: var(--fw-strong);
+}
+.op-c-plan {
+  grid-area: plan;
+  display: flex;
+  min-width: 0;
+}
+.op-c-members {
+  grid-area: members;
+}
+.op-c-storage {
+  grid-area: storage;
+}
+.op-c-videos {
+  grid-area: videos;
+}
+.op-c-created {
+  grid-area: created;
+}
+.op-c-active {
+  grid-area: active;
+}
+/* an account's workspaces: the first one's name gives way, its role and the count of the others never */
+.op-c-spaces {
+  grid-area: spaces;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  white-space: nowrap;
+  line-height: var(--lh-ui);
+}
+.op-role {
+  flex: none;
+  white-space: nowrap;
+}
+.op-num {
+  text-align: right;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.op-dim {
+  color: var(--faint);
+}
+/* the columns' names: quiet, on the list's own ground */
+.op-rows > .op-head {
+  min-height: 34px;
+  padding-block: var(--sp-1);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.op-rows > .op-head .op-num {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.op-rows > a.op-row,
+a.op-link-row.set-row {
+  cursor: pointer;
+  transition: background var(--dur-fast);
+}
+.op-rows > a.op-row:hover,
+a.op-link-row.set-row:hover {
+  background: var(--sel);
+}
+.op-rows > a.op-row:focus-visible,
+a.op-link-row.set-row:focus-visible {
+  outline: 2px solid var(--fg-2);
+  outline-offset: -2px;
+  background: var(--sel);
+}
+.op-rows > a.op-row:active,
+a.op-link-row.set-row:active {
+  background: var(--sel-on);
+}
+.op-link-row.set-row {
+  color: inherit;
+  text-decoration: none;
+  /* one line on a phone too: the name gives way, its role and the way in stay beside it */
+  flex-wrap: nowrap;
+}
+.op-link-row.set-row > .grow {
+  flex-basis: auto;
+}
+.op-chevron {
+  flex: none;
+  color: var(--faint);
+}
+.op-col {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.op-rows-empty {
+  padding: var(--sp-6) var(--sp-4);
+  background: var(--ink-1);
+  border-top: 1px solid var(--line);
+}
+.op-foot {
+  margin: calc(-1 * var(--sp-2)) 0 0;
+  font-size: var(--fs-xs);
+}
+@container oppage (max-width: 1000px) {
+  /* the search and the order in one row, the chips under them across the column */
+  .op-toolbar {
+    flex-wrap: wrap;
+  }
+  .op-toolbar .op-search {
+    flex: 0 1 300px;
+  }
+  .op-toolbar .op-chips {
+    order: 3;
+    flex: 1 1 100%;
+  }
+  .op-rows > .op-row {
+    grid-template-columns: 28px minmax(0, 1fr) 64px 132px 92px;
+    grid-template-areas: 'mark main members storage active';
+  }
+  .op-rows > .op-row.op-plans {
+    grid-template-columns: 28px minmax(0, 1fr) 184px 64px 132px 92px;
+    grid-template-areas: 'mark main plan members storage active';
+  }
+  .op-row:not(.op-acc) .op-c-videos,
+  .op-row:not(.op-acc) .op-c-created {
+    display: none;
+  }
+}
+@container oppage (max-width: 760px) {
+  .op-rows > .op-row {
+    grid-template-columns: 28px minmax(0, 1fr) 124px 88px;
+    grid-template-areas: 'mark main storage active';
+  }
+  .op-rows > .op-row.op-plans {
+    grid-template-columns: 28px minmax(0, 1fr) 176px 124px 88px;
+    grid-template-areas: 'mark main plan storage active';
+  }
+  .op-rows > .op-row.op-acc {
+    grid-template-columns: 28px minmax(0, 1fr) minmax(0, 0.8fr) 96px;
+    grid-template-areas: 'mark main spaces active';
+  }
+  .op-row .op-c-members,
+  .op-row.op-acc .op-c-created {
+    display: none;
+  }
+}
+/* a phone, or a column as narrow: two lines a row — the name and its owner, then the plan (or the workspaces) — and
+   when it was last active at the end; the columns' names go */
+@container oppage (max-width: 560px) {
+  .op-rows > .op-head {
+    display: none;
+  }
+  .op-rows > .op-row,
+  .op-rows > .op-row.op-plans,
+  .op-rows > .op-row.op-acc {
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    grid-template-areas: 'mark main active';
+    row-gap: var(--sp-1);
+    align-items: start;
+    padding-block: var(--sp-3);
+  }
+  .op-rows > .op-row.op-plans {
+    grid-template-areas:
+      'mark main active'
+      'mark plan plan';
+  }
+  .op-rows > .op-row.op-acc {
+    grid-template-areas:
+      'mark main active'
+      'mark spaces spaces';
+  }
+  .op-row .op-c-storage {
+    display: none;
+  }
+  .op-row .op-c-active {
+    padding-top: var(--sp-0_5);
+    font-size: var(--fs-xs);
+  }
+  .op-row .op-c-mark {
+    padding-top: 1px;
+  }
+  .op-toolbar .op-search {
+    flex: 1 1 100%;
+  }
+  .op-toolbar > .grow {
+    display: none;
+  }
+  /* under the search: the chips, scrolling in what the order leaves them */
+  .op-toolbar .op-chips {
+    order: 2;
+    flex: 1 1 0;
+  }
+  .op-toolbar > .op-sort {
+    order: 3;
+  }
+  /* a page's facts: the label over its value */
+  .op-page .set-facts > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-0_5);
+  }
+}
+@media (pointer: coarse) {
+  .op-rows > .op-row {
+    min-height: var(--h-touch);
+  }
+}
+
+/* ---------------------------------------------------------------- a workspace or an account opened */
+.op-crumb {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--faint);
+}
+.op-crumb .btn-link {
+  flex: none;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.op-crumb .btn-link:hover {
+  color: var(--fg);
+}
+/* the crumb belongs to the title under it */
+.op-crumb + .set-head {
+  margin-top: calc(-1 * var(--sp-2));
+}
+/* a long name wraps: it is what the page is about */
+.op-title h1 {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.op-title h1 > .ws-mark,
+.op-title h1 > .avatar {
+  margin-top: var(--sp-0_5);
+}
+.op-title h1 .ws-mark.md {
+  width: 32px;
+  height: 32px;
+  font-size: var(--fs-md);
+}
+.op-title p {
+  overflow-wrap: anywhere;
+}
+.op-title p .badge {
+  vertical-align: 1px;
+}
+.op-plan-now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+}
+.op-set-by {
+  margin: calc(-1 * var(--sp-2)) 0 0;
+  overflow-wrap: anywhere;
+}
+/* a plan the page can't change: why, on the list's ground */
+.op-note {
+  margin: 0;
+  padding: var(--sp-3);
+  border-radius: var(--r);
+  background: var(--ink-1);
+  box-shadow: 0 0 0 1px var(--line);
+}
+.op-plan-form > .seg,
+.op-plan-form .set-field > .seg {
+  justify-self: start;
+  max-width: 100%;
+}
+/* the three changes in one cell: the form keeps its height whichever is chosen */
+.op-plan-panels {
+  display: grid;
+}
+.op-plan-panel {
+  grid-area: 1 / 1;
+  display: grid;
+  align-content: start;
+  gap: var(--sp-2);
+  visibility: hidden;
+}
+.op-plan-panel.on {
+  visibility: visible;
+}
+.op-hint {
+  margin: 0;
+}
+.op-log-row {
+  align-items: flex-start;
+}
+.op-log-mark {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  padding-top: var(--sp-1);
+  color: var(--fg-2);
+}
+.op-log-row .set-sub {
+  overflow-wrap: anywhere;
+}
+.op-log-who {
+  font-size: var(--fs-xs);
+}
+
+/* the trial's last day: a week, two or a month on, or a day in the calendar (share/ExpiryCalendar.tsx) */
+.op-day {
+  display: grid;
+  gap: var(--sp-1);
+  justify-items: start;
+}
+.op-day-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.op-day-readout {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.op-day-readout b {
+  color: var(--fg);
+  font-weight: var(--fw-strong);
+}
+[data-radix-popper-content-wrapper] > .popover.op-day-pop {
+  width: auto;
+  min-width: 0;
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+}
+.op-day-loading {
+  display: grid;
+  place-items: center;
+  width: 260px;
+  height: 280px;
+}
+.op-day-sheet {
+  display: grid;
+  justify-items: center;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ---------------------------------------------------------------- the takedown (Workspaces.tsx TakedownCard) */
+
+/* a row's name and its SUSPENDED mark: the name gives way, the mark never */
+.op-name-line {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.op-name-line > .badge {
+  flex: none;
+}
+/* the dialogs' body: what happens, what goes (counted), why, the name typed */
+.op-ask {
+  display: grid;
+  gap: var(--sp-3);
+}
+.op-ask > p {
+  margin: 0;
+}
+.op-ask .set-field > span:first-child {
+  color: var(--fg-2);
+}
+.op-typed {
+  color: var(--fg);
+  font-weight: var(--fw-strong);
+  overflow-wrap: anywhere;
+}
+.op-gone {
+  display: grid;
+  margin: 0;
+  border-radius: var(--r);
+  box-shadow: 0 0 0 1px var(--line);
+  overflow: hidden;
+}
+.op-gone > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--fs-sm);
+}
+.op-gone > div + div {
+  border-top: 1px solid var(--line);
+}
+.op-gone dt {
+  color: var(--muted);
+}
+.op-gone dd {
+  margin: 0;
+  color: var(--fg-2);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}

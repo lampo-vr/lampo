@@ -1,0 +1,16 @@
+Subject: Bestätige deine E-Mail-Adresse für Lampo
+
+Bestätige deine E-Mail-Adresse
+
+Hallo Mia,
+
+Nur noch ein Schritt: Bestätige, dass mia.keller@example.com dir gehört, dann ist dein Konto auf review.example.com bereit.
+
+Adresse bestätigen:
+https://review.example.com/#/verify/vt_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+Der Link funktioniert einmal, 24 Stunden lang. Wenn du kein Konto angelegt hast, ignoriere diese E-Mail: Ohne den Link passiert nichts.
+
+--
+Du bekommst diese E-Mail, weil mit dieser Adresse ein Konto auf review.example.com angelegt wurde.
+Lampo · review.example.com

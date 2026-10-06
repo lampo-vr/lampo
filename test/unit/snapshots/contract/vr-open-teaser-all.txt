@@ -1,0 +1,39 @@
+/@uploads/Demo/Reels/teaser.mp4
+  Demo/Reels · v2 · 160×90 · 25 fps · 25 frames · 1s
+  session: fixture-edit · open 3 (must 0) · fixed 1 · verified 1 · wontfix 0
+  stage: CLIENT APPROVED — Client approved V2 (Mia) · 3 notes still open
+  review: <store>/data/__@uploads__Demo__Reels__teaser.mp4/review.json
+
+c_b3d2f0  OPEN     SHOULD 00:00:03  f3 range 3-9  v1  [-]  CHECK AGAIN in v2
+    Hold the title a little longer
+    range: 00:00:03 → 00:00:09 (f3–f9, 0.28 s)
+    marked: <store>/data/__@uploads__Demo__Reels__teaser.mp4/c_b3d2f0_marked.png
+    clean:  <store>/data/__@uploads__Demo__Reels__teaser.mp4/c_b3d2f0_clean.png
+
+c_260bfe  OPEN     SHOULD 00:00:08  f8  v2  [-]  CLIENT: they read your replies and fix note as written
+    Can the music start a little later?
+    marked: <store>/data/__@uploads__Demo__Reels__teaser.mp4/c_260bfe_marked.png
+    clean:  <store>/data/__@uploads__Demo__Reels__teaser.mp4/c_260bfe_clean.png
+
+c_1d55b9  FIXED    MUST   00:00:12  f12  v1  [logo,timing]  fixed in v2
+    Logo comes in too early, let it land on the beat
+    drawing: box x96 y14 w52 h40
+    marked: <store>/data/__@uploads__Demo__Reels__teaser.mp4/c_1d55b9_marked.png
+    clean:  <store>/data/__@uploads__Demo__Reels__teaser.mp4/c_1d55b9_clean.png
+    ↳ agent:fixture-edit [fixed v2]: Logo now lands on the beat at 00:00:16
+    ↳ alex: Better. Checking it on the big screen next
+
+c_0f9b87  VERIFIED SHOULD 00:00:18  f18  v1  [text]
+    Typo in the lower third: "Teh"
+    marked: <store>/data/__@uploads__Demo__Reels__teaser.mp4/c_0f9b87_marked.png
+    clean:  <store>/data/__@uploads__Demo__Reels__teaser.mp4/c_0f9b87_clean.png
+    ↳ agent:fixture-edit [fixed v2]: Typo corrected
+    ↳ alex [verified]: -
+
+c_a5b4dc  OPEN     NICE   00:00:20  f20  v1  [color]  CHECK AGAIN in v2
+    Warmer grade at the end?
+    voice: maybe a warmer grade at the end
+    marked: <store>/data/__@uploads__Demo__Reels__teaser.mp4/c_a5b4dc_marked.png
+    clean:  <store>/data/__@uploads__Demo__Reels__teaser.mp4/c_a5b4dc_clean.png
+    ↳ agent:fixture-edit: Will try a warmer LUT in v3
+

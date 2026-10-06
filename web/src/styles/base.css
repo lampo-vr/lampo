@@ -1,0 +1,623 @@
+/* Lampo — "cutting room" design system.
+   The chrome is strictly achromatic (neutral ink + ivory) so it never tints how colour in the video is perceived.
+   Colour only carries meaning: severity (grease-pencil red / amber / cyan / violet for ideas), status (green),
+   Claude (terracotta). Kinds that are not feedback (questions, info) also differ in shape, not only in colour.
+   One exception: the brand orange (--brand; buttons --brand-deep with --on-brand), the window of the logo's frame o, for brand
+   moments only — the logo, the client's invitation — never for state or severity. */
+
+/* Themes. data-theme on <html> ('dark' | 'light') is set before the first paint (index.html) from the viewer's choice
+   (Light · Dark · System, web/src/lib/theme.ts). Dark is the original cutting-room palette; light is paper and ink, a
+   contact sheet on a lightbox. The picture keeps its dark surround in both: the stage, the film stock on cards,
+   thumbnails, the inbox preview, the countdown leader and the lit frame's stage on a review link's invitation are
+   dark islands that redeclare the dark tokens for everything inside them — as is what sits on a tooltip, which is dark
+   in both themes (the stage's steps). */
+:root,
+:root[data-theme='light']
+  :is(
+    .stage,
+    .verify,
+    .walkie,
+    .rec-bar,
+    .draw-bar,
+    .compare-bar,
+    .review-hud,
+    .film-poster,
+    .poster-frame,
+    .c-thumb,
+    .lightbox,
+    .inbox-stage,
+    .inbox-stage-box,
+    .inbox-thumb,
+    .so-tip,
+    .aud-media,
+    .aud-thumb,
+    .cv-loop,
+    .cv-rl
+  ) {
+  color-scheme: dark;
+  /* color is inherited as a resolved value: an island sets it again, or text without a colour of its own keeps the
+     page's ink (dark on dark in the light theme). */
+  color: var(--fg);
+  --ink-0: #070707;
+  --ink-1: #0d0d0e;
+  --ink-2: #131314;
+  --ink-3: #1a1a1b;
+  --ink-4: #232324;
+  --ink-5: #2d2d2f;
+  --line: #1f1f21;
+  --line-2: #2c2c2e;
+  --line-3: #444446;
+  --line-4: #5a5a5c;
+  --fg: #eeebe4;
+  --fg-2: #bebab2;
+  --muted: #8c8982;
+  --faint: #5e5c58;
+  --must: #ff453a;
+  --should: #ffc043;
+  --nice: #5ac8fa;
+  --idea: #bf5af2;
+  --ok: #3ddc97;
+  --claude: #d97757;
+  --must-bg: rgba(255, 69, 58, 0.12);
+  --should-bg: rgba(255, 192, 67, 0.12);
+  --idea-bg: rgba(191, 90, 242, 0.12);
+  --ok-bg: rgba(61, 220, 151, 0.1);
+  --claude-bg: rgba(217, 119, 87, 0.12);
+  --sel: rgba(238, 235, 228, 0.07);
+  /* a row that is the current one (the item in a preview, rows picked for a bar): a step deeper than --sel, still flat */
+  --sel-on: rgba(238, 235, 228, 0.12);
+  /* colours as text on light-on-dark tints, and text on filled buttons */
+  --must-2: #ff8f86;
+  --ok-2: #c9f6e2;
+  --claude-2: #e8977a;
+  --claude-3: #f0a58a;
+  --edge: #8a6d2c;
+  --edge-2: #c9a24a;
+  --danger-hi: #ff5b51;
+  /* a destructive button's fill: a crimson, not the must text colour — next to the orange primary an orange-red would
+     read as the same kind of button; its white label passes AA (5.1:1) */
+  --danger: #d3263e;
+  --danger-glow: rgba(211, 38, 62, 0.34);
+  --on-fg: #111;
+  --on-fg-2: #333;
+  --on-fg-3: #555;
+  --on-fg-tint: #000;
+  --on-fg-ok: #0a7a4d;
+  --fg-hi: #fff;
+  --hi: #fff;
+  --on-must: #fff;
+  --on-should: #2a1a00;
+  --on-nice: #032030;
+  --on-idea: #1c0626;
+  --on-ok: #032417;
+  --on-claude: #2a0f06;
+  --scroll: #2a2a2c;
+  /* behind a dialog: dimmed, not blacked out — the page stays readable as the place the dialog came from */
+  --backdrop: rgba(0, 0, 0, 0.56);
+  /* tooltips and toasts: a step lighter than the floats in the dark, so a passing message still stands out */
+  --tip-bg: #2d2d2f;
+  --tip-fg: var(--fg);
+  --tip-fg-2: var(--fg-2);
+  --tip-edge: rgba(238, 235, 228, 0.12);
+  --tip-ok: var(--ok);
+  --veil: rgba(5, 5, 5, 0.82);
+  --well: #080808;
+  /* the timeline (canvas reads these) */
+  --tl-bg: #080808;
+  --tl-film: #040404;
+  --tl-hole: #1e1e20;
+  --tl-lane: #0b0b0c;
+  --tl-grid: #1b1b1c;
+  --tl-tick: #3a3a3c;
+  --tl-text: #79766f;
+  --tl-wave: #333335;
+  --tl-wave-rms: #7d7a73;
+  --tl-wave-in: #8f8b83;
+  --tl-wave-rms-in: #eeebe4;
+  --tl-closed: #4a4a4c;
+  --tl-verified: #3fd99a;
+  --tl-words: #1c1c1e;
+  --tl-word-text: #a19d95;
+  --tl-seg-a: #262628;
+  --tl-seg-b: #323234;
+  --playhead: #eeebe4;
+  --grain: var(--noise);
+  --grain-o: 0.05;
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 2px 10px rgba(0, 0, 0, 0.4);
+  --shadow-up: 0 -12px 32px rgba(0, 0, 0, 0.45);
+  --must-glow: rgba(255, 69, 58, 0.28);
+  /* Brand orange, "the frame you review, lit": the logo's window, and on the client's invitation pages the one light
+     in the room and the way in. The same orange in both themes; ink on it (--brand-ink). A button in the brand's
+     colour is a shade deeper (--brand-deep) so its white label (--on-brand) passes AA; the logo's orange stays exact.
+     Not a colour of the working chrome. */
+  --brand: #f25a1d;
+  --brand-ink: #1a0b04;
+  --brand-deep: #cf430c;
+  --on-brand: #fff;
+  --brand-hot: #ff9a5c;
+  --brand-glow: rgba(242, 90, 29, 0.42);
+  --brand-haze: rgba(242, 90, 29, 0.16);
+  --cool-haze: rgba(120, 146, 255, 0.1);
+  /* a timeline ruler: frame ticks, a longer one every fourth */
+  --ruler: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='10'%3E%3Cpath d='M.5 1v8M8.5 3v4M16.5 2v6M24.5 3v4' stroke='%233a3a3d'/%3E%3C/svg%3E");
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6' fill='none' stroke='%238c8982' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E");
+  /* The entrance's brand film (ui/Entrance.tsx): dark film over a faint warm lamp — the panel's ground and its light,
+     the mat around the playing frame, the film stock and its perforations, the labels in the picture. The frame's own
+     black under the picture (--film-view) is the same in both themes. */
+  --film-a: #141416;
+  --film-b: #060607;
+  --film-hi: rgba(255, 228, 200, 0.045);
+  --film-glow: rgba(242, 104, 42, 0.12);
+  --film-mat: #0e0e10;
+  --film-edge: rgba(238, 235, 228, 0.1);
+  --film-top: rgba(255, 255, 255, 0.07);
+  --film-view: #0b0b0c;
+  --film-view-edge: rgba(255, 255, 255, 0.06);
+  --film-stock: #0c0c0e;
+  --film-stock-edge: rgba(238, 235, 228, 0.08);
+  --film-label: #7b776f;
+  --film-perf: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='8'%3E%3Crect x='4' y='1' width='8' height='6' rx='1.5' fill='%23202023'/%3E%3C/svg%3E");
+  --shadow-film: 0 2px 4px rgba(0, 0, 0, 0.45), 0 30px 60px -26px rgba(0, 0, 0, 0.85);
+  /* The light table (the setup's pictures, onboarding/pictures.tsx; the entrance's panel family): glass over a warm lamp
+     in the dark, paper in the light; frames on dark mats, their labels quiet; keys on it a soft grey. */
+  --lt-a: #141416;
+  --lt-b: #060607;
+  --lt-hi: rgba(255, 228, 200, 0.045);
+  --lt-glow: rgba(242, 104, 42, 0.12);
+  --lt-lbl: #7b776f;
+  --lt-key: #57575c;
+  --fb-mat: #0e0e10;
+  --fb-edge: rgba(238, 235, 228, 0.1);
+  --fb-top: rgba(255, 255, 255, 0.07);
+  --fb-shadow: 0 2px 4px rgba(0, 0, 0, 0.45), 0 30px 60px -26px rgba(0, 0, 0, 0.85);
+  --fb-view-edge: rgba(255, 255, 255, 0.06);
+  --ruler-lt: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='10'%3E%3Cpath d='M.5 1v8M30.5 3v4M60.5 3v4M90.5 3v4' stroke='%23343437'/%3E%3C/svg%3E");
+  /* Get started's card: a lit corner on its ground */
+  --gs-a: #1a1a1b;
+  --gs-b: #131314;
+}
+
+:root {
+  /* Shadows cast onto the page: dark islands don't redeclare these, so a film strip on paper casts a paper shadow. */
+  --cast: #000;
+  --cast-k: 1;
+  /* a sheet on the light table: the frames' mat (the setup's pictures) */
+  --fr-bg: var(--fb-mat);
+  --fr-edge: var(--fb-edge);
+  --fr-top: var(--fb-top);
+  --fr-shadow: var(--fb-shadow);
+  /* a card that barely lifts off the page (Get started) */
+  --shadow-hair: 0 1px 2px color-mix(in srgb, var(--cast) calc(8% * var(--cast-k)), transparent);
+  /* a bar stuck to the bottom of what scrolls: the page fades into it */
+  --shadow-fade-up: 0 -18px 18px -4px var(--ink-1);
+  --shadow-small:
+    0 1px 2px color-mix(in srgb, var(--cast) calc(22% * var(--cast-k)), transparent),
+    0 6px 16px color-mix(in srgb, var(--cast) calc(22% * var(--cast-k)), transparent);
+  /* what a phone's notch and home indicator take (0 elsewhere) */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* The design system's scales (web/README.md, "The scales"). test/unit/design-scale.test.ts keeps stylesheets on them. */
+  /* Type: seven sizes and a display size (a title that is the page: the client's invitation), three weights, three
+     line heights. 16 px only for text fields on touch screens (iOS zoom). */
+  /* 10 px only for type drawn inside a picture at its own scale (the entrance's film: its frame number and timecode) */
+  --fs-2xs: 10px;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-lg: 15px;
+  --fs-xl: 18px;
+  --fs-2xl: 24px;
+  --fs-3xl: 36px;
+  --fs-4xl: 56px;
+  --fs-touch: 16px;
+  --fw-text: 400;
+  --fw-ui: 500;
+  --fw-strong: 650;
+  --lh-tight: 1.1;
+  --lh-ui: 1.3;
+  --lh-body: 1.5;
+  --track-title: -0.02em;
+  --track-eyebrow: 0.06em;
+  /* Spacing: 4-based. 64 and 80 only for page-level room (empty states, bottom padding over a floating bar). */
+  --sp-0_5: 2px;
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-12: 48px;
+  --sp-16: 64px;
+  --sp-20: 80px;
+  /* Radius: chips and keys · controls and rows · cards, popovers, dialogs · round things. */
+  --r-sm: 4px;
+  --r: 8px;
+  --r-lg: 12px;
+  --r-full: 999px;
+  --radius: var(--r-lg);
+  --radius-sm: var(--r);
+  /* Icons: in chips and menus · in buttons, nav and toolbars · in empty states and large buttons. */
+  --ic-sm: 14px;
+  --ic: 16px;
+  --ic-lg: 20px;
+  /* The play triangle's optical nudge: its weight sits left of its box, so it stands this much right of the middle of a
+     round play button (dock.css .playbtn); pause bars stand exactly in the middle. */
+  --ic-play-nudge: 1px;
+  /* Three shadows: what floats (menus, popovers, dialogs, toasts), what is lifted (a dragged card), the focus ring. */
+  /* What floats (menus, popovers, hover cards, dialogs, the palette): one material — the lightest surface, a hairline
+     edge, a lit top edge and a shadow in three depths (contact, near, far) that softens on paper. */
+  --shadow-float:
+    inset 0 1px 0 color-mix(in srgb, var(--hi) 6%, transparent), 0 1px 2px color-mix(in srgb, var(--cast) calc(24% * var(--cast-k)), transparent),
+    0 8px 24px color-mix(in srgb, var(--cast) calc(26% * var(--cast-k)), transparent),
+    0 24px 64px color-mix(in srgb, var(--cast) calc(34% * var(--cast-k)), transparent);
+  /* a sheet's scrim without an element of its own: the page behind a menu that became a sheet (phones) dims */
+  --shadow-scrim: 0 0 0 100vmax var(--backdrop);
+  --float-bg: var(--ink-3);
+  --float-line: color-mix(in srgb, var(--fg) 11%, transparent);
+  /* the row under the pointer or the keys in a menu, a list in a popover, the palette */
+  --float-sel: color-mix(in srgb, var(--fg) 8%, transparent);
+  --shadow-raise:
+    0 8px 24px color-mix(in srgb, var(--cast) calc(30% * var(--cast-k)), transparent),
+    0 1px 3px color-mix(in srgb, var(--cast) calc(30% * var(--cast-k)), transparent);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--fg) 14%, transparent);
+  /* A sunken track (segmented controls, tabs, the timecode, the timeline): the opposite of the raised material. */
+  --sunk: inset 0 1px 2px color-mix(in srgb, var(--cast) calc(18% * var(--cast-k)), transparent);
+  /* The raised material: the one 3D look for primary actions and for everything selected or active (a segment, a
+     chip, a tab, the current settings section) — a sheen from the top, a light top edge, a darker bottom edge and a
+     soft drop. Pressed sinks in. Two tones share it: strong (the ink fill of a primary button) and surface (the
+     lightest surface, for a selected item inside a sunken track). */
+  --raise-sheen: linear-gradient(to bottom, color-mix(in srgb, var(--hi) 12%, transparent), transparent 60%);
+  --raise-edge:
+    inset 0 1px 0 color-mix(in srgb, var(--hi) 38%, transparent), inset 0 -1px 0 color-mix(in srgb, var(--cast) calc(22% * var(--cast-k)), transparent);
+  --raise-drop:
+    0 1px 2px color-mix(in srgb, var(--cast) calc(38% * var(--cast-k)), transparent),
+    0 3px 10px color-mix(in srgb, var(--cast) calc(16% * var(--cast-k)), transparent);
+  --raise: var(--raise-edge), var(--raise-drop);
+  --press: inset 0 1px 3px color-mix(in srgb, var(--cast) calc(45% * var(--cast-k)), transparent);
+  /* the brand orange's light: a primary in brand colour lifts on its own glow; the lit window throws light around it */
+  --shadow-brand: 0 8px 28px var(--brand-glow), 0 1px 2px color-mix(in srgb, var(--cast) calc(30% * var(--cast-k)), transparent);
+  /* a destructive button's hover: its own red light, like the orange primary's (a lighter fill would fail its label) */
+  --shadow-danger: 0 8px 24px var(--danger-glow), 0 1px 2px color-mix(in srgb, var(--cast) calc(30% * var(--cast-k)), transparent);
+  --shadow-window: 0 0 120px 24px var(--brand-glow), 0 0 32px var(--brand-haze);
+  --focus-ring-brand: 0 0 0 4px color-mix(in srgb, var(--brand) 26%, transparent), 0 0 32px var(--brand-haze);
+  /* the entrance film's gate: the lit frame under the playhead */
+  --shadow-gate: 0 0 0 3px color-mix(in srgb, var(--brand) 12%, transparent), 0 0 24px color-mix(in srgb, var(--brand) 16%, transparent);
+  /* One height scale for every control: side by side, controls share a step (quality.mjs checks rows). Touch screens
+     widen tap areas invisibly (mobile.css) instead of growing the boxes. */
+  --h-xs: 20px;
+  --h-sm: 26px;
+  --h: 30px;
+  --h-lg: 40px;
+  /* touch screens: the smallest a finger hits reliably */
+  --h-touch: 44px;
+  /* the one field and button a whole page is for: the way into a review */
+  --h-xl: 52px;
+  --ui: 'Instrument Sans Variable', 'Instrument Sans', -apple-system, sans-serif;
+  /* Titles: the UI face, heavier and semi-condensed (its width axis) — a tool's type, not a film credit. */
+  --display: 'Instrument Sans Variable', 'Instrument Sans', -apple-system, sans-serif;
+  --mono: 'Martian Mono Variable', 'SF Mono', ui-monospace, monospace;
+  /* key caps: letters in the UI face (the mono face's narrow capital O read as a zero: "Open in player [0]");
+     ⌘ ⇧ ⌥ ↵, which it hasn't got, from the system face at their full size */
+  --keys: 'Instrument Sans Variable', 'Instrument Sans', system-ui, -apple-system, 'Segoe UI Symbol', sans-serif;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Layers above the page, lowest first. Stacking inside one component (the stage's panes and handles) stays local
+     with small numbers. */
+  --z-topbar: 30;
+  --z-inbox: 45;
+  --z-overlay: 50;
+  --z-sheet: 51;
+  /* a dialog sits above the sheet or drawer it was opened from; a menu or popover above whatever opened it */
+  --z-dialog: 52;
+  --z-menu: 55;
+  --z-float: 60;
+  --z-palette: 61;
+  --z-uploads: 70;
+  --z-toast: 80;
+  --z-top: 90;
+  /* Motion: three speeds and four curves for everything that moves. Enter with ease-out, leave with ease-in (faster
+     than entering), springs only for small things that snap into place (a switch, a toast). */
+  --dur-fast: 120ms;
+  --dur: 180ms;
+  --dur-slow: 280ms;
+  --dur-page: 140ms;
+  --dur-page-in: 240ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.55, 0, 0.75, 0.3);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.36, 0.64, 1);
+  --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --noise-ink: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .2 0 0 0 0 .16 0 0 0 0 .1 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* Keyframe glyphs (ui/glyphs.ts; test/unit/keyglyph.test.ts keeps these identical): masks, tinted by colour. */
+  --kg-diamond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill-rule='evenodd' d='M6 .8 11.2 6 6 11.2 .8 6Z'/%3E%3C/svg%3E");
+  --kg-half: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill-rule='evenodd' d='M6 .8 11.2 6 6 11.2 .8 6ZM6 3 9 6 6 9Z'/%3E%3C/svg%3E");
+  --kg-outline: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill-rule='evenodd' d='M6 .8 11.2 6 6 11.2 .8 6ZM6 3 9 6 6 9 3 6Z'/%3E%3C/svg%3E");
+  --kg-circle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill-rule='evenodd' d='M6 1.2A4.8 4.8 0 1 1 6 10.8 4.8 4.8 0 1 1 6 1.2ZM6 3.3A2.7 2.7 0 1 0 6 8.7 2.7 2.7 0 1 0 6 3.3Z'/%3E%3C/svg%3E");
+  --kg-ease: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill-rule='evenodd' d='M1.6 1.4h8.8L6 6l4.4 4.6H1.6L6 6Z'/%3E%3C/svg%3E");
+  --kg-hold: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill-rule='evenodd' d='M3.1 1.6h5.8c.8 0 1.5.7 1.5 1.5v5.8c0 .8-.7 1.5-1.5 1.5H3.1c-.8 0-1.5-.7-1.5-1.5V3.1c0-.8.7-1.5 1.5-1.5Z'/%3E%3C/svg%3E");
+}
+
+/* Light: warm paper, ink-black type, the film details kept; status colours deepened to pass WCAG AA as text.
+   The print sheet is paper in both themes, so it always takes these. */
+:root[data-theme='light'],
+body.printing {
+  color-scheme: light;
+  --cast: #3a2e1c;
+  --cast-k: 0.32;
+  --ink-0: #e9e5dc;
+  --ink-1: #f2efe7;
+  --ink-2: #f8f6f0;
+  --ink-3: #fffdf8;
+  --ink-4: #e8e4da;
+  --ink-5: #dcd7cc;
+  --line: #e1dcd1;
+  --line-2: #d4cec2;
+  --line-3: #b4ad9f;
+  --line-4: #8f887b;
+  --fg: #1c1b19;
+  --fg-2: #3b3833;
+  --muted: #69645b;
+  --faint: #868075;
+  --must: #b31434;
+  --should: #9a4f04;
+  --nice: #00679a;
+  --idea: #8b2db8;
+  --ok: #157548;
+  --claude: #a3461f;
+  --must-bg: rgba(179, 20, 52, 0.09);
+  --should-bg: rgba(154, 79, 4, 0.1);
+  --idea-bg: rgba(139, 45, 184, 0.09);
+  --ok-bg: rgba(21, 117, 72, 0.09);
+  --claude-bg: rgba(163, 70, 31, 0.1);
+  --sel: rgba(28, 27, 25, 0.06);
+  --sel-on: rgba(28, 27, 25, 0.1);
+  --must-2: #9a1030;
+  --ok-2: #0f5f39;
+  --claude-2: #924020;
+  --claude-3: #86391c;
+  --edge: #7a5a17;
+  --edge-2: #7a5a17;
+  --danger-hi: #9a1030;
+  --danger: #b31434;
+  --danger-glow: rgba(179, 20, 52, 0.22);
+  --on-fg: #f7f4ec;
+  --on-fg-2: #d6d0c4;
+  --on-fg-3: #b9b3a7;
+  --on-fg-tint: #fff;
+  --on-fg-ok: #6fdcaa;
+  --fg-hi: #3a3732;
+  --hi: #fff;
+  --on-must: #fff;
+  --on-should: #fffaf0;
+  --on-nice: #f0faff;
+  --on-idea: #fbf3ff;
+  --on-ok: #f2fff8;
+  --on-claude: #fff6f1;
+  --scroll: #cbc5b8;
+  --backdrop: rgba(42, 34, 22, 0.2);
+  /* on paper, tooltips and toasts are ink: a passing message in the page's own type colour */
+  --tip-bg: var(--fg);
+  --tip-fg: var(--on-fg);
+  --tip-fg-2: var(--on-fg-2);
+  --tip-edge: transparent;
+  --tip-ok: var(--on-fg-ok);
+  --veil: rgba(242, 239, 231, 0.86);
+  --well: #e9e5dc;
+  --tl-bg: #efebe3;
+  --tl-film: #e2ddd2;
+  --tl-hole: #f7f4ed;
+  --tl-lane: #f7f5ef;
+  --tl-grid: #e3ded4;
+  --tl-tick: #b7b0a2;
+  --tl-text: #6d685f;
+  --tl-wave: #d2ccbf;
+  --tl-wave-rms: #8d877b;
+  --tl-wave-in: #9a9387;
+  --tl-wave-rms-in: #2a2824;
+  --tl-closed: #b3ada0;
+  --tl-verified: #157548;
+  --tl-words: #e6e1d7;
+  --tl-word-text: #58534b;
+  --tl-seg-a: #dcd6ca;
+  --tl-seg-b: #cfc8bb;
+  --playhead: #1c1b19;
+  --grain: var(--noise-ink);
+  --grain-o: 0.07;
+  --shadow: 0 24px 60px rgba(58, 46, 28, 0.16), 0 2px 10px rgba(58, 46, 28, 0.1);
+  --shadow-up: 0 -12px 32px rgba(58, 46, 28, 0.12);
+  --must-glow: rgba(179, 20, 52, 0.18);
+  --brand-hot: #ff8a4a;
+  --brand-glow: rgba(242, 90, 29, 0.34);
+  --brand-haze: rgba(242, 90, 29, 0.13);
+  --cool-haze: rgba(70, 96, 210, 0.07);
+  --ruler: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='10'%3E%3Cpath d='M.5 1v8M8.5 3v4M16.5 2v6M24.5 3v4' stroke='%23c4bdb0'/%3E%3C/svg%3E");
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6' fill='none' stroke='%2369645b' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E");
+  /* the brand film on paper: a white mat and white film on a clean paper ground, no lamp */
+  --film-a: #fdfcf9;
+  --film-b: #eeeae2;
+  --film-hi: rgba(255, 255, 255, 0.95);
+  --film-glow: rgba(255, 255, 255, 0);
+  --film-mat: #fff;
+  --film-edge: rgba(28, 27, 25, 0.12);
+  --film-top: rgba(255, 255, 255, 1);
+  --film-view-edge: rgba(0, 0, 0, 0.08);
+  --film-stock: #fff;
+  --film-stock-edge: rgba(28, 27, 25, 0.13);
+  --film-label: #8f887b;
+  --film-perf: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='8'%3E%3Crect x='4' y='1' width='8' height='6' rx='1.5' fill='%23e6e0d5'/%3E%3C/svg%3E");
+  --shadow-film: 0 1px 1px rgba(46, 36, 20, 0.07), 0 4px 10px rgba(46, 36, 20, 0.05), 0 28px 50px -26px rgba(46, 36, 20, 0.32);
+  --lt-a: #fdfcf9;
+  --lt-b: #eeeae2;
+  --lt-hi: rgba(255, 255, 255, 0.95);
+  --lt-glow: rgba(255, 255, 255, 0);
+  --lt-lbl: #8f887b;
+  --lt-key: #b4ad9f;
+  --fb-mat: #ffffff;
+  --fb-edge: rgba(28, 27, 25, 0.12);
+  --fb-top: rgba(255, 255, 255, 1);
+  --fb-shadow: 0 1px 1px rgba(46, 36, 20, 0.07), 0 4px 10px rgba(46, 36, 20, 0.05), 0 28px 50px -26px rgba(46, 36, 20, 0.32);
+  --fb-view-edge: rgba(0, 0, 0, 0.08);
+  --ruler-lt: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='10'%3E%3Cpath d='M.5 1v8M30.5 3v4M60.5 3v4M90.5 3v4' stroke='%23cfc8bb'/%3E%3C/svg%3E");
+  --gs-a: #fffdf8;
+  --gs-b: #f8f6f0;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+body {
+  background: var(--ink-1);
+  color: var(--fg);
+  font: var(--fs-md) / var(--lh-body) var(--ui);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+a {
+  color: var(--fg);
+}
+/* bold is the strong weight of the scale, not the browser's "bolder" (700, or 900 inside strong text) */
+b,
+strong {
+  font-weight: var(--fw-strong);
+}
+.icon {
+  flex: none;
+  display: block;
+}
+.mono {
+  font-family: var(--mono);
+  font-stretch: 87.5%;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--track-title);
+}
+.muted {
+  color: var(--muted);
+}
+.faint {
+  color: var(--faint);
+}
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ellipsis-start {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+.ellipsis-start > span {
+  direction: ltr;
+  unicode-bidi: plaintext;
+}
+.serif {
+  font-family: var(--display);
+  font-weight: var(--fw-strong);
+  font-stretch: semi-condensed;
+  letter-spacing: var(--track-title);
+}
+.eyebrow {
+  font: var(--fw-ui) var(--fs-xs) / var(--lh-ui) var(--ui);
+  letter-spacing: var(--track-eyebrow);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+::selection {
+  background: color-mix(in srgb, var(--fg) 22%, transparent);
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scroll);
+  border-radius: var(--r);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+:focus-visible {
+  outline: 1.5px solid var(--fg);
+  outline-offset: 2px;
+}
+/* the ring is the keyboard's: a native select clicked with the mouse matches :focus-visible in Chrome too
+   (lib/themeBoot.ts says which input came last) */
+:root[data-pointer] select:focus-visible {
+  outline: none;
+}
+
+/* Reduced motion: nothing slides, scales or shimmers; state changes still show (instantly). Spinners keep turning:
+   they are the only sign that something is still going on. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur: 0ms;
+    --dur-slow: 0ms;
+    --dur-page: 0ms;
+    --dur-page-in: 0ms;
+  }
+  /* No transitions at all (a 1 ms one would still turn every style change, even an inline transform, into an
+     animation starting from the old value); animations end at once, so what waits for animationend still runs. */
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+  *:not(.spinner),
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* grain on the chrome only — never over the picture */
+/* Film grain. Put it on a box that doesn't scroll: on a scroller the overlay covers only the first screen of the
+   content and then scrolls away, leaving a visible edge. */
+.grain {
+  position: relative;
+  isolation: isolate;
+}
+.grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--grain);
+  opacity: var(--grain-o);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* printing a review (share/PrintView.tsx): paper in both themes */
+body.printing {
+  overflow: auto;
+  background: #fff;
+  color: #111;
+}

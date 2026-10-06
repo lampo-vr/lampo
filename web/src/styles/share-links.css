@@ -1,0 +1,513 @@
+/* ---------------------------------------------------------------- review links (owner side) */
+
+.link-intro {
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--muted);
+}
+/* who the link says it's from (a chosen name), or the one step that gives it one */
+.link-sharer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-2);
+  margin: calc(-1 * var(--sp-2)) 0 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-ui);
+  color: var(--faint);
+}
+.link-sharer > .icon {
+  flex: none;
+}
+.link-sharer .btn-link {
+  font-size: var(--fs-sm);
+}
+/* Making a link: who it's for and the way in, one of three kinds, then every setting as a small button that says its
+   value, in a row that wraps (ShareModal.tsx Details); an expiry and a password are added from the same row and shown
+   under it. */
+.link-new {
+  display: grid;
+  gap: var(--sp-3);
+}
+.link-new-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.link-new-row .input {
+  min-width: 0;
+}
+.link-kind {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+/* A link's settings (LinkSettings.tsx): one framed list, a row per setting — its name, then its control at the end (a
+   switch, the downloads menu, the expiry date's button, the password's field). Every row is one height and nothing
+   opens under one, so nothing moves while settings change. */
+.link-set {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  border-radius: var(--r);
+  background: var(--ink-1);
+  box-shadow: 0 0 0 1px var(--line);
+}
+.link-set-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  height: var(--h-lg);
+  padding: 0 var(--sp-2) 0 var(--sp-3);
+}
+.link-set-row + .link-set-row {
+  border-top: 1px solid var(--line);
+}
+.link-set-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--fs-md);
+  color: var(--fg);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.link-set-row[data-disabled] .link-set-label {
+  color: var(--muted);
+}
+/* what is wrong with the row's value, on its own line's end (the password too short) */
+.link-set-say {
+  margin-left: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--must);
+}
+.link-set-value {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.link-set-menu,
+.link-date-btn {
+  gap: var(--sp-1);
+}
+.link-set-menu > .icon,
+.link-date-btn > .icon {
+  color: var(--muted);
+}
+.link-date-rel {
+  color: var(--muted);
+}
+/* the expiry's choices, over the page from its button: 1, 7 or 30 days, then any day on the calendar */
+.link-date {
+  display: grid;
+  gap: var(--sp-2);
+  justify-items: start;
+}
+.link-date-quick {
+  display: flex;
+  gap: var(--sp-1);
+}
+/* the password in its row: in the clear (it is sent to people), with a new one a press away */
+.link-pass {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-0_5);
+  min-width: 0;
+}
+.link-pass-in {
+  width: 15rem;
+  min-width: 0;
+  height: var(--h-sm);
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+}
+.link-pass.bad .link-pass-in {
+  box-shadow: 0 0 0 1px var(--must);
+}
+
+/* Where links open: a status line with the one action that changes it, not a dashed placeholder */
+.link-where {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  border-radius: var(--r-lg);
+  background: var(--ink-1);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.link-where-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--h);
+  height: var(--h);
+  border-radius: var(--r);
+  background: var(--ink-3);
+  color: var(--muted);
+}
+.link-where.public .link-where-icon {
+  color: var(--ok);
+}
+.link-where-text {
+  display: grid;
+  gap: var(--sp-0_5);
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-ui);
+}
+.link-where-text b {
+  font-weight: var(--fw-strong);
+  color: var(--fg);
+}
+.link-where-text > span {
+  color: var(--faint);
+}
+.link-empty {
+  padding-block: var(--sp-6);
+}
+/* one link (LinkCard): head (tile, name + state, what it opens, actions), the address, what visitors may do, what came
+   of it (a summary that opens the activity), and the QR or the edit form under it */
+/* The links already made: their heading with the count and All links, then one line each in one framed list. */
+.link-made {
+  display: grid;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.link-made-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  min-height: var(--h-sm);
+}
+.link-made-head h3 {
+  margin: 0;
+  font: var(--fw-strong) var(--fs-sm) / var(--lh-ui) var(--ui);
+  color: var(--fg-2);
+}
+.link-made-n {
+  margin-left: var(--sp-1);
+  font-weight: var(--fw-ui);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.link-list {
+  display: grid;
+  /* one column the lines can't widen: a long line ellipsises instead of pushing the buttons out */
+  grid-template-columns: minmax(0, 1fr);
+  border-radius: var(--r);
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--line);
+}
+.link-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
+  background: var(--ink-1);
+}
+.link-list > * + * {
+  border-top: 1px solid var(--line);
+}
+.link-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.link-icon {
+  flex: none;
+  color: var(--muted);
+}
+.link-title {
+  display: grid;
+  /* a long line ellipsises: an implicit column would grow to it */
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-0_5);
+  flex: 1;
+  min-width: 0;
+  padding: var(--sp-1) 0;
+  text-align: left;
+}
+/* with activity, the line opens it */
+button.link-title {
+  margin: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+button.link-title:hover .link-sub,
+button.link-title[aria-expanded='true'] .link-sub {
+  color: var(--fg-2);
+}
+button.link-title:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+.link-name {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  font-size: var(--fs-md);
+  line-height: var(--lh-ui);
+}
+.link-name b {
+  min-width: 0;
+  font-weight: var(--fw-strong);
+  color: var(--fg);
+}
+.link-row.expired .link-name b {
+  color: var(--muted);
+}
+.link-lock {
+  flex: none;
+  color: var(--muted);
+}
+.link-state {
+  flex: none;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.link-sub {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-ui);
+  color: var(--muted);
+}
+.link-acts {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sp-1);
+}
+.link-copy.done {
+  color: var(--ok);
+}
+
+/* the activity (LinkActivity): watched videos with their heat strip, visitors, what happened */
+.link-activity {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-4);
+  padding: var(--sp-3);
+  border-radius: var(--r);
+  background: var(--ink-0);
+  box-shadow: var(--sunk);
+}
+.link-activity-wait {
+  min-height: var(--h-lg);
+}
+.link-act-sec {
+  display: grid;
+  gap: var(--sp-2);
+}
+.link-act-sec h4 {
+  margin: 0;
+  color: var(--faint);
+  font: var(--fw-ui) var(--fs-xs) / var(--lh-ui) var(--ui);
+}
+.link-watches,
+.link-visitors,
+.link-events {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.link-watch {
+  display: grid;
+  gap: var(--sp-1);
+}
+.link-watch-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-width: 0;
+  font-size: var(--fs-md);
+}
+.link-watch-head b {
+  min-width: 0;
+  font-weight: var(--fw-strong);
+}
+.link-watch-v {
+  flex: none;
+  color: var(--faint);
+  font: var(--fs-xs) var(--mono);
+}
+.link-watch-pct {
+  flex: none;
+  margin-left: auto;
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+/* which hundredths played: one cell each in the ink, stronger where more visitors watched (one hue, sequential) */
+.link-heat {
+  display: block;
+  width: 100%;
+  height: 8px;
+  border-radius: 2px;
+  fill: var(--fg-2);
+}
+.link-heat-track {
+  fill: var(--line-3);
+}
+.link-watch-who {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.link-visitors li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  font-size: var(--fs-md);
+}
+.link-visitor-name {
+  min-width: 0;
+  font-weight: var(--fw-strong);
+}
+.link-visitor-facts {
+  margin-left: auto;
+  flex: none;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.link-events li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-md);
+}
+.link-event-icon {
+  display: grid;
+  place-items: center;
+  width: var(--h-xs);
+  height: var(--h-xs);
+  border-radius: 50%;
+  background: var(--ink-2);
+  color: var(--fg-2);
+}
+.link-events li[data-kind='approval'] .link-event-icon {
+  color: var(--ok);
+}
+.link-events time {
+  color: var(--faint);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+.link-privacy {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-1);
+  margin: 0;
+  color: var(--faint);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-body);
+}
+.link-privacy svg {
+  flex: none;
+  transform: translateY(2px);
+}
+
+/* The links and the page of one link being changed share one cell: the dialog keeps its height between them. */
+.link-views {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.link-view {
+  grid-area: 1 / 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+.link-view[aria-hidden='true'] {
+  visibility: hidden;
+}
+.link-change-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+.link-back {
+  gap: var(--sp-1);
+  margin-left: calc(-1 * var(--sp-2));
+}
+.link-change-name {
+  display: grid;
+  gap: var(--sp-1);
+}
+.link-change-label {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.link-change-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+@media (max-width: 639px) {
+  /* a finger's rows: the controls in them are taller, and every row stays the same height */
+  .link-set-row {
+    height: calc(var(--h-lg) + var(--sp-2));
+  }
+  /* the password's field takes what its row has left, in the reading face (a phone types 16 px to keep its zoom) */
+  .link-set-row:has(.link-pass) .link-set-label {
+    flex: none;
+  }
+  .link-pass {
+    flex: 1;
+    justify-content: flex-end;
+  }
+  .link-pass-in {
+    flex: 1;
+    width: auto;
+    height: var(--h-lg);
+    font-family: var(--ui);
+  }
+  /* the name keeps the room: Copy is its icon (its name stays its label) */
+  .link-copy-word {
+    display: none;
+  }
+  .link-visitor-facts {
+    display: none;
+  }
+  .link-where {
+    flex-wrap: wrap;
+  }
+  .link-where-text {
+    flex-basis: calc(100% - var(--h) - var(--sp-3));
+  }
+}
+
+/* ---------------------------------------------------------------- link expiry (LinkSettings.tsx ExpiryPicker) */
+/* Above the share dialog it opens from (the dialog's backdrop sits at 50). */
+[data-radix-popper-content-wrapper] > .popover.expiry-pop {
+  z-index: var(--z-float);
+  width: auto;
+  min-width: 0;
+  padding: var(--sp-3);
+}
+.expiry-loading {
+  display: grid;
+  place-items: center;
+  width: 260px;
+  height: 280px;
+}
+.expiry-sheet {
+  display: grid;
+  justify-items: center;
+  padding-bottom: env(safe-area-inset-bottom);
+}

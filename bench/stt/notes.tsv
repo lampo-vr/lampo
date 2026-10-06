@@ -1,0 +1,31 @@
+id	lang	voice	text
+de01	de	Anna	Der Schnitt bei Sekunde zwölf kommt zu früh, bitte zwei Frames später schneiden.
+de02	de	Eddy (German (Germany))	Die Bauchbinde steht zu lange, blend sie nach drei Sekunden wieder aus.
+de03	de	Flo (German (Germany))	Die Untertitel sind zu klein und liegen auf dem Gesicht, bitte etwas höher setzen.
+de04	de	Reed (German (Germany))	Die Farbkorrektur ist hier viel zu warm, die Haut wirkt orange.
+de05	de	Sandy (German (Germany))	Der Übergang zur nächsten Szene ruckelt, mach lieber einen harten Schnitt.
+de06	de	Shelley (German (Germany))	Das Logo am Ende ist unscharf, bitte die Vektordatei nehmen.
+de07	de	Rocko (German (Germany))	Die Musik ist hier zu laut, man versteht die Sprecherin kaum.
+de08	de	Anna	Im Titel fehlt ein Komma nach dem ersten Satz.
+de09	de	Eddy (German (Germany))	Die Einblendung mit dem Preis muss raus, das Angebot gilt nicht mehr.
+de10	de	Flo (German (Germany))	Kannst du die Szene mit dem Hund etwas kürzen, sie zieht sich.
+de11	de	Reed (German (Germany))	Der Ton springt beim Übergang, da ist ein Knacken zu hören.
+de12	de	Sandy (German (Germany))	Das Bild ist am Anfang zu dunkel, hebt die Tiefen etwas an.
+de13	de	Shelley (German (Germany))	Die Schrift passt nicht zur Marke, bitte wieder die Hausschrift verwenden.
+de14	de	Rocko (German (Germany))	Mach den Zoom auf das Produkt langsamer, das wirkt zu hektisch.
+de15	de	Anna	Genau so lassen, der Moment ist perfekt.
+de16	de	Grandpa (German (Germany))	Der Abspann ist zu lang, fünf Sekunden reichen völlig.
+mx01	mixed	Anna	Die Caption ist zu klein, und die B-Roll danach bitte kürzer.
+mx02	mixed	Flo (German (Germany))	Das Color Grading passt nicht zum Rest vom Reel.
+mx03	mixed	Eddy (German (Germany))	Kannst du den Call to Action am Ende größer machen?
+mx04	mixed	Sandy (German (Germany))	Der Jump Cut bei der zweiten Frage ist zu hart.
+mx05	mixed	Reed (German (Germany))	Bitte das Intro aus After Effects nochmal neu rendern.
+mx06	mixed	Shelley (German (Germany))	Die Safe Zone von Instagram wird hier vom Text verletzt.
+en01	en	Samantha	The cut at the beginning is too early, move it two frames later.
+en02	en	Daniel	The lower third stays on screen too long.
+en03	en	Flo (English (US))	Please fix the typo in the headline.
+en04	en	Reed (English (UK))	The music drowns out the voice in this part.
+en05	en	Sandy (English (US))	Can you make the logo animation a bit faster?
+en06	en	Eddy (English (UK))	The color grade feels too cold compared to the last shot.
+en07	en	Shelley (English (US))	Remove the flash frame right before the transition.
+en08	en	Samantha	Keep this shot exactly as it is, it looks great.

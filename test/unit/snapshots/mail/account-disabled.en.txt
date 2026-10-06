@@ -1,0 +1,13 @@
+Subject: Your Lampo account was disabled
+
+Your account was disabled
+
+Hi Mia,
+
+An admin of review.example.com disabled your account: you’re signed out everywhere and can’t sign in until it is enabled again.
+
+Questions? Ask whoever runs review.example.com.
+
+--
+You get this because you have an account on review.example.com.
+Lampo · review.example.com

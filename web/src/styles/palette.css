@@ -1,0 +1,160 @@
+/* ---------------------------------------------------------------- the command palette (web/src/palette/) */
+
+.palette {
+  position: fixed;
+  z-index: var(--z-palette);
+  left: 50%;
+  top: 12vh;
+  transform: translateX(-50%);
+  width: min(640px, calc(100vw - 24px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  max-height: min(560px, 76vh);
+  border-radius: var(--r-lg);
+  background: var(--float-bg);
+  box-shadow:
+    0 0 0 1px var(--float-line),
+    var(--shadow-float);
+  overflow: hidden;
+  outline: none;
+  animation: palette-in var(--dur) var(--ease-out);
+}
+@keyframes palette-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -6px) scale(0.985);
+  }
+}
+.palette-input {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-4);
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+}
+.palette-input input {
+  flex: 1;
+  min-width: 0;
+  height: 54px;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--fg);
+  font: var(--fs-touch) var(--ui); /* 16 px: iOS doesn't zoom into it */
+}
+.palette-input input::placeholder {
+  color: var(--faint);
+}
+.palette-list {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-1);
+}
+.palette-group + .palette-group {
+  margin-top: var(--sp-1);
+}
+.palette-group-name {
+  padding: var(--sp-2) var(--sp-2) var(--sp-1);
+  font: var(--fw-ui) var(--fs-xs) var(--ui);
+  color: var(--muted);
+}
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: 44px;
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r);
+  cursor: pointer;
+  outline: none;
+}
+.palette-item[aria-selected='true'] {
+  background: var(--float-sel);
+}
+.palette-thumb {
+  flex: none;
+  width: 46px;
+  height: 29px;
+  border-radius: var(--r-sm);
+  object-fit: cover;
+  background: var(--ink-0);
+  box-shadow: 0 0 0 1px var(--line);
+}
+.palette-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 29px;
+  color: var(--muted);
+}
+.palette-item[aria-selected='true'] .palette-icon {
+  color: var(--fg);
+}
+.palette-text {
+  flex: 1;
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.palette-label {
+  font-size: var(--fs-md);
+  color: var(--fg);
+}
+.palette-label mark {
+  background: none;
+  color: var(--fg);
+  font-weight: var(--fw-strong);
+  text-decoration: underline;
+  text-decoration-color: var(--line-4);
+  text-underline-offset: 3px;
+}
+.palette-sub {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.palette-foot {
+  display: flex;
+  gap: var(--sp-4);
+  padding: var(--sp-2) var(--sp-4);
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.palette-foot span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+/* the top bar's way in */
+.palette-btn {
+  gap: var(--sp-2);
+  color: var(--muted);
+}
+.palette-btn:hover {
+  color: var(--fg);
+}
+.palette-btn-key {
+  margin-left: var(--sp-0_5);
+}
+
+@media (max-width: 639px) {
+  .palette {
+    top: 8px;
+    max-height: calc(100dvh - 16px);
+  }
+  .palette-foot {
+    display: none;
+  }
+  .palette-btn {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+  .palette-btn-label,
+  .palette-btn-key {
+    display: none;
+  }
+}

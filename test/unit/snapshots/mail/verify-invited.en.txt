@@ -1,0 +1,16 @@
+Subject: Confirm your email for Lampo
+
+Confirm your email address
+
+Hi Jürgen,
+
+You joined review.example.com. Confirm that juergen@example.com is yours, so password resets and notices reach you.
+
+Confirm my address:
+https://review.example.com/#/verify/vt_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+The link works once, for 24 hours.
+
+--
+You get this because you have an account on review.example.com.
+Lampo · review.example.com

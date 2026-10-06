@@ -1,0 +1,278 @@
+/* ---------------------------------------------------------------- status workflow (mobile first) */
+
+/* One colour per stage, always with an icon and words next to it (never colour alone). */
+[data-stage] {
+  --st: var(--fg-2);
+  --st-bg: color-mix(in srgb, var(--fg) 6%, transparent);
+}
+[data-stage='changes'] {
+  --st: var(--should);
+  --st-bg: var(--should-bg);
+}
+[data-stage='in_progress'] {
+  --st: var(--claude);
+  --st-bg: var(--claude-bg);
+}
+[data-stage='check_fixes'] {
+  --st: var(--nice);
+  --st-bg: color-mix(in srgb, var(--nice) 10%, transparent);
+}
+[data-stage='team_approved'],
+[data-stage='with_client'],
+[data-stage='client_approved'] {
+  --st: var(--ok);
+  --st-bg: var(--ok-bg);
+}
+[data-stage='final'] {
+  --st: var(--fg);
+  --st-bg: color-mix(in srgb, var(--fg) 12%, transparent);
+}
+
+/* ---------------------------------------------------------------- the player's sign-off (StageControl) */
+
+/* A quiet status (no button: the steps are in its tooltip) and a split button for the next step. */
+.signoff {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.signoff .so-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  max-width: min(34vw, 320px);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  white-space: nowrap;
+  border-radius: var(--r);
+  cursor: default;
+}
+.signoff .so-status:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 3px;
+}
+.signoff .so-label {
+  color: var(--st);
+  font-weight: var(--fw-ui);
+}
+.signoff .so-note,
+.signoff .so-wait {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+}
+/* a final version's posts beside where it stands ("· YouTube posted"); a failed one in the must colour */
+.so-pub {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+}
+.so-pub .s-failed {
+  color: var(--must);
+}
+.so-pub .s-sent {
+  color: var(--should);
+}
+/* how far the client got through this version (the tooltip says who, through which link) */
+.signoff .so-watch {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sp-0_5);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+/* Narrower desktops: the status keeps its name and what it waits for moves to its tooltip, so the bar's other
+   controls keep their words on one line. */
+@media (max-width: 1279px) {
+  .signoff .so-note,
+  .signoff .so-wait {
+    display: none;
+  }
+}
+/* the main button and its chevron read as one control */
+.signoff .so-split {
+  display: inline-flex;
+  flex: none;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.signoff .so-split .so-main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+/* an approval as the next step is the primary action in green: the raised material, filled */
+.signoff .so-split .btn.ok {
+  background: var(--raise-sheen), var(--ok);
+  border-color: var(--ok);
+  color: var(--on-ok);
+  font-weight: var(--fw-strong);
+  box-shadow: var(--raise);
+}
+.signoff .so-split .btn.ok:not(:disabled):active {
+  box-shadow: var(--press);
+}
+.signoff .so-split .so-main + * .so-more,
+.signoff .so-split .so-main + .so-more {
+  margin-left: 1px;
+  padding: 0 var(--sp-2);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.signoff .so-more {
+  gap: var(--sp-1);
+}
+.signoff.compact {
+  gap: var(--sp-1);
+}
+.signoff.compact .so-status {
+  max-width: none;
+}
+/* the steps in the status's tooltip */
+.so-tip {
+  display: grid;
+  gap: var(--sp-3);
+  min-width: 300px;
+  max-width: 340px;
+  /* a card inside the one-line tooltip's tight padding: room around the steps and the sentence */
+  padding: var(--sp-2) var(--sp-2) var(--sp-1);
+  white-space: normal;
+}
+.so-tip > span {
+  line-height: var(--lh-ui);
+}
+.so-tip > span + span {
+  margin-top: calc(-1 * var(--sp-2));
+  opacity: 0.8;
+}
+/* history dialog */
+.so-history {
+  display: grid;
+  gap: var(--sp-3);
+}
+.so-history .so-now {
+  margin: 0;
+  color: var(--fg-2);
+  font-size: var(--fs-md);
+}
+.so-note-field {
+  width: 100%;
+  min-height: 72px;
+  font-size: var(--fs-touch); /* no zoom on phones */
+}
+@media (min-width: 640px) {
+  .so-note-field {
+    font-size: var(--fs-md);
+  }
+}
+
+/* the five steps */
+.st-steps {
+  display: grid;
+  /* five steps, or four where no client is in it (StageStepper.tsx) */
+  grid-template-columns: repeat(var(--n, 5), 1fr);
+  margin: 0;
+  padding: var(--sp-1) 0 0;
+  list-style: none;
+}
+.st-steps li {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-2);
+  font: var(--fw-strong) var(--fs-xs) var(--ui);
+  color: var(--muted);
+}
+/* the line between two dots */
+.st-steps li + li::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  right: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--line-2);
+}
+.st-steps li.done + li::before,
+.st-steps li.done + li.now::before {
+  background: var(--st);
+}
+/* each step a keyframe on the track: set (solid), here (hollow, larger), ahead (hollow, faint) */
+.st-steps .kg {
+  position: relative;
+  z-index: 1;
+  --kg-size: 12px;
+  color: var(--line-3);
+}
+.st-steps li.done .kg {
+  color: var(--st);
+}
+/* the words: where it stands now the strongest, what is behind it quieter, what is ahead the faintest */
+.st-steps li.done {
+  color: var(--muted);
+}
+.st-steps li.now {
+  color: var(--fg);
+}
+.st-steps li.now .kg {
+  --kg-size: 14px;
+  margin-top: -1px;
+  color: var(--st);
+}
+
+/* the history */
+.st-history {
+  display: grid;
+  gap: var(--sp-2);
+  margin: var(--sp-2) 0 0;
+  padding: 0;
+  list-style: none;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.st-history li {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: flex-start;
+}
+.st-party {
+  flex: none;
+  min-width: 46px;
+  padding: var(--sp-0_5) var(--sp-1);
+  border-radius: var(--r-sm);
+  text-align: center;
+  font: var(--fw-strong) var(--fs-xs) var(--ui);
+  background: var(--ink-4);
+  color: var(--fg-2);
+}
+.st-party.client {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.st-party.final {
+  background: var(--fg);
+  color: var(--on-fg);
+}
+.st-h-main {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  font-size: var(--fs-sm);
+}
+.st-h-main .muted {
+  font-size: var(--fs-sm);
+}
+.st-h-note {
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+}
+.st-empty {
+  margin: var(--sp-1) 0;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}

@@ -1,0 +1,89 @@
+/* ---------------------------------------------------------------- Radix primitives, in our own clothes */
+
+/* Radix wraps floating content in a positioned element; our menus/popovers used to position themselves. */
+[data-radix-popper-content-wrapper] > .menu,
+[data-radix-popper-content-wrapper] > .popover {
+  position: relative;
+}
+/* Popovers keep the fixed widths they had when they were absolutely positioned inside a narrow anchor; a popover's own
+   width (.fl-pop, .display-pop, …) wins over this default (:where() adds nothing to the specificity), and none is wider
+   than the screen. */
+:where([data-radix-popper-content-wrapper]) > .popover {
+  width: 400px;
+  max-width: calc(100vw - 16px);
+}
+:where([data-radix-popper-content-wrapper]) > .popover.claude-pop {
+  width: 360px;
+}
+.menu :is([role='menuitem'], [role='menuitemcheckbox']) {
+  outline: none;
+}
+.menu :is([role='menuitem'], [role='menuitemcheckbox'])[data-highlighted] {
+  background: var(--float-sel);
+  color: var(--fg);
+}
+.menu :is([role='menuitem'], [role='menuitemcheckbox']).danger[data-highlighted] {
+  color: var(--must);
+}
+
+/* select: a button that looks like the old native <select class="input"> */
+.input.select {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding-right: var(--sp-6); /* a native <select> is 1px wider than its longest option + padding */
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+  background-image: var(--chevron);
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+/* All option labels share one grid cell (only the chosen one visible), so the trigger is as wide as the longest
+   option, like a native select, and does not jump when the value changes. */
+.select-sizer {
+  display: inline-grid;
+  min-width: 0;
+}
+.select-sizer > * {
+  grid-area: 1 / 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.select-sizer > [aria-hidden] {
+  visibility: hidden;
+}
+.input.select[data-state='open'] {
+  border-color: var(--fg-2);
+}
+.select-menu {
+  min-width: var(--radix-select-trigger-width);
+  max-height: min(360px, var(--radix-select-content-available-height));
+  overflow: auto;
+}
+.select-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--h);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  outline: none;
+  user-select: none;
+  white-space: nowrap;
+}
+.select-item[data-highlighted] {
+  background: var(--float-sel);
+  color: var(--fg);
+}
+.select-item[data-state='checked'] {
+  color: var(--fg);
+}
+.select-check {
+  margin-left: auto;
+  display: flex;
+}

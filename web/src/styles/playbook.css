@@ -1,0 +1,1281 @@
+/* The playbook page (playbook/PlaybookPage.tsx): a line of where it stands (the playbooks it inherits, from the House
+   down, and what waits), then one document — brief, rules, skills, references, each written in place — beside what
+   agents read (a pane that stays in view while the document scrolls). Under 920 px of room the pane goes and the line
+   offers it (and the history) as dialogs. Everything a playbook says reads as text first: the body's measure and
+   rhythm; what it inherits steps back, folded. */
+
+.pb {
+  container: pb / inline-size;
+  display: grid;
+  gap: var(--sp-4);
+  min-width: 0;
+  max-width: 1400px;
+  padding-bottom: var(--sp-12);
+}
+/* the loading layout: the same boxes, waiting */
+.pb-wait {
+  display: grid;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+
+/* ---------------------------------------------------------------- where it stands */
+
+/* One line whatever it holds (its height never depends on the data, so the document under it doesn't move when the
+   playbook arrives): what it inherits shrinks first (what a playbook holds gives way to an ellipsis, the names never),
+   then the note. Under 640 px of room: two lines, what it inherits over the links. */
+.pb-meta {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-3);
+  min-width: 0;
+  min-height: var(--h);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+/* the playbooks it reads, from the House down: chips on a dashed track, like keyframes on a timeline */
+.pb-lineage {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.pb-lineage > li {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.pb-lineage > li:last-child {
+  flex: none;
+}
+.pb-lineage > li + li::before {
+  content: '';
+  flex: none;
+  width: var(--sp-4);
+  height: 1px;
+  margin: 0 var(--sp-1);
+  background: repeating-linear-gradient(90deg, var(--line-4) 0 3px, transparent 3px 6px);
+}
+.pb-layer-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  max-width: 100%;
+  height: var(--h-sm);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-full);
+  box-shadow: 0 0 0 1px var(--line-2);
+  color: var(--fg-2);
+  text-decoration: none;
+  white-space: nowrap;
+}
+/* squeezed past what it holds, a chip clips its name with an ellipsis rather than run into the next one */
+.pb-layer-chip {
+  overflow: hidden;
+}
+.pb-layer-chip b {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: var(--fw-ui);
+  color: var(--fg);
+}
+.pb-layer-chip .kg {
+  color: var(--muted);
+}
+.pb-layer-rev {
+  flex: none;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.pb-layer-facts {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+}
+a.pb-layer-chip:hover,
+a.pb-layer-chip:focus-visible {
+  background: var(--sel);
+  box-shadow: 0 0 0 1px var(--line-4);
+}
+.pb-layer-chip.none {
+  box-shadow: 0 0 0 1px var(--line-2);
+  background: transparent;
+}
+.pb-layer-chip.none b {
+  color: var(--muted);
+}
+/* this one: lifted, it wins */
+.pb-layer-chip.here {
+  background: var(--raise-sheen), var(--ink-3);
+  box-shadow: var(--raise);
+}
+.pb-layer-chip.here .kg {
+  color: var(--fg);
+}
+.pb-meta-note {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.pb-meta-note a {
+  color: var(--fg-2);
+  text-decoration: underline;
+  text-decoration-color: var(--line-4);
+  text-underline-offset: 2px;
+}
+.pb-meta-links {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-1);
+}
+/* less room: the playbooks above say only their name and revision (what they hold is in their tooltip and one click
+   away), the lifted chip at the end says which one wins without the words, the last change only "History" */
+@container pb (max-width: 1099px) {
+  .pb-layer-chip:not(.here) .pb-layer-facts,
+  .pb-meta-note.wins,
+  .pb-meta-when {
+    display: none;
+  }
+}
+@container pb (max-width: 639px) {
+  .pb-meta {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pb-meta-note,
+  .pb-meta-when {
+    display: none;
+  }
+  .pb-meta-links {
+    justify-content: flex-start;
+  }
+}
+/* quiet links: there only when they have something */
+.pb-meta-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: var(--h-sm);
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pb-meta-link:hover {
+  background: var(--sel);
+  color: var(--fg);
+}
+.pb-meta-link:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.pb-meta-link[aria-pressed='true'] {
+  background: var(--raise-sheen), var(--ink-3);
+  box-shadow: var(--raise);
+  color: var(--fg);
+}
+.pb-meta-link.waiting {
+  color: var(--fg);
+}
+.pb-meta-link.waiting .kg {
+  color: var(--claude);
+}
+.pb-meta-when {
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- the document and the pane beside it */
+
+.pb-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-4);
+  align-items: start;
+  min-width: 0;
+}
+.pb-pane {
+  display: none;
+}
+@container pb (min-width: 920px) {
+  .pb-layout {
+    grid-template-columns: minmax(0, 1fr) clamp(320px, 36cqi, 460px);
+  }
+  .pb-pane {
+    display: block;
+    position: sticky;
+    top: var(--sp-4);
+    min-width: 0;
+  }
+  .pb-meta-link.narrow {
+    display: none;
+  }
+}
+
+.pb-sheet {
+  display: grid;
+  min-width: 0;
+}
+/* a section: its keyframe (written here ◆, only inherited ◈, empty ◇), title, what it holds, its actions; then its
+   content, under the title */
+.pb-sec {
+  display: grid;
+  gap: var(--sp-3);
+  min-width: 0;
+  padding: var(--sp-6) 0;
+}
+.pb-sec:first-child {
+  padding-top: 0;
+}
+.pb-sec:last-child {
+  padding-bottom: 0;
+}
+.pb-sec + .pb-sec {
+  border-top: 1px solid var(--line);
+}
+.pb-sec-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  min-height: var(--h-sm);
+}
+.pb-sec-key {
+  flex: none;
+  color: var(--faint);
+}
+.pb-sec[data-state='diamond'] .pb-sec-key {
+  color: var(--fg);
+}
+.pb-sec[data-state='half'] .pb-sec-key {
+  color: var(--fg-2);
+}
+.pb-sec-title {
+  margin: 0;
+  font: var(--fw-strong) var(--fs-xl) / var(--lh-ui) var(--display);
+  color: var(--fg);
+}
+.pb-sec-meta {
+  min-width: 0;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.pb-sec-acts {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-left: auto;
+}
+.pb-sec-body {
+  display: grid;
+  gap: var(--sp-3);
+  min-width: 0;
+  padding-left: calc(var(--sp-3) + var(--sp-2));
+}
+.pb-none {
+  margin: 0;
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- writing in place */
+
+.pb-editor {
+  display: grid;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.pb-editor .textarea.pb-textarea {
+  min-height: calc(var(--h-lg) * 2);
+  padding: var(--sp-2) var(--sp-3);
+  font: var(--fw-text) var(--fs-lg) / var(--lh-body) var(--ui);
+}
+/* the empty section's field: a place to write, not a form */
+.pb-editor.ghost .textarea.pb-textarea {
+  border-style: dashed;
+  border-color: var(--line-3);
+  background: transparent;
+}
+.pb-editor.ghost .textarea.pb-textarea:focus {
+  border-style: solid;
+  background: var(--ink-0);
+}
+.pb-editor-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.pb-msg {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.pb-outline {
+  justify-self: start;
+}
+/* someone saved the same section meanwhile: both versions, side by side */
+.pb-conflict {
+  display: grid;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  border-radius: var(--r-lg);
+  background: var(--should-bg);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--should) 30%, transparent);
+}
+.pb-conflict-say {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  margin: 0;
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+  color: var(--fg);
+}
+.pb-conflict-say .kg {
+  flex: none;
+  margin-top: var(--sp-1);
+  color: var(--should);
+}
+
+/* ---------------------------------------------------------------- the rules, one per line */
+
+.pb-rules {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.pb-rule,
+.pb-add {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: var(--sp-0_5) var(--sp-2);
+  margin: 0 calc(-1 * var(--sp-2));
+  border-radius: var(--r);
+  font-size: var(--fs-lg);
+  line-height: var(--lh-body);
+}
+.pb-rule:hover {
+  background: var(--sel);
+}
+/* the rule's keyframe, on its first line's middle */
+.pb-rule-key {
+  flex: none;
+  height: 1lh;
+  color: var(--muted);
+}
+.pb-rule-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--fg);
+}
+.pb-rule-text code {
+  font: var(--fw-text) var(--fs-md) / var(--lh-ui) var(--mono);
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-sm);
+  background: var(--ink-0);
+}
+.pb-rule-text a {
+  color: var(--fg);
+  text-decoration: underline;
+  text-decoration-color: var(--line-4);
+  text-underline-offset: 2px;
+}
+/* taking one out: there on hover, without making the row taller */
+.pb-rule .pb-rule-x {
+  flex: none;
+  margin-block: calc(-1 * var(--sp-0_5));
+  opacity: 0;
+}
+.pb-rule:hover .pb-rule-x,
+.pb-rule .pb-rule-x:focus-visible {
+  opacity: 1;
+}
+/* a new rule: a line to type on, ↵ to keep it */
+.pb-add {
+  align-items: center;
+  min-height: var(--h);
+}
+.pb-add:focus-within {
+  background: var(--ink-0);
+  box-shadow: var(--sunk);
+}
+.pb-add .pb-rule-key {
+  color: var(--faint);
+}
+.pb-add .textarea.pb-add-field {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: var(--sp-0_5) 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: var(--fs-lg);
+  line-height: var(--lh-body);
+}
+/* what the notes keep asking for: a click starts the line, a person writes the rule */
+.pb-asks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.pb-asks-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+.pb-ask {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: var(--h-sm);
+  padding: 0 var(--sp-2);
+  border: 1px dashed var(--line-3);
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--fg);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.pb-ask:hover {
+  border-style: solid;
+  background: var(--sel);
+}
+.pb-ask b {
+  font-weight: var(--fw-ui);
+}
+.pb-ask .mono {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+/* starter rules: one click adds one */
+.pb-starters {
+  display: grid;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  border-radius: var(--r-lg);
+  background: var(--ink-0);
+  box-shadow: var(--sunk);
+}
+.pb-starters-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--h-sm);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.pb-starters ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: 0 var(--sp-4);
+}
+.pb-starter {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  width: 100%;
+  min-height: var(--h);
+  padding: var(--sp-1) var(--sp-2);
+  margin: 0 calc(-1 * var(--sp-2));
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--fg-2);
+  text-align: left;
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+  cursor: pointer;
+}
+.pb-starter:hover,
+.pb-starter:focus-visible {
+  background: var(--sel);
+  color: var(--fg);
+}
+.pb-starter > .icon {
+  flex: none;
+  height: 1lh;
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- what the playbooks above say: folded, one line each */
+
+.pb-inh {
+  display: grid;
+  gap: var(--sp-0_5);
+  min-width: 0;
+}
+.pb-inh-layer {
+  min-width: 0;
+}
+.pb-inh-layer > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  min-height: var(--h);
+  padding: 0 var(--sp-2);
+  margin: 0 calc(-1 * var(--sp-2));
+  border-radius: var(--r);
+  list-style: none;
+  font-size: var(--fs-md);
+  color: var(--muted);
+  cursor: pointer;
+}
+.pb-inh-layer > summary::-webkit-details-marker {
+  display: none;
+}
+.pb-inh-layer > summary:hover {
+  background: var(--sel);
+}
+.pb-inh-layer > summary:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.pb-inh-key {
+  flex: none;
+  color: var(--muted);
+}
+.pb-inh-from {
+  flex: none;
+  color: var(--fg-2);
+}
+.pb-inh-peek {
+  flex: 1;
+  min-width: 0;
+  color: var(--muted);
+}
+.pb-inh-layer[open] .pb-inh-peek {
+  visibility: hidden;
+}
+.pb-inh-chev {
+  flex: none;
+  color: var(--faint);
+  transition: transform var(--dur-fast);
+}
+.pb-inh-layer[open] .pb-inh-chev {
+  transform: rotate(180deg);
+}
+.pb-inh-body {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-2) 0 var(--sp-3) calc(var(--sp-2) + var(--sp-3));
+}
+.pb-inh-body .md-text {
+  font-size: var(--fs-md);
+  color: var(--fg-2);
+}
+.pb-inh-open {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  text-decoration: none;
+}
+.pb-inh-open:hover {
+  color: var(--fg);
+}
+.pb-inh-open .mono {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+/* an agent's suggestion, waiting inside the section it changes */
+.pb-suggest {
+  padding: var(--sp-4);
+  border-radius: var(--r-lg);
+  background: var(--ink-3);
+  box-shadow: 0 0 0 1px var(--line-2);
+  scroll-margin: var(--sp-16);
+}
+
+/* markdown as people read it */
+.md-text {
+  display: grid;
+  gap: var(--sp-2);
+  min-width: 0;
+  font-size: var(--fs-lg);
+  line-height: var(--lh-body);
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+.md-text > :is(p, ul, ol, blockquote, pre, h3, h4, h5, hr) {
+  margin: 0;
+}
+.md-text :is(ul, ol) {
+  padding-left: var(--sp-6);
+  display: grid;
+  gap: var(--sp-1);
+}
+.md-text li::marker {
+  color: var(--faint);
+}
+.md-text :is(h3, h4, h5) {
+  font-weight: var(--fw-strong);
+  line-height: var(--lh-ui);
+  margin-top: var(--sp-2);
+}
+.md-text h3 {
+  font-size: var(--fs-xl);
+}
+.md-text :is(h4, h5) {
+  font-size: var(--fs-lg);
+}
+.md-text code {
+  font: var(--fw-text) var(--fs-md) / var(--lh-ui) var(--mono);
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-sm);
+  background: var(--ink-0);
+}
+.md-text pre {
+  padding: var(--sp-3);
+  border-radius: var(--r);
+  background: var(--ink-0);
+  box-shadow: var(--sunk);
+  overflow-x: auto;
+}
+.md-text pre code {
+  padding: 0;
+  background: none;
+}
+.md-text blockquote {
+  padding-left: var(--sp-3);
+  border-left: 2px solid var(--line-3);
+  color: var(--fg-2);
+}
+.md-text a {
+  color: var(--fg);
+  text-decoration: underline;
+  text-decoration-color: var(--line-4);
+  text-underline-offset: 2px;
+}
+.md-text hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+/* ---------------------------------------------------------------- skills */
+
+.pb-skills {
+  list-style: none;
+  margin: 0 calc(-1 * var(--sp-2));
+  padding: 0;
+  display: grid;
+}
+.pb-skill-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: var(--h-lg);
+  padding: var(--sp-2);
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+}
+.pb-skill-row:hover,
+.pb-skill-row:focus-visible {
+  background: var(--sel);
+}
+.pb-skill-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--h);
+  height: var(--h);
+  border-radius: var(--r);
+  background: var(--ink-0);
+  box-shadow: var(--sunk);
+  color: var(--muted);
+}
+.pb-skill-row.add .pb-skill-icon {
+  background: transparent;
+  box-shadow: 0 0 0 1px var(--line-3);
+}
+.pb-skill-row.add .pb-skill-name {
+  color: var(--fg-2);
+}
+.pb-skill-row.inherited .pb-skill-name {
+  color: var(--fg-2);
+}
+.pb-skill-go {
+  flex: none;
+  color: var(--faint);
+}
+.pb-skill-text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: var(--sp-0_5);
+}
+.pb-skill-name {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-ui);
+}
+.pb-skill-desc {
+  font-size: var(--fs-md);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pb-skill-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: var(--h-xs);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-full);
+  border: 1px solid var(--line-2);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* the skill dialog */
+.pb-skill {
+  display: grid;
+  gap: var(--sp-4);
+}
+.pb-skill-from {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  font-size: var(--fs-md);
+  color: var(--muted);
+}
+.pb-skill-fields {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+}
+.pb-skill-fields label {
+  font-size: var(--fs-md);
+  color: var(--muted);
+}
+.pb-skill-problem {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--danger-hi);
+}
+.pb-skill-body {
+  display: grid;
+  gap: var(--sp-2);
+}
+.pb-skill-body .seg {
+  justify-self: start;
+}
+.pb-skill-preview {
+  max-height: 44dvh;
+  overflow: auto;
+  padding: var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.pb-skill-files {
+  display: grid;
+  gap: var(--sp-2);
+}
+.pb-skill-files-h {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  font-size: var(--fs-md);
+}
+.pb-skill-files-h .muted {
+  flex: 1;
+  font-size: var(--fs-sm);
+}
+.pb-skill-files ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-1);
+}
+.pb-skill-files li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--h);
+  font-size: var(--fs-md);
+}
+.pb-skill-files li a {
+  color: var(--fg);
+}
+.pb-skill-nofiles {
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.pb-skill-delete {
+  color: var(--danger-hi);
+}
+
+/* ---------------------------------------------------------------- references */
+.pb-link-form {
+  display: flex;
+  gap: var(--sp-2);
+}
+.pb-link-form .input {
+  flex: 1;
+  min-width: 0;
+}
+.pb-refs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  gap: var(--sp-3);
+}
+/* the way to add one: a tile of a picture's size, open, with a dashed edge — a place, not a picture */
+.pb-ref-add {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--sp-1);
+  width: 100%;
+  /* the picture's size: its width decides (stretched to the row's height, the ratio would widen it past its column) */
+  align-self: start;
+  aspect-ratio: 16 / 10;
+  border: 1px dashed var(--line-3);
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  transition:
+    color var(--dur-fast),
+    border-color var(--dur-fast),
+    background var(--dur-fast);
+}
+.pb-ref-add:hover,
+.pb-ref-add[data-state='open'] {
+  border-color: var(--line-4);
+  background: var(--sel);
+  color: var(--fg);
+}
+.pb-ref-add:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.pb-ref {
+  display: grid;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+.pb-ref-pic {
+  display: block;
+  aspect-ratio: 16 / 10;
+  border-radius: var(--r);
+  overflow: hidden;
+  background: var(--ink-0);
+  box-shadow: 0 0 0 1px var(--line);
+}
+.pb-ref-pic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.pb-ref-link {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--h-lg);
+  padding: 0 var(--sp-3);
+  border-radius: var(--r);
+  background: var(--ink-0);
+  box-shadow: 0 0 0 1px var(--line);
+  color: var(--fg);
+  text-decoration: none;
+  font-size: var(--fs-md);
+}
+.pb-ref.link {
+  grid-column: 1 / -1;
+}
+.pb-ref-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.pb-ref-meta > .ellipsis {
+  flex: 1;
+  min-width: 0;
+}
+.pb-ref-meta .muted {
+  flex: none;
+}
+
+/* a suggestion */
+.pb-prop {
+  display: grid;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.pb-prop-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.pb-prop-who {
+  display: grid;
+  gap: var(--sp-0_5);
+  min-width: 0;
+}
+.pb-prop-who b {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-strong);
+  line-height: var(--lh-ui);
+}
+.pb-prop-who span {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.pb-prop-reason {
+  margin: 0;
+  font-size: var(--fs-lg);
+  line-height: var(--lh-body);
+  color: var(--fg);
+}
+.pb-prop-evidence {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.pb-prop-evidence .mono {
+  font-size: var(--fs-xs);
+}
+.pb-prop-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}
+.pb-prop-reject {
+  display: grid;
+  gap: var(--sp-2);
+}
+.pb-prop-status {
+  margin: 0;
+  font-size: var(--fs-md);
+}
+.pb-prop-status.accepted {
+  color: var(--ok);
+}
+.pb-prop-status.rejected {
+  color: var(--muted);
+}
+
+/* a change as lines added and removed */
+.pb-diff {
+  display: grid;
+  margin: 0;
+  padding: var(--sp-2) 0;
+  border-radius: var(--r);
+  background: var(--ink-0);
+  box-shadow: var(--sunk);
+  font: var(--fw-text) var(--fs-md) / var(--lh-body) var(--ui);
+}
+.pb-diff-line {
+  display: flex;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-3);
+  min-width: 0;
+}
+.pb-diff-line.add {
+  background: var(--ok-bg);
+}
+.pb-diff-line.del {
+  background: var(--must-bg);
+  color: var(--fg-2);
+}
+.pb-diff-line.del .pb-diff-text {
+  text-decoration: line-through;
+  text-decoration-color: var(--line-4);
+}
+.pb-diff-line.same {
+  color: var(--muted);
+}
+.pb-diff-op {
+  flex: none;
+  width: 1ch;
+  font-family: var(--mono);
+  color: var(--faint);
+}
+.pb-diff-line.add .pb-diff-op {
+  color: var(--ok);
+}
+.pb-diff-line.del .pb-diff-op {
+  color: var(--must);
+}
+.pb-diff-text {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.pb-diff-fold {
+  padding: 0 var(--sp-3);
+  font: var(--fw-text) var(--fs-xs) / var(--lh-body) var(--ui);
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- what agents read */
+
+/* the pane: a well beside the document, as tall as the window leaves, its text scrolling inside */
+.pb-pane-in {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  max-height: calc(100dvh - var(--sp-16) - var(--sp-8));
+  border-radius: var(--r-lg);
+  background: var(--ink-1);
+  box-shadow: 0 0 0 1px var(--line);
+  overflow: hidden;
+}
+.pb-pane-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--sp-2);
+  row-gap: var(--sp-0_5);
+  padding: var(--sp-3) var(--sp-2) var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--line);
+}
+.pb-pane-title {
+  margin: 0;
+  min-height: var(--h-sm);
+  display: flex;
+  align-items: center;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-strong);
+  line-height: var(--lh-ui);
+  color: var(--fg);
+}
+.pb-pane-sub {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.pb-pane-draft {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  color: var(--fg-2);
+}
+.pb-pane-draft .kg {
+  color: var(--should);
+}
+.pb-pane-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-2);
+}
+/* the text itself, as an agent gets it: this playbook's lines lit, inherited ones quieter, the boilerplate faint */
+.pb-agent {
+  margin: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  font: var(--fw-text) var(--fs-sm) / var(--lh-body) var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}
+.pb-al.h1,
+.pb-al.h2 {
+  font-weight: var(--fw-strong);
+  color: var(--fg);
+}
+.pb-al.inh {
+  color: var(--muted);
+}
+.pb-al.own {
+  color: var(--fg);
+}
+.pb-al.draft {
+  background: var(--should-bg);
+  color: var(--fg);
+}
+/* in a dialog: its own well, a screen's height at most */
+.pb-agent.boxed {
+  max-height: 60dvh;
+  border-radius: var(--r);
+  background: var(--ink-0);
+  box-shadow: var(--sunk);
+}
+.pb-agent-hint {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- history */
+
+.pb-history {
+  display: grid;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.pb-history ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-0_5);
+}
+.pb-history li {
+  display: grid;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.pb-history li.open {
+  padding-bottom: var(--sp-3);
+}
+.pb-h-row {
+  display: grid;
+  grid-template-columns: 3em minmax(0, 1fr);
+  align-items: start;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: var(--sp-2);
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--fg);
+  text-align: left;
+  font-size: var(--fs-md);
+  line-height: var(--lh-ui);
+  cursor: pointer;
+}
+.pb-h-row:not(.static):hover,
+.pb-h-row:focus-visible {
+  background: var(--sel);
+}
+.pb-h-row.static {
+  cursor: default;
+}
+.pb-h-rev {
+  display: flex;
+  align-items: center;
+  min-height: 1lh;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.pb-h-main {
+  display: grid;
+  gap: var(--sp-0_5);
+  min-width: 0;
+}
+.pb-h-msg {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+.pb-h-msg > .icon {
+  flex: none;
+  color: var(--faint);
+}
+.pb-h-who {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.pb-history li.rejected .pb-h-msg {
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- touch and phones */
+
+/* touch: everything you tap is thumb-sized (chips keep their look, their tap area grows) */
+@media (hover: none) and (pointer: coarse) {
+  .pb-starter,
+  .pb-inh-layer > summary,
+  .pb-h-row,
+  .pb-add,
+  .pb-ref-add,
+  .pb-skill-row,
+  .pb-outline,
+  .pb-starters-head .btn-link {
+    min-height: var(--h-touch);
+  }
+  .pb-add .textarea.pb-add-field {
+    min-height: var(--h-touch);
+    padding-block: var(--sp-3);
+  }
+  .pb-layer-chip::after,
+  .pb-meta-link::after,
+  .pb-ask::after {
+    content: '';
+    position: absolute;
+    inset: calc(50% - var(--h-touch) / 2) 0;
+  }
+  .pb-rule .pb-rule-x {
+    opacity: 1;
+  }
+}
+
+/* phones: the document takes the width; the section's content starts under its keyframe; a rule comes out through
+   Edit (a 44 px button per rule would double the list's height) */
+@media (max-width: 640px) {
+  .pb-sec-body {
+    padding-left: 0;
+  }
+  .pb-rule .pb-rule-x {
+    display: none;
+  }
+  .pb-skill-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pb-msg {
+    flex-basis: 100%;
+  }
+  .pb-skill-chip.from {
+    display: none;
+  }
+}

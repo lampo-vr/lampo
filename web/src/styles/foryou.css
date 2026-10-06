@@ -1,0 +1,331 @@
+/* ---------------------------------------------------------------- the inbox's cards (foryou/ForYou.tsx; the inbox view on
+   phones and tablets, mobile first) and this device's notifications (NotifyCard.tsx) */
+
+/* This device's notifications, asked under the list: a footnote, not a card — a hairline above, the bell and the words
+   in the list's quiet inks, one small button under them, × to put it away. One column at every width. */
+.fy-notify {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-2) 0;
+  border-top: 1px solid var(--line);
+  color: var(--fg-2);
+}
+.fy-notify > svg {
+  flex: none;
+  margin-top: var(--sp-0_5);
+  color: var(--muted);
+}
+.fy-notify .grow {
+  min-width: 0;
+}
+.fy-notify .grow > .btn {
+  margin-top: var(--sp-2);
+}
+.fy-notify > .btn.icon-only {
+  flex: none;
+  margin: calc(-1 * var(--sp-1)) calc(-1 * var(--sp-1)) 0 0;
+  color: var(--muted);
+}
+.fy-notify b {
+  display: block;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-ui);
+  color: var(--fg);
+}
+.fy-notify p {
+  margin: var(--sp-0_5) 0 0;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-ui);
+}
+/* Settings → Notifications, this device: flat in its card (the card is the box, no box in it) */
+.fy-device {
+  display: grid;
+  gap: var(--sp-3);
+}
+.fy-device-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+}
+.fy-device-head .grow {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.fy-device-head b {
+  display: block;
+  font-size: var(--fs-md);
+}
+.fy-device-head p {
+  margin: var(--sp-0_5) 0 0;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.fy-device-glyph {
+  flex: none;
+  align-self: flex-start;
+  display: grid;
+  place-items: center;
+  width: var(--h);
+  height: var(--h);
+  border-radius: var(--r);
+  background: var(--ink-3);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  color: var(--muted);
+}
+.fy-device-glyph.on {
+  background: var(--raise-sheen), var(--ink-3);
+  box-shadow: var(--raise);
+  color: var(--fg);
+}
+.fy-prefs {
+  display: grid;
+  gap: var(--sp-0_5);
+  padding-top: var(--sp-1);
+  border-top: 1px solid var(--line-2);
+}
+.fy-pref {
+  display: flex;
+  gap: var(--sp-3);
+  align-items: flex-start;
+  min-height: 44px;
+  padding: var(--sp-2) var(--sp-0_5);
+  cursor: pointer;
+}
+.fy-pref .switch {
+  margin-top: var(--sp-0_5);
+}
+.fy-pref > label {
+  flex: 1;
+  display: grid;
+  gap: 1px;
+  cursor: pointer;
+}
+.fy-pref b {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-ui);
+}
+.fy-pref .muted {
+  font-size: var(--fs-sm);
+}
+.fy-prefs-foot {
+  display: flex;
+  gap: var(--sp-2);
+  padding-top: var(--sp-1);
+}
+
+/* groups and items */
+/* stalled videos, last and quieter (as in the inbox list) */
+.fy-group.g-stalled .fy-h {
+  color: var(--muted);
+}
+.fy-group {
+  display: grid;
+  gap: var(--sp-2);
+}
+.fy-h {
+  margin: var(--sp-1) 0 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  font: var(--fw-strong) semi-condensed var(--fs-xl) / var(--lh-tight) var(--display);
+}
+.fy-h .mono {
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  color: var(--muted);
+}
+/* by video: the video's head over its cards — poster, name, project and what it holds, ⋯ for the whole video */
+.fy-vhead {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+  /* as tall as its ⋯, loading or loaded */
+  min-height: var(--h-sm);
+  margin-top: var(--sp-1);
+}
+@media (hover: none) and (pointer: coarse) {
+  .fy-vhead {
+    min-height: var(--h-touch);
+  }
+}
+.fy-vthumb {
+  flex: none;
+  width: 56px;
+  height: 35px;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: var(--ink-0);
+  display: grid;
+  place-items: center;
+  color: var(--faint);
+}
+.fy-vthumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.fy-vhead-body {
+  flex: 1 1 auto;
+  display: grid;
+  min-width: 0;
+}
+.fy-vhead-name {
+  margin: 0;
+  font: var(--fw-strong) semi-condensed var(--fs-lg) / var(--lh-tight) var(--display);
+}
+.fy-vhead-sum {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+/* a count and its word stay together; the line breaks between facts */
+.fy-vhead-sum > span {
+  white-space: nowrap;
+}
+.fy-group.g-video .fy-video {
+  font-weight: var(--fw-ui);
+  color: var(--fg-2);
+}
+.fy-item {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  border-radius: var(--r-lg);
+  background: var(--ink-2);
+  border: 1px solid var(--line);
+}
+/* One box for every thumbnail (portrait, since most renders here are reels): a picture that arrives fills it and
+   changes nothing around it. */
+.fy-thumb {
+  align-self: start;
+  display: grid;
+  place-items: center;
+  width: 76px;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: var(--r);
+  background: var(--ink-0);
+  color: var(--faint);
+}
+.fy-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* a card waiting for the list (ForYou.tsx PendingItem): the card's boxes, nothing to act on */
+.fy-item.pending {
+  pointer-events: none;
+}
+.fy-body {
+  display: grid;
+  gap: var(--sp-1);
+  min-width: 0;
+  /* a tall portrait thumbnail must not spread the text rows apart */
+  align-content: start;
+}
+.fy-meta {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: baseline;
+  justify-content: space-between;
+  min-width: 0;
+}
+.fy-video {
+  font-weight: var(--fw-strong);
+  font-size: var(--fs-md);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* the card's head reads like an inbox row: the video and when, then what happened (inbox.css: .inbox-when) */
+.fy-meta .inbox-when {
+  flex: none;
+}
+.fy-who {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.fy-who .mono {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.fy-text {
+  margin: 0;
+  font-size: var(--fs-lg);
+  line-height: var(--lh-ui);
+  overflow-wrap: anywhere;
+}
+.fy-quote {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  font-style: normal;
+}
+.fy-note {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-2);
+  border-radius: var(--r);
+  background: var(--ok-bg);
+  color: var(--fg-2);
+  font-size: var(--fs-md);
+}
+.fy-changed {
+  font-weight: var(--fw-strong);
+  color: var(--ok);
+  margin-right: var(--sp-1);
+}
+.fy-answer {
+  display: grid;
+  gap: var(--sp-2);
+}
+.fy-answer textarea {
+  width: 100%;
+  min-height: 64px;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r);
+  border: 1px solid var(--line-2);
+  /* a field lifted off the card, not a hole in it (a sunk fill reads as disabled) */
+  background: var(--ink-3);
+  color: var(--fg);
+  font: var(--fs-touch) / var(--lh-ui) var(--ui); /* 16 px: iOS doesn't zoom into it */
+}
+.fy-answer textarea:focus {
+  outline: none;
+  border-color: var(--line-3);
+  box-shadow: var(--focus-ring);
+}
+.fy-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+/* links dressed as buttons */
+.fy-actions a.btn {
+  text-decoration: none;
+}
+.fy-actions .btn {
+  min-height: var(--h-lg);
+}
+
+@media (hover: none) {
+  .fy-actions .btn,
+  .fy-notify .btn {
+    min-height: 44px;
+  }
+}
+@media (min-width: 640px) {
+  .fy-item {
+    grid-template-columns: 112px minmax(0, 1fr);
+    gap: var(--sp-4);
+    padding: var(--sp-3);
+  }
+  .fy-thumb {
+    width: 112px;
+  }
+}

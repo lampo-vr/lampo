@@ -1,0 +1,100 @@
+// Where an agent's process reports what it did through Lampo (lib/activityText.ts): the app shows it live. On this
+// machine the `vr` CLI and the stdio MCP server append a line to a small rolling file in the cache, which the app
+// tails; against a hosted server they send a batch now and then. The app's own MCP endpoint records in memory
+// (server/activity.ts). None of it adds a single token to the agent's work: it is the calls it makes anyway.
+import fs from 'node:fs';
+import path from 'node:path';
+import { readCredentials } from './backend/credentials.ts';
+import { createApi } from './backend/remote.ts';
+import { cleanAgentName } from './names.ts';
+import { CACHE, isoLocal } from './paths.ts';
+import { currentSession } from './sessions.ts';
+import type { AgentActivity } from './types.ts';
+
+/** The rolling file the app tails. */
+export const ACTIVITY_FILE = path.join(CACHE, 'agent-activity.jsonl');
+/** Rotated (to .1) past this size; the app reads only what was appended since it last looked. */
+export const ACTIVITY_MAX_BYTES = 512 * 1024;
+
+/** What an agent's process records: the server fills in the slug. */
+export type ActivityRecord = Omit<AgentActivity, 'slug'> & { slug?: string | null; video?: string | null };
+
+export interface ActivitySink {
+  record(a: ActivityRecord): void;
+  /** Sends what is still queued (a CLI waits for it, briefly, before it exits). */
+  flush(): Promise<void>;
+}
+
+/** Appends one JSON line per activity to the rolling file (this machine). Never throws: activity is a courtesy. */
+export function fileSink(file = ACTIVITY_FILE): ActivitySink {
+  return {
+    record(a) {
+      try {
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        try {
+          const st = fs.statSync(file);
+          if (st.size > ACTIVITY_MAX_BYTES) fs.renameSync(file, `${file}.1`);
+          // What an agent did on which video is its owner's alone, on a shared machine too (A12 AGENT-13): a file an
+          // older version made readable for everyone is closed now.
+          else if (st.mode & 0o077) fs.chmodSync(file, 0o600);
+        } catch {}
+        fs.appendFileSync(file, `${JSON.stringify(a)}\n`, { mode: 0o600 });
+      } catch {}
+    },
+    flush: async () => {},
+  };
+}
+
+/** Batches activity to a hosted server (one POST at most every 2 s, at most 20 entries). */
+export function remoteSink(post: (entries: ActivityRecord[]) => Promise<unknown>): ActivitySink {
+  let queue: ActivityRecord[] = [];
+  let timer: NodeJS.Timeout | null = null;
+  let sending: Promise<void> = Promise.resolve();
+  const send = () => {
+    timer = null;
+    const batch = queue.slice(-20);
+    queue = [];
+    if (!batch.length) return sending;
+    sending = sending.then(() =>
+      post(batch).then(
+        () => {},
+        () => {},
+      ),
+    );
+    return sending;
+  };
+  return {
+    record(a) {
+      queue.push(a);
+      if (queue.length > 50) queue = queue.slice(-20);
+      if (!timer) {
+        timer = setTimeout(send, 2000);
+        timer.unref?.();
+      }
+    },
+    async flush() {
+      if (timer) clearTimeout(timer);
+      await Promise.race([send(), new Promise((r) => setTimeout(r, 800))]);
+    },
+  };
+}
+
+/** The sink for this process: the hosted server it is logged in to, else the file on this machine. */
+export function openActivitySink(): ActivitySink {
+  const c = readCredentials();
+  if (!c) return fileSink();
+  const api = createApi(c);
+  return remoteSink((entries) => api.call('POST', '/api/agents/activity', { entries }));
+}
+
+/** The agent this process works for, by the name the UI shows: the Claude Code session, else VR_BY's agent name.
+ * Null for a person running `vr` by hand: their commands are not agent activity. */
+export function processAgent(env: NodeJS.ProcessEnv = process.env): string | null {
+  const s = currentSession();
+  const own = s?.name ? cleanAgentName(s.name) : '';
+  if (own) return own;
+  const by = env.VR_BY?.match(/^agent:([\s\S]+)$/)?.[1];
+  return (by && cleanAgentName(by)) || null;
+}
+
+export const stamp = (): string => isoLocal();

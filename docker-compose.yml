@@ -1,0 +1,67 @@
+# Lampo behind Caddy (automatic HTTPS). Setup: cp .env.example .env, set VR_DOMAIN / VR_PUBLIC_URL, point DNS
+# at the server, then `docker compose up -d` and read the one-time setup token: `docker compose logs app`.
+# Details: docs/docker.md
+# Docker keeps container logs forever by default: a few rotated files each is plenty (the app logs little and never a
+# request, a token or a password; Caddy keeps no access log).
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  app:
+    build: .
+    image: video-review:local
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - vr-data:/data
+    expose:
+      - "4747"
+    # The app needs no Linux capabilities (it listens on 4747, not a privileged port) and never gains new ones:
+    # a bug in ffmpeg or a dependency can do less with the container.
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # Nothing in the image changes at run time: the app writes to /data only (temp files too, TMPDIR=/data/tmp); /tmp
+    # stays for tools that ignore TMPDIR. Bounded processes and threads (ffmpeg, the speech worker, tesseract).
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    pids_limit: 512
+    # The speech model and ffmpeg jobs need room; lower on a small box and switch speech off (VR_STT=off) if needed.
+    mem_limit: 6g
+    # On stop the app finishes uploads being registered and the running job (up to 30 s) before it exits.
+    stop_grace_period: 45s
+    logging: *logging
+    healthcheck:
+      # Ready, not just alive: data writable, disk above VR_MIN_FREE, ffmpeg, storage credentials (see /readyz).
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4747/readyz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    logging: *logging
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      VR_DOMAIN: ${VR_DOMAIN:?set VR_DOMAIN in .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  vr-data:
+  caddy-data:
+  caddy-config:

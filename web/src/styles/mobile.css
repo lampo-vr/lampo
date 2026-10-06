@@ -1,0 +1,1062 @@
+/* ---------------------------------------------------------------- phones, tablets, touch
+   Breakpoints (keep in sync with web/src/lib/media.ts):
+     phone   < 640 px wide, or a landscape phone (≤ 480 px tall, touch only) — the JS switches to the phone layout
+     tablet  640–1024 px — the desktop layout, stacked below 820 px
+     desktop above 1024 px with a mouse: nothing in this file applies to it. */
+
+/* shown below 820 px (see the tablet block), where the sidebar moves into a drawer */
+.nav-toggle {
+  display: none;
+}
+/* nothing to open (an empty library): the button keeps its place, so the mark doesn't move when there is */
+.nav-toggle.idle {
+  visibility: hidden;
+}
+
+/* ---------------------------------------------------------------- no keyboard to speak of
+   Keyboard shortcuts mean nothing without a keyboard: gone where nothing hovers or the pointer is a finger — either one
+   (some Android phones say they hover; a finger is still a finger). The key caps drawn on buttons go too (overlays.css). */
+@media (hover: none), (pointer: coarse) {
+  .btn kbd,
+  .lib-filter > .kbd,
+  .menu-kbd,
+  button.hint {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------- any touch screen */
+@media (hover: none) and (pointer: coarse) {
+  /* our own :active and .on states show a tap; the grey system flash doesn't fit */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* nothing may hide behind hover */
+  .nav-actions {
+    position: static;
+    width: auto;
+    transform: none;
+    opacity: 1;
+    visibility: visible;
+  }
+  .nav-item:has(> .nav-actions):hover,
+  .nav-item:has(> .nav-actions):focus-within {
+    padding-right: var(--sp-2);
+  }
+  .nav-act {
+    width: 34px;
+    height: 34px;
+  }
+  /* one ⋯ per row on touch (New folder is in its menu too); a row's must mark keeps its distance from it, and the ⋯
+     stay in one column */
+  .nav-act.nav-new {
+    display: none;
+  }
+  .nav-item > .nav-kg {
+    margin-right: var(--sp-2);
+  }
+  /* fingers drag these; the page must not scroll or zoom underneath */
+  .timeline canvas,
+  .wipe-handle,
+  .nsheet-handle {
+    touch-action: none;
+  }
+  .wipe-handle::before {
+    content: '';
+    position: absolute;
+    inset: 0 -22px;
+  }
+  .menu button,
+  .menu :is([role='menuitem'], [role='menuitemcheckbox']) {
+    min-height: var(--h-touch);
+  }
+  /* A finger needs 44 × 44 px. Compact controls keep their look and get an invisible tap area around them instead:
+   * an ::after that reaches 44 px in each direction it is short of (test/e2e/quality.mjs measures it). */
+  :is(
+    .lib-lanes button,
+    .seg button,
+    .session-chip,
+    .shead-toggle,
+    .shead-title,
+    .so-status,
+    .dock-foot button.badge,
+    .nsheet-handle,
+    .vpick,
+    button.input.select,
+    .brand,
+    .nav-act,
+    .playbtn,
+    .p-strip .btn,
+    .side-views button,
+    button.tr-tc,
+    .crumb button,
+    .hero-tabs button,
+    .tr-pick-clear,
+    .range-more,
+    .topbar.bare .user-chip,
+    .ac-chip,
+    .tagf
+  ) {
+    position: relative;
+  }
+  :is(
+    .lib-lanes button,
+    .seg button,
+    .session-chip,
+    .shead-toggle,
+    .shead-title,
+    .so-status,
+    .dock-foot button.badge,
+    .nsheet-handle,
+    .vpick,
+    button.input.select,
+    .brand,
+    .nav-act,
+    .playbtn,
+    .p-strip .btn,
+    .side-views button,
+    button.tr-tc,
+    .crumb button,
+    .hero-tabs button,
+    .tr-pick-clear,
+    .range-more,
+    .topbar.bare .user-chip,
+    .ac-chip,
+    .tagf
+  )::after {
+    content: '';
+    position: absolute;
+    inset: min(0px, calc(50% - 22px));
+  }
+  /* the crumb cuts long paths sideways only: its buttons' tap areas reach above and below the line */
+  .crumb {
+    overflow: clip visible;
+  }
+  /* an Auto-check finding's picture is its play button: a finger's height (it clips the frame, so no ::after) */
+  .ac-thumb {
+    width: 70px;
+    height: var(--h-touch);
+  }
+  /* a note's row is a finger's height, and so is the fold of Auto-check's minor findings; the tags' line is too, so its
+     chips' tap areas stay inside the strip that scrolls them */
+  .nr,
+  .ac-more,
+  .note-tagf {
+    min-height: var(--h-touch);
+  }
+  .btn,
+  .input {
+    min-width: var(--h-touch);
+  }
+  input.input,
+  textarea.input {
+    min-height: var(--h-touch);
+  }
+  /* the library's toolbar: the field is 44 px here, so Filter, the layout switch and Display are too — one row, one
+     height (the quick-view chips keep their size and get tap areas) */
+  .lib-toolbar :is(.lib-filter-btn, .lib-display) {
+    height: var(--h-touch);
+  }
+  .lib-toolbar .seg.icons button {
+    width: 36px;
+    height: calc(var(--h-touch) - 6px);
+  }
+}
+
+/* ---------------------------------------------------------------- tablets (and phones) up to 820 px: stacked player */
+@media (max-width: 820px) {
+  .player {
+    /* minmax(0, …): a plain 1fr column grows to the transport's full width and pushes the picture off-screen */
+    grid-template-columns: minmax(0, 1fr);
+    /* the stage as tall as the video needs at this width, not a fixed share of the screen */
+    grid-template-rows: 54px clamp(240px, calc(100vw * var(--ar, 0.5625) + 96px), 64vh) auto auto;
+  }
+  .nav-toggle {
+    display: inline-flex;
+  }
+  /* the library's toolbar in two rows: field, Filter, layout and Display, then the quick views on a line of their own
+     (squeezed into one row they scrolled out of sight behind the layout switch) */
+  .lib-toolbar {
+    flex-wrap: wrap;
+    row-gap: var(--sp-3);
+  }
+  .lib-filter {
+    flex: 0 1 320px;
+  }
+  .lib-lanes {
+    order: 5;
+    flex: 1 1 100%;
+  }
+}
+
+/* ---------------------------------------------------------------- phones */
+@media (max-width: 639px), (max-height: 480px) and (hover: none) and (pointer: coarse) {
+  /* The account lives behind the drawer's settings gear here: the top bar keeps its room for search, inbox and add.
+     An empty library has no drawer (.bare): there the account stays in the bar, the only way to Settings and to another
+     workspace. */
+  .topbar:not(.bare) .user-chip {
+    display: none;
+  }
+  /* …where it stands left of Search, so nothing at the bar's end moves when a first visit finds the library empty (it
+     can't know before the answer: Library.tsx) */
+  .topbar.bare .user-chip {
+    order: 1;
+  }
+  .topbar.bare > :not(.nav-toggle, .brand, .grow, .user-chip) {
+    order: 2;
+  }
+  /* iOS zooms into any field under 16 px */
+  input,
+  textarea,
+  select,
+  .input,
+  .textarea {
+    font-size: var(--fs-touch) !important;
+  }
+  .btn {
+    min-height: var(--h-touch);
+  }
+  .btn.icon-only {
+    min-width: var(--h-touch);
+  }
+  /* a text field and a select grow with the buttons beside them by the same rule: a narrow desktop window has the
+     phone's buttons, so it has the phone's fields too (the touch block alone left them 30 px beside 44 px buttons) */
+  input.input,
+  textarea.input,
+  button.input.select {
+    min-height: var(--h-touch);
+  }
+  /* a note's reply field at rest is as tall as the buttons above it (it stands for the field it opens into) */
+  .reply-stub {
+    min-height: var(--h-touch);
+  }
+  .topbar {
+    padding-left: max(var(--sp-2), env(safe-area-inset-left));
+    padding-right: max(var(--sp-2), env(safe-area-inset-right));
+    padding-top: env(safe-area-inset-top);
+    height: auto;
+    min-height: calc(54px + env(safe-area-inset-top));
+    gap: var(--sp-1);
+  }
+  /* narrow cards: where it stands, the review link and the agent each on a line of their own, and only the lines there
+     are. Every one is decided by the video itself, so none arrives late: the way to assign an agent is in the card's
+     menu here, as on touch (three rows held for them left a hole between the stage and the agent, and under most cards). */
+  .film:not(.compact) .film-foot {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-auto-rows: auto;
+  }
+  .film:not(.compact) .film-foot > .session-chip {
+    grid-row: auto;
+    grid-column: 1;
+  }
+  .film .session-chip.none {
+    display: none;
+  }
+  /* a phone's bar is tighter: the logo a step smaller, still above the kit's 20 px minimum */
+  .brand-logo {
+    height: 26px;
+  }
+  /* The top bar holds Search, the inbox bell and Add video next to the menu and the mark: on a phone they are icons
+     (their names stay as aria-labels), or the bar outgrows the screen and the browser widens the whole page. */
+  .add-label {
+    display: none;
+  }
+  .topbar .add-video {
+    width: var(--h-touch);
+    padding: 0;
+    justify-content: center;
+  }
+
+  /* modals become sheets from the bottom edge */
+  .backdrop {
+    place-items: end stretch;
+    /* minmax(0, …): an auto column grows to the widest thing in the sheet and pushes it past the screen edge */
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .modal {
+    --sp-dialog: var(--sp-4);
+    min-width: 0;
+    width: 100% !important;
+    max-width: none;
+    max-height: calc(100dvh - 24px - env(safe-area-inset-top));
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    border-bottom: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    animation: sheet-up var(--dur-slow) var(--ease-out);
+  }
+  .backdrop[data-state='closed'] .modal,
+  .modal[data-state='closed'] {
+    animation: sheet-down var(--dur) var(--ease-in) forwards;
+  }
+  /* a room to look at things in is the sheet at its tallest */
+  .modal.fill {
+    height: calc(100dvh - 24px - env(safe-area-inset-top));
+  }
+  .modal-head {
+    padding-top: var(--sp-3);
+  }
+  .modal-foot {
+    flex-wrap: wrap;
+  }
+  /* Menus (⋯, right-click/long-press, selects) become action sheets: the whole width at the bottom edge, over a dimmed
+     page, rows a thumb can hit. Radix positions the wrapper inline; the sheet takes it back. */
+  [data-radix-popper-content-wrapper]:has(> .menu) {
+    position: fixed !important;
+    inset: auto 0 0 !important;
+    transform: none !important;
+    min-width: 0 !important;
+  }
+  .menu {
+    width: 100%;
+    max-height: calc(100dvh - 72px - env(safe-area-inset-top));
+    overflow: auto;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    border-bottom: 0;
+    padding: var(--sp-2) var(--sp-2) calc(var(--sp-2) + env(safe-area-inset-bottom));
+    box-shadow: var(--shadow-scrim), var(--shadow-float);
+    animation: sheet-up var(--dur-slow) var(--ease-out);
+  }
+  .menu[data-state='closed'] {
+    animation: sheet-down var(--dur) var(--ease-in) forwards;
+  }
+  /* Auto-check's findings: a sheet from the bottom edge like a menu, the list scrolling inside it */
+  [data-radix-popper-content-wrapper]:has(> .popover.ac-pop) {
+    position: fixed !important;
+    inset: auto 0 0 !important;
+    transform: none !important;
+    min-width: 0 !important;
+  }
+  .popover.ac-pop {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    border-bottom: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    box-shadow: var(--shadow-scrim), var(--shadow-float);
+    animation: sheet-up var(--dur-slow) var(--ease-out);
+  }
+  .popover.ac-pop[data-state='closed'] {
+    animation: sheet-down var(--dur) var(--ease-in) forwards;
+  }
+  .ac-pop .autocheck {
+    max-height: calc(100dvh - 72px - env(safe-area-inset-top));
+  }
+  .select-menu {
+    min-width: 0;
+    max-height: calc(100dvh - 72px - env(safe-area-inset-top));
+  }
+  .menu-kbd {
+    display: none;
+  }
+  /* a question on a phone: the two answers side by side, each half the sheet, thumb-high */
+  .alert-foot .btn {
+    flex: 1;
+    height: var(--h-lg);
+  }
+  .modal-body {
+    overflow-x: hidden;
+  }
+  /* share links: the name field gets its own line, the link's buttons wrap under it */
+  .link-new > .row {
+    flex-wrap: wrap;
+  }
+  .link-new > .row > .input {
+    flex: 1 1 100%;
+  }
+  .link-new > .row > .btn.primary {
+    flex: 1;
+    justify-content: center;
+  }
+  .link-acts {
+    flex-wrap: wrap;
+  }
+  .link-opt .input {
+    max-width: none;
+  }
+
+  /* ---------------------------------------------------------------- library */
+  .lib-scroll {
+    padding: 0 var(--sp-3) calc(var(--sp-8) + env(safe-area-inset-bottom));
+  }
+  .page > .empty {
+    padding: 0 var(--sp-4);
+  }
+  .hero {
+    padding-top: var(--sp-4);
+  }
+  .hero h1 {
+    font-size: var(--fs-3xl);
+  }
+  /* the tally on its own line under the title: the title never shrinks for it, whatever it counts; a folder's Share
+     stays across from the title (not a row of its own under the tally) */
+  .hero-row {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .hero-row .tally {
+    flex-basis: 100%;
+    order: 2;
+  }
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-4) var(--sp-3);
+  }
+  /* compact on a phone: two columns as well (three left a card ~104 px at 360, too narrow for a stage word like
+     "Changes requested", and a badge never cuts its word); it stays the denser wall by its shorter cards */
+  .grid.compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-3) var(--sp-2);
+  }
+  .film-title {
+    font-size: var(--fs-md);
+  }
+  .film .vchip {
+    height: 18px;
+    padding: 0 var(--sp-1);
+  }
+  /* toolbar: the field and two square buttons (Filter, Display — the layout is inside Display) on one line, one height
+     and one material, the field's; the quick views scroll under it, edge to edge */
+  .lib-toolbar {
+    margin-top: var(--sp-3);
+  }
+  .lib-toolbar > .grow {
+    display: none;
+  }
+  .lib-filter {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .lib-filter .input {
+    height: var(--h-touch);
+  }
+  .lib-filter > .kbd,
+  .lib-display-label {
+    display: none;
+  }
+  .lib-toolbar :is(.lib-filter-btn, .lib-display) {
+    position: relative;
+    width: var(--h-touch);
+    height: var(--h-touch);
+    padding: 0;
+    justify-content: center;
+  }
+  .lib-toolbar :is(.lib-filter-btn, .lib-display):not(.on) {
+    background: var(--ink-0);
+    border-color: var(--line-2);
+    color: var(--fg-2);
+  }
+  /* how many filters apply: a count on the button's corner, not squeezed beside the icon */
+  .lib-filter-btn .fl-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    box-shadow: 0 0 0 2px var(--ink-1);
+  }
+  .lib-lanes {
+    margin: 0 calc(-1 * var(--sp-3));
+    padding: 0 var(--sp-3);
+  }
+  /* the layout, inside Display: the four with their names, across the panel */
+  .dp-layout .seg {
+    flex: 1;
+  }
+  .dp-layout .seg button {
+    flex: 1;
+    justify-content: center;
+  }
+  /* sessions have their own list in the drawer */
+  .lib-toolbar .select {
+    display: none;
+  }
+  .popover.display-pop {
+    width: calc(100vw - 24px);
+  }
+  .shead-sum {
+    display: none;
+  }
+  /* list: each row folds into thumbnail + name and stage, with its menu */
+  .ltable thead {
+    display: none;
+  }
+  .ltable,
+  .ltable tbody {
+    display: block;
+  }
+  .lrow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--sp-1);
+    padding: var(--sp-2) 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .lrow td {
+    display: block;
+    height: auto;
+    padding: 0;
+    border: 0;
+  }
+  .lrow .lc-name {
+    grid-column: 1;
+    height: auto;
+  }
+  .lrow .lc-stage {
+    grid-column: 1;
+    width: auto;
+    padding: var(--sp-1) 0 0 var(--sp-20);
+  }
+  .lrow .lc-notes,
+  .lrow .lc-client,
+  .lrow .lc-date {
+    display: none;
+  }
+  .lrow .lc-menu {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    width: auto;
+  }
+  .lgroup {
+    display: block;
+  }
+  .lgroup th {
+    display: block;
+    padding: var(--sp-4) 0 var(--sp-1);
+  }
+  .lgroup-sum {
+    display: none;
+  }
+  /* board: the lanes one after another */
+  .board {
+    grid-auto-flow: row;
+    grid-template-columns: minmax(0, 1fr);
+    overflow-x: visible;
+  }
+  /* ---------------------------------------------------------------- settings */
+  /* A person or token row: who on the first line, role and actions wrap to a second line on the right. */
+  .set-row {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    row-gap: var(--sp-2);
+  }
+  .set-row > .grow {
+    flex-basis: calc(100% - 60px);
+  }
+  .set-card.panel {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--sp-4);
+  }
+  /* A name field and its button: the field takes the line, the button goes under it on the right. */
+  .set-inline {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .set-inline > .input {
+    flex: 1 1 100%;
+  }
+
+  /* ---------------------------------------------------------------- player */
+  .player.phone-player {
+    height: 100dvh;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+    grid-template-areas: 'top' 'strip' 'stage' 'dock' 'side';
+    overflow: hidden;
+  }
+  .p-bar {
+    gap: var(--sp-1);
+  }
+  .p-bar .p-title :is(b, h1) {
+    font-size: var(--fs-md);
+  }
+  .p-strip {
+    grid-area: strip;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+    padding: var(--sp-1) max(var(--sp-2), env(safe-area-inset-right)) var(--sp-1) max(var(--sp-2), env(safe-area-inset-left));
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    border-bottom: 1px solid var(--line);
+    background: var(--ink-1);
+  }
+  .p-strip::-webkit-scrollbar,
+  .phone-player .dock-foot::-webkit-scrollbar {
+    display: none;
+  }
+  .p-strip > *,
+  .ptools > * {
+    flex: none;
+  }
+  .p-strip > .grow {
+    flex: 1;
+  }
+  /* the name, and where it stands under it (the stage's glyph and words, then the project) */
+  .p-bar .p-sub {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-width: 0;
+    white-space: nowrap;
+  }
+  .p-stage {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    color: var(--st);
+  }
+  .p-bar .p-title .p-stage-label {
+    color: inherit;
+    font-weight: var(--fw-strong);
+  }
+  .p-bar .p-crumb {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* The strip fits a phone without scrolling: the version, compare, the agent and its menu as icons (their names are
+     in the labels), the next step on the right. Every control on one 30 px step, with a 44 px tap area around it. */
+  .p-strip :is(.btn, .session-chip, .vpick) {
+    min-height: 0;
+    height: var(--h);
+  }
+  .p-strip .vpick {
+    min-width: 56px;
+  }
+  /* "V8 · part": the stretch's times are in the picker's list */
+  .p-strip .vpick-when {
+    display: none;
+  }
+  .p-strip .p-tool-word,
+  .p-strip .session-chip .sc-long {
+    display: none;
+  }
+  .p-strip .session-chip .sc-short {
+    display: inline;
+  }
+  .p-strip .session-chip {
+    max-width: 120px;
+  }
+  /* the agent is its state and mark here; its name is in the popover */
+  .p-strip .agent-btn {
+    gap: var(--sp-1);
+    padding: 0 var(--sp-2);
+  }
+  .p-strip .signoff {
+    flex: none;
+  }
+  .phone-player .stage {
+    min-height: 0;
+  }
+  .phone-player .crop::before,
+  .phone-player .crop .dim {
+    display: none;
+  }
+  /* before/after stacked: a sideways swipe is ours, not the browser's */
+  .stage.stacked {
+    touch-action: pan-y;
+  }
+  /* stacked panes: one label (which one shows, and that a swipe switches) instead of two on top of each other */
+  .stage.stacked .pane-label {
+    display: none;
+  }
+  .stack-label {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: none;
+  }
+
+  .phone-player .dock {
+    padding: var(--sp-1) max(var(--sp-2), env(safe-area-inset-right)) var(--sp-2) max(var(--sp-2), env(safe-area-inset-left));
+    gap: var(--sp-1);
+  }
+  .ptransport {
+    display: grid;
+    gap: var(--sp-1);
+  }
+  .ptc {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: var(--sp-2);
+    min-width: 0;
+  }
+  .ptc .main {
+    font: var(--fw-strong) var(--fs-xl) / var(--lh-tight) var(--mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: var(--track-title);
+  }
+  .ptc .sub {
+    font: var(--fw-ui) var(--fs-xs) var(--mono);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .ptc .sub b {
+    color: var(--fg-2);
+  }
+  .pbtns {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-1);
+  }
+  .pstep {
+    flex: 1;
+    min-height: var(--h-touch);
+    font: var(--fw-strong) var(--fs-md) var(--mono);
+  }
+  .pbtns .playbtn {
+    width: 58px;
+    height: 58px;
+    flex: none;
+  }
+  .phone-player .dock-foot {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .phone-player .dock-foot > * {
+    flex: none;
+  }
+  /* in, out, loop, speed, sound … More: one row that fits, quiet until switched on (then the raised material) */
+  .ptools {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-0_5);
+    min-width: 0;
+  }
+  .ptools > .grow {
+    flex: 1;
+  }
+  .ptools .btn.ghost:not(.on) {
+    color: var(--fg-2);
+  }
+  .ptools .btn:not(.icon-only) {
+    padding: 0 var(--sp-3);
+  }
+  /* the speed as a quiet word with its chevron (background-color only: the chevron is the background image); the word
+     stands against the chevron, not at the start of the room kept for "0.25×" ("1×" and its chevron read as two) */
+  .ptools button.input.select {
+    height: var(--h-touch);
+    border-color: transparent;
+    background-color: transparent;
+    box-shadow: none;
+    color: var(--fg-2);
+  }
+  .ptools button.input.select .select-sizer > * {
+    text-align: end;
+  }
+  /* what sits behind More: one labelled row each */
+  .popover.ptools-pop {
+    min-width: 0;
+    width: min(340px, calc(100vw - 24px));
+    padding: var(--sp-1);
+  }
+  .pt-more {
+    display: grid;
+  }
+  .pt-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    min-height: var(--h-touch);
+    padding: var(--sp-1) var(--sp-2);
+    font-size: var(--fs-sm);
+    color: var(--fg-2);
+  }
+  .pt-row + .pt-row {
+    border-top: 1px solid var(--float-line);
+  }
+  /* the safe-zone presets have long names: the select gives way (ellipsis) instead of pushing the panel off-screen */
+  .pt-row button.input.select {
+    flex: 0 1 200px;
+    min-width: 0;
+  }
+  .pt-group {
+    display: flex;
+    gap: var(--sp-1);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  /* notes: a bottom sheet (peek → half → full) */
+  .side.nsheet {
+    grid-area: side;
+    position: relative;
+    border-left: 0;
+    border-top: 1px solid var(--line-2);
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    box-shadow: var(--shadow-up);
+    overflow: hidden;
+    padding-bottom: env(safe-area-inset-bottom);
+    transition: height 0.26s var(--ease);
+  }
+  .nsheet-peek {
+    height: calc(84px + env(safe-area-inset-bottom));
+  }
+  .nsheet-half {
+    height: 44dvh;
+  }
+  .nsheet-full {
+    height: calc(100dvh - 190px - env(safe-area-inset-top));
+  }
+  .nsheet-handle {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    height: 22px;
+    cursor: grab;
+    flex: none;
+  }
+  .nsheet-handle span {
+    width: 38px;
+    height: 5px;
+    border-radius: var(--r-sm);
+    background: var(--line-3);
+  }
+  .nsheet .side-head {
+    padding: 0 var(--sp-3) var(--sp-2);
+    gap: var(--sp-2);
+  }
+  .nsheet .side-title {
+    min-height: 48px;
+    gap: var(--sp-2);
+  }
+  .nsheet .side-head h2 {
+    font-size: var(--fs-lg);
+  }
+  .nsheet .side-count {
+    font-size: var(--fs-xs);
+    color: var(--muted);
+  }
+  .nsheet-peek .tabs,
+  .nsheet-peek .tr-tools,
+  .nsheet-peek .side-scroll {
+    visibility: hidden;
+  }
+  .nsheet .tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .nsheet .side-scroll {
+    padding-bottom: var(--sp-6);
+  }
+  /* the transcript's bar stays at the sheet's bottom edge; its field is as tall as the buttons beside it */
+  .nsheet .tr-scroll.side-scroll {
+    padding-bottom: 0;
+  }
+  .tr-search .input {
+    min-height: var(--h-touch);
+  }
+  /* the pick bar keeps one height with its actions at a thumb's size */
+  /* writing a note: no tabs, and Save stays on screen however long the note gets */
+  .nsheet.composing .tabs,
+  .nsheet.composing .note-tagf,
+  .nsheet.composing .tr-tools,
+  .nsheet.composing .side-scroll > :not(.composer) {
+    display: none;
+  }
+  /* the head holds the where-menu and the range's action at a thumb's size; the × (Cancel) too, in its corner */
+  .nsheet .composer-head {
+    min-height: var(--h-touch);
+    margin: calc(-1 * var(--sp-2)) 0 calc(-1 * var(--sp-2)) 0;
+  }
+  .nsheet :is(.composer-where, .range-more) {
+    height: var(--h-touch);
+  }
+  .nsheet .composer-close {
+    top: var(--sp-1);
+    right: var(--sp-1);
+  }
+  .nsheet .composer-foot {
+    position: sticky;
+    bottom: -12px;
+    z-index: 2;
+    margin: 0 calc(-1 * var(--sp-3)) calc(-1 * var(--sp-3));
+    padding: var(--sp-2) var(--sp-3) var(--sp-3);
+    background: var(--ink-3);
+    border-top: 1px solid var(--line);
+  }
+  .mic.rec {
+    background: var(--must-bg);
+    border-color: var(--must);
+  }
+  .mic {
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* the sheet takes room from the picture, never covers it: half hides the secondary rows, full the whole dock */
+  .phone-player.ps-half .p-strip,
+  .phone-player.ps-half .ptools,
+  .phone-player.ps-half .dock-foot,
+  .phone-player.ps-full .p-strip,
+  .phone-player.ps-full .dock {
+    display: none;
+  }
+
+  /* verify panel inside the sheet */
+  .nsheet .verify {
+    position: static;
+    transform: none;
+    width: auto;
+    box-shadow: none;
+  }
+  .verify-side {
+    width: 100%;
+  }
+  .nsheet .verify-head {
+    flex-wrap: wrap;
+    row-gap: var(--sp-1);
+  }
+  .nsheet .verify-head .eyebrow {
+    white-space: nowrap;
+  }
+  .verify-side button {
+    flex: 1;
+    justify-content: center;
+    min-height: 40px;
+  }
+}
+
+/* ---------------------------------------------------------------- the smallest phones (360 px) */
+@media (max-width: 379px) {
+  /* the player's strip: the agent button's chevron gives way, so the next step keeps its word */
+  .p-strip .agent-btn .i-down {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------- landscape phones: watch big, scroll for the rest */
+@media (max-height: 480px) and (hover: none) and (pointer: coarse) and (orientation: landscape) {
+  body {
+    overflow: auto;
+  }
+  .player.phone-player {
+    height: auto;
+    overflow: visible;
+    grid-template-rows: auto calc(100dvh - 58px) auto auto auto;
+    grid-template-areas: 'top' 'stage' 'strip' 'dock' 'side';
+  }
+  .phone-player .side.nsheet,
+  .phone-player .side.nsheet.nsheet-peek {
+    height: auto;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+  }
+  .phone-player .nsheet-handle {
+    display: none;
+  }
+  .phone-player .nsheet-peek .tabs,
+  .phone-player .nsheet-peek .tr-tools,
+  .phone-player .nsheet-peek .side-scroll {
+    visibility: visible;
+  }
+  .phone-player.ps-half .p-strip,
+  .phone-player.ps-half .ptools,
+  .phone-player.ps-half .dock-foot,
+  .phone-player.ps-full .p-strip,
+  .phone-player.ps-full .dock {
+    display: flex;
+  }
+  .phone-player.ps-full .dock {
+    display: grid;
+  }
+  /* The client's player too: the picture gets the screen's height, transport and notes follow when scrolled. */
+  .g-player.guest {
+    height: auto;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto calc(100dvh - 54px) auto auto;
+    grid-template-areas: 'top' 'stage' 'dock' 'side';
+  }
+  .g-player .side {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+  .g-player .side-scroll {
+    overflow: visible;
+  }
+}
+
+/* ---------------------------------------------------------------- touch tablets: bigger targets in the desktop layout */
+@media (min-width: 640px) and (hover: none) and (pointer: coarse) {
+  .transport .btn.sm {
+    min-height: 40px;
+  }
+  .transport .btn.sm.icon-only {
+    min-width: 40px;
+  }
+  .topbar .btn.sm {
+    min-height: 40px;
+  }
+  .tabs button {
+    min-height: 40px;
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes sheet-down {
+  to {
+    transform: translateY(100%);
+  }
+}
+
+/* ---------------------------------------------------------------- drawer (the library sidebar below 820 px) */
+.drawer {
+  position: fixed;
+  z-index: var(--z-sheet);
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(320px, 86vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--ink-1);
+  border-right: 1px solid var(--float-line);
+  box-shadow: var(--shadow-float);
+  padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) env(safe-area-inset-left);
+  animation: drawer-in var(--dur-slow) var(--ease-out);
+}
+.drawer-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-2) var(--sp-1) var(--sp-4);
+}
+.drawer-head h3 {
+  margin: 0;
+  font: var(--fw-strong) semi-condensed var(--fs-xl) / var(--lh-tight) var(--display);
+}
+.drawer .nav {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  border-right: 0;
+}
+@keyframes drawer-in {
+  from {
+    transform: translateX(-100%);
+  }
+}

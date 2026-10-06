@@ -1,0 +1,81 @@
+/* ---------------------------------------------------------------- range notes: the composer's moment, the note's chip */
+
+.range-ctl,
+.note-range {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-0_5);
+  min-width: 0;
+}
+/* in the composer's head the moment keeps its width; the frame/version eyebrow next to it gives way */
+.range-ctl {
+  flex: none;
+}
+.range-ctl .btn {
+  flex: none;
+}
+/* Beside a frame's chip, where the eye already is: the quiet way to make it a section — the rest of a section's chip,
+   not there yet ("→ 00:13:03", dashed), naming the frame it ends on. Pointed at, it lights and the timeline draws the
+   section it would make. As tall as the chip, so the head keeps one line whether it shows or not. */
+.range-more {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.range-more-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: calc(var(--h-xs) - 2px);
+  padding: 0 var(--sp-2) 0 var(--sp-1);
+  border: 1px dashed var(--line-3);
+  border-radius: var(--r-sm);
+  font: var(--fw-strong) var(--fs-xs) var(--mono);
+  font-stretch: 87.5%;
+  font-variant-numeric: tabular-nums;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out);
+}
+.range-more-arrow {
+  font-family: var(--ui);
+  font-weight: var(--fw-ui);
+}
+.range-more:hover,
+.range-more:focus-visible {
+  color: var(--fg);
+}
+.range-more:hover .range-more-chip,
+.range-more:focus-visible .range-more-chip {
+  border-color: var(--line-4);
+  background: var(--ink-4);
+}
+.range-more:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+/* in → out reads as one stretch, the duration quieter after it */
+.range-ctl .c-tc.range,
+.note-range .c-tc.range {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.note-range-len {
+  color: var(--muted);
+  font-weight: 500;
+}
+.note-range .btn[aria-pressed='true'] {
+  color: var(--fg);
+  background: var(--sel);
+}

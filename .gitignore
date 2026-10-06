@@ -1,0 +1,34 @@
+node_modules
+cache/
+versions/
+web/dist/
+web/dist-mcp/
+.venv/
+.venv-stt/
+__pycache__/
+data/**/.lock
+.DS_Store
+*-versions/
+test-output/
+config.json
+/data/
+
+# private working notes
+BRIEF.md
+# agent worktrees and local agent material; the project's skills are shared
+.claude/*
+!.claude/skills/
+# the private cloud module (billing, signup, plan limits): its own local repository, never part of this one
+/cloud/
+/status/
+# local working files (notes, reports, scripts)
+*.local.md
+*.local.md.bak-*
+/audits/*/
+# a site/ folder kept inside a checkout: not part of this repository
+/site/
+
+# secrets: compose settings, storage keys (.env.example is the template and is committed)
+.env
+.env.*
+!.env.example

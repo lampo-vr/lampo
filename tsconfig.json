@@ -1,0 +1,23 @@
+{
+  // Server, CLI, MCP and tests run as TypeScript directly on Node ≥ 22.18 (type stripping), so only syntax that
+  // erases cleanly is allowed and imports name the .ts file. The web UI has its own tsconfig in web/.
+  "compilerOptions": {
+    "target": "es2024",
+    "lib": ["es2024"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["node"],
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "skipLibCheck": true
+  },
+  "include": ["lib/**/*.ts", "server/**/*.ts", "mcp/**/*.ts", "scripts/**/*.ts", "test/**/*.ts"],
+  "exclude": ["node_modules", "web", "test/e2e/mcp-host"]
+}

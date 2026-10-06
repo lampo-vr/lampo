@@ -1,0 +1,24 @@
+Video review feedback, frame-exact. Please work through the open items.
+Video: /@uploads/Demo/Reels/teaser.mp4
+Current: v2 · 160×90 · 25 fps · 25 frames · 1s
+Review data: <store>/data/__@uploads__Demo__Reels__teaser.mp4/review.json (summary: review.md). Frames are 0-based, timecode mm:ss:ff, drawings in video px.
+
+Open (3):
+1. c_b3d2f0 · SHOULD · – · 00:00:03 f3 (range f3–9) · carried from v1, check again
+   Hold the title a little longer
+   marked: <store>/data/__@uploads__Demo__Reels__teaser.mp4/c_b3d2f0_marked.png
+   clean:  <store>/data/__@uploads__Demo__Reels__teaser.mp4/c_b3d2f0_clean.png
+2. c_260bfe · SHOULD · – · 00:00:08 f8
+   Can the music start a little later?
+   marked: <store>/data/__@uploads__Demo__Reels__teaser.mp4/c_260bfe_marked.png
+   clean:  <store>/data/__@uploads__Demo__Reels__teaser.mp4/c_260bfe_clean.png
+3. c_a5b4dc · NICE · color · 00:00:20 f20 · carried from v1, check again
+   Warmer grade at the end?
+   last reply (agent:fixture-edit): Will try a warmer LUT in v3
+   marked: <store>/data/__@uploads__Demo__Reels__teaser.mp4/c_a5b4dc_marked.png
+   clean:  <store>/data/__@uploads__Demo__Reels__teaser.mp4/c_a5b4dc_clean.png
+
+Already marked fixed, waiting for verification (1): c_1d55b9 (00:00:12, v2)
+
+When an item is done: upload the new render with vr push <file> --to "/@uploads/Demo/Reels/teaser.mp4", then vr fix <id> --note "what you changed".
+Question about a frame: vr add "/@uploads/Demo/Reels/teaser.mp4" --frame <N> --text "…"   ·   Live feedback: vr watch

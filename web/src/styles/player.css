@@ -1,0 +1,547 @@
+/* ---------------------------------------------------------------- player */
+
+.player {
+  height: 100%;
+  display: grid;
+  grid-template-columns: 1fr 392px;
+  grid-template-rows: 54px 1fr auto;
+  grid-template-areas: 'top top' 'stage side' 'dock side';
+  animation: fade 0.3s ease-out;
+}
+.player > .topbar {
+  grid-area: top;
+}
+.p-title {
+  display: grid;
+  line-height: var(--lh-ui);
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.p-bar .p-title,
+.p-title.grow {
+  flex: 1;
+}
+/* The video's name is the page's heading (h1) in the player; elsewhere the bar's title is plain text. */
+.p-title :is(b, h1) {
+  margin: 0;
+  font: inherit;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-strong);
+  letter-spacing: var(--track-title);
+}
+.p-title span {
+  font: var(--fw-ui) var(--fs-xs) var(--ui);
+  color: var(--muted);
+}
+/* The quiet tools: grouped, no borders until hovered, so the stage control is the one thing that stands out. */
+.p-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-0_5);
+  padding-right: var(--sp-1);
+  margin-right: var(--sp-1);
+  border-right: 1px solid var(--line);
+}
+.p-tools .btn.on {
+  background: var(--raise-sheen), var(--ink-3);
+  color: var(--fg);
+}
+.claude-btn .spark {
+  color: var(--claude-2);
+}
+/* The stage control is the one thing that must read in full: the title gives way first, and below 1180 px the quiet
+ * tools drop their words (their names stay in the tooltips). */
+.p-top .signoff {
+  flex: none;
+}
+@media (max-width: 1180px) {
+  .p-top .agent-btn {
+    max-width: 150px;
+  }
+  .p-top .p-tool-word {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------- version picker (player/VersionPicker.tsx) */
+.vpick {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: var(--h-sm);
+  padding: 0 var(--sp-2) 0 var(--sp-2);
+  border-radius: var(--r);
+  border: 1px solid var(--line-2);
+  background: var(--ink-0);
+  color: var(--fg);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+.vpick:hover,
+.vpick[data-state='open'] {
+  border-color: var(--line-3);
+}
+.vpick:active {
+  transform: scale(0.96);
+}
+.vpick-v {
+  font: var(--fw-strong) var(--fs-xs) var(--mono);
+}
+.vpick-note {
+  font-size: var(--fs-xs);
+  color: var(--should);
+}
+/* A partial render (lib/part.ts): quiet words beside the number; a seam that jumps reads like "not the newest". */
+.vpick-part {
+  font-size: var(--fs-xs);
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+.vpick-part.jumps {
+  color: var(--should);
+}
+.vpick-when {
+  font-variant-numeric: tabular-nums;
+}
+.vpick .icon {
+  color: var(--faint);
+}
+.vpick-pop {
+  width: 300px;
+  padding: var(--sp-2);
+}
+.vpick-list {
+  list-style: none;
+  margin: var(--sp-1) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-0_5);
+}
+.vpick-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  border-radius: var(--radius-sm);
+}
+.vpick-list li:hover,
+.vpick-list li.on {
+  background: var(--raise-sheen), var(--ink-3);
+  box-shadow: var(--raise);
+}
+.vpick-row {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-2);
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+}
+.vpick-num {
+  flex: none;
+  width: 30px;
+  font: var(--fw-strong) var(--fs-sm) var(--mono);
+}
+.vpick-meta {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: var(--sp-0_5);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.vpick-tags {
+  display: flex;
+  gap: var(--sp-1);
+}
+.vpick-tags:empty {
+  display: none;
+}
+.vpick-tag {
+  font: var(--fw-ui) var(--fs-xs) var(--ui);
+  color: var(--fg-2);
+}
+.vpick-tag.ok {
+  color: var(--ok);
+}
+.vpick-pb {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-0_5);
+  min-width: 0;
+  color: var(--muted);
+}
+.vpick-check {
+  flex: none;
+  color: var(--fg);
+}
+/* What is said about a version: a part's seams, what the next full render found. */
+.vpick-said {
+  font-size: var(--fs-xs);
+  line-height: var(--lh-ui);
+  color: var(--muted);
+}
+.vpick-said.ask {
+  color: var(--should);
+}
+.stage {
+  grid-area: stage;
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(ellipse 80% 70% at 50% 45%, #141414 0%, #080808 75%);
+  user-select: none;
+}
+.pane {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+.pane + .pane {
+  border-left: 1px solid var(--line);
+}
+.pane-label {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  z-index: 5;
+}
+.pane-label.b {
+  left: auto;
+  right: 14px;
+}
+.canvas {
+  position: absolute;
+}
+.crop {
+  position: absolute;
+  pointer-events: none;
+}
+.crop::before {
+  content: '';
+  position: absolute;
+  inset: -14px;
+  --c: rgba(238, 235, 228, 0.3);
+  background:
+    linear-gradient(var(--c), var(--c)) 0 0 / 9px 1px no-repeat,
+    linear-gradient(var(--c), var(--c)) 0 0 / 1px 9px no-repeat,
+    linear-gradient(var(--c), var(--c)) 100% 0 / 9px 1px no-repeat,
+    linear-gradient(var(--c), var(--c)) 100% 0 / 1px 9px no-repeat,
+    linear-gradient(var(--c), var(--c)) 0 100% / 9px 1px no-repeat,
+    linear-gradient(var(--c), var(--c)) 0 100% / 1px 9px no-repeat,
+    linear-gradient(var(--c), var(--c)) 100% 100% / 9px 1px no-repeat,
+    linear-gradient(var(--c), var(--c)) 100% 100% / 1px 9px no-repeat;
+}
+.crop .dim {
+  position: absolute;
+  bottom: -16px;
+  right: 0;
+  transform: translateY(100%);
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.vbox {
+  position: absolute;
+  overflow: hidden;
+  background: #000;
+  box-shadow: var(--shadow-float);
+}
+.vbox video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  display: block;
+}
+.vbox svg.layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.vbox svg.layer.passive {
+  pointer-events: none;
+}
+.vbox svg.draw {
+  cursor: crosshair;
+  touch-action: none;
+}
+.ig-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.wipe {
+  position: absolute;
+  inset: 0;
+}
+.wipe video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.wipe-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--fg);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--cast) calc(35% * var(--cast-k)), transparent);
+  cursor: ew-resize;
+  z-index: 6;
+}
+.wipe-handle::after {
+  content: 'A B';
+  word-spacing: 8px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 46px;
+  height: 26px;
+  border-radius: var(--r-full);
+  background: var(--fg);
+  color: #111;
+  display: grid;
+  place-items: center;
+  font: var(--fw-strong) var(--fs-xs) var(--mono);
+  box-shadow: var(--raise-drop);
+}
+/* The phone view's frame (Stage.tsx): the body at the device's real size in points, scaled as a whole, the screen in
+   it and the picture's area on the screen. Its box is final before the drawings (phone.css, with their chunk) arrive.
+   Without the phone the same wrappers lie flat over the pane (.unframed), so the video element stays the same one. */
+.unframed {
+  position: absolute;
+  inset: 0;
+}
+.phone {
+  position: absolute;
+  transform-origin: top left;
+  /* the body: a thin black border around the glass, then the metal band (lit a touch at its edge) */
+  background: #050506;
+  box-shadow:
+    0 0 0 1px #48484c,
+    0 0 0 4px #1f1f22,
+    0 0 0 5px #3c3c40,
+    var(--shadow-float);
+}
+.phone.home {
+  background: #0b0b0c;
+}
+.phone.android {
+  background: #08080a;
+  box-shadow:
+    0 0 0 1px #3a3b3f,
+    0 0 0 4px #1a1b1e,
+    0 0 0 5px #2e2f33,
+    var(--shadow-float);
+}
+.phone-screen {
+  position: absolute;
+  overflow: hidden;
+  background: #000;
+}
+.phone-area {
+  position: absolute;
+  overflow: hidden;
+}
+.phone-area .vbox {
+  box-shadow: none;
+}
+.phone-zones {
+  pointer-events: none;
+}
+.phone-note {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font: var(--fw-ui) var(--fs-xs) var(--ui);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.stage-msg {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  text-align: center;
+  padding: var(--sp-4);
+}
+
+/* ---------------------------------------------------------------- compare bar (player/CompareBar.tsx)
+   Floats over the top of the stage, dark in both themes (a dark island, base.css). */
+.compare-bar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  width: fit-content;
+  max-width: calc(100% - 24px);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-1) var(--sp-1) var(--sp-2);
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--ink-2) 88%, transparent);
+  box-shadow:
+    0 0 0 1px var(--line-2),
+    var(--shadow-float);
+  backdrop-filter: blur(14px) saturate(1.2);
+  color: var(--fg);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  animation: pop var(--dur) var(--ease-out);
+}
+.cmp-side {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  font-weight: var(--fw-ui);
+}
+.cmp-tag {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-sm);
+  background: var(--ink-4);
+  font: var(--fw-strong) var(--fs-xs) var(--ui);
+  color: var(--fg-2);
+}
+.cmp-side .input.select {
+  height: 26px;
+  font-size: var(--fs-sm);
+  max-width: 220px;
+}
+.cmp-vs {
+  color: var(--faint);
+  font-size: var(--fs-xs);
+}
+.cmp-sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 var(--sp-1);
+  background: var(--line-2);
+}
+.cmp-modes button,
+.cmp-blend button {
+  height: 24px;
+}
+.cmp-opacity {
+  width: 96px;
+}
+.wipe.overlay video {
+  pointer-events: none;
+}
+@media (max-width: 1180px) {
+  .cmp-modes button .icon + * {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------- review mode (player/ReviewHud.tsx)
+   Bottom of the stage, dark in both themes (a dark island, base.css), like the compare bar. */
+.review-hud {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  right: 14px;
+  width: fit-content;
+  max-width: min(720px, calc(100% - 28px));
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-1) var(--sp-1) var(--sp-1) var(--sp-3);
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--ink-2) 90%, transparent);
+  box-shadow:
+    0 0 0 1px var(--line-2),
+    var(--shadow-float);
+  backdrop-filter: blur(14px) saturate(1.2);
+  color: var(--fg);
+  animation: pop var(--dur) var(--ease-out);
+}
+.rh-count {
+  flex: none;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.rh-note {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-md);
+}
+.rh-text b {
+  font-weight: var(--fw-strong);
+  margin-right: var(--sp-1);
+}
+.rh-tools {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-0_5);
+}
+.rh-tools .btn.primary kbd {
+  margin-left: var(--sp-1);
+}
+/* Phones: the same controls in the strip under the top bar (it scrolls sideways). */
+.compare-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  white-space: nowrap;
+}
+.compare-strip > * {
+  flex: none;
+}
+.compare-strip .input.select {
+  height: 36px;
+}
+.compare-strip .seg button {
+  height: 32px;
+}
+/* a fix preview's still where a video would be (verify mode) */
+.vbox img.pane-still,
+.wipe img.wipe-still {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* narrow windows without a phone layout: the notes go under the stage */
+@media (max-width: 1100px) {
+  .player {
+    grid-template-columns: 1fr 340px;
+  }
+}
+@media (max-width: 820px) {
+  .player {
+    grid-template-columns: 1fr;
+    grid-template-rows: 54px 62vh auto auto;
+    grid-template-areas: 'top' 'stage' 'dock' 'side';
+    height: auto;
+    min-height: 100%;
+  }
+}

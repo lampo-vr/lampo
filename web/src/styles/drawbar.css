@@ -1,0 +1,73 @@
+/* ---------------------------------------------------------------- the drawing tools on the picture (player/DrawBar.tsx)
+   While a note is written the tools sit where you draw: a small dark island at the top of the stage, like the
+   recording bar and the walkie-talkie. The layer covers the stage's grid area and lets the pointer through. */
+
+.draw-layer {
+  grid-area: stage;
+  position: relative;
+  z-index: 6;
+  pointer-events: none;
+}
+.draw-bar {
+  position: absolute;
+  top: var(--sp-4);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  /* big enough to be found at a glance: 40 px tools with 20 px icons, the pill's corners following them */
+  padding: calc(var(--sp-1) * 1.5);
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--ink-1) 90%, transparent);
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow-float);
+  color: var(--fg);
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+  animation: toast 0.25s var(--ease);
+}
+/* the compare bar holds the top of the picture: the tools go under it */
+.draw-bar.under {
+  top: calc(var(--sp-12) + var(--sp-4));
+}
+.draw-bar .btn,
+.draw-bar .btn.icon-only {
+  width: var(--h-lg);
+  min-width: var(--h-lg);
+  height: var(--h-lg);
+  border-radius: var(--r);
+  color: var(--fg-2);
+}
+.draw-bar .btn:hover {
+  color: var(--fg);
+}
+/* the tool in use: raised, in the neutral material (selection never wears the orange) */
+.draw-bar .btn.on {
+  background: var(--raise-sheen), var(--ink-4);
+  box-shadow: var(--raise);
+  color: var(--fg);
+}
+.draw-sep {
+  width: 1px;
+  height: calc(var(--h-xs) * 1.2);
+  margin: 0 var(--sp-0_5);
+  background: var(--line-2);
+}
+/* a finger's size on touch screens */
+@media (hover: none) and (pointer: coarse) {
+  .draw-bar {
+    top: var(--sp-2);
+  }
+  .draw-bar .btn,
+  .draw-bar .btn.icon-only {
+    width: var(--h-touch);
+    min-width: var(--h-touch);
+    height: var(--h-touch);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .draw-bar {
+    animation: none;
+  }
+}

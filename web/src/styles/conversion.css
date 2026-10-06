@@ -1,0 +1,941 @@
+/* The conversion moments (web/src/conversion/: the trial's line and card, the banner at the trial's end, the read-only
+   Add video's popover, the moments of value), in the chunk that brings them (billing/Banner.tsx). Their rooms in the
+   first paint are in theme.css (.nav-trial) and library.css (.lib-banner-room): the boxes here keep those sizes. */
+
+/* ---------------------------------------------------------------- the trial's line: two words and a ruler */
+button.nav-trial {
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--fg-2);
+  text-align: left;
+  font: var(--fw-ui) var(--fs-sm) / 1.2 var(--ui);
+  cursor: pointer;
+  transition: background var(--dur-fast);
+}
+button.nav-trial:hover,
+button.nav-trial[aria-expanded='true'] {
+  background: var(--sel);
+}
+button.nav-trial:focus-visible {
+  outline: 2px solid var(--focus, var(--fg-2));
+  outline-offset: -2px;
+}
+.nav-trial-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.nav-trial-top b {
+  font-weight: var(--fw-ui);
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+.nav-trial-top span {
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.nav-trial.last .nav-trial-top span {
+  color: var(--fg-2);
+}
+
+/* the ruler: the days as frames on a timeline, today the playhead, the end a keyframe */
+.cv-ruler {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-1);
+  height: 12px;
+}
+.cv-ruler-cells {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+  align-items: center;
+  height: 100%;
+}
+/* a day's cell; the frame line between two is the last 2 px of each, left clear */
+.cv-ruler-cells i {
+  height: 4px;
+  border-radius: 1px;
+  background: linear-gradient(to right, var(--cell, var(--line-2)) calc(100% - 2px), transparent 0);
+}
+.cv-ruler-cells i.p,
+.cv-ruler-cells i.t {
+  --cell: var(--line-4);
+}
+.cv-ph {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--playhead);
+}
+.cv-ph::before {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: -2px;
+  width: 6px;
+  height: 4px;
+  background: var(--playhead);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+.cv-ruler .cv-end {
+  --kg-size: 9px;
+  color: var(--line-4);
+}
+.cv-ruler .cv-end.last {
+  color: var(--should);
+}
+.cv-ruler.lg {
+  height: 16px;
+}
+.cv-ruler.lg .cv-ruler-cells i {
+  height: 7px;
+  border-radius: 2px;
+}
+.cv-ruler.lg .cv-end {
+  --kg-size: 11px;
+}
+
+/* ---------------------------------------------------------------- its card: a popover beside the sidebar, a sheet on a phone */
+.cv-pop {
+  z-index: var(--z-menu);
+  width: min(372px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+  background: var(--float-bg);
+  border: 1px solid var(--float-line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-float);
+  color: var(--fg);
+  animation: cv-up var(--dur-slow) var(--ease-out);
+}
+@keyframes cv-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+}
+.cv-card {
+  display: grid;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+}
+.cv-card:focus {
+  outline: none;
+}
+.cv-pop-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: calc(var(--sp-1) * -1) calc(var(--sp-2) * -1) calc(var(--sp-1) * -1) 0;
+}
+.cv-pop-head .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+.cv-pop-head .eyebrow .kg {
+  color: var(--fg-2);
+}
+.cv-pop-day {
+  margin-left: auto;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.cv-card h3 {
+  margin: 0;
+  font: var(--fw-strong) var(--fs-xl) / 1.2 var(--display);
+  font-stretch: semi-condensed;
+  letter-spacing: var(--track-title);
+}
+.cv-card p {
+  margin: 0;
+}
+.cv-pop-sub {
+  margin-top: calc(var(--sp-1) * -1) !important;
+  color: var(--muted);
+}
+.cv-ruler-lg {
+  display: grid;
+  gap: var(--sp-1);
+  padding: var(--sp-3) var(--sp-3) var(--sp-2);
+  border-radius: var(--r);
+  background: var(--ink-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.cv-ticks {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  height: 10px;
+  margin-right: var(--sp-4);
+  font: var(--fw-ui) var(--fs-2xs) / 1 var(--mono);
+  font-stretch: 87.5%;
+  color: var(--muted);
+}
+.cv-ticks .now {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+.cv-pop-sec {
+  display: grid;
+  gap: var(--sp-2);
+}
+.cv-pop-h {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-ui);
+  color: var(--fg-2);
+}
+.cv-facts {
+  display: grid;
+  margin: 0;
+}
+.cv-facts > div {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 30px;
+  border-top: 1px solid var(--line);
+}
+.cv-facts .icon {
+  color: var(--muted);
+}
+.cv-facts dt {
+  color: var(--fg-2);
+}
+.cv-facts dd {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.cv-mini {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line-2);
+  overflow: hidden;
+}
+.cv-mini i {
+  display: block;
+  height: 100%;
+  background: var(--fg-2);
+}
+.cv-pop-after {
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+.cv-pop-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  padding-top: var(--sp-1);
+}
+.cv-fine {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.cv-ok {
+  color: var(--ok);
+}
+
+/* a phone: the same card from the bottom edge */
+.cv-sheet-backdrop {
+  z-index: var(--z-sheet);
+}
+.cv-sheet {
+  position: fixed;
+  z-index: var(--z-sheet);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: calc(100dvh - 24px - env(safe-area-inset-top));
+  overflow: auto;
+  background: var(--float-bg);
+  border-top: 1px solid var(--float-line);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  box-shadow: var(--shadow-up);
+  padding-bottom: env(safe-area-inset-bottom);
+  color: var(--fg);
+  animation: sheet-up var(--dur-slow) var(--ease-out);
+}
+.cv-sheet > .cv-ro {
+  padding: var(--sp-4);
+}
+
+/* ---------------------------------------------------------------- the trial's end at the library's head (6a–6e)
+   Closed it is one line (48 px; on a phone two rows of fixed height), exactly the room library.css holds for it. */
+.cv-te {
+  margin-top: var(--sp-4);
+  border-radius: var(--r-lg);
+  background: var(--ink-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+  overflow: hidden;
+  color: var(--fg);
+}
+.cv-te.warn {
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--should) 9%, transparent), color-mix(in srgb, var(--should) 4%, transparent)), var(--ink-2);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--should) 22%, var(--line));
+}
+.cv-te.bad {
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--must) 9%, transparent), color-mix(in srgb, var(--must) 4%, transparent)), var(--ink-2);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--must) 26%, var(--line));
+}
+.cv-te-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  height: 48px;
+  padding: 0 var(--sp-2) 0 var(--sp-4);
+}
+.cv-te-row > .kg,
+.cv-te-row > .icon {
+  flex: none;
+}
+.cv-te-kg {
+  color: var(--should);
+}
+.cv-te.bad .cv-te-row > .icon {
+  color: var(--must);
+}
+.cv-te.warn .cv-te-row > .icon {
+  color: var(--should);
+}
+.cv-te-t {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--fg-2);
+}
+.cv-te-t b {
+  font-weight: var(--fw-strong);
+  color: var(--fg);
+}
+.cv-te-acts {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.cv-te-tog .icon {
+  transition: transform var(--dur-fast);
+}
+.cv-te-tog[aria-expanded='true'] .icon {
+  transform: rotate(180deg);
+}
+.cv-te-body {
+  padding: var(--sp-2) var(--sp-4) var(--sp-4);
+  animation: cv-up var(--dur-slow) var(--ease-out);
+}
+.cv-te-body p {
+  margin: 0;
+}
+.cv-te-free {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-3);
+}
+.cv-te-col,
+.cv-way {
+  display: grid;
+  align-content: start;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  border-radius: var(--r);
+  background: var(--ink-1);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.cv-te-say {
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+.cv-te-say b {
+  font-weight: var(--fw-strong);
+  color: var(--fg);
+}
+.cv-te-keep {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+}
+@container lib (max-width: 760px) {
+  .cv-te-free,
+  .cv-te-ways {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* the workspace against Free, resource by resource: Free's notch, the part over it hatched */
+.cv-fit-grid {
+  display: grid;
+  gap: var(--sp-3);
+}
+.cv-fit {
+  display: grid;
+  gap: var(--sp-1);
+}
+.cv-fit-h {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.cv-fit-h b {
+  font-weight: var(--fw-ui);
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.cv-fit-bar {
+  position: relative;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--ink-4);
+}
+.cv-fit-in {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--r-full) 0 0 var(--r-full);
+  background: var(--fg-2);
+}
+.cv-fit-over {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 0 var(--r-full) var(--r-full) 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--should) 70%, transparent) 0 2px,
+    color-mix(in srgb, var(--should) 16%, transparent) 2px 6px
+  );
+}
+.cv-fit-notch {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--fg);
+  box-shadow: 0 0 0 2px var(--ink-1);
+}
+.cv-fit-free {
+  position: relative;
+  height: 14px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.cv-fit-free span {
+  position: absolute;
+  transform: translateX(-2px);
+  white-space: nowrap;
+}
+
+/* the end as a timeline: the trial, a week of grace, read-only */
+.cv-endline {
+  display: grid;
+  gap: var(--sp-2);
+}
+.cv-el-track {
+  position: relative;
+  display: grid;
+  grid-template-columns: 22fr 46fr 32fr;
+  gap: var(--sp-1);
+  height: 22px;
+  margin-top: var(--sp-4);
+}
+.cv-el-seg {
+  position: relative;
+  border-radius: var(--r-sm);
+}
+.cv-el-seg.trial {
+  background: var(--line-3);
+}
+.cv-el-seg.grace {
+  background: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--should) 30%, transparent) 0 2px,
+    color-mix(in srgb, var(--should) 10%, transparent) 2px 6px
+  );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--should) 30%, transparent);
+}
+.cv-el-seg.grace em {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-style: normal;
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-ui);
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.cv-el-seg.ro {
+  background: var(--ink-4);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.cv-el-today {
+  position: absolute;
+  top: -16px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--playhead);
+}
+.cv-el-today b {
+  position: absolute;
+  top: -1px;
+  left: 6px;
+  font: var(--fw-ui) var(--fs-2xs) / 1 var(--mono);
+  font-stretch: 87.5%;
+  color: var(--fg);
+  white-space: nowrap;
+}
+.cv-el-pts {
+  display: grid;
+  grid-template-columns: 22fr 46fr 32fr;
+  gap: var(--sp-1);
+}
+.cv-el-pt {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0 var(--sp-1);
+  align-items: baseline;
+  font-size: var(--fs-xs);
+  line-height: 1.35;
+  color: var(--muted);
+}
+.cv-el-pt:last-child {
+  grid-column: 3;
+}
+.cv-el-pt b {
+  font-weight: var(--fw-ui);
+  color: var(--fg-2);
+}
+.cv-el-pt .kg {
+  color: var(--fg-2);
+  transform: translateY(1px);
+}
+
+/* grace and read-only: the three ways on */
+.cv-te-ways {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-3);
+}
+.cv-way {
+  justify-items: start;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.cv-way.lead {
+  background: var(--raise-sheen), var(--ink-3);
+  box-shadow:
+    inset 0 0 0 1px var(--line-3),
+    var(--raise-drop);
+}
+.cv-way .btn {
+  margin-top: var(--sp-1);
+}
+.cv-todo {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cv-todo li {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--sp-2);
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+.cv-todo li .kg {
+  color: var(--muted);
+  transform: translateY(1px);
+}
+.cv-todo li .kg.cv-ok {
+  color: var(--ok);
+}
+.cv-todo li.wait {
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- read-only: why Add video waits */
+.cv-ro {
+  display: grid;
+  gap: var(--sp-3);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.cv-ro p {
+  margin: 0;
+}
+.cv-ro-pop {
+  width: min(340px, calc(100vw - 16px));
+  padding: var(--sp-4);
+}
+.cv-ro-h {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-md);
+  color: var(--fg);
+}
+.cv-ro-h b {
+  font-weight: var(--fw-strong);
+}
+.cv-ro-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+/* ---------------------------------------------------------------- 2a: under the player's stage, after the first loop */
+.cv-loop {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  width: min(680px, calc(100% - 32px));
+  border-radius: var(--r-lg);
+  background: var(--ink-2);
+  box-shadow:
+    0 0 0 1px var(--line-2),
+    var(--shadow);
+  color: var(--fg);
+  overflow: hidden;
+  animation: cv-up var(--dur-slow) var(--ease-out);
+}
+.cv-loop-done {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-ui);
+}
+.cv-loop-done > .kg {
+  margin-top: var(--sp-1);
+}
+.cv-loop-done small {
+  display: block;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-text);
+  color: var(--muted);
+}
+.cv-loop-line {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  border-top: 1px solid var(--line);
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--fg) 3%, transparent), transparent 70%);
+  animation: cv-up 520ms 180ms var(--ease-out) both;
+}
+.cv-loop-line > .kg {
+  margin-top: var(--sp-1);
+  color: var(--muted);
+}
+.cv-loop-t {
+  display: grid;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+.cv-loop-t b {
+  font-weight: var(--fw-strong);
+}
+.cv-loop-t p {
+  margin: 0;
+  max-width: 60ch;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.cv-loop-acts {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  align-self: center;
+}
+
+/* ---------------------------------------------------------------- 2b: the library's corner, the first link opened */
+.cv-float {
+  position: fixed;
+  z-index: var(--z-overlay, 50);
+  right: var(--sp-6);
+  bottom: var(--sp-6);
+  width: 368px;
+  display: grid;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  border-radius: var(--r-lg);
+  background: var(--float-bg);
+  border: 1px solid var(--float-line);
+  box-shadow: var(--shadow-float);
+  color: var(--fg);
+  animation: cv-float-in 560ms var(--ease-out) both;
+}
+@keyframes cv-float-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+.cv-float-h {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-right: calc(var(--sp-1) * -1);
+}
+.cv-eye {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.cv-eye::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ok) 40%, transparent);
+  animation: cv-ring 2.4s var(--ease-out) infinite;
+}
+@keyframes cv-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+.cv-float-t {
+  display: grid;
+  min-width: 0;
+  line-height: 1.3;
+}
+.cv-float-t b {
+  font-weight: var(--fw-strong);
+}
+.cv-float-t small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.cv-mini-page {
+  display: grid;
+  gap: var(--sp-1);
+  margin: 0;
+}
+.cv-mini-page figcaption {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  text-align: center;
+}
+/* a picture of what the link shows: the review page is dark in both themes (a dark island, base.css) */
+.cv-rl {
+  display: grid;
+  border-radius: var(--r);
+  overflow: hidden;
+  background: var(--ink-1);
+  box-shadow: 0 0 0 1px var(--line-2);
+  color: var(--fg);
+}
+.cv-rl-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--fs-2xs);
+}
+.cv-rl-sender {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  color: var(--fg-2);
+}
+.cv-rl-sender > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cv-rl-sender b {
+  color: var(--fg);
+  font-weight: 600;
+}
+.cv-rl-ap {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r-sm);
+  background: var(--raise-sheen), var(--brand-deep);
+  color: var(--on-brand);
+  font-weight: var(--fw-strong);
+}
+.cv-rl-stage {
+  position: relative;
+  height: 112px;
+  overflow: hidden;
+  background: var(--ink-0);
+}
+.cv-rl-stage img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.cv-rl-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
+  font: var(--fw-ui) var(--fs-2xs) / 1.2 var(--ui);
+  color: var(--muted);
+}
+.cv-rl-foot > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cv-rl-badge {
+  flex: none;
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-sm);
+  box-shadow: inset 0 0 0 1px var(--line-3);
+  color: var(--fg-2);
+}
+.cv-float-p {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+.cv-float-f {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* ---------------------------------------------------------------- phones */
+@media (max-width: 639px), (max-height: 480px) and (hover: none) and (pointer: coarse) {
+  /* the banner: the sentence takes the row (two lines at most), the actions a row of their own, × in the corner */
+  .cv-te-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: start;
+    gap: var(--sp-2) var(--sp-3);
+    height: auto;
+    padding: var(--sp-3) var(--sp-2) var(--sp-2) var(--sp-4);
+  }
+  .cv-te-row > .kg,
+  .cv-te-row > .icon {
+    margin-top: var(--sp-1);
+  }
+  /* two lines at most, of a known height: the room library.css holds is this */
+  .cv-te-t {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    font-size: var(--fs-md);
+    line-height: var(--lh-body);
+    height: calc(2em * var(--lh-body));
+    white-space: normal;
+  }
+  .cv-te-acts {
+    grid-column: 2 / -1;
+    grid-row: 2;
+    height: var(--h-touch);
+  }
+  .cv-te-x {
+    grid-column: 3;
+    grid-row: 1;
+    margin-top: calc(var(--sp-3) * -1);
+  }
+  .cv-te-body {
+    padding: 0 var(--sp-3) var(--sp-3);
+  }
+  .cv-te-free,
+  .cv-te-ways {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cv-loop {
+    bottom: 8px;
+    width: calc(100% - 16px);
+  }
+  .cv-loop-line {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .cv-loop-acts {
+    grid-column: 2;
+  }
+  .cv-float {
+    left: var(--sp-3);
+    right: var(--sp-3);
+    bottom: calc(var(--sp-3) + env(safe-area-inset-bottom));
+    width: auto;
+    max-height: calc(100dvh - 96px);
+    overflow: auto;
+  }
+}
+
+/* motion only where it says something; none for whoever asked for less */
+@media (prefers-reduced-motion: reduce) {
+  .cv-pop,
+  .cv-sheet,
+  .cv-te-body,
+  .cv-loop,
+  .cv-loop-line,
+  .cv-float {
+    animation: none;
+  }
+  .cv-eye::after {
+    animation: none;
+    opacity: 0;
+  }
+}

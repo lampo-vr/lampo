@@ -1,0 +1,14 @@
+Subject: “Nordlicht Studio” works again
+
+Your workspace works again
+
+Hi Mia,
+
+Whoever runs review.example.com lifted the suspension of “Nordlicht Studio”: everything works as before, its review links too.
+
+Open Lampo:
+https://review.example.com/
+
+--
+You get this because you work in the workspace “Nordlicht Studio” on review.example.com.
+Lampo · review.example.com

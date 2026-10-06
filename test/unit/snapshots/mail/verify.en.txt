@@ -1,0 +1,16 @@
+Subject: Confirm your email for Lampo
+
+Confirm your email address
+
+Hi Mia,
+
+One step left: confirm that mia.keller@example.com is yours, and your account on review.example.com is ready.
+
+Confirm my address:
+https://review.example.com/#/verify/vt_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+The link works once, for 24 hours. If you didn’t sign up, ignore this email: without the link, nothing happens.
+
+--
+You get this because this address was used to sign up on review.example.com.
+Lampo · review.example.com

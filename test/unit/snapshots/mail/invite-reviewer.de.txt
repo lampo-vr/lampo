@@ -1,0 +1,16 @@
+Subject: Eine Einladung zu Lampo auf review.example.com
+
+Du bist eingeladen
+
+Du bist eingeladen, auf review.example.com Videos zu prüfen: ansehen, Notizen auf exakte Frames setzen, Korrekturen prüfen und freigeben.
+
+Von einem Konto namens „Olivia Hart“.
+
+Einladung annehmen:
+https://review.example.com/#/invite/inv_CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+
+Name und Passwort wählst du selbst. Der Link funktioniert einmal, bis 2. Oktober 2026, 09:30 UTC.
+
+--
+Du bekommst diese E-Mail, weil diese Adresse auf review.example.com eingeladen wurde.
+Lampo · review.example.com

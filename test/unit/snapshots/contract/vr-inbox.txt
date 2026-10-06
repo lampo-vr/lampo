@@ -1,0 +1,14 @@
+[14:05:00] APPROVED v2: Looks good to us teaser.mp4 →fixture-edit by guest:Mia · video: /@uploads/Demo/Reels/teaser.mp4
+[14:03:00] NEW SHOULD [-] c_260bfe 00:00:08 f8 v2 teaser.mp4 →fixture-edit — "Can the music start a little later?" · marked: /home/alex/.video-review/data/__@uploads__Demo__Reels__teaser.mp4/c_260bfe_marked.png · video: /@uploads/Demo/Reels/teaser.mp4
+[12:11:45] REPLY c_1d55b9 00:00:12 teaser.mp4 →fixture-edit by alex — "Better. Checking it on the big screen next" · on: "Logo comes in too early, let it land on the beat" · video: /@uploads/Demo/Reels/teaser.mp4
+[12:10:00] VERIFIED c_0f9b87 00:00:18 teaser.mp4 →fixture-edit by alex · video: /@uploads/Demo/Reels/teaser.mp4
+[10:12:00] REQUEST teaser.mp4 →fixture-edit v1 from alex — "Please pre-review v2 before I watch it" · video: /@uploads/Demo/Reels/teaser.mp4
+[10:09:30] NEW SHOULD [text] c_0f9b87 00:00:18 f18 v1 teaser.mp4 →fixture-edit — "Typo in the lower third: "Teh"" · marked: /home/alex/.video-review/data/__@uploads__Demo__Reels__teaser.mp4/c_0f9b87_marked.png · video: /@uploads/Demo/Reels/teaser.mp4
+[10:08:05] NEW NICE [color] c_a5b4dc 00:00:20 f20 v1 teaser.mp4 →fixture-edit — "Warmer grade at the end?" · marked: /home/alex/.video-review/data/__@uploads__Demo__Reels__teaser.mp4/c_a5b4dc_marked.png · video: /@uploads/Demo/Reels/teaser.mp4
+[10:06:40] NEW SHOULD [-] c_b3d2f0 00:00:03 f3 (3-9) v1 teaser.mp4 →fixture-edit — "Hold the title a little longer" · marked: /home/alex/.video-review/data/__@uploads__Demo__Reels__teaser.mp4/c_b3d2f0_marked.png · video: /@uploads/Demo/Reels/teaser.mp4
+[10:05:12] NEW MUST [logo,timing] c_1d55b9 00:00:12 f12 v1 teaser.mp4 →fixture-edit — "Logo comes in too early, let it land on the beat" · marked: /home/alex/.video-review/data/__@uploads__Demo__Reels__teaser.mp4/c_1d55b9_marked.png · video: /@uploads/Demo/Reels/teaser.mp4
+[10:01:20] ASSIGNED teaser.mp4 →fixture-edit — assigned to Claude session fixture-edit · video: /@uploads/Demo/Reels/teaser.mp4
+[10:00:00] ADDED teaser.mp4 — uploaded (160×90, 25 fps) · video: /@uploads/Demo/Reels/teaser.mp4
+[09:55:00] CHANGES REQUESTED v1: Fix the audio pop first cutdown.mp4 by alex · video: /home/alex/work/demo/export/cutdown.mp4
+[09:50:30] NEW MUST [audio] c_6d58d9 00:00:15 f15 v1 cutdown.mp4 — "Audio pops at the cut" · marked: /home/alex/.video-review/data/__home__alex__work__demo__export__cutdown.mp4/c_6d58d9_marked.png · video: /home/alex/work/demo/export/cutdown.mp4
+[09:45:00] ADDED cutdown.mp4 — added to review (160×90, 25 fps) · video: /home/alex/work/demo/export/cutdown.mp4

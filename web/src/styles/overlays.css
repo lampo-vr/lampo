@@ -1,0 +1,398 @@
+/* ---------------------------------------------------------------- dialogs (ui Modal, Confirm) */
+
+/* The page behind a dialog dims and stays put: no blur, no desaturation — it is where the dialog came from. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--backdrop);
+  display: grid;
+  /* minmax(0, …): a dialog wider than the screen (width={880} on a tablet) is held by its max-width and stays centred */
+  grid-template-columns: minmax(0, 1fr);
+  place-items: center;
+  z-index: var(--z-dialog);
+  animation: fade var(--dur) var(--ease-out);
+}
+/* the drawer's own scrim stays under the drawer; dialogs opened from it come above both */
+.backdrop.drawer-backdrop {
+  z-index: var(--z-overlay);
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+/* A dialog: the float material, one gutter (--sp-dialog) for title, body and actions, and no bands — the head and the
+   actions are part of the sheet, a hairline only where the body can scroll away under the actions. */
+.modal {
+  --sp-dialog: var(--sp-6);
+  width: min(760px, calc(100vw - 32px));
+  /* a dialog asking for more (width={880}) still keeps its gutters on a tablet */
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+  background: var(--float-bg);
+  border: 1px solid var(--float-line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-float);
+  overflow: hidden;
+  animation: dialog-in var(--dur-slow) var(--ease-out);
+}
+/* it takes the focus itself when it opens (its title is read out); that is not a place to draw a ring around */
+.modal:focus {
+  outline: none;
+}
+@keyframes dialog-in {
+  from {
+    transform: translateY(8px) scale(0.97);
+    opacity: 0;
+  }
+}
+@keyframes pop {
+  from {
+    transform: translateY(8px) scale(0.97);
+    opacity: 0;
+  }
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-3) 0 var(--sp-dialog);
+}
+.modal-head h3 {
+  margin: 0;
+  font: var(--fw-strong) semi-condensed var(--fs-xl) / var(--lh-tight) var(--display);
+  letter-spacing: var(--track-title);
+}
+.modal-head .btn.icon-only {
+  color: var(--muted);
+}
+.modal-head .btn.icon-only:hover {
+  color: var(--fg);
+}
+.modal-body {
+  padding: var(--sp-4) var(--sp-dialog) var(--sp-dialog);
+  overflow: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-4);
+}
+/* A room to look at things in (Modal `fill`: the audition's clips): as tall as a dialog may be whatever it shows, so
+   what switches inside never resizes it; the content takes the body, gutters and scrolling included. */
+.modal.fill {
+  height: calc(100dvh - 64px);
+}
+.modal.fill > .modal-body {
+  flex: 1 1 0;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.modal-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-dialog);
+  border-top: 1px solid var(--line);
+}
+/* A dialog's primary action says how to reach it from anywhere in the dialog (ui Modal: ⌘↵). The key cap is drawn,
+   not written: the button's name stays its words. */
+/* the last primary in the actions: the one ⌘↵ presses */
+.modal-foot .btn:is(.primary, .danger-fill):not([data-keys], :disabled, :has(~ .btn:is(.primary, .danger-fill)))::after,
+.btn[data-keys]::after {
+  content: '⌘↵' / '';
+  margin-right: calc(-1 * var(--sp-1));
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-sm);
+  /* the key caps' face (base.css --keys): ⌘ and ↵ from the system face at their full size */
+  font: var(--fw-ui) var(--fs-xs) / var(--lh-ui) var(--keys);
+  letter-spacing: 0.04em;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  color: color-mix(in srgb, currentColor 82%, transparent);
+}
+.btn[data-keys]::after {
+  content: attr(data-keys) / '';
+}
+/* no keyboard, no key caps: nothing hovers, or the pointer is a finger (either one: mobile.css) */
+@media (hover: none), (pointer: coarse) {
+  .modal-foot .btn:is(.primary, .danger-fill)::after,
+  .btn[data-keys]::after {
+    display: none;
+  }
+}
+.steps {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  font: var(--fw-ui) var(--fs-xs) var(--ui);
+  color: var(--muted);
+}
+.steps .n {
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-full);
+  display: inline-grid;
+  place-items: center;
+  font-size: var(--fs-xs);
+  border: 1px solid var(--line-3);
+  color: var(--muted);
+}
+.steps .on {
+  color: var(--fg);
+}
+.steps .on .n {
+  background: var(--fg);
+  border-color: var(--fg);
+  color: var(--on-fg);
+}
+.label {
+  font: var(--fw-ui) var(--fs-xs) / var(--lh-tight) var(--ui);
+  color: var(--muted);
+}
+.browser {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--ink-2);
+}
+/* the folders renders were linked from lately, above the path: one click back to where exports land */
+.browser-recent {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-2);
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  white-space: nowrap;
+  font: var(--fw-ui) var(--fs-xs) var(--ui);
+}
+.browser-recent > .muted {
+  margin-right: var(--sp-1);
+}
+.browser-recent button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: var(--h-xs);
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--fg-2);
+  font: inherit;
+  cursor: pointer;
+}
+.browser-recent button:hover {
+  background: var(--ink-3);
+  color: var(--fg);
+}
+.browser-recent button.on {
+  background: var(--raise-sheen), var(--ink-3);
+  box-shadow: var(--raise);
+  color: var(--fg);
+}
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-0_5);
+  padding: var(--sp-2) var(--sp-2);
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  white-space: nowrap;
+  font: var(--fw-ui) var(--fs-xs) var(--ui);
+  font-stretch: 87.5%;
+}
+.crumbs button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: var(--sp-0_5) var(--sp-1);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+.crumbs button:hover {
+  background: var(--ink-3);
+  color: var(--fg);
+}
+.crumbs .sep {
+  color: var(--line-3);
+}
+.entries {
+  height: 300px;
+  overflow: auto;
+  padding: var(--sp-1);
+}
+.entry {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r);
+  cursor: pointer;
+  color: var(--fg-2);
+}
+.entry:hover {
+  background: var(--ink-3);
+  color: var(--fg);
+}
+.entry.sel {
+  background: var(--fg);
+  color: var(--on-fg);
+}
+.entry.sel .icon,
+.entry.sel .faint,
+.entry.sel .muted {
+  color: var(--on-fg-3) !important;
+}
+.entry .icon {
+  color: var(--faint);
+}
+.entry.video .icon {
+  color: var(--fg-2);
+}
+.sessions {
+  display: grid;
+  gap: var(--sp-1);
+}
+.session {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  text-align: left;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--ink-1);
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.session:hover {
+  border-color: var(--line-3);
+}
+.session.sel {
+  border-color: color-mix(in srgb, var(--claude) 70%, transparent);
+  background: linear-gradient(90deg, var(--claude-bg), transparent 70%), var(--ink-1);
+}
+.session .radio {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--r-full);
+  border: 1.5px solid var(--line-3);
+  display: grid;
+  place-items: center;
+}
+.session.sel .radio {
+  border-color: var(--claude);
+}
+.session.sel .radio::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-full);
+  background: var(--claude);
+}
+/* minmax(0, …) and min-width: 0 all the way down, or a long session name widens the column and runs under the status */
+.session-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-0_5);
+  min-width: 0;
+}
+.session-title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.session-title .badge {
+  flex: none;
+}
+.session-name {
+  font: var(--fw-strong) var(--fs-sm) var(--ui);
+  font-stretch: 87.5%;
+  min-width: 0;
+}
+.session-kind {
+  white-space: nowrap;
+  text-align: right;
+}
+.session-sub {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+/* ---------------------------------------------------------------- popovers and menus: the same material, smaller */
+
+.popover {
+  position: absolute;
+  z-index: var(--z-menu);
+  min-width: min(400px, calc(100vw - 16px));
+  max-width: min(460px, calc(100vw - 16px));
+  max-height: calc(100vh - 80px);
+  overflow: auto;
+  background: var(--float-bg);
+  border: 1px solid var(--float-line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-float);
+  padding: var(--sp-3);
+  display: grid;
+  gap: var(--sp-2);
+}
+/* On what floats, a ghost button's hover is the float's selection: its usual --ink-3 is the float's own background. */
+:is(.popover, .modal, .menu, .panel-floating) .btn.ghost:hover {
+  background: var(--float-sel);
+}
+/* Menus: rows at the control height, the icon in a quiet colour, the shortcut as faint type on the right. */
+.menu {
+  position: absolute;
+  z-index: var(--z-menu);
+  min-width: 200px;
+  background: var(--float-bg);
+  border: 1px solid var(--float-line);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-float);
+  padding: var(--sp-1);
+}
+.menu button {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  min-height: var(--h);
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  color: var(--fg-2);
+  font: var(--fw-ui) var(--fs-md) / var(--lh-ui) var(--ui);
+}
+.menu button:hover {
+  background: var(--float-sel);
+  color: var(--fg);
+}
+.menu button.danger {
+  color: var(--must);
+}
+
+/* the folder browser while a folder loads */
+.entries-sk {
+  display: grid;
+  gap: var(--sp-1);
+}
+.entries-sk-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: 30px;
+  padding: 0 var(--sp-2);
+}

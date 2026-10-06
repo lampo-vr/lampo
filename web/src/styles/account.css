@@ -1,0 +1,27 @@
+/* ---------------------------------------------------------------- the account chip in the top bar */
+
+.user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: var(--h);
+  padding: 0 var(--sp-1);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-2);
+  background: var(--ink-2);
+  color: var(--fg-2);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+.user-chip:hover,
+.user-chip[data-state='open'] {
+  background: var(--ink-3);
+  border-color: var(--line-3);
+  color: var(--fg);
+}
+.user-chip:disabled {
+  cursor: default;
+}

@@ -1,0 +1,13 @@
+Subject: Your Lampo email address was changed
+
+Your email address was changed
+
+Hi Mia,
+
+Your account on review.example.com now signs in with mia@studio.example instead of this address. Notices like this one go there from now on.
+
+If you didn’t make this change, tell whoever runs review.example.com right away.
+
+--
+You get this because you have an account on review.example.com.
+Lampo · review.example.com

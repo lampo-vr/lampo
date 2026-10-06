@@ -1,0 +1,464 @@
+/* ---------------------------------------------------------------- Get started's card (onboarding/GetStarted.tsx)
+   The card's shell and the room it keeps while its code arrives (.ob-pending): the first paint draws both, so the card
+   lands in a room of its own size. What is inside its panes comes with its code (getstarted.css, lighttable.css).
+
+   Its height is set, not found: a head, then the pane every step's pane fits by design (--gs-pane, per width) — all
+   of them stand in one cell, so a step that needs more makes the cell taller for every step, never one alone — and the
+   machine's foot. test/e2e/onboarding.mjs checks the card against its room and that no step moves anything. */
+.ob-gs {
+  --gs-head: 56px;
+  --gs-pane: 288px;
+  --gs-foot: 72px;
+  position: relative;
+  margin: var(--sp-4) 0 var(--sp-8);
+  border-radius: var(--r-lg);
+  background: radial-gradient(ellipse 70% 120% at 85% 0%, var(--gs-a), transparent), var(--gs-b);
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    var(--shadow-hair);
+  overflow: hidden;
+}
+.ob-gs-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: var(--gs-head);
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-6);
+}
+.ob-gs-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: 0;
+  font: var(--fw-strong) var(--fs-xl) / 1.2 var(--display);
+  font-stretch: 87.5%;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.ob-gs-title small {
+  font: var(--fw-ui) var(--fs-sm) / 1 var(--ui);
+  font-stretch: 100%;
+  letter-spacing: 0;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.ob-gs-head .ob-track {
+  margin-left: var(--sp-2);
+}
+.ob-gs-head .ob-grow {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.ob-gs-next {
+  display: none;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.ob-gs-next b {
+  font-weight: var(--fw-ui);
+  color: var(--fg-2);
+}
+.ob-gs.ob-fold .ob-gs-next {
+  display: block;
+}
+.ob-gs-body {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: var(--sp-2);
+  padding: 0 var(--sp-2) var(--sp-2);
+}
+.ob-gs.ob-fold .ob-gs-body {
+  display: none;
+}
+/* the steps: a quiet list, the selected one a flat fill (never raised, never ringed by a pointer) */
+.ob-gs-list {
+  display: grid;
+  align-content: start;
+  gap: var(--sp-0_5);
+  margin: 0;
+  padding: var(--sp-1) 0 var(--sp-2) var(--sp-2);
+  list-style: none;
+}
+.ob-gs-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  min-height: var(--h-lg);
+  padding: 0 var(--sp-3) 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--fg-2);
+  font: var(--fw-ui) var(--fs-md) / var(--lh-ui) var(--ui);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast),
+    color var(--dur-fast);
+}
+.ob-gs-row:hover {
+  background: var(--sel);
+}
+.ob-gs-row[aria-current='step'] {
+  background: var(--sel-on);
+  color: var(--fg);
+}
+/* a ring only for moving through the steps by keys (GetStarted.tsx useKeysMoved): the app's soft ring, not an outline */
+.ob-gs-row:focus-visible {
+  outline: none;
+}
+.ob-gs-list[data-keys] .ob-gs-row:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+.ob-gs-row .kg {
+  --kg-size: 12px;
+  justify-self: center;
+  color: var(--line-4);
+}
+.ob-gs-row.ob-done .kg {
+  color: var(--fg-2);
+}
+.ob-gs-row.ob-done {
+  color: var(--muted);
+}
+.ob-gs-row[aria-current='step'].ob-done {
+  color: var(--fg-2);
+}
+.ob-gs-row .ob-when {
+  font-size: var(--fs-xs);
+  color: var(--faint);
+  white-space: nowrap;
+}
+.ob-gs-row.ob-ticked .kg {
+  animation: ob-kg-pop 620ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  color: var(--ok);
+}
+/* the pane: every step's in one cell (.ob-gs-slot), the selected one shown */
+.ob-gs-pane {
+  position: relative;
+  display: grid;
+  min-height: var(--gs-pane);
+  padding: var(--sp-6);
+  border-radius: var(--r);
+  background: var(--ink-1);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.ob-gs-slot {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+.ob-gs-slot:not(.ob-on) {
+  visibility: hidden;
+}
+.ob-gs-slot.ob-in {
+  animation: ob-col-next var(--dur-page-in) var(--ease-out);
+}
+/* everything done: "You're set" over the same card (it keeps its size), a light passes once along the track, then
+   it folds away (GetStarted.tsx foldAway) */
+.ob-gs-set {
+  display: none;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-2);
+}
+.ob-gs.ob-all .ob-gs-set {
+  display: block;
+  animation: ob-col-next var(--dur-slow) var(--ease-out);
+}
+.ob-gs.ob-all .ob-track::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 40px;
+  height: 18px;
+  margin-top: calc(-1 * calc(var(--sp-2) + 1px));
+  background: radial-gradient(closest-side, var(--brand-glow), transparent);
+  animation: ob-sweep 1100ms var(--ease-in-out) forwards;
+  pointer-events: none;
+}
+/* the machine's foot: later, the way to a server */
+.ob-gs-later {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: calc(var(--gs-foot) - var(--sp-2));
+  margin: 0 var(--sp-2) var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.ob-gs-later .icon {
+  width: 16px;
+  height: 16px;
+}
+.ob-gs-later b {
+  font-weight: var(--fw-ui);
+  color: var(--fg-2);
+}
+.ob-gs-later code {
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  font-stretch: 87.5%;
+  padding: 1px var(--sp-1);
+  border-radius: var(--r-sm);
+  background: var(--sel);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+.ob-gs.ob-fold .ob-gs-later {
+  display: none;
+}
+.ob-ibtn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--h);
+  height: var(--h);
+  padding: 0;
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.ob-ibtn:hover {
+  background: var(--sel);
+  color: var(--fg);
+}
+.ob-ibtn .ob-flip {
+  transform: rotate(180deg);
+}
+/* the plan picked on the website, while the workspace pays nothing yet */
+.ob-gs-plan {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-left: auto;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.ob-gs-plan:hover {
+  color: var(--fg);
+}
+.ob-gs-plan .kg {
+  --kg-size: 9px;
+}
+
+/* the room while the card's code arrives: the card's height, from the same variables */
+.ob-gs.ob-pending {
+  height: calc(var(--gs-head) + var(--gs-pane) + var(--sp-2));
+}
+.ob-gs.ob-pending.ob-foot {
+  height: calc(var(--gs-head) + var(--gs-pane) + var(--sp-2) + var(--gs-foot));
+}
+.ob-gs.ob-pending.ob-fold {
+  height: var(--gs-head);
+}
+
+/* the pane's room by width, measured on every step and state in English and German (test/e2e/onboarding.mjs keeps
+   the card in it): a wide card has the step's picture beside the words, a narrower one gives the words the pane. An
+   agent picked and not connected yet (.ob-tall) has its connect form in its pane: the room for that. */
+@container lib (min-width: 1400px) {
+  .ob-gs {
+    --gs-pane: 264px;
+    --gs-foot: 56px;
+    /* the step's picture grows with a wide card (within the pane's room): the words and the picture one composition */
+    --gs-pic: 296px;
+  }
+  .ob-gs.ob-tall {
+    --gs-pane: 312px;
+  }
+}
+@container lib (min-width: 2000px) {
+  .ob-gs {
+    --gs-pic: 320px;
+  }
+}
+@container lib (min-width: 960px) and (max-width: 1399px) {
+  .ob-gs {
+    --gs-pane: 280px;
+  }
+  .ob-gs.ob-tall {
+    --gs-pane: 328px;
+  }
+}
+@container lib (min-width: 581px) and (max-width: 959px) {
+  .ob-gs {
+    --gs-pane: 264px;
+  }
+  .ob-gs.ob-tall {
+    --gs-pane: 328px;
+  }
+}
+
+/* a phone: the head over two lines, the steps as an accordion, the selected one's pane open under it — every pane in
+   one cell again, so the card keeps its height from step to step */
+@container lib (max-width: 580px) {
+  .ob-gs {
+    --gs-head: 92px;
+    --gs-row: var(--h-lg);
+    --gs-acc: 232px;
+    --gs-foot: 128px;
+    margin-bottom: var(--sp-6);
+  }
+  .ob-gs-head {
+    flex-wrap: wrap;
+    align-content: center;
+    padding: var(--sp-3) var(--sp-2) var(--sp-2) var(--sp-4);
+    row-gap: var(--sp-1);
+  }
+  /* the title takes the line's room: fold and × stand at the card's right edge, as on a desk */
+  .ob-gs-title {
+    flex: 1;
+    min-width: 0;
+  }
+  .ob-gs-head .ob-track {
+    order: 5;
+    flex-basis: 100%;
+    margin: 0;
+  }
+  .ob-gs.ob-fold .ob-gs-next {
+    order: 6;
+    flex-basis: 100%;
+  }
+  .ob-gs-head .ob-grow {
+    order: 7;
+    flex-basis: 100%;
+  }
+  .ob-gs-head .ob-grow:empty {
+    display: none;
+  }
+  .ob-gs-head .ob-gs-plan {
+    margin-left: 0;
+  }
+  .ob-gs-body {
+    display: block;
+    padding: 0 var(--sp-2) var(--sp-2);
+  }
+  .ob-gs-list {
+    padding: 0;
+  }
+  .ob-gs-pane {
+    display: none;
+  }
+  .ob-gs-acc {
+    display: grid;
+    min-height: var(--gs-acc);
+    margin: var(--sp-0_5) 0 var(--sp-2);
+    padding: var(--sp-4);
+    border-radius: var(--r);
+    background: var(--ink-1);
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+  /* the head, the rows and the gaps between them, the open pane with its margins, the body's foot */
+  .ob-gs.ob-pending {
+    height: calc(var(--gs-head) + var(--gs-n, 5) * var(--gs-row) + var(--gs-n, 5) * var(--sp-0_5) + var(--gs-acc) + var(--sp-2) * 2);
+  }
+  .ob-gs.ob-pending.ob-foot {
+    height: calc(var(--gs-head) + var(--gs-n, 5) * var(--gs-row) + var(--gs-n, 5) * var(--sp-0_5) + var(--gs-acc) + var(--sp-2) * 2 + var(--gs-foot));
+  }
+  .ob-gs.ob-tall {
+    --gs-acc: 368px;
+  }
+  .ob-gs-later {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .ob-gs-later .ob-copy {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+@container lib (min-width: 581px) {
+  .ob-gs-acc {
+    display: none;
+  }
+}
+
+@keyframes ob-col-next {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+@keyframes ob-kg-pop {
+  0% {
+    transform: scale(0.4) rotate(-45deg);
+  }
+  60% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes ob-sweep {
+  from {
+    left: -20px;
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  to {
+    left: 100%;
+    opacity: 0;
+  }
+}
+
+/* still under reduced motion: nothing moves but a spinner */
+@media (prefers-reduced-motion: reduce) {
+  .ob-gs *:not(.ob-spin),
+  .ob-gs ::before,
+  .ob-gs ::after {
+    transition: none !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0s !important;
+  }
+}
+/* what is hidden stays hidden, whatever display a class gives it */
+.ob-gs [hidden] {
+  display: none !important;
+}
+
+/* a finger needs 44 × 44 px: the rows are that tall on touch; the compact buttons keep their look and get an invisible
+   tap area around them instead (test/e2e/quality.mjs measures it) */
+@media (hover: none) and (pointer: coarse) {
+  .ob-gs {
+    --gs-row: var(--h-touch);
+  }
+  .ob-gs-row {
+    min-height: var(--h-touch);
+  }
+  .ob-gs .ob-btn,
+  .ob-gs .ob-copy,
+  .ob-gs .ob-lk {
+    position: relative;
+  }
+  .ob-gs .ob-ibtn::after,
+  .ob-gs .ob-btn::after,
+  .ob-gs .ob-copy::after,
+  .ob-gs .ob-lk::after {
+    content: '';
+    position: absolute;
+    inset: min(0px, calc(50% - 22px));
+  }
+}

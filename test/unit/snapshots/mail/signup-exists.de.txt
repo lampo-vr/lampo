@@ -1,0 +1,15 @@
+Subject: Du hast schon ein Konto bei Lampo
+
+Du hast schon ein Konto
+
+Jemand, hoffentlich du, wollte auf review.example.com mit dieser Adresse ein Konto anlegen. Es gibt schon eines dafür, also wurde nichts Neues angelegt.
+
+Anmelden:
+https://review.example.com/
+
+Passwort vergessen? Wähle ein neues:
+https://review.example.com/#/forgot
+
+--
+Du bekommst diese E-Mail, weil mit dieser Adresse ein Konto auf review.example.com angelegt wurde.
+Lampo · review.example.com

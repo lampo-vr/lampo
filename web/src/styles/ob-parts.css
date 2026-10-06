@@ -1,0 +1,866 @@
+.kg.ob-t-ok {
+  color: var(--ok);
+}
+.kg.ob-t-must {
+  color: var(--must);
+}
+.kg.ob-t-should {
+  color: var(--should);
+}
+.kg.ob-t-idea {
+  color: var(--idea);
+}
+.kg.ob-t-ask {
+  color: var(--claude);
+}
+.ob-lede {
+  color: var(--muted);
+  font-size: var(--fs-lg);
+  line-height: var(--lh-body);
+  text-wrap: pretty;
+}
+.ob-lede b {
+  font-weight: var(--fw-ui);
+  color: var(--fg-2);
+}
+.ob-fine {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.ob-fine code,
+.ob-lede code {
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  font-stretch: 87.5%;
+  padding: 1px var(--sp-1);
+  border-radius: var(--r-sm);
+  background: var(--sel);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+.ob-btn {
+  position: relative;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  height: var(--h);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  background: var(--ink-3);
+  color: var(--fg);
+  font: var(--fw-ui) var(--fs-md) / 1 var(--ui);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast),
+    border-color var(--dur-fast),
+    box-shadow var(--dur) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+.ob-btn:hover:not(:disabled) {
+  background: var(--ink-4);
+  border-color: var(--line-3);
+}
+.ob-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.ob-btn .icon {
+  width: 15px;
+  height: 15px;
+}
+.ob-btn.ob-sm {
+  height: var(--h-sm);
+  padding: 0 var(--sp-2);
+  font-size: var(--fs-sm);
+}
+.ob-btn.ob-lg {
+  height: var(--h-lg);
+  padding: 0 var(--sp-4);
+}
+.ob-btn.ob-block {
+  display: flex;
+  width: 100%;
+}
+.ob-btn.ob-raised {
+  background: var(--raise-sheen), var(--ink-3);
+  box-shadow: var(--raise);
+  border-color: var(--line-2);
+}
+.ob-btn.ob-raised:hover:not(:disabled) {
+  background: var(--raise-sheen), var(--ink-4);
+}
+.ob-btn.ob-raised:disabled {
+  background: var(--ink-2);
+  box-shadow: none;
+}
+.ob-btn.ob-go {
+  border-color: var(--brand-deep);
+  background: var(--raise-sheen), var(--brand-deep);
+  color: var(--on-brand);
+  font-weight: var(--fw-strong);
+  box-shadow: var(--raise);
+}
+.ob-btn.ob-go:hover:not(:disabled) {
+  background: var(--raise-sheen), var(--brand-deep);
+  border-color: var(--brand-deep);
+  box-shadow: var(--raise-edge), var(--shadow-brand);
+}
+.ob-btn.ob-go:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+.ob-btn.ob-go .ob-chev {
+  width: 15px;
+  height: 15px;
+  margin-right: calc(-1 * var(--sp-1));
+}
+.ob-btn.ob-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+.ob-btn.ob-ghost:hover:not(:disabled) {
+  background: var(--sel);
+  border-color: transparent;
+  color: var(--fg);
+}
+.ob-btn.ob-okay {
+  color: var(--ok);
+}
+.ob-btn:disabled {
+  cursor: default;
+  color: var(--muted);
+}
+/* the primary is disabled only while what it started runs (invites sending, videos linking): it keeps its label */
+.ob-btn.ob-go:disabled {
+  color: var(--on-brand);
+  cursor: progress;
+}
+.ob-btn .ob-k {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  font: var(--fw-ui) var(--fs-xs) / 1 var(--ui);
+  font-size: calc(var(--fs-xs) - 1px);
+}
+.ob-lk {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: var(--fw-ui) var(--fs-md) / var(--lh-ui) var(--ui);
+  cursor: pointer;
+  text-decoration: none;
+}
+.ob-lk:hover {
+  color: var(--fg);
+}
+.ob-lk .icon {
+  width: 14px;
+  height: 14px;
+}
+.ob-lk.ob-u {
+  text-decoration: underline;
+  text-decoration-color: var(--line-3);
+  text-underline-offset: 2px;
+}
+.ob-spin {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: var(--r-full);
+  border: 2px solid color-mix(in srgb, currentColor 28%, transparent);
+  border-top-color: currentColor;
+  animation: ob-spin 0.8s linear infinite;
+}
+.ob-av {
+  --av: 28px;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: var(--av);
+  height: var(--av);
+  border-radius: var(--r-full);
+  background: var(--ink-5);
+  color: var(--fg-2);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 8%, transparent);
+  font: var(--fw-strong) calc(var(--av) * 0.38) / 1 var(--ui);
+  letter-spacing: 0.01em;
+  user-select: none;
+}
+.ob-cmd {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  min-height: var(--h-lg);
+  padding: 0 var(--sp-1) 0 var(--sp-3);
+  border-radius: var(--r);
+  background: var(--sel);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.ob-cmd code,
+.ob-cmd pre {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  font: var(--fw-ui) var(--fs-xs) / 1.7 var(--mono);
+  font-stretch: 87.5%;
+  color: var(--fg-2);
+  scrollbar-width: none;
+}
+.ob-cmd pre {
+  white-space: pre;
+  padding: var(--sp-2) 0;
+}
+.ob-cmd.ob-multi {
+  align-items: flex-start;
+}
+.ob-cmd.ob-multi .ob-copy {
+  margin-top: calc(var(--sp-1) + var(--sp-0_5));
+}
+.ob-cmd code::-webkit-scrollbar,
+.ob-cmd pre::-webkit-scrollbar {
+  display: none;
+}
+.ob-cmd .ob-p {
+  color: var(--faint);
+  user-select: none;
+}
+.ob-cmd b {
+  font-weight: var(--fw-ui);
+  color: var(--fg);
+}
+.ob-copy {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: 30px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  background: var(--ink-3);
+  color: var(--fg-2);
+  font: var(--fw-ui) var(--fs-sm) / 1 var(--ui);
+  cursor: pointer;
+}
+.ob-copy:hover {
+  color: var(--fg);
+  border-color: var(--line-3);
+}
+.ob-copy .icon {
+  width: 13px;
+  height: 13px;
+}
+.ob-copy.ob-done {
+  color: var(--ok);
+}
+.ob-live {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--sp-0_5) var(--sp-3);
+  padding: var(--sp-3);
+  border-radius: var(--r);
+  background: var(--ink-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.ob-live .kg {
+  --kg-size: 14px;
+  grid-row: span 2;
+  color: var(--muted);
+}
+.ob-live b {
+  font-weight: var(--fw-ui);
+  color: var(--fg);
+}
+.ob-live-sub {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.ob-live-lane {
+  grid-column: 1 / -1;
+  position: relative;
+  height: 2px;
+  margin-top: var(--sp-2);
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+.ob-live-lane::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 30%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--fg-2), transparent);
+  animation: ob-listen 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+.ob-live[data-state='waiting'] .kg {
+  animation: ob-breathe 1.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+.ob-live[data-state='connected'] {
+  background: var(--ok-bg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 32%, transparent);
+}
+.ob-live[data-state='connected'] .kg {
+  color: var(--ok);
+}
+.ob-live[data-state='connected'] .ob-live-lane {
+  background: color-mix(in srgb, var(--ok) 40%, transparent);
+}
+.ob-live[data-state='connected'] .ob-live-lane::after {
+  display: none;
+}
+.ob-track {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  height: 28px;
+  padding: 0 var(--sp-1);
+}
+.ob-track-i {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  color: var(--line-4);
+}
+.ob-track-i .kg {
+  --kg-size: 11px;
+}
+.ob-track-i.ob-done {
+  color: var(--fg-2);
+}
+.ob-track-i.ob-now {
+  color: var(--brand);
+}
+.ob-track-i.ob-now::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--brand-haze), transparent);
+}
+.ob-track-seg {
+  width: 26px;
+  height: 1.5px;
+  border-radius: 1px;
+  background: var(--line-2);
+}
+.ob-track-seg.ob-done {
+  background: var(--fg-2);
+}
+.ob-said {
+  position: relative;
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.ob-said > .kg {
+  --kg-size: 9px;
+  position: absolute;
+  left: -19px;
+  top: calc(0.5lh - 5px);
+  color: var(--fg-2);
+}
+.ob-said-1 {
+  display: block;
+  color: var(--fg-2);
+}
+.ob-said-1 b {
+  font-weight: var(--fw-ui);
+  color: var(--fg);
+}
+.ob-said-2 {
+  display: block;
+  margin-top: var(--sp-0_5);
+  color: var(--muted);
+}
+.ob-said.ob-on {
+  animation: ob-col-next var(--dur-slow) var(--ease-out);
+}
+.ob-connect .ob-said {
+  padding-left: calc(var(--sp-4) + var(--sp-0_5) + 1px);
+}
+.ob-connect .ob-said > .kg {
+  left: 0;
+}
+.ob-block {
+  display: grid;
+  gap: var(--sp-2);
+}
+.ob-block-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-ui);
+  color: var(--fg-2);
+}
+.ob-token {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border-radius: var(--r);
+  background: var(--should-bg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--should) 30%, transparent);
+  animation: ob-col-next var(--dur-slow) var(--ease-out);
+}
+.ob-token .ob-fine {
+  color: var(--fg-2);
+}
+@container (max-width: 820px) {
+  .ob-lede {
+    font-size: var(--fs-md);
+  }
+}
+
+.ob-lk.ob-u {
+  font: inherit;
+  color: var(--fg-2);
+}
+.ob-lk.ob-u:hover {
+  color: var(--fg);
+  text-decoration-color: currentColor;
+}
+.ob-reveal {
+  min-width: 0;
+}
+.ob-connect {
+  display: grid;
+  gap: var(--sp-3);
+  min-width: 0;
+  padding: var(--sp-4);
+  border-radius: var(--r-lg);
+  background: var(--ink-2);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.ob-connect.ob-none {
+  padding: var(--sp-3) var(--sp-4);
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.ob-connect-h {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.ob-connect-h .ob-mk {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r);
+  background: var(--ink-1);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  color: var(--fg);
+}
+.ob-connect-h b {
+  display: block;
+  font-weight: var(--fw-strong);
+  font-size: var(--fs-lg);
+  line-height: 1.25;
+}
+.ob-connect-h small {
+  display: block;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.ob-connect > .ob-btn.ob-raised {
+  justify-self: start;
+}
+.ob-connect .ob-live {
+  background: var(--ink-1);
+}
+.ob-connect .ob-live[data-state='connected'] {
+  background: var(--ok-bg);
+}
+.ob-connect .ob-fine {
+  margin: 0;
+}
+.ob-steps {
+  display: grid;
+  gap: calc(var(--sp-1) + var(--sp-0_5));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: st;
+}
+.ob-steps li {
+  counter-increment: st;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: var(--sp-2);
+  font-size: var(--fs-md);
+  line-height: 1.45;
+  color: var(--fg-2);
+}
+.ob-steps li::before {
+  content: counter(st);
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--ink-4);
+  color: var(--fg-2);
+  font: var(--fw-strong) var(--fs-xs) / 1 var(--ui);
+}
+.ob-live.ob-compact {
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: var(--sp-0_5) var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+}
+.ob-live.ob-compact .kg {
+  grid-row: auto;
+  --kg-size: 12px;
+}
+.ob-live.ob-compact .ob-live-sub {
+  min-width: 0;
+}
+.ob-live.ob-compact .ob-live-lane {
+  margin-top: calc(var(--sp-1) + var(--sp-0_5));
+}
+@container (max-width: 480px) {
+  .ob-live.ob-compact {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .ob-live.ob-compact .ob-live-sub {
+    grid-column: 2;
+  }
+}
+.ob-live,
+.ob-live.ob-compact {
+  grid-template-columns: auto minmax(0, max-content) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--sp-0_5) var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+}
+.ob-live .kg,
+.ob-live.ob-compact .kg {
+  grid-row: auto;
+  --kg-size: 12px;
+}
+.ob-live b {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ob-live .ob-live-sub {
+  justify-self: end;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
+.ob-live-lane {
+  display: none;
+}
+@container (max-width: 560px) {
+  .ob-live,
+  .ob-live.ob-compact {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .ob-live .ob-live-sub,
+  .ob-live.ob-compact .ob-live-sub {
+    grid-column: 2;
+    justify-self: start;
+    text-align: left;
+    white-space: normal;
+  }
+}
+.ob-cmd,
+.ob-cmd.ob-multi {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--sp-2);
+  min-height: 0;
+  padding: calc(var(--sp-1) + 1px) calc(var(--sp-1) + 1px) calc(var(--sp-1) + 1px) var(--sp-3);
+}
+.ob-cmd code,
+.ob-cmd pre {
+  padding: calc(var(--sp-1) + var(--sp-0_5)) 0;
+  overflow: visible;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.65;
+}
+.ob-cmd .ob-copy,
+.ob-cmd.ob-multi .ob-copy {
+  margin-top: 0;
+  align-self: start;
+}
+.ob-cmd pre {
+  white-space: pre;
+  overflow-x: auto;
+  overflow-wrap: normal;
+  scrollbar-width: none;
+}
+.ob-cmd.ob-more pre {
+  -webkit-mask: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+  mask: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+}
+.ob-cmd code,
+.ob-gs-text .ob-cmd code,
+.ob-fine .ob-cmd code {
+  padding: calc(var(--sp-1) + var(--sp-0_5)) 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ob-gs-text .ob-connect {
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+.ob-cmd code {
+  word-break: normal;
+}
+@keyframes ob-breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes ob-col-next {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+@keyframes ob-listen {
+  from {
+    left: -30%;
+  }
+  to {
+    left: 100%;
+  }
+}
+@keyframes ob-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* a command's words: a run of non-spaces moves to the next line whole, and breaks inside only when it alone is wider
+   than the box (a token, a URL or a path never breaks after its - or / otherwise) */
+.ob-w {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.kg.ob-t-warn {
+  color: var(--should);
+}
+.ob-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.ob-fg2 {
+  color: var(--fg-2);
+}
+
+/* a calm list of checks (the server's health check, Get started's files) */
+.ob-checks {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-radius: var(--r-lg);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  background: var(--ink-2);
+  overflow: hidden;
+}
+.ob-check {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--sp-0_5) var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-top: 1px solid var(--line);
+}
+.ob-check:first-child {
+  border-top: 0;
+}
+.ob-check-g {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r);
+  background: var(--ink-1);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--muted);
+}
+.ob-check-g .icon {
+  width: 15px;
+  height: 15px;
+}
+.ob-check b {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-weight: var(--fw-ui);
+  color: var(--fg);
+}
+.ob-check-r {
+  grid-column: 2;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.ob-check-r code {
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  font-stretch: 87.5%;
+  color: var(--fg-2);
+  /* a long data path or bucket name breaks anywhere rather than run out of the row */
+  overflow-wrap: anywhere;
+}
+.ob-check-s {
+  grid-row: 1;
+  grid-column: 3;
+  display: inline-grid;
+  justify-items: end;
+  align-items: center;
+  height: 22px;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-ui);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ob-check-s .kg {
+  --kg-size: 11px;
+}
+/* a check's labels and its line under the name stand in one cell each, the current one shown: the pill keeps the
+   widest label's width and the row the room of what the check will say, while it runs (Health.tsx) */
+.ob-check-s > *,
+.ob-check-r > * {
+  grid-area: 1 / 1;
+}
+.ob-check-s > * {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--sp-1) + var(--sp-0_5));
+}
+.ob-check-r {
+  display: grid;
+}
+.ob-check .ob-held {
+  visibility: hidden;
+}
+/* before the server's first answer: two lines' room under each name (what most checks say) */
+.ob-checks.ob-asking .ob-check-r {
+  min-height: calc(2 * var(--fs-sm) * var(--lh-body));
+}
+.ob-check[data-s='ok'] .ob-check-s {
+  color: var(--ok);
+}
+.ob-check[data-s='warn'] .ob-check-s {
+  color: var(--should);
+}
+.ob-check[data-s='ok'] .ob-check-s .kg,
+.ob-check[data-s='warn'] .ob-check-s .kg {
+  animation: ob-kg-pop 520ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.ob-check-bar {
+  grid-column: 2 / -1;
+  height: 3px;
+  margin-top: var(--sp-2);
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+.ob-check-bar i {
+  display: block;
+  height: 100%;
+  width: var(--p, 0%);
+  border-radius: 2px;
+  background: var(--fg-2);
+  transition: width 400ms var(--ease-out);
+}
+/* On a phone the column meets the screen's gutter: the sign sits inside the column instead of hanging in the gutter. */
+@container ob (max-width: 480px) {
+  .ob-said {
+    padding-left: calc(var(--sp-4) + var(--sp-0_5) + 1px);
+  }
+  .ob-said > .kg {
+    left: 0;
+  }
+}
+
+/* what is in the sample, as keyframes (Get started's sample step and the setup's last step) */
+.ob-smp-keys {
+  display: grid;
+  gap: calc(var(--sp-1) + var(--sp-0_5));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.ob-smp-keys li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.ob-smp-keys .kg {
+  --kg-size: 10px;
+}
+
+/* the connect block's last row: its other ways (a token, Cursor's own link) and what the place around it adds */
+.ob-connect-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-4);
+}
+
+/* labels that take turns in one place: all in one cell, the current one shown, the box as wide as the widest */
+.ob-sizer {
+  display: inline-grid;
+}
+.ob-sizer > * {
+  grid-area: 1 / 1;
+}
+.ob-sizer > .ob-held {
+  visibility: hidden;
+}
+.ob-sizer > .ob-strong {
+  font-weight: var(--fw-strong);
+}
+.ob-btn.ob-raised .ob-chev {
+  width: 15px;
+  height: 15px;
+  margin-right: calc(-1 * var(--sp-1));
+}
+/* the room of what is still on its way (the same words, unseen) */
+.ob-said.ob-room {
+  visibility: hidden;
+}

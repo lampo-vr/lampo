@@ -1,0 +1,105 @@
+/* ---------------------------------------------------------------- setup, sign-in, invite, app consent (server mode)
+   The page, the film and the column are the product's one entrance (ui/Entrance.tsx, entrance.css), the fields and the
+   way in a review link's gate's (ui/EntryForm.tsx, entry-form.css). Here: what only the owner's screens hold — the lists
+   under a sentence, an app's request, the shape of a screen still loading. */
+
+/* what confirming joins, or what a new password leaves behind: a sentence and its list */
+.auth-list {
+  margin: 0;
+  padding-left: var(--sp-6);
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+  color: var(--muted);
+}
+div.auth-list {
+  padding-left: 0;
+}
+.auth-list > p,
+.auth-list > ul {
+  margin: 0;
+}
+.auth-list > ul {
+  margin-top: var(--sp-1);
+  padding-left: var(--sp-6);
+}
+
+/* An app asking to connect (OAuth consent): who asks, where the answer goes, what it may do. */
+.consent-facts,
+.consent-scopes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-2);
+}
+.consent-facts li {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: var(--sp-2);
+  align-items: start;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--muted);
+  /* a fact's last line keeps more than one word ("90 / days." stood alone at 1440) */
+  text-wrap: pretty;
+}
+.consent-facts li svg {
+  margin-top: var(--sp-0_5);
+  color: var(--ok);
+}
+.consent-facts li.warn,
+.consent-facts li.warn svg {
+  color: var(--should);
+}
+.consent-facts code {
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  font-stretch: 87.5%;
+  padding: 1px var(--sp-1);
+  border-radius: var(--r-sm);
+  background: var(--sel);
+  color: var(--fg-2);
+  overflow-wrap: anywhere;
+}
+.consent-facts b {
+  font-weight: var(--fw-ui);
+  color: var(--fg-2);
+}
+.consent-scopes {
+  border-top: 1px solid var(--line);
+  padding-top: var(--sp-4);
+}
+.consent-scopes li {
+  display: grid;
+  gap: var(--sp-0_5);
+  padding-left: var(--sp-3);
+  border-left: 2px solid var(--line-3);
+}
+.consent-scopes li b {
+  font-size: var(--fs-md);
+  color: var(--fg);
+  font-weight: var(--fw-ui);
+}
+.consent-scopes li span {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.consent-scopes li em {
+  font: var(--fw-strong) var(--fs-xs) var(--ui);
+  color: var(--should);
+  font-style: normal;
+}
+.consent-scopes li.capped {
+  border-left-color: var(--should);
+}
+.consent-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  gap: var(--sp-2);
+}
+
+/* while an invite or an app's request is looked up: the head and the button's shapes */
+.auth-sk {
+  display: grid;
+  gap: var(--sp-4);
+}

@@ -1,0 +1,11 @@
+Subject: Test-E-Mail von Lampo
+
+E-Mail funktioniert
+
+Dieser Test von review.example.com ist angekommen: Einladungen, Bestätigungen und Passwort-Links erreichen also ihre Empfänger.
+
+Gesendet mit vr admin mail-test am 2. Oktober 2026, 09:30 UTC.
+
+--
+Du bekommst diese E-Mail, weil jemand von review.example.com aus einen Test geschickt hat.
+Lampo · review.example.com

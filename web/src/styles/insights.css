@@ -1,0 +1,1192 @@
+/* ---------------------------------------------------------------- insights (library/Insights.tsx, InsightsFrame.tsx)
+ * Why so many rounds, on the library's grid: the title where Inbox and All videos have theirs, the period across from
+ * it (the header is the library's own), the content as wide as the page. The answer in a sentence, four stat tiles,
+ * then one card per part of the answer; cards share a row only where both stay roomy (the library's own width decides:
+ * `@container lib`), and a card's rows follow the card's width (`@container card`), so the same rows fit a wide card
+ * and a phone.
+ *
+ * One type scale for every card (the custom properties on .insights), so the order reads the same everywhere:
+ *   title      the card's name (15, strong): it leads
+ *   answer     what the card comes to, in one sentence under the title (13, the second ink): it follows, quieter
+ *   support    an explanation (13, muted)
+ *   label      a section's or a column's name, a stat tile's (12, medium, muted; sentence case, never upper case)
+ *   row        a row's name (13, medium)
+ *   row-2      a row's facts under its name (12, muted)
+ *   num        a figure in a row (13, medium, tabular figures); the stat tiles' values are the page's big numbers
+ * The headline over it all is the page's own size (18). Marks stay quiet (the de-emphasis ink) on shared scales; the
+ * one thing to look at wears the brand's orange: the topic behind the most rounds (its bar and its rule), a stretch a
+ * client watched again and again. Every box has its size before the data arrives. */
+
+.insights {
+  --ins-title: var(--fw-strong) var(--fs-lg) / var(--lh-ui) var(--ui);
+  --ins-answer: var(--fw-text) var(--fs-md) / var(--lh-ui) var(--ui);
+  --ins-support: var(--fw-text) var(--fs-md) / var(--lh-ui) var(--ui);
+  --ins-label: var(--fw-ui) var(--fs-sm) / var(--lh-ui) var(--ui);
+  --ins-row: var(--fw-ui) var(--fs-md) / var(--lh-ui) var(--ui);
+  --ins-row-2: var(--fw-text) var(--fs-sm) / var(--lh-ui) var(--ui);
+  --ins-num: var(--fw-ui) var(--fs-md) / var(--lh-ui) var(--ui);
+  /* the quiet ink of a mark on a scale */
+  --ins-mark: color-mix(in srgb, var(--muted) 55%, transparent);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-6);
+  margin-top: var(--sp-4);
+  padding-bottom: var(--sp-12);
+}
+/* the period, in the page header across from the title (where the inbox has its By video · By kind) */
+.hero-row .ins-period {
+  margin-left: auto;
+  align-self: center;
+}
+/* while the next period loads, the last one's numbers stay, a touch quieter */
+.ins-stale {
+  opacity: 0.55;
+  transition: opacity var(--dur) var(--ease-out);
+}
+/* a first visit: the cards whose rows aren't known yet wait unseen until they are */
+.ins-wait {
+  visibility: hidden;
+}
+/* a control's box in a row that hasn't arrived: its size, not its look */
+.ins-ghost {
+  visibility: hidden;
+}
+
+/* ---------------------------------------------------------------- the type scale's roles */
+.ins-label {
+  margin: 0;
+  font: var(--ins-label);
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- the headline: the page's answer
+   What it comes to in a line or two — the figure and the topic in the first ink, the rest in the second. Two lines'
+   room where the library is narrow, so the tiles never move when it arrives. */
+.ins-lead {
+  margin: 0;
+  max-width: 72ch;
+  min-height: calc(var(--fs-xl) * 1.35);
+  font: var(--fw-text) var(--fs-xl) / 1.35 var(--ui);
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+.ins-lead b {
+  font-weight: var(--fw-strong);
+  color: var(--fg);
+}
+@container lib (max-width: 1099px) {
+  .ins-lead {
+    min-height: calc(var(--fs-xl) * 1.35 * 2);
+  }
+}
+
+/* ---------------------------------------------------------------- the stat tiles */
+.ins-kpis {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sp-4);
+}
+@container lib (max-width: 719px) {
+  .ins-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.ins-kpi {
+  display: grid;
+  align-content: start;
+  gap: var(--sp-1);
+  min-width: 0;
+  padding: var(--sp-4);
+  border-radius: var(--r-lg);
+  background: var(--ink-2);
+  box-shadow: 0 0 0 1px var(--line);
+}
+.ins-kpi .ins-label,
+.ins-kpi-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* the value: sans, proportional figures (a figure, not a column) */
+.ins-kpi-value {
+  font: var(--fw-strong) var(--fs-2xl) / var(--lh-tight) var(--ui);
+  color: var(--fg);
+}
+.ins-kpi-sub {
+  font: var(--ins-row-2);
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- cards */
+.ins-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-6) var(--sp-4);
+}
+/* what causes the rounds beside the projects' versions, where both keep their columns */
+@container lib (min-width: 1100px) {
+  .ins-pair-why.two {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    align-items: start;
+  }
+}
+/* what came back beside the agents: only where each card is as wide as a whole laptop's (the agents keep their column
+   heads) */
+@container lib (min-width: 1880px) {
+  .ins-pair-loop {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.ins-sec {
+  container: card / inline-size;
+  display: grid;
+  align-content: start;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+/* the title, and under it the one sentence the card comes to: the title leads, the sentence follows in the second ink */
+.ins-head {
+  display: grid;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+.ins-head h2 {
+  margin: 0;
+  font: var(--ins-title);
+  color: var(--fg);
+}
+.ins-lede {
+  margin: 0;
+  min-height: calc(var(--fs-md) * var(--lh-ui));
+  font: var(--ins-answer);
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+/* a section's name inside a card, over its rows */
+.ins-sec h3.ins-label {
+  margin-bottom: var(--sp-2);
+}
+/* what else a card's rows say, in one quiet line under them (two lines' room on a narrow card), so the card is as tall
+   loading as loaded */
+.ins-foot {
+  margin: 0;
+  min-height: calc(var(--fs-sm) * var(--lh-ui));
+  font: var(--ins-row-2);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@container card (max-width: 719px) {
+  .ins-foot {
+    min-height: calc(var(--fs-sm) * var(--lh-ui) * 2);
+    max-height: calc(var(--fs-sm) * var(--lh-ui) * 2);
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+}
+
+/* ---------------------------------------------------------------- rows: one list look for every card */
+.ins-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.ins-row {
+  min-width: 0;
+  border-top: 1px solid var(--line);
+}
+/* a row's name, and the facts under it */
+.rc-topic b,
+.pj-name b,
+.bk-topic b,
+.st-name b,
+.ag-name b,
+.cl-name b,
+.cl-video b,
+.un-name b {
+  font: var(--ins-row);
+  color: var(--fg);
+}
+.rc-topic > span,
+.pj-name > span,
+.bk-topic > span,
+.st-name > span,
+.ag-name > span,
+.cl-name > span,
+.cl-video > span,
+.un-name > span {
+  font: var(--ins-row-2);
+  color: var(--muted);
+}
+/* a cause's facts wrap between facts, never inside one (Insights.tsx CauseRow) */
+.rc-topic > .rc-facts {
+  white-space: normal;
+  overflow: visible;
+}
+.rc-fact {
+  white-space: nowrap;
+}
+/* names and facts keep to their line */
+.rc-topic > b,
+.pj-name > *,
+.bk-topic > *,
+.st-name > *,
+.cl-name > *,
+.cl-video > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* a link that is a row's name: underlined on hover, like the library's */
+.st-video:hover b,
+.cl-video:hover b,
+.un-name:hover b,
+.bk-example:hover .bk-quote {
+  text-decoration: underline;
+  text-decoration-color: var(--line-3);
+  text-underline-offset: 3px;
+}
+.st-thumb {
+  flex: none;
+  width: 56px;
+  aspect-ratio: 16 / 10;
+  border-radius: var(--r-sm);
+  background: var(--ink-0);
+  overflow: hidden;
+}
+.st-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* a figure at the end of a row, and what it is under it */
+.rc-num,
+.pj-num b,
+.st-for,
+.wv-num b {
+  font: var(--ins-num);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+/* an empty list: one plain sentence in the room of a row — what will show here */
+.ins-empty {
+  margin: 0;
+  padding: var(--sp-3) 0;
+  border-top: 1px solid var(--line);
+  font: var(--ins-support);
+  line-height: var(--lh-body);
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.ins-empty a {
+  color: var(--fg-2);
+  text-underline-offset: 3px;
+}
+
+/* ---------------------------------------------------------------- what causes the rounds
+   A topic over its counts · the share of the rounds it came up before, as a bar on the whole (0–100 %) · the share ·
+   the rule: made in a click (the playbook opens with it drafted), or said to exist when it still comes up. The topic
+   behind the most rounds wears the orange; the rest stay quiet. */
+.rc-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 220px) minmax(80px, 1fr) 44px 136px;
+  grid-template-areas: 'topic bar num act';
+  align-items: center;
+  column-gap: var(--sp-6);
+  padding: var(--sp-3) 0;
+}
+.rc-topic {
+  grid-area: topic;
+  display: grid;
+  gap: var(--sp-0_5);
+  min-width: 0;
+}
+.rc-bar {
+  grid-area: bar;
+  display: block;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--ink-4);
+  overflow: hidden;
+}
+.rc-bar > span {
+  display: block;
+  width: calc(100% * var(--r));
+  min-width: 3px;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ins-mark);
+}
+.rc-row.top .rc-bar > span {
+  background: var(--brand);
+}
+.rc-num {
+  grid-area: num;
+  text-align: right;
+  white-space: nowrap;
+}
+.rc-act {
+  grid-area: act;
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
+/* a rule exists and the topic still comes up: said first in its facts, in the second ink */
+.rc-still {
+  color: var(--fg-2);
+}
+
+/* ---------------------------------------------------------------- versions to approval by project
+   A project over its approvals · its versions to approval as a bar on one scale, the target a line across every bar ·
+   the figure over its median. A project with nothing approved yet: an outline as long as the version its open videos
+   are on. */
+.pj-list {
+  /* where the target stands on the bars' scale (set by the list) */
+  --t: 0;
+}
+.pj-row,
+.pj-heads {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(64px, 1fr) 64px;
+  align-items: center;
+  column-gap: var(--sp-4);
+}
+.pj-row {
+  padding: var(--sp-3) 0;
+}
+.pj-heads {
+  min-height: calc(var(--fs-sm) * var(--lh-ui));
+  padding-bottom: var(--sp-1);
+}
+.pj-scale {
+  position: relative;
+  align-self: stretch;
+}
+.pj-target-label {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.pj-name {
+  display: grid;
+  gap: var(--sp-0_5);
+  min-width: 0;
+}
+.pj-bar {
+  position: relative;
+  display: block;
+  height: 8px;
+  border-radius: var(--r-full);
+  background: var(--ink-4);
+}
+/* the target: one thin line across the bar, at the same place on every row */
+.pj-bar::after {
+  content: '';
+  position: absolute;
+  left: calc(100% * var(--t));
+  top: calc(-1 * var(--sp-2));
+  bottom: calc(-1 * var(--sp-2));
+  width: 1px;
+  background: var(--fg-2);
+  opacity: 0.6;
+}
+.pj-fill {
+  display: block;
+  width: calc(100% * var(--r));
+  min-width: 3px;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ins-mark);
+}
+.pj-row.open .pj-fill {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--line-3);
+}
+.pj-num {
+  display: grid;
+  justify-items: end;
+  gap: var(--sp-0_5);
+  min-width: 0;
+}
+.pj-num > span {
+  font: var(--ins-row-2);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- what came back
+   A topic over how often · the newest note that came back, and what was said when it did · the agents whose fixes
+   they were. */
+.bk-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 200px) minmax(0, 1fr) minmax(0, 280px);
+  grid-template-areas: 'topic example agents';
+  align-items: center;
+  column-gap: var(--sp-6);
+  padding: var(--sp-3) 0;
+}
+.bk-topic {
+  grid-area: topic;
+  display: grid;
+  gap: var(--sp-0_5);
+  min-width: 0;
+}
+.bk-example {
+  grid-area: example;
+  display: grid;
+  gap: var(--sp-0_5);
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.bk-quote {
+  font: var(--ins-support);
+  color: var(--fg-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bk-why {
+  font: var(--ins-row-2);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bk-agents {
+  grid-area: agents;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-3);
+  min-width: 0;
+  /* as tall as a mark, loading or loaded */
+  min-height: 20px;
+  font: var(--ins-row-2);
+  color: var(--fg-2);
+}
+.bk-agent {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* an agent's mark in a small disc, like the agents' card's */
+.bk-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--r-full);
+  background: var(--ink-4);
+  color: var(--fg);
+}
+
+/* ---------------------------------------------------------------- where it's stuck now
+   The video and what it waits for · on whom · for how long · the one thing to do (nudge the agent, remind the client
+   through the review link, open it). */
+.st-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 56px 148px;
+  grid-template-areas: 'video who for act';
+  align-items: center;
+  column-gap: var(--sp-4);
+  padding: var(--sp-2) 0;
+}
+.st-video {
+  grid-area: video;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.st-name {
+  display: grid;
+  gap: var(--sp-0_5);
+  min-width: 0;
+}
+/* on whom: quiet words in their own column, the asker's own in the second ink */
+.st-who {
+  grid-area: who;
+  font: var(--ins-row-2);
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+.st-who[data-on='you'] {
+  color: var(--fg-2);
+}
+.st-for {
+  grid-area: for;
+  text-align: right;
+  white-space: nowrap;
+}
+.st-act {
+  grid-area: act;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ---------------------------------------------------------------- clients
+   Who (and the review link they came through) · the video and the version they watched · how far (a lane of its
+   timeline: played in ink, watched again and again in the orange; the stretch in whole seconds under it) · the share
+   over the time and sittings · the toggle of the chart of their hundredths. */
+.cl-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) minmax(120px, 1fr) minmax(140px, 1.4fr) 72px auto;
+  grid-template-areas: 'who video done num toggle';
+  align-items: center;
+  column-gap: var(--sp-6);
+  padding: var(--sp-3) 0;
+}
+.cl-who {
+  grid-area: who;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.cl-name,
+.cl-video {
+  display: grid;
+  gap: var(--sp-0_5);
+  min-width: 0;
+}
+.cl-video {
+  grid-area: video;
+  color: inherit;
+  text-decoration: none;
+}
+.cl-row .wv-done {
+  grid-area: done;
+}
+.cl-row .wv-num {
+  grid-area: num;
+}
+.cl-row .wv-toggle {
+  grid-area: toggle;
+}
+/* how far: two lines' room whether or not a stretch was watched again, so a row looks the same loading or loaded */
+.wv-done {
+  display: grid;
+  align-content: start;
+  gap: var(--sp-1);
+  min-width: 0;
+  min-height: calc(var(--fs-md) * var(--lh-ui) + var(--sp-1) + var(--fs-sm) * var(--lh-ui));
+}
+.wv-done-line {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+  min-height: calc(var(--fs-md) * var(--lh-ui));
+}
+.wv-num {
+  display: grid;
+  justify-items: end;
+  gap: var(--sp-0_5);
+  min-width: 0;
+}
+.wv-num > span {
+  font: var(--ins-row-2);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  white-space: nowrap;
+}
+/* the lane: the version from start to end; the parts played in ink, the stretch watched again and again in the brand's
+   orange, the rest bare track — 2 px of card between runs */
+.wv-lane {
+  flex: 1;
+  display: flex;
+  gap: var(--sp-0_5);
+  min-width: 40px;
+  height: 6px;
+}
+.wv-lane > i {
+  flex-basis: 0;
+  min-width: 1px;
+  border-radius: 2px;
+  background: var(--ink-4);
+}
+.wv-lane > i.seen {
+  background: color-mix(in srgb, var(--fg-2) calc(35% + var(--s) * 65%), var(--ink-4));
+}
+.wv-lane > i.again {
+  background: var(--brand);
+}
+/* nothing recorded: the lane is an outline */
+.wv-lane.unseen {
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.wv-again {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  font: var(--ins-row-2);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.wv-again i {
+  flex: none;
+  width: 10px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--brand);
+}
+.wv-toggle .icon {
+  transition: transform var(--dur) var(--ease-out);
+}
+.cl-row.open .wv-toggle .icon {
+  transform: rotate(180deg);
+}
+.wv-detail {
+  grid-column: 1 / -1;
+  padding: var(--sp-4) 0 var(--sp-2);
+}
+/* review links nobody opened, under the clients */
+.ins-unopened {
+  padding-top: var(--sp-2);
+}
+.un-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--sp-3);
+  padding: var(--sp-2) 0;
+}
+.un-name {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.un-name b {
+  white-space: nowrap;
+}
+.un-icon {
+  flex: none;
+  color: var(--muted);
+}
+.un-name > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.un-when {
+  font: var(--ins-row-2);
+  color: var(--muted);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- the chart of a video's hundredths (InsightsChart.tsx)
+   One thin column per hundredth of the newest version — as tall as the viewers who played it (three and more), or as
+   the times it was played (one or two viewers: the plot only as tall as the most played part needs, --lvls steps) —
+   on the counts' gridlines; the parts watched again and again in the brand's orange; the place pointed at (or stepped
+   to with the arrow keys) read out above it, a key for the height and the orange beside; the version's times under it. */
+.wc {
+  --lvls: 5;
+  --plot: calc(min(5, var(--lvls)) * 24px);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    '. head'
+    'y plot'
+    '. x';
+  column-gap: var(--sp-2);
+  row-gap: var(--sp-2);
+  min-height: calc(var(--fs-md) * var(--lh-ui) + var(--plot) + var(--fs-xs) * var(--lh-ui) + 2 * var(--sp-2));
+}
+.wc-head {
+  grid-area: head;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-1) var(--sp-4);
+  margin: 0;
+  min-height: calc(var(--fs-md) * var(--lh-ui));
+}
+.wc-read {
+  font: var(--ins-support);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.wc-read.on {
+  color: var(--fg);
+}
+.wc-keys {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-4);
+}
+.wc-key {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font: var(--ins-row-2);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.wc-key i {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--muted) 55%, transparent);
+}
+.wc-key.again i {
+  background: var(--brand);
+}
+.wc-y {
+  grid-area: y;
+  position: relative;
+  min-width: 2ch;
+  font: var(--fw-text) var(--fs-xs) / 1 var(--ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.wc-y span {
+  position: absolute;
+  right: 0;
+  bottom: calc(var(--y) * 100%);
+  transform: translateY(50%);
+}
+.wc-plot {
+  grid-area: plot;
+  position: relative;
+  height: var(--plot);
+  min-width: 0;
+  border-bottom: 1px solid var(--line-3);
+  outline: none;
+  touch-action: pan-y;
+}
+.wc-plot:focus-visible {
+  border-radius: var(--r-sm);
+  box-shadow: var(--focus-ring);
+}
+.wc-grid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--y) * 100%);
+  height: 1px;
+  background: var(--line);
+}
+.wc-cols {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(100, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1fr);
+  column-gap: var(--sp-0_5);
+}
+/* square at the baseline, rounded at the data's end; a part nobody played has no column, only the baseline */
+.wc-col {
+  grid-row: 1;
+  align-self: end;
+  height: calc(var(--v) * 100%);
+  border-radius: 2px 2px 0 0;
+  background: color-mix(in srgb, var(--muted) 55%, transparent);
+}
+.wc-col.again {
+  background: var(--brand);
+}
+.wc-col.on {
+  background: var(--fg-2);
+}
+.wc-col.again.on {
+  background: var(--brand-hot);
+}
+/* the part pointed at: a wash the plot's height behind its column, so an empty part shows where it is too */
+.wc-at {
+  grid-row: 1;
+  align-self: stretch;
+  border-radius: 2px 2px 0 0;
+  background: var(--ink-4);
+}
+.wc-x {
+  grid-area: x;
+  position: relative;
+  height: calc(var(--fs-xs) * var(--lh-ui));
+  font: var(--fw-text) var(--fs-xs) / var(--lh-ui) var(--ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.wc-x span {
+  position: absolute;
+  top: 0;
+  left: calc(var(--x) * 100%);
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.wc-x span:first-child {
+  transform: none;
+}
+.wc-x span:last-child {
+  transform: translateX(-100%);
+}
+/* each moment's tick on the baseline */
+.wc-x span::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + var(--sp-1));
+  left: 50%;
+  width: 1px;
+  height: var(--sp-1);
+  background: var(--line-3);
+}
+.wc-x span:first-child::before {
+  left: 0;
+}
+.wc-x span:last-child::before {
+  left: auto;
+  right: 0;
+}
+/* ---------------------------------------------------------------- agents
+   An agent (its mark, name, kind, how much it did) · right the first time (one bar of the share, its figure and
+   fraction) · the typical time to fix · the topics that came back as still wrong. Column heads once above the rows;
+   narrower, each measure says what it is in its own line. */
+.ag-row,
+.ag-heads {
+  display: grid;
+  grid-template-columns: minmax(180px, 320px) minmax(220px, 320px) minmax(88px, 140px) minmax(200px, 1fr);
+  align-items: center;
+  column-gap: var(--sp-6);
+}
+.ag-row {
+  padding: var(--sp-3) 0;
+}
+.ag-heads {
+  padding-bottom: var(--sp-2);
+}
+.ag-who {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+/* the agent's mark in a disc the size of a person's picture */
+.ag-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-full);
+  background: var(--ink-4);
+  color: var(--fg);
+}
+.ag-name {
+  display: grid;
+  gap: var(--sp-0_5);
+  min-width: 0;
+}
+.ag-name b,
+.ag-name > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ag-rate,
+.ag-time,
+.ag-back {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-2);
+  min-width: 0;
+}
+.ag-rate {
+  flex-wrap: nowrap;
+  gap: var(--sp-3);
+}
+/* a measure's line is as tall as a figure, whatever stands in it (a row looks the same loading or loaded) */
+.ag-rate,
+.ag-time {
+  min-height: calc(var(--fs-md) * var(--lh-ui));
+  font: var(--ins-num);
+}
+.ag-bar {
+  flex: 1;
+  min-width: 48px;
+  max-width: 160px;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--ink-4);
+  overflow: hidden;
+}
+.ag-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--fg-2);
+}
+.ag-rate b,
+.ag-time b {
+  font: var(--ins-num);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+.ag-rate b {
+  min-width: 4ch;
+  text-align: right;
+}
+.ag-frac,
+.ag-more {
+  font: var(--ins-row-2);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  white-space: nowrap;
+}
+/* nothing to measure yet: said quietly */
+.ag-quiet {
+  font: var(--ins-row-2);
+  color: var(--muted);
+}
+/* what a measure counts: the column heads say it where the card is wide (for readers it is in every row) */
+.ag-cap {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.ag-back .ch {
+  font-variant-numeric: tabular-nums;
+}
+/* what agents read: a quiet line at the end of the agents' card */
+.ins-taste-link {
+  margin: 0;
+  font: var(--ins-support);
+  color: var(--muted);
+}
+.ins-taste-link button {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-weight: var(--fw-ui);
+  text-decoration: underline;
+  text-decoration-color: var(--line-3);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.ins-taste-link button:hover {
+  text-decoration-color: currentColor;
+}
+
+/* the taste file, as agents get it */
+.ins-modal-sub {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-md);
+}
+.ins-taste {
+  max-height: min(60vh, 520px);
+  overflow: auto;
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r);
+  background: var(--ink-0);
+  border: 1px solid var(--line);
+  font: var(--fs-sm) / var(--lh-body) var(--ui);
+  color: var(--fg-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* ---------------------------------------------------------------- narrower cards (a card's own width decides) */
+/* the agents' table needs the room of its four columns; narrower, an agent over its measures, one line each, each
+   saying what it counts */
+@container card (max-width: 799px) {
+  .ag-heads {
+    display: none;
+  }
+  .ag-row {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--sp-2);
+  }
+  .ag-rate,
+  .ag-time,
+  .ag-back {
+    padding-left: calc(var(--sp-8) + var(--sp-3)); /* under the name, past the mark (32) and its gap */
+  }
+  .ag-back:empty,
+  .ag-time:has(.ag-none) {
+    display: none;
+  }
+  .ag-cap {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    font: var(--ins-row-2);
+    color: var(--muted);
+  }
+  .ag-rate .ag-cap {
+    margin-left: calc(-1 * var(--sp-2));
+  }
+  .ag-bar {
+    flex: none;
+    width: 64px;
+  }
+  .ag-rate b {
+    min-width: 0;
+  }
+}
+@container card (max-width: 559px) {
+  /* a topic and its rule on one line, its bar and share under them */
+  .rc-row {
+    grid-template-columns: minmax(0, 1fr) 136px;
+    grid-template-areas:
+      'topic act'
+      'bar num';
+    row-gap: var(--sp-2);
+    column-gap: var(--sp-4);
+  }
+}
+@container card (max-width: 719px) {
+  /* a topic and its agents on one line, the note that came back under them */
+  .bk-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'topic agents'
+      'example example';
+    row-gap: var(--sp-2);
+    column-gap: var(--sp-4);
+  }
+  /* a client, the video, the share and the toggle on one line; how far under them */
+  .cl-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 64px auto;
+    grid-template-areas:
+      'who video num toggle'
+      'done done done done';
+    row-gap: var(--sp-2);
+    column-gap: var(--sp-4);
+  }
+  .cl-row .wv-done {
+    padding-left: calc(var(--sp-6) + var(--sp-3)); /* past the picture (24) and its gap */
+  }
+}
+@container card (max-width: 519px) {
+  /* a phone's line holds a short sentence only: every one keeps two lines' room */
+  .ins-lede {
+    min-height: calc(var(--fs-md) * var(--lh-ui) * 2);
+  }
+  /* a stuck video over on whom; what to do and for how long at its end */
+  .st-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'video act'
+      'who for';
+    row-gap: var(--sp-1);
+  }
+  .st-thumb {
+    width: 48px;
+  }
+  .st-who {
+    max-width: none;
+    padding-left: calc(var(--sp-12) + var(--sp-3)); /* under the name, past the picture (48) and its gap */
+  }
+  /* a client over the video and how far */
+  .cl-row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'who num toggle'
+      'video video video'
+      'done done done';
+    row-gap: var(--sp-1);
+    column-gap: var(--sp-3);
+  }
+  .cl-row .cl-video,
+  .cl-row .wv-done {
+    padding-left: calc(var(--sp-6) + var(--sp-3));
+  }
+  .pj-row,
+  .pj-heads {
+    grid-template-columns: minmax(0, 1fr) minmax(60px, 1fr) 76px;
+    column-gap: var(--sp-4);
+  }
+  /* a topic over the note that came back, the agents under it */
+  .bk-row {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'topic'
+      'example'
+      'agents';
+  }
+  .bk-agents {
+    justify-content: flex-start;
+  }
+  .wc-cols {
+    column-gap: 1px;
+  }
+}
+
+/* ---------------------------------------------------------------- phones */
+@media (max-width: 639px) {
+  .insights {
+    gap: var(--sp-4);
+  }
+  .ins-pair {
+    gap: var(--sp-4);
+  }
+  .ins-lead {
+    font-size: var(--fs-lg);
+    min-height: calc(var(--fs-lg) * 1.35 * 3);
+  }
+  .ins-sec.pad-lg.panel {
+    padding: var(--sp-4);
+  }
+  .ins-kpis {
+    gap: var(--sp-3);
+  }
+  .ins-kpi {
+    padding: var(--sp-3);
+  }
+  .hero-row .ins-period {
+    width: 100%;
+    margin-left: 0;
+    order: 3;
+  }
+  .ins-period > * {
+    flex: 1;
+    justify-content: center;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ins-stale,
+  .wv-toggle .icon {
+    transition: none;
+  }
+}
+
+/* Insights on a plan without them (conversion/limits/InsightsExplained.tsx, .lim-ins): the page explains, there is no
+   period to pick */
+.lib-scroll:has(.lim-ins) .ins-period {
+  visibility: hidden;
+}

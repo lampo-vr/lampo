@@ -1,0 +1,16 @@
+Subject: Reset your Lampo password
+
+Reset your password
+
+Hi Mia,
+
+Someone, hopefully you, asked to reset the password of your account on review.example.com.
+
+Choose a new password:
+https://review.example.com/#/reset/rt_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+
+The link works once, for 60 minutes. A new password signs you out on every other device. If you didn’t ask for this, ignore this email: your password stays as it is.
+
+--
+You get this because you have an account on review.example.com.
+Lampo · review.example.com

@@ -1,0 +1,64 @@
+name: macOS
+
+# The unit suite on macOS and frame exactness in WebKit (Safari's engine, on an emulated iPhone). The maintainer's own
+# Mac runs the same suites before a merge, and GitHub's macOS runners are scarcer than its Linux ones (in a private
+# repository their minutes also count ten times), so this runs only when asked: label a pull request `macos` (it runs
+# then and on every push while the label stays), or start it by hand (Actions → macOS → Run workflow) on any branch.
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [labeled, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'macos')
+    name: macOS (unit, MCP, WebKit)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: cache/playwright
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install ffmpeg
+        run: brew install ffmpeg
+      - id: install
+        run: npm ci
+      - name: Unit and integration tests
+        run: npm test
+      - name: MCP end to end
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run test:mcp
+      # Playwright's WebKit build, cached per playwright-core version (the build it installs follows that version).
+      - name: Which WebKit
+        id: webkit
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: echo "playwright=$(node -p "require('playwright-core/package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        id: webkit-cache
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        with:
+          path: cache/playwright
+          key: playwright-webkit-${{ runner.os }}-${{ runner.arch }}-${{ steps.webkit.outputs.playwright }}
+      - name: Install WebKit
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && steps.webkit-cache.outputs.cache-hit != 'true' }}
+        run: npx playwright-core install webkit
+      - name: Build the UI
+        id: build
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run build
+      - name: WebKit end to end
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        env:
+          VR_STT: 'off'
+        run: npm run test:webkit

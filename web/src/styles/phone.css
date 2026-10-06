@@ -1,0 +1,505 @@
+/* The phone view's drawings (player/phone/PhoneArt.tsx, loaded with its chunk): the phone's own chrome and the apps'
+   interfaces. Inside the frame everything is the phone's: real-world colours (a dark island, like the stage) and sizes in
+   the phone's points — the frame is scaled as a whole (design-scale.test.ts leaves `.phone…` rules to the device). */
+
+/* ---------------------------------------------------------------- the phone's own chrome */
+.phone-chrome,
+.phone-body-art {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.phone-status {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+.phone-status svg {
+  display: block;
+  flex: none;
+}
+.phone-status.island .ps-time,
+.phone-status.island .ps-right {
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+.phone-status.island .ps-time {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  line-height: 22px;
+}
+.phone-status.island .ps-right {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.phone-status.classic {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.phone-status.classic .ps-left,
+.phone-status.classic .ps-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 0;
+}
+.phone-status.classic .ps-right {
+  justify-content: flex-end;
+}
+.phone-status.android {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 22px 0 26px;
+  font-family: Roboto, 'Google Sans', system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+}
+.phone-status.android .ps-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+/* the Dynamic Island: black on black, with the lens just visible on its right */
+.phone-island {
+  position: absolute;
+  background: #000;
+  border-radius: 999px;
+}
+.phone-island::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 13px;
+  width: 11px;
+  height: 11px;
+  margin-top: -5.5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #2a3046 0, #10121c 45%, #050507 70%);
+}
+.phone-hole {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 38%, #262a3a 0, #0b0c12 40%, #000 62%);
+  box-shadow: 0 0 0 1px #0a0a0a;
+}
+.phone-handle {
+  position: absolute;
+  border-radius: 3px;
+  background: #fff;
+  opacity: 0.92;
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.18);
+}
+/* side buttons: the body's metal, a touch lighter where it catches the light */
+.phone-key {
+  position: absolute;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #1b1b1d, #4a4a4e 45%, #2a2a2d);
+}
+.phone-ear {
+  position: absolute;
+  border-radius: 3px;
+  background: #19191b;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.8);
+}
+.phone-lens {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #2f3448 0, #111219 50%, #050506 72%);
+}
+.phone-home {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, #0d0d0e 0 62%, #151517 100%);
+  box-shadow:
+    0 0 0 2px #2b2b2e,
+    inset 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+/* ---------------------------------------------------------------- the apps */
+.phone-ui {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.2;
+  /* the apps' slight shadow, so white reads on any frame */
+  text-shadow:
+    0 0 2px rgba(0, 0, 0, 0.24),
+    0 1px 2px rgba(0, 0, 0, 0.32);
+}
+.phone-ui.android {
+  font-family: Roboto, 'Google Sans', system-ui, sans-serif;
+}
+.phone-ui [data-part],
+.phone-ui .pu-shade,
+.phone-ui .pu-rail-item,
+.phone-ui .pu-row,
+.phone-ui .pu-tab {
+  position: absolute;
+}
+.phone-ui .pu-g {
+  display: block;
+  flex: none;
+  overflow: visible;
+  filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.22)) drop-shadow(0 1px 1.2px rgba(0, 0, 0, 0.3));
+}
+.phone-ui .pu-shade.top {
+  background: linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0));
+}
+.phone-ui .pu-shade.bottom {
+  background: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.42));
+}
+
+/* the top bar */
+.phone-ui .pu-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.phone-ui .pu-top.reels {
+  padding: 0 4px 0 4px;
+}
+.phone-ui .pu-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+.phone-ui .pu-top.tiktok {
+  padding: 0 4px;
+}
+.phone-ui .pu-live {
+  display: inline-grid;
+  place-items: center;
+  height: 20px;
+  padding: 0 4px;
+  border: 1.6px solid #fff;
+  border-radius: 6px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.12);
+}
+.phone-ui .pu-feeds {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  gap: 22px;
+  font-size: 17px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.phone-ui .pu-feeds > span {
+  opacity: 0.72;
+}
+.phone-ui .pu-feeds > .on {
+  position: relative;
+  opacity: 1;
+  font-weight: 700;
+}
+.phone-ui .pu-feeds > .on::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 26px;
+  height: 3px;
+  margin-left: -13px;
+  border-radius: 2px;
+  background: #fff;
+}
+.phone-ui .pu-top.shorts {
+  justify-content: flex-end;
+  gap: 24px;
+  padding: 0 4px;
+}
+.phone-ui .pu-top.stories {
+  display: block;
+}
+
+/* the rail */
+.phone-ui .pu-rail-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.phone-ui .pu-count {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 15px;
+  white-space: nowrap;
+}
+.phone-ui .pu-ico {
+  display: grid;
+  place-items: center;
+}
+.phone-ui .pu-cover,
+.phone-ui .pu-avatar {
+  flex: none;
+  background: linear-gradient(140deg, #ffb26b 0%, #f0606f 48%, #7b4fd6 100%);
+}
+.phone-ui .pu-cover {
+  box-shadow:
+    0 0 0 2px #fff,
+    0 1px 3px rgba(0, 0, 0, 0.35);
+}
+.phone-ui .pu-avatar {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: none;
+}
+.phone-ui .pu-avatar.ring {
+  box-shadow: 0 0 0 1.5px #fff;
+}
+.phone-ui .pu-follow {
+  position: relative;
+  display: block;
+  width: 48px;
+  height: 58px;
+}
+.phone-ui .pu-badge {
+  position: absolute;
+  left: 50%;
+  top: 38px;
+  width: 20px;
+  height: 20px;
+  margin-left: -10px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #f23a5a;
+}
+.phone-ui .pu-badge .pu-g {
+  filter: none;
+}
+.phone-ui .pu-disc {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, transparent 0 13px, rgba(255, 255, 255, 0.08) 13px 14px, transparent 14px),
+    repeating-radial-gradient(circle, #232325 0 2px, #161617 2px 3.5px);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+.phone-ui .pu-round {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(30, 30, 30, 0.42);
+}
+.phone-ui .pu-round .pu-g {
+  filter: none;
+}
+
+/* bottom left: who, the caption, the audio */
+.phone-ui .pu-row {
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.phone-ui .pu-name {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.phone-ui .pu-name.big {
+  font-size: 17px;
+  font-weight: 700;
+}
+.phone-ui .pu-pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.phone-ui .pu-pill.outline {
+  height: 28px;
+  margin-left: 2px;
+  padding: 0 11px;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 8px;
+}
+.phone-ui .pu-pill.solid {
+  height: 30px;
+  margin-left: 4px;
+  padding: 0 13px;
+  border-radius: 15px;
+  background: #fff;
+  color: #0f0f0f;
+  text-shadow: none;
+}
+.phone-ui .pu-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  width: 100%;
+}
+.phone-ui .pu-line {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.phone-ui .pu-line.last {
+  display: flex;
+}
+.phone-ui .pu-clip {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.phone-ui .pu-more {
+  flex: none;
+  margin-left: 4px;
+  font-weight: 600;
+  opacity: 0.8;
+}
+.phone-ui.reels .pu-more {
+  font-weight: 400;
+  opacity: 0.7;
+}
+.phone-ui .pu-audio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 13px;
+}
+.phone-ui.tiktok .pu-audio {
+  font-size: 14px;
+}
+/* Shorts: the sound in a quiet pill */
+.phone-ui .pu-audio.boxed {
+  height: 22px;
+  padding: 0 9px 0 7px;
+  border-radius: 11px;
+  background: rgba(0, 0, 0, 0.28);
+  text-shadow: none;
+}
+
+/* the tab bar */
+.phone-ui .pu-tabs {
+  text-shadow: none;
+}
+.phone-ui .pu-tabs .pu-g {
+  filter: none;
+}
+.phone-ui .pu-tab {
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+.phone-ui.tiktok .pu-tab:not(.on),
+.phone-ui.shorts .pu-tab:not(.on) {
+  color: rgba(255, 255, 255, 0.86);
+}
+.phone-ui .pu-tab-label {
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 12px;
+  white-space: nowrap;
+}
+.phone-ui .pu-tab.on .pu-tab-label {
+  font-weight: 600;
+}
+.phone-ui .pu-create {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 30px;
+  border-radius: 9px;
+  background: #fff;
+  color: #000;
+}
+.phone-ui.shorts .pu-create {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: transparent;
+  color: #fff;
+  box-shadow: 0 0 0 1.5px #fff;
+}
+
+/* Stories: progress, who and when; the reply field */
+.phone-ui .pu-progress {
+  display: flex;
+  gap: 4px;
+  height: 2px;
+}
+.phone-ui .pu-progress i {
+  flex: 1 1 0;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.38);
+}
+.phone-ui .pu-progress .done {
+  background: #fff;
+}
+.phone-ui .pu-progress .now {
+  background: linear-gradient(90deg, #fff 0 42%, rgba(255, 255, 255, 0.38) 42%);
+}
+.phone-ui .pu-story-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 0 4px;
+  height: 32px;
+}
+.phone-ui .pu-story-head .pu-g + .pu-g {
+  margin-left: 12px;
+}
+.phone-ui .pu-when {
+  font-size: 14px;
+  opacity: 0.7;
+}
+.phone-ui .pu-reply {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.phone-ui .pu-field {
+  flex: 1 1 0;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 22px;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.9);
+}

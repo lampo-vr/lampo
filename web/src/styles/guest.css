@@ -1,0 +1,786 @@
+/* ---------------------------------------------------------------- review links (the visitor's side) */
+
+/* The invitation in front of a review (password, expired, not available, nothing yet) is the product's one entrance
+   (ui/Entrance.tsx, entrance.css); the way in (the field, the eye, the line for a miss, the orange button) is
+   ui/EntryForm.tsx, shared with the owner's sign-in (styles/entry-form.css). Here: the room's own line of who shared it. */
+.room .inv-from {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  font-size: var(--fs-lg);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+}
+.room .inv-from b {
+  color: var(--fg);
+  font-weight: var(--fw-strong);
+}
+.room .inv-org {
+  color: var(--muted);
+}
+
+:root[data-entering] :is(.room, .g-player) {
+  animation: inv-enter var(--dur-slow) var(--ease-out) both;
+}
+@keyframes inv-enter {
+  from {
+    opacity: 0;
+  }
+}
+
+/* the review room of a folder link */
+.room {
+  height: 100%;
+  display: grid;
+  grid-template-rows: 54px minmax(0, 1fr);
+}
+/* one row at every width: the wordmark, the visitor's name, the theme */
+.room .room-top {
+  flex-wrap: nowrap;
+}
+.room .room-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2, 8px);
+  min-width: 0;
+}
+/* The visitors' shop window: one centred column, not a strip along the left edge of a wide screen — and on a wide one
+   it grows with the screen (to 1800 px at 2560) and its cards with it, so four videos fill a row instead of standing as
+   an island in the middle. The foot is the page's end, at the bottom when the videos don't reach it. */
+.room-scroll {
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 0 max(var(--sp-6, 24px), calc((100% - max(1180px, min(1800px, 70%))) / 2)) var(--sp-16, 64px);
+}
+.room-head {
+  display: grid;
+  gap: var(--sp-3, 12px);
+  max-width: 720px;
+  padding: var(--sp-8, 32px) 0 var(--sp-6, 24px);
+}
+.room-head h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: var(--fw-strong, 650);
+  font-stretch: semi-condensed;
+  font-size: var(--fs-3xl, 36px);
+  line-height: var(--lh-tight, 1.1);
+  letter-spacing: -0.02em;
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+.room-lede {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--fg-2);
+  font-size: var(--fs-lg, 15px);
+  line-height: var(--lh-body, 1.5);
+}
+.room-progress {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2, 8px) var(--sp-3, 12px);
+  font-size: var(--fs-md, 13px);
+  color: var(--muted);
+}
+.room-meter {
+  width: 160px;
+  height: 6px;
+  border-radius: var(--r-full, 999px);
+  overflow: hidden;
+  background: var(--line-2);
+}
+.room-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ok);
+  transition: width var(--dur) var(--ease-out);
+}
+.room-progress-text b {
+  color: var(--fg);
+  font-weight: var(--fw-strong, 650);
+}
+.room .grid {
+  grid-template-columns: repeat(auto-fill, minmax(clamp(240px, 15vw, 400px), 1fr));
+  gap: var(--sp-6, 24px) var(--sp-4, 16px);
+}
+.room .room-state {
+  min-height: 22px;
+}
+/* A room's card says one thing under its name — where the video stands for the visitor —: one row, not the library's
+   two (three on a phone) for the stage, the link and the agent, which left a dead band under every card. */
+.room .film:not(.compact) .film-foot {
+  grid-template-rows: var(--h-xs);
+}
+.room-todo {
+  font-size: var(--fs-sm, 12px);
+  color: var(--muted);
+}
+.room .g-who {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1, 4px);
+  font-size: var(--fs-sm, 12px);
+  color: var(--fg-2);
+}
+
+/* the room without videos: the empty state (ui/system.tsx) takes the room of the grid */
+.room .room-empty {
+  margin-top: var(--sp-6);
+}
+
+/* the foot of the client's pages (PoweredBy.tsx): "Powered by Lampo" as a quiet badge in the middle, the source offer
+   (AGPL-3.0 §13) beside it — the room's last line, the notes column's foot (the page's end on a phone) */
+.g-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-ui);
+  color: var(--muted);
+}
+.g-foot a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: var(--h-sm);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-full);
+  color: inherit;
+  text-decoration: none;
+  transition:
+    color var(--dur) var(--ease-out),
+    background-color var(--dur) var(--ease-out);
+}
+.g-foot a:hover {
+  color: var(--fg-2);
+  background-color: var(--ink-3);
+}
+.g-foot a:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.g-foot .g-powered b {
+  font-weight: var(--fw-strong);
+  color: var(--fg-2);
+}
+.g-foot .g-foot-dot {
+  color: var(--faint);
+}
+/* the operator's imprint and privacy policy (A13 CLOUD-1): their own quiet line under the badge */
+.g-foot .g-legal {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-xs);
+}
+.room-scroll > .g-foot {
+  flex: none;
+  margin-top: auto;
+  padding-top: var(--sp-12);
+}
+.g-player .side > .g-foot {
+  flex: none;
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+}
+/* A link that neither takes notes nor has any to show (GuestPlayer.tsx notesPanel): no notes column, the video gets the
+   width, and the foot is the page's last row, under the dock in the dock's colour. Only the columns and the areas
+   change: every layout's rows already end in an auto row (the notes' on a phone, an implicit one on a desk). */
+.g-player.guest.no-notes {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'top' 'stage' 'dock' 'foot';
+}
+.g-player > .g-foot {
+  grid-area: foot;
+  padding: 0 var(--sp-3) var(--sp-2);
+  background: var(--ink-1);
+}
+
+/* one video */
+.g-top-acts {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2, 8px);
+  flex: none;
+}
+/* the notes' head: the heading, how many, and the name the visitor writes under (tap it to change) */
+.g-side-head {
+  padding-bottom: var(--sp-3, 12px);
+}
+.g-notes-title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  min-height: var(--h);
+}
+/* the section's heading on the design system's scale (a bare h2 would fall back to the browser's 1.5em bold) */
+.g-notes-title h2 {
+  margin: 0;
+  font: var(--fw-strong) var(--fs-lg) / var(--lh-ui) var(--ui);
+}
+.g-notes-count {
+  font: var(--fw-ui) var(--fs-sm) / var(--lh-ui) var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--faint);
+}
+.g-player .g-who-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  max-width: 60%;
+  height: var(--h);
+  padding: 0 var(--sp-2) 0 var(--sp-1);
+  border: 0;
+  border-radius: var(--r-full);
+  background: none;
+  color: var(--fg-2);
+  font: var(--fw-ui) var(--fs-sm) / var(--lh-ui) var(--ui);
+  cursor: pointer;
+}
+.g-player .g-who-btn:hover {
+  background-color: var(--ink-3);
+  color: var(--fg);
+}
+.g-player .g-who-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.g-side-note {
+  margin-top: var(--sp-1);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--muted);
+}
+/* The name, asked where it is needed (GuestNotes.tsx NameField): in the composer when the first note is sent, in a
+   dialog for Approve or a reply. One column on one edge — the question, who reads the notes, the field — and no glow:
+   the composer's padding is its frame. */
+.g-name {
+  display: grid;
+  gap: var(--sp-2);
+}
+.g-composer .g-name {
+  margin-top: var(--sp-1);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line);
+}
+.g-name .g-name-q {
+  font: var(--fw-strong) var(--fs-md) / var(--lh-ui) var(--ui);
+  color: var(--fg);
+}
+.g-name .g-name-why {
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--muted);
+}
+.g-name .input {
+  width: 100%;
+  height: var(--h-lg);
+}
+.g-name .input:focus {
+  border-color: color-mix(in srgb, var(--brand) 72%, var(--line-3));
+  box-shadow: var(--focus-ring-brand);
+}
+.g-name .g-name-hint {
+  margin: 0;
+  font-size: var(--fs-sm, 12px);
+  color: var(--must);
+}
+/* the visitor's verdict once given, with a way to change it */
+.g-player .g-verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1, 4px);
+  height: var(--h-sm);
+  padding: 0 var(--sp-2, 8px);
+  border-radius: var(--r-full, 999px);
+  font-size: var(--fs-sm, 12px);
+  font-weight: var(--fw-ui, 500);
+  white-space: nowrap;
+  color: var(--ok);
+  background: var(--ok-bg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 30%, transparent);
+}
+.g-player .g-verdict[data-status='changes'] {
+  color: var(--should);
+  background: color-mix(in srgb, var(--should) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--should) 30%, transparent);
+}
+.g-player .g-verdict-change {
+  margin-left: var(--sp-1, 4px);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg-2);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+/* The thank-you after a verdict: on a desk it lies at the foot of the picture, centred on it — clear of the drawing
+   tools and the compare bar at its top —, and nothing moves; on a phone or a tablet it hangs under the pinned bar
+   (below). */
+.g-player .g-thanks {
+  grid-area: stage;
+  align-self: end;
+  justify-self: center;
+  position: relative;
+  z-index: 7;
+  width: min(720px, calc(100% - 2 * var(--sp-4)));
+  margin-bottom: var(--sp-4);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3, 12px);
+  padding: var(--sp-2, 8px) var(--sp-2, 8px) var(--sp-2, 8px) var(--sp-4, 16px);
+  border-radius: var(--r-lg, 12px);
+  background: var(--ink-2);
+  box-shadow:
+    0 0 0 1px var(--line-2),
+    var(--shadow);
+  font-size: var(--fs-md, 13px);
+  line-height: 1.45;
+  color: var(--fg);
+  animation: rise var(--dur-page-in) var(--ease-out) both;
+}
+.g-player .g-thanks > .icon:first-child {
+  flex: none;
+  color: var(--ok);
+}
+.g-player .g-thanks[data-status='changes'] > .icon:first-child {
+  color: var(--should);
+}
+.g-player .g-thanks-count {
+  color: var(--muted);
+}
+.g-player .g-thanks .btn {
+  flex: none;
+}
+/* The notes are the app's rows and cards (GuestNotes.tsx GuestNoteCard, notes.css): only what a visitor alone has is
+   here. A fix waiting for their check: the question on its line, both answers together under it — never one answer
+   left alone on a line of its own. */
+.g-check {
+  display: grid;
+  gap: var(--sp-2);
+}
+.g-check-q {
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+}
+.g-check .check-decision {
+  flex-wrap: nowrap;
+}
+/* the marked frame is the note's picture here, not a way into a larger one (the app's card opens it in a lightbox) */
+.g-note .c-thumb {
+  cursor: inherit;
+}
+.g-note .c-thumb:hover {
+  transform: none;
+}
+/* how a note is written, said once under the composer while the list is empty (the composer is the invitation) */
+.g-player .g-howto {
+  margin: 0;
+  padding: 0 var(--sp-1);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--muted);
+}
+.g-player .g-howto kbd {
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+}
+.g-sending {
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2, 8px);
+  padding: var(--sp-2, 8px) var(--sp-3, 12px);
+  border-radius: var(--r-full, 999px);
+  background: var(--ink-4);
+  box-shadow: var(--shadow);
+  font-size: var(--fs-sm, 12px);
+  z-index: var(--z-float);
+}
+/* the picture's size in pixels is the team's business, not the client's */
+.g-player .crop .dim {
+  display: none;
+}
+
+/* ---------------------------------------------------------------- compare (GuestPlayer.tsx, GuestCompare.tsx)
+   The owner's compare bar (player.css: a dark island floating over the stage's top), here in a layer of its own over
+   the stage; each picture says which side it is on itself, in a chip that reads over any picture. */
+.g-cmp-layer {
+  grid-area: stage;
+  position: relative;
+  z-index: 6;
+  pointer-events: none;
+}
+.g-cmp-layer > * {
+  pointer-events: auto;
+}
+/* two pictures stand apart by their own room; a line between the panes would run through the bar and the tools */
+.g-player .pane + .pane {
+  border-left: 0;
+}
+/* one above the other: the side-by-side glyph turns with them */
+.g-cmp-layer .compare-bar[data-stacked] .cmp-modes [data-value='side'] .icon {
+  transform: rotate(90deg);
+}
+.g-player .pane-tag-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  container-type: inline-size;
+}
+/* a narrow picture (two upright ones on a phone) keeps the side and the version, not B's word */
+@container (max-width: 240px) {
+  .g-player .pane-tag i {
+    display: none;
+  }
+}
+.g-player .pane-tag {
+  position: absolute;
+  top: var(--sp-2);
+  left: var(--sp-2);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: var(--h-sm);
+  padding: 0 var(--sp-2) 0 var(--sp-1);
+  border-radius: var(--r);
+  background: color-mix(in srgb, var(--ink-0) 72%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--fg) 14%, transparent);
+  backdrop-filter: blur(10px) saturate(1.2);
+  color: var(--fg);
+  font: var(--fw-strong) var(--fs-sm) / var(--lh-ui) var(--ui);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.g-player .pane-tag-layer.b .pane-tag {
+  left: auto;
+  right: var(--sp-2);
+}
+/* A and B as in the compare bar (player.css .cmp-tag) */
+.g-player .pane-tag b {
+  display: inline-grid;
+  place-items: center;
+  width: var(--h-xs);
+  height: var(--h-xs);
+  border-radius: var(--r-sm);
+  background: var(--ink-4);
+  font: var(--fw-strong) var(--fs-xs) / 1 var(--ui);
+  color: var(--fg-2);
+}
+/* B's one word: the reference (notes and the verdict are about A) */
+.g-player .pane-tag i {
+  font-style: normal;
+  font-weight: var(--fw-ui);
+  color: var(--fg-2);
+}
+.g-player .pane-tag i::before {
+  content: '·';
+  margin-right: var(--sp-1);
+  color: var(--muted);
+}
+/* the other side's box while its video gets ready: the words where the picture will be */
+.g-player .pane-note {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-4);
+  text-align: center;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+/* Comparing, the drawing tools stand over A, the picture they draw on — the left one side by side, the left of the wipe
+   — clear of the handle (a phone: in their strip under the stage). */
+@media (min-width: 640px) {
+  .g-player[data-compare] .draw-bar {
+    left: 25%;
+  }
+}
+/* fingers: every control of the bar gets a 44 px tap area around its look */
+@media (hover: none) and (pointer: coarse) {
+  .g-cmp-layer .compare-bar :is(.btn, .input.select, .seg button) {
+    position: relative;
+  }
+  .g-cmp-layer .compare-bar :is(.btn, .input.select, .seg button)::after {
+    content: '';
+    position: absolute;
+    inset: min(0px, calc(50% - 22px));
+  }
+}
+
+/* phones and small tablets: one column that scrolls — the bar, the stage, the transport, then the notes */
+@media (max-width: 820px) {
+  /* the stage as tall as the video needs at this width (--ar = height / width, set by the player), not a fixed share;
+     --g-stage per width below (a phone's picture across the width, a compare's two) */
+  .g-player.guest {
+    --g-stage: clamp(200px, calc(100vw * var(--ar, 0.5625) + 72px), 70vh);
+    grid-template-rows: auto var(--g-stage) auto auto;
+  }
+  /* A link with no notes panel (watch only, delivery): the page is at least the screen, and the foot is its end — not a
+     line floating half way down a phone */
+  .g-player.guest.no-notes {
+    min-height: 100dvh;
+    grid-template-rows: auto var(--g-stage) auto minmax(auto, 1fr);
+  }
+  .g-player.no-notes > .g-foot {
+    align-self: end;
+  }
+  /* The bar stays at the top while the page scrolls, as an app's does, and clears the status bar and the notch
+     (viewport-fit=cover; Safari also tints its own bar from a pinned header): nothing scrolls under the clock. */
+  .g-player .g-top {
+    position: sticky;
+    top: 0;
+    height: auto;
+    min-height: calc(54px + env(safe-area-inset-top));
+    padding-top: env(safe-area-inset-top);
+    padding-left: max(var(--sp-3), env(safe-area-inset-left));
+    padding-right: max(var(--sp-3), env(safe-area-inset-right));
+    flex-wrap: nowrap;
+  }
+  .g-transport .tc {
+    min-width: 0;
+    margin: 0 var(--sp-1, 4px);
+  }
+  .g-transport .tc .sub {
+    display: none;
+  }
+  .g-player .side {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+  .g-player .side-scroll {
+    overflow: visible;
+  }
+  /* the page's end: the home indicator and Safari's floating bar keep clear of the foot */
+  .g-player .side > .g-foot,
+  .g-player > .g-foot {
+    padding-top: var(--sp-6);
+    padding-bottom: calc(var(--sp-6) + env(safe-area-inset-bottom));
+  }
+  .room-scroll {
+    padding: 0 var(--sp-4, 16px) calc(var(--sp-12, 48px) + env(safe-area-inset-bottom));
+  }
+  .room-head {
+    padding: var(--sp-6, 24px) 0 var(--sp-4, 16px);
+  }
+  .room .grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: var(--sp-4, 16px) var(--sp-3, 12px);
+  }
+  /* the thank-you hangs under the pinned bar: the title stays readable, and the bottom edge is where menus rise as
+     sheets and Safari keeps its own bar */
+  .g-player .g-thanks {
+    grid-area: auto;
+    position: fixed;
+    z-index: var(--z-float);
+    top: calc(54px + env(safe-area-inset-top) + var(--sp-2));
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(720px, calc(100% - 2 * var(--sp-3)));
+    margin: 0;
+    flex-wrap: wrap;
+  }
+}
+
+/* Phones (lib/media.ts PHONE): the bar is one row — the mark, the title, Approve and ⋯ (GuestPlayer.tsx) —, every
+   control on one 40 px step with a 44 px tap area. */
+@media (max-width: 639px), (max-height: 480px) and (hover: none) and (pointer: coarse) {
+  /* a tablet's bar names its buttons; a phone's has the room for the title */
+  .g-hide-sm {
+    display: none;
+  }
+  .g-player .g-top {
+    gap: var(--sp-2);
+    padding-left: max(var(--sp-2), env(safe-area-inset-left));
+    padding-right: max(var(--sp-1), env(safe-area-inset-right));
+  }
+  .g-top-acts {
+    gap: var(--sp-1);
+  }
+  .g-top-acts .btn {
+    position: relative;
+    min-height: 0;
+    height: var(--h-lg);
+  }
+  .g-top-acts .btn.primary {
+    padding: 0 var(--sp-3);
+  }
+  .g-top-acts .btn.icon-only {
+    min-width: var(--h-touch);
+  }
+  .g-top-acts .btn::after,
+  .g-player .g-who-btn::after,
+  .g-note .note-tools .btn::after,
+  .g-note .note-range .btn::after,
+  .g-note button.c-tc::after,
+  .g-foot a::after {
+    content: '';
+    position: absolute;
+    inset: min(0px, calc(50% - 22px));
+  }
+  .g-player .g-who-btn,
+  .g-note button.c-tc,
+  .g-foot a {
+    position: relative;
+  }
+  /* a card's Reply and a section's play keep their quiet size (a finger's tap area around them), so the head isn't a row
+     taller than its badges */
+  .g-note .note-tools .btn,
+  .g-note .note-range .btn {
+    position: relative;
+    min-height: 0;
+    height: var(--h-sm);
+  }
+  .g-note .note-range .btn.icon-only {
+    min-width: 0;
+    width: var(--h-sm);
+  }
+  .g-transport .select-sizer > * {
+    text-align: center;
+  }
+  .g-player .g-verdict {
+    height: var(--h-lg);
+    padding: 0 var(--sp-3);
+  }
+  .g-player .side > .g-foot,
+  .g-player > .g-foot {
+    padding-bottom: calc(var(--sp-6) + env(safe-area-inset-bottom));
+  }
+  /* the picture across the width: its frame's corner marks give way, the drawing tools sit in their own strip under it
+     (Stage's pad and reserveBottom in GuestPlayer.tsx: PHONE_PAD, TOOLS_ROOM) */
+  .g-player {
+    --g-tools: calc(var(--h-touch) + var(--sp-1));
+    /* the compare row at the stage's top (GuestPlayer.tsx COMPARE_ROOM) */
+    --g-cmp: calc(var(--h-touch) + var(--sp-2));
+  }
+  .g-player.view-only,
+  .g-player[data-compare] {
+    --g-tools: 0px;
+  }
+  .g-player .crop::before {
+    display: none;
+  }
+  /* Comparing on a phone: the bar is the stage's first row, flat on its dark ground — A, swap, B, the two ways, close —
+     every control 40 px tall with a 44 px tap area; the versions by their numbers alone, so the row fits 360 px. */
+  .g-cmp-layer .compare-bar {
+    top: 0;
+    left: 0;
+    right: 0;
+    width: auto;
+    max-width: none;
+    height: var(--g-cmp);
+    margin: 0;
+    padding: 0 max(var(--sp-2), env(safe-area-inset-right)) 0 max(var(--sp-2), env(safe-area-inset-left));
+    justify-content: space-between;
+    gap: var(--sp-1);
+    border-radius: 0;
+    background: none;
+    box-shadow: inset 0 -1px 0 var(--line);
+    backdrop-filter: none;
+    animation: none;
+  }
+  .g-cmp-layer .compare-bar .cmp-side {
+    gap: var(--sp-1);
+  }
+  .g-cmp-layer .compare-bar :is(.input.select, .btn.sm, .seg button) {
+    height: var(--h-lg);
+    min-height: 0;
+  }
+  .g-cmp-layer .compare-bar .input.select {
+    padding-left: var(--sp-2);
+    font-size: var(--fs-md);
+  }
+  .g-cmp-layer .compare-bar .btn.sm.icon-only,
+  .g-cmp-layer .compare-bar .seg button {
+    width: var(--h-lg);
+    min-width: var(--h-lg);
+  }
+  .g-cmp-layer .compare-bar .cmp-sep {
+    display: none;
+  }
+  .g-player .draw-bar {
+    top: auto;
+    bottom: var(--sp-1);
+    gap: var(--sp-3);
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    backdrop-filter: none;
+    animation: none;
+  }
+  /* the transport in one row a thumb reaches: step, play, step, the timecode in the room left, speed and sound */
+  .g-player .dock {
+    padding: var(--sp-1) max(var(--sp-2), env(safe-area-inset-right)) var(--sp-2) max(var(--sp-2), env(safe-area-inset-left));
+    gap: var(--sp-1);
+  }
+  .g-transport {
+    flex-wrap: nowrap;
+    column-gap: var(--sp-1);
+  }
+  .g-transport > .group {
+    gap: 0;
+  }
+  .g-transport > .group:first-child {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .g-transport > .group.right {
+    flex: none;
+  }
+  .g-transport .tc {
+    flex: 1 1 auto;
+    justify-content: center;
+    height: var(--h-lg);
+    padding: 0 var(--sp-2);
+  }
+  .g-transport .tc .main {
+    font-size: var(--fs-lg);
+  }
+  .g-transport .input.select {
+    height: var(--h-lg);
+    min-width: 0;
+    padding-left: var(--sp-2);
+    border-color: transparent;
+    background-color: transparent;
+    box-shadow: none;
+    font-size: var(--fs-md) !important;
+  }
+}
+/* phones held upright: the stage is the picture across the width, plus the tools' strip under it */
+@media (max-width: 639px) {
+  .g-player.guest {
+    --g-stage: clamp(200px, calc((100vw - 2 * var(--sp-2)) * var(--ar, 0.5625) + 2 * var(--sp-2) + var(--g-tools)), 70vh);
+  }
+  /* Comparing: the compare row on top, then the pictures — two landscape ones one above the other, each across the
+     width (--g-down: 2), two upright ones side by side (--g-across: 2), or the one a wipe cuts (no drawing tools while
+     comparing on a phone). */
+  .g-player.guest[data-compare] {
+    --g-stage: clamp(
+      200px,
+      calc(var(--g-cmp) + var(--g-down, 1) * ((100vw / var(--g-across, 1) - 2 * var(--sp-2)) * var(--ar, 0.5625) + 2 * var(--sp-2)) + var(--g-tools)),
+      70vh
+    );
+  }
+  .room-head h1 {
+    font-size: var(--fs-2xl, 24px);
+  }
+}

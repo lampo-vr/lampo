@@ -1,0 +1,147 @@
+/* ---------------------------------------------------------------- the sample's last moment (onboarding/LoopDone.tsx)
+   Over the player, dark in both themes like the stage it covers: the loop's steps, a title, one sentence, the way back. */
+.ob-loop-done {
+  --ld-ground: rgba(8, 8, 9, 0.86);
+  --ld-fg: #eeebe4;
+  --ld-fg-2: #bebab2;
+  --ld-muted: #8c8982;
+  --ld-line: rgba(238, 235, 228, 0.28);
+  --ld-ok: #3ddc97;
+  --ld-must: #ff453a;
+  --ld-ask: #d97757;
+  --ld-hover: rgba(238, 235, 228, 0.07);
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dialog);
+  display: grid;
+  place-items: center;
+  padding: var(--sp-6);
+  background: var(--ld-ground);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  color: var(--ld-fg);
+  animation: ob-ld-in 320ms var(--ease-out);
+}
+.ob-loop-card {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-4);
+  width: min(100%, 460px);
+  text-align: center;
+  animation: ob-ld-rise 520ms 80ms var(--ease-out) backwards;
+}
+.ob-loop-card h2 {
+  margin: 0;
+  font: var(--fw-strong) var(--fs-3xl) / 1.05 var(--display);
+  font-stretch: 87.5%;
+  letter-spacing: var(--track-title);
+}
+.ob-loop-card p {
+  margin: 0;
+  color: var(--ld-fg-2);
+  font-size: var(--fs-lg);
+  text-wrap: pretty;
+}
+/* the loop's four steps on one line at any width: the dashes between them give way first */
+.ob-loop-steps {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: 100%;
+  color: var(--ld-muted);
+  font: var(--fw-ui) var(--fs-xs) / 1 var(--mono);
+  font-stretch: 87.5%;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.ob-loop-st {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  white-space: nowrap;
+}
+.ob-loop-st .kg {
+  --kg-size: 11px;
+}
+.ob-loop-st .ob-loop-must {
+  color: var(--ld-must);
+}
+.ob-loop-st .ob-loop-ask {
+  color: var(--ld-ask);
+}
+.ob-loop-st .ob-loop-ok {
+  color: var(--ld-ok);
+}
+.ob-loop-sep {
+  flex: 0 1 22px;
+  min-width: var(--sp-1);
+  height: 1.5px;
+  background: var(--ld-line);
+}
+.ob-loop-card:focus {
+  outline: none;
+}
+.ob-loop-done .ob-loop-go:focus-visible,
+.ob-loop-done .ob-loop-stay:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ld-fg) 32%, transparent);
+}
+.ob-loop-acts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--sp-2);
+}
+.ob-loop-go,
+.ob-loop-stay {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  height: var(--h-lg);
+  padding: 0 var(--sp-4);
+  border-radius: var(--r);
+  font: var(--fw-strong) var(--fs-md) / 1 var(--ui);
+  text-decoration: none;
+  cursor: pointer;
+}
+.ob-loop-go {
+  border: 1px solid var(--brand-deep);
+  background: var(--raise-sheen), var(--brand-deep);
+  color: var(--on-brand);
+  box-shadow: var(--raise);
+}
+.ob-loop-stay {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ld-fg-2);
+  font-weight: var(--fw-ui);
+}
+.ob-loop-stay:hover {
+  background: var(--ld-hover);
+  color: var(--ld-fg);
+}
+@keyframes ob-ld-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes ob-ld-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ob-loop-done,
+  .ob-loop-card {
+    animation: none;
+  }
+}
+@media (max-width: 440px) {
+  .ob-loop-steps {
+    gap: var(--sp-1);
+  }
+}

@@ -1,0 +1,804 @@
+/* ---------------------------------------------------------------- settings (server mode) */
+
+/* The body carries the background and grain; nav and main scroll, and grain on a scroller ends after a screenful. */
+.settings {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  background: var(--ink-1);
+}
+.set-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-0_5);
+  padding: var(--sp-4) var(--sp-3) var(--sp-3);
+  border-right: 1px solid var(--line);
+  overflow: auto;
+}
+.set-nav > a {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-2);
+  border-radius: var(--radius-sm);
+  color: var(--fg-2);
+  text-decoration: none;
+  font-weight: var(--fw-ui);
+  white-space: nowrap;
+}
+.set-nav > a:hover {
+  background: var(--ink-3);
+  color: var(--fg);
+}
+/* The current section: a short bar inside the row, clear of its rounded corners (an edge along them would bend). */
+/* The current section: lifted, like the library's current place and a chosen segment. */
+.set-nav > a.on {
+  background: var(--raise-sheen), var(--ink-3);
+  color: var(--fg);
+  box-shadow: var(--raise);
+}
+.set-nav > a .icon {
+  color: var(--muted);
+}
+.set-nav > a.on .icon {
+  color: var(--fg);
+}
+.set-server {
+  margin-top: auto;
+  display: grid;
+  gap: var(--sp-1);
+  padding: var(--sp-3) var(--sp-2) var(--sp-0_5);
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-xs);
+  color: var(--fg-2);
+}
+/* label · value rows: a two-column grid, so a value that wraps (the licence line) stays in its column */
+.set-server > div {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr);
+  align-items: baseline;
+}
+.set-server > div > span:first-child {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+/* plain text links: no box, no background, an underline that firms up on hover */
+.set-server a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--line-3);
+  text-underline-offset: 2px;
+}
+.set-server a:hover {
+  color: var(--fg);
+  text-decoration-color: currentColor;
+}
+
+.set-main {
+  overflow: auto;
+}
+/* the reading measure, in the middle of the room beside the sections: on a wide screen the page doesn't hang off the
+   sidebar with the rest of the window empty */
+.set-inner {
+  max-width: 780px;
+  margin-inline: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-4);
+  padding: var(--sp-8) var(--sp-12) var(--sp-20);
+  animation: rise 0.45s var(--ease) both;
+}
+/* the House playbook: the document and what agents read beside it need the room a page of cards doesn't */
+.set-inner.wide {
+  max-width: 1400px;
+}
+/* Billing: room for three plans side by side; centred in its room like every section (audit M1/X1) */
+.set-inner.bill-col {
+  max-width: 1040px;
+}
+.set-head h1 {
+  margin: 0;
+  font: var(--fw-strong) semi-condensed var(--fs-3xl) / var(--lh-tight) var(--display);
+  letter-spacing: var(--track-title);
+}
+.set-head p {
+  margin: var(--sp-2) 0 var(--sp-1);
+  max-width: 64ch;
+  color: var(--muted);
+}
+.set-head b {
+  color: var(--fg-2);
+  font-weight: var(--fw-ui);
+}
+
+.set-card {
+  display: grid;
+  gap: var(--sp-4);
+}
+.set-card > header p {
+  margin: var(--sp-1) 0 0;
+  max-width: 66ch;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.set-card code,
+.set-head code {
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  background: var(--ink-4);
+  padding: var(--sp-0_5) var(--sp-1);
+  border-radius: var(--r-sm);
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+/* phones: a command longer than the card wraps (here, not in mobile.css: this sheet loads with its chunk, after it) */
+@media (max-width: 639px) {
+  .set-card code,
+  .set-head code {
+    display: inline-block;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+.set-form {
+  display: grid;
+  gap: var(--sp-3);
+}
+.set-field {
+  display: grid;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+.set-field > span:first-child {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-ui);
+  color: var(--muted);
+}
+.set-field .input.select {
+  width: 100%;
+}
+.set-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-3);
+}
+.set-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}
+.set-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.set-expired {
+  color: var(--must);
+}
+.set-warn {
+  color: var(--should);
+  font-size: var(--fs-sm);
+}
+.input.invalid {
+  border-color: color-mix(in srgb, var(--must) 60%, transparent);
+}
+
+.set-rows {
+  display: grid;
+  /* one column the rows can't widen: a long line ellipsises instead of pushing the actions out */
+  grid-template-columns: minmax(0, 1fr);
+  border-radius: var(--r);
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--line);
+}
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-3);
+  background: var(--ink-1);
+  border-top: 1px solid var(--line);
+}
+.set-row:first-child {
+  border-top: 0;
+}
+.set-row.off {
+  opacity: 0.6;
+}
+.set-row .input.select {
+  min-width: 108px;
+}
+.set-sub {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.set-prefix {
+  font-size: var(--fs-xs);
+}
+
+/* a token that was just made (Tokens.tsx Fresh): ready, then two numbered steps — copy it, connect an agent */
+.set-fresh {
+  display: grid;
+  gap: var(--sp-6);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--line);
+  container: fresh / inline-size;
+  animation: rise 0.35s var(--ease) both;
+}
+.set-fresh-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.set-fresh-head b {
+  min-width: 0;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-strong);
+  overflow-wrap: anywhere;
+}
+.set-fresh-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--h-xs);
+  height: var(--h-xs);
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--ok) 16%, transparent);
+  color: var(--ok);
+}
+.set-fresh-step {
+  display: grid;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.set-fresh-step > h3 {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  font: var(--fw-strong) var(--fs-md) var(--ui);
+  color: var(--fg);
+}
+.set-fresh-step > h3 + p {
+  margin: calc(-1 * var(--sp-2)) 0 0;
+}
+.set-fresh-step > p {
+  margin: 0;
+}
+
+.set-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--sp-3);
+  color: var(--fg-2);
+}
+.set-steps li {
+  display: grid;
+  gap: var(--sp-1);
+}
+
+.badge.role-owner {
+  background: var(--fg);
+  color: var(--on-fg);
+}
+.badge.role-admin {
+  background: var(--ink-5);
+  color: var(--fg);
+}
+.badge.role-reviewer {
+  background: transparent;
+  color: var(--fg-2);
+  box-shadow: inset 0 0 0 1px var(--line-3);
+}
+
+/* invites: a link glyph in the slot where users show their initials */
+.invite-mark {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+  border: 1px dashed var(--line-3);
+  color: var(--fg-2);
+}
+.set-row:not(.off) .invite-mark {
+  border-color: color-mix(in srgb, var(--edge) 80%, transparent);
+  color: var(--edge-2);
+}
+.set-more {
+  justify-self: start;
+  color: var(--muted);
+}
+.btn.danger-outline {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--must) 40%, transparent);
+  color: var(--must-2);
+}
+.btn.danger-outline:hover {
+  background: var(--must-bg);
+  border-color: var(--must);
+}
+
+@media (max-width: 760px) {
+  .settings {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+  /* the sections as a row that scrolls sideways, with soft edges where there is more (Settings.tsx) */
+  .set-nav {
+    flex-direction: row;
+    padding: var(--sp-2);
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .set-nav::-webkit-scrollbar {
+    display: none;
+  }
+  .set-server {
+    display: none;
+  }
+  .set-inner {
+    padding: var(--sp-6) var(--sp-4) var(--sp-16);
+  }
+  .set-pair {
+    grid-template-columns: 1fr;
+  }
+  .set-facts > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-0_5);
+  }
+}
+
+.set-lang-mode {
+  justify-self: start;
+}
+
+.set-hint {
+  margin: calc(-1 * var(--sp-1)) 0 0;
+}
+
+/* the source offer (AGPL-3.0 §13): quiet, but a real link */
+.set-server a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--line-3);
+  text-underline-offset: 2px;
+}
+.set-server a:hover {
+  color: var(--fg);
+}
+
+/* label → value rows (Speech, About): the value takes the room, long paths wrap */
+.set-facts {
+  display: grid;
+  margin: 0;
+  border-radius: var(--r);
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--line);
+}
+.set-facts > div {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--ink-1);
+  border-top: 1px solid var(--line);
+}
+.set-facts > div:first-child {
+  border-top: 0;
+}
+.set-facts dt {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.set-facts dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--fs-md);
+}
+.set-facts dd.mono {
+  font-size: var(--fs-sm);
+}
+
+/* the licence card's links */
+.set-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-4);
+  font-size: var(--fs-md);
+}
+.set-links a,
+.set-links .set-link-btn {
+  color: var(--fg-2);
+  text-decoration: underline;
+  text-decoration-color: var(--line-3);
+  text-underline-offset: 2px;
+}
+/* a link that opens something in the page (the cookie settings) looks like its neighbours */
+.set-links .set-link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+.set-links a:hover,
+.set-links .set-link-btn:hover {
+  color: var(--fg);
+}
+
+/* Profile: the picture beside its words and buttons */
+.set-picture {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+.set-picture .set-picture-text {
+  display: grid;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+.set-picture .set-picture-text b {
+  font-size: var(--fs-md);
+}
+.set-picture .set-picture-text > span {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.set-picture .set-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  margin-top: var(--sp-1);
+}
+
+/* Voice notes: the state beside what it is doing; the languages as chips with a picker for one more */
+.set-voice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+}
+.set-voice .progress {
+  flex-basis: 100%;
+}
+.set-langs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.set-langs .set-lang-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: var(--h);
+  padding: 0 var(--sp-1) 0 var(--sp-3);
+  border-radius: var(--r-full);
+  background: var(--ink-3);
+  box-shadow: 0 0 0 1px var(--line-2);
+  font-size: var(--fs-md);
+}
+.set-langs .set-lang-x {
+  display: grid;
+  place-items: center;
+  width: var(--h-xs);
+  height: var(--h-xs);
+  border: 0;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.set-langs .set-lang-x:hover {
+  background: var(--ink-5);
+  color: var(--fg);
+}
+
+/* A card that starts folded (settings/parts.tsx Details) */
+.set-details > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-1) var(--sp-3);
+  list-style: none;
+  cursor: pointer;
+}
+.set-details > summary::-webkit-details-marker {
+  display: none;
+}
+.set-details > summary h2 {
+  margin: 0;
+  font: var(--fw-strong) var(--fs-lg) / var(--lh-ui) var(--ui);
+  color: var(--fg);
+}
+.set-details > summary h2::after {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-left: var(--sp-2);
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: translateY(-2px) rotate(-45deg);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.set-details[open] > summary h2::after {
+  transform: translateY(-3px) rotate(45deg);
+}
+.set-details > summary > span {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.set-details > .set-details-body {
+  display: grid;
+  gap: var(--sp-3);
+  margin-top: var(--sp-4);
+}
+.set-card.set-details {
+  display: block;
+}
+
+/* Connect an agent (settings/Mcp.tsx): numbered steps, agent tiles, the live connection */
+.set-card > header h2 .set-step-n,
+.set-fresh-step > h3 .set-step-n {
+  display: inline-grid;
+  place-items: center;
+  width: var(--h-xs);
+  height: var(--h-xs);
+  margin-right: var(--sp-2);
+  border-radius: var(--r-full);
+  background: var(--ink-4);
+  color: var(--fg);
+  font: var(--fw-strong) var(--fs-xs) var(--mono);
+  letter-spacing: 0;
+}
+.set-tiles-w {
+  container: agent-tiles / inline-size;
+  min-width: 0;
+}
+.set-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* every row as tall as the tallest: a line that wraps in one tile makes all of them taller, not its row alone */
+  grid-auto-rows: 1fr;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.set-tiles .set-tile {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  /* name and line stay together in the middle of a taller tile (stretched, they spread apart) */
+  align-content: center;
+  align-items: center;
+  column-gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-3);
+  border-radius: var(--r);
+  background: var(--ink-1);
+  box-shadow: 0 0 0 1px var(--line-2);
+  color: var(--fg-2);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+.set-tiles .set-tile .icon {
+  grid-row: span 2;
+  color: var(--muted);
+}
+.set-tiles .set-tile b {
+  overflow: hidden;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-strong);
+  color: var(--fg);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* what the tile is for, whole: it wraps rather than cut a name mid-word ("VS Code, Antigravity, Gemi…") */
+.set-tiles .set-tile > span:last-child {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-ui);
+  color: var(--muted);
+  text-wrap: balance;
+}
+.set-tiles .set-tile:hover {
+  background: var(--ink-3);
+}
+.set-tiles .set-tile:has(input:checked) {
+  background: var(--raise-sheen), var(--ink-3);
+  box-shadow:
+    0 0 0 1px var(--line-3),
+    var(--raise);
+}
+.set-tiles .set-tile:has(input:checked) .icon {
+  color: var(--fg);
+}
+.set-tiles .set-tile:has(input:focus-visible) {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+/* three across while a name and its line fit whole (a tablet's panel cut "Claude Co…"), else two */
+@container agent-tiles (max-width: 480px) {
+  .set-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+/* four tiles (a fresh token's agents) stand in one row where the panel has room, else two by two */
+.set-tiles.n4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@container agent-tiles (max-width: 600px) {
+  .set-tiles.n4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+/* behind "Other client": the formats as chips with their marks (AgentChoice.tsx OtherClients) */
+.set-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.set-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: var(--h-sm);
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-full);
+  background: var(--ink-1);
+  box-shadow: 0 0 0 1px var(--line-2);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+.set-chip .icon {
+  color: var(--muted);
+}
+.set-chip:hover {
+  background: var(--ink-3);
+}
+.set-chip:has(input:checked) {
+  background: var(--raise-sheen), var(--ink-3);
+  box-shadow:
+    0 0 0 1px var(--line-3),
+    var(--raise);
+  color: var(--fg);
+}
+.set-chip:has(input:checked) .icon {
+  color: var(--fg);
+}
+.set-chip:has(input:focus-visible) {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+@media (pointer: coarse) {
+  .set-chip {
+    height: var(--h-touch);
+  }
+}
+.set-waiting .kg {
+  animation: set-wait 1.6s var(--ease-in-out) infinite;
+}
+@keyframes set-wait {
+  50% {
+    opacity: 0.25;
+  }
+}
+.set-updates {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding-left: var(--sp-4);
+  color: var(--fg-2);
+  font-size: var(--fs-md);
+}
+.set-updates b {
+  color: var(--fg);
+  font-weight: var(--fw-ui);
+}
+
+/* ---------------------------------------------------------------- email (Users, Profile, Notifications)
+   A choice with its sentence: the box (or switch) beside a bold line and what it means. */
+.set-check,
+.set-switch {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+}
+.set-check .checkbox {
+  margin-top: var(--sp-0_5);
+  flex: none;
+}
+.set-check > label,
+.set-switch > label {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: var(--sp-0_5);
+  cursor: pointer;
+}
+.set-check b,
+.set-switch b {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-ui);
+}
+.set-switch .switch {
+  flex: none;
+  margin-top: var(--sp-0_5);
+}
+/* A quiet fact under a form (no relay: emails wait in the outbox). */
+.set-note {
+  margin: 0;
+}
+/* Deleting an account or a workspace (Profile.tsx, Workspace.tsx): what stops it or goes with it, a sentence over the
+   workspaces it names; the dialog's sentence over the field the answer waits for. */
+.set-del-part,
+.set-del-ask {
+  display: grid;
+  gap: var(--sp-2);
+}
+.set-del-part > p,
+.set-del-ask > p {
+  margin: 0;
+}
+.set-del-ask {
+  gap: var(--sp-3);
+}
+.set-del-ask .set-field > span:first-child {
+  color: var(--fg-2);
+}
+.set-typed {
+  color: var(--fg);
+  font-weight: var(--fw-strong);
+  overflow-wrap: anywhere;
+}
+.set-note code {
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+}
+/* An address waiting for its link: where it went, and what to do. */
+.set-address {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: flex-start;
+  padding: var(--sp-3);
+  border-radius: var(--r);
+  background: var(--ink-1);
+  box-shadow: 0 0 0 1px var(--line);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.set-address > svg {
+  flex: none;
+  margin-top: var(--sp-0_5);
+}
+.set-address b {
+  color: var(--fg);
+  font-weight: var(--fw-ui);
+  overflow-wrap: anywhere;
+}
+.set-address .set-actions {
+  margin-top: var(--sp-2);
+}
+.set-actions.start {
+  justify-content: flex-start;
+}

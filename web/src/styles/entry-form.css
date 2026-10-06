@@ -1,0 +1,301 @@
+/* ---------------------------------------------------------------- the fields and the way in (ui/EntryForm.tsx)
+   One look for every form in front of the app — a review link's password, the owner's sign-in, setup, sign-up, confirm
+   and reset, an invite, the new-workspace dialog — so the two sides can't drift apart: a label over a boxed field, an
+   eye in every password, helper text under its field, one line kept for what went wrong (a miss shakes its field) and
+   the orange way in. Phones get fields and buttons a finger hits and iOS doesn't zoom into. */
+
+/* the fields, the line for a miss and the way in, close together; the next field a little further off */
+.inv-form {
+  display: grid;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.inv-form > .entry-field + .entry-field {
+  margin-top: var(--sp-2);
+}
+.entry-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: calc(var(--sp-1) + var(--sp-0_5)) var(--sp-3);
+  min-width: 0;
+}
+.entry-field > .inv-label {
+  grid-row: 1;
+  grid-column: 1;
+}
+.entry-field > .inv-field,
+.entry-field > .entry-hint {
+  grid-column: 1 / -1;
+}
+/* a way out beside the label ("Forgot password?"): after the field in the markup, so Tab reaches it after the field */
+.entry-aside {
+  grid-row: 1;
+  grid-column: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.entry-aside a {
+  color: var(--muted);
+  text-decoration: underline;
+  text-decoration-color: var(--line-3);
+  text-underline-offset: 2px;
+}
+.entry-aside a:hover {
+  color: var(--fg);
+  text-decoration-color: currentColor;
+}
+/* a finger's row: "Forgot password?" beside its field's label, its tap area never reaching into the field under it */
+@media (pointer: coarse) {
+  .entry-aside a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--h-touch);
+  }
+}
+.entry-aside a:focus-visible {
+  outline: none;
+  border-radius: var(--r-sm);
+  box-shadow: var(--focus-ring);
+}
+.inv-label {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-ui);
+  color: var(--fg-2);
+}
+.inv-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+/* a wrong try shakes the field; two names for one shake, so every try plays it again */
+.inv-field[data-shake='a'] {
+  animation: inv-shake-a 420ms var(--ease-out);
+}
+.inv-field[data-shake='b'] {
+  animation: inv-shake-b 420ms var(--ease-out);
+}
+@keyframes inv-shake-a {
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(5px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(1px);
+  }
+}
+@keyframes inv-shake-b {
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(5px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(1px);
+  }
+}
+.gate-input {
+  width: 100%;
+  height: var(--h-lg);
+  padding: 0 var(--sp-3);
+  border-radius: var(--r);
+  border: 1px solid var(--line-2);
+  background: var(--ink-2);
+  color: var(--fg);
+  font: var(--fw-text) var(--fs-md) var(--ui);
+  outline: none;
+  box-shadow: var(--sunk);
+  transition:
+    border-color var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out);
+}
+.gate-input::placeholder {
+  color: var(--faint);
+}
+/* the eye sits inside the field: the text stops short of it */
+.inv-field.with-eye .gate-input {
+  padding-right: var(--sp-12);
+}
+/* dots read better spaced (a shown password, a token or a typed name keep the face's own spacing) */
+.gate-input[type='password'] {
+  letter-spacing: 0.1em;
+}
+.gate-input.mono {
+  font: var(--fw-ui) var(--fs-sm) var(--mono);
+  font-stretch: 87.5%;
+}
+.gate-input:hover {
+  border-color: var(--line-3);
+}
+.gate-input:focus {
+  border-color: var(--line-4);
+  box-shadow: var(--sunk), var(--focus-ring);
+}
+.gate-input:disabled {
+  opacity: 0.6;
+}
+.inv-field.bad .gate-input {
+  border-color: color-mix(in srgb, var(--must) 70%, var(--line-2));
+}
+.inv-eye {
+  position: absolute;
+  right: var(--sp-1);
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.inv-eye:hover {
+  background: var(--sel);
+  color: var(--fg);
+}
+/* what helps fill a field in, under it: quiet; a count that's short turns to the warning colour */
+.entry-hint {
+  display: grid;
+  gap: calc(var(--sp-1) + var(--sp-0_5));
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.entry-hint .warn {
+  color: var(--should);
+}
+.entry-hint code {
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  color: var(--fg-2);
+}
+/* always one line tall, so a message never moves the button */
+.gate-error {
+  margin: 0;
+  min-height: var(--h-xs);
+  font-size: var(--fs-md);
+  line-height: var(--lh-ui);
+  color: var(--must);
+  text-wrap: pretty;
+}
+.gate-error b {
+  font-weight: var(--fw-strong);
+}
+/* the way in: the brand's orange on the raised material, lit by its own glow under the pointer */
+.gate-go,
+.gate-alt {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  width: 100%;
+  height: var(--h-lg);
+  padding: 0 var(--sp-4);
+  border-radius: var(--r);
+  font: var(--fw-strong) var(--fs-md) / 1 var(--ui);
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    box-shadow var(--dur) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out),
+    background var(--dur-fast);
+}
+.gate-go {
+  border: 1px solid var(--brand-deep);
+  background: var(--raise-sheen), var(--brand-deep);
+  color: var(--on-brand);
+  box-shadow: var(--raise);
+}
+.gate-go:hover {
+  box-shadow: var(--raise-edge), var(--shadow-brand);
+}
+.gate-go:active {
+  transform: translateY(1px);
+  box-shadow: var(--press);
+}
+.gate-go[aria-busy='true'] {
+  cursor: progress;
+  box-shadow: var(--raise);
+}
+.gate-go:disabled:not([aria-busy='true']) {
+  cursor: default;
+}
+.gate-go:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+.gate-go .spinner {
+  border-color: color-mix(in srgb, var(--on-brand) 30%, transparent);
+  border-top-color: var(--on-brand);
+}
+/* the words keep their place while the spinner turns beside them (it stands left of them, not in the row they are
+   centred in: they jumped 11 px right and back) */
+:is(.gate-go, .gate-alt) > span {
+  position: relative;
+}
+:is(.gate-go, .gate-alt) > span > .spinner {
+  position: absolute;
+  right: calc(100% + var(--sp-2));
+  top: 50%;
+  translate: 0 -50%;
+}
+/* the other way on, beside or under it (Send it again, Deny): the same size, the quiet material */
+.gate-alt {
+  border: 1px solid var(--line-2);
+  background: var(--ink-3);
+  color: var(--fg);
+  font-weight: var(--fw-ui);
+}
+.gate-alt:hover:not(:disabled) {
+  background: var(--ink-4);
+  border-color: var(--line-3);
+}
+.gate-alt:is(:disabled, [aria-disabled='true']) {
+  color: var(--muted);
+  cursor: default;
+}
+.gate-alt[aria-disabled='true']:hover {
+  background: var(--ink-3);
+  border-color: var(--line-2);
+}
+@media (prefers-reduced-motion: reduce) {
+  .inv-field[data-shake] {
+    animation: none;
+  }
+  .gate-go,
+  .gate-alt {
+    transition: none;
+  }
+}
+/* phones: a field and a button a finger hits, type iOS doesn't zoom into */
+@media (max-width: 560px) {
+  .gate-input {
+    height: var(--h-touch);
+    font-size: var(--fs-touch);
+  }
+  .gate-go,
+  .gate-alt {
+    height: var(--h-touch);
+    font-size: var(--fs-lg);
+  }
+  .inv-eye {
+    width: 40px;
+    height: 40px;
+  }
+}

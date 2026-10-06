@@ -1,0 +1,2 @@
+# The repository ignores versions/ everywhere (a store used in place); this frozen store keeps its renders.
+!versions/

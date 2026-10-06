@@ -1,0 +1,914 @@
+/* ---------------------------------------------------------------- UI primitives (web/src/ui/*): tokens only */
+
+/* ---------------------------------------------------------------- floating layers: enter and leave */
+
+/* Radix sets data-state (open/closed) and data-side on floating content. Menus and popovers grow out of their trigger
+   (from the corner nearest it) and are there at once — a menu is a tool, not a reveal; dialogs rise a little from
+   below over a dimming page and settle; everything leaves faster than it came, and all of it is instant under reduced
+   motion (the --dur tokens are 0 there). Presence waits for the closing animation before it unmounts. */
+.menu,
+.popover,
+.hovercard,
+.select-menu {
+  transform-origin: var(
+    --radix-dropdown-menu-content-transform-origin,
+    var(
+      --radix-popover-content-transform-origin,
+      var(--radix-hover-card-content-transform-origin, var(--radix-context-menu-content-transform-origin, var(--radix-select-content-transform-origin, top)))
+    )
+  );
+  animation: float-in var(--dur) var(--ease-out);
+}
+.menu,
+.select-menu {
+  animation-duration: var(--dur-fast);
+}
+/* On its way out a surface is no longer there for the pointer: a click during the fade reaches what's under it
+   (it was swallowed — the next ⋯ right after closing a dialog didn't open its menu). */
+.menu[data-state='closed'],
+.popover[data-state='closed'],
+.hovercard[data-state='closed'] {
+  animation: float-out var(--dur-fast) var(--ease-in) forwards;
+  pointer-events: none;
+}
+/* …and so is the positioning box Radix wraps it in (it sits over the page at the menu's size) */
+[data-radix-popper-content-wrapper]:has(> [data-state='closed']) {
+  pointer-events: none;
+}
+@keyframes float-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(var(--float-y, -4px));
+  }
+}
+@keyframes float-out {
+  to {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+[data-side='top'] {
+  --float-y: 4px;
+}
+.backdrop[data-state='closed'] {
+  animation: fade-out var(--dur) var(--ease-in) forwards;
+  pointer-events: none;
+}
+.backdrop[data-state='closed'] .modal,
+.modal[data-state='closed'] {
+  animation: dialog-out var(--dur-fast) var(--ease-in) forwards;
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes dialog-out {
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+}
+
+/* ---------------------------------------------------------------- tooltip */
+
+/* Tooltips and toasts are passing messages: ink on paper, a lifted step in the dark (--tip-* in base.css). */
+.tip {
+  z-index: var(--z-top);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: 340px;
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r);
+  background: var(--tip-bg);
+  color: var(--tip-fg);
+  font: var(--fw-ui) var(--fs-sm) / var(--lh-ui) var(--ui);
+  box-shadow:
+    0 0 0 1px var(--tip-edge),
+    var(--shadow-float);
+  transform-origin: var(--radix-tooltip-content-transform-origin);
+  animation: tip-in var(--dur-fast) var(--ease-out);
+}
+.tip[data-state='closed'] {
+  animation: fade-out 80ms linear forwards;
+}
+@keyframes tip-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+.tip .kbd {
+  background: color-mix(in srgb, var(--tip-fg) 10%, transparent);
+  border-color: color-mix(in srgb, var(--tip-fg) 16%, transparent);
+  color: var(--tip-fg-2);
+}
+
+/* ---------------------------------------------------------------- menus */
+
+.menu-icon-gap {
+  width: 15px;
+  flex: none;
+}
+/* a shortcut in a menu is quiet type, not a key cap: the row is the thing to press */
+.menu-kbd {
+  margin-left: var(--sp-6);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: var(--fw-ui) var(--fs-xs) / var(--lh-ui) var(--mono);
+}
+/* a choice that is on or off: the tick keeps its place when it's off, so the rows don't change width */
+.menu [role='menuitemcheckbox'][data-state='unchecked'] > .menu-tick {
+  visibility: hidden;
+}
+.menu :is([role='menuitem'], [role='menuitemcheckbox'])[data-disabled] {
+  opacity: 0.4;
+  cursor: default;
+}
+.menu :is([role='menuitem'], [role='menuitemcheckbox']) > .icon {
+  color: var(--muted);
+  transition: color var(--dur-fast);
+}
+.menu :is([role='menuitem'], [role='menuitemcheckbox'])[data-highlighted] > .icon {
+  color: var(--fg);
+}
+.menu [role='menuitemcheckbox'] > .menu-tick {
+  flex: none;
+  color: var(--fg);
+}
+/* what can't be undone reads as danger before the pointer gets there, and its row lights in the danger colour */
+.menu :is([role='menuitem'], [role='menuitemcheckbox']).danger,
+.menu :is([role='menuitem'], [role='menuitemcheckbox']).danger > .icon {
+  color: var(--must);
+}
+.menu :is([role='menuitem'], [role='menuitemcheckbox']).danger[data-highlighted] {
+  background: var(--must-bg);
+  color: var(--must);
+}
+.context-menu {
+  min-width: 220px;
+}
+
+/* ---------------------------------------------------------------- alert dialog (ui Confirm) */
+
+/* A question before something that can't be undone: the question (naming the thing), one sentence on what happens,
+   and the two answers — no icon, no band. The answers carry their keys: Esc keeps things as they are, ⌘↵ (↵ when
+   nothing is lost) goes ahead. */
+.modal.alert {
+  width: min(420px, calc(100vw - 32px));
+}
+.alert-body {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-dialog) var(--sp-dialog) 0;
+}
+.alert-body h3 {
+  margin: 0;
+  font: var(--fw-strong) semi-condensed var(--fs-xl) / var(--lh-tight) var(--display);
+  letter-spacing: var(--track-title);
+  overflow-wrap: anywhere;
+}
+.alert-text {
+  color: var(--muted);
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+  overflow-wrap: anywhere;
+}
+.alert-text :is(b, strong, code) {
+  color: var(--fg-2);
+}
+.modal-foot.alert-foot {
+  justify-content: flex-end;
+  padding: var(--sp-6) var(--sp-dialog) var(--sp-dialog);
+  border-top: 0;
+}
+
+/* ---------------------------------------------------------------- hover card */
+
+.hovercard {
+  z-index: var(--z-float);
+  width: 280px;
+  max-width: calc(100vw - 16px);
+  padding: var(--sp-3) var(--sp-3);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--float-line);
+  background: var(--float-bg);
+  box-shadow: var(--shadow-float);
+  display: grid;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+}
+.hc-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.hc-head b {
+  font-weight: var(--fw-strong);
+}
+.hc-rows {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sp-1) var(--sp-3);
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.hc-rows dt {
+  color: var(--muted);
+  font: var(--fw-ui) var(--fs-xs) / var(--lh-body) var(--ui);
+}
+.hc-rows dd {
+  margin: 0;
+  color: var(--fg-2);
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------- switch, checkbox */
+
+.switch {
+  all: unset;
+  flex: none;
+  position: relative;
+  width: 34px;
+  height: 20px;
+  border-radius: var(--r-full);
+  background: var(--ink-5);
+  box-shadow: inset 0 0 0 1px var(--line-3);
+  cursor: pointer;
+  transition:
+    background var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out);
+}
+/* On is ink, not a status colour: a choice made, like every selected state (selection never wears a colour). */
+.switch[data-state='checked'] {
+  background: var(--raise-sheen), var(--fg);
+  box-shadow: inset 0 0 0 1px var(--fg);
+}
+.switch:focus-visible {
+  outline: 1.5px solid var(--fg);
+  outline-offset: 2px;
+}
+.switch[data-disabled] {
+  opacity: 0.45;
+  cursor: default;
+}
+.switch-thumb {
+  display: block;
+  width: 16px;
+  height: 16px;
+  margin: var(--sp-0_5);
+  border-radius: var(--r-full);
+  background: var(--raise-sheen), var(--hi);
+  box-shadow: var(--raise);
+  transition: transform var(--dur) var(--ease-spring);
+}
+.switch[data-state='checked'] .switch-thumb {
+  transform: translateX(14px);
+  background: var(--raise-sheen), var(--ink-1);
+}
+.checkbox {
+  all: unset;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--r-sm);
+  display: grid;
+  place-items: center;
+  background: var(--ink-0);
+  box-shadow: inset 0 0 0 1.5px var(--line-3);
+  color: var(--on-fg);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast),
+    box-shadow var(--dur-fast);
+}
+.checkbox:hover {
+  box-shadow: inset 0 0 0 1.5px var(--line-4);
+}
+.checkbox[data-state='checked'] {
+  background: var(--fg);
+  box-shadow: inset 0 0 0 1.5px var(--fg);
+}
+.checkbox:focus-visible {
+  outline: 1.5px solid var(--fg);
+  outline-offset: 2px;
+}
+.checkbox-mark {
+  display: grid;
+  animation: tip-in var(--dur-fast) var(--ease-spring);
+}
+
+/* ---------------------------------------------------------------- progress */
+
+.progress {
+  --fill: var(--fg);
+  position: relative;
+  overflow: hidden;
+  height: 4px;
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--fg) 10%, transparent);
+  /* Safari clips transformed children of a rounded box only with this */
+  transform: translateZ(0);
+}
+.progress.ok {
+  --fill: var(--ok);
+}
+.progress.claude {
+  --fill: var(--claude);
+}
+.progress.must {
+  --fill: var(--must);
+}
+.progress-fill {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--fill);
+  transition: transform 0.4s var(--ease-out);
+}
+.progress[data-state='indeterminate'] .progress-fill {
+  width: 40%;
+  animation: progress-sweep 1.3s var(--ease-in-out) infinite;
+}
+@keyframes progress-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+/* ---------------------------------------------------------------- separator, kbd */
+
+.sep {
+  flex: none;
+  background: var(--line);
+}
+.sep[data-orientation='horizontal'] {
+  height: 1px;
+  width: 100%;
+}
+.sep[data-orientation='vertical'] {
+  width: 1px;
+  align-self: stretch;
+  margin: var(--sp-1) var(--sp-0_5);
+}
+
+/* ---------------------------------------------------------------- avatar */
+
+.avatar {
+  --av: 22px;
+  --av-bg: var(--ink-5);
+  --av-fg: var(--fg-2);
+  flex: none;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: var(--av);
+  height: var(--av);
+  border-radius: var(--r-full);
+  overflow: hidden;
+  background: var(--av-bg);
+  color: var(--av-fg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 8%, transparent);
+  font: var(--fw-strong) calc(var(--av) * 0.4) / 1 var(--ui);
+  user-select: none;
+}
+.avatar.agent {
+  --av-bg: var(--claude-bg);
+  --av-fg: var(--claude-3);
+}
+.avatar.client {
+  --av-bg: var(--should-bg);
+  --av-fg: var(--should);
+}
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.avatar-fb {
+  display: grid;
+  place-items: center;
+}
+
+/* ---------------------------------------------------------------- scroll area */
+
+.sa {
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+  min-width: 0;
+}
+/* Native scrolling (ui/plain.tsx ScrollArea); the rounded corners and max-height come from the root. Its thin
+   scrollbar shows while the pointer is on the area or focus is in it, like the board's lanes. */
+.sa-viewport {
+  width: 100%;
+  height: 100%;
+  max-height: inherit;
+  border-radius: inherit;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.sa-viewport[data-horizontal] {
+  overflow-x: auto;
+}
+.sa:hover > .sa-viewport,
+.sa-viewport:focus-within {
+  scrollbar-color: var(--scroll) transparent;
+}
+
+/* ---------------------------------------------------------------- skeletons */
+
+.sk {
+  display: block;
+  flex: none;
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--fg) 7%, transparent);
+}
+/* Loading reads as a playhead scrubbing across (a thin line with a short trail), eased like a curve and resting at the
+   end before the next pass — not a generic shimmer. */
+.sk::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 36%;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--fg) 5%, transparent) 80%,
+    color-mix(in srgb, var(--fg) 16%, transparent) calc(100% - 1.5px),
+    color-mix(in srgb, var(--fg) 28%, transparent)
+  );
+  animation: sk-sweep 2.2s var(--ease-in-out) infinite;
+}
+@keyframes sk-sweep {
+  70%,
+  100% {
+    transform: translateX(280%);
+  }
+}
+.sk-text {
+  display: grid;
+  min-width: 0;
+}
+/* A line of text on its way (ui/Skeleton.tsx SkLine): the line box of the element it sits in, a bar inside it. No
+   overflow on the outer box, so its baseline stays the text's. */
+.sk-line {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  color: transparent;
+  user-select: none;
+}
+.sk-line-bar {
+  position: absolute;
+  inset: 0.3em 0;
+  border-radius: var(--r-sm);
+}
+/* Nothing for a quick load; then the shape fades in. */
+.sk-region {
+  animation: fade 0.3s var(--ease-out) 0.12s both;
+}
+.sk-rows {
+  display: grid;
+  gap: var(--sp-2);
+}
+.sk-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r);
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+}
+.sk-row-main {
+  flex: 1;
+  display: grid;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.sk-note-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* ---------------------------------------------------------------- status badge (ui/Badge.tsx) */
+
+/* --st comes from [data-stage] (styles/status.css) or [data-tone] below; neutral without either. */
+.sbadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  justify-self: start;
+  align-self: center;
+  max-width: 100%;
+  min-width: 0;
+  height: var(--h-xs);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--st, var(--fg-2)) 9%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--st, var(--fg-2)) 17%, transparent);
+  color: var(--fg-2);
+  font: var(--fw-ui) var(--fs-sm) / var(--lh-tight) var(--ui);
+  white-space: nowrap;
+}
+.sbadge.sm {
+  font-size: var(--fs-xs);
+}
+/* A keyframe glyph (ui/KeyGlyph.tsx): the shape from --kg-*, the colour from `color`. Flat — no glow, no halo. */
+.kg {
+  display: inline-block;
+  flex: none;
+  width: var(--kg-size, 9px);
+  height: var(--kg-size, 9px);
+  background: currentColor;
+  -webkit-mask: var(--kg, var(--kg-outline)) center / contain no-repeat;
+  mask: var(--kg, var(--kg-outline)) center / contain no-repeat;
+}
+.kg[data-shape='diamond'] {
+  --kg: var(--kg-diamond);
+}
+.kg[data-shape='half'] {
+  --kg: var(--kg-half);
+}
+.kg[data-shape='outline'] {
+  --kg: var(--kg-outline);
+}
+.kg[data-shape='circle'] {
+  --kg: var(--kg-circle);
+}
+.kg[data-shape='ease'] {
+  --kg: var(--kg-ease);
+}
+.kg[data-shape='hold'] {
+  --kg: var(--kg-hold);
+}
+/* A state that just changed pops once, like a keyframe set on the timeline. */
+.kg-pop {
+  animation: kg-pop var(--dur-slow) var(--ease-spring) both;
+}
+@keyframes kg-pop {
+  from {
+    transform: scale(0.4) rotate(-45deg);
+    opacity: 0;
+  }
+}
+.sbadge .kg {
+  --kg-size: 8px;
+  color: var(--st, var(--fg-2));
+}
+.sb-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sb-note {
+  flex: none;
+  color: var(--muted);
+  font-weight: var(--fw-ui);
+}
+.sb-note::before {
+  content: '·';
+  margin: 0 var(--sp-1) 0 1px;
+  color: var(--faint);
+}
+.sbadge[data-tone='neutral'] {
+  --st: var(--fg-2);
+}
+.sbadge[data-tone='must'] {
+  --st: var(--must);
+}
+.sbadge[data-tone='should'] {
+  --st: var(--should);
+}
+.sbadge[data-tone='nice'] {
+  --st: var(--nice);
+}
+.sbadge[data-tone='idea'] {
+  --st: var(--idea);
+}
+.sbadge[data-tone='ok'] {
+  --st: var(--ok);
+}
+.sbadge[data-tone='claude'] {
+  --st: var(--claude);
+}
+/* Final: settled and locked {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.75px var(--fg);
+  width: 7px;
+  height: 7px;
+}
+
+/* ---------------------------------------------------------------- toasts (Radix Toast) */
+
+.toasts {
+  position: fixed;
+  left: 50%;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  z-index: var(--z-toast);
+  outline: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: 100%;
+  /* The buttons at the end sit in the pill's curve: the same 6 px around them on top, bottom and right */
+  min-height: calc(var(--h-sm) + var(--sp-3));
+  padding: 0 calc(var(--sp-3) / 2) 0 var(--sp-3);
+  border-radius: var(--r-full);
+  background: var(--tip-bg);
+  color: var(--tip-fg);
+  box-shadow:
+    0 0 0 1px var(--tip-edge),
+    var(--shadow-float);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-ui);
+  animation: toast-in 0.34s var(--ease-spring);
+}
+.toast > .icon {
+  flex: none;
+}
+.toast.ok > .icon {
+  color: var(--tip-ok);
+}
+.toast.error {
+  background: var(--must);
+  color: var(--on-must);
+}
+.toast-title {
+  min-width: 0;
+}
+/* The words end where the toast would end without buttons: 12 px, like the start */
+.toast-title:not(:last-child) {
+  margin-right: var(--sp-1);
+}
+.toast[data-state='closed'] {
+  animation: toast-out var(--dur) var(--ease-in) forwards;
+}
+.toast[data-swipe='move'] {
+  transform: translateY(var(--radix-toast-swipe-move-y));
+}
+.toast[data-swipe='cancel'] {
+  transform: translateY(0);
+  transition: transform var(--dur) var(--ease-out);
+}
+.toast[data-swipe='end'] {
+  animation: toast-swipe var(--dur) var(--ease-in) forwards;
+}
+@keyframes toast-in {
+  from {
+    transform: translateY(16px) scale(0.94);
+    opacity: 0;
+  }
+}
+@keyframes toast-out {
+  to {
+    transform: translateY(8px) scale(0.97);
+    opacity: 0;
+  }
+}
+@keyframes toast-swipe {
+  from {
+    transform: translateY(var(--radix-toast-swipe-end-y));
+  }
+  to {
+    transform: translateY(120%);
+    opacity: 0;
+  }
+}
+/* phones: under the top bar, clear of the notes sheet and the transport at the bottom */
+@media (max-width: 639px), (max-height: 480px) and (hover: none) and (pointer: coarse) {
+  .toasts {
+    top: calc(env(safe-area-inset-top) + 62px);
+    bottom: auto;
+    flex-direction: column-reverse;
+  }
+  .toast {
+    animation-name: toast-in-top;
+  }
+  .toast[data-swipe='end'] {
+    animation-name: toast-swipe-up;
+  }
+  @keyframes toast-in-top {
+    from {
+      transform: translateY(-16px) scale(0.94);
+      opacity: 0;
+    }
+  }
+  @keyframes toast-swipe-up {
+    from {
+      transform: translateY(var(--radix-toast-swipe-end-y));
+    }
+    to {
+      transform: translateY(-120%);
+      opacity: 0;
+    }
+  }
+}
+.toast-act {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex: none;
+  height: var(--h-sm);
+  border: 0;
+  border-radius: var(--r-full);
+  padding: 0 var(--sp-3);
+  background: var(--tip-fg);
+  color: var(--tip-bg);
+  font: var(--fw-strong) var(--fs-sm) var(--ui);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.toast-act:hover {
+  transform: scale(1.04);
+}
+.toast.error .toast-act {
+  background: var(--on-must);
+  color: var(--must);
+}
+.toast-x {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--h-sm);
+  height: var(--h-sm);
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-full);
+  /* a quiet round button, so it holds its place in the curve like the action beside it */
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  color: color-mix(in srgb, currentColor 72%, transparent);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast),
+    color var(--dur-fast);
+}
+.toast-act + .toast-x {
+  margin-left: calc(-1 * var(--sp-1));
+}
+.toast-x:hover,
+.toast-x:focus-visible {
+  background: color-mix(in srgb, currentColor 26%, transparent);
+  color: inherit;
+}
+
+/* ---------------------------------------------------------------- micro-interactions */
+
+.btn:not(:disabled):active,
+.chip:active,
+.seg button:active {
+  transform: scale(0.96);
+}
+/* …but not a button that opens a menu, popover or select: what opens is the feedback, and the float is positioned from
+   the trigger's box while it is pressed — the first time a menu's code arrived mid-press it was placed from the 96 %
+   box and jumped 3 px when the button let go (the first open "wiggled"). */
+.btn:is([aria-haspopup], [aria-expanded]):not(:disabled):active {
+  transform: none;
+}
+.btn.icon-only .icon {
+  transition: transform var(--dur) var(--ease-spring);
+}
+.btn.icon-only:not(:disabled):hover .icon {
+  transform: scale(1.08);
+}
+.chip,
+.seg button {
+  transition:
+    background var(--dur-fast),
+    color var(--dur-fast),
+    border-color var(--dur-fast),
+    transform var(--dur-fast) var(--ease-out);
+}
+.film:active .film-poster {
+  transform: translateY(-2px) scale(0.985);
+  transition-duration: var(--dur-fast);
+}
+
+/* ---------------------------------------------------------------- screen transitions (View Transitions API, lib/transition.ts) */
+
+/* Kept short: while the two pictures cross, the browser holds input (a click lands on the document). */
+::view-transition-old(root) {
+  animation: vt-out var(--dur-page) var(--ease-in) both;
+}
+::view-transition-new(root) {
+  animation: vt-in var(--dur-page-in) var(--ease-out) both;
+}
+:root[data-nav='back']::view-transition-old(root) {
+  animation-name: vt-out-back;
+}
+:root[data-nav='back']::view-transition-new(root) {
+  animation-name: vt-in-back;
+}
+@keyframes vt-out {
+  to {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+}
+@keyframes vt-in {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+}
+@keyframes vt-out-back {
+  to {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+}
+@keyframes vt-in-back {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+}
+
+/* for screen readers only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- words that point at the video
+   A timecode in someone's words (ui/TimecodeText.tsx): a link to its frame in the text's own face, underlined quietly;
+   an agent's offered answers (ui/Choices.tsx): quiet buttons in a row that wraps, a long one wrapping inside itself. */
+.tc-link {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--line-3);
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+.tc-link:hover {
+  text-decoration-color: currentColor;
+}
+.tc-link:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.btn.choice {
+  height: auto;
+  min-height: var(--h-sm);
+  max-width: 100%;
+  padding-block: var(--sp-1);
+  line-height: var(--lh-ui);
+  white-space: normal;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+/* a thumb's size on touch screens: an answer is one tap */
+@media (hover: none) and (pointer: coarse) {
+  .btn.choice {
+    min-height: var(--h-touch);
+  }
+}

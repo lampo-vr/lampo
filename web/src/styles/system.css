@@ -1,0 +1,525 @@
+/* ---------------------------------------------------------------- the design system's families (ui/system.tsx) */
+
+/* Buttons: sizes follow the control heights; .btn, .primary, .ghost and .on live in controls.css. */
+.btn.lg {
+  height: var(--h-lg);
+  padding: 0 var(--sp-4);
+  gap: var(--sp-2);
+  font-size: var(--fs-md);
+}
+.btn.lg.icon-only {
+  width: var(--h-lg);
+  padding: 0;
+}
+.btn.wide {
+  width: 100%;
+}
+/* The raised look says "press me": a primary that can't be pressed yet lies flat, and a primary loses its colour
+   too (a faded orange reads as a muddy brown on the dark surfaces). */
+.btn.primary:disabled,
+.btn.danger-fill:disabled {
+  box-shadow: none;
+}
+.btn.primary:disabled {
+  background: var(--ink-4);
+  border-color: var(--line-2);
+  color: var(--muted);
+  opacity: 1;
+}
+/* Danger, for what can't be undone: a crimson fill (--danger), unmistakably not the orange primary, with the raised
+   material; hover lights its own red glow. */
+.btn.danger-fill {
+  background: var(--raise-sheen), var(--danger);
+  border-color: var(--danger);
+  color: var(--on-must);
+  font-weight: var(--fw-strong);
+  box-shadow: var(--raise);
+}
+.btn.danger-fill:hover {
+  background: var(--raise-sheen), var(--danger);
+  border-color: var(--danger);
+  box-shadow: var(--raise-edge), var(--shadow-danger);
+}
+/* A text action: no box, the height of its line, an underline on hover. */
+.btn-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg-2);
+  font: var(--fw-ui) var(--fs-md) / var(--lh-ui) var(--ui);
+  cursor: pointer;
+  text-underline-offset: 3px;
+}
+.btn-link:hover {
+  color: var(--fg);
+  text-decoration: underline;
+}
+.btn-link:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* Chips: one height (20) and one shape (the status badge's pill) for every small label; only key caps keep a key's
+   corners. */
+.ch {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: var(--sp-1);
+  height: var(--h-xs);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-full);
+  background: var(--ink-3);
+  color: var(--fg-2);
+  font: var(--fw-ui) var(--fs-xs) / var(--lh-ui) var(--ui);
+  white-space: nowrap;
+}
+.ch-count,
+.ch-version {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+.ch-key {
+  border-radius: var(--r-sm);
+  font-family: var(--mono);
+  color: var(--muted);
+  background: var(--ink-2);
+  box-shadow:
+    inset 0 0 0 1px var(--line-2),
+    inset 0 -1px 0 var(--line-2);
+}
+
+/* Panels: one padding rule, three levels. A base panel sits a step above the page, a raised one a step above that; a
+   floating one (menus, popovers, dialogs) casts the one floating shadow. */
+.panel {
+  border-radius: var(--r-lg);
+  background: var(--ink-2);
+  box-shadow: 0 0 0 1px var(--line);
+}
+.panel-raised {
+  background: var(--ink-3);
+}
+.panel-floating {
+  background: var(--float-bg);
+  box-shadow:
+    0 0 0 1px var(--float-line),
+    var(--shadow-float);
+}
+.panel.pad-md {
+  padding: var(--sp-4);
+}
+.panel.pad-dense {
+  padding: var(--sp-3);
+}
+.panel.pad-lg {
+  padding: var(--sp-6);
+}
+
+/* Section and page heads. */
+.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.section-title {
+  margin: 0;
+  font: var(--fw-strong) var(--fs-lg) / var(--lh-ui) var(--ui);
+}
+.section-count {
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.section-actions {
+  margin-left: auto;
+  display: flex;
+  gap: var(--sp-2);
+}
+.page-head {
+  display: grid;
+  gap: var(--sp-2);
+}
+.page-head-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3) var(--sp-6);
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.page-title {
+  margin: 0;
+  font: var(--fw-strong) semi-condensed var(--fs-3xl) / var(--lh-tight) var(--display);
+  letter-spacing: var(--track-title);
+}
+.page-meta {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.page-aside {
+  margin-left: auto;
+  align-self: center;
+}
+
+/* List rows. */
+.list-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  min-height: 40px;
+  padding: 0 var(--sp-3);
+  border: 0;
+  border-radius: var(--r);
+  background: none;
+  color: var(--fg);
+  text-align: left;
+  font: inherit;
+}
+.list-row.dense {
+  min-height: 32px;
+}
+button.list-row {
+  cursor: pointer;
+}
+button.list-row:hover {
+  background: var(--ink-3);
+}
+.list-row-lead,
+.list-row-trail {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.list-row-text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+.list-row-title,
+.list-row-sub {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.list-row-sub {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+/* Empty states: a place, not a gap. A soft panel (the surface lifted a little, a light from above where the scene
+   sits) takes the room of what it stands in for; in it the scene (ui/emptyArt.tsx), a headline without a full stop,
+   one sentence, the one thing to do, a tip or two. `sm` sits inside panels, lists and popovers and keeps to its
+   content. */
+.empty-state {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--sp-2);
+  padding: var(--sp-12) var(--sp-6);
+  border-radius: var(--r-lg);
+  background: radial-gradient(ellipse 56% 64% at 50% 22%, var(--ink-3), transparent), var(--ink-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+  text-align: center;
+}
+/* standing in for a page's content: most of what is left of the window */
+.empty-state.md {
+  min-height: clamp(360px, 60dvh, 640px);
+}
+.empty-state.sm {
+  padding: var(--sp-8) var(--sp-4);
+  border-radius: var(--r);
+  /* no edge of its own: the light fades out before the sides and the top */
+  background: radial-gradient(ellipse 46% 40% at 50% 40%, var(--ink-3), transparent);
+  box-shadow: none;
+}
+.empty-art {
+  width: 240px;
+  height: 144px;
+  margin-bottom: var(--sp-4);
+  color: var(--line-4);
+  overflow: visible;
+}
+.empty-state.sm .empty-art {
+  width: 176px;
+  height: 106px;
+  margin-bottom: var(--sp-2);
+}
+.empty-art .ea-line,
+.empty-art .ea-pencil,
+.empty-art .ea-handle,
+.empty-art .ea-grid,
+.empty-art .ea-ruler,
+.empty-art .ea-head,
+.empty-art .ea-lens-rim {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.empty-art .strong {
+  stroke: var(--fg-2);
+}
+.empty-art .ea-dim {
+  opacity: 0.55;
+}
+.empty-art .ea-dash {
+  stroke-dasharray: 3 4;
+}
+.empty-art .ea-ruler {
+  stroke-width: 1;
+  opacity: 0.8;
+}
+/* hairlines on the pixel grid at any size */
+.empty-art .ea-ruler,
+.empty-art .ea-grid {
+  shape-rendering: crispEdges;
+}
+.empty-art .ea-grid {
+  stroke: var(--line-2);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+.empty-art .ea-handle {
+  stroke-width: 1;
+}
+.empty-art .ea-knob {
+  fill: var(--ink-3);
+  stroke: currentColor;
+}
+.empty-art .ea-pencil {
+  stroke: var(--fg-2);
+  stroke-width: 2;
+}
+.empty-art .ea-head {
+  stroke: var(--fg-2);
+}
+.empty-art .ea-head-cap {
+  fill: var(--fg-2);
+}
+.empty-art .ea-card,
+.empty-art .ea-frame.raised {
+  fill: var(--ink-3);
+  stroke: var(--line-3);
+  stroke-width: 1.2;
+}
+.empty-art .ea-card.front {
+  fill: var(--ink-4);
+}
+.empty-art .ea-frame,
+.empty-art .ea-lane,
+.empty-art .ea-film {
+  fill: var(--ink-1);
+  stroke: var(--line-3);
+  stroke-width: 1.2;
+}
+.empty-art .ea-lane,
+.empty-art .ea-film {
+  stroke: var(--line-2);
+}
+.empty-art .ea-frame-o {
+  fill: var(--fg-2);
+}
+.empty-art .ea-hole {
+  fill: var(--line-2);
+}
+.empty-art .ea-hole-ring {
+  fill: var(--ink-1);
+  stroke: var(--line-3);
+  stroke-width: 1.2;
+}
+.empty-art .ea-bar {
+  fill: var(--line-3);
+}
+.empty-art .ea-ghost {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  stroke-dasharray: 3 3;
+  opacity: 0.7;
+}
+.empty-art .ea-drop {
+  fill: var(--sel);
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+.empty-art .ea-dot {
+  fill: currentColor;
+}
+.empty-art .ea-dot.strong {
+  fill: var(--fg-2);
+  stroke: none;
+}
+.empty-art .ea-lens {
+  fill: var(--sel);
+}
+.empty-art .ea-lens-rim {
+  stroke: var(--fg-2);
+  stroke-width: 2;
+}
+.empty-art .ea-key {
+  fill: var(--ink-3);
+  stroke: currentColor;
+  stroke-width: 1.4;
+}
+.empty-art .ea-key.on {
+  fill: var(--fg-2);
+  stroke: var(--fg-2);
+}
+/* a keyframe still to come: a quiet outline (a dash pattern this small reads as dots, not as a diamond) */
+.empty-art .ea-key.ghost {
+  fill: none;
+  opacity: 0.6;
+}
+.empty-art .ea-lit {
+  fill: var(--brand);
+}
+.empty-art .ea-glow-in {
+  stop-color: var(--brand);
+  stop-opacity: 0.3;
+}
+.empty-art .ea-glow-out {
+  stop-color: var(--brand);
+  stop-opacity: 0;
+}
+/* Parts that move (ui/emptyMotion.ts keys them by `data-m`) turn and scale about their own middle unless the drawing
+   names another point. The loops live there; what is styled here is the drawing at rest, which reduced motion shows. */
+.empty-art [data-m] {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+/* only there while something happens: a render on its way, a frame being scanned, a wipe, a signal */
+.empty-art .ea-enter {
+  opacity: 0;
+}
+/* a stroke that draws itself (pathLength 1) */
+.empty-art .ea-draw {
+  stroke-dasharray: 1 1;
+}
+.empty-art .ea-link {
+  fill: none;
+  stroke: var(--fg-2);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  opacity: 0;
+}
+.empty-art .ea-tile {
+  fill: var(--ink-4);
+  stroke: var(--fg-2);
+  stroke-width: 1.2;
+  offset-rotate: 0deg;
+}
+.empty-art .ea-scan {
+  fill: var(--sel);
+  stroke: var(--line-4);
+  stroke-width: 1.2;
+}
+.empty-art .ea-wipe {
+  fill: none;
+  stroke: var(--fg-2);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+.empty-art .ea-rider {
+  fill: var(--fg-2);
+}
+.empty-art .ea-pulse {
+  offset-rotate: 0deg;
+  offset-distance: 56%;
+}
+
+.empty-title {
+  margin: 0;
+  font: var(--fw-strong) semi-condensed var(--fs-2xl) / var(--lh-tight) var(--display);
+  letter-spacing: var(--track-title);
+  color: var(--fg);
+  text-wrap: balance;
+}
+.empty-state.sm .empty-title {
+  font: var(--fw-strong) semi-condensed var(--fs-xl) / var(--lh-ui) var(--display);
+}
+.empty-body {
+  margin: 0;
+  max-width: 52ch;
+  font-size: var(--fs-lg);
+  line-height: var(--lh-body);
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.empty-state.sm .empty-body {
+  max-width: 44ch;
+  font-size: var(--fs-md);
+}
+.empty-tips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--sp-2) var(--sp-6);
+  margin: var(--sp-4) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.empty-tips kbd {
+  margin: 0 var(--sp-0_5);
+}
+.empty-foot {
+  margin: var(--sp-2) 0 0;
+  max-width: 52ch;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.empty-foot code {
+  white-space: nowrap;
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  padding: var(--sp-0_5) var(--sp-1);
+  border-radius: var(--r-sm);
+  background: var(--ink-3);
+  color: var(--fg-2);
+}
+.empty-action {
+  margin-top: var(--sp-4);
+  display: flex;
+  gap: var(--sp-2);
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.empty-state.sm .empty-action {
+  margin-top: var(--sp-2);
+}
+/* a way somewhere else is a link that looks like its button */
+.empty-action a.btn {
+  text-decoration: none;
+}
+/* phones: a smaller scene, the same composition */
+@media (max-width: 639px) {
+  .empty-state {
+    padding: var(--sp-8) var(--sp-4);
+  }
+  .empty-state.md {
+    min-height: clamp(320px, 56dvh, 560px);
+  }
+  .empty-state.md .empty-art {
+    width: 200px;
+    height: 120px;
+  }
+  .empty-state.md .empty-title {
+    font-size: var(--fs-xl);
+  }
+}
+/* the tips are for keys and dragging files: nothing to do with them on a touch screen */
+@media (hover: none) and (pointer: coarse) {
+  .empty-tips {
+    display: none;
+  }
+}

@@ -1,0 +1,509 @@
+/* Options before a render (web/src/options/): the line that says what a question offers (a note card, the inbox)
+   and the audition — one section per group, sounds as rows with a player each, pictures and clips as tiles (one of
+   them large in its place), one pick per group. Calm like a list: hairlines, one ink for what is picked, the raised
+   material for a pick. */
+
+/* ---------------------------------------------------------------- what a question offers */
+.opt-ask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  min-width: 0;
+}
+.opt-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.opt-group-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  max-width: 100%;
+  min-width: 0;
+  height: var(--h-xs);
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  font: var(--fw-text) var(--fs-sm) / var(--lh-ui) var(--ui);
+  color: var(--fg-2);
+}
+.opt-group-chip .icon {
+  flex: none;
+  color: var(--muted);
+}
+.opt-n {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.opt-ask.md .opt-open {
+  margin-left: auto;
+}
+.opt-picked {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-3);
+}
+.opt-pick-g {
+  color: var(--muted);
+}
+.opt-pick-note {
+  color: var(--fg-2);
+}
+
+/* ---------------------------------------------------------------- the audition */
+.aud {
+  min-width: 0;
+}
+.aud-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-6);
+  min-width: 0;
+}
+/* The room (Modal `fill`: pictures or clips to look at): the list and the large view in one cell as tall as the dialog,
+   each with the dialog's gutters; the list scrolls itself and keeps its place while one is large, and the free text
+   sits at its foot, by Send. */
+.aud.room {
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  height: 100%;
+}
+.aud.room > * {
+  grid-area: 1 / 1;
+  min-height: 0;
+}
+.aud.room > .aud-list {
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  padding: var(--sp-4) var(--sp-dialog) var(--sp-dialog);
+}
+.aud.room > .aud-list > .aud-note {
+  margin-top: auto;
+}
+.aud.room[data-view='large'] > .aud-list {
+  visibility: hidden;
+}
+.aud-head {
+  display: grid;
+  gap: var(--sp-1);
+}
+.aud-q {
+  margin: 0;
+  max-width: 64ch;
+  font: var(--fw-text) var(--fs-lg) / var(--lh-body) var(--ui);
+  color: var(--fg);
+}
+.aud-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-2);
+  margin: 0;
+  font: var(--fw-text) var(--fs-sm) / var(--lh-ui) var(--ui);
+  color: var(--muted);
+}
+.aud-meta b {
+  font-weight: var(--fw-ui);
+  color: var(--fg-2);
+}
+.aud-where,
+.aud-ago {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.aud-where::before,
+.aud-ago::before {
+  content: '·';
+  color: var(--faint);
+}
+.aud-answered {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: var(--sp-1) 0 0;
+  font: var(--fw-text) var(--fs-sm) / var(--lh-ui) var(--ui);
+  color: var(--ok);
+}
+
+.aud-group {
+  display: grid;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.aud-ghead {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  min-width: 0;
+  min-height: var(--h-sm);
+}
+.aud-ghead h4 {
+  margin: 0;
+  min-width: 0;
+  font: var(--fw-strong) var(--fs-md) / var(--lh-ui) var(--ui);
+  color: var(--fg-2);
+}
+.aud-group.focus .aud-ghead h4 {
+  color: var(--fg);
+}
+.aud-rule,
+.aud-level {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex: none;
+  font: var(--fw-text) var(--fs-xs) / var(--lh-ui) var(--ui);
+  color: var(--muted);
+}
+.aud-chosen {
+  max-width: 40%;
+  font: var(--fw-text) var(--fs-sm) / var(--lh-ui) var(--ui);
+  color: var(--muted);
+}
+.aud-chosen.on {
+  color: var(--fg-2);
+}
+.aud-ab {
+  font-variant-numeric: tabular-nums;
+}
+
+/* rows: sounds, links, plain lines, a mix */
+.aud-items.rows {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+/* a row: what plays or shows it, then the pick across the rest (its key, words, progress, time and check) */
+.aud-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: var(--h-lg);
+  padding: 0 var(--sp-3) 0 var(--sp-2);
+  background: var(--float-bg);
+}
+.aud-row + .aud-row {
+  border-top: 1px solid var(--line);
+}
+.aud-row:hover {
+  background: var(--sel);
+}
+/* where the keys are (1–9, Space), only where there is a keyboard to use them: the row lights up as under the pointer.
+   A ring would sit on the list's own border and square off its rounded corners. */
+@media (hover: hover) {
+  .aud-row.here {
+    background: var(--sel);
+  }
+  .aud-tile.here {
+    border-color: var(--line-3);
+  }
+}
+.aud-row.on {
+  background: var(--float-sel);
+}
+.aud-dot,
+.aud-play {
+  width: var(--h-sm);
+}
+.aud-thumb {
+  width: var(--h-sm);
+  height: var(--h-xs);
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: var(--ink-0);
+  cursor: zoom-in;
+}
+.aud-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* the pick: the item's key, its words and a check that fills when picked */
+.aud-pick {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  height: 100%;
+  min-height: var(--h);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg-2);
+  font: var(--fw-text) var(--fs-md) / var(--lh-ui) var(--ui);
+  text-align: left;
+  cursor: pointer;
+}
+.aud-pick:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--r-sm);
+}
+.aud-pick[aria-checked='true'] {
+  color: var(--fg);
+}
+.aud-key {
+  flex: none;
+  min-width: 1.6em;
+  text-align: center;
+}
+.aud-label {
+  flex: 1 1 40%;
+  min-width: 0;
+}
+.aud-site {
+  flex: none;
+  max-width: 40%;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.aud-check {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--ic);
+  height: var(--ic);
+  margin-left: auto;
+  border: 1px solid var(--line-3);
+  border-radius: var(--r-full);
+  color: transparent;
+}
+.aud-pick[role='checkbox'] .aud-check {
+  border-radius: var(--r-sm);
+}
+.aud-pick[aria-checked='true'] .aud-check {
+  background: var(--raise-sheen), var(--fg);
+  border-color: var(--fg);
+  color: var(--on-fg);
+  box-shadow: var(--raise);
+}
+.aud-bar {
+  position: relative;
+  flex: 1 1 30%;
+  min-width: var(--sp-12);
+  height: 2px;
+  border-radius: var(--r-full);
+  background: var(--line-2);
+  overflow: hidden;
+}
+.aud-bar > span {
+  position: absolute;
+  inset: 0;
+  background: var(--fg-2);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.25s linear;
+}
+.aud-row.playing .aud-bar > span {
+  background: var(--fg);
+}
+.aud-time {
+  flex: none;
+  min-width: 4ch;
+  text-align: right;
+  font: var(--fw-text) var(--fs-xs) / var(--lh-ui) var(--mono);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.aud-row.playing .aud-play {
+  background: var(--raise-sheen), var(--ink-3);
+  box-shadow: var(--raise);
+  color: var(--fg);
+}
+
+/* tiles: pictures, clips, moments of renders — as large as the dialog's width allows: up to four a row, each at least
+   240 px, a group of three across the whole row (a lone one takes half of it) */
+.aud-items.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(min(100%, 240px), calc((100% - 3 * var(--sp-3)) / 4)), 1fr));
+  gap: var(--sp-3);
+}
+.aud-items.tiles > .aud-tile:only-child {
+  max-width: calc((100% - var(--sp-3)) / 2);
+}
+.aud-tile {
+  display: grid;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: var(--float-bg);
+}
+.aud-tile.on {
+  border-color: var(--fg-2);
+  box-shadow: 0 0 0 1px var(--fg-2);
+}
+.aud-media {
+  aspect-ratio: 16 / 9;
+  background: var(--ink-0);
+}
+.aud-shot,
+.aud-video {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+}
+button.aud-shot {
+  cursor: zoom-in;
+}
+.aud-shot img,
+.aud-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+/* a clip in the list is a way into it: no controls of its own (they are in the large view), its first moments */
+button.aud-shot .aud-video {
+  pointer-events: none;
+}
+/* a tile's foot: the pick across it, then the way to see it large */
+.aud-tile-foot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  border-top: 1px solid var(--line);
+}
+.aud-tile .aud-pick {
+  padding: 0 var(--sp-3) 0 var(--sp-2);
+}
+.aud-tile:hover .aud-pick {
+  background: var(--sel);
+}
+.aud-expand {
+  margin-right: var(--sp-1);
+}
+
+/* the free text */
+.aud-note {
+  display: grid;
+  gap: var(--sp-2);
+}
+.aud-note-label {
+  font: var(--fw-strong) var(--fs-md) / var(--lh-ui) var(--ui);
+  color: var(--fg-2);
+}
+
+/* the foot: how far the picks are, the keys, Send */
+.aud-status {
+  margin-right: auto;
+  font: var(--fw-text) var(--fs-sm) / var(--lh-ui) var(--ui);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.aud-keys {
+  min-width: 0;
+  overflow: hidden;
+  font: var(--fw-text) var(--fs-xs) / var(--lh-ui) var(--ui);
+  color: var(--muted);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (hover: none) {
+  .aud-keys,
+  .aud-key {
+    display: none;
+  }
+}
+
+/* loading: the same rows and tiles, their words waiting */
+.aud-group.pending .aud-row:hover,
+.aud-group.pending .aud-tile:hover .aud-pick {
+  background: none;
+}
+
+/* One large, in the list's cell: its group and where it is in it, then the tile itself as big as fits at 16:9 under
+   that line (its room is a size container: the width follows from the height left once its pick is under it). */
+.aud-big:focus {
+  outline: none;
+}
+.aud-big {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-dialog) var(--sp-dialog);
+}
+.aud-big-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  min-height: var(--h-sm);
+}
+.aud-big-head > .btn:first-child {
+  flex: none;
+  margin-left: calc(-1 * var(--sp-2));
+}
+.aud-big-where {
+  min-width: 0;
+  font: var(--fw-strong) var(--fs-md) / var(--lh-ui) var(--ui);
+  color: var(--fg);
+}
+.aud-big-n {
+  flex: none;
+  font: var(--fw-text) var(--fs-sm) / var(--lh-ui) var(--ui);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.aud-big-room {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  container-type: size;
+}
+.aud-big-tile {
+  width: min(100cqw, calc((100cqh - var(--h-lg) - 3px) * 16 / 9));
+}
+.aud-big-tile .aud-pick {
+  min-height: var(--h-lg);
+}
+.aud-big-video,
+.aud-big-tile .aud-media > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+@media (max-width: 640px) {
+  /* a phone's large view stands under its line, not in the middle of the sheet */
+  .aud-big-room {
+    place-items: start center;
+  }
+  /* the progress under the words, across the row */
+  .aud-row .aud-pick {
+    flex-wrap: wrap;
+    row-gap: 0;
+  }
+  .aud-row .aud-bar {
+    order: 9;
+    flex: 1 1 100%;
+    margin-bottom: var(--sp-2);
+  }
+  .aud-items.tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .aud-chosen {
+    display: none;
+  }
+}

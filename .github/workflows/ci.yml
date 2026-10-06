@@ -1,0 +1,189 @@
+name: CI
+
+# Linux on every push to main and every pull request. macOS (the unit suite and WebKit) is its own workflow,
+# macos.yml, run on demand (why: see there).
+#
+# Where the jobs run: in the public repository, everything runs on GitHub's ubuntu-latest. Only a private copy of the
+# repository sends check, unit and the browser suites to a self-hosted runner (labels self-hosted, linux, x64,
+# lampo-ci: an account without sudo or Docker, 16 CPUs for its jobs; a private copy without one changes the runs-on
+# lines), and even there a pull request from a fork or from Dependabot always runs on GitHub's ubuntu-latest: code
+# nobody there has read never runs on a self-hosted machine. A fork's pull request carries its own copy of this file,
+# so the repository must also make outside contributors' workflows wait for approval (Settings → Actions → General);
+# approve only after reading .github/.
+# The Docker job always runs on GitHub's runners: a self-hosted runner has no Docker access, on purpose.
+# On a self-hosted runner a step installs nothing: scripts/ci-runner.sh checks for what a job needs and names what is
+# missing, keeps temp files and the npm cache in the runner's work dir, and stops whatever a job left running.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch or pull request (main included) cancels the run before it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# onnxruntime-node (footage search, an optional dependency) installs without the CUDA providers its script would fetch
+# on Linux x64 (~500 MB from NuGet): the model runs on the CPU, and nothing is downloaded at install time.
+env:
+  ONNXRUNTIME_NODE_INSTALL: skip
+
+jobs:
+  check:
+    name: Typecheck and lint
+    runs-on: ${{ github.event.repository.private && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.head.repo.fork && github.event.pull_request.user.login != 'dependabot[bot]')) && fromJSON('["self-hosted","linux","x64","lampo-ci"]') || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Temp files and caches in the runner's work dir
+        run: scripts/ci-runner.sh env
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - name: Leave nothing running
+        if: always() && runner.environment == 'self-hosted'
+        run: scripts/ci-runner.sh cleanup
+
+  test:
+    # The oldest supported Node (engines: >=22.18, the first with type stripping on by default) and the current one.
+    name: Unit, MCP and Auto-check (Node ${{ matrix.node }})
+    runs-on: ${{ github.event.repository.private && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.head.repo.fork && github.event.pull_request.user.login != 'dependabot[bot]')) && fromJSON('["self-hosted","linux","x64","lampo-ci"]') || 'ubuntu-latest' }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22.18', '24']
+    env:
+      # Test files at a time on a private copy's self-hosted runner: os.availableParallelism() sees every thread of its
+      # host, not the runner's 16 CPUs, and both Node versions may run there at once (8 each). On GitHub's runners,
+      # Node's own default.
+      VR_TEST_JOBS: ${{ github.event.repository.private && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.head.repo.fork && github.event.pull_request.user.login != 'dependabot[bot]')) && '8' || '' }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Temp files and caches in the runner's work dir
+        run: scripts/ci-runner.sh env
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      # tesseract + hunspell: the Auto-check's text checks off macOS (the same packages as the Docker image)
+      - name: Install ffmpeg, tesseract and hunspell
+        if: runner.environment == 'github-hosted'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core tesseract-ocr tesseract-ocr-eng tesseract-ocr-deu hunspell hunspell-de-de hunspell-en-us
+      - name: The runner has ffmpeg, tesseract, hunspell and the tools the tests call
+        run: scripts/ci-runner.sh need ffmpeg ocr spelling fonts python3 unzip git
+      - id: install
+        run: npm ci
+      # Each suite runs whatever failed before it (!cancelled()), so one red step never hides another; the job fails
+      # at the end if any did.
+      - name: Unit and integration tests
+        run: npm test
+      - name: MCP end to end
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run test:mcp
+      - name: Auto-check on a generated clip
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run test:qa
+      - name: Leave nothing running
+        if: always() && runner.environment == 'self-hosted'
+        run: scripts/ci-runner.sh cleanup
+
+  e2e:
+    # The browser suites in two parts of about equal time (test/e2e/lib/suites.mjs --shard). Each part runs every one of
+    # its suites, whatever failed before, and fails at the end; a suite that hangs is stopped after 15 minutes. Inside a
+    # part two suites run side by side, the longest first (--jobs 2). A private copy's self-hosted runner with two runner
+    # processes runs the two parts at the same time, so at most four suites run there at once.
+    name: Browser end to end (Chrome, part ${{ matrix.part }} of 2)
+    runs-on: ${{ github.event.repository.private && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.head.repo.fork && github.event.pull_request.user.login != 'dependabot[bot]')) && fromJSON('["self-hosted","linux","x64","lampo-ci"]') || 'ubuntu-latest' }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [1, 2]
+    env:
+      # No speech engine in CI: voice notes keep their audio, nothing downloads a model.
+      VR_STT: 'off'
+      # The speed budgets (perf.mjs) were measured on the maintainer's Mac, not on this runner: a miss is a warning on
+      # the run, not a failure. Counts (requests, React commits) and the bundle budget stay strict.
+      VR_PERF_TIMES: report
+      # No Linux screenshot baselines are committed yet: the styleguide's pixel comparison reports itself as skipped (a
+      # warning, never a pass) and its screenshots are uploaded below as new-screenshot-baselines. Commit them to
+      # test/e2e/baseline/ (styleguide-{dark,light}-linux.png) once they look right, then delete this line: from then on
+      # a missing Linux baseline fails the run (test/e2e/lib/baseline.mjs).
+      VR_BASELINE_MISSING: skip
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Temp files and caches in the runner's work dir
+        run: scripts/ci-runner.sh env
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install ffmpeg
+        if: runner.environment == 'github-hosted'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: The runner has ffmpeg and the tools the suites call
+        run: scripts/ci-runner.sh need ffmpeg python3 unzip
+      - run: npm ci
+      # The browser the suites' time budgets were measured on (perf.mjs, quality-load.mjs): chrome-headless-shell from
+      # `npm run chrome:install`, which the harness prefers (test/e2e/lib/browser.mjs), plus Chrome for Testing for the
+      # notification checks — not the runner's Chrome. Cached per stable version, downloaded when that changes.
+      - name: Which Chrome for Testing is stable
+        id: chrome
+        run: |
+          version=$(node -e "const b = require('@puppeteer/browsers'); b.resolveBuildId(b.Browser.CHROMEHEADLESSSHELL, b.detectBrowserPlatform(), 'stable').then((v) => console.log(v))")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        id: chrome-cache
+        with:
+          path: cache/chrome
+          key: chrome-for-testing-${{ runner.os }}-${{ steps.chrome.outputs.version }}
+      - name: Install chrome-headless-shell and Chrome for Testing
+        if: steps.chrome-cache.outputs.cache-hit != 'true'
+        run: npm run chrome:install
+      - name: The runner has the libraries Chrome loads
+        run: scripts/ci-runner.sh need chrome
+      - run: npm run build
+      # WebKit runs on macOS (macos.yml): Playwright's Linux WebKit can't play H.264.
+      - name: Browser suites
+        run: npm run test:e2e -- --except webkit --shard ${{ matrix.part }}/2 --jobs 2
+      # A screenshot this platform has no baseline for is kept here (test/e2e/lib/baseline.mjs): look at it, then
+      # commit it to test/e2e/baseline/.
+      - name: Keep new screenshot baselines
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: new-screenshot-baselines-${{ matrix.part }}
+          path: test-output/baseline/
+          if-no-files-found: ignore
+      - name: Leave nothing running
+        if: always() && runner.environment == 'self-hosted'
+        run: scripts/ci-runner.sh cleanup
+
+  docker:
+    # Always GitHub's runner: a self-hosted runner has no Docker access, on purpose.
+    name: Docker image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build (no push)
+        run: docker build --build-arg REVISION=${{ github.sha }} --tag video-review:ci .
+      - name: The container answers /healthz
+        run: |
+          docker run -d --name vr -p 4747:4747 -e VR_PUBLIC_URL=http://localhost:4747 -e VR_STT_PREFETCH=0 video-review:ci
+          for i in $(seq 1 30); do curl -fsS http://localhost:4747/healthz && exit 0; sleep 1; done
+          docker logs vr; exit 1

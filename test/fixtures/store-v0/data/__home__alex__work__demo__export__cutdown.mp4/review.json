@@ -1,0 +1,71 @@
+{
+  "video": "/home/alex/work/demo/export/cutdown.mp4",
+  "project": "work/demo",
+  "fps": 25,
+  "width": 160,
+  "height": 90,
+  "duration": 1,
+  "versions": [
+    {
+      "v": 1,
+      "hash": "2ac27b5131b25feec8428e9409075710db8e6028",
+      "mtime": "2026-09-28T07:38:00.000Z",
+      "size": 8492,
+      "frames": 25,
+      "fps": 25,
+      "width": 160,
+      "height": 90,
+      "duration": 1,
+      "registered": "2026-09-28T09:45:00+02:00"
+    }
+  ],
+  "comments": [
+    {
+      "id": "c_6d58d9",
+      "v": 1,
+      "frame": 15,
+      "timecode": "00:00:15",
+      "t": 0.6,
+      "range": null,
+      "text": "Audio pops at the cut",
+      "tags": [
+        "audio"
+      ],
+      "severity": "must",
+      "drawing": [],
+      "shots": {
+        "clean": "c_6d58d9_clean.png",
+        "marked": "c_6d58d9_marked.png"
+      },
+      "voice": null,
+      "status": "open",
+      "author": "alex",
+      "created": "2026-09-28T09:50:30+02:00",
+      "replies": []
+    }
+  ],
+  "session": null,
+  "folder": "Demo/Cutdowns",
+  "added": "2026-09-28T09:45:00+02:00",
+  "added_by": "alex",
+  "frames": 25,
+  "meta": {
+    "codec": "h264",
+    "pix_fmt": "yuv420p",
+    "color_space": null,
+    "color_range": null,
+    "audio": {
+      "codec": "aac",
+      "sample_rate": 44100,
+      "channels": 1
+    }
+  },
+  "updated": "2026-09-28T09:55:00+02:00",
+  "approval": {
+    "status": "changes",
+    "v": 1,
+    "by": "alex",
+    "at": "2026-09-28T09:55:00+02:00",
+    "note": "Fix the audio pop first"
+  }
+}

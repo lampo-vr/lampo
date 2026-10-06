@@ -1,0 +1,91 @@
+/* Paying with the card on file (conversion/pay.tsx): the card in one line with Change, the order and what is due today,
+   the one orange button. Loaded with the adapter's code. */
+.pay-saved {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  border-radius: var(--r);
+  background: var(--ink-1);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.pay-brand {
+  display: block;
+  width: 32px;
+  height: 20px;
+}
+.pay-brand.plain {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  place-items: center;
+  border-radius: var(--r-sm);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  color: var(--muted);
+}
+.pay-saved-t {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+.pay-saved-t b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--fw-ui);
+}
+.pay-saved-t small {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.pay-sum {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin: var(--sp-1) 0;
+}
+.pay-sum > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-1) 0;
+  font-variant-numeric: tabular-nums;
+}
+.pay-sum dt {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  color: var(--fg-2);
+}
+.pay-sum dt small {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.pay-sum dd {
+  margin: 0;
+  white-space: nowrap;
+}
+.pay-sum > .muted dt,
+.pay-sum > .muted dd {
+  color: var(--muted);
+}
+.pay-sum > .pay-total {
+  margin-top: var(--sp-1);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--line-2);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-strong);
+}
+.pay-sum > .pay-total dt {
+  color: var(--fg);
+}
+.pay-note {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.pay-go.btn {
+  width: 100%;
+  height: var(--h-lg);
+}

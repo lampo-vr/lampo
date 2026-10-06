@@ -1,0 +1,16 @@
+Subject: Confirm your new email for Lampo
+
+Confirm your new address
+
+Hi Mia,
+
+You asked to sign in to review.example.com with mia@studio.example from now on. Confirm that it’s yours and the change is made.
+
+Confirm the new address:
+https://review.example.com/#/verify/vt_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+Until then you keep signing in with your current address. The link works once, for 24 hours. Didn’t ask for this? Ignore this email.
+
+--
+You get this because this address was entered for an account on review.example.com.
+Lampo · review.example.com

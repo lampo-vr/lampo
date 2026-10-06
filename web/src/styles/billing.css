@@ -1,0 +1,1437 @@
+/* Settings → Billing and the workspace's billing banner (billing/Banner.tsx): only where a billing provider runs. */
+
+/* back from paying, and the banner: a quiet line of tint with its icon and one way on */
+.bill-note,
+.bill-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border-radius: var(--r);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-ui);
+  background: var(--ink-2);
+  box-shadow: 0 0 0 1px var(--line);
+  color: var(--fg);
+}
+.bill-note.ok {
+  background: var(--ok-bg);
+  box-shadow: none;
+}
+.bill-note > span,
+.bill-banner > span {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-wrap: pretty;
+}
+.bill-note .icon,
+.bill-banner .icon {
+  flex: none;
+}
+.bill-banner.warn {
+  background: var(--should-bg);
+  box-shadow: none;
+}
+.bill-banner.warn > .icon {
+  color: var(--should);
+}
+.bill-banner.bad {
+  background: var(--must-bg);
+  box-shadow: none;
+}
+.bill-banner.bad > .icon {
+  color: var(--must);
+}
+.bill-banner .btn {
+  flex: none;
+}
+/* in the library: above its head, the page's own width */
+.bill-banner.lib {
+  margin-top: var(--sp-4);
+}
+@media (max-width: 639px) {
+  .bill-banner {
+    flex-wrap: wrap;
+  }
+  .bill-banner > span {
+    flex-basis: calc(100% - var(--sp-8));
+  }
+  .bill-banner .btn {
+    margin-left: auto;
+  }
+}
+
+/* ------------------------------------------------------------------ the page: three parts, one rhythm */
+.bill-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-6);
+}
+.bill-page > .set-head {
+  margin-bottom: calc(-1 * var(--sp-2));
+}
+.bill-fine {
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-ui);
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.bill-muted {
+  color: var(--muted);
+}
+/* the small-caps label a block of a panel starts with */
+.bill-k {
+  margin: 0;
+  font: var(--fw-ui) var(--fs-xs) / var(--lh-ui) var(--ui);
+  letter-spacing: var(--track-eyebrow);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.bill-err {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-1);
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-ui);
+  color: var(--must);
+}
+.bill-err .icon {
+  flex: none;
+  margin-top: 1px;
+}
+.bill-u {
+  color: var(--fg-2);
+  text-decoration: underline;
+  text-decoration-color: var(--line-3);
+  text-underline-offset: 2px;
+}
+.bill-u:hover {
+  color: var(--fg);
+  text-decoration-color: currentColor;
+}
+.bill-ok {
+  color: var(--ok);
+}
+.bill-must {
+  color: var(--must);
+}
+/* the neutral raised button (the app's raised material on the plain surface): a way on that isn't the view's one */
+.bill-raised.btn {
+  background: var(--raise-sheen), var(--ink-3);
+  box-shadow: var(--raise);
+}
+.bill-raised.btn:hover {
+  background: var(--raise-sheen), var(--ink-4);
+}
+.bill-quiet.btn {
+  color: var(--muted);
+}
+/* tags inform (a trial, a pick, default, paid): small, flat, never a selection */
+.bill-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: calc(var(--h-xs) - 2px);
+  padding: 0 calc(var(--sp-1) + var(--sp-0_5));
+  border-radius: var(--r-sm);
+  background: var(--ink-4);
+  color: var(--fg-2);
+  font: var(--fw-ui) var(--fs-xs) / 1 var(--ui);
+  white-space: nowrap;
+}
+.bill-tag.pick {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--line-3);
+}
+.bill-tag.ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.bill-tag.bad {
+  background: var(--must-bg);
+  color: var(--must);
+}
+
+/* ------------------------------------------------------------------ the plan: one panel */
+.bill-hero {
+  container: bill-hero / inline-size;
+  display: grid;
+  gap: var(--sp-4);
+  padding: var(--sp-6);
+}
+.bill-hero.warn {
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--should) 7%, transparent), transparent 140px), var(--ink-2);
+}
+.bill-hero.bad {
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--must) 8%, transparent), transparent 140px), var(--ink-2);
+}
+.bill-hero-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-2) var(--sp-6);
+}
+.bill-hero-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  min-width: 0;
+}
+/* the plan's name is the page's one display heading after its title: 30 px (the scale's 24 × 1.25) */
+.bill-hero-name h2 {
+  margin: 0;
+  font-weight: var(--fw-strong);
+  font-size: calc(var(--fs-2xl) * 1.25);
+  line-height: var(--lh-tight);
+  font-family: var(--display);
+  font-stretch: semi-condensed;
+  letter-spacing: var(--track-title);
+}
+.bill-hero-price {
+  display: grid;
+  justify-items: end;
+  gap: var(--sp-0_5);
+  text-align: right;
+}
+.bill-hp-k {
+  font-size: var(--fs-lg);
+  color: var(--fg-2);
+  font-variant-numeric: tabular-nums;
+}
+.bill-hp-k b {
+  font: var(--fw-strong) var(--fs-2xl) / 1 var(--display);
+  font-stretch: semi-condensed;
+  color: var(--fg);
+}
+.bill-hp-s {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.bill-hero-line {
+  margin: 0;
+  max-width: 72ch;
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+.bill-hero-ruler {
+  display: grid;
+  gap: calc(var(--sp-1) + var(--sp-0_5));
+  max-width: 640px;
+}
+.bill-hero-ruler .bill-ticks {
+  margin-right: calc(var(--sp-4) + var(--sp-0_5));
+}
+.bill-hero-ruler.grace .bill-ruler-cells i:is(.past, .today) {
+  background: color-mix(in srgb, var(--must) 55%, var(--line-2));
+}
+.bill-hero-free {
+  display: grid;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  border-radius: var(--r);
+  background: var(--ink-1);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.bill-hero-free .bill-fit-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-6);
+}
+.bill-hero-addon {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.bill-hero-addon > span {
+  flex: 1;
+}
+.bill-hero-addon b {
+  font-weight: var(--fw-ui);
+  color: var(--fg);
+}
+.bill-hero-addon .icon {
+  color: var(--muted);
+}
+.bill-hero-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  padding-top: var(--sp-1);
+}
+.bill-told {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+/* what the workspace uses: three equal meters */
+.bill-usage {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-6);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--line);
+}
+@container bill-hero (max-width: 620px) {
+  .bill-usage {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-3);
+  }
+  .bill-hero-top {
+    flex-direction: column;
+  }
+  .bill-hero-price {
+    justify-items: start;
+    text-align: left;
+  }
+  .bill-hero-free .bill-fit-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-3);
+  }
+}
+.bill-meter {
+  display: grid;
+  gap: var(--sp-2);
+  align-content: start;
+  min-width: 0;
+}
+.bill-meter-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.bill-meter-head span {
+  white-space: nowrap;
+}
+.bill-meter-head b {
+  font-weight: var(--fw-ui);
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.bill-meter-head b.over {
+  color: var(--must);
+}
+.bill-bar {
+  height: calc(var(--sp-1) + var(--sp-0_5));
+  border-radius: var(--r-full);
+  background: var(--ink-4);
+  overflow: hidden;
+}
+/* no limit: the same track, dashed, so three meters always read as three */
+.bill-bar.none {
+  background: repeating-linear-gradient(90deg, var(--line-2) 0 6px, transparent 6px 10px);
+}
+.bill-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--fg-2);
+}
+.bill-bar.over > span {
+  background: var(--must);
+}
+
+/* the days as a ruler: frames on a timeline, today the playhead, the end a keyframe */
+.bill-ruler {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-1);
+  height: calc(var(--sp-3) + var(--sp-0_5));
+}
+.bill-ruler-end.kg {
+  --kg-size: 11px;
+  color: var(--line-4);
+}
+.bill-ruler-end.kg.should {
+  color: var(--should);
+}
+.bill-ruler-end.kg.must {
+  color: var(--must);
+}
+.bill-ruler-cells {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+  gap: var(--sp-0_5);
+  align-items: center;
+  height: 100%;
+}
+.bill-ruler-cells i {
+  height: calc(var(--sp-1) + var(--sp-0_5));
+  border-radius: 2px;
+  background: var(--line-2);
+}
+.bill-ruler-cells i:is(.past, .today) {
+  background: var(--line-4);
+}
+.bill-ruler-ph {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--playhead);
+}
+.bill-ruler-ph::before {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: -2px;
+  width: 6px;
+  height: 4px;
+  background: var(--playhead);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+/* its dates: in the mono face, never faint (they inform) */
+.bill-ticks {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  font: var(--fw-ui) var(--fs-2xs) / 1 var(--mono);
+  font-stretch: 87.5%;
+  color: var(--muted);
+}
+.bill-ticks-now {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  color: var(--fg-2);
+}
+
+/* the workspace against Free, resource by resource: Free's notch, the part over it hatched */
+.bill-fit-grid {
+  display: grid;
+  gap: var(--sp-3);
+}
+.bill-fit {
+  display: grid;
+  gap: var(--sp-1);
+}
+.bill-fit-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.bill-fit-head b {
+  font-weight: var(--fw-ui);
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.bill-fit-bar {
+  position: relative;
+  height: calc(var(--sp-1) + var(--sp-0_5));
+  border-radius: var(--r-full);
+  background: var(--ink-4);
+}
+.bill-fit-in {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: var(--r-full) 0 0 var(--r-full);
+  background: var(--fg-2);
+}
+.bill-fit-over {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 0 var(--r-full) var(--r-full) 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--should) 70%, transparent) 0 2px,
+    color-mix(in srgb, var(--should) 16%, transparent) 2px 6px
+  );
+}
+.bill-fit-notch {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--fg);
+  box-shadow: 0 0 0 2px var(--ink-1);
+}
+.bill-fit-free {
+  position: relative;
+  height: calc(var(--sp-3) + var(--sp-0_5));
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.bill-fit-free span {
+  position: absolute;
+  left: var(--x);
+  transform: translateX(-2px);
+  white-space: nowrap;
+}
+.bill-fit-free span.end {
+  transform: translateX(calc(-100% + 2px));
+}
+.bill-cancel {
+  display: grid;
+  gap: var(--sp-4);
+}
+.bill-cancel p {
+  margin: 0;
+  color: var(--fg-2);
+}
+
+/* ------------------------------------------------------------------ the picker: select a plan, one action says what it costs */
+.bill-picker {
+  container: bill-picker / inline-size;
+  display: grid;
+  gap: var(--sp-4);
+  scroll-margin-top: var(--sp-6);
+}
+.bill-pk-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+.bill-pk-ctl {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.bill-seg.seg {
+  margin: 0;
+  min-inline-size: 0;
+}
+.bill-save {
+  margin-left: calc(var(--sp-1) + var(--sp-0_5));
+  font-style: normal;
+  font-size: var(--fs-xs);
+  color: var(--ok);
+}
+.bill-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: var(--h);
+  padding: 0 var(--sp-3) 0 var(--sp-1);
+  border-radius: var(--r);
+  border: 1px solid var(--line);
+  background: var(--ink-0);
+  box-shadow: var(--sunk);
+}
+.bill-stepper > b {
+  min-width: calc(var(--sp-4) + var(--sp-0_5));
+  text-align: center;
+  font: var(--fw-strong) var(--fs-md) / 1 var(--ui);
+  font-variant-numeric: tabular-nums;
+}
+.bill-stepper > span {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.bill-step {
+  display: inline-grid;
+  place-items: center;
+  width: calc(var(--h-xs) + var(--sp-0_5));
+  height: calc(var(--h-xs) + var(--sp-0_5));
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.bill-step:hover:not(:disabled) {
+  background: var(--sel);
+  color: var(--fg);
+}
+.bill-step:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.bill-pick-note {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.bill-pick-note .icon {
+  flex: none;
+  color: var(--muted);
+}
+.bill-pick-note b {
+  color: var(--fg);
+  font-weight: var(--fw-strong);
+}
+/* the tiles share their rows (subgrid): name, line, price, billing, facts and note line up whatever wraps */
+.bill-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(6, auto);
+  column-gap: var(--sp-3);
+}
+.bill-tile {
+  grid-row: span 6;
+  display: grid;
+  grid-template-rows: subgrid;
+  row-gap: var(--sp-2);
+  align-content: start;
+  min-width: 0;
+  padding: var(--sp-4);
+  border: 0;
+  border-radius: var(--r-lg);
+  background: var(--ink-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast),
+    box-shadow var(--dur) var(--ease-out);
+}
+.bill-tile:hover:not(.off) {
+  box-shadow: inset 0 0 0 1px var(--line-3);
+}
+.bill-tile:has(input:focus-visible) {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+/* selected: the raised material and a filled radio, never the orange */
+.bill-tile.on,
+.bill-tile.on:hover {
+  background: var(--raise-sheen), var(--ink-3);
+  box-shadow:
+    inset 0 0 0 1px var(--line-4),
+    var(--raise-drop);
+}
+.bill-tile.off {
+  cursor: not-allowed;
+  background: transparent;
+}
+.bill-tile.off :is(.bill-t-price b, .bill-t-h b) {
+  color: var(--muted);
+}
+.bill-t-h {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: calc(var(--h-xs) + var(--sp-0_5));
+}
+.bill-t-h b {
+  font: var(--fw-strong) var(--fs-lg) / var(--lh-ui) var(--ui);
+}
+.bill-t-h .bill-tag:first-of-type {
+  margin-left: auto;
+}
+.bill-radio {
+  flex: none;
+  width: var(--sp-4);
+  height: var(--sp-4);
+  border-radius: 50%;
+  background: var(--ink-1);
+  box-shadow: inset 0 0 0 1.5px var(--line-4);
+  transition: box-shadow var(--dur-fast);
+}
+.bill-tile.on .bill-radio {
+  background: var(--ink-3);
+  box-shadow: inset 0 0 0 5px var(--fg);
+}
+.bill-tile.off .bill-radio {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--line-2);
+}
+.bill-t-line {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.bill-t-price {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+}
+.bill-t-price b {
+  font: var(--fw-strong) var(--fs-3xl) / 1 var(--display);
+  font-stretch: semi-condensed;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.bill-t-price span {
+  font-size: var(--fs-xs);
+  line-height: var(--lh-ui);
+  color: var(--muted);
+}
+.bill-t-billed {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.bill-t-facts {
+  display: grid;
+  align-content: start;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-sm);
+}
+.bill-t-plus {
+  font-weight: var(--fw-ui);
+  color: var(--fg-2);
+}
+.bill-t-li {
+  display: grid;
+  grid-template-columns: var(--sp-3) minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--sp-2);
+  color: var(--fg-2);
+}
+.bill-t-li .kg {
+  color: var(--muted);
+  transform: translateY(1px);
+}
+.bill-t-note {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.bill-tile.off .bill-t-note {
+  color: var(--fg-2);
+}
+@container bill-picker (max-width: 680px) {
+  .bill-tiles {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    row-gap: var(--sp-2);
+  }
+  .bill-tile {
+    grid-row: auto;
+    grid-template-rows: none;
+  }
+  /* a phone shows the selection's facts; the others say their price and why */
+  .bill-tile:not(.on) :is(.bill-t-facts, .bill-t-billed) {
+    display: none;
+  }
+  .bill-t-price b {
+    font-size: calc(var(--fs-2xl) * 1.25);
+  }
+}
+/* the one bar: the selected plan, its cost for this workspace, the one orange action */
+.bill-pick-bar {
+  position: sticky;
+  bottom: var(--sp-4);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-3) var(--sp-3) calc(var(--sp-4) + var(--sp-1));
+  border-radius: var(--r-lg);
+  background: var(--float-bg);
+  border: 1px solid var(--float-line);
+  box-shadow: var(--shadow-small);
+}
+.bill-pk-sum {
+  flex: 1;
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.bill-pk-sum b {
+  font: var(--fw-strong) var(--fs-lg) / var(--lh-ui) var(--ui);
+}
+.bill-pk-sum span {
+  color: var(--fg-2);
+  font-variant-numeric: tabular-nums;
+}
+.bill-pk-sum small {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.bill-pick-bar .btn {
+  flex: none;
+}
+@container bill-picker (max-width: 560px) {
+  .bill-pk-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .bill-pk-ctl {
+    justify-content: space-between;
+  }
+  .bill-pick-bar {
+    bottom: calc(var(--sp-3) + var(--safe-bottom, 0px));
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--sp-3);
+    padding: var(--sp-3);
+  }
+  .bill-pick-bar .btn {
+    width: 100%;
+    height: var(--h-touch);
+  }
+}
+.bill-pk-foot {
+  display: grid;
+  gap: var(--sp-2);
+}
+.bill-free-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-1) var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.bill-free-row b {
+  font-weight: var(--fw-strong);
+  color: var(--fg-2);
+}
+
+/* ------------------------------------------------------------------ the account: one panel, three rows */
+.bill-acct {
+  display: grid;
+  gap: var(--sp-3);
+}
+.bill-acct-panel {
+  container: bill-acct / inline-size;
+  display: grid;
+}
+.bill-acct-row {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: var(--sp-6);
+  padding: calc(var(--sp-4) + var(--sp-1)) var(--sp-6);
+  border-top: 1px solid var(--line);
+}
+.bill-acct-row:first-child {
+  border-top: 0;
+}
+.bill-acct-k h3 {
+  margin: 0;
+  font: var(--fw-strong) var(--fs-md) / var(--lh-ui) var(--ui);
+}
+.bill-acct-k p {
+  margin: var(--sp-0_5) 0 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.bill-acct-v {
+  min-width: 0;
+}
+.bill-pm-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bill-pm {
+  display: grid;
+  grid-template-columns: var(--sp-8) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: calc(var(--sp-12));
+}
+.bill-pm + .bill-pm {
+  border-top: 1px solid var(--line);
+}
+.bill-mark {
+  display: block;
+  width: var(--sp-8);
+  height: calc(var(--sp-4) + var(--sp-1));
+}
+.bill-mark-any {
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+  background: var(--ink-4);
+  color: var(--muted);
+}
+.bill-pm-t {
+  display: grid;
+  min-width: 0;
+}
+.bill-pm-t b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--fw-ui);
+}
+.bill-pm-t small {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.bill-pm-t small.bad {
+  color: var(--must);
+  font-weight: var(--fw-ui);
+}
+.bill-pm-r {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-1);
+}
+.bill-pm.gone {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 var(--sp-1) 0 var(--sp-3);
+  margin: var(--sp-1) 0;
+  border-radius: var(--r);
+  background: var(--sel);
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  animation: bill-rise var(--dur-slow) var(--ease-out);
+}
+@keyframes bill-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.bill-add-lk {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-sm);
+}
+/* a new card in place: Stripe's field, "use it for renewals" under it, then Save card */
+.bill-add-card {
+  display: grid;
+  gap: var(--sp-3);
+  margin-top: var(--sp-3);
+  padding: var(--sp-4);
+  border-radius: var(--r-lg);
+  background: var(--ink-1);
+  box-shadow: inset 0 0 0 1px var(--line);
+  animation: bill-rise var(--dur-slow) var(--ease-out);
+}
+.bill-add-card > .bill-chk {
+  order: 4;
+}
+.bill-add-card .set-actions {
+  order: 5;
+  justify-content: flex-end;
+}
+.bill-add-card .bill-safe {
+  order: 6;
+}
+.bill-chk {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--fg-2);
+  cursor: pointer;
+}
+.bill-chk input {
+  width: var(--sp-4);
+  height: var(--sp-4);
+  margin: 0;
+  accent-color: var(--fg);
+}
+/* the details: a summary, Edit beside it; edited in the row as a form */
+.bill-det-view {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-3) var(--sp-4);
+  align-items: start;
+}
+.bill-det-view address {
+  display: grid;
+  gap: var(--sp-0_5);
+  font-style: normal;
+}
+.bill-det-view address b {
+  font-weight: var(--fw-ui);
+}
+.bill-det-view address span {
+  color: var(--fg-2);
+}
+.bill-det-edit {
+  grid-column: 2;
+  grid-row: 1;
+}
+.bill-kv {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--sp-1);
+  margin: 0;
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line);
+}
+.bill-kv > div {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: var(--sp-3);
+  align-items: baseline;
+}
+.bill-kv dt {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.bill-kv dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: 0;
+  min-width: 0;
+  color: var(--fg-2);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.bill-taxid {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+.bill-vat {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--sp-1) + var(--sp-0_5));
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.bill-vat.ok {
+  color: var(--ok);
+}
+.bill-vat.bad {
+  color: var(--must);
+}
+.bill-det-form {
+  display: grid;
+  gap: var(--sp-4);
+  animation: bill-rise var(--dur-slow) var(--ease-out);
+}
+.bill-det-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-3);
+  align-items: start;
+}
+.bill-span2 {
+  grid-column: span 2;
+  display: grid;
+}
+/* the app's Select as the entry field beside it: its size, its sunk face */
+.bill-country .input.select {
+  width: 100%;
+  height: var(--h-lg);
+  padding: 0 var(--sp-3);
+  border-radius: var(--r);
+  border: 1px solid var(--line-2);
+  background-color: var(--ink-2);
+  box-shadow: var(--sunk);
+  font-size: var(--fs-md);
+}
+.bill-country .input.select:hover {
+  border-color: var(--line-3);
+}
+.bill-form-acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}
+/* invoices: a table that keeps its badges in their column at every width (audit B-M3) */
+.bill-inv {
+  display: grid;
+}
+.bill-inv-r {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr) auto 84px var(--sp-8);
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: calc(var(--sp-12) - var(--sp-0_5));
+  border-top: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+}
+.bill-inv-h {
+  min-height: calc(var(--sp-8) - var(--sp-1));
+  border-top: 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.bill-inv-d {
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+.bill-inv-x {
+  display: grid;
+  min-width: 0;
+}
+.bill-inv-x b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--fw-ui);
+}
+.bill-inv-x small {
+  font: var(--fw-ui) var(--fs-xs) / var(--lh-ui) var(--mono);
+  font-stretch: 87.5%;
+  color: var(--muted);
+}
+.bill-inv-a {
+  text-align: right;
+  white-space: nowrap;
+}
+.bill-inv-p {
+  display: flex;
+  justify-content: flex-end;
+}
+.bill-inv-r.next :is(.bill-inv-d, .bill-inv-x b, .bill-inv-a) {
+  color: var(--muted);
+  font-weight: var(--fw-text);
+}
+@container bill-acct (max-width: 640px) {
+  .bill-acct-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-3);
+    padding: var(--sp-4);
+  }
+  /* a card's actions go under its name, so the name never breaks */
+  .bill-pm {
+    padding: var(--sp-2) 0;
+  }
+  .bill-pm-r:has(.btn) {
+    grid-column: 2 / -1;
+    justify-content: flex-start;
+    margin: calc(-1 * var(--sp-1)) 0 0 calc(-1 * var(--sp-2));
+  }
+  .bill-det-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bill-span2 {
+    grid-column: auto;
+  }
+  .bill-det-view {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bill-det-edit {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: start;
+  }
+  .bill-kv > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  /* each invoice in two lines: what and how much, when and its state */
+  .bill-inv-h {
+    display: none;
+  }
+  .bill-inv-r {
+    grid-template-columns: minmax(0, 1fr) auto var(--sp-8);
+    grid-template-areas:
+      'x a p'
+      'd s p';
+    gap: var(--sp-0_5) var(--sp-3);
+    padding: var(--sp-2) 0;
+  }
+  .bill-inv-r:nth-child(2) {
+    border-top: 0;
+  }
+  .bill-inv-x {
+    grid-area: x;
+  }
+  .bill-inv-a {
+    grid-area: a;
+  }
+  .bill-inv-d {
+    grid-area: d;
+    font-size: var(--fs-xs);
+    color: var(--muted);
+  }
+  .bill-inv-s {
+    grid-area: s;
+    justify-self: end;
+  }
+  .bill-inv-p {
+    grid-area: p;
+  }
+  .bill-inv-x small {
+    display: none;
+  }
+}
+/* a member, a complimentary workspace: who decides, or that there is nothing to decide */
+.bill-who {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-4) calc(var(--sp-4) + var(--sp-1));
+  color: var(--fg-2);
+}
+.bill-who p {
+  margin: 0;
+}
+.bill-who .icon {
+  flex: none;
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------------ a renewal that didn't go through: the fix */
+.bill-fix {
+  display: grid;
+  gap: var(--sp-4);
+}
+.bill-fix-lede {
+  margin: 0;
+  max-width: 72ch;
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+.bill-fix-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: var(--sp-6);
+}
+.bill-fix-works,
+.bill-fix-pay {
+  display: grid;
+  align-content: start;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+.bill-fix-pay {
+  padding-left: var(--sp-6);
+  border-left: 1px solid var(--line);
+}
+.bill-fix-tl {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  border-radius: var(--r);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.bill-fix-pt {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 0 var(--sp-2);
+  font-size: var(--fs-sm);
+}
+.bill-fix-pt small {
+  grid-column: 1 / -1;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.bill-fix-pt.end {
+  justify-items: end;
+}
+.bill-fix-line {
+  position: relative;
+  height: calc(var(--sp-1) + var(--sp-0_5));
+  border-radius: var(--r-full);
+  background: repeating-linear-gradient(90deg, var(--line-2) 0 4px, transparent 4px 7px);
+}
+.bill-fix-line i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--must) 55%, var(--line-2));
+}
+.bill-fix-line em {
+  position: absolute;
+  bottom: calc(100% + var(--sp-1));
+  left: 0;
+  font: var(--fw-ui) var(--fs-2xs) / 1 var(--mono);
+  font-style: normal;
+  color: var(--fg-2);
+}
+.bill-fix-todo {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--fg-2);
+}
+.bill-fix-todo li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+.bill-fix-todo li .kg {
+  transform: translateY(1px);
+}
+.bill-fix-todo li.wait .kg {
+  color: var(--muted);
+}
+.bill-fix-inv {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-variant-numeric: tabular-nums;
+}
+.bill-fix-inv > .icon {
+  flex: none;
+  color: var(--muted);
+}
+.bill-fix-inv-t {
+  flex: 1;
+  display: grid;
+  min-width: 0;
+}
+.bill-fix-inv-t small {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.bill-fix-keep {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+/* the payment form (billing/Pay.tsx IntentForm) and, between its card and Pay, what is due; a declined card's field
+   carries the error's ring */
+.bill-fix-pay .co-el:has(~ .bill-error) {
+  border-radius: var(--r);
+  box-shadow: 0 0 0 1px var(--must);
+}
+.bill-fix-sum {
+  order: 4;
+  display: grid;
+  gap: var(--sp-1);
+  margin: 0;
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-sm);
+}
+.bill-fix-sum > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  color: var(--fg-2);
+}
+.bill-fix-sum :is(dt, dd) {
+  margin: 0;
+}
+.bill-fix-sum dd {
+  font-variant-numeric: tabular-nums;
+}
+.bill-fix-sum > .total {
+  padding-top: var(--sp-2);
+  font: var(--fw-strong) var(--fs-lg) / var(--lh-ui) var(--ui);
+  color: var(--fg);
+}
+.bill-fix-pay .set-actions {
+  order: 5;
+}
+.bill-fix-pay .set-actions .btn {
+  width: 100%;
+  height: var(--h-lg);
+}
+.bill-fix-after {
+  order: 6;
+  text-align: center;
+}
+.bill-fix-pay .bill-safe {
+  order: 7;
+  justify-content: center;
+}
+.bill-fix-room {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.bill-fix-room .icon {
+  flex: none;
+  color: var(--muted);
+}
+.bill-fix-done {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-4) 0;
+  text-align: center;
+}
+.bill-fix-done p {
+  margin: 0;
+  max-width: 44ch;
+  color: var(--fg-2);
+}
+.bill-fix-done-acts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: var(--sp-3);
+}
+@media (max-width: 760px) {
+  .bill-fix-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bill-fix-pay {
+    padding-left: 0;
+    border-left: 0;
+    padding-top: var(--sp-4);
+    border-top: 1px solid var(--line);
+  }
+}
+
+/* one control scale on a touch screen: fields and their buttons a finger hits, text iOS doesn't zoom into */
+@media (pointer: coarse) {
+  .bill-page :is(.gate-input, .input.select) {
+    height: var(--h-touch);
+    font-size: var(--fs-touch);
+  }
+  .bill-form-acts .btn {
+    height: var(--h-touch);
+  }
+}
+@media (max-width: 760px) {
+  .bill-hero {
+    padding: var(--sp-4);
+  }
+  .bill-hero-name h2 {
+    font-size: calc(var(--fs-2xl) * 1.08);
+  }
+}
+
+.bill-pay-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.bill-error {
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-ui);
+  color: var(--must);
+}
+.bill-safe {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin: 0;
+}

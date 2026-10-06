@@ -1,0 +1,701 @@
+/* A limit's sheet (conversion/limits/LimitSheet.tsx): what was asked for and why there's no room (head), what fits
+   (left), paying in place (right), the other way out (foot). The sheet layer (51), the float material; on a phone a
+   sheet from the bottom in one column, the pay button sticky with a solid ring of its column's colour. Loaded with the
+   sheet's code. */
+.lim-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-sheet);
+  background: var(--backdrop);
+  animation: lim-fade var(--dur) var(--ease-out);
+}
+@keyframes lim-fade {
+  from {
+    opacity: 0;
+  }
+}
+/* anchored at its top, never centred: what the payment form adds as it loads grows the sheet downwards, the head and
+   the plan never move */
+.lim-sheet {
+  position: fixed;
+  z-index: var(--z-sheet);
+  top: max(var(--sp-4), 50dvh - 430px);
+  left: 50%;
+  width: min(968px, calc(100% - var(--sp-12)));
+  max-height: calc(100dvh - 2 * max(var(--sp-4), 50dvh - 430px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
+  background: var(--float-bg);
+  border: 1px solid var(--float-line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-float);
+  color: var(--fg);
+  transform: translateX(-50%);
+  overflow: hidden;
+  animation: lim-in 340ms var(--ease-out) both;
+}
+.lim-sheet:focus {
+  outline: none;
+}
+@keyframes lim-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px) scale(0.985);
+  }
+}
+.lim-sheet.done {
+  width: min(520px, calc(100% - var(--sp-12)));
+  grid-template-rows: auto;
+}
+/* ---------------------------------------------------------------- head */
+.lim-head {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-2);
+  padding: var(--sp-4) var(--sp-6);
+  border-bottom: 1px solid var(--line);
+}
+.lim-eyebrow,
+.lim-k {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-ui);
+  letter-spacing: var(--track-eyebrow);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.lim-x {
+  position: absolute;
+  top: var(--sp-3);
+  right: var(--sp-3);
+}
+.lim-head h2,
+.lim-done h2 {
+  margin: 0;
+  padding-right: var(--sp-8);
+  font: var(--fw-strong) var(--fs-2xl) / var(--lh-tight) var(--display);
+  font-stretch: semi-condensed;
+  letter-spacing: var(--track-title);
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+.lim-head h2:focus,
+.lim-done h2:focus {
+  outline: none;
+}
+.lim-lede {
+  max-width: 72ch;
+  margin: 0;
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+/* the room the workspace has, with what was asked for hanging over its end */
+.lim-cap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-1);
+  max-width: 560px;
+  margin-top: var(--sp-2);
+}
+.lim-cap-top,
+.lim-cap-lbl {
+  position: relative;
+  height: var(--sp-4);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+.lim-cap-top > span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-weight: var(--fw-ui);
+  color: var(--should);
+}
+.lim-cap-bar {
+  position: relative;
+  height: 10px;
+  border-radius: var(--r-full);
+  background: var(--ink-4);
+}
+.lim-cap-used {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--r-full) 0 0 var(--r-full);
+  background: var(--fg-2);
+}
+.lim-cap-inc {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 0 var(--r-full) var(--r-full) 0;
+  background: repeating-linear-gradient(-45deg, var(--should) 0 3px, color-mix(in srgb, var(--should) 35%, transparent) 3px 6px);
+}
+.lim-cap-lim {
+  position: absolute;
+  top: -5px;
+  bottom: -5px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--fg);
+  box-shadow: 0 0 0 2px var(--float-bg);
+}
+.lim-cap-lbl {
+  color: var(--muted);
+}
+.lim-cap-lbl > span {
+  position: absolute;
+  top: 0;
+  white-space: nowrap;
+}
+.lim-cap-lbl b {
+  font-weight: var(--fw-ui);
+  color: var(--fg-2);
+}
+.lim-cap-lim-l {
+  transform: translateX(-50%);
+}
+/* ---------------------------------------------------------------- body: what fits | paying */
+.lim-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 384px);
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.lim-fit,
+.lim-pay {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-6) var(--sp-6);
+}
+.lim-pay {
+  gap: var(--sp-3);
+  background: var(--ink-2);
+  border-left: 1px solid var(--line);
+}
+.lim-plan {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-top: calc(-1 * var(--sp-2));
+}
+.lim-plan h3,
+.lim-contract h3 {
+  margin: 0;
+  font: var(--fw-strong) var(--fs-2xl) / var(--lh-tight) var(--display);
+  font-stretch: semi-condensed;
+  letter-spacing: var(--track-title);
+}
+.lim-line {
+  margin: 0;
+  color: var(--muted);
+}
+/* Yearly · Monthly, with what yearly saves */
+.lim-seg {
+  margin: 0;
+  min-inline-size: 0;
+}
+.lim-seg i {
+  font-style: normal;
+  font-weight: var(--fw-ui);
+  color: var(--ok);
+}
+.lim-price {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-1);
+  margin-top: calc(-1 * var(--sp-1));
+}
+.lim-price p {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: 0;
+}
+.lim-price b {
+  font: var(--fw-strong) var(--fs-3xl) / 1 var(--display);
+  font-stretch: semi-condensed;
+  letter-spacing: var(--track-title);
+  font-variant-numeric: tabular-nums;
+}
+.lim-price span,
+.lim-price-sub {
+  color: var(--muted);
+}
+.lim-price .lim-price-sub {
+  font-size: var(--fs-sm);
+}
+/* now → then */
+.lim-chg {
+  border-radius: var(--r);
+  box-shadow: inset 0 0 0 1px var(--line);
+  overflow: hidden;
+}
+.lim-chg table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-variant-numeric: tabular-nums;
+}
+.lim-chg th,
+.lim-chg td {
+  height: 36px;
+  padding: var(--sp-1) var(--sp-3);
+  text-align: left;
+  vertical-align: middle;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-text);
+}
+.lim-chg thead th:nth-child(1),
+.lim-chg thead th:nth-child(3) {
+  width: 37%;
+}
+.lim-chg thead th {
+  height: 30px;
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-ui);
+  color: var(--muted);
+}
+.lim-chg tbody tr {
+  border-top: 1px solid var(--line);
+}
+.lim-chg tbody th {
+  color: var(--fg-2);
+}
+.lim-chg td.a {
+  color: var(--muted);
+}
+.lim-chg td.b {
+  font-weight: var(--fw-ui);
+}
+.lim-next {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+.lim-to {
+  flex: none;
+  color: var(--muted);
+}
+.lim-chg tr.same td.b {
+  font-weight: var(--fw-text);
+  color: var(--muted);
+}
+.lim-same {
+  font-size: var(--fs-xs);
+}
+.lim-keep {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+.lim-ok {
+  flex: none;
+  color: var(--ok);
+}
+.lim-keep .lim-ok {
+  transform: translateY(1px);
+}
+.lim-other {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.lim-contract {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: start;
+  gap: var(--sp-3);
+}
+.lim-payfine {
+  margin: calc(-1 * var(--sp-1)) 0 0;
+  text-align: center;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.lim-confirming .spinner {
+  width: var(--sp-3);
+  height: var(--sp-3);
+}
+/* the checkout step's one-column layout carries the class `sheet`, which share.css's printable note sheet also styles
+   (900 px wide, centred, padded, white): inside a limit's sheet it is the column's own width and look */
+.lim-pay .co.sheet {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  color: inherit;
+  background: none;
+  font: inherit;
+}
+/* ---------------------------------------------------------------- foot: making room instead, Not now */
+.lim-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  min-height: 52px;
+  padding: var(--sp-2) var(--sp-6);
+  border-top: 1px solid var(--line);
+}
+.lim-room {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.lim-room > .icon {
+  flex: none;
+}
+.lim-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg-2);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+/* a link inside a sentence: on a phone a finger's room around it, without moving the words */
+@media (max-width: 639px) {
+  .lim-link {
+    position: relative;
+  }
+  .lim-link::after {
+    content: '';
+    position: absolute;
+    inset: -13px -4px;
+  }
+}
+.lim-link:hover {
+  color: var(--fg);
+}
+.lim-later {
+  flex: none;
+  font-size: var(--fs-sm);
+}
+/* ---------------------------------------------------------------- paid: calm, the plan in place */
+.lim-done {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-8) var(--sp-8) var(--sp-6);
+  text-align: center;
+}
+.lim-done h2 {
+  padding: 0;
+}
+.lim-done p {
+  max-width: 44ch;
+  margin: 0;
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+.lim-done .lim-fine {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.lim-done .btn {
+  margin: var(--sp-2) 0;
+}
+/* ---------------------------------------------------------------- Insights on a plan without them: explained, never locked */
+.lim-ins {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: var(--sp-8);
+  align-items: center;
+  padding: var(--sp-8);
+  border-radius: var(--r-lg);
+  background: radial-gradient(ellipse 70% 120% at 90% 0%, var(--gs-a), transparent), var(--gs-b);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.lim-ins-txt {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--sp-3);
+}
+.lim-ins-txt h2 {
+  margin: 0;
+  font: var(--fw-strong) var(--fs-2xl) / var(--lh-tight) var(--display);
+  font-stretch: semi-condensed;
+  letter-spacing: var(--track-title);
+}
+.lim-ins-lede {
+  margin: 0;
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+.lim-ins-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lim-ins-list li {
+  display: grid;
+  grid-template-columns: var(--sp-4) minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--sp-2);
+  color: var(--fg-2);
+}
+.lim-ins-list li > :first-child {
+  justify-self: center;
+  color: var(--muted);
+}
+.lim-ins-list .lim-ok {
+  color: var(--ok);
+}
+.lim-ins-list .lim-ins-agent {
+  color: var(--claude);
+}
+.lim-ins-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-top: var(--sp-2);
+}
+.lim-ins-fine {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.lim-ins-fig {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-4);
+  margin: 0;
+  padding: var(--sp-6) var(--sp-6) var(--sp-4);
+  border-radius: var(--r-lg);
+  background: var(--ink-1);
+  box-shadow: inset 0 0 0 1px var(--line);
+  mask: linear-gradient(to bottom, #000 70%, transparent);
+}
+.lim-ins-fig figcaption {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-3);
+  font: var(--fw-ui) var(--fs-2xs) / 1 var(--mono);
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.lim-ins-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-1);
+  height: 120px;
+  padding-top: var(--sp-4);
+  border-bottom: 1px solid var(--line-2);
+}
+.lim-ins-bars i {
+  flex: 1;
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+  background: repeating-linear-gradient(-45deg, var(--line-3) 0 2px, transparent 2px 5px);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.lim-ins-rows {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-2);
+}
+.lim-ins-rows span {
+  height: var(--sp-2);
+  border-radius: var(--r-sm);
+  background: var(--ink-3);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.lim-ins-rows i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--line-3);
+}
+@media (max-width: 899px) {
+  .lim-ins {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--sp-6);
+    gap: var(--sp-6);
+  }
+}
+@media (max-width: 639px) {
+  .lim-ins {
+    padding: var(--sp-4);
+  }
+  .lim-ins-acts .btn {
+    min-height: var(--h-touch);
+  }
+}
+
+/* while the page explains, the sidebar's Insights row says which plan brings them (the page sets the plan's name) */
+.lib:has(.lim-ins) .nav-item:has(> .i-chart)::after {
+  content: var(--lim-ins-plan, none);
+  flex: none;
+  order: 2;
+  font: var(--fw-ui) var(--fs-xs) var(--ui);
+  color: var(--muted);
+}
+/* ---------------------------------------------------------------- an invite beyond the plan (conversion/InviteBeyond.tsx) */
+.lim-beyond {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  border-radius: var(--r);
+  background: var(--ink-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+  animation: lim-rise 420ms var(--ease-out) both;
+}
+@keyframes lim-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.lim-beyond > .icon {
+  margin-top: var(--sp-1);
+  color: var(--fg-2);
+}
+.lim-beyond > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.lim-beyond b {
+  font-weight: var(--fw-strong);
+}
+.lim-beyond p {
+  margin: 0;
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+.lim-beyond strong {
+  font-weight: var(--fw-strong);
+  color: var(--fg);
+}
+.lim-beyond-today {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sp-3);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.lim-beyond-today > span:first-child {
+  font-weight: var(--fw-ui);
+  color: var(--fg-2);
+}
+.lim-beyond-fine {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- phones: a sheet from the bottom, one column */
+@media (max-width: 639px), (max-height: 480px) and (hover: none) and (pointer: coarse) {
+  .lim-sheet,
+  .lim-sheet.done {
+    top: auto;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    max-height: calc(100dvh - var(--sp-2));
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    transform: none;
+    animation: lim-up 380ms var(--ease-out) both;
+  }
+  .lim-head {
+    padding: var(--sp-4);
+  }
+  .lim-head h2 {
+    font-size: var(--fs-xl);
+  }
+  /* the head, the body and the foot scroll as one: a long head never leaves the form a sliver */
+  .lim-sheet:not(.done) {
+    grid-template-rows: auto;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  .lim-body {
+    grid-template-columns: minmax(0, 1fr);
+    overflow: visible;
+  }
+  .lim-fit,
+  .lim-pay {
+    padding: var(--sp-4);
+  }
+  .lim-pay {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+  /* the one button stays in reach while the sheet scrolls, on a solid ring of its column's colour (the card on file's,
+     and the checkout step's) */
+  .lim-pay .pay-go,
+  .lim-pay .co .btn.primary.wide {
+    position: sticky;
+    bottom: var(--sp-3);
+    z-index: 1;
+    height: var(--h-touch);
+    box-shadow:
+      var(--raise),
+      0 0 0 10px var(--ink-2);
+  }
+  .lim-foot {
+    flex-wrap: wrap;
+    padding: var(--sp-3) var(--sp-4) calc(var(--sp-3) + var(--safe-bottom));
+  }
+  .lim-later,
+  .lim-x,
+  .lim-seg button {
+    min-height: var(--h-touch);
+  }
+  .lim-chg th,
+  .lim-chg td {
+    padding: var(--sp-1) var(--sp-2);
+  }
+  .lim-cap-lim-l {
+    display: none;
+  }
+  .lim-done {
+    padding: var(--sp-6) var(--sp-4) calc(var(--sp-6) + var(--safe-bottom));
+  }
+}
+@keyframes lim-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lim-sheet,
+  .lim-sheet.done,
+  .lim-scrim,
+  .lim-beyond {
+    animation: none;
+  }
+}

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0b0b0c" />
+    <title>Lampo · offline</title>
+    <link rel="icon" href="/icons/favicon-32.png" />
+    <style>
+      :root {
+        --ink: #0b0b0c;
+        --fg: #eeebe4;
+        --muted: #8f8b83;
+        --line: #2a2a2e;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        background: var(--ink);
+        color: var(--fg);
+        font:
+          16px/1.5 -apple-system,
+          'Helvetica Neue',
+          sans-serif;
+      }
+      main {
+        min-height: 100dvh;
+        display: grid;
+        place-content: center;
+        gap: 22px;
+        padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+        text-align: center;
+      }
+      .leader {
+        width: 132px;
+        height: 132px;
+        margin: 0 auto;
+        border-radius: 50%;
+        border: 1px solid var(--line);
+        display: grid;
+        place-items: center;
+        position: relative;
+      }
+      .leader::before {
+        content: '';
+        position: absolute;
+        inset: 14px;
+        border-radius: 50%;
+        border: 1px solid var(--line);
+      }
+      .leader b {
+        font: italic 400 64px/1 'Iowan Old Style', Georgia, serif;
+      }
+      h1 {
+        margin: 0;
+        font: italic 400 34px/1.1 'Iowan Old Style', Georgia, serif;
+      }
+      p {
+        margin: 0 auto;
+        max-width: 30ch;
+        color: var(--muted);
+      }
+      button {
+        justify-self: center;
+        min-height: 44px;
+        padding: 0 22px;
+        border-radius: 10px;
+        border: 0;
+        background: var(--fg);
+        color: #111;
+        font: 600 15px/1 -apple-system, sans-serif;
+      }
+      .mono {
+        font: 11px/1 ui-monospace, Menlo, monospace;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #6b675f;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="leader" aria-hidden="true"><b>0</b></div>
+      <h1>Out of reach.</h1>
+      <p>This phone can't reach your review server right now. Reviews live there, not on the phone — check the network (or the tunnel) and try again.</p>
+      <button type="button" id="retry">Try again</button>
+      <div class="mono">Lampo · offline</div>
+    </main>
+    <!-- A file, not inline: the content policy runs no inline script or handler but the theme boot. -->
+    <script src="/offline.js"></script>
+  </body>
+</html>

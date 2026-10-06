@@ -1,0 +1,1223 @@
+/* notes sidebar */
+.side {
+  grid-area: side;
+  border-left: 1px solid var(--line);
+  background: var(--ink-2);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+/* the filters (or the transcript's search) keep the same room above the line under them as the title has above them;
+   a size container, so the head row's Auto-check chip can drop its name where the panel is narrow */
+.side-head {
+  container: notes-head / inline-size;
+  padding: var(--sp-3);
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: var(--sp-3);
+}
+.side-title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+/* the spacer between the views and the buttons takes one gap, not two */
+.side-title > .grow {
+  margin-left: calc(-1 * var(--sp-2));
+}
+.side-title h2 {
+  margin: 0;
+  font: var(--fw-strong) var(--fs-lg) / var(--lh-tight) var(--ui);
+  letter-spacing: var(--track-title);
+}
+.side-count {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+/* The filters: the segmented track across the panel's width, every word in sight, and under it the notes' tags as
+   chips — one line each, whatever the video holds (a language's words or many tags that don't fit scroll, with soft
+   edges, rather than wrap or cut one). The tags' line is there from the first paint, so the list never moves down. */
+.note-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-2);
+}
+.note-tabs {
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.note-tabs button {
+  flex: 1 0 auto;
+  justify-content: center;
+  padding: 0 var(--sp-1);
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+}
+.note-tagf {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  min-height: var(--h-sm);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.note-tagnone {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.tagf.pending {
+  pointer-events: none;
+  border-color: var(--line);
+}
+/* a phone's sheet: the Auto-check chip opens the tags' line (its head row has no room), a hairline after it */
+.note-tagf-ac {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sp-1);
+  padding-right: var(--sp-1);
+  border-right: 1px solid var(--line-2);
+}
+/* a tag: a quiet outlined chip with its count; picked, the raised material every selection wears */
+.tagf {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: var(--h-sm);
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--fg-2);
+  font: var(--fw-ui) var(--fs-sm) / var(--lh-tight) var(--ui);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+/* a quiet second word, as every chip's count (controls.css .tabs button .n) */
+.tagf .n {
+  font: var(--fw-ui) var(--fs-xs) / 1 var(--ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.tagf .icon {
+  color: var(--ok);
+}
+.tagf:hover {
+  color: var(--fg);
+  border-color: var(--line-3);
+}
+.tagf.on {
+  color: var(--fg);
+  border-color: transparent;
+  background: var(--raise-sheen), var(--ink-3);
+  box-shadow: var(--raise);
+}
+.tagf.on .n {
+  color: var(--fg-2);
+}
+.tagf:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.side-scroll {
+  flex: 1;
+  overflow: auto;
+  padding: var(--sp-3) var(--sp-3) var(--sp-8);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-2);
+  align-content: start;
+}
+/* The notes: a row each, tight, their hover grounds reaching a step past the content edge so the words stay on it
+   (NotesPanel.tsx NoteRows; hundreds of notes are windowed, .note-rows, the same stack). */
+.note-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1px;
+  align-content: start;
+  margin: 0 calc(-1 * var(--sp-2));
+}
+
+/* ---------------------------------------------------------------- a note as a row
+   Timecode · severity glyph · the first line · (state, replies), one line at a control's height. Who wrote it and when
+   is said once, above the first row of each person's sitting (.note-group). Colour sits in the glyph; hover changes
+   the ground only, and the picture that comes under the pointer lies over the row's end, so nothing moves. */
+.note-row {
+  display: grid;
+  min-width: 0;
+}
+.note-group {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: var(--sp-3) var(--sp-2) var(--sp-1);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.note-list > .note-row:first-child .note-group {
+  padding-top: 0;
+}
+.note-group b {
+  min-width: 0;
+  font-weight: var(--fw-strong);
+  color: var(--fg-2);
+}
+.note-group-dot {
+  color: var(--faint);
+}
+.nr {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  min-width: 0;
+  min-height: var(--h);
+  padding: var(--sp-0_5) var(--sp-2);
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--fg);
+  font: var(--fw-text) var(--fs-md) / var(--lh-ui) var(--ui);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.nr:hover {
+  background: var(--sel);
+}
+.nr:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+/* the timecodes in one column of one width, so the words start together (a section's length is at the row's end) */
+.nr-tc {
+  width: calc(var(--sp-16) + var(--sp-1));
+  overflow: hidden;
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  font-stretch: 87.5%;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.nr-tc.overall {
+  font: var(--fw-ui) var(--fs-xs) var(--ui);
+}
+.nr-len {
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  font-stretch: 87.5%;
+}
+.nr-kg {
+  display: inline-grid;
+  place-items: center;
+  width: var(--ic-sm);
+}
+.nr-kind.nr-question,
+.nr-kind.nr-agent {
+  color: var(--claude-2);
+}
+.nr-kind.nr-info {
+  color: var(--muted);
+}
+.nr-text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.nr-text .c-edit {
+  display: inline;
+  font-size: inherit;
+}
+.nr-text .muted {
+  color: var(--muted);
+}
+.nr-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.nr-v {
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+}
+.nr-said {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-0_5);
+  font-variant-numeric: tabular-nums;
+}
+.nr-state {
+  color: var(--muted);
+}
+.nr-state.nr-fixed {
+  color: var(--ok);
+}
+.nr-state.again {
+  color: var(--should);
+}
+.nr-state.nr-open:not(.again) {
+  color: var(--claude-2);
+}
+/* the picture, only while the pointer (or the focus) is on the row: over its end, so the row keeps its shape */
+.nr-thumb {
+  position: absolute;
+  top: 50%;
+  right: var(--sp-1);
+  height: calc(var(--h) - var(--sp-1));
+  max-width: var(--sp-16);
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  background: var(--ink-0);
+  box-shadow: 0 0 0 1px var(--line-2);
+  transform: translateY(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.nr:hover .nr-thumb,
+.nr:focus-visible .nr-thumb {
+  opacity: 1;
+}
+/* the note the playhead is at: a raised ground, its timecode in the ink */
+.note-row.here .nr {
+  background: var(--ink-3);
+}
+.note-row.here .nr-tc {
+  color: var(--fg);
+}
+.note-row.closed .nr-text,
+.note-row.closed .nr-tc {
+  color: var(--muted);
+}
+.note-row.closed .nr-kg {
+  opacity: 0.55;
+}
+/* while the notes load: the same rows, waiting */
+.note-row.pending {
+  pointer-events: none;
+}
+.note-row.pending .nr {
+  cursor: default;
+}
+/* the selected note, open as its card in the row's place: a step of room above and below, back on the content edge,
+   its picture large enough to read */
+.note-list > .comment {
+  margin: var(--sp-2) var(--sp-2);
+}
+.note-list > .comment .c-thumb {
+  width: calc(var(--sp-20) + var(--sp-4));
+}
+
+/* ---------------------------------------------------------------- a note
+   Calm cards: who and when, what it is (one badge), the text, the thread. Colour sits in dots and badges, never in a
+   stripe along a rounded edge. The same base (.comment, .c-*) dresses the client page's and verify mode's notes. */
+.comment {
+  position: relative;
+  border-radius: var(--radius);
+  background: var(--ink-1);
+  border: 1px solid var(--line);
+  padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-3);
+  display: grid;
+  gap: var(--sp-2);
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+  /* fades in where its placeholder was: rising into place would read as the list jumping */
+  animation: fade 0.3s var(--ease-out) both;
+}
+/* a card while the notes load (NotesPanel's pending state): the card's frame, a head and a line */
+.comment.pending {
+  gap: var(--sp-3);
+  cursor: default;
+  pointer-events: none;
+  animation: none;
+}
+.comment:hover {
+  border-color: var(--line-3);
+}
+.comment.here {
+  background: var(--ink-3);
+}
+.comment.active {
+  border-color: color-mix(in srgb, var(--fg) 45%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--fg) 6%, transparent);
+}
+.comment.closed {
+  opacity: 0.6;
+}
+.comment.closed:hover,
+.comment.closed.active {
+  opacity: 1;
+}
+
+.note-head,
+.c-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.note-who {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-1);
+  min-width: 0;
+  flex: 1;
+  font-size: var(--fs-sm);
+}
+.note-who b {
+  font-weight: var(--fw-strong);
+  min-width: 0;
+}
+.note-role {
+  flex: none;
+  font: var(--fw-ui) var(--fs-xs) var(--ui);
+  color: var(--muted);
+}
+.when {
+  flex: none;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.c-tc {
+  flex: none;
+  font: var(--fw-strong) var(--fs-xs) var(--mono);
+  font-stretch: 87.5%;
+  color: var(--fg);
+  padding: var(--sp-0_5) var(--sp-2) var(--sp-0_5);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+}
+button.c-tc {
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+button.c-tc:hover {
+  background: var(--ink-5);
+}
+/* The quiet tools (reply, ⋯) come forward when the card is hovered, focused or chosen. */
+.note-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-0_5);
+  margin-right: calc(-1 * var(--sp-1));
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.note:hover .note-tools,
+.note:focus-within .note-tools,
+.note.active .note-tools,
+.note-tools:has([data-state='open']) {
+  opacity: 1;
+}
+@media (hover: none) {
+  .note-tools {
+    opacity: 1;
+  }
+  .note-tools .c-id {
+    display: none;
+  }
+}
+.c-id {
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  color: var(--muted);
+  margin-right: var(--sp-1);
+}
+.note-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-1);
+  min-width: 0;
+}
+.note-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: 20px;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-full);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  background: var(--ink-3);
+}
+.note-tag.mono {
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+}
+.note-state {
+  margin-left: auto;
+}
+.note-flag {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--should);
+}
+.note-body,
+.c-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-3);
+  align-items: start;
+}
+.c-main {
+  display: grid;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.c-text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: var(--lh-body);
+  font-size: var(--fs-md);
+}
+.note[data-kind='info'] .c-text {
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+}
+/* A note that changes the words: what is heard, struck, → what it should say (NotesPanel's CommentCard, VerifyPanel). */
+.c-edit {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-0_5) var(--sp-2);
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+  min-width: 0;
+}
+.c-edit-from {
+  color: var(--fg-2);
+  text-decoration: line-through;
+  text-decoration-color: var(--must);
+  background: var(--must-bg);
+  border-radius: var(--r-sm);
+  padding: 0 0.2em;
+  overflow-wrap: anywhere;
+}
+.c-edit-arrow {
+  color: var(--faint);
+}
+.c-edit-to {
+  color: var(--fg);
+  text-decoration: none;
+  background: var(--ok-bg);
+  border-radius: var(--r-sm);
+  padding: 0 0.2em;
+  overflow-wrap: anywhere;
+}
+.c-edit-cut {
+  color: var(--muted);
+  font-style: italic;
+}
+.c-edit-say {
+  display: grid;
+  gap: var(--sp-1);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+/* a note that only changes the words and has no picture: nothing under its diff */
+.note-body:empty {
+  display: none;
+}
+/* Notes · Transcript: the panel's two views, as its heading */
+.side-views {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex: none;
+}
+.side-views button {
+  height: var(--h-sm);
+  padding: 0;
+  border: 0;
+  background: none;
+  font: var(--fw-strong) var(--fs-lg) / var(--lh-tight) var(--ui);
+  letter-spacing: var(--track-title);
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  border-radius: var(--r-sm);
+}
+.side-views button:hover {
+  color: var(--muted);
+}
+.side-views button.on {
+  color: var(--fg);
+}
+.side-views button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+/* The composer's "Change the words": heard → say, the words field first */
+.cw {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--sp-2) var(--sp-3);
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  border-radius: var(--r);
+  background: var(--ink-1);
+  box-shadow: 0 0 0 1px var(--line);
+  min-width: 0;
+  margin: 0;
+  border: 0;
+}
+.cw-title {
+  /* floated: a legend that is a grid item like the rest (a rendered legend would sit in the border) */
+  float: left;
+  grid-column: 1 / -1;
+  padding: 0;
+  margin: 0;
+  font: var(--fw-strong) var(--fs-sm) / var(--lh-tight) var(--ui);
+  color: var(--fg-2);
+}
+.cw-label {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.cw-from {
+  color: var(--fg-2);
+  overflow-wrap: anywhere;
+}
+.cw .cw-to {
+  min-height: var(--h);
+  padding: var(--sp-1) var(--sp-2);
+}
+.c-thumb {
+  width: 56px;
+  /* the width and height attributes give its shape (a card's thumbnail keeps its room before it loads), this its size */
+  height: auto;
+  display: block;
+  background: var(--ink-0);
+  border-radius: var(--r-sm);
+  box-shadow: 0 0 0 1px var(--line-2);
+  transition: transform var(--dur) var(--ease-out);
+  cursor: zoom-in;
+}
+.c-thumb:hover {
+  transform: scale(1.05);
+}
+/* a voice note: play, where it is, how long (player/VoiceClip.tsx) */
+.voice-clip {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: var(--sp-0_5) var(--sp-3) var(--sp-0_5) var(--sp-0_5);
+  border-radius: var(--r-full);
+  background: var(--ink-4);
+}
+.voice-clip .voice-seek {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.voice-time {
+  flex: none;
+  min-width: 4ch;
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  text-align: right;
+}
+.voice-clip.playing .voice-time {
+  color: var(--fg-2);
+}
+
+/* ---------------------------------------------------------------- the thread under a note */
+.thread {
+  position: relative;
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-0_5) 0 0 var(--sp-0_5);
+}
+.thread-more {
+  justify-self: start;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  cursor: pointer;
+}
+.thread-more:hover {
+  color: var(--fg);
+}
+.msg {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sp-2);
+  align-items: start;
+}
+.msg-body {
+  display: grid;
+  gap: var(--sp-0_5);
+  min-width: 0;
+}
+.msg-who {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-1);
+  font-size: var(--fs-sm);
+}
+.msg-who b {
+  font-weight: var(--fw-strong);
+}
+.msg p {
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+/* its author changed it since: said quietly after the time */
+.msg-edited {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.msg-edited::before {
+  content: '· ';
+}
+/* Your own reply's ⋯ (edit, delete): at the line's end, out of the line's height, forward under the pointer or focus */
+.msg-tools.btn.sm.icon-only {
+  align-self: center;
+  margin: calc(-1 * var(--sp-1)) calc(-1 * var(--sp-1)) calc(-1 * var(--sp-1)) auto;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.msg.own:hover .msg-tools,
+.msg.own:focus-within .msg-tools,
+.msg-tools[data-state='open'] {
+  opacity: 1;
+}
+@media (hover: none) {
+  .msg-tools.btn.sm.icon-only {
+    opacity: 1;
+  }
+}
+.msg .reply-edit {
+  margin-top: var(--sp-0_5);
+}
+/* A status change: one line with its icon, the words that came with it indented under it. */
+.act {
+  display: grid;
+  gap: var(--sp-0_5);
+}
+.act-line {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  min-width: 0;
+}
+.act-line b {
+  color: var(--fg-2);
+  font-weight: var(--fw-strong);
+}
+.act-line > span {
+  min-width: 0;
+}
+.act-line .icon {
+  flex: none;
+  margin: 0 var(--sp-0_5);
+}
+.act-ok .act-line .icon {
+  color: var(--ok);
+}
+.act-should .act-line .icon {
+  color: var(--should);
+}
+.act-claude .act-line .icon {
+  color: var(--claude-2);
+}
+.act-text {
+  margin: 0 0 0 var(--sp-6);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ---------------------------------------------------------------- editing in place */
+.note-editor,
+.note-answer {
+  display: grid;
+  gap: var(--sp-1);
+}
+.note-edit .autotext {
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+}
+.note-editor-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-1);
+}
+/* A reply on a fix to check: Send as reply (⌘↵) or Send and reopen, both named — what goes is never a guess. On a
+   narrow card the two sends keep their line and Cancel steps above them. */
+.note-editor-foot.choice {
+  flex-wrap: wrap;
+}
+/* on a client's note: the client sees what is written here (CommentCard.tsx ClientReads) */
+.client-reads {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin: 0;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-ui);
+  color: var(--fg-2);
+}
+.note-answer .autotext {
+  background: var(--ink-0);
+}
+.c-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex-wrap: wrap;
+}
+/* "Reply…": looks like the field it turns into. */
+.reply-stub {
+  flex: 1;
+  min-width: 120px;
+  height: 30px;
+  padding: 0 var(--sp-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--ink-0);
+  color: var(--faint);
+  text-align: left;
+  font-size: var(--fs-sm);
+  cursor: text;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+.reply-stub:hover {
+  border-color: var(--line-3);
+}
+
+/* Older note markup (the client page, verify mode): a reply as a quiet block, no stripe. */
+.c-note {
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  padding: var(--sp-2) var(--sp-2);
+  border-radius: var(--r);
+  background: var(--ink-3);
+  display: grid;
+  gap: var(--sp-0_5);
+}
+.c-note b {
+  font: var(--fw-strong) var(--fs-xs) var(--ui);
+  color: var(--muted);
+  display: inline-flex;
+  gap: var(--sp-1);
+  align-items: center;
+}
+.c-note.agent b {
+  color: var(--claude-2);
+}
+.c-note.fix {
+  background: var(--ok-bg);
+  color: var(--ok-2);
+}
+.c-note.fix b {
+  color: var(--ok);
+}
+.banner {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+}
+.banner.check {
+  color: var(--should);
+}
+
+/* ---------------------------------------------------------------- above the list */
+.verify-cta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
+  border-radius: var(--radius);
+  background: var(--ok-bg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 22%, transparent);
+}
+.verify-cta > .icon {
+  flex: none;
+  color: var(--ok);
+}
+.verify-cta .grow {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.verify-cta b {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-strong);
+}
+.verify-cta .grow span {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.composer {
+  position: relative;
+  /* the foot's severity word gives way before anything wraps (narrow panels) */
+  container: composer / inline-size;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line-2);
+  background: var(--ink-3);
+  padding: var(--sp-3);
+  display: grid;
+  gap: var(--sp-3);
+  box-shadow: var(--shadow-raise);
+  animation: pop 0.25s var(--ease);
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+/* writing in it: the frame comes forward (the text field itself draws no box, the composer is the field) */
+.composer:focus-within {
+  border-color: color-mix(in srgb, var(--fg) 40%, transparent);
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--fg) 5%, transparent),
+    var(--shadow-raise);
+}
+/* The head says where the note is (the frame, or the range and its length — a menu for the whole video) and, beside
+   it, the one action that changes that (RangeControl.tsx). The action keeps its room whatever it says, so whether it
+   shares the line or wraps under the timecode depends on the timecode's width alone (a range is wider), never on the
+   action's label. The drawing tools are on the picture (DrawBar.tsx), not in here. */
+.composer-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-2);
+  min-height: var(--h-sm);
+  min-width: 0;
+}
+.composer-head > * {
+  white-space: nowrap;
+}
+/* room for the card's × (the owner's composer), which never moves */
+.composer:has(> .composer-close) .composer-head {
+  padding-right: calc(var(--h-sm) + var(--sp-1));
+}
+.composer-where {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  height: var(--h-sm);
+  padding: 0 var(--sp-1) 0 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.composer-where:hover,
+.composer-where[data-state='open'] {
+  color: var(--fg-2);
+}
+.composer-where:hover .c-tc,
+.composer-where[data-state='open'] .c-tc {
+  background: var(--ink-5);
+}
+.composer-where:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+/* "part": the note allows a partial render (the where-menu's Quick check) */
+.c-part {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-0_5);
+  font-size: var(--fs-xs);
+  color: var(--fg-2);
+}
+/* Cancel is the card's × (Esc), in its corner like a card you close: the head and the toolbar keep their room */
+.composer-close {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  color: var(--muted);
+}
+/* the text is the hero: no box of its own, the type a step up */
+.composer-write {
+  position: relative;
+  min-width: 0;
+}
+.composer .composer-text {
+  display: block;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--fg);
+  font-size: var(--fs-lg);
+  line-height: var(--lh-body);
+  /* two lines of room from the start (field-sizing: content ignores rows), a thumb's height on a phone */
+  min-height: calc(2em * var(--lh-body));
+}
+.composer .composer-text:focus {
+  box-shadow: none;
+}
+/* "#" in the text: the tags that fit, in the float material, under the line */
+.tag-suggest {
+  position: absolute;
+  top: calc(100% + var(--sp-1));
+  left: 0;
+  z-index: var(--z-menu);
+  display: grid;
+  min-width: 200px;
+  padding: var(--sp-1);
+  background: var(--float-bg);
+  border: 1px solid var(--float-line);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-float);
+}
+.tag-suggest [role='option'] {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--h);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-sm);
+  color: var(--fg-2);
+  font: var(--fw-ui) var(--fs-md) / var(--lh-ui) var(--ui);
+  cursor: pointer;
+}
+.tag-suggest [role='option'] .icon {
+  color: var(--muted);
+}
+.tag-suggest [role='option'][aria-selected='true'] {
+  background: var(--float-sel);
+  color: var(--fg);
+}
+/* what is picked for the note, under its text: tags, marks, the voice note — each a chip that takes itself off */
+.composer-picked {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  margin-top: calc(-1 * var(--sp-1));
+}
+.composer-picked .chip {
+  font-size: var(--fs-xs);
+}
+.composer-picked .chip .icon {
+  color: var(--muted);
+}
+.composer-picked .chip.love .icon:first-child {
+  color: var(--ok);
+}
+.composer-picked .chip:hover .chip-x {
+  color: var(--fg);
+}
+.chip-x {
+  color: var(--faint);
+}
+.composer-hint {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+/* one quiet toolbar: severity, tags, the paperclip, voice — then Save on the right (it wraps to its own line only when
+   the words are long and the panel narrow) */
+.composer-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-1);
+  min-width: 0;
+}
+.composer-foot > .btn.ghost {
+  color: var(--muted);
+}
+.composer-foot > .btn.ghost:hover,
+.composer-foot > .btn.ghost[data-state='open'] {
+  color: var(--fg);
+}
+.composer-send {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-left: auto;
+}
+/* the action beside the raised one is quiet: Save beside Send, or (on an agent's video) Send beside Save */
+.composer-send .btn.ghost {
+  color: var(--fg-2);
+}
+.composer-send .btn.ghost:hover {
+  color: var(--fg);
+}
+/* the agent waits for these notes: a footnote to the buttons, on a line of its own */
+.composer-wait {
+  flex-basis: 100%;
+  margin: 0;
+  padding-left: var(--sp-1);
+  text-wrap: pretty;
+}
+.composer-foot .btn.sev-pick {
+  gap: var(--sp-1);
+  padding: 0 var(--sp-2) 0 var(--sp-1);
+  color: var(--fg-2);
+}
+.sev-chev {
+  color: var(--faint);
+}
+@container composer (max-width: 250px) {
+  .sev-word,
+  .sev-chev {
+    display: none;
+  }
+  .composer-foot .btn.sev-pick {
+    padding: 0 var(--sp-2);
+  }
+}
+.sev-mark.sev-must {
+  color: var(--must);
+}
+.sev-mark.sev-should {
+  color: var(--should);
+}
+.sev-mark.sev-nice {
+  color: var(--nice);
+}
+.sev-mark.sev-idea {
+  color: var(--idea);
+}
+.rec {
+  color: var(--must);
+  animation: blink 1s infinite;
+}
+@keyframes blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+/* the notes list's empty state (ui/system.tsx EmptyState, sm): a little air around its panel */
+.side-empty {
+  margin: var(--sp-2) 0;
+  padding-block: var(--sp-12);
+}
+.side-empty .serif {
+  font-size: var(--fs-2xl);
+  color: var(--fg-2);
+}
+.lightbox {
+  max-width: 92vw;
+  max-height: 92vh;
+  border-radius: var(--r-sm);
+  box-shadow:
+    0 0 0 6px #050505,
+    0 0 0 7px var(--line-2),
+    var(--shadow);
+  animation: pop 0.25s var(--ease);
+}
+.help-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--sp-2) var(--sp-4);
+  align-items: center;
+}
+.help-grid kbd {
+  justify-self: start;
+  font-size: var(--fs-xs);
+  padding: var(--sp-0_5) var(--sp-1) var(--sp-0_5);
+}
+.qr svg {
+  width: 190px;
+  height: 190px;
+  border-radius: var(--r);
+  display: block;
+  box-shadow: 0 0 0 6px #fff;
+}
+
+/* the speech engine getting ready for a voice note (player/SttProgress.tsx) */
+.stt-progress {
+  display: grid;
+  gap: var(--sp-1);
+  min-width: 200px;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.stt-progress b {
+  color: var(--fg-2);
+  font-weight: var(--fw-strong);
+}
+.c-note b .avatar {
+  --av-bg: var(--ink-5);
+}
+
+/* a fix preview in the thread */
+.pv {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: var(--sp-0_5) 0 0 var(--sp-6);
+}
+.pv-thumb {
+  flex: none;
+  width: 72px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  background: var(--ink-0);
+  box-shadow: 0 0 0 1px var(--line-2);
+  cursor: zoom-in;
+}
+.pv-meta {
+  display: grid;
+  gap: var(--sp-1);
+  justify-items: start;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+/* narrow windows: the notes sit under the stage (player.css) */
+@media (max-width: 820px) {
+  .side {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+  /* the page scrolls here, not the list (it is as tall as its notes): no scroll box of its own, so what is pinned in
+     it — the drafts' head (record.css .unsent-top) — pins to the window. A phone's sheet scrolls its list. */
+  .side:not(.nsheet) .side-scroll:not(.tr-scroll) {
+    overflow: visible;
+  }
+}

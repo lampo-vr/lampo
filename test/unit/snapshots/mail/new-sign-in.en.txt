@@ -1,0 +1,14 @@
+Subject: New sign-in to Lampo
+
+A new sign-in to your account
+
+Hi Mia,
+
+Your account on review.example.com was signed in to from Safari on iPhone on 2 October 2026, 09:30 UTC.
+
+If this was you, there’s nothing to do. If not, choose a new password now:
+https://review.example.com/#/forgot
+
+--
+You get these because sign-in alerts are on. Turn them off under Settings → Notifications.
+Lampo · review.example.com

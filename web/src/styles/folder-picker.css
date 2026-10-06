@@ -1,0 +1,163 @@
+/* The folder picker (library/FolderPicker.tsx): one control — the search over the list, in one hairline box on the
+   dialog's own surface. One highlight, where the keys or the pointer are; the current choice wears a check, not a
+   fill, so the two never fight. */
+.fp {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  overflow: hidden;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+.fp:focus-within {
+  border-color: var(--line-3);
+}
+.fp-search {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: var(--h-lg);
+  padding: 0 var(--sp-1) 0 var(--sp-3);
+  border-bottom: 1px solid var(--line);
+  color: var(--faint);
+}
+/* a field inside the control: no box, no ring of its own (the control is the box) */
+.fp-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  outline: none;
+}
+.fp-input::placeholder {
+  color: var(--faint);
+}
+/* the list folds back into its field: the chevron points the way it goes */
+.fp-fold.btn {
+  flex: none;
+  color: var(--muted);
+}
+.fp-fold .icon {
+  transform: rotate(180deg);
+}
+.fp-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  max-height: 248px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-1);
+}
+.fp-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  min-height: var(--h);
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg-2);
+  text-align: left;
+  cursor: pointer;
+}
+.fp-row .icon {
+  flex: none;
+  color: var(--faint);
+}
+.fp-row.active {
+  background: var(--float-sel);
+  color: var(--fg);
+}
+.fp-row.sel {
+  color: var(--fg);
+  font-weight: var(--fw-ui);
+}
+.fp-row .fp-check {
+  color: var(--fg);
+}
+.fp-row kbd {
+  flex: none;
+}
+/* what makes something new: quieter until the keys or the pointer are on it */
+.fp-row.create,
+.fp-new {
+  color: var(--muted);
+}
+/* the "New project" row as a field: the same row, the name typed in its place */
+.fp-naming {
+  cursor: text;
+  background: var(--float-sel);
+  color: var(--fg);
+}
+.fp-naming .fp-input {
+  height: var(--h);
+}
+.fp-hint {
+  flex: none;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.fp-none {
+  padding: var(--sp-2);
+  color: var(--muted);
+}
+
+/* the choice in a form, folded: a field like a select's, opened in place into the control above */
+.folder-field {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  height: var(--h-lg);
+  padding: 0 var(--sp-3);
+  border-radius: var(--r);
+  border: 1px solid var(--line-2);
+  background: transparent;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+  font-weight: var(--fw-ui);
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+.folder-field:hover {
+  border-color: var(--line-3);
+}
+.folder-field:focus {
+  outline: none;
+}
+.folder-field:focus-visible {
+  border-color: var(--line-3);
+  box-shadow: var(--focus-ring);
+}
+.folder-field > .icon {
+  flex: none;
+  color: var(--faint);
+}
+.folder-field .folder-field-chev {
+  color: var(--muted);
+}
+.folder-field-note {
+  flex: 0 1 auto;
+  max-width: 45%;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-text);
+  color: var(--muted);
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .fp-row {
+    min-height: var(--h-touch);
+  }
+  .fp-input {
+    font-size: var(--fs-touch);
+  }
+  .fp-row kbd {
+    display: none;
+  }
+}

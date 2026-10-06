@@ -1,0 +1,113 @@
+/* The cookie settings' box and settings (consent/consent.ts: CookieConsent 3.1.0, whose own stylesheet comes with it) in
+   the app's look, as the website dresses them: the float material (menus, popovers, dialogs), the line tokens, raised
+   neutral buttons of equal weight — none in orange: a choice, not a pitch —, the app's fonts, both themes from the
+   tokens, no motion under reduced motion. The library's own layer (above everything) stays: the box asks before anything
+   else may load. Its variables are set on the box's and the settings' wrappers, which hold everything it draws. */
+:root #cc-main .cm-wrapper,
+:root #cc-main .pm-wrapper,
+:root #cc-main .pm-overlay {
+  --cc-font-family: var(--ui);
+  --cc-modal-border-radius: var(--r-lg);
+  --cc-btn-border-radius: var(--r);
+  --cc-modal-margin: var(--sp-4);
+  --cc-bg: var(--float-bg);
+  --cc-primary-color: var(--fg);
+  --cc-secondary-color: var(--muted);
+  --cc-link-color: var(--fg);
+  --cc-btn-primary-bg: var(--ink-4);
+  --cc-btn-primary-color: var(--fg);
+  --cc-btn-primary-border-color: var(--line-2);
+  --cc-btn-primary-hover-bg: var(--ink-4);
+  --cc-btn-primary-hover-color: var(--fg);
+  --cc-btn-primary-hover-border-color: var(--line-3);
+  --cc-btn-secondary-bg: var(--ink-4);
+  --cc-btn-secondary-color: var(--fg);
+  --cc-btn-secondary-border-color: var(--line-2);
+  --cc-btn-secondary-hover-bg: var(--ink-4);
+  --cc-btn-secondary-hover-color: var(--fg);
+  --cc-btn-secondary-hover-border-color: var(--line-3);
+  --cc-separator-border-color: var(--line);
+  --cc-toggle-on-bg: var(--fg);
+  --cc-toggle-off-bg: var(--line-3);
+  --cc-toggle-on-knob-bg: var(--ink-0);
+  --cc-toggle-off-knob-bg: var(--fg);
+  --cc-toggle-enabled-icon-color: var(--ink-0);
+  --cc-toggle-disabled-icon-color: var(--ink-0);
+  --cc-toggle-readonly-bg: var(--line-2);
+  --cc-toggle-readonly-knob-bg: var(--muted);
+  --cc-toggle-readonly-knob-icon-color: var(--ink-0);
+  --cc-section-category-border: var(--line);
+  --cc-cookie-category-block-bg: var(--ink-2);
+  --cc-cookie-category-block-border: var(--line);
+  --cc-cookie-category-block-hover-bg: var(--ink-4);
+  --cc-cookie-category-block-hover-border: var(--line-2);
+  --cc-cookie-category-expanded-block-bg: var(--ink-2);
+  --cc-cookie-category-expanded-block-hover-bg: var(--ink-4);
+  --cc-overlay-bg: var(--backdrop);
+  --cc-webkit-scrollbar-bg: var(--line-2);
+  --cc-webkit-scrollbar-hover-bg: var(--line-3);
+  --cc-footer-bg: var(--ink-2);
+  --cc-footer-color: var(--muted);
+  --cc-footer-border-color: var(--line);
+  color: var(--fg);
+}
+:root #cc-main :is(.cm, .pm) {
+  border: 1px solid var(--float-line);
+  box-shadow: var(--shadow-float);
+}
+:root #cc-main :is(.cm__title, .pm__title) {
+  font-family: var(--display);
+  font-weight: var(--fw-strong);
+  letter-spacing: var(--track-title);
+}
+:root #cc-main :is(.cm__desc, .pm__section-desc, .pm__table) {
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+}
+:root #cc-main :is(.cm__btn, .pm__btn) {
+  background: var(--raise-sheen), var(--ink-4);
+  box-shadow: var(--raise);
+  font: var(--fw-strong) var(--fs-md) / 1 var(--ui);
+  transition:
+    transform var(--dur) var(--ease-out),
+    border-color var(--dur);
+}
+:root #cc-main :is(.cm__btn, .pm__btn):active {
+  transform: translateY(1px);
+  box-shadow: var(--press);
+}
+/* The two answers wear the primary button's look, both of them, as on the website: an accept that stands out beside a
+   plain refusal would steer the choice (and a steered consent isn't one). "Settings" and "Save" stay plain, one size. */
+:root #cc-main :is(.cm__btn, .pm__btn):is([data-role='all'], [data-role='necessary']),
+:root #cc-main :is(.cm__btn, .pm__btn):is([data-role='all'], [data-role='necessary']):hover {
+  background: var(--raise-sheen), var(--brand-deep);
+  border-color: var(--brand-deep);
+  color: var(--on-brand);
+}
+:root #cc-main :is(.cm__btn, .pm__btn):is([data-role='all'], [data-role='necessary']):hover {
+  box-shadow: var(--raise), var(--shadow-brand);
+}
+:root #cc-main :is(.cm__desc, .pm__section-desc) a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  background: none;
+}
+:root #cc-main .cm-wrapper :is(button, a, input):focus-visible,
+:root #cc-main .pm-wrapper :is(button, a, input):focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+:root #cc-main .pm__badge {
+  background: var(--ink-4);
+  color: var(--muted);
+  font: var(--fw-ui) var(--fs-xs) / 1 var(--mono);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root #cc-main .cm-wrapper,
+  :root #cc-main .cm-wrapper *,
+  :root #cc-main .pm-wrapper,
+  :root #cc-main .pm-wrapper * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

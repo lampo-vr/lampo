@@ -1,0 +1,13 @@
+Video review feedback, frame-exact. Please work through the open items.
+Video: /home/alex/work/demo/export/cutdown.mp4
+Current: v1 · 160×90 · 25 fps · 25 frames · 1s
+Review data: <store>/data/__home__alex__work__demo__export__cutdown.mp4/review.json (summary: review.md). Frames are 0-based, timecode mm:ss:ff, drawings in video px.
+
+Open (1, 1 must):
+1. c_6d58d9 · MUST · audio · 00:00:15 f15
+   Audio pops at the cut
+   marked: <store>/data/__home__alex__work__demo__export__cutdown.mp4/c_6d58d9_marked.png
+   clean:  <store>/data/__home__alex__work__demo__export__cutdown.mp4/c_6d58d9_clean.png
+
+When an item is done (after re-rendering to the same path): vr fix <id> --note "what you changed" (version is picked up automatically).
+Question about a frame: vr add "/home/alex/work/demo/export/cutdown.mp4" --frame <N> --text "…"   ·   Live feedback: vr watch

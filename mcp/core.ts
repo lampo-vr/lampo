@@ -1,0 +1,182 @@
+// The review tools and resources every MCP transport serves: stdio (bin/vr-mcp — one agent on this machine, or a
+// hosted server behind `vr login`) and Streamable HTTP (/mcp in the app — any client with a URL). One factory builds
+// the server; the SDK calls it per HTTP request (2026-07-28 is stateless) or once per stdio connection.
+//   access.ts   who may call what (TOOL_ACCESS, the permission table)
+//   toolkit.ts  the options and the shared tool wrapper (access check, errors as results, authorship)
+//   tools/      the tools: read.ts, notes.ts, videos.ts, footage.ts; feedback.ts (wait_for_feedback), app.ts (the MCP App card)
+//   format.ts   what the tools say: note lines, headers, downscaled frames
+//   follow.ts   change notifications over stdio (over HTTP, server/routes/mcp.ts sends them from the app's feed)
+import fs from 'node:fs';
+import path from 'node:path';
+import { McpServer, ResourceTemplate } from '@modelcontextprotocol/server';
+import { z } from 'zod';
+import { BRAND_NAME } from '../lib/brand.ts';
+import { MCP_NAME } from '../lib/mcpConfig.ts';
+import { forAgents } from '../lib/onboarding.ts';
+import { slugify } from '../lib/paths.ts';
+import { publicMessage } from '../lib/publicError.ts';
+import { keepLines, oneLine } from '../lib/time.ts';
+import { allowed, audienceOf, backendFor } from './access.ts';
+import { registerReviewApp } from './app.ts';
+import { registerFeedback } from './feedback.ts';
+import { markedPicture, preview, reviewUri } from './format.ts';
+import { createToolKit, type ReviewServerOptions } from './toolkit.ts';
+import { registerAskTools } from './tools/asks.ts';
+import { registerFootageTools } from './tools/footage.ts';
+import { registerNoteTools } from './tools/notes.ts';
+import { registerPlaybookTools } from './tools/playbooks.ts';
+import { registerPostTools } from './tools/posts.ts';
+import { registerReadingTools } from './tools/read.ts';
+import { registerVideoTools } from './tools/videos.ts';
+
+export { type Access, allowed, backendFor, NO_FILES, type Principal, TOOL_ACCESS } from './access.ts';
+export { reviewUri } from './format.ts';
+export type { ReviewServerOptions } from './toolkit.ts';
+
+const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version?: string };
+export const SERVER_VERSION = pkg.version || '0.0.0';
+
+// Sent once per connection; every tool description is sent on every turn, so the loop is told here, once.
+const INSTRUCTIONS = `${BRAND_NAME}: frame-exact video review. People pin notes (with drawings) to exact frames of your renders.
+Loop: get_playbook before rendering → get_open_notes (a note with a drawing comes with its frame, cropped; get_note shows one in full) → fix → re-render to the same path (or vr push) → mark_fixed with what changed (never verify: people do) → wait_for_feedback with its cursor. Don't poll: wait_for_feedback blocks until something is new.
+You hear new notes only while you wait in wait_for_feedback. Asked to work on Lampo notes (or the watch prompt): list_videos({session:"me"}) shows what is assigned to you; work it, then call wait_for_feedback again after every answer until the person says stop (or its answer does). When you connect, offer to start listening.
+Hear only what changed: since (get_open_notes) and known (get_playbook, get_taste) take what an earlier answer said.
+Every question for the person goes to Lampo, never your own chat: add_note (kind question, choices) on the frame, ask_options for what they must see or hear first; wait_for_feedback brings the answer. In a project (After Effects, Premiere…), attach_preview shows a fix before you render; render once a batch is done.
+Frames are 0-based, timecode mm:ss:ff, drawings in video pixels.`;
+
+/** Builds one MCP server instance over a backend. Tools report errors as results, so a bad id never breaks a session. */
+export function createReviewServer(options: ReviewServerOptions): McpServer {
+  // Files on this server's disk are the machine's own business: everyone else reaches videos by name (access.ts).
+  const o: ReviewServerOptions = { ...options, backend: backendFor(options.principal, options.backend) };
+  const b = o.backend;
+  const server = new McpServer(
+    // `name` is the identifier (the key people give it in their configs, MCP_NAME); `title` is what a client shows.
+    { name: MCP_NAME, title: BRAND_NAME, version: SERVER_VERSION, ...(o.sourceUrl ? { websiteUrl: o.sourceUrl } : {}) },
+    {
+      instructions: INSTRUCTIONS,
+      capabilities: { resources: { subscribe: true, listChanged: true } },
+      cacheHints: { 'tools/list': { ttlMs: 3_600_000, cacheScope: 'private' } },
+    },
+  );
+
+  const kit = createToolKit(server, o);
+  registerReadingTools(kit);
+  registerNoteTools(kit);
+  registerAskTools(kit);
+  registerVideoTools(kit);
+  registerPlaybookTools(kit);
+  registerPostTools(kit);
+  registerFootageTools(kit);
+  if (kit.offers('wait_for_feedback'))
+    registerFeedback(server, {
+      backend: b,
+      wake: o.wake,
+      hold: o.hold,
+      stillAllowed: o.stillAllowed,
+      preview: (f, w) => preview(b, f, w),
+      drawn: async (id) => {
+        const hit = await b.findComment(id);
+        if (!hit?.comment.drawing?.length) return [];
+        await b.fetchShots(hit.review, [hit.comment]);
+        return markedPicture(b, hit.review, hit.comment);
+      },
+      allowed: allowed(o.principal, 'view'),
+      audience: audienceOf(o.principal),
+      publicEvent: o.publicEvent,
+      activity: (args, ctx) => kit.activity('wait_for_feedback', args, ctx),
+      me: kit.me,
+      told: o.told,
+      quiet: o.quiet,
+      onWait: o.onWait,
+      log: o.log,
+    });
+  if (kit.offers('wait_for_feedback')) registerWatchPrompt(server, o.log);
+  if (kit.offers('show_review'))
+    registerReviewApp(server, {
+      backend: b,
+      appUrl: o.appUrl ?? null,
+      preview: (f, w) => preview(b, f, w),
+      principal: o.principal,
+      allowed: (a) => allowed(o.principal, a),
+      activity: kit.activity,
+    });
+
+  server.registerResource(
+    'inbox',
+    'vr://inbox',
+    {
+      title: 'Review inbox',
+      description: 'Newest human feedback across all videos (INBOX.md). Subscribe to hear about new feedback.',
+      mimeType: 'text/markdown',
+    },
+    async (uri) => {
+      // A failure reading it goes out by audience, as vr://review's does.
+      const text = await (o.inboxMarkdown ?? b.inboxMarkdown)().catch((e: unknown) => {
+        throw new Error(publicMessage(e, audienceOf(o.principal), { status: 500, where: 'mcp vr://inbox' }));
+      });
+      return { contents: [{ uri: uri.href, mimeType: 'text/markdown', text: keepLines(text) }] };
+    },
+  );
+
+  server.registerResource(
+    'review',
+    new ResourceTemplate('vr://review/{slug}', {
+      list: async () => ({
+        resources: forAgents(await b.listReviews())
+          .filter((r) => !r.archived)
+          .map((r) => ({
+            uri: reviewUri(slugify(r.video)),
+            name: path.basename(r.video),
+            description: r.folder || r.project,
+            mimeType: 'text/markdown',
+          })),
+      }),
+    }),
+    {
+      title: 'Review summary',
+      description: 'review.md of one video: open items, fixed-awaiting-verification, closed, versions. Subscribe to hear about changes.',
+      mimeType: 'text/markdown',
+    },
+    async (uri, { slug }) => {
+      const s = decodeURIComponent(String(slug));
+      // Where the assigned agent works is for those who work with agents, as over HTTP (server/helpers.ts agentView).
+      const text = await b.reviewMarkdown(s, { agentDetails: allowed(o.principal, 'agents') }).catch((e: unknown) => {
+        throw new Error(publicMessage(e, audienceOf(o.principal), { status: 404, where: 'mcp vr://review' }));
+      });
+      return { contents: [{ uri: uri.href, mimeType: 'text/markdown', text: keepLines(text) }] };
+    },
+  );
+
+  return server;
+}
+
+/** The prompt `watch` (Claude Code: /lampo:watch, also /mcp__lampo__watch): "work on my notes and keep listening". */
+export const WATCH_PROMPT = 'watch';
+
+/**
+ * What a person types to set their agent to work: MCP clients show a server's prompts as commands (Claude Code as
+ * `/mcp__lampo__watch`). An MCP client acts only when prompted, so without this (or the same in words) notes wait
+ * unread: the text has it work what is assigned to it, then wait for more until told to stop.
+ */
+export function watchPromptText(video?: string | null): string {
+  const only = video ? ` Only this video: ${oneLine(video)}.` : '';
+  return `Work on my ${BRAND_NAME} notes, then keep listening for new ones until I say stop.${only}
+1. list_videos({session: "me", open_only: true}) shows the videos assigned to you. For each: get_playbook, get_open_notes, fix every note, re-render to the same path (or upload the next version), then mark_fixed with what you changed. Ask me in ${BRAND_NAME} (add_note, kind question) when only I can decide, not in this chat.
+2. Then call wait_for_feedback, and again after every answer, each time with the cursor of the last one. "No new feedback" means: call it again (unless it says to stop: then tell me). Work whatever it hands you the same way, then wait again.
+While you don't wait, new notes wait unread: keep listening until I say stop.`;
+}
+
+function registerWatchPrompt(server: McpServer, log?: (line: string) => void): void {
+  server.registerPrompt(
+    WATCH_PROMPT,
+    {
+      title: `Work on ${BRAND_NAME} notes and keep listening`,
+      description: `Works the notes on the videos assigned to you in ${BRAND_NAME}, then waits for new ones until you say stop.`,
+      argsSchema: z.object({ video: z.string().max(1000).optional().describe('only this video (its name)') }),
+    },
+    ({ video }) => {
+      log?.(`prompt ${WATCH_PROMPT}`);
+      return { messages: [{ role: 'user', content: { type: 'text', text: keepLines(watchPromptText(video)) } }] };
+    },
+  );
+}

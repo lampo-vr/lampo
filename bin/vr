@@ -1,0 +1,6 @@
+#!/usr/bin/env node
+// `vr`, the agent CLI. Symlink-safe: node resolves the real path of this file, so ../lib is always the project's lib.
+import { launch } from './launch.js';
+
+const { main } = await launch(new URL('../lib/cli.ts', import.meta.url));
+await main(process.argv.slice(2));
