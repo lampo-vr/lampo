@@ -555,10 +555,11 @@ export function guestRoutes(ctx: ServerContext): Router {
       waveform: `/api/g/${share.token}/waveform/${id}?v=${ver.v}`,
       approval: clientVerdict(review, ver.v, share),
       perms: p,
-      // each with its frame size only (a note's marked frame keeps its room on the page), never a file, hash or path
+      // each with its frame size only (a note's marked frame keeps its room on the page), never a file, hash or path;
+      // when it came, except to an embed (when the team last worked on it: like its video's `updated`)
       versions: (p.versions === 'all' ? review.versions : [ver]).map((x) => ({
         v: x.v,
-        registered: x.registered,
+        ...(share.embed ? {} : { registered: x.registered }),
         ...(x.width && x.height ? { width: x.width, height: x.height } : {}),
       })),
       download: { preview: p.download !== 'off' ? dl('preview') : null, original: p.download === 'original' ? dl('original') : null },

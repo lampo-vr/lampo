@@ -442,7 +442,8 @@ test('a watch-only link shows no other link’s notes, whatever its notes settin
 
 // An Embed link's player (/e/<token>) and its oEmbed are what any site that frames it, and anyone who asks oEmbed about
 // it, can read: the video's name and nothing else of the owner's — no slug or path, no folder, not the link's own name,
-// no other link's notes or names, nor who shared it or the team's name — on its watch page's routes too, and once it ended.
+// no other link's notes or names, nor who shared it or the team's name, nor when the team worked on it (the video's
+// `updated`, a version's `registered`) — on its watch page's routes too, and once it ended.
 test('an embed and its oEmbed name the video and nothing else of the owner’s', async () => {
   const enc = encodeURIComponent(spot.slug);
   const other = JSON.parse((await request('POST', `/api/review/${enc}/shares`, { label: 'Legal team' })).text);
@@ -497,6 +498,8 @@ test('an embed and its oEmbed name the video and nothing else of the owner’s',
   assert.equal(watch.status, 200, watch.text);
   const video = JSON.parse(watch.text);
   assert.deepEqual([video.label, video.reviewer, video.org], ['', null, null]);
+  assert.ok(video.versions.length, 'it lists the version it plays');
+  for (const x of video.versions) assert.deepEqual(Object.keys(x).sort(), ['height', 'v', 'width'], `nor when a version came: ${JSON.stringify(x)}`);
   await crawl(watch.text);
   // an embed that ended says so and names nobody to ask
   for (const url of [`/api/g/${ended.token}`, `/api/g/${ended.token}/review/${answer.slug}`, `/api/g/${ended.token}/embed`]) {
@@ -508,7 +511,10 @@ test('an embed and its oEmbed name the video and nothing else of the owner’s',
   assert.ok(fetched.size >= 3, `crawled the player’s URLs (${fetched.size})`);
   const all = surface.join('\n');
   assert.ok(all.includes('spot.mp4'), 'the video’s name is its title');
+  const came = store.loadReview(spot.slug)?.versions.at(-1)?.registered;
+  assert.ok(came);
   for (const secret of [
+    came,
     dir,
     HOME,
     'olivia-home',

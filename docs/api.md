@@ -1102,7 +1102,7 @@ Details:
   `401`. `404` when unknown or revoked; `410` with `{error, by, expired}` when it expired (whom to ask, and since
   when). `reviewer_avatar` is reserved: pictures are for signed-in people. An Embed link's token is in other sites'
   pages, so its answers name nobody: `label` `""`, `reviewer` and `org` `null` (here and in the video's answer), no
-  video's `updated`, no `by` when it expired, and none of the visitors' notes or decisions.
+  video's `updated` nor version's `registered`, no `by` when it expired, and none of the visitors' notes or decisions.
 - **Visits and watching.** A visit counts once per visitor and half hour, never for the team checking its own link (the
   owner's machine, or a signed-in account). `visitor` is the random id the page keeps, `name` what the visitor typed,
   if anything (an Embed link's visits are anonymous: its visits and reports keep no `name`). 60 visits a minute per
