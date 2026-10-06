@@ -5,8 +5,8 @@ organisations that can't use the AGPL, and to fund the project), contributions a
 below. You keep the copyright in your contribution; you grant the maintainers a broad license to it. Every
 contribution is also always available under the project's open source license.
 
-**How to sign:** the CLA Assistant check on your first pull request asks you to agree with one comment. That's all;
-it covers all your future contributions.
+**How to sign:** the CLA check on your first pull request asks you to agree with one comment,
+`I have read the CLA Document and I hereby sign the CLA`. That's all; it covers all your future contributions.
 
 The text is the Harmony Individual Contributor License Agreement, version 1.0, with Option Five ("any license") for
 Section 2.3. It is published by the [Harmony Agreements](https://www.harmonyagreements.org/) project under the
