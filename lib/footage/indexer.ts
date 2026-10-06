@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { heavy, PRIORITY, QueueFullError } from '../jobs.ts';
 import { slugify } from '../paths.ts';
-import { FFMPEG, lower, spawnMedia } from '../probe.ts';
+import { FFMPEG, lower, selectFrames, spawnMedia } from '../probe.ts';
 import { renderKey } from '../renderKey.ts';
 import { wsKey } from '../scope.ts';
 import { seekTime } from '../shots.ts';
@@ -117,7 +117,7 @@ async function grabChunk(
   withOcr: boolean,
 ): Promise<{ pictures: Uint8Array[]; thumbs: string[]; ocr: string[] }> {
   const first = frames[0] as number;
-  const select = `select='${frames.map((f) => `eq(n\\,${f - first})`).join('+')}'`;
+  const select = `select='${selectFrames(frames.map((f) => f - first))}'`;
   // the whole frame letterboxed to the model's square (bench: whole frame beats a centre crop, letterbox beats squash)
   const fit = `scale=${size}:${size}:force_original_aspect_ratio=decrease:flags=area,pad=${size}:${size}:(ow-iw)/2:(oh-ih)/2:black`;
   const n = frames.length;

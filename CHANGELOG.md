@@ -23,6 +23,8 @@ format stays backwards compatible throughout.
   on Send.
 - On a phone, a long note keeps the line you are typing above the pinned Save and Send, and that bar sits flush with
   the bottom of the notes sheet instead of letting the note show beneath it.
+- Auto-check works again on videos longer than about 50 seconds with current FFmpeg releases (5.1.9, 7.1.4, 8.0.2
+  and later), which refused how it picked the frames to read; it still reads exactly the same frames.
 
 ## [0.1.0] - 2026-10-06
 
