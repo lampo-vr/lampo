@@ -1,6 +1,8 @@
 // Playbook text that the server and the browser both read: the SKILL.md format (the open Agent Skills format: YAML
 // frontmatter with name and description, then markdown), the naming rule for skills, the limits, and a line diff for
-// proposals and history. Browser-safe: no Node imports.
+// proposals and history, and which change a suggestion would replace. Browser-safe: no Node imports.
+import { compareTime } from './time.ts';
+import type { PlaybookProposal, PlaybookRevision } from './types.ts';
 
 export const PLAYBOOK_LIMITS = {
   /** Characters of a brief or of the rules. */
@@ -132,6 +134,38 @@ export function lineDiff(before: string | null, after: string | null): DiffLine[
   while (i < n) out.push({ op: 'del', text: a[i++] });
   while (j < m) out.push({ op: 'add', text: b[j++] });
   return out;
+}
+
+/**
+ * What accepting a suggestion now would replace: the last change to its section after the revision it was made on —
+ * or, once someone deciding has looked at its diff against a newer revision (`seen`), after that one. A person's edit
+ * or another suggestion accepted for the same section; revisions that left the text as it was (a skill's file) don't
+ * count. null: nothing to replace. The server refuses an accept on it (lib/playbooks.ts), the card says it first.
+ */
+export function changedSince(
+  p: { rev: number; history: PlaybookRevision[] },
+  prop: Pick<PlaybookProposal, 'base_rev' | 'section'>,
+  seen?: number,
+): PlaybookRevision | null {
+  const base = Math.max(typeof prop.base_rev === 'number' ? prop.base_rev : p.rev, Math.min(seen ?? -1, p.rev));
+  if (base >= p.rev) return null;
+  return p.history.filter((h) => h.rev > base && h.section === prop.section && h.before !== h.after).at(-1) ?? null;
+}
+
+/**
+ * Suggestions newest first. Times are whole seconds and an agent suggests several in a row: within one second, the one
+ * made later (further down a playbook's list) is the newer.
+ */
+export function newestFirst(proposals: PlaybookProposal[]): PlaybookProposal[] {
+  return proposals
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => compareTime(b.p.at, a.p.at) || b.i - a.i)
+    .map((x) => x.p);
+}
+
+/** The suggestions waiting for one section of a playbook (a skill: the same name), the newest first. */
+export function waitingFor(proposals: PlaybookProposal[], section: string): PlaybookProposal[] {
+  return newestFirst(proposals.filter((x) => x.status === 'pending' && x.section === section));
 }
 
 /** How much a change adds and removes, in lines ("+3 −1"). */

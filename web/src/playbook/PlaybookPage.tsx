@@ -6,18 +6,19 @@
 // #/playbook/<folder>; the House's in Settings → Playbook. Reading is for the whole team; editing and deciding for
 // people with the `playbook` action.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { PlaybookView } from '../../../lib/types.ts';
+import type { PlaybookView, PlaybookWaiting } from '../../../lib/types.ts';
 import { useCan } from '../api/auth.ts';
 import { playbookHref, usePlaybook, usePlaybooks } from '../api/playbooks.ts';
 import { t } from '../i18n/index.ts';
 import { ago } from '../lib/format.ts';
 import { I } from '../ui/icons.tsx';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
+import { Menu } from '../ui/primitives.tsx';
 import { EmptyState } from '../ui/system.tsx';
 import { AgentDialog, AgentPane, dirtyDrafts } from './AgentPane.tsx';
 import type { DraftSection } from './agentText.ts';
 import { HistoryDialog, HistoryPane } from './History.tsx';
-import { PlaybookSkeleton, tabFromHash } from './PlaybookShell.tsx';
+import { PlaybookSkeleton, suggestionFromHash, tabFromHash } from './PlaybookShell.tsx';
 import { BriefSection, factsOf, label, OpenSkill, RefsSection, RulesSection, SkillsSection, shortName, who } from './Sections.tsx';
 import '../styles/playbook.css';
 import '../styles/refs.css';
@@ -75,16 +76,20 @@ function Doc({ view, scope }: { view: PlaybookView; scope: string }) {
   }, [topic]);
   const waiting = p.proposals.filter((x) => x.status === 'pending');
   const of = (section: string) => waiting.filter((x) => (section === 'skills' ? x.section.startsWith('skill:') : x.section === section));
-  const toSuggestion = () => {
-    const el = document.querySelector<HTMLElement>('.pb-suggest');
+  const toSuggestion = (id?: string | null) => {
+    const el = (id && document.getElementById(`pb-suggest-${id}`)) || document.querySelector<HTMLElement>('.pb-suggest');
     el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    el?.querySelector<HTMLElement>('[data-testid=pb-accept], [data-testid=pb-reject]')?.focus({ preventScroll: true });
+    // the decision has the focus: Accept where it can be pressed, else Reject (never Accept anyway). One query per
+    // button: a selector list answers whichever comes first in the card, and that is Reject.
+    const go = el?.querySelector<HTMLElement>('[data-testid=pb-accept]') ?? el?.querySelector<HTMLElement>('[data-testid=pb-reject]');
+    go?.focus({ preventScroll: true });
   };
-  // a link that asks for the suggestions shows the first one; for the history, on a narrow screen, its dialog
+  // a link that asks for the suggestions shows the one it names (the inbox's), else the first; for the history, on a
+  // narrow screen, its dialog
   // biome-ignore lint/correctness/useExhaustiveDependencies: on arrival only
   useEffect(() => {
     const f = tabFromHash();
-    if (f === 'suggestions') requestAnimationFrame(toSuggestion);
+    if (f === 'suggestions') requestAnimationFrame(() => toSuggestion(suggestionFromHash()));
     if (f === 'history' && !beside()) setDialog('history');
   }, []);
   const ds = dirtyDrafts(view, drafts);
@@ -95,7 +100,7 @@ function Doc({ view, scope }: { view: PlaybookView; scope: string }) {
         scope={scope}
         waiting={waiting.length}
         side={side}
-        onSuggestions={toSuggestion}
+        onSuggestions={() => toSuggestion()}
         onAgents={() => show('agents')}
         onHistory={() => show('history')}
       />
@@ -203,6 +208,7 @@ function Lineage({
             {t('{n} suggestion|{n} suggestions', { n: waiting })}
           </button>
         )}
+        <Below scope={scope} below={view.below ?? []} />
         <button type="button" className="pb-meta-link narrow" onClick={onAgents} data-testid="pb-agent-view">
           <I name="eye" size={14} />
           {t('What agents read')}
@@ -216,6 +222,47 @@ function Lineage({
         )}
       </span>
     </div>
+  );
+}
+
+/**
+ * Suggestions waiting in the playbooks of folders inside this one (the House: in any folder's): a quiet link to that
+ * playbook, on its suggestions — or, from several, a menu of them. A project's page is where people look first.
+ */
+function Below({ scope, below }: { scope: string; below: PlaybookWaiting[] }) {
+  if (!below.length) return null;
+  // the path from here: "Reels" on Acme's page, "Acme/Reels" on the House's
+  const name = (b: PlaybookWaiting) => (scope ? b.scope.slice(scope.length + 1) : b.scope);
+  const href = (b: PlaybookWaiting) => `${playbookHref(b.scope)}?tab=suggestions`;
+  if (below.length === 1) {
+    const b = below[0] as PlaybookWaiting;
+    return (
+      <a className="pb-meta-link waiting below" href={href(b)} data-testid="pb-below">
+        <KeyGlyph shape="ease" size={10} />
+        <b className="pb-below-name">{name(b)}</b>
+        <span className="pb-below-n">· {t('{n} suggestion waiting|{n} suggestions waiting', { n: b.pending })}</span>
+        <I name="right" size={12} className="pb-below-go" />
+      </a>
+    );
+  }
+  const n = below.reduce((sum, b) => sum + b.pending, 0);
+  return (
+    <Menu
+      trigger={
+        <button type="button" className="pb-meta-link waiting below" data-testid="pb-below">
+          <KeyGlyph shape="ease" size={10} />
+          <span className="pb-below-n">{t('{n} suggestion waiting in folders inside|{n} suggestions waiting in folders inside', { n })}</span>
+          <I name="down" size={12} className="pb-below-go" />
+        </button>
+      }
+      items={below.map((b) => ({
+        label: `${name(b)} · ${t('{n} suggestion|{n} suggestions', { n: b.pending })}`,
+        icon: 'playbook' as const,
+        onClick: () => {
+          location.hash = href(b);
+        },
+      }))}
+    />
   );
 }
 

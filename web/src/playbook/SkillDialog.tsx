@@ -1,7 +1,10 @@
 // A skill of a playbook, edited in one dialog: its name and when to use it (what an agent reads to decide), the
 // instructions in markdown with a preview, the small files that come with it, and a SKILL.md to import or copy. An
-// inherited skill opens read-only, with the way to the playbook it lives in.
-import { useId, useRef, useState } from 'react';
+// inherited skill opens read-only, with the way to the playbook it lives in. The instructions are what gets written
+// here: the dialog is one to write in (Modal `writing`), their field at least twelve lines, growing with the text
+// until the dialog meets the screen's edge, then scrolling; Write and Preview are one box, the preview laid over the
+// field, so switching never moves anything. A phone gets the whole screen.
+import { useEffect, useId, useRef, useState } from 'react';
 import { PLAYBOOK_LIMITS, parseSkill, SKILL_NAME, skillMarkdown, skillProblem } from '../../../lib/playbookText.ts';
 import type { PlaybookSkill, PlaybookSkillSummary } from '../../../lib/types.ts';
 import { playbookHref, skillFileUrl, usePlaybookActions } from '../api/playbooks.ts';
@@ -10,7 +13,7 @@ import { bytes } from '../lib/format.ts';
 import { copyText, toast, toastError } from '../lib/toast.ts';
 import { AutoTextarea } from '../ui/controls.tsx';
 import { I } from '../ui/icons.tsx';
-import { IconButton, Modal, Segmented, useConfirm } from '../ui/primitives.tsx';
+import { IconButton, Menu, Modal, Segmented, useConfirm } from '../ui/primitives.tsx';
 import { Button } from '../ui/system.tsx';
 import { Markdown } from './Markdown.tsx';
 
@@ -36,6 +39,13 @@ export function SkillDialog({ scope, skill, inherited, base_rev, canEdit, onClos
   const [ask, confirmation] = useConfirm();
   const importer = useRef<HTMLInputElement>(null);
   const adder = useRef<HTMLInputElement>(null);
+  const field = useRef<HTMLTextAreaElement>(null);
+  // Write chosen: the field takes the focus where it was left (the preview lay over it)
+  const wrote = useRef(false);
+  useEffect(() => {
+    if (tab === 'write' && wrote.current) field.current?.focus();
+    wrote.current = true;
+  }, [tab]);
   const ids = { name: useId(), desc: useId() };
   const readOnly = !canEdit || !!inherited;
   const problem = name || description ? skillProblem({ name, description, body }) : null;
@@ -99,13 +109,30 @@ export function SkillDialog({ scope, skill, inherited, base_rev, canEdit, onClos
     <Modal
       title={inherited ? inherited.name : skill ? t('Skill') : t('New skill')}
       onClose={onClose}
-      width={720}
+      writing
       head={
-        !readOnly && (
-          <Button variant="ghost" size="sm" icon="upload" onClick={() => importer.current?.click()}>
-            {t('Import SKILL.md')}
-          </Button>
-        )
+        // the file this is, both ways: bring one in, take this one out (a phone's actions keep one row)
+        <Menu
+          trigger={
+            <button type="button" className="btn ghost sm pb-skill-md" data-testid="pb-skill-md">
+              SKILL.md
+              <I name="down" size={14} />
+            </button>
+          }
+          items={[
+            !readOnly && { label: t('Import SKILL.md…'), icon: 'upload' as const, onClick: () => importer.current?.click() },
+            {
+              label: t('Copy SKILL.md'),
+              icon: 'copy' as const,
+              onClick: () =>
+                void copyText(
+                  skillMarkdown(
+                    inherited ? { name: inherited.name, description: inherited.description, body: inherited.body ?? '' } : { name, description, body, extra },
+                  ),
+                ).then((ok) => toast(ok ? t('SKILL.md copied') : t('Could not copy'), ok ? 'ok' : 'error')),
+            },
+          ]}
+        />
       }
       foot={
         readOnly ? (
@@ -127,17 +154,6 @@ export function SkillDialog({ scope, skill, inherited, base_rev, canEdit, onClos
               </Button>
             )}
             <span className="grow" />
-            <Button
-              variant="ghost"
-              icon="copy"
-              onClick={() =>
-                void copyText(skillMarkdown({ name, description, body, extra })).then((ok) =>
-                  toast(ok ? t('SKILL.md copied') : t('Could not copy'), ok ? 'ok' : 'error'),
-                )
-              }
-            >
-              {t('Copy SKILL.md')}
-            </Button>
             <button type="button" className="btn" onClick={onClose}>
               {t('Cancel')}
             </button>
@@ -165,7 +181,7 @@ export function SkillDialog({ scope, skill, inherited, base_rev, canEdit, onClos
           if (f) void importFile(f);
         }}
       />
-      <div className="pb-skill" data-testid="pb-skill-dialog">
+      <div className="pb-skill modal-grow" data-testid="pb-skill-dialog">
         {inherited ? (
           <p className="pb-skill-from">
             <I name="playbook" size={14} /> {t('From the {name} playbook — change it there.', { name: inherited.from || t('House') })}
@@ -198,35 +214,46 @@ export function SkillDialog({ scope, skill, inherited, base_rev, canEdit, onClos
         </div>
         {name && !SKILL_NAME.test(name) && !readOnly && <p className="pb-skill-problem">{t('Lowercase letters, digits and hyphens, like export-reels')}</p>}
         {problem && SKILL_NAME.test(name) && description && !readOnly && <p className="pb-skill-problem">{problem}</p>}
-        <div className="pb-skill-body">
-          {!readOnly && (
-            <Segmented
-              label={t('Instructions')}
-              value={tab}
-              onChange={(v) => setTab(v as 'write' | 'preview')}
-              options={[
-                { value: 'write', label: t('Write') },
-                { value: 'preview', label: t('Preview') },
-              ]}
-            />
-          )}
-          {readOnly || tab === 'preview' ? (
-            <div className="pb-skill-preview">
+        {!readOnly && (
+          <Segmented
+            label={t('Instructions')}
+            value={tab}
+            onChange={(v) => setTab(v as 'write' | 'preview')}
+            options={[
+              { value: 'write', label: t('Write') },
+              { value: 'preview', label: t('Preview') },
+            ]}
+          />
+        )}
+        {readOnly ? (
+          <div className="pb-skill-pane read">
+            <div className="pb-skill-preview" data-testid="pb-skill-preview">
               {(inherited?.body ?? body).trim() ? <Markdown text={inherited?.body ?? body} /> : <p className="muted">{t('No instructions yet.')}</p>}
             </div>
-          ) : (
+          </div>
+        ) : (
+          // one box: the field sizes it (its text, at least twelve lines), the preview lies over it
+          <div className="pb-skill-pane" data-tab={tab}>
             <AutoTextarea
-              className="textarea pb-textarea"
+              ref={field}
+              className="pb-skill-text"
               value={body}
               onChange={(e) => setBody(e.target.value)}
               onSubmit={() => void save()}
               placeholder={t('Step by step, the way you’d explain it to a new editor: settings, order, what to check before rendering.')}
               aria-label={t('Instructions')}
-              rows={10}
+              aria-hidden={tab === 'preview' || undefined}
+              tabIndex={tab === 'preview' ? -1 : undefined}
+              rows={12}
               data-testid="pb-skill-body"
             />
-          )}
-        </div>
+            {tab === 'preview' && (
+              <div className="pb-skill-preview" data-testid="pb-skill-preview">
+                {body.trim() ? <Markdown text={body} /> : <p className="muted">{t('No instructions yet.')}</p>}
+              </div>
+            )}
+          </div>
+        )}
         <div className="pb-skill-files">
           <div className="pb-skill-files-h">
             <b>{t('Files')}</b>

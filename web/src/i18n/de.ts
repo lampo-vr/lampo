@@ -1919,7 +1919,7 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'From the {name} playbook — change it there.': 'Aus dem Playbook {name} – dort änderst du ihn.',
   History: 'Verlauf',
   House: 'Studio',
-  'Import SKILL.md': 'SKILL.md importieren',
+  'Import SKILL.md…': 'SKILL.md importieren …',
   Instructions: 'Anleitung',
   'Loading the playbook': 'Das Playbook lädt',
   'Lowercase letters, digits and hyphens, like export-reels': 'Kleinbuchstaben, Ziffern und Bindestriche, z. B. export-reels',
@@ -1951,8 +1951,23 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'the rules': 'die Regeln',
   'the skill {name}': 'den Skill {name}',
   'Waiting for someone who edits playbooks': 'Wartet auf jemanden, der Playbooks bearbeitet',
-  '{name} changed this in r{rev}, after the suggestion was made. Accepting it would replace that change: the diff now shows what it would replace. Reject it, or ask for a new one.':
-    '{name} hat das in r{rev} geändert, nachdem der Vorschlag gemacht wurde. Ihn anzunehmen würde diese Änderung ersetzen: Der Vergleich zeigt jetzt, was er ersetzen würde. Lehne ihn ab oder bitte um einen neuen.',
+  '{name} changed {what} in r{rev}, after this suggestion was made. The diff shows what accepting it would replace.':
+    '{name} hat {what} in r{rev} geändert, nachdem dieser Vorschlag gemacht wurde. Der Vergleich zeigt, was er beim Annehmen ersetzen würde.',
+  '{name} accepted another suggestion for {what} in r{rev}. The diff shows what accepting this one would replace.':
+    '{name} hat in r{rev} einen anderen Vorschlag für {what} angenommen. Der Vergleich zeigt, was dieser beim Annehmen ersetzen würde.',
+  '{n} suggestions for {what}, the newest first. Whichever you accept, the others then show what they would replace.':
+    '{n} Vorschläge für {what}, der neueste zuerst. Welchen du auch annimmst: Die anderen zeigen danach, was sie ersetzen würden.',
+  '{n} suggestions for {what} are waiting, this one the newest. Whichever you accept, the others then show what they would replace.':
+    '{n} Vorschläge für {what} warten, dieser ist der neueste. Welchen du auch annimmst: Die anderen zeigen danach, was sie ersetzen würden.',
+  '{n} suggestions for {what} are waiting, a newer one among them. Whichever you accept, the others then show what they would replace.':
+    '{n} Vorschläge für {what} warten, darunter ein neuerer. Welchen du auch annimmst: Die anderen zeigen danach, was sie ersetzen würden.',
+  'Newest of {n}': 'Neuester von {n}',
+  'Accept anyway': 'Trotzdem annehmen',
+  'Decided already': 'Schon entschieden',
+  '{n} suggestion waiting in folders inside|{n} suggestions waiting in folders inside':
+    '{n} Vorschlag wartet in Ordnern darin|{n} Vorschläge warten in Ordnern darin',
+  '{n} suggestion waiting here and in folders inside|{n} suggestions waiting here and in folders inside':
+    '{n} Vorschlag wartet hier und in Ordnern darin|{n} Vorschläge warten hier und in Ordnern darin',
   'What agents read': 'Was Agenten lesen',
   'What changed': 'Was sich geändert hat',
   'What changed (optional)': 'Was sich geändert hat (optional)',

@@ -152,6 +152,10 @@ a.pb-layer-chip:focus-visible {
   .pb-meta {
     grid-template-columns: minmax(0, 1fr);
   }
+  /* one row of links: this playbook's own suggestions first; the ones further down are in the inbox and on the tab */
+  .pb-meta-link.waiting ~ .pb-meta-link.below {
+    display: none;
+  }
   .pb-meta-note,
   .pb-meta-when {
     display: none;
@@ -194,6 +198,28 @@ a.pb-layer-chip:focus-visible {
 }
 .pb-meta-link.waiting .kg {
   color: var(--claude);
+}
+/* suggestions waiting in a playbook further down ("Reels · 5 suggestions waiting →"): quieter than this one's own */
+.pb-meta-link.below {
+  min-width: 0;
+  color: var(--fg-2);
+  text-decoration: none;
+}
+.pb-below-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: var(--fw-strong);
+}
+.pb-below-n {
+  flex: none;
+}
+.pb-below-go {
+  flex: none;
+  color: var(--muted);
+}
+.pb-meta-link.below:hover .pb-below-go {
+  color: var(--fg);
 }
 .pb-meta-when {
   color: var(--muted);
@@ -302,12 +328,14 @@ a.pb-layer-chip:focus-visible {
   min-width: 0;
 }
 .pb-editor .textarea.pb-textarea {
-  min-height: calc(var(--h-lg) * 2);
+  /* an open editor: room for a paragraph (an empty section's field, below, stays a short place to start) */
+  min-height: calc(6 * var(--lh-body) * var(--fs-lg) + 2 * var(--sp-2) + 2px);
   padding: var(--sp-2) var(--sp-3);
   font: var(--fw-text) var(--fs-lg) / var(--lh-body) var(--ui);
 }
 /* the empty section's field: a place to write, not a form */
 .pb-editor.ghost .textarea.pb-textarea {
+  min-height: calc(var(--h-lg) * 2);
   border-style: dashed;
   border-color: var(--line-3);
   background: transparent;
@@ -618,6 +646,26 @@ a.pb-layer-chip:focus-visible {
   box-shadow: 0 0 0 1px var(--line-2);
   scroll-margin: var(--sp-16);
 }
+/* several for the same part (the brief, the rules, one skill): together, under one line that says how they relate */
+.pb-suggest-set {
+  display: grid;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.pb-suggest-say {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: 0;
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+}
+.pb-suggest-key {
+  flex: none;
+  color: var(--claude);
+  transform: translateY(1px);
+}
 
 /* markdown as people read it */
 .md-text {
@@ -766,10 +814,20 @@ a.pb-layer-chip:focus-visible {
   white-space: nowrap;
 }
 
-/* the skill dialog */
+/* the skill dialog: one to write in (Modal `writing`), a column whose instructions take the room it has */
 .pb-skill {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--sp-4);
+  min-height: 0;
+}
+.pb-skill > * {
+  flex: none;
+}
+.pb-skill > .seg {
+  align-self: flex-start;
+  /* the tabs belong to the box under them */
+  margin-bottom: calc(var(--sp-2) - var(--sp-4));
 }
 .pb-skill-from {
   display: flex;
@@ -794,19 +852,43 @@ a.pb-layer-chip:focus-visible {
   font-size: var(--fs-sm);
   color: var(--danger-hi);
 }
-.pb-skill-body {
-  display: grid;
-  gap: var(--sp-2);
+/* Write and Preview are one box. The field sizes it (its text, at least twelve lines), growing until the dialog meets
+   the screen's edge and scrolling inside from there; the preview lies over it, so switching moves nothing. */
+.pb-skill > .pb-skill-pane {
+  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(12 * var(--lh-body) * var(--fs-lg) + 2 * var(--sp-3) + 2px);
 }
-.pb-skill-body .seg {
-  justify-self: start;
+.pb-skill-pane > .textarea.autotext {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  padding: var(--sp-3);
+  font: var(--fw-text) var(--fs-lg) / var(--lh-body) var(--ui);
+}
+.pb-skill-pane[data-tab='preview'] > .textarea {
+  visibility: hidden;
 }
 .pb-skill-preview {
-  max-height: 44dvh;
+  position: absolute;
+  inset: 0;
   overflow: auto;
+  overscroll-behavior: contain;
   padding: var(--sp-3);
   border: 1px solid var(--line);
-  border-radius: var(--r);
+  border-radius: var(--radius-sm);
+}
+/* an inherited skill (or one you may only read): the preview alone, as tall as its text until the dialog is full */
+.pb-skill > .pb-skill-pane.read {
+  min-height: calc(5 * var(--lh-body) * var(--fs-lg) + 2 * var(--sp-3) + 2px);
+}
+.pb-skill-pane.read > .pb-skill-preview {
+  position: static;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 .pb-skill-files {
   display: grid;
@@ -994,6 +1076,46 @@ a.pb-layer-chip:focus-visible {
   display: flex;
   justify-content: flex-end;
   gap: var(--sp-2);
+}
+/* the newest of several suggestions for the same part */
+.pb-prop-tag {
+  flex: none;
+  align-self: flex-start;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  height: var(--h-xs);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-full);
+  border: 1px solid var(--line-2);
+  font-size: var(--fs-xs);
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+/* what the person deciding should know first: others wait for the same part; the part changed since */
+.pb-prop-note {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: 0;
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+}
+.pb-prop-note-key {
+  flex: none;
+  color: var(--claude);
+  transform: translateY(1px);
+}
+.pb-prop-note.changed {
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r);
+  background: var(--ink-0);
+  box-shadow: 0 0 0 1px var(--line-2);
+  color: var(--fg);
+}
+.pb-prop-note.changed .pb-prop-note-key {
+  color: var(--fg-2);
 }
 .pb-prop-reject {
   display: grid;
@@ -1271,6 +1393,14 @@ a.pb-layer-chip:focus-visible {
   }
   .pb-skill-fields {
     grid-template-columns: minmax(0, 1fr);
+  }
+  /* the files' hint gets a line of its own under "Files · Add file" instead of wrapping beside the word */
+  .pb-skill-files-h .muted {
+    order: 3;
+    flex-basis: 100%;
+  }
+  .pb-skill-files-h .btn {
+    margin-left: auto;
   }
   .pb-msg {
     flex-basis: 100%;

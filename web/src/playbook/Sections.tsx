@@ -6,8 +6,8 @@
 // for a section waits inside it, with its diff and Accept / Reject.
 import { useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { PLAYBOOK_LIMITS, scopeLabel, skillMarkdown } from '../../../lib/playbookText.ts';
-import type { NoteRef, Playbook, PlaybookLayer, PlaybookProposal, PlaybookSection, PlaybookView, TasteSuggestion } from '../../../lib/types.ts';
+import { newestFirst, PLAYBOOK_LIMITS, scopeLabel } from '../../../lib/playbookText.ts';
+import type { NoteRef, Playbook, PlaybookLayer, PlaybookProposal, PlaybookView, TasteSuggestion } from '../../../lib/types.ts';
 import { ApiError, enc } from '../api/client.ts';
 import { playbookHref, playbookKeys, playbookRefUrl, usePlaybookActions, useSkill } from '../api/playbooks.ts';
 import { useLibrary } from '../api/queries.ts';
@@ -33,13 +33,6 @@ export const label = (scope: string) => (scope ? scopeLabel(scope) : t('House'))
 export const shortName = (scope: string) => (scope ? scope.split('/').pop() || scope : t('House'));
 /** Who made a change, without the agent: prefix. */
 export const who = (by: string | null | undefined) => (by ? by.replace(/^agent:/, '') : '');
-
-/** What a section says now (a skill: its SKILL.md), the left side of a suggestion's diff. */
-export function currentText(p: Playbook, section: PlaybookSection): string {
-  if (section === 'brief' || section === 'rules') return p[section];
-  const s = p.skills.find((x) => `skill:${x.name}` === section);
-  return s ? skillMarkdown(s) : '';
-}
 
 /** What a playbook holds, in a few words: "brief · 12 rules · 3 skills". */
 export function factsOf(x: { brief: string; rules: string; skills: unknown[]; refs: unknown[] }): string {
@@ -96,13 +89,37 @@ function Section({
   );
 }
 
-/** Suggestions an agent made for a section, waiting inside it. */
+/**
+ * Suggestions agents made for a section, waiting inside it, the newest first. Several for the same part (the brief,
+ * the rules, one skill) stand together under one line: which is newest, and that accepting one makes the others show
+ * what they would replace.
+ */
 function Waiting({ list, playbook, scope }: { list: PlaybookProposal[]; playbook: Playbook; scope: string }) {
-  return list.map((p) => (
+  const groups = new Map<string, PlaybookProposal[]>();
+  for (const p of newestFirst(list)) groups.set(p.section, [...(groups.get(p.section) ?? []), p]);
+  const card = (p: PlaybookProposal) => (
     <div key={p.id} className="pb-suggest" id={`pb-suggest-${p.id}`} data-testid="pb-suggestion">
-      <ProposalCard proposal={p} current={currentText(playbook, p.section)} scope={scope} />
+      <ProposalCard proposal={p} playbook={playbook} scope={scope} />
     </div>
-  ));
+  );
+  return [...groups.values()].map((g) =>
+    g.length > 1 ? (
+      <div key={g[0].section} className="pb-suggest-set" data-testid="pb-suggest-set">
+        <p className="pb-suggest-say">
+          <KeyGlyph shape="ease" size={10} className="pb-suggest-key" />
+          <span>
+            {t('{n} suggestions for {what}, the newest first. Whichever you accept, the others then show what they would replace.', {
+              n: g.length,
+              what: sectionWords(g[0].section),
+            })}
+          </span>
+        </p>
+        {g.map(card)}
+      </div>
+    ) : (
+      card(g[0])
+    ),
+  );
 }
 
 // ---------------------------------------------------------------- writing a text section in place

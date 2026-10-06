@@ -98,13 +98,13 @@ const submitOnModEnter = (e: ReactKeyboardEvent<HTMLElement>) => {
   go.click();
 };
 
-export function ModalLayer({ title, onClose, children, foot, width, head, fill }: ModalProps) {
+export function ModalLayer({ title, onClose, children, foot, width, head, fill, writing }: ModalProps) {
   return (
     <Dialog.Root open onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="backdrop" onClick={stop}>
           <Dialog.Content
-            className={fill ? 'modal fill' : 'modal'}
+            className={fill ? 'modal fill' : writing ? 'modal writing' : 'modal'}
             style={width ? { width } : undefined}
             aria-describedby={undefined}
             onEscapeKeyDown={escapeInDialog}

@@ -1795,6 +1795,14 @@ export interface PlaybookView {
   markdown: string;
   /** Recurring asks from the taste file that aren't rules yet (people who may edit only). */
   suggestions?: TasteSuggestion[];
+  /** The playbooks of folders inside this one (any depth) with suggestions waiting, by path (people who may edit only). */
+  below?: PlaybookWaiting[];
+}
+
+/** A playbook with suggestions waiting for a decision, as the page of a playbook above it points to it. */
+export interface PlaybookWaiting {
+  scope: PlaybookScope;
+  pending: number;
 }
 
 /** GET /api/playbook/skill: one skill as it applies somewhere, with its SKILL.md. */

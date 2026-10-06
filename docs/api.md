@@ -856,17 +856,20 @@ routes. Every change broadcasts `playbook` (`{scope}`) on `/api/events`.
 | `GET /api/playbook/refs/:file?folder=` | a reference's picture or still, only through the playbook that names it |
 | `POST /api/playbook/proposals` | a suggestion: `{folder? \| video?, section: "brief" \| "rules" \| "skill", content, reason, evidence?, by?}` → `201` with the proposal (`pp_…`, `pending`) |
 | `GET /api/playbook/proposals/:id` | the proposal, and `current`: what its section says now (the diff's left side) |
-| `POST /api/playbook/proposals/:id/accept` | `{message?}` → `{proposal, rev}` |
+| `POST /api/playbook/proposals/:id/accept` | `{message?, base_rev?}` → `{proposal, rev}`; `409` when its section changed after the suggestion was made (or after `base_rev`) |
 | `POST /api/playbook/proposals/:id/reject` | `{reason?}` → the proposal, `rejected` with the reason the agent reads |
 
 Details:
 
 - **`PlaybookView`**: `scope`, `label`, the `playbook` itself (brief, rules, refs, skills, history, proposals), the
   `layers` above it (House first), the `skills` in force (each with `from`), the `stamp` a render made now would get,
-  the `markdown` agents read, and `suggestions` (recurring asks no rule names yet) for people with the playbook
-  action.
+  the `markdown` agents read, and for people with the playbook action `suggestions` (recurring asks no rule names yet)
+  and `below`: the playbooks of folders inside this one with suggestions waiting (`{scope, pending}`, by path).
 - **Conflicts.** A text write answers `rev: null` when nothing changed, and `409` when someone changed the same section
-  after `base_rev`.
+  after `base_rev`. Accepting a suggestion is refused (`409` with `by`, `changed_rev`, `rev` and, when it was another
+  suggestion accepted, its `proposal`) when its section changed after the suggestion was made: the person looks at the
+  diff against the section as it is now, then accepts with that revision as `base_rev` to replace the change on
+  purpose. Another section's changes never hold a suggestion up.
 - **References**: a link `{folder?, kind: "link", url, caption?}`, a frame-exact still of a video
   `{folder?, kind: "frame", video, v?, frame, to_frame?, caption?}`, or an image `{folder?, kind: "image", data,
   caption?}` (base64).

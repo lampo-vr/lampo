@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isoLocal } from './paths.ts';
 import { chainOf, HOUSE, listPlaybooks, playbookFile, playbookRoot, readPlaybook, stampFor } from './playbookFiles.ts';
-import { cleanText, PLAYBOOK_LIMITS, parseSkill, SKILL_FILE, type SkillText, scopeLabel, skillMarkdown, skillProblem } from './playbookText.ts';
+import { changedSince, cleanText, PLAYBOOK_LIMITS, parseSkill, SKILL_FILE, type SkillText, scopeLabel, skillMarkdown, skillProblem } from './playbookText.ts';
 import { frameRef, frameTarget, imageRef, linkRef } from './refs.ts';
 import { storage } from './storage/index.ts';
 import * as store from './store.ts';
@@ -28,6 +28,7 @@ import type {
   PlaybookSummary,
   PlaybookText,
   PlaybookView,
+  PlaybookWaiting,
   TasteSuggestion,
 } from './types.ts';
 
@@ -447,32 +448,37 @@ function trimDecided(p: Playbook): void {
 }
 
 /**
- * A suggestion is a whole new text made against the revision it saw: accepting it after a person changed the same
- * section would silently replace their change, so that is refused (the diff then shows what it would replace).
- * Revisions that left the text as it was (a skill's file) don't count.
+ * A suggestion is a whole new text made against the revision it saw: accepting it after someone changed the same
+ * section (a person's edit, or another suggestion accepted for it) would silently replace that change, so that is
+ * refused — unless the person deciding says which revision they looked at the diff against (`seen`, the playbook's
+ * revision on their screen) and nothing changed in that section since: then it replaces it on purpose.
  */
-function checkProposalBase(p: Playbook, prop: PlaybookProposal): void {
-  if (typeof prop.base_rev !== 'number' || prop.base_rev >= p.rev) return;
-  const since = p.history.filter((h) => h.rev > prop.base_rev && h.section === prop.section && h.before !== h.after);
-  const last = since.at(-1);
+function checkProposalBase(p: Playbook, prop: PlaybookProposal, seen?: number): void {
+  const last = changedSince(p, prop, seen);
   if (!last) return;
   const by = last.accepted_by || last.by;
   const what = prop.section.startsWith('skill:') ? `the skill ${prop.section.slice(6)}` : `the ${prop.section}`;
+  const after =
+    seen !== undefined && seen > prop.base_rev ? `r${Math.min(seen, p.rev)}, the revision you looked at` : `this suggestion was made on r${prop.base_rev}`;
   throw new PlaybookError(
     409,
-    `${by} changed ${what} in r${last.rev}, after this suggestion was made on r${prop.base_rev}; accepting it would replace that change. Look at the diff again, then reject it or ask for a new one`,
-    { by, changed_rev: last.rev, base_rev: prop.base_rev, rev: p.rev },
+    `${by} changed ${what} in r${last.rev}, after ${after}; accepting it would replace that change. Look at the diff again, then accept it with base_rev ${p.rev} to replace it on purpose, or reject it`,
+    { by, changed_rev: last.rev, base_rev: prop.base_rev, rev: p.rev, ...(last.proposal ? { proposal: last.proposal } : {}) },
   );
 }
 
-export function acceptProposal(id: string, o: { by: string; message?: string }): { proposal: PlaybookProposal; rev: PlaybookRevision } {
+/**
+ * Accepts a suggestion: its text becomes the section's next revision. `base_rev`: the playbook's revision the person
+ * deciding saw the diff against (the app sends it); without it, the suggestion's own.
+ */
+export function acceptProposal(id: string, o: { by: string; message?: string; base_rev?: number }): { proposal: PlaybookProposal; rev: PlaybookRevision } {
   const hit = findProposal(id);
   if (!hit) throw new PlaybookError(404, 'no such suggestion');
   return update(hit.scope, (p) => {
     const prop = p.proposals.find((x) => x.id === id);
     if (!prop) throw new PlaybookError(404, 'no such suggestion');
     if (prop.status !== 'pending') throw new PlaybookError(409, `this suggestion was ${prop.status} already`);
-    checkProposalBase(p, prop);
+    checkProposalBase(p, prop, o.base_rev);
     let rev: PlaybookRevision;
     const change = { by: prop.by, accepted_by: o.by, proposal: prop.id, message: o.message || `${prop.reason.split('\n')[0].slice(0, 160)}` };
     if (prop.section === 'brief' || prop.section === 'rules') {
@@ -629,8 +635,20 @@ export function playbookView(scope: PlaybookScope, o: { suggestions?: boolean } 
     stamp: stampFor(scope),
     markdown: agentMarkdown(scope),
   };
-  if (o.suggestions) view.suggestions = suggestionsFor(scope, playbook);
+  if (o.suggestions) {
+    view.suggestions = suggestionsFor(scope, playbook);
+    view.below = waitingBelow(scope);
+  }
   return view;
+}
+
+/** The playbooks of folders inside a scope (any depth; the House: every folder's) with suggestions waiting. */
+export function waitingBelow(scope: PlaybookScope): PlaybookWaiting[] {
+  return listPlaybooks()
+    .filter((p) => p.scope !== scope && (scope === HOUSE || p.scope.startsWith(`${scope}/`)))
+    .map((p) => ({ scope: p.scope, pending: p.proposals.filter((x) => x.status === 'pending').length }))
+    .filter((x) => x.pending > 0)
+    .sort((a, b) => a.scope.localeCompare(b.scope));
 }
 
 /** Recurring asks from the notes that the playbook's rules don't mention yet (by their tag). */

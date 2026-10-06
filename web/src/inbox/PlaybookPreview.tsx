@@ -1,6 +1,7 @@
 // A playbook suggestion beside the inbox list: which playbook, the change as a diff against what it says now, and
-// Accept / Reject right here; "Open the playbook" goes to its page (the suggestions tab).
-import { useProposal } from '../api/playbooks.ts';
+// Accept / Reject right here; "Open the playbook" goes to its page, on this suggestion. The card reads the playbook
+// itself (the page's query): what changed since, and the other suggestions waiting for the same section.
+import { usePlaybook } from '../api/playbooks.ts';
 import { t } from '../i18n/index.ts';
 import { loader, useLoaded } from '../lib/lazy.ts';
 import { I } from '../ui/icons.tsx';
@@ -15,9 +16,11 @@ import '../styles/playbook.css';
 const proposalCode = loader(() => import('../playbook/Proposal.tsx'));
 
 export function PlaybookPreview({ item, onDone, onBack, backLabel }: PreviewProps) {
-  const q = useProposal(item.proposal ?? null);
-  const code = useLoaded(proposalCode);
   const scope = item.scope ?? '';
+  const q = usePlaybook(scope);
+  const code = useLoaded(proposalCode);
+  const playbook = q.data?.playbook;
+  const proposal = playbook?.proposals.find((x) => x.id === item.proposal);
   const name = scope || t('House');
   return (
     <section className="inbox-preview" aria-label={t('{video}: preview', { video: name })} data-testid="inbox-playbook-preview">
@@ -34,12 +37,15 @@ export function PlaybookPreview({ item, onDone, onBack, backLabel }: PreviewProp
         </a>
       </header>
       <div className="inbox-pv-playbook">
-        {q.data && code ? (
-          <code.ProposalCard proposal={q.data} current={q.data.current} scope={scope} compact onDecided={() => onDone(item.key)} />
+        {playbook && proposal && code ? (
+          <code.ProposalCard proposal={proposal} playbook={playbook} scope={scope} compact onDecided={() => onDone(item.key)} />
         ) : q.error ? (
           <EmptyState art="error" size="sm" className="inbox-empty" title={t('This didn’t load')}>
             {q.error.message}
           </EmptyState>
+        ) : playbook && !proposal ? (
+          // decided elsewhere a moment ago: the inbox moves on when it hears of it
+          <EmptyState art="check" size="sm" className="inbox-empty" title={t('Decided already')} />
         ) : (
           <SkeletonRegion label={t('Loading the suggestion')}>
             <SkeletonText lines={5} />

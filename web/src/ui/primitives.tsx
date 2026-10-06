@@ -46,6 +46,12 @@ export interface ModalProps {
   /** A room to look at things in (the audition's clips): the screen's height whatever it shows, so what switches inside
    * never resizes it; the content lays itself out in the body, with the gutters, and scrolls itself. */
   fill?: boolean;
+  /**
+   * A dialog to write in (a skill's instructions): its body is a column, and the part marked `.modal-grow` takes the
+   * room the dialog has — growing with its text until the dialog meets the screen's edge, then scrolling inside, while
+   * what stands above and below it stays put. The whole screen on a phone.
+   */
+  writing?: boolean;
 }
 
 /** A dialog: its code arrives with the layers (at once, when it opens before they did). */

@@ -97,7 +97,8 @@ const Propose = z
     by: byName.optional(),
   })
   .strict();
-const Accept = z.object({ message }).strict();
+// base_rev: the playbook's revision the person deciding saw the diff against (lib/playbooks.ts acceptProposal)
+const Accept = z.object({ message, base_rev }).strict();
 const Reject = z.object({ reason: z.string().max(PLAYBOOK_LIMITS.reason).optional() }).strict();
 const proposalId = z.string().regex(/^pp_[a-f0-9]{12}$/, 'expected a suggestion id like pp_1a2b3c4d5e6f');
 
@@ -310,7 +311,7 @@ export function playbookRoutes(ctx: ServerContext): Router {
     person(req);
     const id = parse(proposalId, req.params.id);
     const b = body(Accept, req);
-    const out = run(() => playbooks.acceptProposal(id, { by: ctx.actor(req), message: b.message }));
+    const out = run(() => playbooks.acceptProposal(id, { by: ctx.actor(req), message: b.message, base_rev: b.base_rev }));
     changed(out.proposal.scope, true);
     res.json(out);
   });
