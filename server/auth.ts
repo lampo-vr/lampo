@@ -580,7 +580,11 @@ export function authRoutes({ cfg, setupToken, setupDone, extension = () => NO_EX
       throw Object.assign(fail(429, `too many sign-in attempts, try again in ${Math.ceil(wait / 60)} min`), { retryAfter: wait });
     }
     const ok = await auth.verifyPassword(password, user?.password || (await auth.dummyHash()));
-    if (!user || !ok || user.disabled) {
+    // The account as it is now that the check is done: one deleted, disabled or given a new password meanwhile is
+    // answered like an address without an account — no session, no token, no mail for what is gone.
+    const now = ok && user ? auth.findUserByEmail(email) : null;
+    const same = now && user && now.id === user.id && now.password === user.password && !now.disabled ? now : null;
+    if (!same) {
       byIp.hit(ip);
       byAccountAndIp.hit(pair);
       byAccount.hit(account);
@@ -591,11 +595,11 @@ export function authRoutes({ cfg, setupToken, setupDone, extension = () => NO_EX
       throw fail(401, 'wrong email or password');
     }
     byAccountAndIp.reset(pair);
-    const busy = Math.max(signInsByAccount.retryAfter(user.id), signInsByIp.retryAfter(ip));
+    const busy = Math.max(signInsByAccount.retryAfter(same.id), signInsByIp.retryAfter(ip));
     if (busy) throw Object.assign(fail(429, `too many sign-ins, try again in ${Math.ceil(busy / 60)} min`), { retryAfter: busy });
-    signInsByAccount.hit(user.id);
+    signInsByAccount.hit(same.id);
     signInsByIp.hit(ip);
-    return user;
+    return same;
   }
 
   r.get('/api/auth/status', (req, res) => {

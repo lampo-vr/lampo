@@ -7,6 +7,10 @@ format stays backwards compatible throughout.
 
 ## [Unreleased]
 
+### Fixed
+- An account deleted, disabled or given a new password while someone signs in to it gets no session and sends no
+  sign-in email: the answer is the same as for any wrong sign-in.
+
 ## [0.1.0] - 2026-10-06
 
 The first public release: what it has first, then everything that changed while it was made, newest first.
