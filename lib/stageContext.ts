@@ -36,7 +36,8 @@ function activeLinks(): Share[] {
   }
   warned = false;
   const now = Date.now();
-  return links.list.filter((s) => !isExpired(s, now));
+  // an embed plays for whoever sees the site it is on and asks nobody for a verdict: it never says "out for review"
+  return links.list.filter((s) => !isExpired(s, now) && !s.embed);
 }
 
 /** The newest approved version older than the newest render, if any (for carrying the approval over). */

@@ -167,7 +167,18 @@ test('perLang makes its words again after a switch, and keeps the same object me
 // through perLang; a memo'd component calls useLang().
 const WEB = path.join(import.meta.dirname, '../../web/src');
 // Calls that are fine at a module's top level: the language machinery itself, and English keys.
-const MACHINERY = new Set(['perLang', 'subscribeLang', 'english', 'preloadLang', 'loadLang', 'detectLang', 'setDictionary', 'langPref', 'setLangPref']);
+const MACHINERY = new Set([
+  'perLang',
+  'subscribeLang',
+  'english',
+  'preloadLang',
+  'loadLang',
+  'loadClientLang',
+  'detectLang',
+  'setDictionary',
+  'langPref',
+  'setLangPref',
+]);
 type Node = { type: string; start: number; end: number; [k: string]: unknown };
 const isNode = (v: unknown): v is Node => !!v && typeof v === 'object' && typeof (v as Node).type === 'string';
 function walk(node: unknown, visit: (n: Node) => boolean | undefined): void {

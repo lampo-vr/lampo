@@ -297,7 +297,8 @@ after the first screenful), and no heading loses the tops or tails of its letter
   slash). A doubled slash, a dot segment or a trailing slash is a 404 before anything else (`canonicalPaths` in
   `server/guard.ts`), so the guard and the role table always judge the path the route will serve. The guard denies by
   default (`isPublicPath`), the role table runs for every signed-in request, and the same security headers go out
-  (a Content-Security-Policy with the theme script's hash, `frame-ancestors 'none'`, `nosniff`). Media, frames,
+  (a Content-Security-Policy with the theme script's hash, `frame-ancestors 'none'`, `nosniff`; the one page another
+  site may frame is an Embed link's player, `/e/<token>`: `frame-ancestors *` and no `X-Frame-Options`). Media, frames,
   posters, screenshots and API answers (`/api/`, `/media/`, `/data/`, review links' own included) carry
   `Cross-Origin-Resource-Policy: same-origin`, so no other site's page can load them as an image or a video.
 - **On your machine.** Only requests from the machine itself, with no proxy headers, are the owner without signing in.

@@ -7,6 +7,14 @@ format stays backwards compatible throughout.
 
 ## [Unreleased]
 
+### Added
+- **Embed a video on your own site.** A new kind of link, *Embed*: Share → Embed copies the code for one `<iframe>`
+  that keeps the video's shape, and the video plays on any site in Lampo's own frame-exact player — the timecode with
+  frames, frame steps and the player's keys, the render's chapters on its timeline, captions from its transcript, full
+  screen, and options to start muted, loop or show the picture alone. It shows the video and nothing else, sets no
+  cookie, and stops wherever it is the moment the link is revoked or expires. Sites that embed from an address find it
+  through oEmbed.
+
 ### Fixed
 - An account deleted, disabled or given a new password while someone signs in to it gets no session and sends no
   sign-in email: the answer is the same as for any wrong sign-in.

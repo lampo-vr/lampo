@@ -39,6 +39,8 @@ const SECONDS = {
   share: 59,
   'guest-compare': 34,
   'guest-look': 22,
+  // an Embed link's player in another site's page (measured alone, 2026-10-06)
+  embed: 45,
   settings: 49,
   range: 47,
   theme: 42,

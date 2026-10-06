@@ -5,7 +5,19 @@ import express, { type Router } from 'express';
 import QRCode from 'qrcode';
 import { z } from 'zod';
 import { allFolders, folderIdFor, folderName } from '../../../lib/folders.ts';
-import { allShares, covers, createShare, listShares, madeFor, resolveShare, revokeShare, shareInfo, sharerName, updateShare } from '../../../lib/shares.ts';
+import {
+  allShares,
+  covers,
+  createShare,
+  LinkRefusedError,
+  listShares,
+  madeFor,
+  resolveShare,
+  revokeShare,
+  shareInfo,
+  sharerName,
+  updateShare,
+} from '../../../lib/shares.ts';
 import { FOLDER_LIMITS } from '../../../lib/store.ts';
 import type { ShareInfo, SharesResponse } from '../../../lib/types.ts';
 import type { ServerContext } from '../../context.ts';
@@ -13,7 +25,7 @@ import { gate } from '../../extension.ts';
 import { countStep } from '../../funnel.ts';
 import { lanIps } from '../../guard.ts';
 import { getReview } from '../../helpers.ts';
-import { body, fail, query, router } from '../../http.ts';
+import { body, fail, failFrom, query, router } from '../../http.ts';
 
 /** Where the owner reaches this server from, for a link's QR code. */
 const BaseQuery = z.object({ base: z.string().max(2000).optional() });
@@ -30,7 +42,19 @@ const Settings = z.object({
   download: z.enum(['off', 'preview', 'original']).optional(),
   expires: when.nullable().optional(),
   password: z.string().min(4, 'at least 4 characters').max(200).nullable().optional(),
+  /** An embed (lib/shares.ts embedRefusal: one video, no password). */
+  embed: z.boolean().optional(),
 });
+
+/** Makes or changes a link: one the kind can't be (an embed of a folder, or with a password) is a 400 with its reason. */
+function refusable<T>(fn: () => T): T {
+  try {
+    return fn();
+  } catch (e) {
+    if (e instanceof LinkRefusedError) throw failFrom(400, e);
+    throw e;
+  }
+}
 const NewFolderShare = Settings.extend({ folder: z.string().min(1).max(FOLDER_LIMITS.length) });
 const FolderSharesQuery = z.object({ folder: z.string().max(FOLDER_LIMITS.length).optional() });
 
@@ -75,7 +99,7 @@ export function ownerShareRoutes(ctx: ServerContext): Router {
       getReview(req.params.slug);
       const b = body(Settings, req);
       // Made for this video, by its id (createShare): never for one added later under the same name.
-      const s = createShare({ slug: req.params.slug }, { ...b, by: ctx.actor(req), byId: req.auth?.user?.id });
+      const s = refusable(() => createShare({ slug: req.params.slug }, { ...b, by: ctx.actor(req), byId: req.auth?.user?.id }));
       changed(ctx, req.params.slug);
       countStep(ctx, 'link_first');
       res.json(shareInfo(s));
@@ -110,7 +134,7 @@ export function ownerShareRoutes(ctx: ServerContext): Router {
       if (!folder || !allFolders().includes(folder)) throw fail(404, 'no such folder');
       const { folder: _f, ...input } = b;
       // The link is on this folder by its id: wherever it moves, and never on another folder made under its name later.
-      const s = createShare({ folder, folder_id: folderIdFor(folder) }, { ...input, by: ctx.actor(req), byId: req.auth?.user?.id });
+      const s = refusable(() => createShare({ folder, folder_id: folderIdFor(folder) }, { ...input, by: ctx.actor(req), byId: req.auth?.user?.id }));
       ctx.broadcast('library');
       countStep(ctx, 'link_first');
       res.json(shareInfo(s));
@@ -118,7 +142,8 @@ export function ownerShareRoutes(ctx: ServerContext): Router {
   );
 
   r.patch('/api/shares/:token', express.json(), (req, res) => {
-    const s = updateShare(req.params.token, body(Settings, req));
+    const input = body(Settings, req);
+    const s = refusable(() => updateShare(req.params.token, input));
     if (!s) throw fail(404, 'no such link');
     changed(ctx, s.slug);
     res.json(shareInfo(s));

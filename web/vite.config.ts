@@ -17,8 +17,9 @@ function serviceWorker(): Plugin {
     apply: 'build',
     generateBundle(_options, bundle) {
       const files = ['/offline.html', '/offline.js', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/favicon-32.png'];
+      // the app's entry only: the embed player (embed.html) is for other sites' pages, never this app's start
       for (const f of Object.values(bundle))
-        if (f.type === 'chunk' && f.isEntry) {
+        if (f.type === 'chunk' && f.isEntry && f.name !== 'embed') {
           files.push(`/${f.fileName}`);
           for (const css of f.viteMetadata?.importedCss ?? []) files.push(`/${css}`);
         }
@@ -74,5 +75,14 @@ export default defineConfig({
   server: { fs: { allow: ['..'] } },
   // #/styleguide is in dev and test builds; VR_STYLEGUIDE=0 (the Dockerfile) leaves it out of a release.
   define: { __STYLEGUIDE__: JSON.stringify(process.env.VR_STYLEGUIDE !== '0') },
-  build: { outDir: 'dist', emptyOutDir: true, chunkSizeWarningLimit: 1000 },
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
+    chunkSizeWarningLimit: 1000,
+    // Two pages: the app (index.html) and an Embed link's player (embed.html, served at /e/<token>), an entry of its own
+    // so the player another site frames loads none of the app, and the app's first paint none of it.
+    rollupOptions: {
+      input: { index: fileURLToPath(new URL('./index.html', import.meta.url)), embed: fileURLToPath(new URL('./embed.html', import.meta.url)) },
+    },
+  },
 });

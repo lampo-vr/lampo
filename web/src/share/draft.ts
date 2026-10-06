@@ -15,11 +15,13 @@ export interface Draft {
   password: string;
   /** 'keep': as it is (none on a new link); 'set': the field is open, its password goes with the link; 'remove'. */
   passwordAction: 'keep' | 'set' | 'remove';
+  /** An embed (one video's player for another site's page): watch only, the newest version, never a password. */
+  embed: boolean;
 }
 
 /** What is wrong with the password in its field, if anything: it goes with the link only once it is long enough. */
 export function passwordProblem(d: Draft): string | null {
-  if (d.passwordAction !== 'set') return null;
+  if (d.passwordAction !== 'set' || d.embed) return null;
   if (!d.password) return t('Type a password, or turn it off');
   return d.password.length < 4 ? t('At least 4 characters') : null;
 }

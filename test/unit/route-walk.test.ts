@@ -174,8 +174,8 @@ function variants(pattern: string): string[] {
 
 const isPublic = (p: string) =>
   ctx.extension.routes.some((r) => r.public && r.path === p) ||
-  /^\/(api\/g|media\/g|data\/g|oauth|\.well-known)(\/|$)/.test(p) ||
-  /^\/(healthz|readyz|robots\.txt|mcp)$/.test(p) ||
+  /^\/(api\/g|media\/g|data\/g|e|oauth|\.well-known)(\/|$)/.test(p) ||
+  /^\/(healthz|readyz|robots\.txt|mcp|oembed)$/.test(p) ||
   /^\/api\/(auth\/(status|setup|login|token|logout|invite\/peek|invite\/accept|signup|verify|verify\/resend|forgot|reset|reset\/peek)|info|uploads\/direct\/:ticket)$/.test(
     p,
   );

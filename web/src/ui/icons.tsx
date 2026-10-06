@@ -12,6 +12,7 @@ import {
   Bell,
   Blend,
   BookOpenText,
+  Captions,
   ChartColumn,
   Check,
   CheckCheck,
@@ -61,11 +62,13 @@ import {
   LogOut,
   type LucideIcon,
   Mail,
+  Maximize,
   Maximize2,
   Menu,
   MessageCircle,
   MessageSquareText,
   Mic,
+  Minimize,
   Minus,
   Monitor,
   Moon,
@@ -134,6 +137,10 @@ const P = {
   loop: { icon: Repeat },
   volume: { icon: Volume2 },
   mute: { icon: VolumeX },
+  // an Embed link's player (web/src/embed/): the whole screen, and what is said as captions
+  fullscreen: { icon: Maximize },
+  fullscreenExit: { icon: Minimize },
+  captions: { icon: Captions },
   // player tools and views
   phone: { icon: Smartphone },
   layers: { icon: Layers },
@@ -222,6 +229,8 @@ const P = {
   command: { icon: Terminal },
   // agents to connect (Settings → Connect an agent): an editor, a chat app, anything else that speaks MCP
   editor: { icon: Code },
+  // an Embed link: code for another site's page
+  embed: { icon: Code },
   chat: { icon: MessageCircle },
   plug: { icon: Plug },
   // the agent's mark (Claude sessions, agent notes, "Ask Claude")

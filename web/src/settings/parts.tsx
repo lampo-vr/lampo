@@ -73,7 +73,20 @@ const words = (s: string) =>
  * together and starts a line of its own when the line is full; `lines` (a JSON or TOML config) keeps its lines as they
  * are. Whatever doesn't fit scrolls sideways with a soft edge. Copy takes the text as it is.
  */
-export function Code({ label, children, testid, lines }: { label?: string; children: string; testid?: string; lines?: boolean }) {
+export function Code({
+  label,
+  children,
+  testid,
+  lines,
+  copy: copies = true,
+}: {
+  label?: string;
+  children: string;
+  testid?: string;
+  lines?: boolean;
+  /** false: no Copy of its own (what it sits in copies it: an embed's line). */
+  copy?: boolean;
+}) {
   const [done, setDone] = useState(false);
   const [edgeRef, edges] = useScrollEdges<HTMLPreElement>();
   const copy = async () => {
@@ -85,9 +98,11 @@ export function Code({ label, children, testid, lines }: { label?: string; child
   return (
     <div className={`set-code ${label ? '' : 'bare'} ${lines ? 'lines' : ''}`} data-testid={testid}>
       {label && <div className="set-code-label">{label}</div>}
-      <button type="button" className="btn sm ghost set-copy" onClick={copy} aria-label={label ? t('Copy {label}', { label }) : t('Copy snippet')}>
-        <I name={done ? 'check' : 'copy'} size={14} /> {done ? t('Copied') : t('Copy')}
-      </button>
+      {copies && (
+        <button type="button" className="btn sm ghost set-copy" onClick={copy} aria-label={label ? t('Copy {label}', { label }) : t('Copy snippet')}>
+          <I name={done ? 'check' : 'copy'} size={14} /> {done ? t('Copied') : t('Copy')}
+        </button>
+      )}
       <pre ref={edgeRef} className={`mono ${edges}`}>
         {words(command)}
         {args.map((a) => (

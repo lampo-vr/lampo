@@ -115,6 +115,14 @@ env.addEventListener?.('storage', (e) => {
   if (e.key === LANG_KEY) loadLang(pickLang(e.newValue)).catch(() => {});
 });
 
+/**
+ * A page that shows only visitors' words (an Embed link's player, web/src/embed/): `l` with the visitor pages' German
+ * alone (de.client.ts), not the app's whole dictionary. Its keys are `client::` ones.
+ */
+export async function loadClientLang(l: Lang): Promise<void> {
+  use(l, l === 'de' ? (await import('./de.client.ts')).client : null);
+}
+
 /** For tests: use these words directly. */
 export function setDictionary(l: Lang, w: Readonly<Record<string, string>> | null): void {
   use(l, w);

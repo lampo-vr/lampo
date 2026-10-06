@@ -1,0 +1,422 @@
+/* An Embed link's player (web/src/embed/): the picture fills the frame another site gave it, the bar floats over its
+   foot and steps aside while the film plays. Dark in every theme and on every page it is put on: a player is a dark
+   island like the app's stage, and what is around it is the site's. The app's own controls (.playbtn, .btn) in the
+   app's tokens; the one orange is the Lampo mark's window. */
+
+.em-body {
+  background: var(--ink-0);
+}
+.em {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--ink-0);
+  color: var(--fg);
+  container: em / size;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.em[data-idle] {
+  cursor: none;
+}
+.em-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  background: var(--ink-0);
+}
+/* the picture's own press target: under the bar, over the video (which shows no controls of its own) */
+.em-surface {
+  position: absolute;
+  inset: 0;
+}
+
+/* ---------------------------------------------------------------- before the first play */
+.em-big.playbtn {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--h-xl);
+  height: var(--h-xl);
+  margin: 0;
+  transform: translate(-50%, -50%);
+  box-shadow:
+    0 0 0 6px color-mix(in srgb, var(--fg) 10%, transparent),
+    var(--shadow-float);
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    background var(--dur-fast);
+}
+.em-big.playbtn:hover {
+  transform: translate(-50%, -50%) scale(1.04);
+}
+.em-big.playbtn:active {
+  transform: translate(-50%, -50%) scale(0.96);
+}
+
+/* ---------------------------------------------------------------- the bar */
+.em-shade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(var(--h-xl) * 2);
+  background: linear-gradient(to top, color-mix(in srgb, var(--ink-0) 82%, transparent), color-mix(in srgb, var(--ink-0) 40%, transparent) 55%, transparent);
+  pointer-events: none;
+  transition: opacity var(--dur-slow) var(--ease-out);
+}
+.em-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-0_5);
+  padding: 0 var(--sp-3) var(--sp-2);
+  transition:
+    opacity var(--dur-slow) var(--ease-out),
+    transform var(--dur-slow) var(--ease-out);
+}
+.em[data-bar='hidden'] .em-bar {
+  opacity: 0;
+  transform: translateY(var(--sp-1));
+  pointer-events: none;
+}
+.em[data-bar='hidden'] .em-shade {
+  opacity: 0;
+}
+.em-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  height: var(--h);
+}
+/* the controls on the picture: ivory glyphs, a quiet light under the pointer (the app's ghost fill would be a grey box) */
+.em-btn.btn.ghost {
+  position: relative;
+  color: var(--fg);
+}
+.em-btn.btn.ghost:hover,
+.em-btn.btn.ghost.em-on {
+  background: color-mix(in srgb, var(--fg) 14%, transparent);
+  color: var(--fg-hi);
+}
+.em-btn.em-on::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: var(--sp-0_5);
+  width: var(--sp-3);
+  height: 2px;
+  border-radius: var(--r-full);
+  background: var(--fg);
+  transform: translateX(-50%);
+}
+/* the app's play button, sized to the bar: an ivory disc whether it plays or not (on a picture, the dark "playing"
+   disc of the dock would sink into it) */
+.em-play.playbtn,
+.em-play.playbtn.playing {
+  width: var(--h);
+  height: var(--h);
+  margin: 0 var(--sp-1) 0 0;
+  background: var(--fg);
+  color: var(--on-fg);
+  box-shadow: none;
+}
+.em-play.playbtn:hover {
+  background: var(--fg-hi);
+}
+
+/* the timecode as the app shows it, the last frame's beside it, the chapter it is in */
+.em-clock {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  flex: 1;
+  min-width: 0;
+  padding: 0 var(--sp-2);
+}
+.em-time {
+  flex: none;
+  font: var(--fw-text) var(--fs-md) / var(--lh-tight) var(--mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--track-title);
+  white-space: nowrap;
+  color: var(--fg);
+}
+.em-total {
+  color: var(--muted);
+}
+.em-rate {
+  flex: none;
+  font: var(--fw-ui) var(--fs-xs) / var(--lh-tight) var(--mono);
+  color: var(--fg-2);
+}
+.em-chapter {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--fw-ui) var(--fs-sm) / var(--lh-tight) var(--ui);
+  color: var(--fg-2);
+}
+.em-chapter::before {
+  content: '·';
+  margin-right: var(--sp-2);
+  color: var(--muted);
+}
+
+/* the Lampo mark: where the player comes from, quiet until pointed at */
+.em-mark {
+  display: grid;
+  place-items: center;
+  width: var(--h);
+  height: var(--h);
+  margin-left: var(--sp-1);
+  border-radius: var(--r);
+  /* the frame o quieter than the controls, its window the brand's orange at full strength */
+  color: var(--fg-2);
+  transition: color var(--dur-fast);
+}
+.em-mark:hover,
+.em-mark:focus-visible {
+  color: var(--fg-hi);
+}
+.em-corner {
+  position: absolute;
+  right: var(--sp-2);
+  bottom: var(--sp-2);
+}
+
+/* ---------------------------------------------------------------- the timeline */
+.em-scrub {
+  position: relative;
+  height: var(--sp-4);
+  margin: 0 var(--sp-1);
+  cursor: pointer;
+  touch-action: none;
+  outline-offset: var(--sp-0_5);
+  border-radius: var(--r-sm);
+}
+.em-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 3px;
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--fg) 22%, transparent);
+  overflow: hidden;
+  transform: translateY(-50%);
+  transition: height var(--dur-fast) var(--ease-out);
+}
+.em-scrub[data-active] .em-track {
+  height: 5px;
+}
+.em-loaded,
+.em-played {
+  position: absolute;
+  inset: 0 auto 0 0;
+}
+.em-loaded {
+  width: calc(var(--loaded) * 100%);
+  background: color-mix(in srgb, var(--fg) 22%, transparent);
+}
+.em-played {
+  width: calc(var(--at) * 100%);
+  background: var(--fg);
+}
+/* the playhead: a short upright bar, the timeline's own */
+.em-head {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--at) * 100%);
+  width: 3px;
+  height: 11px;
+  border-radius: var(--r-full);
+  background: var(--fg-hi);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink-0) 45%, transparent);
+  transform: translate(-50%, -50%);
+  transition: height var(--dur-fast) var(--ease-out);
+}
+.em-scrub[data-active] .em-head {
+  height: 15px;
+}
+/* a chapter: the keyframe glyph (base.css --kg-diamond) on the track, set off it by a ring of the picture's dark */
+.em-ch {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--x) * 100%);
+  width: 13px;
+  height: 13px;
+  background: var(--ink-0);
+  -webkit-mask: var(--kg-diamond) center / contain no-repeat;
+  mask: var(--kg-diamond) center / contain no-repeat;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.em-ch::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  background: var(--fg-2);
+  -webkit-mask: var(--kg-diamond) center / contain no-repeat;
+  mask: var(--kg-diamond) center / contain no-repeat;
+}
+.em-ch[data-passed]::after {
+  background: var(--fg-hi);
+}
+/* what is under the pointer: its frame (the hover frames), its timecode, its chapter — in the tooltips' material */
+.em-peek {
+  position: absolute;
+  bottom: calc(100% + var(--sp-2));
+  display: grid;
+  gap: var(--sp-1);
+  padding: var(--sp-1);
+  border-radius: var(--r);
+  background: var(--tip-bg);
+  color: var(--tip-fg);
+  box-shadow:
+    0 0 0 1px var(--tip-edge),
+    var(--shadow-float);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.em-peek-frame {
+  width: 100%;
+  max-height: 100px;
+  border-radius: var(--r-sm);
+  background-color: var(--ink-0);
+  background-repeat: no-repeat;
+}
+.em-peek-tc {
+  text-align: center;
+  font: var(--fw-ui) var(--fs-xs) / var(--lh-tight) var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+.em-peek-ch {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+  font: var(--fw-ui) var(--fs-xs) / var(--lh-tight) var(--ui);
+  color: var(--tip-fg-2);
+  padding: 0 var(--sp-1) var(--sp-0_5);
+}
+
+/* ---------------------------------------------------------------- captions */
+.em-cue {
+  position: absolute;
+  left: 50%;
+  bottom: var(--sp-4);
+  max-width: 86%;
+  padding: var(--sp-0_5) var(--sp-2);
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--ink-0) 78%, transparent);
+  color: var(--fg-hi);
+  font: var(--fw-ui) var(--fs-md) / var(--lh-ui) var(--ui);
+  text-align: center;
+  white-space: pre-line;
+  transform: translateX(-50%);
+  pointer-events: none;
+  transition: bottom var(--dur-slow) var(--ease-out);
+}
+.em[data-bar='shown'] .em-cue {
+  bottom: calc(var(--h) + var(--sp-4) + var(--sp-6));
+}
+
+/* ---------------------------------------------------------------- the tooltips (EmbedTips.tsx) */
+.em-tip {
+  position: absolute;
+  z-index: var(--z-float);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r-sm);
+  background: var(--tip-bg);
+  color: var(--tip-fg);
+  box-shadow: 0 0 0 1px var(--tip-edge);
+  font: var(--fw-ui) var(--fs-xs) / var(--lh-ui) var(--ui);
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - var(--sp-2)));
+}
+.em-tip-key {
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-sm);
+  border: 1px solid color-mix(in srgb, var(--tip-fg) 18%, transparent);
+  color: var(--tip-fg-2);
+  font: var(--fw-ui) var(--fs-xs) / var(--lh-ui) var(--keys);
+}
+
+/* ---------------------------------------------------------------- the frame without a film */
+.em-wait,
+.em-gone {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: var(--sp-2);
+  padding: var(--sp-4);
+  color: var(--muted);
+  font: var(--fw-ui) var(--fs-md) / var(--lh-ui) var(--ui);
+  text-align: center;
+}
+.em-wait {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--ink-0) 55%, transparent);
+  color: var(--fg-2);
+}
+
+/* ---------------------------------------------------------------- the frame's size */
+/* a small frame (a phone's page, a wall of films): the frame steps go (← → stay), then the chapter's name, then the
+   last frame's timecode */
+@container em (max-width: 479px) {
+  .em-step,
+  .em-chapter {
+    display: none;
+  }
+  .em-bar {
+    padding: 0 var(--sp-2) var(--sp-1);
+  }
+}
+@container em (max-width: 419px) {
+  .em-total,
+  .em-rate {
+    display: none;
+  }
+}
+@container em (min-width: 720px) {
+  .em-cue {
+    font-size: var(--fs-lg);
+  }
+}
+@container em (min-width: 1100px) {
+  .em-cue {
+    font-size: var(--fs-xl);
+  }
+  .em-bar {
+    padding: 0 var(--sp-4) var(--sp-3);
+  }
+}
+/* a finger: every control 44 px to hit, the boxes unchanged */
+@media (pointer: coarse) {
+  .em-btn::after,
+  .em-play::after,
+  .em-mark::after {
+    content: '';
+    position: absolute;
+    inset: calc((var(--h-touch) - var(--h)) / -2);
+  }
+  .em-play.playbtn,
+  .em-mark {
+    position: relative;
+  }
+}

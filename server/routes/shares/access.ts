@@ -3,10 +3,12 @@
 // ids it gave them), shows only the versions it allows, and lets visitors comment or approve only when it says so.
 import type { Request } from 'express';
 import { addressKey, type RateLimit, type Recent } from '../../../lib/rateLimit.ts';
+import { currentWorkspace } from '../../../lib/scope.ts';
 import { covers, isExpired, isUnlocked, resolveShare, settingsOf, sharerName, slugOfGuestId, visibleVerdicts } from '../../../lib/shares.ts';
 import { verdictOn } from '../../../lib/stage.ts';
 import * as store from '../../../lib/store.ts';
 import type { Approval, GuestPerms, Review, ShareWithToken, Version } from '../../../lib/types.ts';
+import { badgeHidden, roleIn } from '../../../lib/workspaces.ts';
 import { tunnelVisitor } from '../../auth.ts';
 import type { ServerContext } from '../../context.ts';
 import { fail } from '../../http.ts';
@@ -53,6 +55,39 @@ export function open(req: Request<{ token: string }>): ShareWithToken {
   const share = link(req);
   if (!isUnlocked(share, req.headers.cookie)) throw fail(401, 'This review link needs a password.');
   return share;
+}
+
+/**
+ * An Embed link (lib/shares.ts `embed`), as its player and oEmbed reach it: 404 for any other link — a review link's
+ * token opens no player on someone else's site — and for one with a password (never made so: nobody in a frame could
+ * type it), 410 once it expired. Cookies never count here: the player in its frame has none.
+ */
+export function embedOf(token: unknown): ShareWithToken {
+  const share = resolveShare(token);
+  if (!share?.embed || share.password || share.folder) throw fail(404, 'This video isn’t available.');
+  if (isExpired(share)) throw fail(410, 'This video isn’t available any more.');
+  return share;
+}
+
+/**
+ * "Powered by Lampo" (the guest pages' foot, the embed's mark) unless the link's workspace hid it on a plan that may
+ * (A13 CLOUD-7): the billing provider is asked only when its admins did, so a link of a workspace that never touched it
+ * costs nothing more. A visitor's page never fails on billing: whatever goes wrong there shows the badge.
+ */
+export async function badgeShown(ctx: ServerContext): Promise<boolean> {
+  const ws = currentWorkspace();
+  if (!badgeHidden(ws)) return true;
+  return !(await ctx.extension.badgeOptional(ws).catch(() => false));
+}
+
+/**
+ * The team opening its own link to check it is not the client: a signed-in member of the link's workspace, or the owner
+ * at the machine the app runs on. Such visits aren't counted, so "opened" in the stats and the stage means a visitor
+ * (someone signed in to another workspace is a visitor here like anyone).
+ */
+export function isTeam(ctx: ServerContext, req: Request): boolean {
+  const a = ctx.identify(req);
+  return !!a && (!a.user || !!roleIn(currentWorkspace(), a.user.id));
 }
 
 /** Writes come from the guest page itself: a foreign page can't post notes in a visitor's name. */

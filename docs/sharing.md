@@ -22,6 +22,7 @@ What they do arrives like any other feedback: in your inbox, on the timeline, wi
    | *Review* (the default) | watch the newest version, leave notes, approve or request changes |
    | *Watch only* | watch the newest version, nothing else |
    | *Delivery* | watch the newest version and download the original file |
+   | *Embed* (one video) | watch the newest version in a player on your own site: you get the code to paste ([below](#embedding-a-video)) |
 
    Under the kinds, every setting is a row with its name and its switch (the kinds set them); any of them
    changes the link ([below](#what-a-link-allows)).
@@ -205,6 +206,51 @@ pages stay. A plan that lapses shows the badge again by itself.
 
 ![A folder link’s review room: “Alex shared 3 videos with you”, 1 of 3 reviewed, Download all with its size, and the videos with where they stand](assets/review-room.webp)
 
+## Embedding a video
+
+An *Embed* link puts one video on your own site — a page's hero film, a wall of work — in Lampo's own frame-exact
+player, the way a site embeds a YouTube video. Pick *Embed* in a video's share dialog, name the link ("Website hero")
+and *Create link*: the code is copied, and the link's line opens with it in view. *Copy* on that line copies it again;
+its ⋯ menu has *Copy the player’s address* for a site that embeds from an address (below).
+
+```html
+<iframe src="https://app.example.com/e/1rT9cQ…"
+  title="launch-film.mp4"
+  style="display:block;width:100%;aspect-ratio:16/9;border:0"
+  allow="autoplay; fullscreen; picture-in-picture" allowfullscreen
+  loading="lazy"></iframe>
+```
+
+The frame is as wide as the place you paste it and keeps the video's shape (its `aspect-ratio`). The player plays the
+newest version: play and pause, the timecode with frames as the app shows it, a frame back and on, sound, full screen,
+and on its timeline the video's chapters and, when the version has been heard, captions. Keys as in the app's player:
+Space or K plays and pauses, J K L play backwards, stop and forwards (L again: faster), ← → step a frame (⇧ ten), M
+mutes, F goes full screen, C turns captions on. A small Lampo mark sits at the bar's end; where a workspace hides the
+badge ([For the visitor](#for-the-visitor)), the player hides it too.
+
+- **Chapters** are the render's own chapter markers, as Premiere, Resolve or Final Cut export them: a keyframe glyph
+  on the timeline for each, its name in the bar while it plays and under the pointer. A render without markers has
+  none.
+- **Captions** are what the version's transcript heard (the player draws them above its bar). The player never starts
+  hearing a version: one that hasn't been heard has no captions button.
+- **Options** go in the player's address: `?autoplay=1` starts it by itself, muted (browsers only let a silent video
+  start on its own), `loop=1` plays it on a loop, `controls=0` shows the picture alone (a page's background film: a
+  click or Space still pauses it), `lang=de` speaks German. A hero film:
+  `https://app.example.com/e/1rT9cQ…?autoplay=1&loop=1&controls=0`.
+- **It shows the video and nothing else**: no notes, no names, no other versions, no downloads. Its title is the
+  video's file name, as a *Watch only* visitor reads it.
+- **Revoking** the link stops every page it is on at once (the frame then says "This video isn't available"), and so
+  does its expiry. An embed has no password: it plays for anyone who sees the page it is on.
+- **What it records** is what a *Watch only* link records ([What a link records](#what-a-link-records)), counted when
+  someone plays it, not when the page around it loads. The player sets no cookie and keeps nothing in the browser. An
+  embed never makes a video *Out for review*: it asks nobody for a decision.
+- **It is dark on every page**, like any player: the page around it keeps its own colours.
+
+**oEmbed.** Sites and tools that embed from an address (WordPress, Notion and others) find the player through
+[oEmbed](https://oembed.com): both the player's address and the link's watch page name it in their head, and
+`GET /oembed?url=<address>&format=json` answers with the player's `<iframe>`, its size (scaled down to `maxwidth` and
+`maxheight` when given), the video's title and its poster. Any other link, address or format is a 404 (501 for XML).
+
 ## Downloads
 
 A link's *Downloads* setting decides what visitors can take home:
@@ -246,6 +292,8 @@ files home).
   the minute and by the day ([below](#details)).
 - Through the local tunnel only review links answer. On a hosted server they are the only thing reachable without
   signing in.
+- **Only an embed's player may sit in another site's frame.** `/e/<token>` answers with `frame-ancestors *` and no
+  `X-Frame-Options`; every other page and answer of the app, review pages included, refuses to be framed.
 
 ## Webhooks
 

@@ -13,8 +13,8 @@ import { fail } from './http.ts';
 /** A review link's data (not its page: that loads, asks /api/g/<token> and shows the link as ended). */
 const GUEST_DATA = /^\/(?:api|media|data)\/g\//;
 
-/** The review link a guest path names: /g/<token>, /api/g/<token>/…, /media/g/<token>/…, /data/g/<token>/…. */
-const GUEST_TOKEN = /^\/(?:api\/|media\/|data\/)?g\/([^/]+)/;
+/** The review link a guest path names: /g/<token>, /e/<token> (an embed), /api/g/<token>/…, /media/g/<token>/…, /data/g/<token>/…. */
+const GUEST_TOKEN = /^\/(?:(?:api\/|media\/|data\/)?g|e)\/([^/]+)/;
 
 /** What a session reads: kept by the browser per session (`Vary: Cookie`), never per URL alone (below). */
 const SESSION_CONTENT = /^\/(?:api|media|data)\//;

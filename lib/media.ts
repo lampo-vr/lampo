@@ -4,13 +4,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { FREEZE } from './findings.ts';
 import { cacheDir, projectDirOf } from './paths.ts';
-import { analysisRows, FFMPEG, lower, runBg, spawnMedia } from './probe.ts';
+import { analysisRows, FFMPEG, FFPROBE, lower, runBg, spawnMedia } from './probe.ts';
 import { renderKey } from './renderKey.ts';
 import { wsKey } from './scope.ts';
 import { colorFilter, seekTime } from './shots.ts';
 import { SPRITE_VERSION, spriteFrame, spriteLayout } from './sprite.ts';
-import { posterFrame } from './time.ts';
-import type { Analysis, FreezeRange, FreezeScan, Loudness, MediaMeta, ProjectTracks, Version, Waveform } from './types.ts';
+import { posterFrame, timeToFrame } from './time.ts';
+import type { Analysis, Chapter, FreezeRange, FreezeScan, Loudness, MediaMeta, ProjectTracks, Version, Waveform } from './types.ts';
 
 const cacheFile = (kind: string, hash: string, ext: string) => path.join(cacheDir(), kind, `${hash}${ext}`);
 
@@ -190,6 +190,47 @@ export async function waveform(src: MediaSource, ver: Pick<Version, 'hash' | 'sa
         rms[f] = b > a ? Math.round(Math.sqrt(sq / (b - a)) * 1000) / 1000 : 0;
       }
       return writeJson(out, { fps: ver.fps, peaks, rms, audio: true });
+    }),
+  );
+}
+
+/** The most chapters a render's markers give an embed's timeline, and the longest title kept of each. */
+export const CHAPTER_LIMITS = { count: 100, title: 80 } as const;
+
+/**
+ * The render's own chapter markers (what Premiere, Resolve or Final Cut write into an MP4 or MOV), as the frames they
+ * start on, first first: an embed's timeline shows them. A chapter's title is one line of plain text; one without a
+ * title, one past the render's end and a second one on the same frame are left out. None (the usual case): []. Read
+ * once per render (ffprobe reads the container's index, not the picture) and kept like the waveform.
+ */
+export async function chapters(src: MediaSource, ver: Pick<Version, 'hash' | 'sample' | 'fps' | 'frames'>): Promise<Chapter[]> {
+  const out = cacheFile('chapters', renderKey(ver), '.json');
+  const hit = readJson<Chapter[]>(out);
+  if (Array.isArray(hit)) return hit;
+  return once(out, () =>
+    slot(async () => {
+      const file = await fileOf(src);
+      let found: { start_time?: string; tags?: { title?: unknown } }[] = [];
+      try {
+        const { stdout } = await runBg(FFPROBE, ['-v', 'error', '-show_chapters', '-of', 'json', file]);
+        found = (JSON.parse(stdout.toString()) as { chapters?: typeof found }).chapters ?? [];
+      } catch {
+        // a render ffprobe can't read the chapters of has none to show
+      }
+      const list: Chapter[] = [];
+      for (const c of found) {
+        const title = String(c.tags?.title ?? '')
+          .replace(/[\p{Cc}\p{Cf}\s]+/gu, ' ')
+          .trim();
+        const frame = timeToFrame(Number(c.start_time), ver.fps);
+        if (!title || !Number.isFinite(frame) || frame < 0 || frame >= ver.frames || list.some((x) => x.frame === frame)) continue;
+        list.push({ frame, title: Array.from(title).slice(0, CHAPTER_LIMITS.title).join('') });
+        if (list.length >= CHAPTER_LIMITS.count) break;
+      }
+      return writeJson(
+        out,
+        list.sort((a, b) => a.frame - b.frame),
+      );
     }),
   );
 }

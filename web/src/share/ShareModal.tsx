@@ -17,6 +17,7 @@ import { RowsSkeleton, SkeletonRegion, SkLine } from '../ui/Skeleton.tsx';
 import { EmptyState } from '../ui/system.tsx';
 import { Tip } from '../ui/tip.tsx';
 import { type Access, type Draft, passwordProblem } from './draft.ts';
+import { embedCode, embedSrc } from './embedCode.ts';
 import { LinkCard, type Reach } from './LinkCard.tsx';
 import { LinkSettings } from './LinkSettings.tsx';
 import '../styles/share-links.css';
@@ -34,6 +35,7 @@ const fresh = (label = ''): Draft => ({
   expires: '',
   password: '',
   passwordAction: 'keep',
+  embed: false,
 });
 const draftOf = (s: ShareInfo): Draft => ({
   label: s.label,
@@ -44,6 +46,7 @@ const draftOf = (s: ShareInfo): Draft => ({
   expires: day(s.expires),
   password: '',
   passwordAction: 'keep',
+  embed: !!s.embed,
 });
 
 function inputOf(d: Draft, editing: boolean): ShareInput {
@@ -57,25 +60,38 @@ function inputOf(d: Draft, editing: boolean): ShareInput {
     download: d.download,
     // The end of the chosen day, in the owner's time zone.
     expires: d.expires ? new Date(`${d.expires}T23:59:59`).toISOString() : null,
+    embed: d.embed,
   };
+  // an embed never has a password: a link changed into one loses the one it had
+  if (d.embed) {
+    if (editing) out.password = null;
+    return out;
+  }
   if (!editing) out.password = d.passwordAction === 'set' && d.password ? d.password : undefined;
   else if (d.passwordAction === 'remove') out.password = null;
   else if (d.passwordAction === 'set' && d.password) out.password = d.password;
   return out;
 }
 
-// What a link is for, in one of three words: most links are one of these. Anything else reads as "custom".
-type PresetId = 'review' | 'watch' | 'handoff';
-type Kind = Pick<Draft, 'access' | 'notes' | 'versions' | 'download'>;
+// What a link is for, in one of four words: most links are one of these. Anything else reads as "custom". An embed is
+// a video's: a folder's dialog offers the first three.
+type PresetId = 'review' | 'watch' | 'handoff' | 'embed';
+type Kind = Pick<Draft, 'access' | 'notes' | 'versions' | 'download' | 'embed'>;
 const PRESETS: { id: PresetId; label: () => string; set: Kind }[] = [
-  { id: 'review', label: () => t('Review'), set: { access: 'review', notes: 'own', versions: 'latest', download: 'off' } },
-  { id: 'watch', label: () => t('Watch only'), set: { access: 'watch', notes: 'own', versions: 'latest', download: 'off' } },
-  { id: 'handoff', label: () => t('Delivery'), set: { access: 'watch', notes: 'own', versions: 'latest', download: 'original' } },
+  { id: 'review', label: () => t('Review'), set: { access: 'review', notes: 'own', versions: 'latest', download: 'off', embed: false } },
+  { id: 'watch', label: () => t('Watch only'), set: { access: 'watch', notes: 'own', versions: 'latest', download: 'off', embed: false } },
+  { id: 'handoff', label: () => t('Delivery'), set: { access: 'watch', notes: 'own', versions: 'latest', download: 'original', embed: false } },
+  { id: 'embed', label: () => t('Embed'), set: { access: 'watch', notes: 'own', versions: 'latest', download: 'off', embed: true } },
 ];
 // Which notes visitors see doesn't matter to someone who only watches.
 const presetOf = (d: Draft): PresetId | '' =>
   PRESETS.find(
-    (p) => p.set.access === d.access && p.set.versions === d.versions && p.set.download === d.download && (d.access === 'watch' || p.set.notes === d.notes),
+    (p) =>
+      p.set.embed === d.embed &&
+      p.set.access === d.access &&
+      p.set.versions === d.versions &&
+      p.set.download === d.download &&
+      (d.access === 'watch' || p.set.notes === d.notes),
   )?.id ?? '';
 
 export function ShareModal({
@@ -112,6 +128,8 @@ export function ShareModal({
   const passwordRef = useRef<HTMLInputElement>(null);
   const editPasswordRef = useRef<HTMLInputElement>(null);
   const [revoking, setRevoking] = useState<ShareInfo | null>(null);
+  // an embed just made: its line opens with its code in view
+  const [opened, setOpened] = useState<string | null>(null);
   // Phones and tablets: the system share sheet (Messages, WhatsApp, Mail…) next to Copy.
   const canShare = useTouch() && typeof navigator.share === 'function';
   useEffect(() => {
@@ -130,6 +148,8 @@ export function ShareModal({
   const reachKind: Reach = hosted || tunnel.url ? 'public' : d?.lan?.length ? 'lan' : 'local';
   const reach = reachKind === 'public' ? t('anyone with the link') : reachKind === 'lan' ? t('people on your network') : t('this computer only');
   const urlOf = (s: ShareInfo) => `${base}/g/${s.token}`;
+  /** What a new link puts on the clipboard: its address, or an embed's code for a site's page. */
+  const copyOf = (s: ShareInfo) => (s.embed ? embedCode({ src: embedSrc(urlOf(s)), title: s.name ?? s.label, width: s.width, height: s.height }) : urlOf(s));
   // The form clears the moment a link is sent, not when the round trip ends: that waits for the list's refetch too, and
   // by then the person may be typing the next link's name — a late reset wiped it. A failure puts the sent form back,
   // unless the next one has been started since.
@@ -155,8 +175,12 @@ export function ShareModal({
     try {
       const s = await act.create.mutateAsync(inputOf(sent.draft, false));
       // with a password: both on the clipboard, ready to send (it can't be shown again: the server keeps it scrambled)
-      const password = sent.draft.passwordAction === 'set' ? sent.draft.password : '';
-      if (await copyText(password ? `${urlOf(s)}\n${t('Password')}: ${password}` : urlOf(s)))
+      const password = sent.draft.passwordAction === 'set' && !sent.draft.embed ? sent.draft.password : '';
+      if (s.embed) {
+        // the code to paste into a site's page; its line opens with it in view
+        setOpened(s.token ?? null);
+        if (await copyText(copyOf(s))) toast(t('Embed code copied · reachable by {reach}', { reach }), 'ok');
+      } else if (await copyText(password ? `${urlOf(s)}\n${t('Password')}: ${password}` : urlOf(s)))
         toast(
           password ? t('Link and password copied · reachable by {reach}', { reach }) : t('Link created and copied · reachable by {reach}', { reach }),
           'ok',
@@ -217,15 +241,18 @@ export function ShareModal({
       : t('Share folder {folder}', { folder })
     : t('Share {name}', { name: name ?? '' });
   const empty = !!d && !d.shares.length;
+  // an embed plays one video on someone else's page: a folder's links are the first three kinds
+  const offered = here === 'video' ? PRESETS : PRESETS.filter((p) => p.id !== 'embed');
   const kinds = (of: Draft, change: (p: Partial<Draft>) => void) => (
     <Segmented
       label={t('Kind of link')}
       value={presetOf(of)}
       onChange={(v) => {
         const p = PRESETS.find((x) => x.id === v);
-        if (p) change(p.set);
+        // an embed has no password: one being set goes with the kind (an existing link's is removed on save)
+        if (p) change(p.set.embed ? { ...p.set, password: '', passwordAction: 'keep' } : p.set);
       }}
-      options={PRESETS.map((p) => ({ value: p.id, label: p.label() }))}
+      options={offered.map((p) => ({ value: p.id, label: p.label() }))}
     />
   );
 
@@ -368,6 +395,7 @@ export function ShareModal({
                     <LinkCard
                       key={s.token}
                       s={s}
+                      opened={opened === s.token}
                       url={urlOf(s)}
                       reach={reachKind}
                       here={here}

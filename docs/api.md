@@ -1024,7 +1024,9 @@ answers `429` with `Retry-After`. The events:
 ## Review links
 
 What they allow and why: [sharing.md](sharing.md). A link's settings are `{label, comment, approve, notes: own | all,
-versions: latest | all, download: off | preview | original, expires: ISO | null, password: string | null}`. By default
+versions: latest | all, download: off | preview | original, expires: ISO | null, password: string | null, embed?}`.
+`embed: true` makes an Embed link (one video's player for another site): watch only whatever else is sent, never on a
+folder and never with a password (`400` with the reason); `embed: false` makes it a review link again. By default
 a link takes notes and decisions, shows each visitor their own notes and only the newest version, has no downloads and
 no expiry, and is labelled "Review link". A label is 80 characters at most, a password at least 4. Visitors see a
 link's label only when it was given one (`label` is `""` in `/api/g/…` otherwise).
@@ -1055,7 +1057,7 @@ summed up from the link's records.
 |---|---|
 | `GET /api/g/:token` | `GuestLinkResponse`: what the link is and which videos it shows (below) |
 | `POST /api/g/:token/unlock` | `{password}`: sets the link's cookie; `403` if wrong, `429` with `Retry-After` when guessing |
-| `POST /api/g/:token/visit` | `{name?, visitor?}`: counts a visit (below) |
+| `POST /api/g/:token/visit` | `{name?, visitor?, slug?, v?}`: counts a visit (below); with a video of the link (an embed's first play), its view too |
 | `POST /api/g/:token/progress` | `{visitor, slug, v, seen, plays?, secs, name?}`: which hundredths of version `v` played, how often and for how long → `204` |
 | `GET /api/g/:token/review/:id?v=` | `GuestReviewResponse`: one video, its versions (if allowed; each with its frame size, `width` and `height`), download URLs, the visible notes with `frameHere` for the version shown |
 | `GET /api/g/:token/review/:id/compare?v=` | links that show every version: another version to play beside the one on screen (`GuestCompareResponse`: `v`, `fps`, `frames`, `width`, `height`, `media`, `preparing?`, `busy?`), without notes, decisions or downloads, and not counted as a view; `403` on a link that shows only the newest version, `400` without `v` |
@@ -1070,6 +1072,9 @@ summed up from the link's records.
 | `POST /api/g/:token/comments/:id/replies` | `{name, text}` on a note the link shows |
 | `POST /api/g/:token/comments/:id/check` | `{name, verdict: confirm \| reopen, text?}` on a note marked fixed |
 | `POST /api/g/:token/approval` | the client's decision (below) → `{approval}` |
+| `GET /api/g/:token/embed` | Embed links: what the player at `/e/<token>` plays (`EmbedResponse`: `title`, `slug`, `v`, `fps`, `frames`, `width`, `height`, `duration`, `media`, `preparing?`, `busy?`, `poster`, `sprite`, `chapters` `[{frame, title}]`, `captions` URL or `null`, `captions_lang?`, `badge`); `404` for any other link, `410` expired |
+| `GET /api/g/:token/captions/:id?v=` | Embed links: the transcript's lines as WebVTT; `404` when the version wasn't heard |
+| `GET /oembed?url=&format=json&maxwidth=&maxheight=` | oEmbed for an Embed link's `/e/<token>` or `/g/<token>` address on this server: `{version, type: video, title, html, width, height, thumbnail_url, thumbnail_width, thumbnail_height, provider_name?, provider_url?}`; `404` for anything else, `501` for another format; any origin may ask |
 
 Details:
 

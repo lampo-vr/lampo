@@ -1,4 +1,5 @@
 // The HTTP app without the process around it (listening, watchers, UI build), so tests can boot it on any port.
+import fs from 'node:fs';
 import path from 'node:path';
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
 import { ROLES } from '../lib/auth.ts';
@@ -40,6 +41,7 @@ import { refRoutes } from './routes/refs.ts';
 import { reviewRoutes } from './routes/review.ts';
 import { serverHealthRoutes } from './routes/serverHealth.ts';
 import { sessionRoutes } from './routes/sessions.ts';
+import { discoveryTag } from './routes/shares/embed.ts';
 import { shareRoutes } from './routes/shares.ts';
 import { statusRoutes } from './routes/status.ts';
 import { systemRoutes } from './routes/system.ts';
@@ -124,6 +126,8 @@ export function createApp(ctx: ServerContext, { ui }: AppOptions = {}): Express 
   });
   // The machine's tunnel: review links tell its visitors apart by Cloudflare's header (ipOf, server/routes/shares).
   app.locals.tunnel = ctx.capabilities.tunnel;
+  // An Embed link's pages carry their oEmbed discovery tag (staticUi below; server/routes/shares/embed.ts).
+  app.locals.discovery = ((req, token, kind) => discoveryTag(ctx, req, token, kind)) satisfies Discovery;
   // One guard for a hosted server and the person's own machine; the machine adds its host names and the LAN link.
   app.use(
     createGuard({
@@ -259,6 +263,38 @@ function mountExtension(app: Express, ctx: ServerContext): void {
   }
 }
 
+/** An Embed link's oEmbed discovery tag for its page (`e`) or its watch page (`g`); '' for any other link. */
+type Discovery = (req: Request, token: string, kind: 'e' | 'g') => string;
+
+/**
+ * A page of the build (`file`, read anew: a few KB), with an Embed link's oEmbed discovery tag in its head when `token`
+ * names one, else as built (pre-compressed when the browser takes it). `no-transform`: a CDN in front must not inject
+ * scripts into it or rewrite it (its one inline script is pinned by the CSP's hash; Rocket Loader, email obfuscation and
+ * the like would break the page or be refused).
+ */
+function sendPage(req: Request, res: Response, file: string, link?: { token: string; kind: 'e' | 'g' }): void {
+  const headers = { 'Cache-Control': 'no-cache, no-transform' };
+  const discovery = req.app.locals.discovery as Discovery | undefined;
+  const tag = link && discovery ? discovery(req, link.token, link.kind) : '';
+  if (tag) {
+    let html: string;
+    try {
+      html = fs.readFileSync(file, 'utf8');
+    } catch {
+      res.status(404).json({ error: 'not found' });
+      return;
+    }
+    res
+      .set(headers)
+      .type('html')
+      .send(html.replace('</head>', `    ${tag}\n  </head>`));
+    return;
+  }
+  if (sendPrecompressed(req, res, file, headers)) return;
+  res.set(headers);
+  sendInternal(res, file);
+}
+
 /** Built UI from web/dist with a fallback to index.html for client-side routes. */
 export function staticUi(dist = path.join(ROOT, 'web', 'dist')) {
   return (app: Express): void => {
@@ -284,12 +320,18 @@ export function staticUi(dist = path.join(ROOT, 'web', 'dist')) {
     // Machine endpoints never fall back to the page, however they are spelled: a client probing /.well-known, /oauth
     // or /API must get a clean 404. The page itself is revalidated every time (it names the current build's files).
     const index = path.join(dist, 'index.html');
-    // `no-transform`: a CDN in front must not inject scripts into it or rewrite it (its one inline script is pinned by
-    // the CSP's hash; Rocket Loader, email obfuscation and the like would break the page or be refused).
+    // An Embed link's player: a page of its own (web/embed.html), the one other sites may frame (server/guard.ts). Any
+    // token gets it: the player asks for the link and says when it isn't one (or isn't any more) inside the frame.
+    const embed = path.join(dist, 'embed.html');
+    app.get('/e/:token', (req, res) => {
+      if (!fs.existsSync(embed)) res.status(404).json({ error: 'not found' });
+      else sendPage(req, res, embed, { token: req.params.token, kind: 'e' });
+    });
+    // a review link's page names its token: an Embed link's watch page carries the discovery tag too
+    const watchPage = /^\/g\/([A-Za-z0-9_-]+)$/;
     app.get(/^\/(?!api(?:\/|$)|media(?:\/|$)|data(?:\/|$)|mcp(?:\/|$)|oauth(?:\/|$)|\.well-known(?:\/|$)).*/i, (req, res) => {
-      if (sendPrecompressed(req, res, index, { 'Cache-Control': 'no-cache, no-transform' })) return;
-      res.setHeader('Cache-Control', 'no-cache, no-transform');
-      sendInternal(res, index);
+      const token = watchPage.exec(req.path)?.[1];
+      sendPage(req, res, index, token ? { token, kind: 'g' } : undefined);
     });
   };
 }
