@@ -389,6 +389,8 @@ try {
   });
 
   await check('J K L, Space, M and F as in the player; chapters as keyframe glyphs that name and start their part', async () => {
+    // the chapters are read when the version arrives, in the background (never when a visitor asks): wait for that
+    await until(async () => (await api(`/api/g/${stepsLink.token}/embed`)).chapters?.length === 3, 'the chapters, read when the video arrived');
     const p = await fresh();
     await p.goto(site('keys', embedSnippet(stepsLink.token, 'Steps')), { waitUntil: 'domcontentloaded' });
     const frame = await player(p);

@@ -362,7 +362,9 @@ export function createBackground(broadcast: Broadcast, playback: Playback, { pro
     if (ver.part || cachedChapters(ver)) return;
     const file = store.versionFile(review, ver.v);
     if (!file) return;
-    heavy(() => chapters(file, ver), PRIORITY.poster, { key: jobKey('chapters', ver) }).catch(() => {});
+    // a moment's read of the container that a player shows (the embed asks before it plays): ahead of the encodes
+    // queued with it, like a scrub copy, so a page that embeds a version just uploaded has them
+    heavy(() => chapters(file, ver), PRIORITY.scrub, { key: jobKey('chapters', ver) }).catch(() => {});
   }
 
   function warm(review: Review): void {
