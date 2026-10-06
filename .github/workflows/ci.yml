@@ -43,7 +43,7 @@ jobs:
           persist-credentials: false
       - name: Temp files and caches in the runner's work dir
         run: scripts/ci-runner.sh env
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -73,7 +73,7 @@ jobs:
           persist-credentials: false
       - name: Temp files and caches in the runner's work dir
         run: scripts/ci-runner.sh env
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
           cache: npm
@@ -128,7 +128,7 @@ jobs:
           persist-credentials: false
       - name: Temp files and caches in the runner's work dir
         run: scripts/ci-runner.sh env
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
