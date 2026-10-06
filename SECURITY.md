@@ -6,10 +6,6 @@ Please **don't open a public issue** for a security problem. Report it privately
 repository's **Security** tab → **Report a vulnerability**. Only the maintainers see the report. If you can't use
 GitHub, write to **security@lampo.video**.
 
-<!-- Maintainers, before publishing: enable "Private vulnerability reporting" in the repository settings (the link
-above depends on it). -->
-
-
 Please include:
 - what an attacker can do, and in which mode (local, LAN, review link, server mode);
 - the version or commit, and your configuration (storage adapter, reverse proxy);
