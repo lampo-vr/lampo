@@ -78,6 +78,8 @@ const SECONDS = {
   // a folder's zip, then one version from the player's and a card's ⋯, the menus at 1440 and 390 in both themes
   download: 14,
   status: 12,
+  // archived projects: archive with Undo, the lists, the Archived page, the banner, ⌘K, restore, 390–1440 both themes
+  archive: 18,
   moving: 10,
   wake: 9,
   phone: 8,

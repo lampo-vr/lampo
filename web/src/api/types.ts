@@ -317,6 +317,8 @@ export interface VideoSummary {
   mtime: string | null;
   missing: boolean;
   archived: boolean | null;
+  /** Its project is archived (lib/archived.ts): since when. Read-only until restored; absent while it isn't. */
+  project_archived?: string;
   added: string;
   updated?: string;
   lastComment: string;
@@ -324,9 +326,18 @@ export interface VideoSummary {
   sample?: true;
 }
 
+/** An archived project: when, and by whom (a name). */
+export interface ArchivedProjectInfo {
+  at: string;
+  by?: string;
+}
+
 export interface LibraryResponse {
   videos: VideoSummary[];
+  /** Every folder, archived projects' included (`archived_projects` says which are). */
   folders: string[];
+  /** The archived projects by name; absent while none is. */
+  archived_projects?: Record<string, ArchivedProjectInfo>;
 }
 
 export interface ReviewResponse {

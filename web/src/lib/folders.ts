@@ -2,7 +2,8 @@ import { t } from '../i18n/index.ts'; // Folder paths ("Acme/Reels/Q3") and the 
 // the library model, which the unit tests run in Node.
 
 export type LibraryView =
-  | { kind: 'all' | 'inbox' | 'unsorted' | 'insights' }
+  /** `archived`: the archived projects (lib/archived.ts), put away from the other views. */
+  | { kind: 'all' | 'inbox' | 'unsorted' | 'insights' | 'archived' }
   | { kind: 'folder'; id: string }
   /** A folder's playbook, beside its videos (#/playbook/<folder>). */
   | { kind: 'playbook'; id: string }

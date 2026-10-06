@@ -63,6 +63,17 @@ test('scope: a folder view covers its subfolders; the other views filter by what
   assert.deepEqual(names(scope(all, { kind: 'session', id: 'edit' })), ['Teaser Überblendung.mp4']);
 });
 
+test('scope: an archived project’s videos are only on its own page and the Archived view', () => {
+  const shut = (v: VideoSummary): VideoSummary => ({ ...v, project_archived: '2026-10-07T10:00:00+02:00' });
+  const library = [spot, teaser, reel, loose].map((v) => (v.folder?.startsWith('Globex') ? shut(v) : v));
+  const edit = shut({ ...teaser, folder: 'Globex', session: { name: 'edit' } } as VideoSummary);
+  assert.deepEqual(names(scope(library, { kind: 'all' })), ['spot.mp4', 'Teaser Überblendung.mp4', 'loose.mp4'], 'All videos');
+  assert.deepEqual(names(scope(library, { kind: 'archived' })), ['reel.mp4'], 'the Archived view');
+  assert.deepEqual(names(scope(library, { kind: 'folder', id: 'Globex' })), ['reel.mp4'], 'its own page');
+  assert.deepEqual(names(scope(library, { kind: 'folder', id: 'Globex/Social' })), ['reel.mp4'], 'a folder in it');
+  assert.deepEqual(names(scope([...library, edit], { kind: 'session', id: 'edit' })), ['Teaser Überblendung.mp4'], 'an agent’s videos');
+});
+
 test('filters: archived hidden by default, every word must match, umlauts folded, lanes, sessions', () => {
   assert.ok(!applyFilters(all, none).includes(old));
   assert.ok(applyFilters(all, { ...none, archived: true }).includes(old));

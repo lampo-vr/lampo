@@ -3,13 +3,15 @@
 // loads it is the same sidebar: the views are known without data (only their counts wait), the projects are rows of
 // the same height, so nothing moves when the data arrives.
 
+import { useQueryClient } from '@tanstack/react-query';
 import { type DragEvent, type ReactElement, type ReactNode, useEffect, useMemo, useState } from 'react';
 import { agentKindOfRef } from '../../../lib/agentKind.ts';
+import { archivedIn } from '../../../lib/archived.ts';
 import { useAuthStatus, useCan } from '../api/auth.ts';
 import { enc } from '../api/client.ts';
 import { useFolderActions } from '../api/mutations.ts';
 import { useBilling } from '../api/queries.ts';
-import type { VideoSummary } from '../api/types.ts';
+import type { ArchivedProjectInfo, VideoSummary } from '../api/types.ts';
 import { billingCode } from '../billing/code.ts';
 import { trialLineDue } from '../billing/due.ts';
 import { t } from '../i18n/index.ts';
@@ -30,6 +32,7 @@ import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { ScrollArea } from '../ui/plain.tsx';
 import { Confirm, ContextMenu, IconButton, Menu, type MenuEntry } from '../ui/primitives.tsx';
 import { SkLine } from '../ui/Skeleton.tsx';
+import { archivedCode } from './archiving.ts';
 import { arrowNav } from './arrowNav.ts';
 import { downloadFolder } from './downloadFolder.ts';
 import { DRAG_FOLDER, DRAG_VIDEO, type Dropped, useDrop } from './drag.ts';
@@ -172,7 +175,7 @@ const agentNow = loader(() => import('../sessions/Live.tsx'));
 
 /**
  * The videos opened last in the player (lib/recent.ts), newest first: a small poster, the name and where it stands.
- * Nothing yet, or only videos that are gone or archived: no section. While the library loads, as many rows as it will
+ * Nothing yet, or only videos that are gone or archived (or in an archived project): no section. While the library loads, as many rows as it will
  * most likely show, so nothing below moves.
  */
 function RecentNav({ videos, pending }: { videos: VideoSummary[]; pending: boolean }) {
@@ -186,7 +189,7 @@ function RecentNav({ videos, pending }: { videos: VideoSummary[]; pending: boole
     ? []
     : slugs
         .map((s) => bySlug.get(s))
-        .filter((v): v is VideoSummary => !!v && !v.archived)
+        .filter((v): v is VideoSummary => !!v && !v.archived && !v.project_archived)
         .slice(0, RECENT_SHOWN);
   const count = pending ? Math.min(slugs.length, RECENT_SHOWN) : rows.length;
   if (!count) return null;
@@ -226,6 +229,8 @@ interface SidebarProps {
   /** Missing while the library loads. */
   videos?: VideoSummary[];
   folders?: string[];
+  /** The archived projects (lib/archived.ts): out of the tree, behind the Archived row. */
+  archived?: Record<string, ArchivedProjectInfo>;
   view: LibraryView;
   onMoveVideo: (slug: string, folder: string | null) => void;
   /** In the phone drawer: the library opens the share sheet itself (the drawer closes first). */
@@ -233,6 +238,7 @@ interface SidebarProps {
 }
 
 const NONE: never[] = [];
+const NO_ARCHIVE: Record<string, ArchivedProjectInfo> = {};
 
 /** A project row while the library loads: a folder row's height and shape, its name on its way. */
 const PendingRow = ({ w }: { w: string }) => (
@@ -266,9 +272,12 @@ function whatMovesUp(videos: number, subfolders: number, target: string | null):
   return t('Only the folder goes: {what} moves up to {target}.|Only the folder goes: {what} move up to {target}.', { n: videos + subfolders, what, target });
 }
 
-export function Sidebar({ videos: loaded, folders = NONE, view, onMoveVideo, onShareFolder }: SidebarProps) {
+export function Sidebar({ videos: loaded, folders: all = NONE, archived = NO_ARCHIVE, view, onMoveVideo, onShareFolder }: SidebarProps) {
   const pending = !loaded;
   const videos = loaded ?? NONE;
+  // An archived project leaves the tree (it and its folders), and its videos the counts: the Archived row holds them.
+  const folders = useMemo(() => all.filter((f) => !archivedIn(f, archived)), [all, archived]);
+  const archivedCount = Object.keys(archived).length;
   // Reviewers browse projects but don't reorganize them.
   const can = useCan();
   const organize = can('organize');
@@ -282,12 +291,16 @@ export function Sidebar({ videos: loaded, folders = NONE, view, onMoveVideo, onS
   // The inbox's count is the bell's: what waits for you (asked once someone is signed in; on its way until then).
   const forYou = useVisibleForYou(!!useAuthStatus().data?.user);
   const waiting = forYou.data ? forYou.data.total : forYou.error ? undefined : null;
-  const live = videos.filter((v) => !v.archived);
+  const live = videos.filter((v) => !v.archived && !v.project_archived);
+  const qc = useQueryClient();
+  const me = useAuthStatus().data?.user?.name ?? null;
   // The trial at the foot, above Settings (billing/Banner.tsx): its room from the first paint when the plan this browser
   // kept says one runs, its words and ruler once their code is here (the library asks for the plan; this reads it)
   const billing = useBilling(false).data;
   const Trial = useLoaded(billingCode, usePainted(!!billing))?.TrialLine;
   const viewFolder = view.kind === 'folder' || view.kind === 'playbook' ? view.id : null;
+  // on an archived project's page, the Archived row is where you are
+  const inArchive = view.kind === 'archived' || (!!viewFolder && !!archivedIn(viewFolder, archived));
 
   const toggle = (f: string) =>
     setExpanded((s) => {
@@ -382,9 +395,14 @@ export function Sidebar({ videos: loaded, folders = NONE, view, onMoveVideo, onS
     }
   };
 
+  // Archived at once, with Undo; the request goes once the toast is gone (Archived.tsx).
+  const archive = (f: string) => void archivedCode.load().then((m) => m.archiveProject(qc, f, me), toastError);
+
   // The ⋯ menu and the right-click menu of a row, naming what it acts on: a project (top level) or a folder in one.
   const folderMenu = (f: string): MenuEntry[] => {
     const p = isProject(f);
+    // a project is put away by its owners and admins (lib/archived.ts): out of sight, nothing lost, back in one click
+    const archiveIt = p && can('archive') && { label: t('Archive project'), icon: 'archive' as const, onClick: () => archive(f) };
     const shareIt = share && {
       label: p ? t('Share project…') : t('Share folder…'),
       icon: 'link' as const,
@@ -403,6 +421,7 @@ export function Sidebar({ videos: loaded, folders = NONE, view, onMoveVideo, onS
           shareIt,
           downloadIt,
           'sep',
+          archiveIt,
           { label: p ? t('Delete project…') : t('Delete folder…'), icon: 'trash', danger: true, onClick: () => setDeleting(f) },
         ]
       : [shareIt, downloadIt];
@@ -535,6 +554,19 @@ export function Sidebar({ videos: loaded, folders = NONE, view, onMoveVideo, onS
                 onClick={() => goView({ kind: 'unsorted' })}
                 drop={organize ? dropOn(null) : undefined}
                 testId="nav-unsorted"
+              />
+            )}
+            {/* the archived projects, out of the tree: a row of its shape, there while there are some (or one is open) */}
+            {((!pending && archivedCount > 0) || inArchive) && (
+              <NavItem
+                twisty={<span className="twisty none" />}
+                icon="archive"
+                label={t('Archived')}
+                count={pending ? null : archivedCount}
+                countOf={t('project|projects', { n: archivedCount })}
+                active={inArchive}
+                onClick={() => goView({ kind: 'archived' })}
+                testId="nav-archived"
               />
             )}
             {organize && !pending && !folders.length && !(editing?.mode === 'new' && editing.parent === '') && (

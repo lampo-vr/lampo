@@ -127,6 +127,8 @@ export function useVideoMenu(v: VideoSummary, { home, folders }: { home?: string
     );
 
   const lanes = useMemo(() => lanesFor(v, can, board), [v, can, board]);
+  // in an archived project (lib/archived.ts) nothing new: no link, post or agent; only its owners and admins move it out
+  const shut = !!v.project_archived;
   // A removed video downloads again once it is restored (the server says the same).
   const newest = can('download') && !v.archived && v.v ? v.v : 0;
   // The first run's sample goes for good in one click (it is never archived; the first run offers it again).
@@ -156,9 +158,12 @@ export function useVideoMenu(v: VideoSummary, { home, folders }: { home?: string
       }),
     ),
     'sep',
-    can('share') && !v.archived && { label: t('Share…'), icon: 'send', onClick: () => setDialog('share') },
+    can('share') && !v.archived && !shut && { label: t('Share…'), icon: 'send', onClick: () => setDialog('share') },
     // a final version's next step: the composer opens in the player (publish/Publishing.tsx)
-    can('post') && v.stage.stage === 'final' && !v.stage.final_superseded && { label: t('Publish…'), icon: 'upload', onClick: () => go(v.slug, 'publish=1') },
+    can('post') &&
+      !shut &&
+      v.stage.stage === 'final' &&
+      !v.stage.final_superseded && { label: t('Publish…'), icon: 'upload', onClick: () => go(v.slug, 'publish=1') },
     // the newest version as its own file, the ones before it a step further in (versions count up from V1)
     newest > 0 && { label: t('Download V{v}', { v: newest }), icon: 'download', onClick: () => void downloadVersion(v.slug, newest) },
     newest > 0 && {
@@ -172,8 +177,8 @@ export function useVideoMenu(v: VideoSummary, { home, folders }: { home?: string
       },
     },
     'sep',
-    organize && { label: t('Move to…'), icon: 'moveTo', onClick: () => setDialog('move') },
-    organize && { label: t('Assign agent…'), icon: 'terminal', onClick: () => setDialog('assign') },
+    organize && (!shut || can('archive')) && { label: t('Move to…'), icon: 'moveTo', onClick: () => setDialog('move') },
+    organize && !shut && { label: t('Assign agent…'), icon: 'terminal', onClick: () => setDialog('assign') },
     'sep',
     {
       label: t('Copy for an agent'),
@@ -207,5 +212,5 @@ export function useVideoMenu(v: VideoSummary, { home, folders }: { home?: string
     </>
   );
 
-  return { items, dialogs, organize, assign: organize ? () => setDialog('assign') : null };
+  return { items, dialogs, organize, assign: organize && !shut ? () => setDialog('assign') : null };
 }

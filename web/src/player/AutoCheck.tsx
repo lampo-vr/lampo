@@ -83,8 +83,8 @@ interface AutoCheckProps {
   asked?: number;
   /** Shows the finding: plays its stretch (`stretch`: one hold of a summary), or the spot on the frame for text. */
   onPlay: (x: QaItem, stretch?: FrameRange) => void;
-  /** "Ask the agent": the finding becomes a note. */
-  onAccept: (x: QaItem) => void;
+  /** "Ask the agent": the finding becomes a note (absent: nothing new here, an archived project's video). */
+  onAccept?: (x: QaItem) => void;
   /** "That's intended": absent when the role may not (reviewers only turn findings into notes). */
   onIntended?: (x: QaItem) => void;
   onRerun?: () => void;
@@ -341,11 +341,13 @@ function AutoCheckFindings({
                 </span>
               )}
               <span className="ac-acts">
-                <Tip content={t('Turns it into a note for the agent to fix')}>
-                  <button type="button" className={`btn sm ${w.verdict === 'intended' ? 'ghost' : ''}`} onClick={() => onAccept(x)}>
-                    <I name="plus" size={13} /> {t('Ask the agent')}
-                  </button>
-                </Tip>
+                {onAccept && (
+                  <Tip content={t('Turns it into a note for the agent to fix')}>
+                    <button type="button" className={`btn sm ${w.verdict === 'intended' ? 'ghost' : ''}`} onClick={() => onAccept(x)}>
+                      <I name="plus" size={13} /> {t('Ask the agent')}
+                    </button>
+                  </Tip>
+                )}
                 {onIntended && (
                   <Tip content={t('Auto-check won’t list it again on this video, not in later versions either. The agent isn’t told.')}>
                     <button

@@ -2,7 +2,9 @@
 // filtered, sorted and grouped from one calm toolbar. What goes where is decided in model.ts. While it loads it is the
 // same page: the top bar, the sidebar, the title and the toolbar are real, and only what the data decides (counts,
 // names, posters) waits as placeholders of its own size — so nothing moves when the data arrives.
+import { useQueryClient } from '@tanstack/react-query';
 import { lazy, type ReactNode, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { archivedIn } from '../../../lib/archived.ts';
 import { can as roleCan } from '../../../lib/permissions.ts';
 import { LANES } from '../../../lib/stage.ts';
 import { compareTime } from '../../../lib/time.ts';
@@ -32,14 +34,17 @@ import { LazyShareModal } from '../share/LazyShareModal.tsx';
 import type { EmptyArtName } from '../ui/emptyArt.tsx';
 import { Spinner } from '../ui/feedback.tsx';
 import { I } from '../ui/icons.tsx';
-import { Drawer, Tip } from '../ui/primitives.tsx';
+import { Drawer, IconButton, Menu, type MenuEntry, Tip } from '../ui/primitives.tsx';
 import { SkeletonRegion, SkLine } from '../ui/Skeleton.tsx';
 import { Button, EmptyState } from '../ui/system.tsx';
 import { VIDEO_ACCEPT } from '../uploads/formats.ts';
 import { useFileDrop } from '../uploads/useFileDrop.ts';
+import { ArchivedBanner } from './ArchivedBanner.tsx';
 import { AskLead, useFolderAsk } from './AskLead.tsx';
+import { archivedCode, useArchived } from './archiving.ts';
 import { arrowNav } from './arrowNav.ts';
 import { Board, BoardPending } from './Board.tsx';
+import { downloadFolder } from './downloadFolder.ts';
 import { Film, FilmPending } from './Film.tsx';
 import { FilmGrid } from './FilmGrid.tsx';
 import { FilmList, FilmListPending } from './FilmList.tsx';
@@ -85,6 +90,8 @@ if (/^#\/insights\b/.test(location.hash)) void insightsCode.load().catch(() => {
 const Insights = screen(insightsCode);
 // Add video opens on a click or a drop, never in the first paint: its code (and the folder picker's) comes right after.
 const addVideoCode = loader(() => import('./AddVideo.tsx'));
+// The Archived page comes at once when the page opens on it.
+if (/^#\/archived\b/.test(location.hash)) void archivedCode.load().catch(() => {});
 const UploadDialog = lazy(() => import('../uploads/UploadDialog.tsx').then((m) => ({ default: m.UploadDialog })));
 
 /** What "Make one with an agent" copies: the person's agent makes the video with whatever it has, puts it up for review
@@ -178,6 +185,8 @@ interface Page {
   insights?: boolean;
   /** What waits for you instead of videos (the inbox view). */
   inbox?: boolean;
+  /** The archived projects instead of videos (the Archived view). */
+  archive?: boolean;
   /** A folder's playbook instead of its videos (the folder's second tab). */
   playbook?: boolean;
   /** The folder a page is about: its header has the Videos · Playbook tabs. */
@@ -191,6 +200,8 @@ function pageOf(view: LibraryView): Page {
       return { crumb: [], title: t('Inbox'), inbox: true, empty: { art: 'inbox', title: '' } };
     case 'insights':
       return { crumb: [], title: t('Insights'), insights: true, empty: { art: 'insights', title: '' } };
+    case 'archived':
+      return { crumb: [], title: t('Archived'), archive: true, empty: { art: 'filed', title: '' } };
     case 'unsorted':
       // shown only while some video has no project (the sidebar row goes with the last one; Library sends #/unsorted on)
       return {
@@ -297,7 +308,26 @@ function FolderTabs({ folder, playbook, pending }: { folder: string; playbook: b
   );
 }
 
-function Hero({ page, totals, onShare, pending }: { page: Page; totals: Totals | null; onShare?: () => void; pending: boolean }) {
+function Hero({
+  page,
+  totals,
+  onShare,
+  pending,
+  archived,
+  projects,
+  menu,
+}: {
+  page: Page;
+  totals: Totals | null;
+  onShare?: () => void;
+  pending: boolean;
+  /** The page is an archived project's (or a folder in one): the banner instead of Share; `onRestore` for who may. */
+  archived?: { onRestore?: () => void } | null;
+  /** The Archived view: how many projects it holds (null: on its way). */
+  projects?: number | null;
+  /** A project's own ⋯ (its owners and admins): what it does to the project as a whole, Archive among it. */
+  menu?: MenuEntry[] | null;
+}) {
   return (
     <div className="hero">
       {/* a crumb only inside a project (the top views, projects and agents have none); its line stays, so titles never move */}
@@ -323,8 +353,22 @@ function Hero({ page, totals, onShare, pending }: { page: Page; totals: Totals |
         {page.inbox && <InboxTally pending={pending} />}
         {page.inbox && <InboxKeys pending={pending} />}
         {page.inbox && <InboxModeSwitch />}
+        {page.archive && (
+          <div className="tally">
+            <span>
+              {projects == null ? (
+                <SkLine w="5em" />
+              ) : (
+                <>
+                  <b>{projects}</b> {t('project|projects', { n: projects })}
+                </>
+              )}
+            </span>
+          </div>
+        )}
         {!page.insights &&
           !page.inbox &&
+          !page.archive &&
           (totals ? (
             // two quiet facts: how many, and what matters most in them (must-fix notes, else open notes) — what waits for
             // you is the inbox's to count
@@ -352,16 +396,26 @@ function Hero({ page, totals, onShare, pending }: { page: Page; totals: Totals |
             </div>
           ))}
         {page.insights && <PeriodPicker />}
-        {onShare && (
-          <Tip
-            content={
-              page.folder && isProject(page.folder) ? t('A review link for everything in this project') : t('A review link for everything in this folder')
-            }
-          >
-            <button type="button" className="btn sm hero-share" onClick={onShare}>
-              <I name="send" size={14} /> {page.folder && isProject(page.folder) ? t('Share project') : t('Share folder')}
-            </button>
-          </Tip>
+        {archived ? (
+          <ArchivedBanner onRestore={archived.onRestore} />
+        ) : (
+          onShare && (
+            <Tip
+              content={
+                page.folder && isProject(page.folder) ? t('A review link for everything in this project') : t('A review link for everything in this folder')
+              }
+            >
+              <button type="button" className="btn sm hero-share" onClick={onShare}>
+                <I name="send" size={14} /> {page.folder && isProject(page.folder) ? t('Share project') : t('Share folder')}
+              </button>
+            </Tip>
+          )
+        )}
+        {!archived && menu && (
+          <Menu
+            trigger={<IconButton className={`btn sm ghost icon-only hero-more${onShare ? '' : ' alone'}`} label={t('Project actions')} icon="more" size={15} />}
+            items={menu}
+          />
         )}
       </div>
       {page.folder && <FolderTabs folder={page.folder} playbook={!!page.playbook} pending={pending} />}
@@ -397,6 +451,25 @@ function UnfiledRow({ videos, onSort, busy }: { videos: VideoSummary[]; onSort: 
   );
 }
 
+/** The Archived page's rows while their code or the library is on its way: the rows' own shape (library.css). */
+const ArchivedPending = () => (
+  <ul className="arch-list" aria-hidden="true">
+    {['9em', '6em'].map((w) => (
+      <li key={w} className="arch-row pending">
+        <span className="arch-open">
+          <I name="archive" size={16} />
+          <span className="arch-name">
+            <SkLine w={w} />
+          </span>
+          <span className="arch-meta">
+            <SkLine w="11em" />
+          </span>
+        </span>
+      </li>
+    ))}
+  </ul>
+);
+
 /** The layout's own shapes while the library loads: a section of cards, the table, or the four lanes. */
 function Pending({ layout, group, sort, onSort }: { layout: Layout; group: GroupBy; sort: SortBy; onSort: (s: SortBy) => void }) {
   if (layout === 'list') return <FilmListPending sort={sort} onSort={onSort} grouped={group !== 'none'} />;
@@ -431,10 +504,17 @@ function Pending({ layout, group, sort, onSort }: { layout: Layout; group: Group
  */
 export default function Library({ view, pending = false }: { view: LibraryView; pending?: boolean }) {
   const { data, error, refetch } = useLibrary(!pending);
-
+  // projects archived or restored a moment ago are so at once (./archiving.ts)
+  const now = useArchived(data);
+  const archivedProjects = now.archived;
   // a video moved to another lane stands there at once, before the server has it (library/moving.tsx)
-  const videos = useMovedVideos(data?.videos ?? null);
+  const videos = useMovedVideos(now.videos);
   const folders = data?.folders ?? [];
+  // where a video can go or be uploaded to: no archived project, nor a folder in one
+  const openFolders = useMemo(() => folders.filter((f) => !archivedIn(f, archivedProjects)), [folders, archivedProjects]);
+  // the project this page is about is archived: read only, with a banner (and Restore for its owners and admins)
+  const shutHere = (view.kind === 'folder' || view.kind === 'playbook') && data ? archivedIn(view.id, archivedProjects) : null;
+  const qc = useQueryClient();
   const [prefs, setPref] = usePrefs(LIBRARY_PREFS, LIBRARY_PER_TAB);
   const [adding, setAdding] = useState(false);
   const Add = useLoaded(addVideoCode, usePainted(!pending) || adding);
@@ -467,9 +547,26 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
   const linkHere = atMachine && !!info?.capabilities?.linkFiles;
   const can = useCan();
   const mayUpload = can('upload');
+  const restoreHere = shutHere && can('archive') ? () => void archivedCode.load().then((m) => m.restoreProject(qc, shutHere), toastError) : undefined;
+  const Arch = useLoaded(archivedCode, view.kind === 'archived');
   // A folder's Share button stands from the first paint (the role this browser saw last), not once the videos arrive
   const likelyRole = useLikelyRole();
   const mayShareLikely = !!likelyRole && roleCan(likelyRole, 'share');
+  // A project's page has its own ⋯ for its owners and admins (from the first paint: the role this browser saw last), as
+  // its row in the sidebar has: download it, archive it (with Undo; the page then says so).
+  const me = status?.user?.name ?? null;
+  const projectMenu: MenuEntry[] | null =
+    (view.kind === 'folder' || view.kind === 'playbook') && isProject(view.id) && likelyRole && roleCan(likelyRole, 'archive')
+      ? [
+          roleCan(likelyRole, 'download') && { label: t('Download project'), icon: 'download', onClick: () => void downloadFolder(view.id) },
+          'sep',
+          {
+            label: t('Archive project'),
+            icon: 'archive',
+            onClick: () => void archivedCode.load().then((m) => m.archiveProject(qc, view.id, me), toastError),
+          },
+        ]
+      : null;
   const [dropped, setDropped] = useState<File[] | null>(null);
   const picker = useRef<HTMLInputElement>(null);
   const filterRef = useRef<HTMLInputElement>(null);
@@ -698,7 +795,7 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
           className={folderAsk.lead ? 'asked' : ''}
           title={page.empty.title}
           action={
-            (view.kind === 'folder' || view.kind === 'all') && mayUpload ? (
+            (view.kind === 'folder' || view.kind === 'all') && mayUpload && !shutHere ? (
               // a question waiting above is the one thing to do here: adding a video steps back
               <Button variant={locked || folderAsk.lead ? 'secondary' : 'primary'} icon={locked ? 'lock' : linkHere ? 'plus' : 'upload'} onClick={add}>
                 {view.kind === 'all'
@@ -719,13 +816,13 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
           }
           tips={[
             ...(page.empty.tip ? [page.empty.tip] : []),
-            ...((view.kind === 'folder' || view.kind === 'all') && mayUpload ? [t('Drop video files anywhere on this page')] : []),
+            ...((view.kind === 'folder' || view.kind === 'all') && mayUpload && !shutHere ? [t('Drop video files anywhere on this page')] : []),
           ]}
         >
           {page.empty.body}
         </EmptyState>
       );
-    if (layout === 'board') return <Board videos={shown} where={(v) => whereFor(v)} home={info?.home} folders={folders} />;
+    if (layout === 'board') return <Board videos={shown} where={(v) => whereFor(v)} home={info?.home} folders={openFolders} />;
     if (layout === 'list')
       return (
         <FilmList
@@ -734,7 +831,7 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
           onSort={(s) => setPref('sort', s)}
           where={whereFor}
           home={info?.home}
-          folders={folders}
+          folders={openFolders}
           onOpenSection={(f) => goView({ kind: 'folder', id: f })}
         />
       );
@@ -744,7 +841,14 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
       return (
         <section key={s.key} className="lib-section" aria-label={s.title}>
           {titled && s.title && (
-            <SectionHead section={s} collapsed={closed} onToggle={() => toggleSection(s.key)} onDropVideo={moveVideo} current={s.folder === base} />
+            <SectionHead
+              section={s}
+              collapsed={closed}
+              onToggle={() => toggleSection(s.key)}
+              // nothing goes into an archived project
+              onDropVideo={shutHere ? undefined : moveVideo}
+              current={s.folder === base}
+            />
           )}
           {s.key === '~' && unfiledHere && !closed && <UnfiledRow videos={s.videos} onSort={sortAll} busy={autoSort.isPending} />}
           {!closed && (
@@ -757,7 +861,7 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
                   key={v.slug}
                   v={v}
                   home={info?.home}
-                  folders={folders}
+                  folders={openFolders}
                   where={s.key === '~' ? null : whereFor(v, s)}
                   compact={layout === 'compact'}
                   priority={si === 0 && i < 8}
@@ -775,7 +879,8 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
     <div className={`lib-content layout-${layout}`} onKeyDown={arrowNav} data-testid="library-content" data-layout={layout}>
       {videos && folderAsk.known ? (
         <>
-          {base && <AskLead ask={folderAsk} folder={base} />}
+          {/* a question waiting in an archived project waits as it is: nothing is answered there until it is restored */}
+          {base && !shutHere && <AskLead ask={folderAsk} folder={base} />}
           {content()}
         </>
       ) : (
@@ -817,12 +922,13 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
           <div className="lib grain bare" role="status" aria-busy="true" aria-label={t('Loading the library')} data-testid="skeleton" />
         ) : (
           <div className={`lib grain ${bare ? 'bare' : ''}`}>
-            {!bare && <Sidebar videos={videos ?? undefined} folders={data?.folders} view={view} onMoveVideo={moveVideo} />}
+            {!bare && <Sidebar videos={videos ?? undefined} folders={data?.folders} archived={archivedProjects} view={view} onMoveVideo={moveVideo} />}
             {videos && !bare && navOpen && (
               <Drawer open={navOpen} onOpenChange={setNavOpen} title={t('Menu')}>
                 <Sidebar
                   videos={videos}
                   folders={folders}
+                  archived={archivedProjects}
                   view={view}
                   onMoveVideo={moveVideo}
                   onShareFolder={(f) => {
@@ -871,6 +977,9 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
                     pending={pending}
                     totals={videos ? totals : null}
                     onShare={(view.kind === 'folder' || view.kind === 'playbook') && mayShareLikely ? () => setSharingFolder(view.id) : undefined}
+                    archived={shutHere ? { onRestore: restoreHere } : null}
+                    menu={projectMenu}
+                    projects={page.archive ? (data ? Object.keys(archivedProjects).length : null) : undefined}
                   />
                   {page.insights ? (
                     <Suspense fallback={<InsightsPending />}>
@@ -880,6 +989,10 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
                     <Suspense fallback={<InboxViewPending />}>
                       <InboxView pending={pending} />
                     </Suspense>
+                  ) : page.archive ? (
+                    <div className="lib-content" data-testid="library-content">
+                      {Arch && videos ? <Arch.ArchivedView videos={videos} archived={archivedProjects} /> : <ArchivedPending />}
+                    </div>
                   ) : page.playbook && view.kind === 'playbook' ? (
                     <Suspense fallback={<PlaybookPending scope={view.id} />}>
                       <PlaybookPage scope={view.id} pending={pending} />
@@ -954,7 +1067,7 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
                   ? t('{workspace} is suspended: nothing can be added for now.', { workspace: suspended })
                   : locked
                     ? t('Drop anyway: it waits until there’s room.')
-                    : view.kind === 'folder'
+                    : view.kind === 'folder' && !shutHere
                       ? t('Into {folder}; you can still pick another.', { folder: crumbs(view.id) })
                       : t('Into the library; you can still pick a project.')}
               </p>
@@ -965,8 +1078,8 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
           <Suspense fallback={null}>
             <UploadDialog
               files={dropped}
-              folders={folders}
-              defaultFolder={view.kind === 'folder' ? view.id : null}
+              folders={openFolders}
+              defaultFolder={view.kind === 'folder' && !shutHere ? view.id : null}
               maxBytes={info.features.upload_max_bytes}
               existing={uploaded}
               onClose={() => setDropped(null)}
@@ -982,8 +1095,8 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
               upload();
             }}
             home={info?.home}
-            folders={folders}
-            defaultFolder={view.kind === 'folder' ? view.id : undefined}
+            folders={openFolders}
+            defaultFolder={view.kind === 'folder' && !shutHere ? view.id : undefined}
             recent={recentDirs}
           />
         )}

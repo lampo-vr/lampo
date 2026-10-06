@@ -547,6 +547,17 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
     'Apps, die du per Anmeldung für deine Reviews zugelassen hast (ChatGPT, Claude, Cursor, …). Dein Passwort sehen sie nie.',
   Archive: 'Archivieren',
   'Archived {name}': '{name} archiviert',
+  // archived projects (lib/archived.ts): put away, read only until restored
+  'Archive project': 'Projekt archivieren',
+  Archived: 'Archiviert',
+  'Archived {when}': 'Archiviert {when}',
+  'Archived {when} by {name}': 'Archiviert {when} von {name}',
+  'Restored {name}': '{name} wiederhergestellt',
+  'Nothing archived': 'Nichts archiviert',
+  'Archive a project from its ⋯ menu: it leaves the sidebar and the lists, and stays as it is until it’s restored.':
+    'Archiviere ein Projekt über sein ⋯-Menü: Es verschwindet aus der Seitenleiste und den Listen und bleibt, wie es ist, bis es wiederhergestellt wird.',
+  'project|projects': 'Projekt|Projekte',
+  'Read only: nothing in it changes until it’s restored.': 'Nur lesen: Darin ändert sich nichts, bis es wiederhergestellt ist.',
   Arrow: 'Pfeil',
   'Ask {name}': '{name} fragen',
   'Ask questions, leave notes on frames and reply to notes.': 'Fragen stellen, Notizen an Frames hinterlassen und auf Notizen antworten.',
@@ -1395,6 +1406,7 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   '⇧ drag to mark a section': '⇧ + Ziehen markiert einen Abschnitt',
   '<0>C</0> note <1>←</1><2>→</2> frame <3>I</3><4>O</4> section <5>?</5> all keys':
     '<0>C</0> Notiz <1>←</1><2>→</2> Frame <3>I</3><4>O</4> Abschnitt <5>?</5> alle Tasten',
+  '<0>←</0><1>→</1> frame <2>I</2><3>O</3> section <4>?</4> all keys': '<0>←</0><1>→</1> Frame <2>I</2><3>O</3> Abschnitt <4>?</4> alle Tasten',
   'a note on this frame, or on the marked section · ⌘↵ sends · ⌘S keeps it as a draft · Esc cancels':
     'eine Notiz zu diesem Frame oder zum markierten Abschnitt · ⌘↵ sendet · ⌘S behält sie als Entwurf · Esc bricht ab',
   'clear the marked section': 'den markierten Abschnitt aufheben',

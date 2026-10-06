@@ -123,8 +123,14 @@ export function useVideoActions() {
     mutationFn: ({ slug, folder }: { slug: string; folder: string | null }) => api(`/api/review/${enc(slug)}/folder`, { method: 'PUT', body: { folder } }),
     onMutate: async ({ slug, folder }: { slug: string; folder: string | null }) => [
       await guess<LibraryResponse>(qc, keys.library, (old) => ({
+        ...old,
         folders: folder && !old.folders.includes(folder) ? [...old.folders, folder].sort() : old.folders,
-        videos: old.videos.map((v) => (v.slug === slug ? { ...v, folder } : v)),
+        videos: old.videos.map((v) => {
+          if (v.slug !== slug) return v;
+          // out of an archived project (its owners and admins may): open to work at once
+          const { project_archived: _was, ...moved } = v;
+          return { ...moved, folder };
+        }),
       })),
     ],
     onError: (_e, _v, undo) => undoAll(undo),
@@ -162,6 +168,7 @@ export function useFolderActions() {
       mutationFn: (b: { from: string; to: string }) => api('/api/folders', { method: 'PATCH', body: b }),
       onMutate: async ({ from, to }: { from: string; to: string }) => [
         await guess<LibraryResponse>(qc, keys.library, (old) => ({
+          ...old,
           folders: [...new Set(old.folders.map((f) => renamed(f, from, to) ?? f))].sort(),
           videos: old.videos.map((v) => (renamed(v.folder, from, to) === v.folder ? v : { ...v, folder: renamed(v.folder, from, to) })),
         })),

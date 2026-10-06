@@ -11,6 +11,7 @@ import { InboxBell } from '../inbox/InboxBell.tsx';
 import { fileName } from '../lib/format.ts';
 import { backToLibrary, crumbs } from '../lib/nav.ts';
 import { copyText, toast, toastError } from '../lib/toast.ts';
+import { ArchivedBanner } from '../library/ArchivedBanner.tsx';
 import { downloadVersion } from '../library/downloadVersion.ts';
 import { SessionChip } from '../sessions/Sessions.tsx';
 import { StageControl, StageLine } from '../status/StageControl.tsx';
@@ -44,6 +45,8 @@ interface PlayerTopbarProps {
   strip?: ReactNode;
   /** The frame on screen (the agent's "Quick check: render only this part"). */
   frameNow?: () => number;
+  /** Its project is archived (lib/archived.ts): the banner stands where the next step does; `onRestore` for who may. */
+  archived?: { onRestore?: () => void } | null;
 }
 
 export const PlayerTopbar = memo(function PlayerTopbar({
@@ -62,6 +65,7 @@ export const PlayerTopbar = memo(function PlayerTopbar({
   phone = false,
   strip = null,
   frameNow,
+  archived = null,
 }: PlayerTopbarProps) {
   useLang(); // memo'd: renders again on a language switch by itself
   const { review, summary, slug } = data;
@@ -126,7 +130,11 @@ export const PlayerTopbar = memo(function PlayerTopbar({
     </Tip>
   );
   // where the video stands, and the next step as one button (the rest behind its chevron)
-  const approval = <StageControl data={data} latestV={latestV} onShare={onShare} onVerify={onVerify} onPublish={onPublish} compact={phone} />;
+  const approval = archived ? (
+    <ArchivedBanner onRestore={archived.onRestore} />
+  ) : (
+    <StageControl data={data} latestV={latestV} onShare={onShare} onVerify={onVerify} onPublish={onPublish} compact={phone} />
+  );
   // The version on screen as its own file (as rendered, whatever the browser plays), the others a step further in.
   const canDownload = allowed('download') && !review.archived;
   const versionWords = (x: Version) => [`V${x.v}`, x.v === latestV && t('newest'), x.part && partTag(x.part, x.fps)].filter(Boolean).join(' · ');

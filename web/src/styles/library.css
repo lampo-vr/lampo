@@ -357,6 +357,10 @@
   margin-left: auto;
   align-self: center;
 }
+/* a project's own ⋯ (Archive among it), after Share, or where Share stands when there is none */
+.hero-more.alone {
+  margin-left: auto;
+}
 /* The italic serif needs a 1.3em line box (ascent 0.99 + descent 0.31), and the ellipsis needs overflow: hidden, so
    a 0.95 line-height cut the tail off the "g" of Insights. The line box is tall enough now; the negative margins take
    the extra 0.195em back on each side, so the heading sits where a 0.95 line put it. */
@@ -1827,4 +1831,127 @@ button.shead-title:hover {
 }
 .topbar .add-video.locked .icon {
   color: var(--muted);
+}
+
+/* An archived project (lib/archived.ts): "Archived · Restore" where its page's or its player's main action stands
+   (library/ArchivedBanner.tsx), the height of the small button it replaces, so nothing moves. Calm: a fact in quiet
+   ink on a hairline, never a colour; Restore a quiet text action. */
+.arch-banner {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sp-1);
+  height: var(--h-sm);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-full);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-ui);
+  white-space: nowrap;
+}
+.hero-row > .arch-banner {
+  margin-left: auto;
+}
+.arch-banner-word {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+.arch-banner-word > .icon {
+  color: var(--muted);
+}
+.arch-banner-dot {
+  color: var(--faint);
+}
+.arch-banner-act {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--line-3);
+  text-underline-offset: 3px;
+}
+.arch-banner-act:hover {
+  text-decoration-color: currentColor;
+}
+.arch-banner-act:focus-visible {
+  outline: none;
+  border-radius: var(--r-sm);
+  box-shadow: var(--focus-ring);
+}
+
+/* The Archived page: one row per archived project, as the list layout draws a video (a hairline between, the row's
+   tone under the pointer): what it is, how much it holds and when it went; Restore at the end for who may. */
+.arch-list {
+  display: grid;
+  margin: var(--sp-4) 0 var(--sp-8);
+  padding: 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+}
+.arch-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+  min-height: var(--h-xl);
+  padding-right: var(--sp-2);
+  border-bottom: 1px solid var(--line);
+  transition: background var(--dur-fast);
+}
+.arch-row:not(.pending):hover,
+.arch-row:focus-within {
+  background: var(--ink-2);
+}
+.arch-open {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+  align-self: stretch;
+  padding: 0 var(--sp-2);
+  color: var(--fg);
+  text-decoration: none;
+  outline-offset: -2px;
+}
+.arch-open > .icon {
+  flex: none;
+  color: var(--muted);
+}
+.arch-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-ui);
+}
+.arch-meta {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.arch-restore {
+  flex: none;
+}
+/* a phone: the name over what it holds and when, Restore across */
+@media (max-width: 639px) {
+  .arch-open {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-content: center;
+    column-gap: var(--sp-3);
+    row-gap: var(--sp-0_5);
+    padding-block: var(--sp-2);
+  }
+  .arch-open > .icon {
+    grid-row: span 2;
+  }
+  .arch-restore {
+    height: var(--h-touch);
+  }
 }
