@@ -7,14 +7,11 @@ format stays backwards compatible throughout.
 
 ## [Unreleased]
 
+### Added
 - **Download a video from its ⋯ menu**, in the player and on its card in the library: *Download V3* saves the version
   on screen (on a card, the newest) as it was rendered, named `spot V3.mp4`, and *Download another version* lists the
   others. A version in a codec browsers can't play downloads as itself, not as the copy the player shows. Members,
   admins and owners may download, as for whole folders; reviewers watch and leave notes.
-- A download that breaks off and picks up again — a video from the library, or a file from a Delivery link — now gets
-  the whole rest of the file, not just the next piece of it.
-
-### Added
 - **Embed a video on your own site.** A new kind of link, *Embed*: Share → Embed copies the code for one `<iframe>`
   that keeps the video's shape, and the video plays on any site in Lampo's own frame-exact player — the timecode with
   frames, frame steps and the player's keys, the render's chapters on its timeline, captions from its transcript, full
@@ -24,6 +21,8 @@ format stays backwards compatible throughout.
   link is an embed from when it is made: an existing link doesn't become one, nor an embed another kind of link.
 
 ### Fixed
+- A download that breaks off and picks up again — a video from the library, or a file from a Delivery link — now gets
+  the whole rest of the file, not just the next piece of it.
 - An account deleted, disabled or given a new password while someone signs in to it gets no session and sends no
   sign-in email: the answer is the same as for any wrong sign-in. The same holds while someone takes an invite with
   it: it joins no workspace, and nobody is signed in.
