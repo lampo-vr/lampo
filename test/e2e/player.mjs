@@ -412,6 +412,53 @@ try {
     }
   });
 
+  await check('Auto-check that couldn’t read a version says so (not "Checking…" for good), and Run again asks once more', async () => {
+    // the server's answer for a check that failed (server/background.ts; background.test.ts makes a real one)
+    const qaUrl = `/api/qa/${enc(reel.slug)}/1`;
+    const reruns = [];
+    const answer = (r) => {
+      if (r.method() === 'GET' && r.url().endsWith(qaUrl))
+        return r.respond({ status: 200, contentType: 'application/json', body: JSON.stringify({ none: true, failed: true, error: 'could not read' }) });
+      if (r.method() === 'POST' && r.url().endsWith(`${qaUrl}/rerun`)) reruns.push(r.url());
+      return r.continue();
+    };
+    await page.setRequestInterception(true);
+    page.on('request', answer);
+    try {
+      await openPlayer(reel.slug);
+      await until(async () => (await page.$eval('[data-testid=ac-chip]', (e) => e.dataset.state).catch(() => '')) === 'failed', 'the chip says it failed');
+      assert(/Couldn’t read/.test(await text('[data-testid=ac-chip]')), `the chip: ${await text('[data-testid=ac-chip]')}`);
+      assert(
+        (await page.$eval('[data-testid=ac-chip]', (e) => e.getAttribute('aria-label'))) === 'Auto-check couldn’t read V1',
+        'its label says which version',
+      );
+      await openChecks();
+      assert((await text('.ac-summary')) === 'Couldn’t read V1', `the head: ${await text('.ac-summary')}`);
+      assert(/couldn’t read this version’s file/.test((await text('[data-testid=ac-failed]')) || ''), 'what happened, in words');
+      assert(!(await page.$('.ac-pop .ac-clear:not([data-testid=ac-failed])')), 'never "Nothing to fix"');
+      await shot('autocheck-failed');
+      await page.click('.ac-pop .ac-rerun');
+      await until(() => reruns.length === 1, 'Run again asks the server once more');
+      // a phone: the chip in the tags' line, the words in the sheet, inside the screen
+      await page.setViewport({ width: 390, height: 800, isMobile: true, hasTouch: true });
+      await openPlayer(reel.slug);
+      for (let i = 0; i < 3 && !(await page.$('.nsheet-half, .nsheet-full')); i++) {
+        await page.click('.nsheet-handle');
+        await sleep(400);
+      }
+      await page.waitForSelector('.note-tagf [data-testid=ac-chip][data-state=failed]');
+      await page.$eval('[data-testid=ac-chip]', (b) => b.click());
+      await page.waitForSelector('.ac-pop [data-testid=ac-failed]');
+      const box = await page.$eval('.ac-pop [data-testid=ac-failed]', (e) => ((r) => ({ left: r.left, right: r.right }))(e.getBoundingClientRect()));
+      assert(box.left >= 0 && box.right <= 390, `the words fit the screen: ${JSON.stringify(box)}`);
+      await shot('autocheck-failed-phone');
+    } finally {
+      page.off('request', answer);
+      await page.setRequestInterception(false);
+      await page.setViewport({ width: 1440, height: 900, isMobile: false, hasTouch: false });
+    }
+  });
+
   await check('the timeline: hover names the frame, the frame preview comes from the sprite', async () => {
     await openPlayer();
     const box = await (await page.$('.timeline canvas')).boundingBox();

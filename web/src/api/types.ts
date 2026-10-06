@@ -405,6 +405,8 @@ export interface QaItem {
 export interface QaResult {
   pending?: boolean;
   none?: boolean;
+  /** With `none`: the check ran and couldn't read the version (Run again tries once more). */
+  failed?: boolean;
   error?: string;
   items?: QaItem[];
   text_language?: string | null;

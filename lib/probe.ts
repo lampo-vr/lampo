@@ -472,6 +472,37 @@ export const analysisRows = (w: number, width: number, height: number, step = 2)
   Math.max(step, Math.min(ANALYSIS_TALLEST * w, Math.round((w * height) / width / step) * step));
 
 /**
+ * A `select` expression that passes exactly these frames, by decode index (`n`), escaped for a filter graph. FFmpeg 5.1.9,
+ * 7.1.4, 8.0.2 and later refuse an expression nested more than 100 deep, and `eq(n,a)+eq(n,b)+…` nests one level per
+ * frame: Auto-check's half-second samples of anything longer than about 50 s failed ("Error reinitializing filters!").
+ * Evenly spaced runs become one term, `between(n,a,b)*not(mod(n-a,step))`, single frames `eq(n,f)`, and the terms are
+ * summed as a balanced tree: a few levels deep, however many frames.
+ */
+export function selectFrames(frames: readonly number[]): string {
+  const f = [...new Set(frames)].sort((a, b) => a - b);
+  const terms: string[] = [];
+  for (let i = 0; i < f.length; ) {
+    const a = f[i] as number;
+    const step = (f[i + 1] ?? a) - a;
+    let j = i;
+    while (j + 1 < f.length && (f[j + 1] as number) - (f[j] as number) === step) j++;
+    if (j - i >= 2) {
+      terms.push(step === 1 ? `between(n\\,${a}\\,${f[j]})` : `between(n\\,${a}\\,${f[j]})*not(mod(n-${a}\\,${step}))`);
+      i = j + 1;
+    } else {
+      terms.push(`eq(n\\,${a})`);
+      i++;
+    }
+  }
+  const sum = (t: string[]): string => {
+    if (t.length <= 1) return t[0] ?? '0';
+    const half = Math.ceil(t.length / 2);
+    return `(${sum(t.slice(0, half))}+${sum(t.slice(half))})`;
+  };
+  return sum(terms);
+}
+
+/**
  * Refuses renders whose headers promise more than any real render is: absurd sizes, durations or frame rates would
  * make every later job (posters, sprites, diffs, proxies) run for hours or allocate gigabytes; a sliver (16×8192) or a
  * thumbnail (16×16) is no render either.

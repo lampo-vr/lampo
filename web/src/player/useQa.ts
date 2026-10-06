@@ -63,6 +63,8 @@ export function useQa({ slug, v, fps, review, onAccepted }: { slug: string; v: n
   return {
     suggestions,
     pending: !!data?.pending,
+    // the check ran and couldn't read this version: said, never "Checking…" for good
+    failed: !!data?.failed,
     progress,
     // a result from before the language rules may name a language the check guessed: only a dictionary's is shown
     language: shownTextLanguage(data),

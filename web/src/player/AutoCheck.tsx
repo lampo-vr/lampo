@@ -74,6 +74,8 @@ interface AutoCheckProps {
   aspect: number;
   items: QaItem[] | null;
   pending: boolean;
+  /** The check ran and couldn't read this version: said as such (Run again tries once more), never "Checking…". */
+  failed?: boolean;
   progress: QaProgress | null;
   timecodeOf: (f: number) => string;
   active?: string;
@@ -90,11 +92,12 @@ interface AutoCheckProps {
   spelling?: QaResult['spelling'];
 }
 
-/** Where the check stands, as the chip says it: nothing yet, running, problems to look at, minor ones only, or clear. */
-export type AutoCheckState = 'running' | 'problems' | 'minor' | 'clear';
+/** Where the check stands, as the chip says it: nothing yet, running, problems to look at, minor ones only, clear, or
+ * that it couldn't read the version. */
+export type AutoCheckState = 'running' | 'problems' | 'minor' | 'clear' | 'failed';
 
 export function AutoCheck(props: AutoCheckProps) {
-  const { items, pending, progress, asked } = props;
+  const { items, pending, failed, progress, asked } = props;
   const [open, setOpen] = useState(false);
   // a finding picked elsewhere (its diamond on the timeline) opens the findings on it — once the press is over: opened
   // inside the pointerdown, the focus the press then moves off it would close the popover at once
@@ -108,11 +111,11 @@ export function AutoCheck(props: AutoCheckProps) {
     if (!open) clearRangeHint();
   }, [open]);
   useEffect(() => clearRangeHint, []);
-  if (!items && !pending) return null;
+  if (!items && !pending && !failed) return null;
   const list = items || [];
   const main = list.filter((x) => x.severity !== 'nice');
   const minor = list.length - main.length;
-  const state: AutoCheckState = pending ? 'running' : main.length ? 'problems' : minor ? 'minor' : 'clear';
+  const state: AutoCheckState = pending ? 'running' : failed ? 'failed' : main.length ? 'problems' : minor ? 'minor' : 'clear';
   const pct = progress?.total ? Math.round(((progress.done ?? 0) / progress.total) * 100) : null;
   // the words beside the name (problems stand alone: the count is the news)
   const count =
@@ -122,7 +125,9 @@ export function AutoCheck(props: AutoCheckProps) {
         ? t('{n} to check|{n} to check', { n: main.length })
         : state === 'minor'
           ? t('{n} minor|{n} minor', { n: minor })
-          : null;
+          : state === 'failed'
+            ? t('Couldn’t read')
+            : null;
   const name =
     state === 'running'
       ? pct !== null
@@ -132,13 +137,17 @@ export function AutoCheck(props: AutoCheckProps) {
         ? t('Auto-check: {n} finding to check|Auto-check: {n} findings to check', { n: main.length })
         : state === 'minor'
           ? t('Auto-check: {n} minor finding|Auto-check: {n} minor findings', { n: minor })
-          : t('Auto-check: nothing found in V{v}', { v: props.v });
+          : state === 'failed'
+            ? t('Auto-check couldn’t read V{v}', { v: props.v })
+            : t('Auto-check: nothing found in V{v}', { v: props.v });
   const chip = (
     <button type="button" className={`ac-chip ${state}`} data-state={state} aria-label={name} data-testid="ac-chip">
       {state === 'running' ? (
         <Spinner />
       ) : state === 'problems' ? (
         <KeyGlyph shape="diamond" size={10} className="ac-chip-kg" />
+      ) : state === 'failed' ? (
+        <KeyGlyph shape="outline" size={10} className="ac-chip-kg" />
       ) : (
         <I name="fixed" size={14} className="ac-chip-ok" />
       )}
@@ -186,6 +195,7 @@ function AutoCheckFindings({
   aspect,
   items,
   pending,
+  failed,
   progress,
   timecodeOf,
   active,
@@ -226,13 +236,15 @@ function AutoCheckFindings({
     ? progress?.step
       ? `${progress.step}…`
       : t('Checking this version…')
-    : main.length
-      ? minor.length
-        ? t('{n} finding + {minor} minor|{n} findings + {minor} minor', { n: main.length, minor: minor.length })
-        : t('{n} finding|{n} findings', { n: main.length })
-      : minor.length
-        ? t('{n} minor finding|{n} minor findings', { n: minor.length })
-        : t('No issues found in V{v}', { v });
+    : failed
+      ? t('Couldn’t read V{v}', { v })
+      : main.length
+        ? minor.length
+          ? t('{n} finding + {minor} minor|{n} findings + {minor} minor', { n: main.length, minor: minor.length })
+          : t('{n} finding|{n} findings', { n: main.length })
+        : minor.length
+          ? t('{n} minor finding|{n} minor findings', { n: minor.length })
+          : t('No issues found in V{v}', { v });
   const textLine = done ? spellingLine(spelling, language) : null;
   const named = language ? languageName(language) : null;
   // Where a finding is, in pieces that never break inside — the timecodes, the length, the rest — so a narrow card
@@ -354,9 +366,9 @@ function AutoCheckFindings({
     );
   };
   return (
-    <section className={`autocheck ${pending ? 'running' : list.length ? 'found' : 'clear'}`} aria-label={t('Auto-check')}>
+    <section className={`autocheck ${pending ? 'running' : failed ? 'failed' : list.length ? 'found' : 'clear'}`} aria-label={t('Auto-check')}>
       <header className="ac-pop-head">
-        <I name={!pending && !list.length ? 'fixed' : 'autoCheck'} size={15} className="ac-icon" />
+        <I name={!pending && !failed && !list.length ? 'fixed' : 'autoCheck'} size={15} className="ac-icon" />
         <b>{t('Auto-check')}</b>
         <span className="ac-summary">{summary}</span>
         {onRerun && !pending && (
@@ -376,7 +388,12 @@ function AutoCheckFindings({
           </button>
         )}
         {(all || !main.length) && minor.length > 0 && <ul className="ac-list minor">{minor.map(row)}</ul>}
-        {!pending && !list.length && <p className="ac-clear">{t('Nothing to fix. Watch it for everything a machine can’t judge.')}</p>}
+        {!pending && failed && (
+          <p className="ac-clear ac-failed" data-testid="ac-failed">
+            {t('Auto-check couldn’t read this version’s file, so nothing was checked. Playing it and its notes aren’t affected.')}
+          </p>
+        )}
+        {!pending && !failed && !list.length && <p className="ac-clear">{t('Nothing to fix. Watch it for everything a machine can’t judge.')}</p>}
       </div>
       {!pending && (explain || textLine) && (
         <p className="ac-about">

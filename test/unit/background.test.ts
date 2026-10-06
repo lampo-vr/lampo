@@ -1,11 +1,12 @@
 // Jobs keyed by a render's bytes (server/background.ts): two videos can hold the same render (a copy tracked twice,
 // the same export uploaded to two folders). The one that asks second joins the job the first started — and must hear
-// its end too: the player waits for that event ("Checking this render…" stayed up for good before).
+// its end too: the player waits for that event ("Checking this render…" stayed up for good before). An Auto-check
+// that fails is remembered: every look at the player and every poll started it again, and "Checking…" never ended.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
-import { isolatedEnv, makeVideo, must, sleep } from '../lib/helpers.ts';
+import { isolatedEnv, makeVideo, must, sleep, until } from '../lib/helpers.ts';
 
 const { dir } = isolatedEnv();
 const store = await import('../../lib/store.ts');
@@ -91,4 +92,37 @@ test('a full queue: what someone asked for is refused with a clear answer, a war
   }
   // nothing was remembered as failed: asked again with room, the sprite starts
   assert.ok('pending' in background.startSprite(review) || 'sprite' in background.startSprite(review));
+});
+
+test('an Auto-check that fails is said, not started again on every ask; Run again tries once more', async (t) => {
+  const file = makeVideo(path.join(dir, 'd/export/unreadable.mp4'), { w: 160, h: 90, fps: 25, dur: 1, pattern: 'rgbtestsrc' });
+  const review = store.createOrGetReview(file, { by: 'tester' }).review;
+  const slug = slugify(review.video);
+  // the version's bytes as kept turn out unreadable: every ffmpeg run on them fails (a decode error, not a crash)
+  const kept = store.snapshotPath(slug, 1, path.extname(file));
+  fs.mkdirSync(path.dirname(kept), { recursive: true });
+  fs.writeFileSync(kept, Buffer.alloc(64 * 1024, 7));
+  const logged: string[] = [];
+  t.mock.method(console, 'error', (...a: unknown[]) => logged.push(a.join(' ')));
+  let ended = 0;
+  const broadcast = (type: string, data: { slug?: string }) => {
+    if (type === 'qa' && data.slug === slug) ended++;
+  };
+  const background = createBackground(
+    broadcast as never,
+    createPlayback(() => {}),
+    { projectFiles: false },
+  );
+  assert.ok('pending' in background.startQa(review, 1), 'the first ask starts the check');
+  await until(() => ended === 1, 'the player waiting on the check hears that it ended');
+  const failed = background.startQa(review, 1) as { none?: true; failed?: true; error?: string };
+  assert.ok(failed.none && failed.failed, `said as failed, not pending: ${JSON.stringify(failed)}`);
+  assert.ok(failed.error && !/ffmpeg|exited|Invalid data/i.test(failed.error), `a sentence of ours, never ffmpeg's output: ${failed.error}`);
+  assert.deepEqual(background.startQa(review, 1), failed, 'asking again starts nothing');
+  assert.equal(logged.filter((l) => l.startsWith('qa')).length, 1, "the server's log has the details, once");
+  // Run again: one more try, which fails the same way and is said again
+  assert.ok('pending' in background.startQa(review, 1, [], true), 'Run again starts it once more');
+  await until(() => ended === 2, 'its end is heard too');
+  assert.ok('failed' in background.startQa(review, 1));
+  assert.equal(logged.filter((l) => l.startsWith('qa')).length, 2);
 });

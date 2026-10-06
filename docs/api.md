@@ -776,7 +776,9 @@ Details:
   the version's bytes are gone.
 - **Work in the background.** Analysis, diff and Auto-check answer `{pending: true}` while the work runs: watch for
   the matching event and ask again. Diff and Auto-check answer `{none: true, error?}` when there is nothing to compute
-  (no version before, the bytes are gone); analysis answers `410` when the bytes are gone.
+  (no version before, the bytes are gone); analysis answers `410` when the bytes are gone. An Auto-check that ran and
+  couldn’t read the version answers `{none: true, failed: true, error}` (its event is sent too) and isn’t started again
+  by asking: `POST …/rerun` tries it once more.
 - **Freezes** (`Analysis.freezes`, `FreezeScan` in `lib/types.ts`): stretches where neither the picture as a whole nor
   any patch of it moves, each with `motion` — how the picture moves at its edges and inside it (`HoldMotion`). A scan
   by older rules (another `v`, or none) is made again on the next request; until then the answer is pending.

@@ -11,7 +11,7 @@ import { cutsFromDiffs, writeCuts } from './cuts.ts';
 import { FREEZE, holdListing, holdVerdict, LIMITS, SOUND_PEAK, stallMark, type Verdict } from './findings.ts';
 import { analysis, projectTracks } from './media.ts';
 import { cacheDir, dataDir } from './paths.ts';
-import { analysisRows, FFMPEG, lower, runBg, STDERR_KEEP, spawnMedia } from './probe.ts';
+import { analysisRows, FFMPEG, lower, runBg, STDERR_KEEP, selectFrames, spawnMedia } from './probe.ts';
 import { renderKey } from './renderKey.ts';
 import { wsKey } from './scope.ts';
 import { seekTime } from './shots.ts';
@@ -112,13 +112,13 @@ interface ExtractedFrame {
   file: string;
 }
 
-// Extract the given frame numbers (exact, by decode index) as JPEGs; returns [{frame, file}] in order.
-async function extractFrames(file: string, ver: Version, frames: number[], dir: string, prefix: string): Promise<ExtractedFrame[]> {
+/** Extract the given frame numbers (exact, by decode index) as JPEGs; returns [{frame, file}] in order. Exported for its
+ * test (select-frames.test.ts). */
+export async function extractFrames(file: string, ver: Version, frames: number[], dir: string, prefix: string): Promise<ExtractedFrame[]> {
   if (!frames.length) return [];
   const wanted = [...new Set(frames)].sort((a, b) => a - b);
-  const expr = wanted.map((n) => `eq(n\\,${n})`).join('+');
   const script = path.join(dir, `${prefix}.filter`);
-  fs.writeFileSync(script, `select='${expr}',showinfo,${ocrScale(ver)}`);
+  fs.writeFileSync(script, `select='${selectFrames(wanted)}',showinfo,${ocrScale(ver)}`);
   const { stderr } = await runBg(
     FFMPEG,
     [

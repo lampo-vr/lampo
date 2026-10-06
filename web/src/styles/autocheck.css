@@ -341,3 +341,7 @@
   font-size: var(--fs-sm);
   color: var(--ok);
 }
+/* it couldn't read the version: said plainly, never in the all-clear colour */
+.ac-clear.ac-failed {
+  color: var(--fg-2);
+}
