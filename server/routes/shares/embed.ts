@@ -16,6 +16,7 @@ import { cachedTranscript } from '../../../lib/transcripts.ts';
 import type { Chapter, EmbedResponse, OEmbedResponse, Review, ShareWithToken, Version } from '../../../lib/types.ts';
 import { suspensionOf } from '../../../lib/workspaces.ts';
 import type { ServerContext } from '../../context.ts';
+import { requestHost } from '../../guard.ts';
 import { versionBytes } from '../../helpers.ts';
 import { fail, query, router, VersionQuery } from '../../http.ts';
 import { badgeShown, embedOf, target, version } from './access.ts';
@@ -44,8 +45,12 @@ export function pageBase(ctx: ServerContext, req: Request): string {
   return `${req.protocol}://${host}`;
 }
 
-/** The token an embed's page or watch page names (`/e/<token>` or `/g/<token>` on this server), or null. */
-function tokenOf(ctx: ServerContext, url: string): { token: string; base: string } | null {
+/**
+ * The token an embed's page or watch page names (`/e/<token>` or `/g/<token>` on this server), or null. This server's
+ * own addresses only, so an answer never names another site: its public URL, else the name it was asked by or the
+ * machine's tunnel (whose name changes every time it starts).
+ */
+function tokenOf(ctx: ServerContext, req: Request, url: string): { token: string; base: string } | null {
   let u: URL;
   try {
     u = new URL(url);
@@ -53,9 +58,14 @@ function tokenOf(ctx: ServerContext, url: string): { token: string; base: string
     return null;
   }
   if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
-  // a hosted server answers for its own address only; the machine for whatever name it is reached by (the tunnel's
-  // changes every time it starts)
-  if (ctx.hosted && ctx.cfg.public_url && u.origin !== new URL(ctx.cfg.public_url).origin) return null;
+  const ours = (other: string | null) => {
+    try {
+      return !!other && new URL(other).origin === u.origin;
+    } catch {
+      return false;
+    }
+  };
+  if (ctx.cfg.public_url ? !ours(ctx.cfg.public_url) : u.hostname.replace(/^\[|\]$/g, '') !== requestHost(req) && !ours(ctx.tunnel.url)) return null;
   const m = /^\/[eg]\/([^/]+)$/.exec(u.pathname);
   return m && TOKEN.test(m[1] as string) ? { token: m[1] as string, base: u.origin } : null;
 }
@@ -155,7 +165,7 @@ export function embedRoutes(ctx: ServerContext): Router {
     const q = query(OEmbedQuery, req);
     // (oEmbed's own answer for a format it doesn't offer: said here, it is the asker's choice, not a fault of ours)
     if (q.format && q.format !== 'json') return void res.status(501).json({ error: 'Only the JSON format is offered.' });
-    const named = tokenOf(ctx, q.url);
+    const named = tokenOf(ctx, req, q.url);
     if (!named) throw fail(404, 'No embed at that address.');
     const ws = linkWorkspace(named.token);
     // a suspended workspace's links answer like ended ones (server/workspace.ts)

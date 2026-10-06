@@ -111,8 +111,9 @@ export function watchingOf(
     }
   }
   const bySlug = new Map(reviews.map((r) => [slugify(r.video), r]));
+  // (an embed sits on a site and waits for nobody in particular: nobody to remind)
   const unopened: InsightsUnopened[] = links
-    .filter((l) => !l.revoked && !(l.expires && Date.parse(l.expires) <= now) && !l.stats?.opens && (l.folder || (l.slug && bySlug.has(l.slug))))
+    .filter((l) => !l.revoked && !l.embed && !(l.expires && Date.parse(l.expires) <= now) && !l.stats?.opens && (l.folder || (l.slug && bySlug.has(l.slug))))
     .sort((a, b) => compareTime(a.created, b.created))
     .slice(0, UNOPENED)
     .map((l) => {

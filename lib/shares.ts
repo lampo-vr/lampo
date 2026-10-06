@@ -476,7 +476,7 @@ export function updateShare(token: string, input: ShareInput): ShareWithToken | 
 
 /** Every link with what happened through it, revoked ones too (what a client watched stays true after the link goes).
  * No tokens: for looking back (Insights, a video's viewers), never for serving. */
-export function linksWithStats(): Pick<Share, 'label' | 'slug' | 'folder' | 'created' | 'revoked' | 'expires' | 'stats' | 'id'>[] {
+export function linksWithStats(): Pick<Share, 'label' | 'slug' | 'folder' | 'created' | 'revoked' | 'expires' | 'stats' | 'id' | 'embed'>[] {
   return Object.values(load()).map((s) => ({
     label: s.label,
     slug: s.slug,
@@ -486,6 +486,7 @@ export function linksWithStats(): Pick<Share, 'label' | 'slug' | 'folder' | 'cre
     expires: s.expires,
     stats: s.stats,
     id: s.id,
+    ...(s.embed ? { embed: true } : {}),
   }));
 }
 

@@ -70,7 +70,7 @@ const quiet = makeVideo(path.join(dir, 'Clients/Acme/export/quiet.mp4'), { w: 18
 age(quiet);
 store.createOrGetReview(quiet, { by: 'tester' });
 
-const { request } = await startApp({ token: 'test-token', loadSessions: async () => [], ui: staticUi(dist) });
+const { request, base } = await startApp({ token: 'test-token', loadSessions: async () => [], ui: staticUi(dist) });
 const visitor = { 'x-forwarded-for': '203.0.113.9' };
 
 const make = async (body: object, at = enc) => request('POST', `/api/review/${at}/shares`, { body });
@@ -195,7 +195,7 @@ test('only the player’s page may be framed by another site; nothing it loads s
       body: { visitor: 'embed-visit-0001', slug: d.slug, v: d.v, seen: '1'.padEnd(25, '0'), secs: 1 },
       headers: visitor,
     }),
-    await request('GET', `/oembed?url=${encodeURIComponent(`http://example.test/e/${s.token}`)}`, { headers: visitor }),
+    await request('GET', `/oembed?url=${encodeURIComponent(`${base}/e/${s.token}`)}`, { headers: visitor }),
   ];
   for (const r of answers) assert.equal(r.headers['set-cookie'], undefined, `no cookie: ${r.status} ${r.text.slice(0, 80)}`);
 });
@@ -220,7 +220,7 @@ test('oEmbed: the iframe, its size, the title and the poster for an Embed link; 
   const s = await embedLink();
   const d = await ready(s.token);
   const ask = (url: string, more = '') => request('GET', `/oembed?url=${encodeURIComponent(url)}${more}`, { headers: visitor });
-  const r = await ask(`https://films.example.test/e/${s.token}`, '&format=json');
+  const r = await ask(`${base}/e/${s.token}`, '&format=json');
   assert.equal(r.status, 200, r.text);
   assert.equal(r.headers['access-control-allow-origin'], '*');
   const o = r.json();
@@ -241,31 +241,32 @@ test('oEmbed: the iframe, its size, the title and the poster for an Embed link; 
   assert.equal(o.provider_name, 'Lampo');
   assert.equal(
     o.html,
-    `<iframe src="https://films.example.test/e/${s.token}" width="320" height="180" title="launch-film.mp4" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>`,
+    `<iframe src="${base}/e/${s.token}" width="320" height="180" title="launch-film.mp4" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>`,
   );
-  assert.equal(o.thumbnail_url, `https://films.example.test${d.poster}`);
+  assert.equal(o.thumbnail_url, `${base}${d.poster}`);
   assert.deepEqual([o.thumbnail_width, o.thumbnail_height], [640, 360]);
   // its watch page's address answers the same; bounds scale it down, never up
-  const watch = (await ask(`https://films.example.test/g/${s.token}`, '&maxwidth=160')).json();
+  const watch = (await ask(`${base}/g/${s.token}`, '&maxwidth=160')).json();
   assert.deepEqual([watch.width, watch.height], [160, 90]);
   assert.match(watch.html, /width="160" height="90"/);
-  assert.deepEqual([(await ask(`https://films.example.test/e/${s.token}`, '&maxwidth=2000&maxheight=90')).json().height, 0], [90, 0], 'the tighter bound wins');
+  assert.deepEqual([(await ask(`${base}/e/${s.token}`, '&maxwidth=2000&maxheight=90')).json().height, 0], [90, 0], 'the tighter bound wins');
 
   const review = (await make({ label: 'Mia' })).json();
   const revoked = await embedLink();
   await request('DELETE', `/api/shares/${revoked.token}`);
   const expired = await embedLink({ expires: new Date(Date.now() - 60_000).toISOString() });
   for (const [url, why] of [
-    [`https://films.example.test/g/${review.token}`, 'a review link'],
-    [`https://films.example.test/e/${revoked.token}`, 'a revoked embed'],
-    [`https://films.example.test/e/${expired.token}`, 'an expired embed'],
-    ['https://films.example.test/e/AAAAAAAAAAAAAAAAAAAAAAAA', 'an unknown token'],
-    [`https://films.example.test/x/${s.token}`, 'another path'],
-    [`ftp://films.example.test/e/${s.token}`, 'another scheme'],
+    [`${base}/g/${review.token}`, 'a review link'],
+    [`${base}/e/${revoked.token}`, 'a revoked embed'],
+    [`${base}/e/${expired.token}`, 'an expired embed'],
+    [`${base}/e/AAAAAAAAAAAAAAAAAAAAAAAA`, 'an unknown token'],
+    [`${base}/x/${s.token}`, 'another path'],
+    [`ftp://127.0.0.1/e/${s.token}`, 'another scheme'],
+    [`https://films.example.test/e/${s.token}`, 'another site’s address: an answer never names it'],
     ['not a url', 'not an address'],
   ] as const)
     assert.equal((await ask(url)).status, 404, why);
-  assert.equal((await ask(`https://films.example.test/e/${s.token}`, '&format=xml')).status, 501, 'JSON only');
+  assert.equal((await ask(`${base}/e/${s.token}`, '&format=xml')).status, 501, 'JSON only');
   assert.equal((await request('GET', '/oembed', { headers: visitor })).status, 400, 'no address');
 });
 
@@ -314,6 +315,18 @@ test('a visit counts on the first play like a Watch only link’s, once per half
     (await request('POST', `/api/g/${s.token}/visit`, { body: { visitor: 'embed-visit-0002', slug: 'v_AAAAAAAAAAAAAAAA', v: 1 }, headers: visitor })).status,
     404,
   );
+});
+
+test('Insights never lists an embed among the links nobody opened: there is nobody to remind', async () => {
+  const { watchingOf } = await import('../../lib/insightsWatch.ts');
+  const quietSlug = slugOf(quiet);
+  const watch = (await make({ label: 'Watch, never opened', comment: false, approve: false }, encodeURIComponent(quietSlug))).json();
+  await make({ label: 'Embed, never played', embed: true }, encodeURIComponent(quietSlug));
+  const review = store.loadReview(quietSlug);
+  assert.ok(review);
+  const unopened = watchingOf([review], 0, Date.now() + 1).unopened.map((u) => u.label);
+  assert.ok(unopened.includes(watch.label), `a watch-only link is listed: ${unopened}`);
+  assert.ok(!unopened.includes('Embed, never played'), `an embed isn’t: ${unopened}`);
 });
 
 test('the token in the path never reaches the log', () => {

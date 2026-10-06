@@ -327,7 +327,10 @@ try {
     // full screen: the page around it allowed it (allowfullscreen)
     await p.keyboard.press('f');
     await frame.waitForFunction(() => !!document.fullscreenElement, { timeout: 5000 });
-    await until(async () => (await frame.$eval('[data-testid=em-full]', (e) => e.getAttribute('aria-label'))) === 'Exit full screen', 'the button says how to leave');
+    await until(
+      async () => (await frame.$eval('[data-testid=em-full]', (e) => e.getAttribute('aria-label'))) === 'Exit full screen',
+      'the button says how to leave',
+    );
     await shot(p, 'embed-05-fullscreen-1440');
     await p.keyboard.press('f');
     await frame.waitForFunction(() => !document.fullscreenElement, { timeout: 5000 });

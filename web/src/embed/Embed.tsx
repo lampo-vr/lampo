@@ -154,14 +154,16 @@ function Player({ d, token, options, again }: { d: EmbedResponse; token: string;
     if (video) video.muted = true;
     setMuted(true);
   }, [options.muted, video, setMuted]);
+  // it starts by itself, muted, with neither the play button nor the bar in the way; a browser that refuses (a battery
+  // saver, a site that may not autoplay) leaves the play button
   const autoplayed = useRef(false);
+  const [refused, setRefused] = useState(false);
   useEffect(() => {
     if (!options.autoplay || !video || !d.media || autoplayed.current) return;
     autoplayed.current = true;
     video.muted = true;
-    setStarted(true);
-    play();
-  }, [options.autoplay, video, d.media, play]);
+    video.play().catch(() => setRefused(true));
+  }, [options.autoplay, video, d.media]);
   // a source that stays broken (the link revoked or expired while it played, after recover.ts tried again): ask
   useEffect(() => {
     if (!video) return;
@@ -279,7 +281,7 @@ function Player({ d, token, options, again }: { d: EmbedResponse; token: string;
     if (options.controls) wake();
   };
 
-  const showBig = options.controls && !started && !pb.playing;
+  const showBig = options.controls && !started && !pb.playing && (!options.autoplay || refused);
   const aspect = d.width / d.height || 16 / 9;
   return (
     <div
