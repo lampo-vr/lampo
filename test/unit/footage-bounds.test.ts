@@ -60,12 +60,14 @@ test('a single long take is read a chunk at a time: no picture job decodes from 
   store.createOrGetReview(take, { by: 'tester' });
   fs.rmSync(path.join(work, 'args'), { force: true });
   assert.equal(await indexNow(targets(), { e }), 1);
-  // the picture jobs: one ffmpeg each, its frames picked by select=eq(n,…) counted from the first one sought to
+  // the picture jobs: one ffmpeg each, its frames picked by a select (lib/probe.ts selectFrames: eq(n,f) for a frame,
+  // between(n,a,b)*… for evenly spaced ones) counted from the first one sought to
   const spans = fs
     .readFileSync(path.join(work, 'args'), 'utf8')
     .split('\n')
-    .filter((l) => l.includes("select='eq(n"))
-    .map((l) => Math.max(...[...l.matchAll(/eq\(n\\?,(\d+)\)/g)].map((m) => Number(m[1]))));
+    .filter((l) => l.includes("select='"))
+    .map((l) => Math.max(...[...l.matchAll(/(?:eq\(n\\?,|between\(n\\?,\d+\\?,)(\d+)\)/g)].map((m) => Number(m[1]))));
   assert.ok(spans.length >= 2, `${spans.length} picture jobs`);
+  assert.ok(spans.every(Number.isFinite), `every picture job's frames read: ${spans}`);
   assert.ok(Math.max(...spans) <= CHUNK_FRAMES, `a picture job decoded ${Math.max(...spans)} frames past its first keyframe`);
 });
