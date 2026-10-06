@@ -1337,6 +1337,7 @@ function PlayerView({
             aspect={W / H}
             items={qa.suggestions}
             pending={qa.pending}
+            failed={qa.failed}
             progress={qa.progress}
             language={qa.language}
             spelling={qa.spelling}

@@ -22,15 +22,23 @@ import type { DiffResult, QaResult, Review, TranscriptAnswer, Version } from '..
 import type { Broadcast } from './events.ts';
 import type { Playback } from './playback.ts';
 
-/** A cached result, or a note that it is being computed / cannot be. */
-export type Started<K extends string, T> = ({ [key in K]: T } & { pending?: undefined; none?: undefined }) | { pending: true } | { none: true; error?: string };
+/** A cached result, or a note that it is being computed / cannot be (`failed`: it ran and couldn't be made). */
+export type Started<K extends string, T> =
+  | ({ [key in K]: T } & { pending?: undefined; none?: undefined })
+  | { pending: true }
+  | { none: true; error?: string; failed?: true };
+
+/** What a pre-review that couldn't read its render says, to `vr qa` and the API (the player has its own words): never
+ * ffmpeg's output, which goes to the server's log. */
+export const QA_FAILED = 'the pre-review could not read this version; `vr qa --rerun` tries it again';
 
 export interface Background {
   /** Everything the latest version needs before someone opens it. */
   warm(review: Review): void;
   /** `languages`: the account's (prefs.voice_languages) when someone asked; the on-screen text is read in the
-   * transcript's language, these and the server's speech languages first (lib/text/language.ts). */
-  startQa(review: Review, v: number, languages?: string[]): Started<'qa', QaResult>;
+   * transcript's language, these and the server's speech languages first (lib/text/language.ts). A check that failed
+   * answers `failed` until `again` (Run again) tries it once more. */
+  startQa(review: Review, v: number, languages?: string[], again?: boolean): Started<'qa', QaResult>;
   startDiff(review: Review, v: number): Started<'diff', DiffResult>;
   /** Any two versions compared, waiting for the result (queued like every heavy job): carrying an approval over. */
   compare(review: Review, oldV: number, newV: number): Promise<DiffResult>;
@@ -169,8 +177,13 @@ export function createBackground(broadcast: Broadcast, playback: Playback, { pro
     );
   }
 
+  // A check that failed on a render (ffmpeg couldn't read it) isn't started again by itself: every look at the player,
+  // its poll and `vr qa`'s poll each started it again, and the player said "Checking…" for good. Until the next start
+  // or Run again; a full queue is no failure.
+  const qaFailed = new Set<string>();
+
   // Automatic pre-review of a version (OCR typos, safe zones, flash/black frames, loudness, clipping, freezes).
-  function startQa(review: Review, v: number, languages: string[] = []): Started<'qa', QaResult> {
+  function startQa(review: Review, v: number, languages: string[] = [], again = false): Started<'qa', QaResult> {
     const ver = review.versions.find((x) => x.v === v);
     if (!ver) return { none: true };
     const hit = cachedQa(ver);
@@ -179,6 +192,8 @@ export function createBackground(broadcast: Broadcast, playback: Playback, { pro
     if (!store.versionAvailable(review, ver.v)) return { none: true, error: 'the bytes of this version are gone' };
     // Another video with the same render may be checking it already: this one waits for the same result.
     const key = renderKey(ver);
+    if (again && !qaJobs.busy(key)) qaFailed.delete(wsKey(key));
+    if (qaFailed.has(wsKey(key))) return { none: true, failed: true, error: QA_FAILED };
     if (!qaJobs.busy(key)) needJobRoom();
     if (qaJobs.join(key, slug, v)) {
       const hash = key;
@@ -195,7 +210,13 @@ export function createBackground(broadcast: Broadcast, playback: Playback, { pro
           () => {
             for (const w of qaJobs.waiting(hash)) broadcast('qa', w);
           },
-          (e: Error) => removed(review) || console.error('qa', e.message),
+          (e: Error) => {
+            if (e instanceof QueueFullError) return;
+            qaFailed.add(wsKey(hash));
+            if (!removed(review)) console.error('qa', e.message);
+            // the players waiting on it ask again and hear that it failed
+            for (const w of qaJobs.waiting(hash)) broadcast('qa', w);
+          },
         )
         .finally(() => qaJobs.done(hash));
     }

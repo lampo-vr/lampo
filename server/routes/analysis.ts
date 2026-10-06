@@ -61,7 +61,8 @@ export function analysisRoutes(ctx: ServerContext): Router {
     const review = getReview(req.params.slug);
     const ver = getVersion(review, req.params.v);
     fs.rmSync(path.join(cacheDir(), 'qa', `${renderKey(ver)}.json`), { force: true });
-    res.json(background.startQa(review, ver.v, languagesOf(req)));
+    // Run again tries a check that failed once more
+    res.json(background.startQa(review, ver.v, languagesOf(req), true));
   });
 
   r.post('/api/qa/:slug/dismiss', express.json(), (req, res) => {

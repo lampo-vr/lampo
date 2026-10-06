@@ -25,6 +25,8 @@ format stays backwards compatible throughout.
   the bottom of the notes sheet instead of letting the note show beneath it.
 - Auto-check works again on videos longer than about 50 seconds with current FFmpeg releases (5.1.9, 7.1.4, 8.0.2
   and later), which refused how it picked the frames to read; it still reads exactly the same frames.
+- When Auto-check can't read a version, the player and the inbox say so, with Run again, instead of "Checking…" for
+  good, and it is no longer started again every time someone opens the video.
 
 ## [0.1.0] - 2026-10-06
 

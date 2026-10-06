@@ -420,11 +420,13 @@ function RenderFacts({ item, review, ver }: { item: ForYouItem; review: Review; 
   const found = qa.data?.items ? undismissed(qa.data.items, review, ver.fps) : undefined;
   const check = qa.data?.pending
     ? t('Looking at it…')
-    : found
-      ? found.length
-        ? t('{n} thing to look at|{n} things to look at', { n: found.length })
-        : t('Nothing found')
-      : null;
+    : qa.data?.failed
+      ? t('Couldn’t read this version')
+      : found
+        ? found.length
+          ? t('{n} thing to look at|{n} things to look at', { n: found.length })
+          : t('Nothing found')
+        : null;
   return (
     <div className="inbox-pv-render" data-testid="inbox-pv-render">
       <dl className="inbox-pv-facts">

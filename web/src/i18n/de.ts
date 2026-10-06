@@ -3277,6 +3277,13 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Auto-check: checking this version, {pct}%': 'Auto-Check: prüft diese Version, {pct} %',
   'Auto-check: nothing found in V{v}': 'Auto-Check: nichts gefunden in V{v}',
   'Checking…': 'Prüft …',
+  // Auto-check couldn't read the version (player/AutoCheck.tsx, inbox/Preview.tsx)
+  'Auto-check couldn’t read V{v}': 'Auto-Check konnte V{v} nicht lesen',
+  'Auto-check couldn’t read this version’s file, so nothing was checked. Playing it and its notes aren’t affected.':
+    'Auto-Check konnte die Datei dieser Version nicht lesen, also wurde nichts geprüft. Abspielen und Notizen funktionieren wie immer.',
+  'Couldn’t read': 'Nicht lesbar',
+  'Couldn’t read V{v}': 'V{v} nicht lesbar',
+  'Couldn’t read this version': 'Diese Version war nicht lesbar',
   'No {tag} notes here': 'Hier keine Notizen mit {tag}',
   'No tags yet · type # in a note': 'Noch keine Tags · tippe # in eine Notiz',
   'Show every tag': 'Alle Tags zeigen',
