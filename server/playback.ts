@@ -4,6 +4,7 @@
 // always use the original bytes.
 import fs from 'node:fs';
 import path from 'node:path';
+import { pipeline } from 'node:stream';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { heavy, jobRoom, PRIORITY, QueueFullError } from '../lib/jobs.ts';
@@ -337,11 +338,14 @@ export function streamFile(
   const ext = path.extname(file).toLowerCase();
   res.setHeader('Content-Type', ext === '.webm' ? 'video/webm' : ext === '.mkv' ? 'video/x-matroska' : ext === '.m4a' ? 'audio/mp4' : 'video/mp4');
   res.setHeader('Accept-Ranges', 'bytes');
+  // a version's bytes never change under the same name: the date lets a browser resume a download it broke off
+  res.setHeader('Last-Modified', st.mtime.toUTCString());
   res.setHeader('Cache-Control', cache ?? (immutable ? 'private, max-age=31536000, immutable' : 'no-cache'));
   const range = req.headers.range && /bytes=(\d*)-(\d*)/.exec(req.headers.range);
   if (!range) {
     res.setHeader('Content-Length', st.size);
-    fs.createReadStream(file).pipe(res);
+    // pipeline, not pipe: a viewer who aborts (a seek, a closed tab) closes the file too; pipe left it open for good
+    pipeline(fs.createReadStream(file), res, () => {});
     return;
   }
   let start = range[1] === '' ? st.size - Number(range[2]) : Number(range[1]);
@@ -356,5 +360,5 @@ export function streamFile(
   res.status(206);
   res.setHeader('Content-Range', `bytes ${start}-${end}/${st.size}`);
   res.setHeader('Content-Length', end - start + 1);
-  fs.createReadStream(file, { start, end }).pipe(res);
+  pipeline(fs.createReadStream(file, { start, end }), res, () => {});
 }

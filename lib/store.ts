@@ -568,6 +568,8 @@ const CONTENT_TYPE: Record<string, string> = { '.webm': 'video/webm', '.mkv': 'v
 export function uploadName(name: string): string {
   const base = path
     .basename(String(name).replace(/\\/g, '/'))
+    // a lone surrogate (JSON can carry one) would make every URL built from the name throw in the browser
+    .toWellFormed()
     .normalize('NFC')
     .replace(/\p{Cc}/gu, '')
     // one line: a line or paragraph separator would start one wherever the name is printed

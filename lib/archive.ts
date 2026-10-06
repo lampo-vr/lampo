@@ -53,6 +53,7 @@ const trimEnds = (s: string) => s.trim().replace(/^[. ]+|[. ]+$/g, '');
 export function safeSegment(raw: string, fallback = '_', max = 120): string {
   const cleaned = trimEnds(
     raw
+      .toWellFormed()
       .normalize('NFC')
       .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, '')
       .replace(/[\\/:*?"<>|]/g, '_')

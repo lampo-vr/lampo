@@ -24,6 +24,10 @@ format stays backwards compatible throughout.
   link is an embed from when it is made: an existing link doesn't become one, nor an embed another kind of link.
 
 ### Fixed
+- Video playback, downloads and review-link files that were cut short (a seek, a closed tab) no longer leave the file
+  open on the server; and a version's file says when it was made, so a browser can resume a download.
+- A video whose file name held a broken character no longer breaks the library for the whole workspace: names are made
+  well-formed when they come in.
 - The skill dialog's instructions field was one line high until you typed.
 - A playbook opened on its suggestions (the inbox's *Open the playbook*) put the focus on Reject, so Enter opened the
   reject form instead of accepting: Accept has it now, on the suggestion the inbox showed.
