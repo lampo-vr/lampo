@@ -186,11 +186,32 @@ try {
     await shot('folder');
   });
 
+  /** The instructions' field and the dialog around it: heights in lines, whether the dialog's body or the field scrolls. */
+  const skillBox = () =>
+    page.evaluate(() => {
+      const ta = document.querySelector('[data-testid=pb-skill-body]');
+      const pane = document.querySelector('.pb-skill-pane');
+      const body = document.querySelector('[role=dialog] .modal-body');
+      const files = document.querySelector('.pb-skill-files');
+      const lh = parseFloat(getComputedStyle(ta).lineHeight);
+      return {
+        lines: ta.getBoundingClientRect().height / lh,
+        pane: Math.round(pane.getBoundingClientRect().height),
+        filesTop: Math.round(files.getBoundingClientRect().top),
+        bodyScrolls: body.scrollHeight > body.clientHeight + 1,
+        fieldScrolls: ta.scrollHeight > ta.clientHeight + 1,
+        dialog: document.querySelector('[role=dialog]').getBoundingClientRect().height,
+      };
+    });
+
   await check('a skill: written in the dialog, stored as SKILL.md for agents', async () => {
     await page.click('[data-testid=pb-new-skill]');
     await page.waitForSelector('[data-testid=pb-skill-dialog]');
     await page.type('[data-testid=pb-skill-name]', 'reels export');
     await page.type('[data-testid=pb-skill-desc]', 'Export a reel for Instagram and TikTok');
+    // a place to write: at least twelve lines before anything is typed
+    const empty = await skillBox();
+    assert(empty.lines >= 12, `the empty field is ${empty.lines.toFixed(1)} lines high`);
     await page.type('[data-testid=pb-skill-body]', '1. Render the Reel_Master comp\n2. -14 LUFS');
     await page.click('[data-testid=pb-skill-save]');
     await page.waitForSelector('[data-testid=pb-skill-dialog]', { hidden: true });
@@ -198,6 +219,32 @@ try {
     const skill = await api(`/api/playbook/skill?folder=${e(FOLDER)}&name=reels-export`);
     assert(skill.markdown.startsWith('---\nname: reels-export\n') && skill.markdown.includes('Export a reel for Instagram'), `SKILL.md ${skill.markdown}`);
     await until(async () => (await agents()).includes('reels-export'), 'agents read it');
+  });
+
+  await check('the skill’s instructions grow with the text until the dialog is full, then scroll inside; Write and Preview are one box', async () => {
+    await page.click('[data-testid=pb-skill-row]');
+    await page.waitForSelector('[data-testid=pb-skill-dialog]');
+    await page.click('.pb-skill > .seg button:first-child');
+    await page.waitForFunction(() => document.activeElement?.matches('[data-testid=pb-skill-body]'));
+    const before = await skillBox();
+    await page.keyboard.press('End');
+    await page.keyboard.down('Meta');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.up('Meta');
+    await page.keyboard.type(Array.from({ length: 16 }, (_, i) => `\n${i + 3}. Check step ${i + 3}`).join(''));
+    const grown = await skillBox();
+    assert(grown.pane > before.pane && !grown.bodyScrolls, `it grew (${before.pane} → ${grown.pane} px), the dialog's body still: ${JSON.stringify(grown)}`);
+    await page.keyboard.type(Array.from({ length: 40 }, (_, i) => `\n${i + 19}. Check step ${i + 19}`).join(''));
+    const full = await skillBox();
+    assert(full.fieldScrolls && !full.bodyScrolls, `full: the field scrolls, not the dialog: ${JSON.stringify(full)}`);
+    assert(full.dialog <= 900 - 64 + 1, `the dialog stays inside the window: ${full.dialog}`);
+    await shot('skill-dialog-full');
+    await page.click('.pb-skill > .seg button:last-child');
+    await page.waitForSelector('[data-testid=pb-skill-preview]');
+    const preview = await skillBox();
+    assert(preview.pane === full.pane && preview.filesTop === full.filesTop, `Preview keeps the box: ${JSON.stringify({ full, preview })}`);
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('[data-testid=pb-skill-dialog]', { hidden: true });
   });
 
   const suggest = (content, reason) => api('/api/playbook/proposals', 'POST', { folder: FOLDER, section: 'rules', content, reason, by: 'agent:promo-edit' });
@@ -343,6 +390,20 @@ try {
     await page.keyboard.press('Escape');
     await page.waitForSelector('[role=dialog]', { hidden: true });
     await shot('phone');
+    // a skill is written on the whole screen: the sheet at its tallest, the instructions taking what it leaves
+    await page.click('[data-testid=pb-new-skill]');
+    await page.waitForSelector('[data-testid=pb-skill-dialog]');
+    await page.waitForFunction(() => {
+      const d = document.querySelector('[role=dialog]')?.getBoundingClientRect();
+      return d && Math.abs(d.bottom - innerHeight) < 1 && d.height >= innerHeight - 25;
+    });
+    const sheet = await skillBox();
+    assert(sheet.lines >= 12 && !sheet.bodyScrolls, `the field fills the sheet: ${JSON.stringify(sheet)}`);
+    const foot = await page.$$eval('[role=dialog] .modal-foot .btn', (bs) => new Set(bs.map((b) => Math.round(b.getBoundingClientRect().top))).size);
+    assert(foot === 1, `the actions keep one row: ${foot}`);
+    await shot('phone-skill');
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('[role=dialog]', { hidden: true });
     await page.setViewport({ width: 1440, height: 900 });
   });
 

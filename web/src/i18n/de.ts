@@ -1916,7 +1916,7 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'From the {name} playbook — change it there.': 'Aus dem Playbook {name} – dort änderst du ihn.',
   History: 'Verlauf',
   House: 'Studio',
-  'Import SKILL.md': 'SKILL.md importieren',
+  'Import SKILL.md…': 'SKILL.md importieren …',
   Instructions: 'Anleitung',
   'Loading the playbook': 'Das Playbook lädt',
   'Lowercase letters, digits and hyphens, like export-reels': 'Kleinbuchstaben, Ziffern und Bindestriche, z. B. export-reels',

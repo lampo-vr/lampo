@@ -1799,7 +1799,7 @@ export const EN = [
   'Illustration · not your data',
   'Image',
   'Image or clip…',
-  'Import SKILL.md',
+  'Import SKILL.md…',
   'Imprint',
   'In',
   'in {folder}',

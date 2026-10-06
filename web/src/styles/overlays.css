@@ -89,6 +89,17 @@
   padding: 0;
   overflow: hidden;
 }
+/* A dialog to write in (Modal `writing`: a skill's instructions): the body is a column and its `.modal-grow` part takes
+   whatever room the dialog has. It grows with its text until the dialog meets the screen's edge, then scrolls inside,
+   while the fields above it and the actions below stay where they are. */
+.modal.writing > .modal-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+}
+.modal.writing .modal-grow {
+  flex: 1 1 auto;
+}
 .modal-foot {
   display: flex;
   align-items: center;

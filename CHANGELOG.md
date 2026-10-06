@@ -15,6 +15,12 @@ format stays backwards compatible throughout.
   cookie, and stops wherever it is the moment the link is revoked or expires. Sites that embed from an address find it
   through oEmbed.
 
+### Changed
+- **The skill dialog is a place to write.** The instructions start twelve lines high and grow with the text until the
+  dialog is full, then scroll inside while the name, the files and the actions stay put; Write and Preview are one box,
+  so switching moves nothing; on a phone the dialog takes the whole screen. Import and Copy sit together under
+  *SKILL.md*. An open brief or rules editor starts with room for a paragraph.
+
 ### Fixed
 - An account deleted, disabled or given a new password while someone signs in to it gets no session and sends no
   sign-in email: the answer is the same as for any wrong sign-in.
@@ -23,6 +29,7 @@ format stays backwards compatible throughout.
   on Send.
 - On a phone, a long note keeps the line you are typing above the pinned Save and Send, and that bar sits flush with
   the bottom of the notes sheet instead of letting the note show beneath it.
+- The skill dialog's instructions field was one line high until you typed.
 
 ## [0.1.0] - 2026-10-06
 
