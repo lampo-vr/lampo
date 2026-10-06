@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Lampo</title>
+    <!-- The timecode's face and the words', fetched with the page: a timecode drawn in a stand-in font first would
+         change width under the viewer -->
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="../node_modules/@fontsource-variable/martian-mono/files/martian-mono-latin-standard-normal.woff2" />
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="../node_modules/@fontsource-variable/instrument-sans/files/instrument-sans-latin-standard-normal.woff2" />
+  </head>
+  <body class="em-body">
+    <div id="root"></div>
+    <script type="module" src="/src/embed/main.tsx"></script>
+  </body>
+</html>

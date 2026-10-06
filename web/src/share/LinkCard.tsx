@@ -7,9 +7,11 @@ import { t } from '../i18n/index.ts';
 import { isProject } from '../lib/folders.ts';
 import { ago, pct } from '../lib/format.ts';
 import { copyText, toast } from '../lib/toast.ts';
+import { Code } from '../settings/parts.tsx';
 import { I } from '../ui/icons.tsx';
 import { IconButton, Menu } from '../ui/primitives.tsx';
 import { lang } from './dates.ts';
+import { embedCode, embedSrc } from './embedCode.ts';
 // its styles come with it: Settings → Review links shows these lines without the share dialog having loaded
 import '../styles/share-links.css';
 
@@ -32,6 +34,7 @@ export function whatOf(s: ShareInfo): string {
 
 /** What visitors may do, in the kind's word where it is one. */
 function kindOf(s: ShareInfo): string {
+  if (s.embed) return t('Embed');
   if (!s.comment) return s.download === 'original' ? t('Delivery') : t('Watch only');
   return s.approve ? t('Notes and approval') : t('Notes');
 }
@@ -55,6 +58,8 @@ function activityOf(s: ShareInfo): string {
 
 interface Props {
   s: ShareInfo;
+  /** An embed just made: its line opens with its code in view. */
+  opened?: boolean;
   url: string;
   reach: Reach;
   /** Where the line is shown: a video's dialog names a folder link's folder; Settings names what every link opens. */
@@ -66,20 +71,31 @@ interface Props {
   onRevoke: () => void;
 }
 
-export function LinkCard({ s, url, reach, here, canShare, editing, onEdit, onRevoke }: Props) {
+export function LinkCard({ s, opened = false, url, reach, here, canShare, editing, onEdit, onRevoke }: Props) {
   const [copied, setCopied] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(opened);
+  useEffect(() => {
+    if (opened) setOpen(true);
+  }, [opened]);
   useEffect(() => {
     if (!copied) return;
     const id = setTimeout(() => setCopied(false), 1600);
     return () => clearTimeout(id);
   }, [copied]);
+  // an embed's line always opens: its code is there, then what came of it
   const any = !!(s.stats.opens || s.stats.notes || s.stats.downloads || s.activity.events.length);
+  const opens = any || !!s.embed;
+  // an embed: the player's address, and the code a site pastes; Copy copies the code
+  const player = embedSrc(url);
+  const code = s.embed ? embedCode({ src: player, title: s.name ?? s.label, width: s.width, height: s.height }) : null;
   const copy = async () => {
-    if (await copyText(url)) {
+    if (await copyText(code ?? url)) {
       setCopied(true);
-      toast(t('Copied · {reach}', { reach: reachText(reach) }), 'ok');
+      toast(code ? t('Embed code copied · {reach}', { reach: reachText(reach) }) : t('Copied · {reach}', { reach: reachText(reach) }), 'ok');
     }
+  };
+  const copyPlayer = async () => {
+    if (await copyText(player)) toast(t('Copied · {reach}', { reach: reachText(reach) }), 'ok');
   };
   const until =
     s.expires && !s.expired ? t('until {date}', { date: new Date(s.expires).toLocaleDateString(lang(), { day: 'numeric', month: 'short' }) }) : null;
@@ -97,8 +113,8 @@ export function LinkCard({ s, url, reach, here, canShare, editing, onEdit, onRev
   return (
     <article className={`link-row ${s.expired ? 'expired' : ''} ${open ? 'open' : ''}`} aria-label={t('Review link “{label}”', { label: s.label })}>
       <div className="link-head">
-        <I name={s.kind === 'folder' ? 'folder' : 'link'} size={16} className="link-icon" />
-        {any ? (
+        <I name={s.kind === 'folder' ? 'folder' : s.embed ? 'embed' : 'link'} size={16} className="link-icon" />
+        {opens ? (
           <button type="button" className="link-title link-open" aria-expanded={open} onClick={() => setOpen((x) => !x)} data-testid="link-sum">
             {name}
             <span className="link-sub ellipsis">{line}</span>
@@ -125,7 +141,8 @@ export function LinkCard({ s, url, reach, here, canShare, editing, onEdit, onRev
               type="button"
               className={`btn sm ghost link-copy ${copied ? 'done' : ''}`}
               onClick={copy}
-              aria-label={copied ? t('Copied') : t('Copy link')}
+              aria-label={copied ? t('Copied') : code ? t('Copy embed code') : t('Copy link')}
+              data-testid="link-copy"
             >
               <I name={copied ? 'check' : 'copy'} size={14} />
               <span className="link-copy-word">{copied ? t('Copied') : t('Copy')}</span>
@@ -137,6 +154,8 @@ export function LinkCard({ s, url, reach, here, canShare, editing, onEdit, onRev
             }
             items={[
               !s.gone && { label: t('Change link'), icon: 'edit', onClick: onEdit },
+              // a site that embeds from an address (oEmbed: WordPress, Notion, …) takes the player's
+              !!code && !s.expired && !s.gone && { label: t('Copy the player’s address'), icon: 'link', onClick: copyPlayer },
               any && { label: open ? t('Hide activity') : t('Activity'), icon: 'users', onClick: () => setOpen((x) => !x) },
               'sep',
               { label: t('Revoke'), icon: 'x', danger: true, onClick: onRevoke },
@@ -145,7 +164,12 @@ export function LinkCard({ s, url, reach, here, canShare, editing, onEdit, onRev
         </div>
       </div>
 
-      {open && (
+      {open && code && !s.expired && !s.gone && (
+        <section className="link-embed" aria-label={t('Embed code')} data-testid="link-embed-code">
+          <Code copy={false}>{code}</Code>
+        </section>
+      )}
+      {open && any && (
         <Suspense fallback={<div className="link-activity-wait" />}>
           <LinkActivity s={s} />
         </Suspense>

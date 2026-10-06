@@ -4445,6 +4445,14 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Your data is downloading': 'Deine Daten werden heruntergeladen',
   'Your profile, picture, drafts, unsent recordings, devices and sign-ins go for good. The notes you wrote stay in their workspaces, signed with your name.':
     'Profil, Bild, Entwürfe, nicht gesendete Aufnahmen, Geräte und Anmeldungen werden endgültig gelöscht. Deine Notizen bleiben in ihren Workspaces, mit deinem Namen.',
+  // an Embed link: the share dialog's fourth kind, its code and the player's address
+  Embed: 'Einbettung',
+  'Embed code': 'Einbettungscode',
+  'Copy embed code': 'Einbettungscode kopieren',
+  'Copy the player’s address': 'Adresse des Players kopieren',
+  'Embed code copied · {reach}': 'Einbettungscode kopiert · {reach}',
+  'Embed code copied · reachable by {reach}': 'Einbettungscode kopiert · erreichbar für {reach}',
+  'Plays for anyone who sees it': 'Läuft für alle, die es sehen',
 };
 
 export const de: Record<Key, string> = { ...owner, ...client };

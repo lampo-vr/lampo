@@ -157,15 +157,17 @@ export function LinkSettings({
   // left once with something typed: a short password says so then, not with every key
   const [left, setLeft] = useState(false);
   const watch = d.access === 'watch';
-  const kept = editing && hasPassword && d.passwordAction === 'keep';
-  const passwordOn = d.passwordAction === 'set' || kept;
+  // an embed plays the newest version for anyone who sees the page it is on: only its expiry is the owner's to set
+  const embed = d.embed;
+  const kept = editing && hasPassword && d.passwordAction === 'keep' && !embed;
+  const passwordOn = !embed && (d.passwordAction === 'set' || kept);
   const problem = passwordProblem(d);
   const bad = !!problem && (checked || (left && !!d.password));
   const download = DOWNLOADS().find((o) => o.value === d.download)?.label ?? '';
   return (
     <div className="link-set" data-testid="link-details">
-      <Row label={t('Leave notes')} htmlFor={`${id}n`}>
-        <Switch id={`${id}n`} label={t('Leave notes')} checked={!watch} onCheckedChange={(on) => set({ access: on ? 'review' : 'watch' })} />
+      <Row label={t('Leave notes')} htmlFor={`${id}n`} disabled={embed}>
+        <Switch id={`${id}n`} label={t('Leave notes')} checked={!watch} disabled={embed} onCheckedChange={(on) => set({ access: on ? 'review' : 'watch' })} />
       </Row>
       <Row label={t('Approve or request changes')} htmlFor={`${id}a`} disabled={watch}>
         <Switch
@@ -185,19 +187,20 @@ export function LinkSettings({
           onCheckedChange={(on) => set({ notes: on ? 'all' : 'own' })}
         />
       </Row>
-      <Row label={t('All versions, to switch and compare')} htmlFor={`${id}v`}>
+      <Row label={t('All versions, to switch and compare')} htmlFor={`${id}v`} disabled={embed}>
         <Switch
           id={`${id}v`}
           label={t('All versions, to switch and compare')}
           checked={d.versions === 'all'}
+          disabled={embed}
           onCheckedChange={(on) => set({ versions: on ? 'all' : 'latest' })}
         />
       </Row>
-      <Row label={t('Downloads')}>
+      <Row label={t('Downloads')} disabled={embed}>
         <Menu
           align="end"
           trigger={
-            <button type="button" className="btn sm ghost link-set-menu" aria-label={`${t('Downloads')}: ${download}`}>
+            <button type="button" className="btn sm ghost link-set-menu" aria-label={`${t('Downloads')}: ${download}`} disabled={embed}>
               {download}
               <I name="down" size={12} />
             </button>
@@ -217,8 +220,10 @@ export function LinkSettings({
         {/* on: a week to start with; its button says the day and changes it */}
         <Switch id={`${id}e`} label={t('Expiry date')} checked={!!d.expires} onCheckedChange={(on) => set({ expires: on ? ymd(inDays(7)) : '' })} />
       </Row>
-      <Row label={t('Password')} htmlFor={`${id}p`} say={bad ? problem : null} testId="link-password">
-        {kept ? (
+      <Row label={t('Password')} htmlFor={`${id}p`} say={bad ? problem : null} testId="link-password" disabled={embed}>
+        {embed ? (
+          <span className="link-set-value">{t('Plays for anyone who sees it')}</span>
+        ) : kept ? (
           <>
             <span className="link-set-value">{t('Set')}</span>
             <button type="button" className="btn sm ghost" onClick={() => set({ passwordAction: 'set', password: generatePassword() })}>
@@ -258,6 +263,7 @@ export function LinkSettings({
           id={`${id}p`}
           label={t('Password')}
           checked={passwordOn}
+          disabled={embed}
           onCheckedChange={(on) => {
             setLeft(false);
             set(on ? { passwordAction: 'set', password: generatePassword() } : { passwordAction: editing && hasPassword ? 'remove' : 'keep', password: '' });

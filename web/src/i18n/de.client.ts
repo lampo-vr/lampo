@@ -249,4 +249,11 @@ export const client: Record<ClientKey, string> = {
   // the operator's legal pages (A13 CLOUD-1): the entrance's foot, Settings → About, a review link's foot
   'client::Imprint': 'Impressum',
   'client::Privacy': 'Datenschutz',
+  // an Embed link's player (web/src/embed/): its controls, its mark, a link that isn't one (any more)
+  'client::Captions': 'Untertitel',
+  'client::Full screen': 'Vollbild',
+  'client::Exit full screen': 'Vollbild beenden',
+  'client::Timeline': 'Zeitleiste',
+  'client::Powered by {brand}': 'Bereitgestellt von {brand}',
+  'client::This video isn’t available': 'Dieses Video ist nicht verfügbar',
 };

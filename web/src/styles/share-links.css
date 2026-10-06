@@ -303,6 +303,10 @@ button.link-title:focus-visible {
 .link-activity-wait {
   min-height: var(--h-lg);
 }
+/* an embed's line, opened: the code a site pastes (settings/parts.tsx Code), above what came of it */
+.link-embed {
+  min-width: 0;
+}
 .link-act-sec {
   display: grid;
   gap: var(--sp-2);
