@@ -18,7 +18,8 @@ format stays backwards compatible throughout.
 
 ### Fixed
 - An account deleted, disabled or given a new password while someone signs in to it gets no session and sends no
-  sign-in email: the answer is the same as for any wrong sign-in.
+  sign-in email: the answer is the same as for any wrong sign-in. The same holds while someone takes an invite with
+  it: it joins no workspace, and nobody is signed in.
 - Save and Send in the note composer stay where they are when the video's agent is assigned, starts waiting or is
   unassigned while you write: only which of the two is the main action changes, so a click meant for Save never lands
   on Send.

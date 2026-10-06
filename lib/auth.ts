@@ -1321,19 +1321,29 @@ export async function acceptInvite(
   const holder = findUserByEmail(e);
   const fits = await verifyPassword(password, holder?.password || (await dummyHash()));
   const hash = await hashPassword(password);
+  /**
+   * The password was checked against `holder` as it was read before the (awaited) check: it proves only the account
+   * that is still there now, the same one with the same password (checkLogin's rule). One deleted, disabled or given a
+   * new password meanwhile proves nothing, and takes the path of an address that doesn't join now.
+   */
+  const proven = (now: User | undefined): now is User => !!now && !!holder && fits && now.id === holder.id && now.password === holder.password && !now.disabled;
   if (holder && !holder.disabled && fits && !isGated(holder)) {
     // Its own password proves the account is theirs: it joins now, under its own name.
     if (nameFree && !nameFree(holder.name, ws)) throw new Error(`the name "${holder.name}" is taken`);
-    const invite = withLock(LOCK_DIR, () => {
+    const joined = withLock(LOCK_DIR, () => {
+      const now = load().users.find((u) => holdsEmail(u.email, e));
+      if (!proven(now) || isGated(now)) return null;
       const all = loadInvites();
       const i = findPending(all, token);
       if (!i) throw new Error('this invite is not valid anymore');
-      i.accepted = { at: isoLocal(), user: holder.id, name: holder.name };
+      i.accepted = { at: isoLocal(), user: now.id, name: now.name };
       saveInvites(all);
-      return i;
+      return { invite: i, user: { ...now } };
     });
-    join?.(holder, invite.role, inviteWorkspace(invite));
-    return { kind: 'in', user: holder };
+    if (joined) {
+      join?.(joined.user, joined.invite.role, inviteWorkspace(joined.invite));
+      return { kind: 'in', user: joined.user };
+    }
   }
   return withLock(LOCK_DIR, (): Accepted => {
     const invites = loadInvites();
@@ -1343,7 +1353,7 @@ export async function acceptInvite(
     const live = liveClaims(invite, f.users);
     if (live.length >= MAX_CLAIMS) throw new Error('too many people are confirming their address for this invite: ask for a new one');
     const there = f.users.find((u) => holdsEmail(u.email, e));
-    if (there && !(isGated(there) && fits && !there.disabled)) return { kind: 'taken', user: there };
+    if (there && !(isGated(there) && proven(there))) return { kind: 'taken', user: there };
     let user = there;
     if (!user) {
       // The least role and no workspace until the address is confirmed (the invite's role is taken then).
