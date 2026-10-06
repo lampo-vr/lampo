@@ -252,7 +252,9 @@ badge ([For the visitor](#for-the-visitor)), the player hides it too.
 **oEmbed.** Sites and tools that embed from an address (WordPress, Notion and others) find the player through
 [oEmbed](https://oembed.com): both the player's address and the link's watch page name it in their head, and
 `GET /oembed?url=<address>&format=json` answers with the player's `<iframe>`, its size (scaled down to `maxwidth` and
-`maxheight` when given), the video's title and its poster. Any other link, address or format is a 404 (501 for XML).
+`maxheight` when given), the video's title and its poster, which other sites may show as a picture. On your own
+machine it answers at the tunnel's address too, the one the pages name. Any other link, address or format is a 404
+(501 for XML).
 
 ## Downloads
 
@@ -293,10 +295,11 @@ files home).
   strangers with the address can neither guess it quickly nor lock the client out.
 - **Writes must come from the review page itself**, and what visitors write is limited per visitor and per link, by
   the minute and by the day ([below](#details)).
-- Through the local tunnel only review links answer. On a hosted server they are the only thing reachable without
-  signing in.
+- Through the local tunnel only review links answer (and oEmbed, which speaks of embeds alone). On a hosted server
+  they are the only thing reachable without signing in.
 - **Only an embed's player may sit in another site's frame.** `/e/<token>` answers with `frame-ancestors *` and no
-  `X-Frame-Options`; every other page and answer of the app, review pages included, refuses to be framed.
+  `X-Frame-Options`; every other page and answer of the app, review pages included, refuses to be framed. Likewise
+  only an embed's poster (its oEmbed thumbnail) may be shown as a picture on another site's page.
 
 ## Webhooks
 

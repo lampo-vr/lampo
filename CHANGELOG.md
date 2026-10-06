@@ -13,8 +13,8 @@ format stays backwards compatible throughout.
   frames, frame steps and the player's keys, the render's chapters on its timeline, captions from its transcript, full
   screen, and options to start muted, loop or show the picture alone. It shows the video and nothing else, sets no
   cookie, and stops wherever it is the moment the link is revoked or expires. Sites that embed from an address find it
-  through oEmbed. A link is an embed from when it is made: an existing link doesn't become one, nor an embed another
-  kind of link.
+  through oEmbed (on your own machine through its public tunnel too), with the poster as a thumbnail they may show. A
+  link is an embed from when it is made: an existing link doesn't become one, nor an embed another kind of link.
 
 ### Fixed
 - An account deleted, disabled or given a new password while someone signs in to it gets no session and sends no

@@ -508,6 +508,44 @@ test('Insights never lists an embed among the links nobody opened: there is nobo
   assert.ok(!unopened.includes('Embed, never played'), `an embed isn’t: ${unopened}`);
 });
 
+test('another site may show an embed’s poster (its oEmbed thumbnail) as a picture, and nothing else a link serves', async () => {
+  const s = await embedLink();
+  const d = await ready(s.token);
+  const picture = { ...visitor, 'Sec-Fetch-Site': 'cross-site', 'Sec-Fetch-Dest': 'image' };
+  const poster = await request('GET', d.poster, { headers: picture });
+  assert.equal(poster.status, 200);
+  assert.equal(poster.headers['cross-origin-resource-policy'], 'cross-origin', 'the poster');
+  const o = (await request('GET', `/oembed?url=${encodeURIComponent(`${base}/e/${s.token}`)}`, { headers: visitor })).json();
+  const thumb = new URL(o.thumbnail_url);
+  const shown = await request('GET', thumb.pathname + thumb.search, { headers: picture });
+  assert.equal(shown.status, 200);
+  assert.equal(shown.headers['cross-origin-resource-policy'], 'cross-origin', 'the oEmbed thumbnail');
+  // everything else stays the app's own: the embed's media, frames and data, and any other link's poster
+  const review = (await make({ label: 'Mia' })).json();
+  const other = (await request('GET', `/api/g/${review.token}`, { headers: visitor })).json().videos[0];
+  for (const url of [d.media, d.sprite, d.captions, `/api/g/${s.token}/embed`, other.poster, other.sprite]) {
+    const r = await request('GET', url, { headers: { ...picture, Range: 'bytes=0-99' } });
+    assert.equal(r.headers['cross-origin-resource-policy'], 'same-origin', `${url}: ${r.status}`);
+  }
+});
+
+test('on the machine, oEmbed answers at the tunnel’s address, the one its discovery tag names; nothing else there does', async () => {
+  const s = await embedLink();
+  const tunnel = 'quiet-otter-1234.trycloudflare.com';
+  const via = { Host: tunnel, 'cf-ray': '8f00000000000000-AMS', 'cf-connecting-ip': '203.0.113.5' };
+  const page = await request('GET', `/g/${s.token}`, { headers: via });
+  assert.equal(page.status, 200);
+  const href = /type="application\/json\+oembed" href="([^"]+)"/.exec(page.text)?.[1]?.replace(/&amp;/g, '&');
+  assert.ok(href, 'the watch page names its oEmbed');
+  const asked = new URL(href);
+  assert.equal(asked.host, tunnel, 'at the address the page was reached by');
+  const o = await request('GET', asked.pathname + asked.search, { headers: via });
+  assert.equal(o.status, 200, o.text);
+  assert.match(o.json().html, new RegExp(`src="http://${tunnel}/e/${s.token}"`));
+  // the tunnel's address still answers nothing of the app's own
+  for (const url of ['/', '/api/info', '/api/library', '/api/shares']) assert.equal((await request('GET', url, { headers: via })).status, 421, url);
+});
+
 test('the token in the path never reaches the log', () => {
   assert.equal(loggedPath('/e/Abc123secretTokenValue'), '/e/…');
   assert.equal(loggedPath('/api/g/Abc123secret/embed'), '/api/g/…/embed');
