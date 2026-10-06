@@ -246,6 +246,50 @@ try {
     await until(async () => (await p.evaluate(() => navigator.clipboard.readText())) === copied, 'Copy copies the code');
     const made = (await api(`/api/review/${encodeURIComponent(filmVideo.slug)}/shares`)).shares.find((s) => s.token === token);
     assert(made?.embed && !made.comment && !made.password && made.download === 'off', `an embed: ${JSON.stringify(made)}`);
+    // on a phone the dialog is a sheet: the four kinds fit its width, and so does the code (it scrolls inside its box)
+    await p.setViewport({ width: 390, height: 844, deviceScaleFactor: SHOTS ? 2 : 1 });
+    await until(
+      async () =>
+        await p.evaluate(() => {
+          const seg = document.querySelector('.link-new .seg');
+          const sheet = document.querySelector('[role=dialog]');
+          if (!seg || !sheet) return false;
+          const s = seg.getBoundingClientRect();
+          const d = sheet.getBoundingClientRect();
+          return seg.scrollWidth <= seg.clientWidth + 0.5 && s.right <= d.right + 0.5 && document.documentElement.scrollWidth <= 390;
+        }),
+      'the kinds fit a phone',
+    );
+    await shot(p, 'embed-02-dialog-390');
+    await p.close();
+  });
+
+  await check('in German the four kinds fit a phone’s sheet too, and an embed says what it doesn’t take', async () => {
+    const p = await fresh();
+    await p.evaluateOnNewDocument(() => localStorage.setItem('vr.lang', 'de'));
+    await p.goto(`${BASE}/#/v/${encodeURIComponent(filmVideo.slug)}`, { waitUntil: 'domcontentloaded' });
+    await p.waitForSelector('[data-testid=share-button]', { timeout: 20_000 });
+    await p.click('[data-testid=share-button]');
+    await p.waitForSelector('[data-testid=link-name]');
+    await p.evaluate(() =>
+      [...document.querySelectorAll('.link-new .seg [role=radio], .link-new .seg button')].find((b) => b.textContent.trim() === 'Einbettung').click(),
+    );
+    await p.waitForFunction(() => document.querySelector('.link-new [data-testid=link-password]')?.textContent.includes('Läuft für alle, die es sehen'));
+    await p.setViewport({ width: 390, height: 844, deviceScaleFactor: SHOTS ? 2 : 1 });
+    const fit = await until(
+      async () =>
+        await p.evaluate(() => {
+          const seg = document.querySelector('.link-new .seg');
+          const sheet = document.querySelector('[role=dialog]');
+          if (!seg || !sheet) return null;
+          const s = seg.getBoundingClientRect();
+          const d = sheet.getBoundingClientRect();
+          return { fits: seg.scrollWidth <= seg.clientWidth + 0.5 && s.right <= d.right - 8, right: Math.round(s.right), sheet: Math.round(d.right) };
+        }),
+      'the dialog in German',
+    );
+    await shot(p, 'embed-02-dialog-390-de');
+    assert(fit.fits, `the kinds fit: ${JSON.stringify(fit)}`);
     await p.close();
   });
 
