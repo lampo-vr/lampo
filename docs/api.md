@@ -1105,9 +1105,10 @@ Details:
   video's `updated`, no `by` when it expired, and none of the visitors' notes or decisions.
 - **Visits and watching.** A visit counts once per visitor and half hour, never for the team checking its own link (the
   owner's machine, or a signed-in account). `visitor` is the random id the page keeps, `name` what the visitor typed,
-  if anything. 60 visits a minute per link and address, then `429`. Progress: `seen` is 25 hex digits (`lib/watch.ts`),
-  `plays` 100 counts, `secs` 3600 at most; nothing is kept for the team; 12 reports a minute per visitor and 240 per
-  address ([sharing.md](sharing.md#what-a-link-records)).
+  if anything (an Embed link's visits are anonymous: its visits and reports keep no `name`). 60 visits a minute per
+  link and address, then `429`. Progress: `seen` is 25 hex digits (`lib/watch.ts`), `plays` 100 counts, `secs` 3600 at
+  most; nothing is kept for the team; 12 reports a minute per visitor and 240 per address
+  ([sharing.md](sharing.md#what-a-link-records)).
 - **Opening a video** counts a view of that video and version in the link's `stats.videos` (once per address, video
   and version per half hour, never for the team): that is what makes a stage *Out for review*. `media` is `null`
   with `preparing: true` while the link's preview copy is being made; `busy: true` with it says the server's queue is
