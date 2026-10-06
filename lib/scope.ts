@@ -32,6 +32,12 @@ export const boundToWorkspace = <F extends (...args: any[]) => any>(fn: F): F =>
  */
 export const wsKey = (key: string): string => `${currentWorkspace()}\u0000${key}`;
 
+/** The workspace a `wsKey` key was made in ('' for a key that isn't one): what a shared memory is fair between. */
+export const workspaceOfKey = (key: string): string => {
+  const end = key.indexOf('\u0000');
+  return end < 0 ? '' : key.slice(0, end);
+};
+
 /**
  * An app route that leaves the server — a notification's, a chat message's, an agent's link (`#/v/<slug>?c=…`) — with
  * the workspace it belongs to (`w=<id>`), when there is more than one: the same name can be another team's video, and
