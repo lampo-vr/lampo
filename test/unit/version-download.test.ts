@@ -215,3 +215,39 @@ test('only the machine’s owner here: someone else on the network is asked to s
   assert.ok([401, 403].includes(r.status), `a visitor → ${r.status}`);
   assert.ok(!r.headers['content-disposition']);
 });
+
+test('a download broken off closes its file: aborted streams leave no file open behind them', async () => {
+  // open descriptors of this process (the app runs in it): /proc on Linux, /dev/fd on macOS
+  const fdDir = fs.existsSync('/proc/self/fd') ? '/proc/self/fd' : '/dev/fd';
+  const openFiles = () =>
+    fs.readdirSync(fdDir).filter((fd) => {
+      try {
+        return fs.readlinkSync(path.join(fdDir, fd)) === fs.realpathSync(bigFile);
+      } catch {
+        return false;
+      }
+    }).length;
+  // macOS's /dev/fd can't name a descriptor's file: count all of them instead
+  const named = fdDir === '/proc/self/fd';
+  const count = () => (named ? openFiles() : fs.readdirSync(fdDir).length);
+  const before = count();
+  const abort = (headers: Record<string, string>) =>
+    new Promise<void>((resolve, reject) => {
+      const req = http.request({ host: '127.0.0.1', port, path: url(big), headers, agent: false }, (res) => {
+        res.once('data', () => {
+          req.destroy();
+          resolve();
+        });
+      });
+      req.on('error', (e: NodeJS.ErrnoException) => (e.code === 'ECONNRESET' ? resolve() : reject(e)));
+      req.end();
+    });
+  for (let i = 0; i < 20; i++) await abort(i % 2 ? { Range: 'bytes=1000-' } : {});
+  // the server notices each abort on its own turn of the loop: give it a moment, then the files must be closed
+  let after = count();
+  for (let i = 0; i < 50 && after > before; i++) {
+    await new Promise((r) => setTimeout(r, 50));
+    after = count();
+  }
+  assert.ok(after <= before, `open ${named ? 'copies of the file' : 'descriptors'}: ${before} before, ${after} after 20 aborted downloads`);
+});
