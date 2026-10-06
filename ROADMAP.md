@@ -212,6 +212,20 @@ Findings of audit A12 (2026-10-02, `AUDITS.md`) that are known and left for late
     **INV-13** 16 dead exports, **INV-14** long functions and `as unknown as`, **INV-15** mixed API naming, **INV-16**
     strictness flags still off.
 
+## Deferred from A13
+
+Findings of audit A13 (2026-10-05, `AUDITS.md`) and its verification rounds that are known and left for later.
+
+- **A13 VERIFY-4b** (low): while one address's reset or confirmation waits in the mail queue, another person asking
+  from the same address (one office network) gets theirs only on a later try. Key the one-at-a-time rule by recipient
+  too (`askerWaits` in `lib/mail/index.ts`).
+- **A13 VERIFY-5** (low): pending OAuth sign-ins are kept in a bounded store that makes room by dropping the oldest;
+  when it is full it should refuse new ones (or bound them per network) instead.
+- **A13 VERIFY-6** (info): a version diff cut short by its time limit is cached as if it were complete; mark it partial
+  so a later run finishes it.
+- **A13 VERIFY-7** (info): a few request-time ffmpeg runs (voice-note transcription, recording clips, the publishing
+  cover) don't go through the on-demand gate yet, and footage jobs have no crash-guard key.
+
 ## Open decisions
 
 - 1.0 criteria: the data format frozen, server mode audited, CI green on GitHub.
