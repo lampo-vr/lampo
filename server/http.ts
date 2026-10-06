@@ -3,8 +3,12 @@ import { type NextFunction, type Request, type Response, Router } from 'express'
 import { z } from 'zod';
 import { type Audience, publicMessage, statusOf } from '../lib/publicError.ts';
 
-/** Review-link paths (also server/guard.ts): nobody on them is identified, so nobody there is the owner. */
-export const GUEST_PATH = /^\/(g\/|api\/g\/|media\/g\/|data\/g\/|assets\/)/;
+/** Review-link paths (also server/guard.ts): nobody on them is identified, so nobody there is the owner. /e/<token> is
+ * an Embed link's player, the page another site frames (EMBED_PAGE). */
+export const GUEST_PATH = /^\/(g\/|e\/|api\/g\/|media\/g\/|data\/g\/|assets\/)/;
+
+/** An Embed link's player page (/e/<token>): the one answer of the app another site may put in a frame (server/guard.ts). */
+export const EMBED_PAGE = /^\/e\/[A-Za-z0-9_-]+$/;
 
 export class HttpError extends Error {
   status: number;
@@ -77,12 +81,12 @@ export const attachment = (filename: string): string =>
 
 /**
  * A path as it may go to the log: review-link tokens, one-time upload tickets and signed media URLs are credentials
- * that sit in the path itself (/g/<token>, /api/g/<token>/…, /api/uploads/direct/<ticket>, /media/s/<sealed>/…), so
+ * that sit in the path itself (/g/<token>, /e/<token>, /api/g/<token>/…, /api/uploads/direct/<ticket>, /media/s/<sealed>/…), so
  * they are cut out — whoever reads the log must not be able to open the link.
  */
 export const loggedPath = (p: string): string =>
   p
-    .replace(/^\/((?:api\/|media\/|data\/)?g)\/[^/]+/, '/$1/…')
+    .replace(/^\/((?:api\/|media\/|data\/)?g|e)\/[^/]+/, '/$1/…')
     .replace(/^\/api\/uploads\/direct\/[^/]+/, '/api/uploads/direct/…')
     .replace(/^\/media\/([sz])\/[^/]+/, '/media/$1/…');
 

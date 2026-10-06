@@ -148,3 +148,24 @@ test('the real wrapper: a module whose canHideBadge throws or says anything but 
   assert.ok(logs.includes('extension.badge.failed'));
   assert.equal(await createExtension({ ...base, entitlements: entitlements(async () => true) }, host).badgeOptional('w1'), true);
 });
+
+// An Embed link's player shows the Lampo mark in its corner by the same rule, and its oEmbed names Lampo as the
+// provider only while the mark shows. oEmbed answers for this server's own address only.
+test('an embed shows the mark, and its oEmbed names Lampo, by the same rule', async () => {
+  billing();
+  paid.add('w1');
+  assert.equal((await request('PUT', '/api/workspaces/current/badge', { body: { hidden: true }, headers: owner })).status, 200);
+  const made = await request('POST', `/api/review/${encodeURIComponent(slug)}/shares`, { body: { label: 'Website', embed: true }, headers: owner });
+  assert.equal(made.status, 200, made.text);
+  const embed = made.json().token as string;
+  const player = async () => (await request('GET', `/api/g/${embed}/embed`, { headers: visitor })).json().badge;
+  const oembed = (url = `${PUBLIC}/e/${embed}`) => request('GET', `/oembed?url=${encodeURIComponent(url)}`, { headers: visitor });
+  assert.equal(await player(), false, 'hidden on a paid plan');
+  const quiet = (await oembed()).json();
+  assert.equal(quiet.provider_name, undefined);
+  assert.equal(quiet.provider_url, undefined);
+  paid.delete('w1');
+  assert.equal(await player(), true, 'the plan lapsed: the mark is back');
+  assert.equal((await oembed()).json().provider_name, 'Lampo');
+  assert.equal((await oembed(`https://elsewhere.test/e/${embed}`)).status, 404, 'another server’s address');
+});

@@ -23,6 +23,9 @@ export const ROUTE_ACTIONS: [string, string, Rule][] = [
   // OAuth for MCP clients: consenting is your own business; token, registration and revocation authenticate the client.
   ['*', '/api/oauth/*', 'self'],
   ['*', '/oauth/*', 'public'],
+  // oEmbed for Embed links (server/routes/shares/embed.ts): the address it is asked about is its only key, like the
+  // link's own pages; it answers signed in or not, and never for any other link.
+  ['GET', '/oembed', 'public'],
   // Workspaces: yours to list, make and switch between; naming the one you work in is an admin's.
   ['GET', '/api/workspaces', 'self'],
   ['POST', '/api/workspaces', 'self'],

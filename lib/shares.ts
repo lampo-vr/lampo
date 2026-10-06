@@ -243,16 +243,37 @@ function withToken(token: string, s: Share): ShareWithToken {
   return { token, ...rest };
 }
 
-export const settingsOf = (s: Share): ShareSettings => ({
-  comment: s.comment ?? SHARE_DEFAULTS.comment,
-  approve: s.approve ?? SHARE_DEFAULTS.approve,
-  // a link that only plays shows its visitors no one else's notes or decisions, whatever was stored (A13 LINK-2: a
-  // watch-only link kept "notes from all links" and showed them while the dialog said it doesn't)
-  notes: (s.comment ?? SHARE_DEFAULTS.comment) ? (s.notes ?? SHARE_DEFAULTS.notes) : 'own',
-  versions: s.versions ?? SHARE_DEFAULTS.versions,
-  download: s.download ?? SHARE_DEFAULTS.download,
-  expires: s.expires ?? null,
-});
+/** An embed's settings, whatever was stored: it only plays the newest version, through a page on someone else's site. */
+const EMBED_PLAYS = { comment: false, approve: false, notes: 'own', versions: 'latest', download: 'off' } as const;
+
+export const settingsOf = (s: Share): ShareSettings =>
+  s.embed
+    ? { ...EMBED_PLAYS, expires: s.expires ?? null, embed: true }
+    : {
+        comment: s.comment ?? SHARE_DEFAULTS.comment,
+        approve: s.approve ?? SHARE_DEFAULTS.approve,
+        // a link that only plays shows its visitors no one else's notes or decisions, whatever was stored (A13 LINK-2: a
+        // watch-only link kept "notes from all links" and showed them while the dialog said it doesn't)
+        notes: (s.comment ?? SHARE_DEFAULTS.comment) ? (s.notes ?? SHARE_DEFAULTS.notes) : 'own',
+        versions: s.versions ?? SHARE_DEFAULTS.versions,
+        download: s.download ?? SHARE_DEFAULTS.download,
+        expires: s.expires ?? null,
+      };
+
+/**
+ * Why a link can't be an embed, or null: an embed plays one video for anyone who sees the page it is on, so it is never
+ * a folder's and never has a password (a visitor in a frame on another site can't type one, and its unlock cookie
+ * would be a third party's). `s` is the link as it would be after the change.
+ */
+export function embedRefusal(s: Pick<Share, 'embed' | 'folder' | 'password'>): string | null {
+  if (!s.embed) return null;
+  if (s.folder) return 'An embed is for one video: make it from the video’s share dialog.';
+  if (s.password) return 'An embed plays for anyone who sees the page it is on, so it can’t have a password.';
+  return null;
+}
+
+/** A link that can't be made or changed so (embedRefusal): the routes answer 400 with its sentence. */
+export class LinkRefusedError extends Error {}
 
 /** The link's public id (stored on notes made through it). Old links get one derived from the token. */
 export const shareId = (s: ShareWithToken): string => s.id || legacyId(s.token);
@@ -354,6 +375,10 @@ function applyInput(s: Share, input: ShareInput): void {
   if (input.versions !== undefined) s.versions = input.versions;
   if (input.download !== undefined) s.download = input.download;
   if (input.expires !== undefined) s.expires = input.expires || null;
+  if (input.embed !== undefined) {
+    if (input.embed) s.embed = true;
+    else delete s.embed;
+  }
   if (input.password !== undefined) {
     if (input.password) s.password = hashPassword(input.password);
     else delete s.password;
@@ -416,6 +441,8 @@ export function createShare(target: string | Target, { label, by = USER, byId, .
     stats: { opens: 0, last_opened: null, reviewers: [] },
   };
   applyInput(share, input);
+  const refused = embedRefusal(share);
+  if (refused) throw new LinkRefusedError(refused);
   const ws = currentWorkspace();
   // Indexed before the link exists: a visitor can never reach it through another workspace's links.
   if (ws !== DEFAULT_WORKSPACE)
@@ -437,6 +464,9 @@ export function updateShare(token: string, input: ShareInput): ShareWithToken | 
     const s = all[tokenKey(token)];
     if (!s || s.revoked) return false;
     applyInput(s, input);
+    // thrown before anything is written: the file is read afresh for every change
+    const refused = embedRefusal(s);
+    if (refused) throw new LinkRefusedError(refused);
     s.updated = isoLocal();
     out = withToken(token, s);
     return true;
@@ -934,6 +964,7 @@ export function shareInfo(s: ShareWithToken): ShareInfo {
   // The video's name, archived or not, but never that of another video added later under the same slug.
   const at = !s.folder && s.slug ? loadReview(s.slug) : null;
   const review = at && madeFor(s, at) ? at : null;
+  const newest = review?.versions.at(-1);
   const stats = s.stats || emptyStats();
   // The records per visitor and per video stay on the server; the owner gets them summed up in `activity`.
   const { visitors: _visitors, videos: _videos, activity: _activity, ...counts } = stats;
@@ -950,6 +981,7 @@ export function shareInfo(s: ShareWithToken): ShareInfo {
     slug: s.folder ? null : s.slug || null,
     folder: s.folder || null,
     name: review ? path.basename(review.video) : null,
+    ...(newest ? { width: newest.width, height: newest.height } : {}),
     password: !!s.password,
     expired: isExpired(s),
     stats: {

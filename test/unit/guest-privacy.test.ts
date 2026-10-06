@@ -9,12 +9,18 @@ import http from 'node:http';
 import path from 'node:path';
 import { test } from 'node:test';
 import { startApp } from '../lib/app.ts';
-import { age, FFMPEG, isolatedEnv, makeVideo, slugOf, until } from '../lib/helpers.ts';
+import { age, FFMPEG, isolatedEnv, makeVideo, slugOf, tmpdir, until } from '../lib/helpers.ts';
 
 const { dir } = isolatedEnv();
 const store = await import('../../lib/store.ts');
 const folders = await import('../../lib/folders.ts');
 const { loadConfig } = await import('../../lib/config.ts');
+const { staticUi } = await import('../../server/app.ts');
+
+// the pages as a build has them: a review link's (the app) and an embed's player
+const dist = tmpdir('vr-privacy-dist-');
+fs.writeFileSync(path.join(dist, 'index.html'), '<!doctype html><html><head><title>app</title></head><body></body></html>');
+fs.writeFileSync(path.join(dist, 'embed.html'), '<!doctype html><html><head><title>player</title></head><body></body></html>');
 
 // Where an owner's renders typically live: their home folder, then one folder per client.
 const HOME = path.join(dir, 'Users', 'olivia-home');
@@ -30,7 +36,7 @@ const spot = track('Clients/Acme/Reels/export/spot.mp4', 'Acme/Reels');
 const teaser = track('Clients/Acme/Teaser/export/teaser.mp4', 'Acme');
 const other = track('Clients/Globex/export/launch.mp4', 'Globex');
 
-const { port } = await startApp({ token: 'test-token', loadSessions: async () => [] });
+const { port } = await startApp({ token: 'test-token', loadSessions: async () => [], ui: staticUi(dist) });
 
 interface Seen {
   status: number;
@@ -431,4 +437,64 @@ test('a watch-only link shows no other link’s notes, whatever its notes settin
   const video = JSON.parse(room.text).videos[0].slug;
   const seen = `${room.text}\n${(await guest('GET', `/api/g/${press.token}/review/${video}`)).text}`;
   for (const secret of ['do not show the claim', 'Mia Legal']) assert.ok(!seen.includes(secret), `a watch-only visitor must not see “${secret}”`);
+});
+
+// An Embed link's player (/e/<token>) and its oEmbed are what any site that frames it, and anyone who asks oEmbed about
+// it, can read: the video's name and nothing else of the owner's — no slug or path, no folder, not the link's own name,
+// no other link's notes or names.
+test('an embed and its oEmbed name the video and nothing else of the owner’s', async () => {
+  const enc = encodeURIComponent(spot.slug);
+  const other = JSON.parse((await request('POST', `/api/review/${enc}/shares`, { label: 'Legal team' })).text);
+  const otherId = JSON.parse((await guest('GET', `/api/g/${other.token}`)).text).videos[0].slug;
+  const said = await guest('POST', `/api/g/${other.token}/comments`, { name: 'Ola Other', slug: otherId, frame: 2, text: 'other link secret note' });
+  assert.equal(said.status, 200, said.text);
+  const made = await request('POST', `/api/review/${enc}/shares`, { label: 'Homepage hero', embed: true });
+  assert.equal(made.status, 200, made.text);
+  const { token } = JSON.parse(made.text);
+  surface.length = 0;
+  fetched.clear();
+
+  const page = await guest('GET', `/e/${token}`);
+  assert.equal(page.status, 200);
+  const discovery = /type="application\/json\+oembed" href="([^"]+)"/.exec(page.text)?.[1]?.replace(/&amp;/g, '&');
+  assert.ok(discovery, 'the page names its oEmbed');
+  const answer = await until(async () => {
+    const r = await guest('GET', `/api/g/${token}/embed`);
+    assert.equal(r.status, 200, r.text);
+    const d = JSON.parse(r.text);
+    return d.media ? d : null;
+  }, 'the player’s media');
+  await crawl(JSON.stringify(answer));
+  await guest('POST', `/api/g/${token}/visit`, { visitor: 'embed-privacy-01', slug: answer.slug, v: answer.v });
+  await guest('POST', `/api/g/${token}/progress`, { visitor: 'embed-privacy-01', slug: answer.slug, v: answer.v, seen: '1'.padEnd(25, '0'), secs: 1 });
+  const asked = new URL(discovery as string);
+  const oembed = await guest('GET', asked.pathname + asked.search);
+  assert.equal(oembed.status, 200, oembed.text);
+  await crawl(oembed.text);
+  await guest('GET', `/oembed?url=${encodeURIComponent(`http://127.0.0.1/g/${token}`)}`);
+
+  assert.ok(fetched.size >= 3, `crawled the player’s URLs (${fetched.size})`);
+  const all = surface.join('\n');
+  assert.ok(all.includes('spot.mp4'), 'the video’s name is its title');
+  for (const secret of [
+    dir,
+    HOME,
+    'olivia-home',
+    'Clients',
+    'Acme',
+    'Reels',
+    'Globex',
+    spot.slug,
+    teaser.slug,
+    other.slug,
+    'other link secret note',
+    'Ola Other',
+    'Legal team',
+    'Homepage hero',
+    'tester',
+    path.basename(dir),
+  ]) {
+    const at = all.indexOf(secret);
+    assert.ok(at < 0, `an embed must never show ${JSON.stringify(secret)}: …${all.slice(Math.max(0, at - 300), at + 80)}…`);
+  }
 });

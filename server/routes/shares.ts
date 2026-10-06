@@ -6,13 +6,15 @@
 //   shares/owner.ts   the owner's link management
 //   shares/guest.ts   the link, its videos, visits and views, and everything a visitor writes
 //   shares/media.ts   playback, waveforms, posters, sprites, screenshots and downloads through a link
+//   shares/embed.ts   an Embed link's player data, captions and oEmbed (its page, /e/<token>: server/app.ts staticUi)
 import type { Router } from 'express';
 import type { ServerContext } from '../context.ts';
 import { router } from '../http.ts';
+import { embedRoutes } from './shares/embed.ts';
 import { guestRoutes } from './shares/guest.ts';
 import { guestMediaRoutes } from './shares/media.ts';
 import { ownerShareRoutes } from './shares/owner.ts';
 
 export function shareRoutes(ctx: ServerContext): Router {
-  return router().use(ownerShareRoutes(ctx), guestRoutes(ctx), guestMediaRoutes(ctx));
+  return router().use(ownerShareRoutes(ctx), guestRoutes(ctx), guestMediaRoutes(ctx), embedRoutes(ctx));
 }

@@ -177,7 +177,12 @@ async function uiMount(): Promise<(app: Express) => void> {
   if (DEV_MODE) {
     const { createServer } = await import('vite');
     const vite = await createServer({ root: webRoot, server: { middlewareMode: true, ws: { port: cfg.port + 10000 } }, appType: 'spa' });
-    return (app) => app.use(vite.middlewares);
+    // an Embed link's player is a page of its own (web/embed.html), not the app's
+    return (app) =>
+      app.use((req, _res, next) => {
+        if (/^\/e\/[A-Za-z0-9_-]+$/.test(req.path)) req.url = '/embed.html';
+        next();
+      }, vite.middlewares);
   }
   const dist = path.join(webRoot, 'dist');
   if (!fs.existsSync(path.join(dist, 'index.html'))) {

@@ -52,7 +52,7 @@ import type {
   Version,
 } from '../../../lib/types.ts';
 import { MAX_PLAYS_PER_REPORT, PARTS, SEEN_PATTERN } from '../../../lib/watch.ts';
-import { badgeHidden, getWorkspace, roleIn, workspaceNamed } from '../../../lib/workspaces.ts';
+import { getWorkspace, workspaceNamed } from '../../../lib/workspaces.ts';
 import type { ServerContext } from '../../context.ts';
 import { countStep, noticeMoment } from '../../funnel.ts';
 import { metaOf, sanitizeDrawing, versionBytes } from '../../helpers.ts';
@@ -60,7 +60,22 @@ import { body, commentId, fail, failFrom, parse, query, router, VersionQuery } f
 import { freeBytes } from '../../ready.ts';
 import { addInlineRef, attachInline, refOfFile, sendRefFile } from '../refs.ts';
 import { shotsToFollow } from '../review.ts';
-import { changed, clientVerdict, ipOf, keptInMemory, link, may, open, perms, sameSite, target, tooMany, version } from './access.ts';
+import {
+  badgeShown,
+  changed,
+  clientVerdict,
+  ipOf,
+  isTeam as isTeamOf,
+  keptInMemory,
+  link,
+  may,
+  open,
+  perms,
+  sameSite,
+  target,
+  tooMany,
+  version,
+} from './access.ts';
 
 const Name = z.string().max(200).optional();
 const refCaption = z.string().max(REF_LIMITS.caption).optional();
@@ -126,7 +141,9 @@ const GuestApproval = z.object({
 const Unlock = z.object({ password: z.string().max(200) });
 /** The random id a guest page keeps in its browser (web/src/guest/watch.ts): what tells visitors apart, never an address. */
 const VisitorId = z.string().regex(/^[A-Za-z0-9_-]{12,40}$/);
-const Visit = z.object({ name: Name, visitor: VisitorId.optional() });
+/** A visit; `slug` + `v`: a video of the link the visitor started watching there (an embed counts its view on the first
+ * play, not when the page around it loads). */
+const Visit = z.object({ name: Name, visitor: VisitorId.optional(), slug: z.string().min(1).max(600).optional(), v: z.number().int().positive().optional() });
 /** How much of one video played since the last report (lib/watch.ts). */
 const Progress = z
   .object({
@@ -203,9 +220,6 @@ export function guestRoutes(ctx: ServerContext): Router {
   const views = new Recent<number>();
   // The name a visitor gave on a link (sent with the visit, a note or a verdict), so a view can say who looked.
   const names = new Recent<string>();
-  // The team opening its own link to check it is not the client: a signed-in member of the link's workspace, or the
-  // owner at the machine the app runs on. Such visits aren't counted, so "opened" in the stats and the stage means a
-  // visitor (someone signed in to another workspace is a visitor here like anyone).
   // Whose team visitors are told a link is from: on a server with several workspaces, the link's own (another team's
   // clients never read workspace #1's name); the server's name (org_name, VR_ORG_NAME) is workspace #1's, the
   // operator's own team, as in the account mails (server/accountMail.ts).
@@ -216,12 +230,25 @@ export function guestRoutes(ctx: ServerContext): Router {
     if (ws === DEFAULT_WORKSPACE) return cfg.org_name || null;
     return workspaceNamed(ws) ? getWorkspace(ws)?.name || null : null;
   };
-  const isTeam = (req: Request) => {
-    const a = ctx.identify(req);
-    return !!a && (!a.user || !!roleIn(currentWorkspace(), a.user.id));
-  };
+  // the team opening its own link to check it isn't counted (access.ts)
+  const isTeam = (req: Request) => isTeamOf(ctx, req);
   const remember = (share: ShareWithToken, req: Request, name: string | undefined) => {
     if (name && name !== 'client') names.set(`${share.token}|${ipOf(req)}`, name);
+  };
+  /**
+   * A visitor opened one video of the link at `ver` (its page, or an embed's first play): counted once per address,
+   * video and version every half hour, never for the team's own previews. Open pages hear of it at once — an embed's at
+   * most once a minute (announce): a page on a busy site brings visitors all day, and every open player refetches.
+   */
+  const viewed = (share: ShareWithToken, req: Request, review: Review, ver: Version) => {
+    if (isTeam(req)) return;
+    const slug = slugify(review.video);
+    const key = `${share.token}|${ipOf(req)}|${slug}|${ver.v}`;
+    if (Date.now() - (views.get(key) || 0) <= HALF_HOUR) return;
+    views.set(key, Date.now());
+    recordView(share.token, slug, ver.v, names.get(`${share.token}|${ipOf(req)}`));
+    if (share.embed) announce(share, slug);
+    else changed(ctx, slug);
   };
 
   // ---------------------------------------------------------------- the link itself
@@ -254,19 +281,10 @@ export function guestRoutes(ctx: ServerContext): Router {
     };
   }
 
-  // "Powered by Lampo" unless the link's workspace hid it on a plan that may (A13 CLOUD-7): the billing provider is asked
-  // only when its admins did, so a link of a workspace that never touched it costs nothing more
-  const badgeOf = async (): Promise<boolean> => {
-    const ws = currentWorkspace();
-    if (!badgeHidden(ws)) return true;
-    // a visitor's page never fails on billing: whatever goes wrong there shows the badge
-    return !(await ctx.extension.badgeOptional(ws).catch(() => false));
-  };
-
   r.get('/api/g/:token', async (req, res) => {
     const share = link(req);
     const locked = !isUnlocked(share, req.headers.cookie);
-    const badge = await badgeOf();
+    const badge = await badgeShown(ctx);
     const out: GuestLinkResponse = {
       label: guestLabel(share),
       reviewer: sharerName(share),
@@ -317,6 +335,9 @@ export function guestRoutes(ctx: ServerContext): Router {
     const from = `${share.token}|${ipOf(req)}`;
     if (!visitsPerAddress.take(from)) throw tooMany('Too many visits in a minute.', visitsPerAddress.retryAfter(from));
     const b = body(Visit, req);
+    // the video it names is one the link covers, at a version it shows (checked before anything is counted)
+    const watching = b.slug ? target(share, b.slug) : null;
+    const at = watching ? version(share, watching, b.v) : null;
     if (isTeam(req)) {
       res.json({ ok: true });
       return;
@@ -338,6 +359,7 @@ export function guestRoutes(ctx: ServerContext): Router {
       countStep(ctx, 'link_opened_first');
       noticeMoment(ctx, 'link_open', share.by_id, { link: share.label, slug: share.slug });
     }
+    if (watching && at) viewed(share, req, watching, at);
     res.json({ ok: true });
   });
 
@@ -347,6 +369,13 @@ export function guestRoutes(ctx: ServerContext): Router {
   const reportsPerVisitor = new RateLimit(12, 60_000);
   const reportsPerAddress = new RateLimit(240, 60_000);
   const announced = new Recent<number>();
+  /** Open pages hear that a video's link activity changed, at most once a minute per link and video. */
+  const announce = (share: ShareWithToken, slug: string) => {
+    const k = `${share.token}|${slug}`;
+    if (Date.now() - (announced.get(k) || 0) <= 60_000) return;
+    announced.set(k, Date.now());
+    changed(ctx, slug);
+  };
   keptInMemory(ctx, {
     notesPerVisitor,
     writesPerVisitorDay,
@@ -391,11 +420,7 @@ export function guestRoutes(ctx: ServerContext): Router {
       name: name === 'client' ? null : name,
     });
     // Open pages learn about it (the card's "80 % watched"), at most once a minute per video.
-    const k = `${share.token}|${slug}`;
-    if (Date.now() - (announced.get(k) || 0) > 60_000) {
-      announced.set(k, Date.now());
-      changed(ctx, slug);
-    }
+    announce(share, slug);
     res.status(204).end();
   });
 
@@ -544,15 +569,7 @@ export function guestRoutes(ctx: ServerContext): Router {
     res.setHeader('Cache-Control', 'no-store');
     res.json(guestReview(share, review, ver));
     // Which videos the client actually looked at, and which version (lib/stageContext.ts: shared is not seen).
-    if (!isTeam(req)) {
-      const slug = slugify(review.video);
-      const key = `${share.token}|${ipOf(req)}|${slug}|${ver.v}`;
-      if (Date.now() - (views.get(key) || 0) > HALF_HOUR) {
-        views.set(key, Date.now());
-        recordView(share.token, slug, ver.v, names.get(`${share.token}|${ipOf(req)}`));
-        changed(ctx, slug);
-      }
-    }
+    viewed(share, req, review, ver);
   });
 
   // The other side of a compare (web/src/guest/GuestCompare.tsx): another version of the video, played beside the one

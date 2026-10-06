@@ -10,10 +10,10 @@ import { z } from 'zod';
 import { THEME_BOOT } from '../lib/themeBoot.ts';
 import { type Identify, LAN_COOKIE, sameToken, sessionUpdates } from './auth.ts';
 import type { ContentSources } from './extension.ts';
-import { GUEST_PATH, LanQuery, queryOr } from './http.ts';
+import { EMBED_PAGE, GUEST_PATH, LanQuery, queryOr } from './http.ts';
 
 export { isLocal } from './auth.ts';
-export { GUEST_PATH };
+export { EMBED_PAGE, GUEST_PATH };
 
 // The one inline script the page may run: it sets the colour theme before the first paint (lib/themeBoot.ts).
 export const THEME_BOOT_HASH = `'sha256-${crypto.createHash('sha256').update(THEME_BOOT).digest('base64')}'`;
@@ -157,9 +157,13 @@ const consentPage = (req: Request): boolean =>
   req.method === 'GET' && (req.path === '/oauth/authorize' || (req.path === '/' && queryOr(ConsentQuery, req)?.consent !== undefined));
 
 function securityHeaders(req: Request, res: Response, { mediaOrigins = [], dev, publicUrl, moduleSources }: HeaderOptions): void {
+  // An Embed link's player is made to sit in a frame on someone else's site, any site (docs/sharing.md): its page alone
+  // may be framed. Everything else — the app, the API, the media, every other review page — never is.
+  const framed = EMBED_PAGE.test(req.path);
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'same-origin');
-  res.setHeader('X-Frame-Options', 'DENY');
+  if (framed) res.removeHeader('X-Frame-Options');
+  else res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Cross-Origin-Opener-Policy', consentPage(req) ? 'unsafe-none' : 'same-origin');
   res.setHeader('Permissions-Policy', 'microphone=(self), camera=(), geolocation=()');
   // Nothing an instance serves is for search engines: sign-in, invites, review links, the app, its files.
@@ -185,7 +189,7 @@ function securityHeaders(req: Request, res: Response, { mediaOrigins = [], dev, 
       "object-src 'none'",
       "base-uri 'none'",
       "form-action 'self'",
-      "frame-ancestors 'none'",
+      framed ? 'frame-ancestors *' : "frame-ancestors 'none'",
     ].join('; '),
   );
 }

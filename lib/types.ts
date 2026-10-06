@@ -979,6 +979,12 @@ export interface ShareSettings {
   download: ShareDownload;
   /** ISO time after which the link stops working, or null. */
   expires: string | null;
+  /**
+   * An embed: the video's player alone at /e/<token>, for an <iframe> on another site (docs/sharing.md, "Embedding a
+   * video"). Watch only whatever else is stored (the newest version, no notes, no downloads), one video, never a
+   * password. Absent: a review link like any other.
+   */
+  embed?: boolean;
 }
 
 export interface ShareStats {
@@ -1197,6 +1203,9 @@ export interface ShareInfo extends ShareSettings {
   folder: string | null;
   /** The video's file name (video links). */
   name: string | null;
+  /** Video links: the newest version's frame size (an embed's code keeps its shape). Optional; older servers leave them out. */
+  width?: number;
+  height?: number;
   password: boolean;
   expired: boolean;
   /** What the link was made for is gone (its video or folder was deleted outside the app): it opens nothing. Only in
@@ -2630,6 +2639,61 @@ export interface GuestCompareResponse {
   media: string | null;
   preparing?: boolean;
   busy?: boolean;
+}
+
+/** A chapter of a version: where it starts (a frame) and what the render's own chapter marker calls it. */
+export interface Chapter {
+  frame: number;
+  title: string;
+}
+
+/**
+ * GET /api/g/:token/embed: what the embed player (/e/<token>) needs to play an Embed link's video, nothing more — the
+ * newest version's frame facts, its media, poster and hover frames, its chapters and captions when it has them, and
+ * whether the badge shows. Never notes, verdicts, names of people, folders or downloads. Other links answer 404.
+ */
+export interface EmbedResponse {
+  /** The video's file name, as a Watch only visitor sees it. */
+  title: string;
+  /** The video's id within the link, as in GuestVideo (the watch reports name it). */
+  slug: string;
+  v: number;
+  fps: number;
+  frames: number;
+  width: number;
+  height: number;
+  duration: number;
+  /** As in GuestReviewResponse: null while its copy is being made (then `preparing`, and the page asks again soon). */
+  media: string | null;
+  preparing?: boolean;
+  busy?: boolean;
+  poster: string;
+  /** The hover frames (lib/sprite.ts layout); answers 202 until made. */
+  sprite: string;
+  /** The render's own chapter markers, first frame first; empty when it has none. */
+  chapters: Chapter[];
+  /** WebVTT of what is said, when the version's transcript exists; null otherwise. */
+  captions: string | null;
+  /** The language the captions were heard in (ISO 639-1), when known. */
+  captions_lang?: string | null;
+  /** The Lampo mark in the corner, as `badge` in GuestLinkResponse (A13 CLOUD-7). */
+  badge: boolean;
+}
+
+/** GET /oembed?url=…&format=json for an Embed link (oEmbed 1.0, type video). */
+export interface OEmbedResponse {
+  version: '1.0';
+  type: 'video';
+  title: string;
+  html: string;
+  width: number;
+  height: number;
+  thumbnail_url: string;
+  thumbnail_width: number;
+  thumbnail_height: number;
+  /** Only while the badge shows (the workspace didn't hide it). */
+  provider_name?: string;
+  provider_url?: string;
 }
 
 export interface InfoResponse {
