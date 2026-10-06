@@ -167,7 +167,13 @@ try {
     // to Google and back: the fake signs in at once and sends the browser to Lampo's callback
     await Promise.all([page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 20000 }), page.click('[data-testid=pubset-youtube-add]')]);
     await page.waitForSelector('[data-testid=pubset-return]', { timeout: 20000 });
-    assert((await text('[data-testid=pubset-return]')).includes('Connected: Studio channel'), `the return said: ${await text('[data-testid=pubset-return]')}`);
+    // the line is there before its words are final (it says what it waits for first): wait for the words
+    await page
+      .waitForFunction(() => document.querySelector('[data-testid=pubset-return]')?.textContent.includes('Connected: Studio channel'), {
+        polling: 100,
+        timeout: 10000,
+      })
+      .catch(async () => assert(false, `the return said: ${await text('[data-testid=pubset-return]')}`));
     await page.waitForSelector('[data-testid=pubset-row][data-kind=youtube][data-state=ready]');
     const row = await text('[data-testid=pubset-row][data-kind=youtube]');
     assert(row.includes('Studio Channel'), `the row names the channel: ${row}`);
