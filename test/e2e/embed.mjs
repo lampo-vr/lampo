@@ -3,8 +3,9 @@
 // Browser end-to-end test of an Embed link: a real server (local mode, temp store, free port), headless Chrome, and a
 // page on another origin (another host and port) that pastes the code the share dialog copies. Share → Embed on a
 // video: the settings an embed doesn't take are off and fixed, Create copies the code, and the link's line opens with
-// it. In the other site's page the frame keeps the video's shape, plays, and steps frame by frame — each picture
-// ffmpeg's decode of that frame, the timecode the app's —; J K L, Space, M and F (full screen) work; chapters stand on
+// it; Change link keeps a link on its side (an embed is offered no kinds, a review link no Embed). In the other site's
+// page the frame keeps the video's shape, plays, and steps frame by frame — each picture ffmpeg's decode of that
+// frame, the timecode the app's —; J K L, Space, M and F (full screen) work; chapters stand on
 // the timeline as keyframe glyphs (a press on one goes to its first frame, pointing names it); captions show what is
 // said; the Lampo mark is there. The embed sets no cookie and keeps nothing in the browser. Revoking ends it where it
 // is open. At 390, 768 and 1440 in both colour schemes of the page around it, the player looks the same: dark, like a
@@ -298,6 +299,43 @@ try {
     );
     await shot(p, 'embed-02-dialog-390-de');
     assert(fit.fits, `the kinds fit: ${JSON.stringify(fit)}`);
+    await p.close();
+  });
+
+  await check('Change link keeps a link’s side: an embed is offered no other kind, and another link not Embed', async () => {
+    const enc = encodeURIComponent(stepsVideo.slug);
+    const kept = await api(`/api/review/${enc}/shares`, 'POST', { label: 'Kept embed', embed: true });
+    await api(`/api/review/${enc}/shares`, 'POST', { label: 'Mia, review' });
+    const p = await fresh();
+    await p.goto(`${BASE}/#/v/${enc}`, { waitUntil: 'domcontentloaded' });
+    await p.waitForSelector('[data-testid=share-button]', { timeout: 20_000 });
+    await p.click('[data-testid=share-button]');
+    await p.waitForSelector('.link-row');
+    const change = async (label) => {
+      await p.click(`.link-row [aria-label="More for ${label}"]`);
+      await p.waitForSelector('.menu[data-state=open] [role=menuitem]');
+      await p.evaluate(() =>
+        [...document.querySelectorAll('.menu[data-state=open] [role=menuitem]')].find((m) => m.textContent.trim() === 'Change link').click(),
+      );
+      await p.waitForSelector('[data-testid=link-change]');
+    };
+    await change('Kept embed');
+    assert(!(await p.$('[data-testid=link-change] .seg')), 'an embed being changed is offered no kinds');
+    const says = await p.$eval('[data-testid=link-change] [data-testid=link-kind-fixed]', (e) => e.textContent);
+    assert(says.includes('create a new one'), `it says how to get another kind: ${says}`);
+    // its name still changes, and it stays an embed
+    await p.$eval('[data-testid=link-change-name]', (e) => e.select());
+    await p.keyboard.type('Kept embed, autumn');
+    await p.click('[data-testid=link-save]');
+    await p.waitForSelector('[data-testid=link-change]', { hidden: true });
+    const saved = (await api(`/api/review/${enc}/shares`)).shares.find((s) => s.token === kept.token);
+    assert(saved?.embed && saved.label === 'Kept embed, autumn', `saved, still an embed: ${JSON.stringify(saved)}`);
+    await change('Mia, review');
+    const kinds = await p.$$eval('[data-testid=link-change] .seg [role=radio], [data-testid=link-change] .seg button', (bs) =>
+      bs.map((b) => b.textContent.trim()),
+    );
+    assert(kinds.join(',') === 'Review,Watch only,Delivery', `a review link being changed: ${kinds}`);
+    await shot(p, 'embed-02-change-review');
     await p.close();
   });
 

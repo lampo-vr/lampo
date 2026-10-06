@@ -107,18 +107,111 @@ test('an Embed link is one video, watch only, never a password; a folder has non
   assert.equal(folder.status, 400, folder.text);
   assert.match(folder.json().error, /one video/);
 
-  // a review link with a password becomes an embed only without it; back again, it is a review link
+  // the kind is chosen when a link is made: a review link never becomes an embed, with its password or without
   const review = (await make({ label: 'Mia', password: 'letmein1' })).json();
-  const keep = await request('PATCH', `/api/shares/${review.token}`, { body: { embed: true } });
-  assert.equal(keep.status, 400, keep.text);
-  const dropped = await request('PATCH', `/api/shares/${review.token}`, { body: { embed: true, password: null } });
-  assert.equal(dropped.status, 200, dropped.text);
-  assert.equal(dropped.json().embed, true);
-  assert.equal(dropped.json().password, false);
-  const back = await request('PATCH', `/api/shares/${review.token}`, { body: { embed: false, comment: true, approve: true } });
-  assert.equal(back.json().embed, undefined);
-  assert.equal(back.json().comment, true);
+  for (const body of [{ embed: true }, { embed: true, password: null }]) {
+    const r = await request('PATCH', `/api/shares/${review.token}`, { body });
+    assert.equal(r.status, 400, r.text);
+  }
   assert.equal((await request('GET', `/api/g/${review.token}/embed`, { headers: visitor })).status, 404, 'a review link opens no player');
+});
+
+/** A link made an embed by hand in shares.json, keeping what came in through it (a store edited, or from before the rule). */
+function embedByHand(id: string): void {
+  flushShareStats();
+  const file = path.join(DATA, 'shares.json');
+  const all = JSON.parse(fs.readFileSync(file, 'utf8')) as { shares: Record<string, { id?: string; embed?: boolean }> };
+  const s = Object.values(all.shares).find((x) => x.id === id);
+  assert.ok(s, 'the link is in the file');
+  s.embed = true;
+  fs.writeFileSync(`${file}.tmp`, JSON.stringify(all));
+  fs.renameSync(`${file}.tmp`, file);
+}
+
+test('a link is an embed from the start or never; an embed shows no notes, names or decisions, whatever it holds', async () => {
+  // a review link visitors used: a note with a mark and a picture, and a decision
+  const used = (await make({ label: 'Legal team' })).json();
+  const id = (await request('GET', `/api/g/${used.token}`, { headers: visitor })).json().videos[0].slug;
+  const said = await request('POST', `/api/g/${used.token}/comments`, {
+    body: {
+      name: 'Jane Visitor',
+      slug: id,
+      frame: 12,
+      text: 'remove the claim',
+      drawing: [{ type: 'arrow', x1: 0.1, y1: 0.1, x2: 0.5, y2: 0.5, color: '#ff0000' }],
+    },
+    headers: visitor,
+  });
+  assert.equal(said.status, 200, said.text);
+  const picture = path.join(dir, 'in/ref.png');
+  execFileSync(FFMPEG, ['-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=64x64', '-frames:v', '1', '-y', picture]);
+  const ref = await request('POST', `/api/g/${used.token}/comments/${said.json().id}/refs`, {
+    body: { name: 'Jane Visitor', kind: 'image', data: fs.readFileSync(picture).toString('base64') },
+    headers: visitor,
+  });
+  assert.equal(ref.status, 200, ref.text);
+  const decided = await request('POST', `/api/g/${used.token}/approval`, {
+    body: { name: 'Jane Visitor', v: 1, status: 'changes', note: 'hold it' },
+    headers: visitor,
+  });
+  assert.equal(decided.status, 200, decided.text);
+  const shown = (await request('GET', `/api/g/${used.token}/review/${id}`, { headers: visitor })).json();
+  const marked = shown.notes[0].marked as string;
+  const refFile = shown.notes[0].refs[0].src as string;
+  await until(async () => (await request('GET', marked, { headers: visitor })).status === 200, 'the marked frame through the review link');
+  assert.equal((await request('GET', refFile, { headers: visitor })).status, 200, 'the picture through the review link');
+
+  // it never becomes an embed, whatever comes with the change: the dialog's whole Embed kind included
+  for (const body of [
+    { embed: true },
+    { label: 'Legal team', comment: false, approve: false, notes: 'own', versions: 'latest', download: 'off', expires: null, embed: true },
+  ]) {
+    const r = await request('PATCH', `/api/shares/${used.token}`, { body });
+    assert.equal(r.status, 400, r.text);
+    assert.match(r.json().error, /new link/);
+  }
+  const still = (await request('GET', `/api/shares`)).json().shares.find((s: { token: string }) => s.token === used.token);
+  assert.equal(still.embed, undefined, 'still a review link');
+  assert.equal(still.comment, true, 'nothing of the refused change landed');
+  assert.equal((await request('GET', `/api/g/${used.token}/embed`, { headers: visitor })).status, 404);
+
+  // an embed never becomes a review link: its token sits in other sites' pages, for anyone to read
+  const e = await embedLink();
+  for (const body of [
+    { embed: false },
+    { label: 'Website hero', comment: true, approve: true, notes: 'own', versions: 'latest', download: 'off', expires: null, embed: false },
+  ]) {
+    const r = await request('PATCH', `/api/shares/${e.token}`, { body });
+    assert.equal(r.status, 400, r.text);
+    assert.match(r.json().error, /new link/);
+  }
+  const eid = (await ready(e.token)).slug;
+  const stranger = await request('POST', `/api/g/${e.token}/comments`, { body: { name: 'Stranger', slug: eid, frame: 1, text: 'hello' }, headers: visitor });
+  assert.equal(stranger.status, 403, stranger.text);
+  const approves = await request('POST', `/api/g/${e.token}/approval`, { body: { name: 'Stranger', v: 1, status: 'approved' }, headers: visitor });
+  assert.equal(approves.status, 403, approves.text);
+  // the same kind is no switch: an embed's name and expiry change, so do a review link's settings
+  const renamed = await request('PATCH', `/api/shares/${e.token}`, { body: { label: 'Website hero, autumn', embed: true, expires: null } });
+  assert.equal(renamed.status, 200, renamed.text);
+  assert.equal(renamed.json().embed, true);
+  const watch = await request('PATCH', `/api/shares/${used.token}`, { body: { comment: true, approve: false, embed: false } });
+  assert.equal(watch.status, 200, watch.text);
+  assert.equal(watch.json().approve, false);
+
+  // an embed holding what came in through it before (set by hand): nothing of it reaches anyone with the token
+  embedByHand(used.id);
+  const link = await request('GET', `/api/g/${used.token}`, { headers: visitor });
+  assert.equal(link.status, 200, link.text);
+  const video = link.json().videos[0];
+  assert.deepEqual([video.approval, video.notes, video.open, video.check], [null, 0, 0, 0], JSON.stringify(video));
+  const page = await request('GET', `/api/g/${used.token}/review/${id}`, { headers: visitor });
+  assert.equal(page.status, 200, page.text);
+  assert.deepEqual([page.json().approval, page.json().notes], [null, []]);
+  for (const secret of ['remove the claim', 'Jane Visitor', 'hold it']) assert.ok(!`${link.text}${page.text}`.includes(secret), secret);
+  assert.equal((await request('GET', marked, { headers: visitor })).status, 404, 'its marked frame');
+  assert.equal((await request('GET', refFile, { headers: visitor })).status, 404, 'its picture');
+  const reply = await request('POST', `/api/g/${used.token}/comments/${said.json().id}/replies`, { body: { name: 'Stranger', text: 'hi' }, headers: visitor });
+  assert.equal(reply.status, 403, reply.text);
 });
 
 test('the player is told what it plays and nothing about people, folders or notes', async () => {

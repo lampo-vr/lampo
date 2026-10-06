@@ -1026,7 +1026,8 @@ answers `429` with `Retry-After`. The events:
 What they allow and why: [sharing.md](sharing.md). A link's settings are `{label, comment, approve, notes: own | all,
 versions: latest | all, download: off | preview | original, expires: ISO | null, password: string | null, embed?}`.
 `embed: true` makes an Embed link (one video's player for another site): watch only whatever else is sent, never on a
-folder and never with a password (`400` with the reason); `embed: false` makes it a review link again. By default
+folder and never with a password (`400` with the reason). A link is an embed from when it is made or never: a `PATCH`
+whose `embed` would change that is a `400` ("make a new link"); the same value changes nothing. By default
 a link takes notes and decisions, shows each visitor their own notes and only the newest version, has no downloads and
 no expiry, and is labelled "Review link". A label is 80 characters at most, a password at least 4. Visitors see a
 link's label only when it was given one (`label` is `""` in `/api/g/…` otherwise).
