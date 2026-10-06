@@ -111,6 +111,7 @@ export type {
   UploadResult,
   UserPrefs,
   UserPrefsPatch,
+  VersionDownload,
   VideoAudience,
   WakePref,
   WebhookDelivery,

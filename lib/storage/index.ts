@@ -28,9 +28,10 @@ import { createS3Store } from './s3.ts';
  * the link is revoked, expires or gets a password — and what a visitor can pass on. Short URLs keep the bytes coming
  * from the CDN or bucket (a proxy through the server would put every viewer's bytes on its own line and skip the CDN);
  * the server checks the link again on every redirect, and the player asks for a fresh one when an old one stops
- * working (web/src/player/recover.ts).
+ * working (web/src/player/recover.ts). A version the team downloads gets minutes too: a download starts at once (the
+ * store checks a URL only then), and one passed on stops working soon, whoever had it.
  */
-export const SIGNED_URL_SECONDS = { team: 6 * 3600, guest: 5 * 60 } as const;
+export const SIGNED_URL_SECONDS = { team: 6 * 3600, guest: 5 * 60, download: 5 * 60 } as const;
 
 export interface RemoteStore {
   readonly kind: 'bunny' | 's3';

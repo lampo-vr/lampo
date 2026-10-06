@@ -436,6 +436,8 @@ Details:
 | `PUT /api/review/:slug/folder` | move a video: `{folder}`, or `null` for no project |
 | `GET /api/folders/download/info?folder=&kind=` | what the folder's zip holds: `ArchiveInfo` (files, bytes, `resumable` once every checksum is ready) |
 | `GET /api/folders/download?folder=&kind=original\|preview` | the folder and its subfolders as one zip, originals by default ([archive notes](#review-links)) |
+| `GET /api/review/:slug/download/info?v=` | what a version's download will be: `VersionDownload` (`v`, `name` like `spot V3.mp4`, `bytes`, `url`); the newest without `v` |
+| `GET /api/review/:slug/download?v=` | that version's own file, as it was uploaded or linked, as an attachment named so (below) |
 
 Details:
 
@@ -450,7 +452,11 @@ Details:
   most recently changed videos. Archived videos never appear, and no disk paths do.
 - **Downloads** need the download action. The zip works like a folder link's ([below](#review-links)): `425` while
   previews are being made, `404` with nothing to download, and `429` with `Retry-After` while 2 downloads from the same
-  address are already running.
+  address are already running. One version's file is asked for by the video and `v` only (any other query is a `400`):
+  `404` for a version the video doesn't have, `410` when its bytes are gone or the video was removed (restored, it
+  downloads again). With Bunny, S3 or a media host of its own the answer is a `302` to a signed URL that works for 5
+  minutes (the media host names the file; a bucket's URL keeps its own name); otherwise the file streams with ranges,
+  and a range that asks for the rest of the file gets all of it. Nothing is recorded, as for a folder's zip.
 - **Folder paths** are `/`-separated names of at most 60 characters each. One named for a write — made, renamed to,
   moved into, uploaded into (tus or ticket metadata), asked on — is at most **12 levels and 400 characters**; more is
   a `400` that says which, never a path cut to fit, and a rename can't carry a subfolder past either. Every `folder` /
@@ -795,7 +801,7 @@ same server answers video by signed URLs, and nothing else:
 
 | Route (on the media host only) | What it does |
 |---|---|
-| `GET /media/s/:sealed/:name` | a file: a version, its scrub copy, a fix preview's or reference's clip, a question's clip or sound; ranges, `Content-Disposition` for a download |
+| `GET /media/s/:sealed/:name` | a file: a version, its scrub copy, a fix preview's or reference's clip, a question's clip or sound; ranges, `Content-Disposition` for a download (whose ranges run to the end asked for) |
 | `GET /media/z/:sealed/:name` | a folder's zip (the team's, or a review link's: the link is asked again when it starts) |
 | `PUT` · `GET /api/uploads/direct/:ticket` | one-time uploads, as on the app host |
 | `GET /healthz` · `/readyz` · `/robots.txt` | as on any host |

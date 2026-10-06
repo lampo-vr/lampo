@@ -4,19 +4,21 @@
 import { memo, type ReactNode, useRef } from 'react';
 import { useCan } from '../api/auth.ts';
 import { enc } from '../api/client.ts';
-import type { ReviewResponse } from '../api/types.ts';
+import type { ReviewResponse, Version } from '../api/types.ts';
 import { t } from '../i18n/index.ts';
 import { useLang } from '../i18n/T.tsx';
 import { InboxBell } from '../inbox/InboxBell.tsx';
 import { fileName } from '../lib/format.ts';
 import { backToLibrary, crumbs } from '../lib/nav.ts';
 import { copyText, toast, toastError } from '../lib/toast.ts';
+import { downloadVersion } from '../library/downloadVersion.ts';
 import { SessionChip } from '../sessions/Sessions.tsx';
 import { StageControl, StageLine } from '../status/StageControl.tsx';
 import { I } from '../ui/icons.tsx';
 import { IconButton, Menu, Tip } from '../ui/primitives.tsx';
 import { VIDEO_ACCEPT } from '../uploads/formats.ts';
 import { AgentMenu } from './ClaudeMenu.tsx';
+import { partTag } from './partWords.ts';
 import { VersionPicker } from './VersionPicker.tsx';
 
 interface PlayerTopbarProps {
@@ -125,6 +127,9 @@ export const PlayerTopbar = memo(function PlayerTopbar({
   );
   // where the video stands, and the next step as one button (the rest behind its chevron)
   const approval = <StageControl data={data} latestV={latestV} onShare={onShare} onVerify={onVerify} onPublish={onPublish} compact={phone} />;
+  // The version on screen as its own file (as rendered, whatever the browser plays), the others a step further in.
+  const canDownload = allowed('download') && !review.archived;
+  const versionWords = (x: Version) => [`V${x.v}`, x.v === latestV && t('newest'), x.part && partTag(x.part, x.fps)].filter(Boolean).join(' · ');
   const more = (
     <div style={{ position: 'relative' }}>
       <Menu
@@ -134,7 +139,20 @@ export const PlayerTopbar = memo(function PlayerTopbar({
           uploaded && allowed('upload') && { label: t('Upload new version…'), icon: 'upload', onClick: () => picker.current?.click() },
           // desktop has its Share button; the phone's strip has no room for it
           phone && allowed('share') && { label: t('Share…'), icon: 'link', onClick: onShare },
-          { label: t('Export notes (PDF)'), icon: 'download', onClick: () => window.open(`${location.pathname}#/print/${enc(slug)}`, '_blank') },
+          'sep',
+          canDownload && { label: t('Download V{v}', { v }), icon: 'download', onClick: () => void downloadVersion(slug, v) },
+          canDownload && {
+            sub: {
+              label: t('Download another version'),
+              icon: 'history',
+              items: [...review.versions]
+                .reverse()
+                .filter((x) => x.v !== v)
+                .map((x) => ({ label: versionWords(x), onClick: () => void downloadVersion(slug, x.v) })),
+            },
+          },
+          'sep',
+          { label: t('Export notes (PDF)'), icon: 'notes', onClick: () => window.open(`${location.pathname}#/print/${enc(slug)}`, '_blank') },
           !uploaded && { label: t('Copy file path'), icon: 'copy', onClick: async () => (await copyText(review.video)) && toast(t('Path copied'), 'ok') },
         ]}
       />

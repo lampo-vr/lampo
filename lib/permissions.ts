@@ -14,7 +14,7 @@ export const ACTIONS = {
   organize: 'folders, moving videos, assigning Claude sessions, checking for new renders',
   remove: 'remove any video (members may remove what they uploaded)',
   share: 'create, change and revoke client links',
-  download: 'download whole folders (originals or previews) from the library',
+  download: 'download videos (any version, as rendered) and whole folders (originals or previews) from the library',
   agents: 'requests to agents, agent status, connecting agents, writing as agent:…',
   qa: 'rerun the pre-review, dismiss its suggestions',
   playbook: "edit playbooks (the House's and projects'), accept or reject what agents suggest",

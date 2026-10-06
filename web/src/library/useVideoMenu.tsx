@@ -20,6 +20,7 @@ import { laneLabel } from '../status/stageText.ts';
 import { LANE_SHAPE } from '../ui/glyphs.ts';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { Confirm, type MenuEntry, Modal } from '../ui/primitives.tsx';
+import { downloadVersion } from './downloadVersion.ts';
 import type { LaneId } from './model.ts';
 import { moveCode } from './moved.ts';
 import { movesOf, nextMove } from './moves.ts';
@@ -126,6 +127,8 @@ export function useVideoMenu(v: VideoSummary, { home, folders }: { home?: string
     );
 
   const lanes = useMemo(() => lanesFor(v, can, board), [v, can, board]);
+  // A removed video downloads again once it is restored (the server says the same).
+  const newest = can('download') && !v.archived && v.v ? v.v : 0;
   // The first run's sample goes for good in one click (it is never archived; the first run offers it again).
   const qc = useQueryClient();
   const onRemoveSample = () =>
@@ -156,6 +159,19 @@ export function useVideoMenu(v: VideoSummary, { home, folders }: { home?: string
     can('share') && !v.archived && { label: t('Share…'), icon: 'send', onClick: () => setDialog('share') },
     // a final version's next step: the composer opens in the player (publish/Publishing.tsx)
     can('post') && v.stage.stage === 'final' && !v.stage.final_superseded && { label: t('Publish…'), icon: 'upload', onClick: () => go(v.slug, 'publish=1') },
+    // the newest version as its own file, the ones before it a step further in (versions count up from V1)
+    newest > 0 && { label: t('Download V{v}', { v: newest }), icon: 'download', onClick: () => void downloadVersion(v.slug, newest) },
+    newest > 0 && {
+      sub: {
+        label: t('Download another version'),
+        icon: 'history',
+        items: Array.from({ length: Math.max(0, Math.min(v.versions, newest) - 1) }, (_, i) => newest - 1 - i).map((n) => ({
+          label: `V${n}`,
+          onClick: () => void downloadVersion(v.slug, n),
+        })),
+      },
+    },
+    'sep',
     organize && { label: t('Move to…'), icon: 'moveTo', onClick: () => setDialog('move') },
     organize && { label: t('Assign agent…'), icon: 'terminal', onClick: () => setDialog('assign') },
     'sep',

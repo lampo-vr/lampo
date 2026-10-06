@@ -492,7 +492,7 @@ it on every request, and the app hides what a role can't do.
 | upload videos and new versions; remove videos they uploaded | | ✓ | ✓ | ✓ |
 | projects and folders, moving videos, assigning agents | | ✓ | ✓ | ✓ |
 | make review links | | ✓ | ✓ | ✓ |
-| download whole folders from the library | | ✓ | ✓ | ✓ |
+| download a video (any version, as rendered) or whole folders from the library | | ✓ | ✓ | ✓ |
 | requests to agents, agent status, connecting agents, writing as `agent:…` | | ✓ | ✓ | ✓ |
 | rerun Auto-check, dismiss its findings | | ✓ | ✓ | ✓ |
 | edit playbooks; accept or reject what agents suggest | | ✓ | ✓ | ✓ |

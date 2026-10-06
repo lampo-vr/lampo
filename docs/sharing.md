@@ -278,8 +278,10 @@ before anyone taps it.
   originals)".
 
 Your team downloads folders from the library: *Download project* or *Download folder* in its ⋯ menu gives the original
-files. On a hosted server that takes the download right (members and up; reviewers watch and leave notes, they don't take
-files home).
+files. One video downloads from its own ⋯ menu, in the player and on its card in the library: *Download V3* gives the
+version on screen (on a card, the newest) as it was rendered, named `spot V3.mp4`, and *Download another version* lists
+the others. A version in a codec browsers can't play downloads as itself, not as the copy the player plays. On a hosted
+server both take the download right (members and up; reviewers watch and leave notes, they don't take files home).
 
 ## Security
 

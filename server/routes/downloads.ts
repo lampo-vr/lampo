@@ -2,6 +2,8 @@
 // browser-playable files, 'original' = the rendered bytes); the team gets it from the library ('download' action).
 // The archive streams straight from the files (bounded memory, no temp copy), with its exact length up front. Once
 // every CRC is cached it is deterministic: ETag + ranges, so a download that breaks off resumes (If-Range).
+// The team also downloads one version of a video (its ⋯ menu): the file itself, the way a review link's is handed out.
+// A review link's single files are in ./shares/media.ts.
 import path from 'node:path';
 import type { Request, Response, Router } from 'express';
 import { z } from 'zod';
@@ -16,6 +18,7 @@ import {
   listingBytes,
   listingPin,
   prepareCrcs,
+  versionFileName,
 } from '../../lib/archive.ts';
 import { folderName, shownFolders } from '../../lib/folders.ts';
 import { Recent } from '../../lib/rateLimit.ts';
@@ -24,16 +27,20 @@ import { guestName, isExpired, recordDownload, resolveShare, reviewsOf, settings
 import { SIGNED_URL_SECONDS } from '../../lib/storage/index.ts';
 import { mediaArchiveUrl, openMedia } from '../../lib/storage/mediaHost.ts';
 import * as store from '../../lib/store.ts';
-import type { ArchiveInfo, Review, ShareWithToken, Version } from '../../lib/types.ts';
+import type { ArchiveInfo, Review, ShareWithToken, Version, VersionDownload } from '../../lib/types.ts';
 import type { ServerContext } from '../context.ts';
 import { mediaHostOf, requestHost } from '../guard.ts';
-import { attachment, fail, query, router } from '../http.ts';
+import { getReview, getVersion } from '../helpers.ts';
+import { attachment, fail, query, router, VersionQuery } from '../http.ts';
+import { type Source, sendDownload, versionOriginal } from '../playback.ts';
 import { issuerOf, issuerStill } from '../uploadTickets.ts';
 import { ipOf, keptInMemory, open } from './shares/access.ts';
 
 const Kind = z.enum(['preview', 'original']).optional();
 const GuestQuery = z.object({ kind: Kind, name: z.string().max(200).optional() });
 const TeamQuery = z.object({ folder: z.string().min(1).max(store.FOLDER_LIMITS.length), kind: Kind });
+/** One version's file: `?v=` and nothing else (a `path` or `file` is refused, not ignored). */
+const VersionDownloadQuery = z.strictObject(VersionQuery.shape);
 /** Who asked for a team's zip (server/uploadTickets.ts TicketIssuer): identified again when the zip is fetched. */
 const ArchiveIssuer = z.object({
   via: z.enum(['local', 'lan', 'cookie', 'token', 'oauth']),
@@ -203,6 +210,33 @@ export function downloadRoutes(ctx: ServerContext): Router {
   });
   const sendTeamArchive = (req: Request, res: Response, folder: string, listing: ArchiveListing) =>
     sendArchive(req, res, listing, { filename: archiveName(folder), slots: [wsKey(`team|${ipOf(req)}`)] });
+
+  // ---------------------------------------------------------------- one version, for the team
+
+  // A version's own file, as it was uploaded or linked — never the copy the browser plays, whatever its codec — named
+  // "spot V3.mp4". Asked for by the video and its version, never by a path. The same right as a folder's zip
+  // (`download`), and recorded nowhere, like the team's zips.
+  function teamVersion(req: Request<{ slug: string }>): { ver: Version; src: Source; name: string } {
+    const q = query(VersionDownloadQuery, req);
+    const review = getReview(req.params.slug);
+    // a removed video is out of the library, as out of its folder's zip: restored, it downloads again
+    if (review.archived) throw fail(410, 'this video was removed: restore it to download it');
+    const ver = getVersion(review, q.v);
+    if (!store.versionAvailable(review, ver.v)) throw fail(410, 'the bytes of this version are gone');
+    return { ver, src: versionOriginal(review, ver), name: versionFileName(review.video, ver.v) };
+  }
+
+  r.get('/api/review/:slug/download/info', (req, res) => {
+    const { ver, name } = teamVersion(req);
+    const out: VersionDownload = { v: ver.v, name, bytes: ver.size, url: `/api/review/${encodeURIComponent(req.params.slug)}/download?v=${ver.v}` };
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(out);
+  });
+
+  r.get('/api/review/:slug/download', async (req, res) => {
+    const { src, name } = teamVersion(req);
+    await sendDownload(req, res, src, name, SIGNED_URL_SECONDS.download);
+  });
 
   // ---------------------------------------------------------------- on the media host
 

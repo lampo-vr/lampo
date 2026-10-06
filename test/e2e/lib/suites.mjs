@@ -75,6 +75,8 @@ const SECONDS = {
   playbook: 15,
   styleguide: 15,
   zoom: 14,
+  // a folder's zip, then one version from the player's and a card's ⋯, the menus at 1440 and 390 in both themes
+  download: 14,
   status: 12,
   moving: 10,
   wake: 9,
@@ -82,7 +84,6 @@ const SECONDS = {
   run: 8,
   'mcp-app': 6,
   oauth: 5,
-  download: 3,
 };
 const DEFAULT_SECONDS = 20;
 const weight = (name) => SECONDS[name] ?? DEFAULT_SECONDS;
