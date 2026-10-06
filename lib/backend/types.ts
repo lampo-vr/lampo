@@ -6,6 +6,7 @@ import type { GrabCount } from '../shots.ts';
 import type { SessionInput, SyncResult } from '../store.ts';
 import type {
   AgentStatus,
+  ArchivedProject,
   AskCreated,
   AskView,
   ClaudeSession,
@@ -218,8 +219,11 @@ export interface Backend {
   putElements(slug: string, v: number | undefined, map: unknown): Promise<ElementsAttached>;
   /** What these notes point at in their versions' elements maps, and those elements' names (empty without maps). */
   pointers(review: Review, comments: readonly Comment[]): Promise<ReviewPointers>;
-  move(slug: string, folder: string | null, by: string): Promise<Review>;
+  /** `out`: the caller may take a video out of an archived project (owners and admins; a server decides by role). */
+  move(slug: string, folder: string | null, by: string, o?: { out?: boolean }): Promise<Review>;
   folders(reviews: Review[]): Promise<string[]>;
+  /** The archived projects (lib/archived.ts), by name: what agents' lists leave out unless asked. None from older servers. */
+  archivedProjects(): Promise<Readonly<Record<string, Pick<ArchivedProject, 'at' | 'by'>>>>;
   assign(slug: string, session: SessionInput | null, by: string): Promise<void>;
   sync(slug: string): Promise<(SyncResult & { review: Review }) | null>;
   sessions(): Promise<ClaudeSession[]>;

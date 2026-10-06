@@ -3,7 +3,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Request, Response } from 'express';
 
+import { archivedIn } from '../lib/archived.ts';
 import { simplifyPoints } from '../lib/drawing.ts';
+import { archivedNow } from '../lib/folderIds.ts';
 import { queued } from '../lib/jobs.ts';
 import { isOwner } from '../lib/ownership.ts';
 import { slugify } from '../lib/paths.ts';
@@ -13,7 +15,7 @@ import { assignedState } from '../lib/sessions.ts';
 import { stageForReview } from '../lib/stageContext.ts';
 import * as store from '../lib/store.ts';
 import { compareTime, oneLine } from '../lib/time.ts';
-import type { AssignedSession, ClaudeSession, ConnectedAgent, FrameMeta, Review, Shape, Version, VideoSummary } from '../lib/types.ts';
+import type { ArchivedProject, AssignedSession, ClaudeSession, ConnectedAgent, FrameMeta, Review, Shape, Version, VideoSummary } from '../lib/types.ts';
 import type { Started } from './background.ts';
 import { fail, sendInternal } from './http.ts';
 
@@ -101,8 +103,10 @@ export const metaOf = (review: Review, ver: Version): FrameMeta => ({
   frames: ver.frames,
 });
 
-export function summary(review: Review, sessions: ClaudeSession[]): VideoSummary {
+/** `archived`: the archived projects (lib/folderIds.ts), read once by a caller that sums up many videos. */
+export function summary(review: Review, sessions: ClaudeSession[], archived: Readonly<Record<string, ArchivedProject>> = archivedNow()): VideoSummary {
   const slug = slugify(review.video);
+  const shut = archivedIn(review.folder, archived);
   const latest = review.versions.at(-1);
   const upload = store.isUpload(review);
   // Whether its agent runs, and whether it hears new notes by itself (an MCP client only while it waits for them).
@@ -137,6 +141,7 @@ export function summary(review: Review, sessions: ClaudeSession[]): VideoSummary
     mtime,
     missing: !!review.missing || !mtime,
     archived: review.archived || null,
+    ...(shut ? { project_archived: (archived[shut] as ArchivedProject).at } : {}),
     added: review.added,
     updated: review.updated,
     lastComment: review.comments.reduce((a, c) => (compareTime(c.created, a) > 0 ? c.created : a), ''),

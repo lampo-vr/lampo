@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { analysisSize, BLOCK_CHANGED, blockDiff, greyFilter } from './diff.ts';
+import { checkReviewOpen } from './folderIds.ts';
 import { isoLocal } from './paths.ts';
 import { FFMPEG, isVideoContainer, probe, run } from './probe.ts';
 import { colorFilter, seekTime } from './shots.ts';
@@ -129,6 +130,7 @@ export async function attachPreview(commentId: string, file: string, req: Previe
   const hit = store.findComment(commentId);
   if (!hit) throw new Error(`no note ${commentId}`);
   const { slug, review, comment } = hit;
+  checkReviewOpen(review);
   const latest = review.versions.at(-1) as Version;
   const frame = req.frame ?? store.frameIn(review, comment, latest.v);
   if (!Number.isInteger(frame) || frame < 0 || frame >= latest.frames) throw new Error(`frame ${frame} is outside 0–${latest.frames - 1} of v${latest.v}`);

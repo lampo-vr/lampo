@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { checkElementMap, fitElementMap, pointedAt } from './elements.ts';
+import { checkReviewOpen } from './folderIds.ts';
 import { reviewDir, slugify } from './paths.ts';
 import { renderKey } from './renderKey.ts';
 import { wsKey } from './scope.ts';
@@ -24,6 +25,7 @@ export class NoVersionError extends Error {
  * version's (lib/elements.ts), then written at once. Throws ElementMapError (400) for a bad map — nothing is kept.
  */
 export function attachElements(review: Review, v: number | undefined, value: unknown): ElementsAttached {
+  checkReviewOpen(review);
   const ver = v === undefined ? review.versions.at(-1) : review.versions.find((x) => x.v === v);
   if (!ver) throw new NoVersionError(v === undefined ? 'the video has no version' : `no v${v}`);
   const { map, scaled_from } = fitElementMap(checkElementMap(value), ver);

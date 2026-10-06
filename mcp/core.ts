@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/server';
 import { z } from 'zod';
+import { archivedIn } from '../lib/archived.ts';
 import { BRAND_NAME } from '../lib/brand.ts';
 import { MCP_NAME } from '../lib/mcpConfig.ts';
 import { forAgents } from '../lib/onboarding.ts';
@@ -121,16 +122,20 @@ export function createReviewServer(options: ReviewServerOptions): McpServer {
   server.registerResource(
     'review',
     new ResourceTemplate('vr://review/{slug}', {
-      list: async () => ({
-        resources: forAgents(await b.listReviews())
-          .filter((r) => !r.archived)
-          .map((r) => ({
-            uri: reviewUri(slugify(r.video)),
-            name: path.basename(r.video),
-            description: r.folder || r.project,
-            mimeType: 'text/markdown',
-          })),
-      }),
+      list: async () => {
+        // archived projects are put away: their videos are read by name, not listed
+        const shut = await b.archivedProjects();
+        return {
+          resources: forAgents(await b.listReviews())
+            .filter((r) => !r.archived && !archivedIn(r.folder, shut))
+            .map((r) => ({
+              uri: reviewUri(slugify(r.video)),
+              name: path.basename(r.video),
+              description: r.folder || r.project,
+              mimeType: 'text/markdown',
+            })),
+        };
+      },
     }),
     {
       title: 'Review summary',

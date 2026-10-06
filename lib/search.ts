@@ -4,6 +4,8 @@
 // beats one at the start of a word, which beats one inside a word; ties go to what changed last.
 // Access: whoever may `view` the library sees all of it (server mode has one workspace); guests never reach this.
 import path from 'node:path';
+import { archivedIn } from './archived.ts';
+import { archivedNow } from './folderIds.ts';
 import { shownFolders } from './folders.ts';
 import { slugify } from './paths.ts';
 import { renderKey } from './renderKey.ts';
@@ -11,7 +13,7 @@ import { STAGE_LABELS } from './stage.ts';
 import { stageForReview } from './stageContext.ts';
 import { listReviews } from './store.ts';
 import { compareTime, noteKind } from './time.ts';
-import type { Comment, Review, SearchFolder, SearchNote, SearchResponse, SearchVideo } from './types.ts';
+import type { ArchivedProject, Comment, Review, SearchFolder, SearchNote, SearchResponse, SearchVideo } from './types.ts';
 
 const MARKS = /\p{M}/gu;
 /** Case and accents folded: "Änderung" → "anderung", "Straße" → "strasse". The query is folded this way. */
@@ -98,38 +100,57 @@ function noteHit(r: Review, c: Comment, reply: string | null): SearchNote {
   };
 }
 
-export function search(q: string, { limit = 8, reviews = listReviews() }: { limit?: number; reviews?: Review[] } = {}): SearchResponse {
-  const live = reviews.filter((r) => !r.archived && r.versions.length);
+export function search(
+  q: string,
+  {
+    limit = 8,
+    reviews = listReviews(),
+    archived = archivedNow(),
+  }: { limit?: number; reviews?: Review[]; archived?: Readonly<Record<string, ArchivedProject>> } = {},
+): SearchResponse {
+  const listed = reviews.filter((r) => !r.archived && r.versions.length);
+  // Archived projects (lib/archived.ts) are put away: what matches in them comes apart (`archived`), and only for a query.
+  const away = (folder: string | null | undefined) => !!archivedIn(folder, archived);
+  const live = listed.filter((r) => !away(r.folder));
   const words = [...new Set(fold(q).split(/\s+/).filter(Boolean))].slice(0, 6).map((w) => w.slice(0, 64));
   if (!words.length) {
     const recent = [...live].sort((a, b) => compareTime(b.updated, a.updated)).slice(0, limit);
     return { q, videos: recent.map(videoHit), folders: [], notes: [] };
   }
 
-  const videos = live
-    .map((r) => {
-      const name = path.basename(r.video);
-      // The project is matched (it names the job) but never returned: locally it can be a path on this disk.
-      const project = r.project && !r.project.startsWith('/') ? r.project : '';
-      const m = score([field(name, 3), field(r.folder || '', 1), field(project, 1)], words);
-      return m && { s: m.total, t: r.updated || '', x: r };
-    })
-    .filter((m) => !!m)
-    .sort(byScoreThenRecent)
-    .slice(0, limit)
-    .map((m) => videoHit(m.x));
+  const videosIn = (pool: Review[]) =>
+    pool
+      .map((r) => {
+        const name = path.basename(r.video);
+        // The project is matched (it names the job) but never returned: locally it can be a path on this disk.
+        const project = r.project && !r.project.startsWith('/') ? r.project : '';
+        const m = score([field(name, 3), field(r.folder || '', 1), field(project, 1)], words);
+        return m && { s: m.total, t: r.updated || '', x: r };
+      })
+      .filter((m) => !!m)
+      .sort(byScoreThenRecent)
+      .slice(0, limit)
+      .map((m) => videoHit(m.x));
+  const videos = videosIn(live);
 
   // Folders: ties go to the fuller one.
-  const folders: SearchFolder[] = shownFolders(reviews)
-    .folders.map((f) => {
-      const name = f.split('/').at(-1) as string;
-      const m = score([field(name, 3), field(f, 1)], words);
-      return m && { s: m.total, x: { folder: f, name, videos: live.filter((r) => r.folder === f || r.folder?.startsWith(`${f}/`)).length } };
-    })
-    .filter((m) => !!m)
-    .sort((a, b) => b.s - a.s || b.x.videos - a.x.videos || a.x.folder.localeCompare(b.x.folder, 'de'))
-    .slice(0, limit)
-    .map((m) => m.x);
+  const known = shownFolders(reviews).folders;
+  const foldersIn = (list: string[], pool: Review[]): SearchFolder[] =>
+    list
+      .map((f) => {
+        const name = f.split('/').at(-1) as string;
+        const m = score([field(name, 3), field(f, 1)], words);
+        return m && { s: m.total, x: { folder: f, name, videos: pool.filter((r) => r.folder === f || r.folder?.startsWith(`${f}/`)).length } };
+      })
+      .filter((m) => !!m)
+      .sort((a, b) => b.s - a.s || b.x.videos - a.x.videos || a.x.folder.localeCompare(b.x.folder, 'de'))
+      .slice(0, limit)
+      .map((m) => m.x);
+  const folders = foldersIn(
+    known.filter((f) => !away(f)),
+    live,
+  );
+  const shut = { folders: foldersIn(known.filter(away), listed), videos: videosIn(listed.filter((r) => away(r.folder))) };
 
   // Notes: at least one word must be in the note itself (its text, a reply or who wrote it), or "spot" would list
   // every note of spot.mp4.
@@ -149,5 +170,5 @@ export function search(q: string, { limit = 8, reviews = listReviews() }: { limi
   }
   notes.sort(byScoreThenRecent);
 
-  return { q, videos, folders, notes: notes.slice(0, limit).map((m) => m.x) };
+  return { q, videos, folders, notes: notes.slice(0, limit).map((m) => m.x), ...(shut.folders.length || shut.videos.length ? { archived: shut } : {}) };
 }

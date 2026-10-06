@@ -3,6 +3,7 @@
 // folder's ask (lib/asks.ts). One path for the API route, `vr ask` / the MCP tool on this machine, and the upload URL
 // that brings an item's file later. Nothing half-made stays: a file that fails takes the others with it.
 import { askFileUrl, createAsk, findAsk, setAskItemRef } from './asks.ts';
+import { checkNotArchived, checkReviewOpen } from './folderIds.ts';
 import { allFolders, createFolder, normFolder } from './folders.ts';
 import { heavy, PRIORITY } from './jobs.ts';
 import { answeredAlready, cleanOptions, cleanPrompt, OPTION_LIMITS, type OptionGroupInput, optionRefs } from './options.ts';
@@ -99,6 +100,9 @@ export async function makeAsk(input: MakeAsk): Promise<MadeAsk> {
   const moments = Object.values(input.sources).filter((s) => s.frame).length;
   if (moments > OPTION_LIMITS.moments) throw new Error(`a question shows at most ${OPTION_LIMITS.moments} moments of renders (this one ${moments})`);
   if (input.slug && !store.loadReview(input.slug)?.versions.length) throw new Error('no such video');
+  // nothing new in an archived project: refused before any upload URL is handed out or any file is stored
+  if (input.slug) checkReviewOpen(store.loadReview(input.slug));
+  else checkNotArchived(normFolder(input.folder));
   const id = store.reservedCommentId();
   const slug = input.slug || null;
   input.mint?.(id, groups);

@@ -26,6 +26,7 @@ import { countStep, noticeMoment } from '../funnel.ts';
 import { accountOf, agentView, finalLock, getReview, getVersion, isOwn, metaOf, sanitizeDrawing, signOffByPerson, summary, versionBytes } from '../helpers.ts';
 import { body, commentId, fail, failFrom, parse, query, router } from '../http.ts';
 import { checkWake, startAgent } from '../wake.ts';
+import { archivedList } from './library.ts';
 import { InlineRefInput } from './refs.ts';
 
 const severity = z.enum(SEVERITIES);
@@ -253,8 +254,11 @@ export function reviewRoutes(ctx: ServerContext): Router {
 
   // Every review in full (remote `vr` and MCP read the library through this).
   r.get('/api/reviews', (req, res) => {
+    const projects = archivedList();
     res.json({
       reviews: store.listReviews().map((review) => ({ slug: slugify(review.video), review: agentView.review(req, review), stage: stageForReview(review) })),
+      // which projects are archived: what agents' lists leave out unless asked (lib/archived.ts)
+      ...(projects ? { archived_projects: projects } : {}),
     });
   });
 

@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { checkKey, localOwner, startingName } from './auth.ts';
-import { FoldersUnreadableError, folderIdOf } from './folderIds.ts';
+import { archivedProjectOf, checkNotArchived, checkReviewOpen, FoldersUnreadableError, folderIdOf } from './folderIds.ts';
 import { currentWorkspace, DATA, DEFAULT_WORKSPACE, dataDir, inWorkspace, isoLocal, slugify, USER, WORKSPACE_ID } from './paths.ts';
 import { summarizeActivity } from './shareActivity.ts';
 import { approvalsOf } from './stage.ts';
@@ -427,6 +427,9 @@ export function linkWorkspace(token: unknown): string {
 
 export function createShare(target: string | Target, { label, by = USER, byId, ...input }: ShareInput & { by?: string; byId?: string } = {}): ShareWithToken {
   const t: Target = typeof target === 'string' ? { slug: target } : { ...target };
+  // no new review link into an archived project (the links it has keep working, watch only: archivedFor)
+  if ('slug' in t) checkReviewOpen(loadReview(t.slug));
+  else checkNotArchived(t.folder);
   // A video link is for the video at that slug now, not for one added there later (madeFor).
   if ('slug' in t && !t.video_added) Object.assign(t, identityOf(loadReview(t.slug)));
   const token = crypto.randomBytes(18).toString('base64url');
@@ -848,6 +851,16 @@ export function recordDownload(token: string, d: Omit<ShareDownloadRecord, 'at'>
 }
 
 // ---------------------------------------------------------------- what a link covers
+
+/**
+ * The archived project a link's videos are in (lib/archived.ts), or null: a folder link's by its folder, a video link's
+ * by where its video is now. While it is, the link is watch only — its visitors watch, and download what it offers,
+ * but leave no note or decision; restored, it is what it was (nothing of the link itself changes).
+ */
+export function archivedFor(s: Pick<Share, 'folder' | 'slug'>): string | null {
+  if (s.folder) return archivedProjectOf(s.folder);
+  return s.slug ? archivedProjectOf(loadReview(s.slug)?.folder) : null;
+}
 
 /** Does the link include this review? Folder links cover the folder and everything below it (a folder that is gone
  * is refused before: resolveShare, listShares); a video link only the video it was made for. */

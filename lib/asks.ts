@@ -9,6 +9,7 @@
 // is parsed once per change and held (like shares.json).
 import fs from 'node:fs';
 import path from 'node:path';
+import { checkNotArchived } from './folderIds.ts';
 import { answeredAlready, lastAnswer, OPTION_LIMITS, optionRefs, picksLine } from './options.ts';
 import { dataDir, isoLocal } from './paths.ts';
 import { storage } from './storage/index.ts';
@@ -166,6 +167,8 @@ function change<T>(id: string, fn: (ask: FolderAsk, all: FolderAsk[]) => T): T {
     const all = readFile(FILE());
     const ask = all.find((a) => a.id === id);
     if (!ask) throw new Error(`no question ${id}`);
+    // a question in an archived project waits as it is: no answer, no file, until the project is restored
+    checkNotArchived(ask.folder);
     const out = fn(ask, all);
     const fit = fitted(all, id);
     gone = fit.gone;
@@ -199,6 +202,7 @@ export interface AskInput {
 export function createAsk(input: AskInput): FolderAsk {
   const text = input.text.trim();
   if (text.length > ASK_LIMITS.text) throw new Error(`a question is at most ${ASK_LIMITS.text} characters long`);
+  checkNotArchived(input.folder);
   const ask: FolderAsk = {
     id: input.id ?? reservedCommentId(),
     folder: input.folder,
@@ -279,6 +283,7 @@ export function removeAsk(id: string, by: string): FolderAsk {
     const all = readFile(FILE());
     const hit = all.find((a) => a.id === id);
     if (!hit) throw new Error(`no question ${id}`);
+    checkNotArchived(hit.folder);
     save(all.filter((a) => a.id !== id));
     logAskEvent('delete', by, hit);
     return hit;

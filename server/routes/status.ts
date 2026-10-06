@@ -1,9 +1,12 @@
 // The status workflow over HTTP: where every video stands (GET /api/status), carrying an approval over to an identical
 // render, and marking a video final or reopening it. Approving itself stays PUT /api/review/:slug/approval (the team) and
 // POST /api/g/:token/approval (a client). The rules are in docs/workflow.md; the stage comes from lib/stage.ts.
+
 import path from 'node:path';
 import express, { type Router } from 'express';
 import { z } from 'zod';
+import { archivedIn } from '../../lib/archived.ts';
+import { archivedNow } from '../../lib/folderIds.ts';
 import { slugify } from '../../lib/paths.ts';
 import { renderKey } from '../../lib/renderKey.ts';
 import { assignedState } from '../../lib/sessions.ts';
@@ -34,9 +37,11 @@ export function statusRoutes(ctx: ServerContext): Router {
 
   r.get('/api/status', async (_req, res) => {
     const sessions = await ctx.sessions.get();
+    // archived projects are put away (lib/archived.ts): not listed here either
+    const shut = archivedNow();
     const videos: StatusVideo[] = store
       .listReviews()
-      .filter((review) => !review.archived)
+      .filter((review) => !review.archived && !archivedIn(review.folder, shut))
       .map((review) => {
         const latest = review.versions.at(-1);
         const sessionActive = !!assignedState(review.session, sessions).active;

@@ -6,6 +6,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { checkReviewOpen } from '../folderIds.ts';
 import { dataDir, isoLocal, slugify } from '../paths.ts';
 import { renderKey } from '../renderKey.ts';
 import { stageOf } from '../stage.ts';
@@ -347,6 +348,7 @@ function agentKeepsOff(p: StoredPost, person: boolean | undefined): void {
 export function draftPost(input: DraftInput): { post: StoredPost; created: boolean } {
   const review = loadReview(input.slug);
   if (!review) throw new PostError(404, 'unknown video');
+  checkReviewOpen(review);
   const f = finalOf(review);
   if ('why' in f) throw new PostError(409, f.why, f.next);
   const fields = cleanFields(input.platform, input.fields);

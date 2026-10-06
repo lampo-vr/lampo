@@ -15,7 +15,9 @@
 // moves when it was put aside), next to the dismissals.
 import fs from 'node:fs';
 import path from 'node:path';
+import { archivedIn } from './archived.ts';
 import { shownAsks } from './asks.ts';
+import { archivedNow } from './folderIds.ts';
 import { attentionOf, lastActivity } from './insights.ts';
 import { optionsSeen } from './options.ts';
 import { dataDir, isoLocal, slugify } from './paths.ts';
@@ -298,7 +300,9 @@ export interface ForYouOptions {
 
 export function forYou(viewer: ForYouViewer, { server = false, now = Date.now(), limit, stageFor }: ForYouOptions = {}): ForYouResponse {
   if (!can(viewer.role, 'view')) return { items: [], counts: emptyCounts() };
-  const reviews = listReviews().filter((r) => !r.archived);
+  // an archived project's work is put away with it (lib/archived.ts): none of it waits for anyone
+  const shut = archivedNow();
+  const reviews = listReviews().filter((r) => !r.archived && !archivedIn(r.folder, shut));
   const bySlug = new Map(reviews.map((r) => [slugify(r.video), r]));
   const stored = load();
   const dismissed = dismissedOf(stored, viewer.key);
@@ -314,7 +318,7 @@ export function forYou(viewer: ForYouViewer, { server = false, now = Date.now(),
     ...(can(viewer.role, 'publish') ? postItems() : []),
     // what happened, a moved store's history included (docs/moving.md: the Inbox reads it as what happened)
     ...fromEvents(readHistory({ limit: 3000 }), bySlug, viewer, server, now).filter((i) => i.kind !== 'version' || !reviewing.has(`${i.slug}:${i.v}`)),
-  ].filter((i) => !(i.dismissible && dismissed[i.key]));
+  ].filter((i) => !(i.dismissible && dismissed[i.key]) && !archivedIn(i.folder, shut));
   // A video the list already shows (a fix to check, a question…) isn't listed again as stalled.
   const shown = new Set(listed.map((i) => i.slug));
   const stalled = can(viewer.role, 'approve') ? stalledItems(reviews, stageFor ?? ((r) => stageOf(r, { now })), now).filter((i) => !shown.has(i.slug)) : [];

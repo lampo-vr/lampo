@@ -1,13 +1,16 @@
 // Projects & folders: a user-made tree, independent of where the files live on disk.
 //   data/folders.json          {"folders": ["ACME", "ACME/Spring Sale", …]}  (explicit folders, so empty ones survive)
 //                              "ids": {"ACME": "f_…"}  (folders review links were made on: lib/folderIds.ts)
+//                              "archived": {"ACME": {"at": "…", "by": "…"}}  (projects put away: lib/archived.ts)
 //   review.json "folder"       "ACME/Spring Sale" or null (= Unsorted)
-// A folder path is "/"-separated; top-level folders are shown as projects.
+// A folder path is "/"-separated; top-level folders are shown as projects. Nothing changes inside an archived project
+// (made, renamed, moved, deleted, moved into) until it is restored; only its owners and admins take a video out of it.
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { projectOfFolder } from './archived.ts';
 import { moveAskFolders } from './asks.ts';
-import { FoldersUnreadableError, foldersFile, newFolderId, parseFolders, readFoldersText } from './folderIds.ts';
+import { checkNotArchived, cleanArchived, FoldersUnreadableError, foldersFile, newFolderId, parseFolders, readFoldersText } from './folderIds.ts';
 import { dataDir, isoLocal, projectOf, slugify, USER } from './paths.ts';
 import { movePlaybooks, playbookRoot } from './playbookFiles.ts';
 import { bindShareTargets, folderLinks, moveShareFolders, revokeShares } from './shares.ts';
@@ -25,7 +28,7 @@ import {
   writeAtomic,
 } from './store.ts';
 import { compareTime } from './time.ts';
-import type { FolderSuggestion, Review } from './types.ts';
+import type { ArchivedProject, FolderSuggestion, Review } from './types.ts';
 
 const FILE = foldersFile;
 const LOCK_DIR = (): string => path.join(dataDir(), '.folders');
@@ -81,24 +84,29 @@ const parentOf = (p: string) => p.split('/').slice(0, -1).join('/') || null;
  * does (lib/shares.ts readJson): read as empty, the next change would write the file without the folders' ids, and
  * every folder review link of the workspace would end for good. Everything that changes folders reads it first.
  */
-function loadFile(): { folders: string[]; ids: Record<string, string> } {
+function loadFile(): { folders: string[]; ids: Record<string, string>; archived: Record<string, ArchivedProject> } {
   const text = readFoldersText(FILE());
-  if (text === null) return { folders: [], ids: {} };
+  if (text === null) return { folders: [], ids: {}, archived: {} };
   const f = parseFolders(text, FILE());
-  return { folders: f.folders || [], ids: f.ids || {} };
+  return { folders: f.folders || [], ids: f.ids || {}, archived: cleanArchived(f.archived) };
 }
 
 export function loadFolders(): string[] {
   return loadFile().folders;
 }
 
-/** The folders, and the ids of those still there (an id ends with its folder). */
-function save(list: Iterable<string>, ids: Record<string, string>): void {
+/**
+ * The folders, the ids of those still there (an id ends with its folder) and the archived projects still there: every
+ * change reads the file first and carries `archived` on as it found it, unless the change is the archive's own.
+ */
+function save(list: Iterable<string>, ids: Record<string, string>, archived: Record<string, ArchivedProject>): void {
   const set = new Set(list);
   const folders = [...set].sort(byName);
   const kept = Object.entries(ids).filter(([f]) => set.has(f));
+  const shut = Object.entries(archived).filter(([f]) => set.has(f));
   fs.mkdirSync(dataDir(), { recursive: true });
-  writeAtomic(FILE(), `${JSON.stringify({ folders, ...(kept.length ? { ids: Object.fromEntries(kept) } : {}) }, null, 2)}\n`);
+  const file = { folders, ...(kept.length ? { ids: Object.fromEntries(kept) } : {}), ...(shut.length ? { archived: Object.fromEntries(shut) } : {}) };
+  writeAtomic(FILE(), `${JSON.stringify(file, null, 2)}\n`);
 }
 
 /** Ids moved with their folders: `map` gives a folder's new path, or null for one whose id ends. */
@@ -150,8 +158,10 @@ export function shownFolders(reviews: Review[] = listReviews()): { folders: stri
 export function createFolder(p: unknown): string {
   const f = normFolder(p);
   if (!f) throw new Error('folder name is empty');
+  // nothing new in an archived project, a folder neither (and its own name is taken)
+  checkNotArchived(f);
   withLock(LOCK_DIR(), () => {
-    const { folders, ids } = loadFile();
+    const { folders, ids, archived } = loadFile();
     const all = new Set(folders);
     // A folder made now is a new one, whatever an id left over under its name says (a file edited by hand).
     const made = new Set<string>();
@@ -160,7 +170,7 @@ export function createFolder(p: unknown): string {
         all.add(a);
         made.add(a);
       }
-    save(all, made.size ? Object.fromEntries(Object.entries(ids).filter(([x]) => !made.has(x))) : ids);
+    save(all, made.size ? Object.fromEntries(Object.entries(ids).filter(([x]) => !made.has(x))) : ids, archived);
   });
   return f;
 }
@@ -171,10 +181,10 @@ export function createFolder(p: unknown): string {
  */
 export function folderIdFor(p: string): string {
   return withLock(LOCK_DIR(), () => {
-    const { folders, ids } = loadFile();
+    const { folders, ids, archived } = loadFile();
     if (ids[p] && folders.includes(p)) return ids[p];
     const id = newFolderId();
-    save([...folders, ...ancestors(p)], { ...ids, [p]: id });
+    save([...folders, ...ancestors(p)], { ...ids, [p]: id }, archived);
     return id;
   });
 }
@@ -191,8 +201,15 @@ function setFolderInto(review: Review, folder: string | null, by: string): void 
   if (before !== folder) logEvent({ type: 'moved', by, review, text: `${before || 'Unsorted'} → ${folder || 'Unsorted'}` });
 }
 
-export function moveVideo(slug: string, folder: unknown, by = USER): Review {
+/**
+ * Files a video in `folder` (null: no project). Never into an archived project; out of one only with `out` — the
+ * caller may take videos out of archived projects (owners and admins: the `archive` action) — and never to another
+ * place in it.
+ */
+export function moveVideo(slug: string, folder: unknown, by = USER, { out = false }: { out?: boolean } = {}): Review {
   const f = normFolder(folder);
+  checkNotArchived(f);
+  if (!out) checkNotArchived(loadReview(slug)?.folder);
   if (f) createFolder(f);
   return mutate(slug, (r) => setFolderInto(r, f, by));
 }
@@ -204,6 +221,9 @@ export function renameFolder(from: unknown, to: unknown, by = USER): string {
   if (!a || !b) throw new Error('folder name is empty');
   if (a === b) return b;
   if (inside(b, a)) throw new Error('a folder cannot move into itself');
+  // an archived project keeps its name and its folders, and takes no folder in, until it is restored
+  checkNotArchived(a);
+  checkNotArchived(b);
   const known = allFolders();
   if (known.includes(b)) throw new Error(`"${b}" already exists`);
   const map = (f: string) => (inside(f, a) ? b + f.slice(a.length) : f);
@@ -211,8 +231,8 @@ export function renameFolder(from: unknown, to: unknown, by = USER): string {
   // tree under another, again and again, would otherwise build any depth out of names that each fit.
   for (const f of known) if (inside(f, a)) withinLimits(f, map(f));
   withLock(LOCK_DIR(), () => {
-    const { folders, ids } = loadFile();
-    save([...folders.map(map), ...ancestors(b)], moveIds(ids, map));
+    const { folders, ids, archived } = loadFile();
+    save([...folders.map(map), ...ancestors(b)], moveIds(ids, map), archived);
   });
   // Its playbooks go with it (and those of its subfolders), and so do review links and the questions asked on it.
   withLock(playbookRoot(), () => movePlaybooks(a, map));
@@ -238,6 +258,8 @@ function withinLimits(from: string, to: string): void {
 export function deleteFolder(p: unknown, by = USER): string | null {
   const a = existingFolder(p);
   if (!a) throw new Error('folder name is empty');
+  // its videos would leave the archive on the way (a project's to No project): restored first, then deleted
+  checkNotArchived(a);
   const parent = parentOf(a);
   const lift = (f: string) => (f === a ? parent : (parent ? `${parent}/` : '') + f.slice(a.length + 1));
   // Folders already there that a subfolder moving up would fall into (the two become one).
@@ -252,12 +274,13 @@ export function deleteFolder(p: unknown, by = USER): string | null {
   // Questions asked on it wait one level up (on the project, or with no project at all: '').
   moveAskFolders((f) => (inside(f, a) ? (lift(f) ?? '') : null));
   withLock(LOCK_DIR(), () => {
-    const { folders, ids } = loadFile();
+    const { folders, ids, archived } = loadFile();
     // A subfolder's id goes up with it; the deleted folder's ends, and so does one of a subfolder that merges.
     const lifted = (f: string) => (!inside(f, a) ? f : f === a || merges(f) ? null : lift(f));
     save(
       folders.map((f) => (inside(f, a) ? lift(f) : f)).filter((f): f is string => !!f),
       moveIds(ids, lifted),
+      archived,
     );
   });
   for (const slug of listSlugs()) {
@@ -265,6 +288,50 @@ export function deleteFolder(p: unknown, by = USER): string | null {
     if (r?.folder && inside(r.folder, a)) mutate(slug, (rv) => setFolderInto(rv, rv.folder && lift(rv.folder), by));
   }
   return parent;
+}
+
+// ---------------------------------------------------------------- archiving a project
+
+const refused = (status: number, message: string) => Object.assign(new Error(message), { status });
+
+/** A project as someone names it to archive or restore it: one that is there, at the top level. */
+function projectNamed(p: unknown): string {
+  const name = existingFolder(p);
+  if (!name) throw refused(400, 'which project? (path)');
+  const top = projectOfFolder(name);
+  if (top !== name) throw refused(400, `only a project can be archived: "${name}" is a folder in ${top}`);
+  if (!allFolders().includes(name)) throw refused(404, `no project "${name}"`);
+  return name;
+}
+
+/**
+ * Archives a project (lib/archived.ts): it leaves the lists and becomes read-only, everything in it kept as it is.
+ * `by`: the name shown with it, and the account. Archived already: it stays as it was archived first. Returns the
+ * project's name and its record.
+ */
+export function archiveProject(p: unknown, by: { name: string; id?: string }): { project: string; archived: ArchivedProject } {
+  const name = projectNamed(p);
+  return withLock(LOCK_DIR(), () => {
+    const { folders, ids, archived } = loadFile();
+    const was = archived[name];
+    if (was) return { project: name, archived: was };
+    const record: ArchivedProject = { at: isoLocal(), by: by.name, ...(by.id ? { by_id: by.id } : {}) };
+    // listed in the file (a project only its videos made is kept there from now on, so its mark has a place)
+    save([...folders, name], ids, { ...archived, [name]: record });
+    return { project: name, archived: record };
+  });
+}
+
+/** Restores an archived project: back in the lists, open to work again, as it was. Not archived: nothing changes. */
+export function restoreProject(p: unknown): { project: string; restored: boolean } {
+  const name = projectNamed(p);
+  return withLock(LOCK_DIR(), () => {
+    const { folders, ids, archived } = loadFile();
+    if (!archived[name]) return { project: name, restored: false };
+    const { [name]: _restored, ...rest } = archived;
+    save(folders, ids, rest);
+    return { project: name, restored: true };
+  });
 }
 
 // Where a new video probably belongs: the folder its siblings (same project dir) already live in, else a folder
@@ -326,7 +393,7 @@ export interface FolderRepair {
 /** A JSON string's body (escapes kept), in a RegExp's source. */
 const STRING = String.raw`"((?:[^"\\]|\\.)*)"`;
 /** What a damaged folders.json still says, as far as its text is whole: the folders listed, and the ids. */
-function recover(text: string): { folders: string[]; ids: [string, string][] } {
+function recover(text: string): { folders: string[]; ids: [string, string][]; archived: Record<string, ArchivedProject> } {
   const str = (raw: string): string | null => {
     try {
       const s = JSON.parse(`"${raw}"`) as string;
@@ -355,7 +422,21 @@ function recover(text: string): { folders: string[]; ids: [string, string][] } {
       if (s) ids.push([s, m[2] as string]);
     }
   }
-  return { folders, ids };
+  // the archived projects, each entry as far as its text reads whole (a name, then an object without nesting)
+  const archived: Record<string, ArchivedProject> = {};
+  const shut = /"archived"\s*:\s*\{/g.exec(text);
+  if (shut) {
+    const entry = new RegExp(`\\s*${STRING}\\s*:\\s*(\\{[^{}]*\\})\\s*([,}])`, 'y');
+    entry.lastIndex = shut.index + shut[0].length;
+    for (let m = entry.exec(text); m; m = m[3] === '}' ? null : entry.exec(text)) {
+      const name = str(m[1] as string);
+      if (!name) continue;
+      try {
+        Object.assign(archived, cleanArchived({ [name]: JSON.parse(m[2] as string) }));
+      } catch {}
+    }
+  }
+  return { folders, ids, archived };
 }
 
 /**
@@ -510,7 +591,8 @@ export function repairFolders({ write = false, takeBack = [] }: { write?: boolea
             if ((err as NodeJS.ErrnoException).code === 'EEXIST') continue;
             throw err;
           }
-          save(folders, Object.fromEntries(now));
+          // the archived projects the damaged text still names in whole stay archived
+          save(folders, Object.fromEntries(now), was.archived);
           return kept;
         }
       });

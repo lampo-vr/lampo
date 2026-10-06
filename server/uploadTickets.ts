@@ -8,6 +8,7 @@ import type { Request } from 'express';
 import { z } from 'zod';
 import { hasItem, type OptionAttached, type OptionTarget } from '../lib/askOptions.ts';
 import * as auth from '../lib/auth.ts';
+import { checkNotArchived, checkReviewOpen } from '../lib/folderIds.ts';
 import { fileName, folderName, slugName } from '../lib/inputs.ts';
 import { listApps } from '../lib/oauth/store.ts';
 import { MAX_HANDLES } from '../lib/part.ts';
@@ -250,13 +251,23 @@ export function createUploadTickets({ origin = null }: { origin?: string | null 
     return { url: `${origin || base || ''}/api/uploads/direct/${token}`, expires: new Date(expires).toISOString() };
   }
   return {
-    issue: (input, by, base, byId, guard) => mint({ kind: 'render', meta: uploadMeta(input), ...(byId ? { byId } : {}) }, by, base, guard),
+    issue: (input, by, base, byId, guard) => {
+      const meta = uploadMeta(input);
+      // nothing new in an archived project: no URL for it at all (the upload checks again when it lands)
+      if (meta.slug) checkReviewOpen(store.loadReview(meta.slug));
+      else checkNotArchived(meta.folder);
+      return mint({ kind: 'render', meta, ...(byId ? { byId } : {}) }, by, base, guard);
+    },
     issuePreview(target, by, base, guard) {
-      if (!store.findComment(target.comment)) throw new Error(`no note ${target.comment}`);
+      const hit = store.findComment(target.comment);
+      if (!hit) throw new Error(`no note ${target.comment}`);
+      checkReviewOpen(hit.review);
       return mint({ kind: 'preview', preview: target }, by, base, guard);
     },
     issueRef(target, by, base, guard) {
-      if (!target.draft && !store.findComment(target.comment)) throw new Error(`no note ${target.comment}`);
+      const hit = target.draft ? null : store.findComment(target.comment);
+      if (!target.draft && !hit) throw new Error(`no note ${target.comment}`);
+      checkReviewOpen(hit ? hit.review : store.loadReview(target.draft?.slug ?? ''));
       return mint({ kind: 'ref', ref: target }, by, base, guard);
     },
     issueOption(target, by, base, guard, offered) {
