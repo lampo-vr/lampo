@@ -11,7 +11,8 @@ import { test } from 'node:test';
 import { startApp } from '../lib/app.ts';
 import { age, FFMPEG, isolatedEnv, makeVideo, slugOf, tmpdir, until } from '../lib/helpers.ts';
 
-const { dir } = isolatedEnv();
+// the team has a name (review links show it; an embed never does)
+const { dir } = isolatedEnv({ vars: { VR_ORG_NAME: 'Example Studio' } });
 const store = await import('../../lib/store.ts');
 const folders = await import('../../lib/folders.ts');
 const { loadConfig } = await import('../../lib/config.ts');
@@ -441,16 +442,28 @@ test('a watch-only link shows no other link’s notes, whatever its notes settin
 
 // An Embed link's player (/e/<token>) and its oEmbed are what any site that frames it, and anyone who asks oEmbed about
 // it, can read: the video's name and nothing else of the owner's — no slug or path, no folder, not the link's own name,
-// no other link's notes or names.
+// no other link's notes or names, nor who shared it or the team's name — on its watch page's routes too, and once it ended.
 test('an embed and its oEmbed name the video and nothing else of the owner’s', async () => {
   const enc = encodeURIComponent(spot.slug);
   const other = JSON.parse((await request('POST', `/api/review/${enc}/shares`, { label: 'Legal team' })).text);
   const otherId = JSON.parse((await guest('GET', `/api/g/${other.token}`)).text).videos[0].slug;
   const said = await guest('POST', `/api/g/${other.token}/comments`, { name: 'Ola Other', slug: otherId, frame: 2, text: 'other link secret note' });
   assert.equal(said.status, 200, said.text);
+  // the sharer goes by a name of their own now: a review link's visitors read it and the team's name (the control)…
+  const auth = await import('../../lib/auth.ts');
+  const owner = auth.localOwner();
+  assert.ok(owner);
+  await auth.updateUser(owner.id, { name: 'Olivia Sharer' });
+  const told = JSON.parse((await request('GET', `/api/g/${other.token}`)).text);
+  assert.deepEqual([told.label, told.reviewer, told.org], ['Legal team', 'Olivia Sharer', 'Example Studio'], 'a review link names them');
+  // …an embed's token never does, whichever of its routes is asked, nor once it has ended
   const made = await request('POST', `/api/review/${enc}/shares`, { label: 'Homepage hero', embed: true });
   assert.equal(made.status, 200, made.text);
   const { token } = JSON.parse(made.text);
+  const ended = JSON.parse(
+    (await request('POST', `/api/review/${enc}/shares`, { label: 'Spring campaign hero', embed: true, expires: new Date(Date.now() - 60_000).toISOString() }))
+      .text,
+  );
   surface.length = 0;
   fetched.clear();
 
@@ -472,6 +485,25 @@ test('an embed and its oEmbed name the video and nothing else of the owner’s',
   assert.equal(oembed.status, 200, oembed.text);
   await crawl(oembed.text);
   await guest('GET', `/oembed?url=${encodeURIComponent(`http://127.0.0.1/g/${token}`)}`);
+  // its watch page (/g/<token>, which oEmbed and the page's head name too) and what that page asks
+  await guest('GET', `/g/${token}`);
+  const room = await guest('GET', `/api/g/${token}`);
+  assert.equal(room.status, 200, room.text);
+  const link = JSON.parse(room.text);
+  assert.deepEqual([link.label, link.reviewer, link.org], ['', null, null], 'no link name, sharer or team');
+  assert.ok(!link.videos.some((v: object) => 'updated' in v), 'nor when the video last changed');
+  await crawl(room.text);
+  const watch = await guest('GET', `/api/g/${token}/review/${answer.slug}`);
+  assert.equal(watch.status, 200, watch.text);
+  const video = JSON.parse(watch.text);
+  assert.deepEqual([video.label, video.reviewer, video.org], ['', null, null]);
+  await crawl(watch.text);
+  // an embed that ended says so and names nobody to ask
+  for (const url of [`/api/g/${ended.token}`, `/api/g/${ended.token}/review/${answer.slug}`, `/api/g/${ended.token}/embed`]) {
+    const r = await guest('GET', url);
+    assert.equal(r.status, 410, `${url}: ${r.text}`);
+    assert.equal(JSON.parse(r.text).by, undefined, r.text);
+  }
 
   assert.ok(fetched.size >= 3, `crawled the player’s URLs (${fetched.size})`);
   const all = surface.join('\n');
@@ -491,6 +523,9 @@ test('an embed and its oEmbed name the video and nothing else of the owner’s',
     'Ola Other',
     'Legal team',
     'Homepage hero',
+    'Spring campaign hero',
+    'Olivia Sharer',
+    'Example Studio',
     'tester',
     path.basename(dir),
   ]) {

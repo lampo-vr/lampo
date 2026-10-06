@@ -43,8 +43,9 @@ export function link(req: Request<{ token: string }>): ShareWithToken {
   if (!share) throw fail(404, 'This review link is not valid any more.');
   if (isExpired(share))
     throw fail(410, `This review link expired on ${new Date(share.expires as string).toLocaleDateString('en-GB', { dateStyle: 'long' })}.`, {
-      // whom to ask for a new one (the page says so); the link was valid once, so this names nobody new
-      by: sharerName(share),
+      // whom to ask for a new one (the page says so); the link was valid once, so this names nobody new — but an
+      // embed's token is in other sites' pages: it names nobody (whose in guest.ts)
+      ...(share.embed ? {} : { by: sharerName(share) }),
       expired: share.expires,
     });
   return share;
