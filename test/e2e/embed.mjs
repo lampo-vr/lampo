@@ -207,6 +207,14 @@ try {
     const kinds = await p.$$eval('.link-new .seg [role=radio], .link-new .seg button', (bs) => bs.map((b) => b.textContent.trim()));
     assert(kinds.join(',') === 'Review,Watch only,Delivery,Embed', `a video’s kinds: ${kinds}`);
     const box = () => p.$eval('.link-new [data-testid=link-details]', (e) => Math.round(e.getBoundingClientRect().height));
+    // the dialog grows in from a smaller scale: measure once its entrance has run, or the first height is the scaled one
+    await p.waitForFunction(
+      () => {
+        const d = document.querySelector('[role=dialog]');
+        return !!d && d.getAnimations().every((a) => a.playState !== 'running') && d.getBoundingClientRect().width === d.offsetWidth;
+      },
+      { polling: 50, timeout: 5000 },
+    );
     const tall = await box();
     await p.evaluate(() =>
       [...document.querySelectorAll('.link-new .seg [role=radio], .link-new .seg button')].find((b) => b.textContent.trim() === 'Embed').click(),
