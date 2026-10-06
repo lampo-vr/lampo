@@ -2637,8 +2637,8 @@ export interface GuestReviewResponse {
   perms: GuestPerms;
   /** The versions a visitor may switch between (just the shown one for 'latest' links). `width`/`height`: the frame
    * size, which a note's marked frame on that version has (its card keeps the room before the picture arrives).
-   * Optional: older servers leave them out. */
-  versions: { v: number; registered: string; width?: number; height?: number }[];
+   * Optional: older servers leave them out. `registered`: when the version came; an Embed link's answer leaves it out. */
+  versions: { v: number; registered?: string; width?: number; height?: number }[];
   download: { preview: string | null; original: string | null };
   notes: GuestNote[];
 }

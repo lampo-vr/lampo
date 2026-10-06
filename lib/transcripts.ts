@@ -5,9 +5,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Config } from './config.ts';
 import { cacheDir } from './paths.ts';
-import { Recent } from './rateLimit.ts';
+import { Memo } from './rateLimit.ts';
 import { renderKey } from './renderKey.ts';
-import { wsKey } from './scope.ts';
+import { workspaceOfKey, wsKey } from './scope.ts';
 import { writeAtomic } from './store.ts';
 import { transcribeTimed } from './stt/index.ts';
 import { buildTranscript, TRANSCRIPT_VERSION, toVtt } from './transcript.ts';
@@ -34,15 +34,22 @@ export function forgetTranscript(ver: Pick<Version, 'hash' | 'sample'>): void {
 
 /**
  * How many renders' captions are kept in memory: whether there are any and their language (a few bytes each), and the
- * WebVTT itself (a 4-hour talk's is a few hundred KB).
+ * WebVTT itself (a 4-hour talk's is a few hundred KB), by count and by bytes.
  */
-export const CAPTIONS_KEPT = { summaries: 10_000, texts: 32 } as const;
+export const CAPTIONS_KEPT = { summaries: 10_000, texts: 2_000, textBytes: 32 * 2 ** 20 } as const;
 // An embed's player asks on every page view of the site it sits on whether its version has captions, and for them when
 // they are turned on. A long transcript is megabytes to read and parse, so both are kept per render (`wsKey`: each
-// workspace its own cache), each checked against the file — inode, size and time: every write is an atomic rename,
-// `vr` in another process too — and dropped with the transcript. Bounded: visitors reach these.
-const summaries = new Recent<{ stamp: string; has: boolean; lang: string | null }>(CAPTIONS_KEPT.summaries);
-const texts = new Recent<{ stamp: string; vtt: string | null }>(CAPTIONS_KEPT.texts);
+// workspace its own entries), each checked against the file — inode, size and time: every write is an atomic rename,
+// `vr` in another process too — and dropped with the transcript. Bounded: visitors reach these. What is asked for stays
+// (a hit counts as a use), and a full memory makes room in the workspace holding the most (`Memo`), so one workspace's
+// many long videos can't push the other workspaces' captions out.
+const summaries = new Memo<{ stamp: string; has: boolean; lang: string | null }>(CAPTIONS_KEPT.summaries, { groupOf: workspaceOfKey });
+const texts = new Memo<{ stamp: string; vtt: string | null }>(CAPTIONS_KEPT.texts, {
+  maxBytes: CAPTIONS_KEPT.textBytes,
+  // as UTF-16, what a string may take in memory
+  weigh: (kept) => 2 * (kept.vtt?.length ?? 0),
+  groupOf: workspaceOfKey,
+});
 /** The two, for the server's list of what it keeps in memory (server/routes/shares/access.ts keptInMemory). */
 export const captionsMemory = { captionSummaries: summaries, captionTexts: texts };
 

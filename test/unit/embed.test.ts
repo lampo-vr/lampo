@@ -425,6 +425,37 @@ test('a visit counts on the first play like a Watch only link’s, once per half
   );
 });
 
+// An embed's token sits in other sites' pages, so a name sent with it is anyone's to make up: its visits are anonymous,
+// and the name is kept nowhere — not in the link's records, the owner's link activity or Insights. A Watch only link's
+// visitor, sending the same, is named (the control).
+test('an embed’s visits are anonymous: a name sent with a visit or a report is recorded nowhere', async () => {
+  const s = await embedLink();
+  const d = await ready(s.token);
+  const watch = (await make({ label: 'Watch, named', comment: false, approve: false })).json();
+  const watchId = (await request('GET', `/api/g/${watch.token}`, { headers: visitor })).json().videos[0].slug;
+  const from = { 'x-forwarded-for': '203.0.113.31' };
+  for (const [token, id, who] of [
+    [s.token, d.slug, 'Planted Name'],
+    [watch.token, watchId, 'Mia Watcher'],
+  ]) {
+    const visit = await request('POST', `/api/g/${token}/visit`, { body: { name: who, visitor: 'named-visit-0001', slug: id, v: d.v }, headers: from });
+    assert.equal(visit.status, 200, visit.text);
+    const report = { name: who, visitor: 'named-visit-0001', slug: id, v: d.v, seen: 'f'.padEnd(25, '0'), secs: 2 };
+    const progress = await request('POST', `/api/g/${token}/progress`, { body: report, headers: from });
+    assert.equal(progress.status, 204, progress.text);
+  }
+  flushShareStats();
+  const records = fs.readFileSync(path.join(DATA, 'shares.json'), 'utf8');
+  assert.ok(records.includes('Mia Watcher'), 'a Watch only link keeps the name its visitor gave');
+  assert.ok(!records.includes('Planted Name'), 'an embed’s records keep none');
+  const owner = await request('GET', `/api/review/${enc}/shares`);
+  assert.equal(owner.status, 200, owner.text);
+  const insights = await request('GET', '/api/insights');
+  assert.equal(insights.status, 200, insights.text);
+  assert.ok(owner.text.includes('Mia Watcher'), 'the owner’s link activity names the Watch only visitor');
+  for (const seen of [owner.text, insights.text]) assert.ok(!seen.includes('Planted Name'), 'the owner never reads the made-up name');
+});
+
 test('a transcript is read once, not on every page view: the player’s answer and its captions come from memory', async (t) => {
   const s = await embedLink();
   const d = await ready(s.token);

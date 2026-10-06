@@ -1,9 +1,10 @@
-// Sliding-window rate limits in memory (sign-in, invites, OAuth, MCP, review-link passwords and notes), and `Recent`, a
-// map of what was seen lately with the same bound. Keys are IPs,
-// accounts, tokens or links, and a visitor can make up new ones at will (an IPv6 /64 is a lot of addresses), so the
-// table is bounded twice: a key is dropped once its window has passed (swept at most once per window), and it never
-// holds more than `maxKeys`, least recently used first. The cap is high on purpose: evicting a key forgets its
-// history, so filling the table to wipe someone's own count has to cost that many requests within one window.
+// Sliding-window rate limits in memory (sign-in, invites, OAuth, MCP, review-link passwords and notes), `Recent`, a
+// map of what was seen lately with the same bound, and `Memo`, a `Recent` of what was costly to make, bounded by bytes
+// too and fair between workspaces. Keys are IPs, accounts, tokens or links, and a visitor can make up new ones at will
+// (an IPv6 /64 is a lot of addresses), so the table is bounded twice: a key is dropped once its window has passed
+// (swept at most once per window), and it never holds more than `maxKeys`, least recently used first. The cap is high
+// on purpose: evicting a key forgets its history, so filling the table to wipe someone's own count has to cost that
+// many requests within one window.
 
 /**
  * The key a limit counts an address under. One IPv6 connection usually holds a whole /64 (2^64 addresses a visitor can
@@ -40,8 +41,8 @@ export interface RateLimitOptions {
  * where forgetting a key early only means counting it again.
  */
 export class Recent<V> {
-  private readonly map = new Map<string, V>();
-  private readonly max: number;
+  protected readonly map = new Map<string, V>();
+  protected readonly max: number;
 
   constructor(max = 10_000) {
     this.max = max;
@@ -63,6 +64,116 @@ export class Recent<V> {
 
   delete(key: string): void {
     this.map.delete(key);
+  }
+}
+
+export interface MemoOptions<V> {
+  /** Bytes held at most, every group together (default: no bound but the entries'). */
+  maxBytes?: number;
+  /** What a value takes in memory, roughly; its key and the entry itself are counted on top. */
+  weigh?: (value: V) => number;
+  /** The group a key belongs to (a workspace: `wsKey` keys, `workspaceOfKey`). */
+  groupOf: (key: string) => string;
+}
+
+/** What an entry takes besides its value: the key's string, two map entries, the record around the value. */
+const ENTRY_BYTES = 160;
+
+/** A group's keys, least recently used first, with what each weighs, and their sum. */
+interface Group {
+  keys: Map<string, number>;
+  bytes: number;
+}
+
+/**
+ * What was costly to make (a file read and parsed, a text built from it), kept while it is asked for: bounded by
+ * entries and by bytes, the least recently used going first — a hit counts as a use, so what is asked for all day
+ * stays. When it is full, room is made in the group holding the most (bytes when over the bytes, entries when over the
+ * entries), least recently used first: a group never pushes another one's out below its own size, so one workspace's
+ * many videos can't push everyone else's out, and a workspace alone on the server may use it all. A `Recent`, so it is
+ * listed with what else visitors fill (`keptInMemory`).
+ */
+export class Memo<V> extends Recent<V> {
+  private readonly maxBytes: number;
+  private readonly weigh: (value: V) => number;
+  private readonly groupOf: (key: string) => string;
+  private readonly groups = new Map<string, Group>();
+  private total = 0;
+
+  constructor(max: number, { maxBytes = Number.POSITIVE_INFINITY, weigh = () => 0, groupOf }: MemoOptions<V>) {
+    super(max);
+    this.maxBytes = maxBytes;
+    this.weigh = weigh;
+    this.groupOf = groupOf;
+  }
+
+  /** Bytes held now: every group's, or one group's. */
+  bytes(group?: string): number {
+    return group === undefined ? this.total : (this.groups.get(group)?.bytes ?? 0);
+  }
+
+  /** Entries held now by one group. */
+  sizeOf(group: string): number {
+    return this.groups.get(group)?.keys.size ?? 0;
+  }
+
+  override get(key: string): V | undefined {
+    if (!this.map.has(key)) return undefined;
+    const value = this.map.get(key) as V;
+    // a use: the newest, in the whole and in its group
+    this.map.delete(key);
+    this.map.set(key, value);
+    const keys = this.groups.get(this.groupOf(key))?.keys;
+    const weight = keys?.get(key);
+    if (keys && weight !== undefined) {
+      keys.delete(key);
+      keys.set(key, weight);
+    }
+    return value;
+  }
+
+  override set(key: string, value: V): void {
+    this.delete(key);
+    const weight = ENTRY_BYTES + 2 * key.length + Math.max(0, Math.ceil(this.weigh(value)) || 0);
+    // more than the whole may hold: made again whenever it is asked for, and nothing else goes for it
+    if (weight > this.maxBytes) return;
+    const name = this.groupOf(key);
+    let group = this.groups.get(name);
+    if (!group) {
+      group = { keys: new Map(), bytes: 0 };
+      this.groups.set(name, group);
+    }
+    this.map.set(key, value);
+    group.keys.set(key, weight);
+    group.bytes += weight;
+    this.total += weight;
+    // ties go to the group that grew: it makes its own room first (even this entry, when it alone is over)
+    while (this.map.size > this.max) this.dropOldestOf(this.largest(group, (g) => g.keys.size));
+    while (this.total > this.maxBytes) this.dropOldestOf(this.largest(group, (g) => g.bytes));
+  }
+
+  override delete(key: string): void {
+    if (!this.map.delete(key)) return;
+    const name = this.groupOf(key);
+    const group = this.groups.get(name);
+    const weight = group?.keys.get(key);
+    if (!group || weight === undefined) return;
+    group.keys.delete(key);
+    group.bytes -= weight;
+    this.total -= weight;
+    if (!group.keys.size) this.groups.delete(name);
+  }
+
+  /** The group holding the most by `size`; `start` (the one that grew) unless another holds more. */
+  private largest(start: Group, size: (g: Group) => number): Group {
+    let most = start;
+    for (const g of this.groups.values()) if (size(g) > size(most)) most = g;
+    return most;
+  }
+
+  private dropOldestOf(group: Group): void {
+    const oldest = group.keys.keys().next();
+    if (!oldest.done) this.delete(oldest.value);
   }
 }
 

@@ -238,8 +238,11 @@ export function guestRoutes(ctx: ServerContext): Router {
     share.embed ? { label: '', reviewer: null, org: null } : { label: guestLabel(share), reviewer: sharerName(share), org: orgOf() };
   // the team opening its own link to check it isn't counted (access.ts)
   const isTeam = (req: Request) => isTeamOf(ctx, req);
+  // An embed's visits are anonymous: its token sits in other sites' pages, so a name sent with it is anyone's to make up,
+  // and the owner's link activity and Insights would show it as a viewer's.
+  const nameOf = (share: ShareWithToken, sent: string | undefined): string | undefined => (sent && !share.embed ? guestName(sent) : undefined);
   const remember = (share: ShareWithToken, req: Request, name: string | undefined) => {
-    if (name && name !== 'client') names.set(`${share.token}|${ipOf(req)}`, name);
+    if (name && name !== 'client' && !share.embed) names.set(`${share.token}|${ipOf(req)}`, name);
   };
   /**
    * A visitor opened one video of the link at `ver` (its page, or an embed's first play): counted once per address,
@@ -353,7 +356,7 @@ export function guestRoutes(ctx: ServerContext): Router {
     const key = `${share.token}|${visitor || ipOf(req)}`;
     const fresh = Date.now() - (visits.get(key) || 0) > HALF_HOUR;
     if (fresh) visits.set(key, Date.now());
-    const name = b.name ? guestName(b.name) : undefined;
+    const name = nameOf(share, b.name);
     remember(share, req, name);
     // A folder link's room is a visit of its own; on a video link the video's view says it (recordView).
     const act = fresh && share.folder ? { kind: 'open' as const, name } : undefined;
@@ -414,7 +417,7 @@ export function guestRoutes(ctx: ServerContext): Router {
     const review = target(share, b.slug);
     const ver = version(share, review, b.v);
     const slug = slugify(review.video);
-    const name = b.name ? guestName(b.name) : null;
+    const name = nameOf(share, b.name) ?? null;
     const visitor = visitorKey(share, b.visitor);
     if (!mayKeep(share, req, visitor)) throw tooMany('Too many reports.', newVisitors.retryAfter(`${share.token}|${ipOf(req)}`));
     recordWatch(share.token, slug, visitor, {
@@ -552,10 +555,11 @@ export function guestRoutes(ctx: ServerContext): Router {
       waveform: `/api/g/${share.token}/waveform/${id}?v=${ver.v}`,
       approval: clientVerdict(review, ver.v, share),
       perms: p,
-      // each with its frame size only (a note's marked frame keeps its room on the page), never a file, hash or path
+      // each with its frame size only (a note's marked frame keeps its room on the page), never a file, hash or path;
+      // when it came, except to an embed (when the team last worked on it: like its video's `updated`)
       versions: (p.versions === 'all' ? review.versions : [ver]).map((x) => ({
         v: x.v,
-        registered: x.registered,
+        ...(share.embed ? {} : { registered: x.registered }),
         ...(x.width && x.height ? { width: x.width, height: x.height } : {}),
       })),
       download: { preview: p.download !== 'off' ? dl('preview') : null, original: p.download === 'original' ? dl('original') : null },

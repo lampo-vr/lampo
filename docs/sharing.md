@@ -245,8 +245,9 @@ badge ([For the visitor](#for-the-visitor)), the player hides it too.
 - **Revoking** the link stops every page it is on at once (the frame then says "This video isn't available"), and so
   does its expiry. An embed has no password: it plays for anyone who sees the page it is on.
 - **What it records** is what a *Watch only* link records ([What a link records](#what-a-link-records)), counted when
-  someone plays it, not when the page around it loads. The player sets no cookie and keeps nothing in the browser. An
-  embed never makes a video *Out for review*: it asks nobody for a decision.
+  someone plays it, not when the page around it loads, and never with a name: its visits are anonymous. The player
+  sets no cookie and keeps nothing in the browser. An embed never makes a video *Out for review*: it asks nobody for
+  a decision.
 - **It is dark on every page**, like any player: the page around it keeps its own colours.
 
 **oEmbed.** Sites and tools that embed from an address (WordPress, Notion and others) find the player through
