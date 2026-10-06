@@ -1073,8 +1073,8 @@ summed up from the link's records.
 | `POST /api/g/:token/comments/:id/replies` | `{name, text}` on a note the link shows |
 | `POST /api/g/:token/comments/:id/check` | `{name, verdict: confirm \| reopen, text?}` on a note marked fixed |
 | `POST /api/g/:token/approval` | the client's decision (below) → `{approval}` |
-| `GET /api/g/:token/embed` | Embed links: what the player at `/e/<token>` plays (`EmbedResponse`: `title`, `slug`, `v`, `fps`, `frames`, `width`, `height`, `duration`, `media`, `preparing?`, `busy?`, `poster`, `sprite`, `chapters` `[{frame, title}]`, `captions` URL or `null`, `captions_lang?`, `badge`); `404` for any other link, `410` expired |
-| `GET /api/g/:token/captions/:id?v=` | Embed links: the transcript's lines as WebVTT; `404` when the version wasn't heard |
+| `GET /api/g/:token/embed` | Embed links: what the player at `/e/<token>` plays (`EmbedResponse`: `title`, `slug`, `v`, `fps`, `frames`, `width`, `height`, `duration`, `media`, `preparing?`, `busy?`, `poster`, `sprite`, `chapters` `[{frame, title}]`, `captions` URL or `null`, `captions_lang?`, `badge`; `chapters` as read when the version arrived); `404` for any other link, `410` expired, `429` when one address asks too often |
+| `GET /api/g/:token/captions/:id?v=` | Embed links: the transcript's lines as WebVTT; `404` when the version wasn't heard, `429` as above |
 | `GET /oembed?url=&format=json&maxwidth=&maxheight=` | oEmbed for an Embed link's `/e/<token>` or `/g/<token>` address on this server: `{version, type: video, title, html, width, height, thumbnail_url, thumbnail_width, thumbnail_height, provider_name?, provider_url?}`; `404` for anything else, `501` for another format; any origin may ask |
 
 Details:

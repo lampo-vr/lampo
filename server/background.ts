@@ -8,7 +8,7 @@ import { cachedCuts, shotCuts } from '../lib/cuts.ts';
 import { cachedDiff, computeDiff } from '../lib/diff.ts';
 import { createIndexer, type Indexer } from '../lib/footage/indexer.ts';
 import { heavy, jobCrashed, needJobRoom, PRIORITY, QueueFullError, unlessBusy } from '../lib/jobs.ts';
-import { analysis, cachedAnalysis, cachedPoster, cachedSprite, poster, sprite } from '../lib/media.ts';
+import { analysis, cachedAnalysis, cachedChapters, cachedPoster, cachedSprite, chapters, poster, sprite } from '../lib/media.ts';
 import { confirmParts, partsToConfirm } from '../lib/parts.ts';
 import { projectDirOf, slugify } from '../lib/paths.ts';
 import { confirmPreviews, previewsToCheck } from '../lib/previews.ts';
@@ -127,7 +127,16 @@ export function createBackground(broadcast: Broadcast, playback: Playback, { pro
     if (analysisPending.has(key)) return true;
     needJobRoom();
     analysisPending.add(key);
-    heavy(async () => analysis(await bytes(review, ver.v), ver), PRIORITY.analysis, { key: jobKey('analysis', ver) })
+    heavy(
+      async () => {
+        const file = await bytes(review, ver.v);
+        // its chapter markers too, from the bytes fetched for it anyway (readChapters: never for a visitor)
+        if (!ver.part && !cachedChapters(ver)) await chapters(file, ver).catch(() => []);
+        return analysis(file, ver);
+      },
+      PRIORITY.analysis,
+      { key: jobKey('analysis', ver) },
+    )
       .then(
         () => broadcast('analysis', { slug, v: ver.v }),
         () => {},
@@ -344,6 +353,18 @@ export function createBackground(broadcast: Broadcast, playback: Playback, { pro
     return { state: 'pending', v };
   }
 
+  /**
+   * A render's chapter markers (an embed's timeline shows them), read once while its bytes are on this disk: a version
+   * that just arrived, a machine's renders. Never when a visitor asks, and never fetched from remote storage for them
+   * alone — bytes that live elsewhere have them read with their analysis (startAnalysis).
+   */
+  function readChapters(review: Review, ver: Version): void {
+    if (ver.part || cachedChapters(ver)) return;
+    const file = store.versionFile(review, ver.v);
+    if (!file) return;
+    heavy(() => chapters(file, ver), PRIORITY.poster, { key: jobKey('chapters', ver) }).catch(() => {});
+  }
+
   function warm(review: Review): void {
     const ver = review.versions.at(-1);
     if (!ver || !store.versionAvailable(review, ver.v)) return;
@@ -355,6 +376,7 @@ export function createBackground(broadcast: Broadcast, playback: Playback, { pro
         () => broadcast('poster', { slug }),
         () => {},
       );
+    readChapters(review, ver);
     // Nobody waits on these now: a full queue skips them (said once in the log), and they are made when asked for.
     unlessBusy(() => startAnalysis(review, ver.v));
     if (review.versions.length > 1) unlessBusy(() => startDiff(review, ver.v));

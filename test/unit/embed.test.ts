@@ -2,7 +2,9 @@
 // another site. What the kind may be (one video, watch only, never a password), what the player is told (the newest
 // version, its media, chapters and captions, the badge, nothing about people or folders), which answers another site
 // may frame (the player's page alone), that it sets no cookie, that revoking or expiry ends it, that its visits count
-// like a Watch only link's without ever marking the video "out for review", and oEmbed (answers and refusals).
+// like a Watch only link's without ever marking the video "out for review", and oEmbed (answers and refusals). What a
+// page view costs: chapters read when a version arrives, a transcript read once and kept, one address asking only so
+// often.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -10,11 +12,15 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { startApp } from '../lib/app.ts';
 import { age, FFMPEG, isolatedEnv, makeVideo, slugOf, tmpdir, until } from '../lib/helpers.ts';
+import type { Reply } from '../lib/http.ts';
 
 const { dir } = isolatedEnv();
 const store = await import('../../lib/store.ts');
 const { renderKey } = await import('../../lib/renderKey.ts');
-const { transcriptFile } = await import('../../lib/transcripts.ts');
+const { captionsVtt, CAPTIONS_KEPT, forgetTranscript, transcriptFile } = await import('../../lib/transcripts.ts');
+const { cachedChapters } = await import('../../lib/media.ts');
+const { Recent, RateLimit } = await import('../../lib/rateLimit.ts');
+const { guestMemory } = await import('../../server/routes/shares/access.ts');
 const { TRANSCRIPT_VERSION } = await import('../../lib/transcript.ts');
 const { flushShareStats } = await import('../../lib/shares.ts');
 const { stageForReview } = await import('../../lib/stageContext.ts');
@@ -70,8 +76,13 @@ const quiet = makeVideo(path.join(dir, 'Clients/Acme/export/quiet.mp4'), { w: 18
 age(quiet);
 store.createOrGetReview(quiet, { by: 'tester' });
 
-const { request, base } = await startApp({ token: 'test-token', loadSessions: async () => [], ui: staticUi(dist) });
+const { ctx, request, base } = await startApp({ token: 'test-token', loadSessions: async () => [], ui: staticUi(dist) });
 const visitor = { 'x-forwarded-for': '203.0.113.9' };
+// The film arrives as a version does (server/background.ts warm): its chapters are read then, never when a visitor asks.
+const filmReview = store.loadReview(slug);
+assert.ok(filmReview);
+ctx.background.warm(filmReview);
+await until(() => cachedChapters(ver), 'the film’s chapters, read when it arrived');
 
 const make = async (body: object, at = enc) => request('POST', `/api/review/${at}/shares`, { body });
 const embedLink = async (body: object = {}) => {
@@ -251,6 +262,10 @@ test('the player is told what it plays and nothing about people, folders or note
   const other = (await make({ label: 'Quiet', embed: true }, encodeURIComponent(slugOf(quiet)))).json();
   const q = await ready(other.token);
   assert.deepEqual([q.chapters, q.captions, q.width, q.height], [[], null, 180, 320]);
+  // its chapters weren't read when it arrived (made before this server ran): a visitor's request doesn't read them either
+  const quietVer = store.loadReview(slugOf(quiet))?.versions[0];
+  assert.ok(quietVer);
+  assert.equal(cachedChapters(quietVer), null, 'no chapters read in the request path');
   assert.equal((await request('GET', `/api/g/${other.token}/captions/${q.slug}`, { headers: visitor })).status, 404);
 });
 
@@ -408,6 +423,77 @@ test('a visit counts on the first play like a Watch only link’s, once per half
     (await request('POST', `/api/g/${s.token}/visit`, { body: { visitor: 'embed-visit-0002', slug: 'v_AAAAAAAAAAAAAAAA', v: 1 }, headers: visitor })).status,
     404,
   );
+});
+
+test('a transcript is read once, not on every page view: the player’s answer and its captions come from memory', async (t) => {
+  const s = await embedLink();
+  const d = await ready(s.token);
+  const file = transcriptFile(renderKey(ver));
+  const kept = fs.readFileSync(file, 'utf8');
+  // heard again: a new file in its place (as every write is), which the next answer reads — once
+  const again = JSON.parse(kept);
+  again.lines = [...again.lines, { text: 'Heard again.', t0: 1.5, t1: 2.5, f0: 45, f1: 74, w0: 4, n: 2 }];
+  fs.writeFileSync(`${file}.tmp`, JSON.stringify(again));
+  fs.renameSync(`${file}.tmp`, file);
+  let reads = 0;
+  const read = fs.readFileSync;
+  t.mock.method(fs, 'readFileSync', ((...args: unknown[]) => {
+    if (args[0] === file) reads++;
+    return Reflect.apply(read, fs, args);
+  }) as typeof fs.readFileSync);
+  for (let i = 0; i < 5; i++) {
+    const r = await request('GET', `/api/g/${s.token}/embed`, { headers: visitor });
+    assert.deepEqual([r.status, r.json().captions, r.json().captions_lang], [200, d.captions, 'en']);
+    const vtt = await request('GET', d.captions, { headers: visitor });
+    assert.equal(vtt.status, 200, vtt.text);
+    assert.match(vtt.text, /Heard again\./, 'what was heard last');
+  }
+  assert.ok(reads <= 2, `the transcript was read ${reads} times for ten answers`);
+  t.mock.restoreAll();
+
+  // forgotten (to be heard again from scratch, or the cache cleared): no captions until there is a transcript again
+  forgetTranscript(ver);
+  assert.equal((await request('GET', `/api/g/${s.token}/embed`, { headers: visitor })).json().captions, null);
+  assert.equal((await request('GET', d.captions, { headers: visitor })).status, 404);
+  fs.writeFileSync(file, kept);
+  assert.equal((await request('GET', `/api/g/${s.token}/embed`, { headers: visitor })).json().captions, d.captions, 'back with it');
+});
+
+test('what the player’s routes keep in memory is listed and bounded', async () => {
+  const mem = guestMemory.get(ctx);
+  assert.ok(mem);
+  for (const want of ['embedAsks', 'captionSummaries', 'captionTexts']) assert.ok(want in mem, `${want} is listed: ${Object.keys(mem).join(', ')}`);
+  assert.ok(mem.embedAsks instanceof RateLimit && mem.captionSummaries instanceof Recent && mem.captionTexts instanceof Recent);
+  // the captions of many versions (a site embedding a whole wall of films): the latest few kept, never all of them
+  const texts = mem.captionTexts as InstanceType<typeof Recent>;
+  const summaries = mem.captionSummaries as InstanceType<typeof Recent>;
+  for (let i = 0; i < CAPTIONS_KEPT.texts * 3; i++) captionsVtt({ hash: `made-up-${i}` });
+  assert.ok(texts.size <= CAPTIONS_KEPT.texts, `${texts.size} captions kept`);
+  assert.ok(summaries.size <= CAPTIONS_KEPT.summaries);
+});
+
+test('one address asks for the player’s data and captions only so often; another address still gets them', async () => {
+  const s = await embedLink();
+  const d = await ready(s.token);
+  // visitors through the machine's tunnel, told apart by the address Cloudflare names
+  const from = (ip: string) => ({ 'cf-ray': '8f00000000000000-AMS', 'cf-connecting-ip': ip });
+  let refused: Reply | null = null;
+  let n = 0;
+  for (; n < 1000 && !refused; n++) {
+    const r = await request('GET', n % 2 ? d.captions : `/api/g/${s.token}/embed`, { headers: from('198.51.100.7') });
+    if (r.status === 429) refused = r;
+    else assert.equal(r.status, 200, r.text);
+  }
+  assert.ok(refused, 'a flood from one address is slowed down');
+  assert.ok(n > 100, `a page with many players, viewed again and again, isn't: refused after ${n}`);
+  assert.ok(Number(refused.headers['retry-after']) > 0, 'it says when to ask again');
+  assert.equal((await request('GET', d.captions, { headers: from('198.51.100.7') })).status, 429, 'its captions too');
+  assert.equal((await request('GET', `/api/g/${s.token}/embed`, { headers: from('203.0.113.200') })).status, 200, 'another visitor plays');
+  // an IPv6 visitor counts as its /64
+  const mem = guestMemory.get(ctx);
+  const asks = mem?.embedAsks as InstanceType<typeof RateLimit>;
+  for (let i = 0; i < n; i++) asks.hit('2001:db8:7:7::/64');
+  assert.equal((await request('GET', `/api/g/${s.token}/embed`, { headers: from('2001:db8:7:7::99') })).status, 429);
 });
 
 test('Insights never lists an embed among the links nobody opened: there is nobody to remind', async () => {
