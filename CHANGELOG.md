@@ -8,6 +8,15 @@ format stays backwards compatible throughout.
 ## [Unreleased]
 
 ### Added
+- **Archive a project.** A project that is done can be put away from its ⋯ menu (owners and admins), with Undo: it
+  leaves the sidebar, All videos, the board, Recent, the Inbox and Insights' lists of what waits now, and the
+  sidebar's *Archived* row (with how many) opens the archived projects; ⌘K finds them under *Archived*. Opened, an
+  archived project and its videos say *Archived · Restore* where Share or the next step stands, and are read only:
+  you watch, read and download, but nothing new goes in — no version, note, reply, sign-off, move into it or review
+  link — until it is restored, in one click and as it was. Its review links play watch only meanwhile and take notes
+  and decisions again once it is back; embeds keep playing. Agents get one sentence for any write into it, and
+  `list_videos`, `list_folders`, `vr ls` and `vr folders` leave it out unless asked (`archived`). Storage counts as
+  before.
 - **Suggestions waiting in a playbook further down are no longer out of sight.** A project's playbook (and the House's)
   says when agents' suggestions wait in its folders — "Reels · 5 suggestions waiting" — and one click opens that
   playbook on them; the folder's Playbook tab counts them too.

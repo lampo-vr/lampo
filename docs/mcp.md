@@ -493,9 +493,14 @@ the coordinates are not). Read tools are marked read-only, so clients can allow 
 
 ### Parameters
 
-- **`list_videos({open_only?, folder?, session?})`.** `folder` includes its subfolders; `session: "me"`: the videos
+- **`list_videos({open_only?, folder?, session?, archived?})`.** `folder` includes its subfolders; `session: "me"`: the videos
   assigned to you — over HTTP the agent the app lists for this connection, over stdio the Claude Code session the
-  server runs in. Each video's line ends with `· stage <stage> (<detail>)`.
+  server runs in. Each video's line ends with `· stage <stage> (<detail>)`. Archived videos and the videos of an
+  archived project only with `archived: true` (accepted, not announced: it costs the tool list nothing); their line
+  then ends with ` · archived`.
+- **`list_folders({archived?})`.** Archived projects (and their folders) only with `archived: true` (not announced
+  either), a project's line ending with `  archived`. A write into an archived project answers `the project "<name>" is archived: it is
+  read-only until a person restores it` ([agents.md](agents.md#where-a-video-stands)).
 - **`get_open_notes({video, images?, max_images?, since?, all?})`.** `images`: `drawn` (the default) shows the marked
   frame of each note with a drawing, cropped to it (512 px at most; the label names the crop in video pixels; a
   drawing over most of the frame shows the whole frame). `all` shows every note's marked frame, range strip and

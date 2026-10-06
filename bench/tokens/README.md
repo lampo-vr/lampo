@@ -89,6 +89,11 @@ line (about 4 tokens each), one `elements: #logo "Acme logo", …` line in the h
 more anywhere, a note without a part nothing either; `get_open_notes`' structured content (`notes: [{id, elements,
 part_ok?}]`) is data for clients, not counted. Budgets unchanged (`get_open_notes` 3000 holds).
 
+Archived projects (2026-10-07): the tool list unchanged (5718, lean 2932: `list_videos` and `list_folders` accept
+`archived`, not announced; announced it cost 25 each, 50 in all). A write into an archived project answers one
+sentence of about 17 tokens; `list_videos` and `list_folders` asked for archived ones add ` · archived` (2) per
+archived video or project; nothing else changed.
+
 The largest tools before: `add_note` 1605, `attach_preview` 657, `attach_reference` 598, `reply` 529,
 `propose_playbook_change` 484. After: `add_note` 796, `attach_preview` 431, `propose_playbook_change` 309,
 `attach_reference` 296, `set_render_source` 288.

@@ -498,6 +498,7 @@ it on every request, and the app hides what a role can't do.
 | edit playbooks; accept or reject what agents suggest | | ✓ | ✓ | ✓ |
 | draft posts of a final video, download the publish kit ([publishing.md](publishing.md)) | | ✓ | ✓ | ✓ |
 | remove any video | | | ✓ | ✓ |
+| archive a project and restore it; move a video out of an archived project | | | ✓ | ✓ |
 | connect publishing accounts; publish, schedule, cancel or retry posts | | | ✓ | ✓ |
 | turn footage search on or off for the workspace ([footage.md](footage.md)) | | | ✓ | ✓ |
 | accounts, invites, everyone's API tokens | | | ✓ (not owners') | ✓ |

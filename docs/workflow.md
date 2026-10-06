@@ -43,6 +43,15 @@ name, "via review link" or the person's name, since a link is for anyone — a c
 
 ![The board: To review with “Check 2 fixes” and a new V1, Being fixed with what its agent is doing, Approved with “Mia · 85%”, and Final](assets/board.webp)
 
+**Archiving a project.** A project that is done can be put away: *Archive project* in its ⋯ menu (owners and admins),
+with Undo. It leaves the sidebar, All videos, the board, Recent, the Inbox and Insights' lists of what waits now, and
+⌘K lists it apart, under *Archived*. The sidebar's *Archived* row (with how many) opens a page of the archived
+projects; each opens as before, and so do its videos, with *Archived · Restore* where the project's *Share* or the
+player's next step stands. Everything in it is read only until it is restored: you can watch, read and download, but
+nothing new goes in (no version, note, reply, sign-off, move into it or review link). Owners and admins can still move
+a video out. *Restore* (on its page, in the player or on the Archived page) brings it back as it was. Its review links
+play watch only meanwhile and take notes and decisions again once it is restored.
+
 ## In the player
 
 The player's top bar shows where the video stands and **one button for your next step**: *Approve V3*, *Check 2

@@ -433,6 +433,8 @@ Details:
 | `GET /api/folders?video=` | the folder tree, plus a suggestion for a video on disk |
 | `POST` · `PATCH` · `DELETE /api/folders` | create `{path}`, rename `{from, to}`, delete `?path=` |
 | `POST /api/folders/auto` | file every unsorted linked video where it belongs (uploads are left as they are) |
+| `POST /api/folders/archive` | archive a project: `{path}` (below) |
+| `POST /api/folders/restore` | restore an archived project: `{path}` |
 | `PUT /api/review/:slug/folder` | move a video: `{folder}`, or `null` for no project |
 | `GET /api/folders/download/info?folder=&kind=` | what the folder's zip holds: `ArchiveInfo` (files, bytes, `resumable` once every checksum is ready) |
 | `GET /api/folders/download?folder=&kind=original\|preview` | the folder and its subfolders as one zip, originals by default ([archive notes](#review-links)) |
@@ -442,14 +444,28 @@ Details:
 Details:
 
 - **The library** includes archived videos, marked `archived`. For a role without the agents action, the assigned
-  agent's folder is left out (`session.cwd: null`), here and in the review routes below.
+  agent's folder is left out (`session.cwd: null`), here and in the review routes below. It lists every video and
+  folder of an archived project too: `archived_projects` says which projects are (`{name: {at, by}}`, absent while
+  none is), and their videos carry `project_archived` (when). `GET /api/folders` and `GET /api/reviews` answer
+  `archived_projects` as well.
+- **Archived projects.** Owners and admins archive a project (a top-level folder; a folder inside one is a `400`) and
+  restore it, signed in in the app: an API token gets `403`. Nothing is moved or deleted. While it is archived nothing
+  new goes into it: a note, a reply, a status, a reference, a draft, a recording, an approval, final or reopen, a new
+  version (an upload, an upload URL, a re-render of a linked file, which waits on disk until it is restored), a folder
+  made, renamed, moved or deleted in it, a video or folder moved into it, a review link, a question with options, a
+  request to its agent, an agent assigned or its status. Each is refused with `423` and one sentence, `{archived:
+  "<project>", error: "the project \"<project>\" is archived: it is read-only until a person restores it"}`. Owners and
+  admins can still move a video out (`PUT /api/review/:slug/folder`); removing a video and downloading work as before. Its
+  review links play watch only meanwhile ([sharing.md](sharing.md#what-a-link-allows)). Storage counts toward the plan
+  as before.
 - **Removing** needs the remove action, or being the one who added the video. A video with notes is archived and can
   be restored. A video without notes is deleted: its review and its stored copies, uploads included. A linked file on
   disk is never touched.
 - **Search** answers a `SearchResponse`: `videos` (stage, poster), `folders` (video count) and `notes` (video, frame,
   timecode, author, status, kind; `reply` when a reply matched), best first, at most `limit` (1–20, default 8) of
   each. Every word must match; case, accents and German spelling (ä = a = ae) don't matter. Without `q` it lists the
-  most recently changed videos. Archived videos never appear, and no disk paths do.
+  most recently changed videos. Archived videos never appear, and no disk paths do. What matches in an archived
+  project comes apart, only for a query: `archived: {folders, videos}` (absent when nothing does).
 - **Downloads** need the download action. The zip works like a folder link's ([below](#review-links)): `425` while
   previews are being made, `404` with nothing to download, and `429` with `Retry-After` while 2 downloads from the same
   address are already running. One version's file is asked for by the video and `v` only (any other query is a `400`):

@@ -47,7 +47,8 @@ export function registerReadingTools({ b, o, tool, openReview, me }: ToolKit): v
         open_only: z.boolean().optional(),
         folder: folderName.optional().describe('e.g. "Acme/Reels" (with subfolders)'),
         session: z.string().optional().describe('a session name, or "me": assigned to you'),
-        archived: z.boolean().optional().describe('include archived ones'),
+        // archived projects' videos too (for the few who need them: accepted, not announced — mcp/lean.ts)
+        archived: z.boolean().optional().meta({ hidden: true }),
       }),
     },
     async ({ open_only, folder, session, archived }) => {
@@ -308,7 +309,8 @@ export function registerReadingTools({ b, o, tool, openReview, me }: ToolKit): v
     {
       title: 'Project/folder tree',
       description: 'The folder tree with video and open-note counts.',
-      inputSchema: z.object({ archived: z.boolean().optional().describe('include archived projects') }),
+      // archived projects too: accepted, not announced (mcp/lean.ts)
+      inputSchema: z.object({ archived: z.boolean().optional().meta({ hidden: true }) }),
     },
     async ({ archived }) => {
       // archived projects (and what is in them) only when asked

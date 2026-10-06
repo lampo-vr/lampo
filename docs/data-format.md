@@ -480,14 +480,19 @@ server's disk.
 ## folders.json and shares.json
 
 ```json
-{"folders": ["Acme", "Acme/Reels", "Acme/Reels/Spring"],
- "ids": {"Acme/Reels": "f_1a2b3c4d5e6f"}}
+{"folders": ["Acme", "Acme/Reels", "Acme/Reels/Spring", "Globex"],
+ "ids": {"Acme/Reels": "f_1a2b3c4d5e6f"},
+ "archived": {"Globex": {"at": "2026-10-07T10:12:03+02:00", "by": "Ada", "by_id": "u_…"}}}
 ```
 
 The folders, listed so that empty ones survive. A video's own folder is `folder` in its review.json.
 
 - **`ids`** (optional) names the folders review links were made on. An id moves with its folder (renamed, moved, or
   its parent deleted) and ends with it, so a folder deleted and made again under the same name is another folder.
+- **`archived`** (optional) names the projects (top-level folders only) that were archived: when, by whom (a name,
+  and the account for newer records). An archived project leaves the lists and takes nothing new until it is
+  restored, which removes its entry ([api.md](api.md#library-and-folders)). Every change of the file keeps the entries
+  of the projects still there; a repair keeps those the damaged text still names in whole. Absent while none is.
 - **A file that can't be read is never taken for no folders.** No file means no folders yet. A file that can't be read
   or parsed stops every folder change instead, which would write it again without its ids; `shares.json` and
   `links.json` are read the same way. Meanwhile the library, search, playbooks and downloads show the folders videos
