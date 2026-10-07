@@ -235,6 +235,9 @@ Findings of audit A13 (2026-10-05, `AUDITS.md`) and its verification rounds that
   hunter2"), and the rule for a bare AWS secret key also takes a relative path of exactly 40 characters that has digits,
   both cases and a "/" (it says less, never more). Prose needs a different approach than shapes; the path is a cosmetic
   loss.
+- **A13 RUNS-FIT-4** (info): the first write of a runs file that holds thousands of open runs with steps takes a while
+  (seconds at 20,000), as each pass of `fitRuns` sorts every run again; only a file written before the bounds gets
+  there, never the API. Sort each kind once and walk it (or a heap for the longest open run).
 - **A13 RUN-2, look-alikes** (info): an account's name may hold a character that looks like "·" but isn't one of the
   six refused (`checkName`); it can't pass for another's agent (runs go by account id), it only reads alike.
 - **A13 VERIFY-5** (low): pending OAuth sign-ins are kept in a bounded store that makes room by dropping the oldest;

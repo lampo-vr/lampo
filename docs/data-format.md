@@ -661,7 +661,8 @@ app rewrites the file under the video's lock (`.lock`), atomically, about a seco
 writes it, and `lampo` only reads it to name a version's run. It is compacted as it is written: at most 200 steps per
 run (a stretch of render progress keeps its first and last line; the first step, questions and errors stay), steps
 only on the 20 newest runs that ended, none on a run that ended more than 90 days ago, and past 300 runs on a video
-open runs nobody has heard from go first, then the oldest ended ones. Each file holds at most about 1 MB: past it, the
+open runs nobody has heard from go first, then the oldest ended ones. Each file holds at most about 1 MB on disk
+(UTF-8): past it, the
 steps of the oldest ended runs go first, then open runs nobody has heard from, then the oldest ended runs. Lines it
 can't read are kept as they are. A store without the file has no runs; nothing else changes. The files count toward
 a workspace's storage. `clock` also keeps whose agent is at the run (an account id) and the requests people made of

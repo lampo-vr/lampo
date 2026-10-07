@@ -53,12 +53,12 @@ before(async () => {
     as[key] = { Cookie: cookieFrom(login), Origin: PUBLIC };
     as[`${key}Token`] = { Authorization: `Bearer ${auth.createToken(u.id, 'agent').token}` };
   }
-  for (const name of ['spot', 'flood', 'flood-2', 'budget']) {
+  for (const name of ['spot', 'flood', 'flood-2', 'budget', 'retries']) {
     const file = makeVideo(path.join(dir, `renders/${name}.mp4`), { w: 160, h: 90, fps: 25, dur: 1 });
     videos.push(slugify((await store.ingestUpload(file, { name: `${name}.mp4`, folder: 'Acme', by: 'Mia', keep: true })).review.video));
   }
 });
-const [spot, flood, flood2, budget] = [0, 1, 2, 3].map((i) => () => videos[i] as string);
+const [spot, flood, flood2, budget, retries] = [0, 1, 2, 3, 4].map((i) => () => videos[i] as string);
 
 const post = (who: Record<string, string>, entries: object[]) => request('POST', '/api/agents/activity', { body: { entries }, headers: who });
 const runs = async (slug: string, who = as.mia) => ((await request('GET', `/api/runs?slug=${enc(slug)}`, { headers: who })).json() as RunsResponse).runs;
@@ -271,4 +271,26 @@ test('what a person asked of agents is in their own export, and nobody else’s'
   assert.equal(asked[0]?.video.name, 'budget.mp4');
   const eves = (await accountExport(ids.eve as string)).find((f) => f.name === 'workspaces/w1/agent-requests.json');
   assert.deepEqual(JSON.parse(eves?.data.toString() ?? '[]'), []);
+});
+
+test('runs people sent that nobody picked up are bounded per video: the one waiting longest makes room', async () => {
+  const keep = { ...lib.RUN_LIMITS };
+  Object.assign(lib.RUN_LIMITS, { queuedPerVideo: 3 });
+  try {
+    // six agents worked on the video and stopped; Mia tries each again: six runs sent that no agent has picked up
+    await post(
+      as.miaToken,
+      Array.from({ length: 6 }, (_, i) => ({ agent: `q${i}`, kind: 'status', text: 'Working on it', video: retries() })),
+    );
+    // tried again in order, q0 first (the list comes newest first)
+    const done = (await runs(retries())).filter((r) => r.ended === null).sort((a, b) => a.agent.name.localeCompare(b.agent.name));
+    assert.equal(done.length, 6);
+    for (const r of done) assert.equal((await request('POST', `/api/runs/${r.id}/stop`, { body: {}, headers: as.mia })).status, 200);
+    for (const r of done) assert.equal((await request('POST', `/api/runs/${r.id}/retry`, { body: {}, headers: as.mia })).status, 200, r.agent.name);
+    const waiting = (await runs(retries())).filter((r) => r.ended === null && r.state === 'queued');
+    assert.equal(waiting.length, 3, 'no more than the video holds');
+    assert.deepEqual(waiting.map((r) => r.agent.name).sort(), ['q3 · Mia', 'q4 · Mia', 'q5 · Mia'], 'the newest stay');
+  } finally {
+    Object.assign(lib.RUN_LIMITS, keep);
+  }
 });

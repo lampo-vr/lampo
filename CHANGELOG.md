@@ -177,6 +177,8 @@ format stays backwards compatible throughout.
 - **A file keeps a bounded number of older versions**, and bringing back the bytes it already has makes no new version.
 - An agent's work kept with a video now stays small whatever an agent sends: a video and each person's agents hold only
   so many pieces of work at once, and what is kept of finished work is bounded, so the server stays quick.
+- A video holds only a few pieces of work that no agent has begun yet: sending another stops the one that waited
+  longest (its notes stay open).
 - An agent's work is its account's: another person's agent can no longer take over, join or be stopped in place of it
   by naming itself like it, and an account's name can no longer contain "·".
 - Reviewers see where an agent's work stands, but no longer what it touched in the project: its steps, commands and the

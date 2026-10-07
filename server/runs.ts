@@ -15,7 +15,7 @@ import { RateLimit, Recent } from '../lib/rateLimit.ts';
 import * as lib from '../lib/runs.ts';
 import { boundToWorkspace, currentWorkspace, inWorkspace, wsKey } from '../lib/scope.ts';
 import * as store from '../lib/store.ts';
-import { isAgent, isIdea, isRequired } from '../lib/time.ts';
+import { compareTime, isAgent, isIdea, isRequired } from '../lib/time.ts';
 import type {
   ActivityWords,
   AgentActivity,
@@ -373,6 +373,22 @@ export function createRuns({ broadcast, actor, notify, ownerOfSession }: RunsOpt
       return r && lib.shownRun(r);
     }
     const notes = o.notes ?? (o.how === 'nudge' ? openNotes(review) : []);
+    // Runs people sent that no agent picked up yet are bounded per video: the newest is what the person wants now, so
+    // the one waiting longest makes room (nothing was done on it; its notes and requests went out all the same).
+    const waiting = lib
+      .readRuns(slug)
+      .filter((x) => x.ended === null && x.state === 'queued')
+      .sort((a, b) => compareTime(a.started, b.started));
+    for (const x of waiting.slice(0, Math.max(0, waiting.length - lib.RUN_LIMITS.queuedPerVideo + 1)))
+      change(
+        slug,
+        x.id,
+        (y) => {
+          lib.endRun(y, 'stopped', Date.now());
+          return ['ended'];
+        },
+        who.who,
+      );
     const r = openRun(
       {
         slug,

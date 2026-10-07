@@ -58,6 +58,8 @@ export const RUN_LIMITS = {
   asks: 20,
   /** Open runs on one video: past it an agent's own write opens none (a person's Send still does). */
   openPerVideo: 12,
+  /** Runs people sent on one video that no agent has picked up yet: a new one past it closes the one waiting longest. */
+  queuedPerVideo: 6,
   /** Open runs one account's agents hold in a workspace through their own writes. */
   openPerAccount: 40,
   /** Runs files held in memory, in bytes all together (the least used that are written go first). */
@@ -377,9 +379,10 @@ export function fitRuns(h: Pick<Held, 'runs' | 'raw'>, max: number, now = Date.n
   for (const r of ended.slice(RUN_LIMITS.stepRuns)) r.steps = [];
   trimRuns(runs, max);
   const size = new Map<StoredRun, number>();
-  const measure = (r: StoredRun) => size.set(r, JSON.stringify(r).length + 1);
+  // bytes as the file holds them (UTF-8), not the string's length
+  const measure = (r: StoredRun) => size.set(r, Buffer.byteLength(JSON.stringify(r)) + 1);
   for (const r of runs) measure(r);
-  let total = h.raw.reduce((n, l) => n + l.length + 1, 0) + [...size.values()].reduce((n, x) => n + x, 0);
+  let total = h.raw.reduce((n, l) => n + Buffer.byteLength(l) + 1, 0) + [...size.values()].reduce((n, x) => n + x, 0);
   const drop = (r: StoredRun) => {
     total -= size.get(r) ?? 0;
     size.delete(r);

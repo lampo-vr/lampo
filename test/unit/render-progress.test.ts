@@ -353,6 +353,10 @@ test('redaction: keys named *_KEY, a user’s password given to a command, webho
     ['PGPASSWORD=hunter2 psql -h db', ['hunter2'], ['PGPASSWORD=', 'psql -h db']],
     ['SMTP_PASS=hunter2 send failed', ['hunter2'], ['SMTP_PASS=', 'send failed']],
     ['mysql -uroot -phunter2 -h db failed', ['hunter2'], ['mysql -uroot -p', '-h db failed']],
+    ['mysql -u root -h db -phunter2 mydb', ['hunter2'], ['mysql -u root -h db -p', 'mydb']],
+    ['mysqlsh -u root -phunter2 --sql', ['hunter2'], ['mysqlsh -u root -p']],
+    ['mysqlimport -u root -phunter2 shop items.txt', ['hunter2'], ['mysqlimport -u root -p', 'shop items.txt']],
+    ['cache down: redis://:hunter2@cache.internal:6379/0', ['hunter2'], ['cache down: redis://', '@cache.internal:6379/0']],
   ];
   for (const [text, gone, kept] of cases) {
     const out = redact(text);
@@ -371,6 +375,9 @@ test('redaction: keys named *_KEY, a user’s password given to a command, webho
     'Could not resolve src/components/Logo/AnimatedEntryFrames.tsx',
     'git -u origin main',
     'ffmpeg -i in.mov -pix_fmt yuv420p -pass 1 -passlogfile ff out.mp4',
+    'ffmpeg -i mysql.mov -pix_fmt yuv420p out.mp4',
+    'Error: mysql -u root failed; then ffmpeg -pix_fmt yuv420p',
+    'see http://example.com:8080/path for more',
   ])
     assert.equal(redact(text), text);
 });

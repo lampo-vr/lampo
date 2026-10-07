@@ -1083,7 +1083,8 @@ Details:
   notes and requests go out all the same. An agent's own write (a note, a fix, a reply, a question, an upload, a
   status) with no run open opens one (`opened_by.how: "agent"`, working); reads and waits never do. Those are bounded:
   a video holds a dozen open runs, one account's agents a few dozen in a workspace, opened so often; past that the
-  activity still shows live and opens nothing (a person's Send always opens its run).
+  activity still shows live and opens nothing (a person's Send always opens its run). Runs people opened that no
+  agent has picked up yet (`queued`) are a few per video: a new one ends the one waiting longest (`stopped`).
 - **A `Run`** (`lib/types.ts`): `id`, `slug` (or `null` and `folder`), `agent {name, kind, session_id?, runner?}`,
   `opened_by {who, id?, how}`, `delivery` (`listening`, or `machine` for one this machine started), `state`
   (`queued` → `starting` → `working` ⇄ `needs_you` → `done` · `failed` · `stopped` · `lost`), `started`, `ended`,

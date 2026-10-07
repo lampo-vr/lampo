@@ -59,6 +59,34 @@ console.log(JSON.stringify({ ms: Date.now() - t, size, kept: h.runs.length, step
     assert.ok(r.out.ms < 5000, `${r.out.ms} ms`);
   });
 
+test('open runs whose heads alone are over the bytes (nothing left to take): written as they are, and the write returns', () => {
+  // nothing a pass may drop or shorten: every one is at work and has no steps; only the guard ends the loop
+  const r = child(`${atWork(30, 0, 0)}
+for (const x of list) x.request = 'r'.repeat(40_000);
+const h = { runs: list, raw: [] };
+const t = Date.now();
+const lines = lib.fitRuns(h, lib.RUN_LIMITS.runs, now);
+console.log(JSON.stringify({ ms: Date.now() - t, size: lines.reduce((n, l) => n + l.length + 1, 0), kept: h.runs.length }));`);
+  assert.equal(r.status, 0, `the write never came back (or failed): ${r.err.slice(0, 400)}`);
+  assert.ok(r.out);
+  assert.ok(r.out.size > runs.RUN_LIMITS.fileBytes, 'over, as it was: nothing of runs at work is dropped');
+  assert.equal(r.out.kept, 30);
+});
+
+test('the bytes are counted as the file holds them (UTF-8), not as characters', () => {
+  // 30 open runs whose steps say "€" (three bytes each in the file, one character): over the bytes, under in characters
+  const r = child(`import fs from 'node:fs';
+${atWork(30, 50, 0)}
+for (const x of list) x.steps = x.steps.map((s, n) => ({ ...s, text: '€'.repeat(n === 0 || n === 49 ? 6_000 : 30) }));
+fs.writeFileSync(lib.runsFile(${JSON.stringify(slug)}), '');
+lib.changeRuns(${JSON.stringify(slug)}, (all) => all.splice(0, all.length, ...list));
+lib.flushRuns(${JSON.stringify(slug)});
+console.log(JSON.stringify({ size: fs.statSync(lib.runsFile(${JSON.stringify(slug)})).size }));`);
+  assert.equal(r.status, 0, r.err.slice(0, 400));
+  assert.ok(r.out);
+  assert.ok(r.out.size <= runs.RUN_LIMITS.fileBytes, `${r.out.size} bytes on disk`);
+});
+
 test('a runs.jsonl already over its bytes on disk loads, and its first write comes back within them', () => {
   const r = child(
     `${atWork(30, 2, 18_500)}

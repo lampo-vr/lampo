@@ -17,8 +17,8 @@ const RULES: [RegExp, (...m: string[]) => string][] = [
   [/-{5}BEGIN [A-Z ]*PRIVATE[ ]KEY-{5}[\s\S]*?(?:-{5}END [A-Z ]*PRIVATE[ ]KEY-{5}|$)/g, () => CUT],
   // Authorization headers' schemes
   [/\b(Bearer|Basic|Token|Digest)\s+[A-Za-z0-9._~+/=-]{6,}/gi, (_m, scheme) => `${scheme} ${CUT}`],
-  // credentials in a URL: scheme://user:password@host
-  [/\b([a-z][a-z0-9+.-]*:\/\/)[^\s/@:]+:[^\s/@]*@/gi, (_m, scheme) => `${scheme}${CUT}@`],
+  // credentials in a URL: scheme://user:password@host, and a password with no user (redis://:password@host)
+  [/\b([a-z][a-z0-9+.-]*:\/\/)[^\s/@:]*:[^\s/@]*@/gi, (_m, scheme) => `${scheme}${CUT}@`],
   // name=value, name: value, "name": "value", ?name=value&
   [new RegExp(String.raw`(["']?\b${SECRET_NAME}\b["']?\s*[:=]\s*)(?!\[redacted\])(?:"[^"]*"|'[^']*'|[^\s,;&"'})\]]+)`, 'gi'), (_m, head) => `${head}${CUT}`],
   // --name value
@@ -31,8 +31,12 @@ const RULES: [RegExp, (...m: string[]) => string][] = [
     (_m, head) => `${head}${CUT}`,
   ],
   [/(["']?\b(?:[A-Za-z0-9]+[_.-])+pass\b["']?\s*[:=]\s*)(?!\[redacted\])(?:"[^"]*"|'[^']*'|[^\s,;&"'})\]]+)/gi, (_m, head) => `${head}${CUT}`],
-  // a MySQL or MariaDB client's password glued to -p (mysql -uroot -psecret)
-  [/(\b(?:mysql|mysqldump|mysqladmin|mariadb|mariadb-dump)\b[^\n]*?\s-p)(?!\[redacted\])\S+/gi, (_m, head) => `${head}${CUT}`],
+  // a MySQL or MariaDB client's password glued to -p, among that command's own options (mysql -u root -psecret), never
+  // a later -p… elsewhere on the line (ffmpeg -pix_fmt)
+  [
+    /(\b(?:mysql(?:dump|admin|import|sh|check|pump|slap)?|mariadb(?:-[a-z]+)?)(?:\s+(?!-p)-\S+(?:\s+(?!-)[^\s-]\S*)?)*\s+-p)(?!\[redacted\])\S+/gi,
+    (_m, head) => `${head}${CUT}`,
+  ],
   // a user and password given to a command: curl -u user:password, --user user:password, --proxy-user …
   [/((?:^|\s)(?:-u|--user|--proxy-user|-U)(?:\s+|=))([^\s:@]+):(?!\/\/)\S+/g, (_m, head, user) => `${head}${user}:${CUT}`],
   // webhook addresses are their own credential (Slack, Discord)
