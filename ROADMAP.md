@@ -219,6 +219,14 @@ Findings of audit A13 (2026-10-05, `AUDITS.md`) and its verification rounds that
 - **A13 FILES-6** (low): a project file's older versions are capped per file, not per area, so an area of thousands of
   files that each keep their versions holds a large catalog that every change reads and writes whole. Give each area a
   budget of versions (the oldest unpinned go first), or split a big catalog by top-level path.
+- **A13 FILES-10** (low): past the safety net's cap, trashing a project file frees only the cap's worth for a day (the
+  rest counts until it may go). Add "delete for good" from the trash for owners and admins (`remove`, a person only,
+  with the erasure log).
+- **A13 FILES-11** (low): the restore and commit plan checks don't count uploads under way, and run in a queue apart
+  from the upload routes' one; count `declaredIn` there too and share one queue per workspace.
+- **A13 FILES-12** (low): until the workspace's plan size was asked once since the start (`rememberPlan`), usage leaves
+  the safety net's excess out (a render upload in that window gets its room), and a plan change is seen up to an hour
+  late; ask every workspace's plan at start and when the module says it changed.
 
 - **A13 VERIFY-4b** (low): while one address's reset or confirmation waits in the mail queue, another person asking
   from the same address (one office network) gets theirs only on a later try. Key the one-at-a-time rule by recipient

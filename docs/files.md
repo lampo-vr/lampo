@@ -49,8 +49,10 @@ account (and its kind), how it came (the app, the CLI, an agent's tool), when.
   under the writer's name: `spot (Alex).aep`. Bytes refused at the last moment stay stored, so the same push can be
   committed as a copy without sending them again.
 - **Older versions** are kept 30 days after they were replaced, the ten newest of each file (versions kept on purpose
-  besides). Any of them can be brought back as the newest version (V5 with V2's bytes; V4 stays one of its versions);
-  bringing back the bytes the file has already makes no new version.
+  besides) — and every version replaced within the last day, whoever replaced it. Any of them can be brought back as
+  the newest version (V5 with V2's bytes; V4 stays one of its versions); bringing back the bytes the file has already
+  makes no new version. A file takes at most 24 new versions a day: the next is refused (429) until the first of them
+  is a day old — push it under another name meanwhile.
 - **The trash** keeps a file 30 days. Restoring puts it back at its path, or beside it as `name (restored).ext` when
   something else is there now. Members trash what they added; owners and admins anything.
 - **Bytes are kept once per workspace** by their SHA-256: the same logo in fifty projects is stored and counted once.
@@ -63,7 +65,8 @@ Files and renders share the plan's storage.
 - **Counted:** the current version of every live file, once per workspace, versions kept on purpose (pinned), and
   uploads waiting for their commit (a push that stores first and commits later): until they are committed, or for the
   day the server keeps them.
-- **Not counted:** the trash and replaced versions (the safety net). Trashing a file gives its space back at once.
+- **Not counted:** the trash and replaced versions (the safety net). Trashing a file gives its space back at once, up
+  to what the safety net may hold; what it holds past that counts for the day below.
 - The safety net is kept 30 days, and holds at most a quarter of the plan's storage — and, plan or none, never more
   than what the workspace's files count (or a floor of 5 GB). Past that, the oldest of it goes early, with its bytes,
   but **nothing that went in within the last day**: a file just trashed, a folder just deleted, a version just
@@ -72,7 +75,8 @@ Files and renders share the plan's storage.
   goes (`purge_at`), every older version too (`kept_until`).
 - **Uploads under way** count by their declared size from the start, as renders do.
 - **What comes back counts again:** restoring from the trash, a trashed folder or an older version is checked against
-  the plan like a push.
+  the plan like a push, by what it changes: what the trash held past its cap counts already, so it isn't counted
+  twice.
 
 A push is checked against the plan and the server's disk for all of its files at once, before any byte moves: a 402
 with the plan's sentence and the numbers the limit sheet shows (`reason`, `needed`, `room`, `fits`), or a 507 when the

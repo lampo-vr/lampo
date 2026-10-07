@@ -84,6 +84,9 @@ format stays backwards compatible throughout.
   command runs on the agent's own machine, never on a server ([docs/agents.md](docs/agents.md)).
 
 ### Fixed
+- **A project file's recent versions stay restorable.** New versions, by anyone, never drop a version replaced the
+  same day; a file's new versions per day are bounded and the next is refused with when it may come. A file deleted
+  close to the plan's limit can be restored: what it already counted is no longer counted twice.
 - **What you just trashed stays restorable.** A file just trashed, a folder just deleted or a version just replaced is
   never taken early, even when the trash holds more than its share of the plan; meanwhile what is over counts toward
   the plan, and each trashed file says when it really goes.

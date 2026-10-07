@@ -19,6 +19,7 @@ import {
   blobKey,
   bytesToCount,
   bytesToRestore,
+  checkVersionsRoom,
   commitFiles,
   DIR_ID,
   dirInfoOf,
@@ -410,6 +411,7 @@ export function fileRoutes(ctx: ServerContext): Router {
         const conflicts = pushConflicts(area.scope, items);
         if (conflicts.length) throw new FileConflictError(conflicts);
       }
+      checkVersionsRoom(area.scope, items);
       // bytes the workspace holds already: nothing to send
       const held = heldBlobs(items.flatMap((i) => (i.sha256 ? [i.sha256] : [])));
       const stored = (i: (typeof items)[number]) => !!i.sha256 && held.get(i.sha256)?.size === i.size;

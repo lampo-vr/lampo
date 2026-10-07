@@ -38,6 +38,12 @@ export const FILE_LIMITS = {
    * read and written whole on every change.
    */
   versions: 10,
+  /**
+   * New versions one file may take in a day (FILE_LIMITS.protectHours): a version replaced within the day is never
+   * dropped, so this is what bounds a file's catalog lines and the bytes it holds uncounted meanwhile — a new version
+   * every hour around the clock. The next is refused (429) until the oldest of them is a day old.
+   */
+  versionsPerDay: 24,
   /** Hours bytes a file stopped naming (purged, its last version dropped) are kept when a push just asked for them. */
   touchHours: 1,
   /**

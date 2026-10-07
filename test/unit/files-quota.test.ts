@@ -56,7 +56,7 @@ function raw(
   { host = APP, headers = {}, body }: { host?: string; headers?: Record<string, string>; body?: Buffer | string } = {},
 ) {
   // biome-ignore lint/suspicious/noExplicitAny: response bodies are checked field by field
-  return new Promise<{ status: number; text: string; json: () => any }>((resolve, reject) => {
+  return new Promise<{ status: number; headers: http.IncomingHttpHeaders; text: string; json: () => any }>((resolve, reject) => {
     const data = body === undefined ? undefined : Buffer.isBuffer(body) ? body : Buffer.from(body);
     const h = { Host: host, ...(data ? { 'content-length': String(data.length) } : {}), ...headers };
     const req = http.request({ host: '127.0.0.1', port, method, path: url, headers: h, agent: false }, (res) => {
@@ -64,7 +64,7 @@ function raw(
       res.on('data', (d: Buffer) => chunks.push(d));
       res.on('end', () => {
         const b = Buffer.concat(chunks);
-        resolve({ status: res.statusCode || 0, text: b.toString('utf8'), json: () => JSON.parse(b.toString('utf8')) });
+        resolve({ status: res.statusCode || 0, headers: res.headers, text: b.toString('utf8'), json: () => JSON.parse(b.toString('utf8')) });
       });
     });
     req.on('error', reject);
@@ -319,10 +319,11 @@ test('what comes back counts again: out of the trash or an older version, past t
   const v2 = crypto.randomBytes(1000);
   const next = await api('POST', '/api/files/uploads', asMember, { files: [{ path: 'c.bin', size: v2.length, sha256: sha(v2), base: 1 }] });
   assert.equal((await raw('PUT', new URL(next.json().uploads[0].url).pathname, { host: MEDIA, body: v2 })).status, 200);
-  await push('d.bin', crypto.randomBytes(4000));
+  await push('d.bin', crypto.randomBytes(4500));
+  // V1 back counts its 6,000 and stops counting V2's 1,000: 5,000 more, past the plan by 500
   const revert = await api('POST', `/api/files/${cId}/restore`, asMember, { v: 1 });
   assert.equal(revert.status, 402, revert.text);
-  assert.equal(revert.json().needed, 6000);
+  assert.equal(revert.json().needed, 5000);
   // with room again (d trashed), it comes back
   const d = (await api('GET', '/api/files?deep=1', asMember)).json().files.find((f: { path: string }) => f.path === 'd.bin');
   assert.equal((await api('DELETE', `/api/files/${d.id}`, asMember)).status, 200);
@@ -331,28 +332,109 @@ test('what comes back counts again: out of the trash or an older version, past t
   assert.equal(ok.json().sha256, sha(v1));
 });
 
-test('a file keeps a bounded number of older versions; bringing back the bytes it has makes nothing new', async () => {
+/** A new version of `p` (based on `base`) by `who`, its bytes sent: the push's status, else the PUT's. */
+async function newVersion(p: string, data: Buffer, base: number, who: Record<string, string> = asMember): Promise<number> {
+  const ask = await api('POST', '/api/files/uploads', who, { files: [{ path: p, size: data.length, sha256: sha(data), base }] });
+  if (ask.status !== 200) return ask.status;
+  return (await raw('PUT', new URL(ask.json().uploads[0].url).pathname, { host: MEDIA, body: data })).status;
+}
+/** The House's catalog with every older version of `id` replaced `days` ago (as if pushed then). */
+function ageVersions(id: string, days: number) {
+  const file = inWorkspace('w1', () => fileAreas.areaFile(fileAreas.HOUSE_AREA));
+  const area = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const then = new Date(Date.now() - days * DAY).toISOString();
+  for (const e of area.files) if (e.id === id) for (const x of e.older ?? []) x.replaced = then;
+  fs.writeFileSync(file, JSON.stringify(area));
+}
+
+test('a file keeps a bounded number of older versions — never dropping one replaced within the day', async () => {
   await clean();
   storage = 100 * PLAN;
-  const first = Buffer.from('version 1\n');
-  const p = await push('notes.txt', first);
+  const p = await push('notes.txt', Buffer.from('version 1\n'));
   const id = p.put?.json().commit.files[0].id;
-  for (let v = 2; v <= FILE_LIMITS.versions + 5; v++) {
-    const data = Buffer.from(`version ${v}\n`);
-    const ask = await api('POST', '/api/files/uploads', asMember, { files: [{ path: 'notes.txt', size: data.length, sha256: sha(data), base: v - 1 }] });
-    assert.equal(ask.status, 200, ask.text);
-    assert.equal((await raw('PUT', new URL(ask.json().uploads[0].url).pathname, { host: MEDIA, body: data })).status, 200);
-  }
-  const h = (await api('GET', `/api/files/${id}/history`, asMember)).json();
-  assert.equal(h.versions[0].v, FILE_LIMITS.versions + 5);
-  assert.equal(h.versions.length, FILE_LIMITS.versions + 1, 'the current one and the newest older ones');
+  for (let v = 2; v <= FILE_LIMITS.versions + 5; v++) assert.equal(await newVersion('notes.txt', Buffer.from(`version ${v}\n`), v - 1), 200);
+  // all within the day: every one kept
+  let h = (await api('GET', `/api/files/${id}/history`, asMember)).json();
+  assert.equal(h.versions.length, FILE_LIMITS.versions + 5, 'none replaced today is dropped');
+  // a day on, the next version leaves the newest older ones only
+  ageVersions(id, 2);
+  assert.equal(await newVersion('notes.txt', Buffer.from('version next\n'), FILE_LIMITS.versions + 5), 200);
+  h = (await api('GET', `/api/files/${id}/history`, asMember)).json();
+  assert.equal(h.versions.length, FILE_LIMITS.versions + 2, 'the current one, the one it just replaced, the newest older ones');
   // bring back the newest older one, then the same bytes again: the second makes no version
   const older = h.versions[1].v;
   const once = await api('POST', `/api/files/${id}/restore`, asMember, { v: older });
-  assert.equal(once.json().v, FILE_LIMITS.versions + 6);
+  assert.equal(once.status, 200, once.text);
   const twice = await api('POST', `/api/files/${id}/restore`, asMember, { v: older });
   assert.equal(twice.status, 200, twice.text);
-  assert.equal(twice.json().v, FILE_LIMITS.versions + 6, 'its bytes are the file’s already: nothing new');
-  const after = (await api('GET', `/api/files/${id}/history`, asMember)).json();
-  assert.equal(after.versions.length, FILE_LIMITS.versions + 1);
+  assert.equal(twice.json().v, once.json().v, 'its bytes are the file’s already: nothing new');
+});
+
+test('someone else’s new versions never take a version replaced within the day; a day’s new versions are bounded', async () => {
+  await clean();
+  storage = 100 * PLAN;
+  const v1 = Buffer.from('the owner’s first cut\n');
+  const first = await push('cut.txt', v1, {}, asOwner);
+  const id = first.put?.json().commit.files[0].id;
+  // the member may not trash it…
+  assert.equal((await api('DELETE', `/api/files/${id}`, asMember)).status, 403);
+  // …and eleven quick versions of theirs don't take the owner's V1 either
+  for (let v = 2; v <= 12; v++) assert.equal(await newVersion('cut.txt', Buffer.from(`tiny ${v}`), v - 1), 200);
+  const h = (await api('GET', `/api/files/${id}/history`, asOwner)).json();
+  const kept = h.versions.find((x: { v: number }) => x.v === 1);
+  assert.ok(kept, 'V1 is still one of its versions');
+  assert.ok(Date.parse(kept.kept_until) - Date.now() > 20 * DAY, `kept_until says when it goes: ${kept.kept_until}`);
+  const back = await api('POST', `/api/files/${id}/restore`, asOwner, { v: 1 });
+  assert.equal(back.status, 200, back.text);
+  assert.equal(back.json().sha256, sha(v1));
+  // a day's new versions of one file are bounded: the next is refused before any byte, saying when it may come
+  let v = back.json().v as number;
+  let status = 200;
+  while (status === 200 && v < 60) status = await newVersion('cut.txt', Buffer.from(`more ${v}`), v++);
+  assert.equal(status, 429, `refused after ${FILE_LIMITS.versionsPerDay} in a day`);
+  const refused = await api('POST', '/api/files/uploads', asMember, { files: [{ path: 'cut.txt', size: 3, sha256: sha(Buffer.from('abc')), base: v - 1 }] });
+  assert.equal(refused.status, 429);
+  assert.match(refused.json().error, /new versions today/);
+  assert.ok(Number(refused.headers['retry-after']) > 0, 'when the next may come');
+  // a revert is a new version too
+  assert.equal((await api('POST', `/api/files/${id}/restore`, asOwner, { v: 1 })).status, 429);
+});
+
+test('a big file replaced by tiny versions again and again: what it holds counts, the disk stays bounded', async () => {
+  await clean();
+  for (let round = 0; round < 4; round++) {
+    const big = crypto.randomBytes(9000);
+    const b = await push(`stash${round}.bin`, big);
+    if (b.answer.status === 402) break;
+    assert.equal(b.put?.status, 200, b.put?.text);
+    for (let v = 2; v <= 12; v++) await newVersion(`stash${round}.bin`, Buffer.from(`t${v}`), v - 1);
+  }
+  assert.ok(onDisk() <= PLAN + CAP, `${onDisk()} bytes on disk`);
+  const u = await usage();
+  assert.ok(u.bytes >= onDisk() - CAP - 100, `what is held counts: ${JSON.stringify(u)} with ${onDisk()} on disk`);
+});
+
+test('a file deleted near the plan comes back on its day; so does a folder of them', async () => {
+  await clean();
+  await push('keep.bin', crypto.randomBytes(3000), {}, asOwner);
+  const big = await push('big.bin', crypto.randomBytes(6000), {}, asOwner);
+  const bigId = big.put?.json().commit.files[0].id;
+  assert.equal((await api('DELETE', `/api/files/${bigId}`, asOwner)).status, 200);
+  assert.equal((await usage()).bytes, 3000 + 6000 - CAP, 'what the trash holds over its cap counts');
+  // bringing it back adds only what it doesn't count already: 9,000 after it, within the plan
+  const back = await api('POST', `/api/files/${bigId}/restore`, asOwner, {});
+  assert.equal(back.status, 200, back.text);
+  assert.equal((await usage()).bytes, 9000);
+  // a folder of two the same way: back whole, as one by one
+  assert.equal((await api('DELETE', `/api/files/${bigId}`, asOwner)).status, 200);
+  // (the big one gone for good first: room for the pair)
+  await inWorkspace('w1', () => files.purgeFiles({ now: Date.now() + 40 * DAY, cap: 0 }));
+  assert.equal((await api('POST', '/api/folders', asOwner, { path: 'Pair' })).status, 200);
+  for (const name of ['a.bin', 'b.bin']) assert.equal((await push(name, crypto.randomBytes(3500), { folder: 'Pair' }, asOwner)).put?.status, 200);
+  const del = await api('DELETE', '/api/folders?path=Pair', asOwner);
+  assert.ok(del.status === 200 || del.status === 204, del.text);
+  const group = (await trash()).dirs.find((d: { path: string }) => d.path === 'Pair');
+  const whole = await api('POST', `/api/files/${group.id}/restore`, asOwner, {});
+  assert.equal(whole.status, 200, whole.text);
+  assert.equal(whole.json().files, 2);
 });

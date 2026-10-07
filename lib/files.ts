@@ -531,10 +531,31 @@ function asOlder(e: FileEntry, replaced: string): FileVersion {
  * A file's older versions held to FILE_LIMITS.versions besides the pinned ones: past it the oldest unpinned go early
  * (each is a line of the catalog every change reads and writes whole).
  */
-function trimOlder(e: FileEntry): void {
+function trimOlder(e: FileEntry, now = Date.now()): void {
   let unpinned = 0;
-  e.older = (e.older ?? []).filter((x) => !!x.pinned?.length || ++unpinned <= FILE_LIMITS.versions);
+  const recent = (x: FileVersion) => !!x.replaced && now - Date.parse(x.replaced) < FILE_LIMITS.protectHours * 3600_000;
+  // a version replaced within the day is never dropped (another person's work may be the one replaced): it stays in the
+  // safety net, counted past its cap, and only the file's own day-old versions go early
+  e.older = (e.older ?? []).filter((x) => !!x.pinned?.length || recent(x) || ++unpinned <= FILE_LIMITS.versions);
   if (!e.older.length) delete e.older;
+}
+
+/**
+ * A new version of `e` (a push, a revert) once it took FILE_LIMITS.versionsPerDay within the day: refused (429), with
+ * when the next may come — what a file held within the day can't go early, so the day's versions are bounded here.
+ */
+function checkVersionRoom(e: FileEntry, now = Date.now()): void {
+  const day = FILE_LIMITS.protectHours * 3600_000;
+  const today = (e.older ?? []).filter((x) => !!x.replaced && now - Date.parse(x.replaced) < day).map((x) => Date.parse(x.replaced as string));
+  if (today.length < FILE_LIMITS.versionsPerDay) return;
+  const wait = Math.max(60, Math.ceil((Math.min(...today) + day - now) / 1000));
+  throw Object.assign(
+    new FileError(
+      429,
+      `${e.path} has had ${FILE_LIMITS.versionsPerDay} new versions today: each is kept at least a day, so the next can come once the first of them is a day old — or push it under another name`,
+    ),
+    { retryAfter: wait },
+  );
 }
 
 const conflictOf = (e: FileEntry, base: number | null): FileConflict => ({
@@ -649,6 +670,7 @@ export function commitFiles(areaId: string, items: CommitItem[], o: { conflict?:
       else conflicts.push(conflictOf(e, base));
     }
     if (conflicts.length) throw new FileConflictError(conflicts);
+    for (const p of plan) if (p.state === 'version' && p.e) checkVersionRoom(p.e);
     const adding = plan.filter((p) => p.state === 'added' || p.state === 'copy').length;
     if (a.files.length + adding > FILE_LIMITS.perArea) throw tooMany();
     if (adding && liveCount(listAreas().filter((x) => x.id !== a.id)) + a.files.length + adding > FILE_LIMITS.perWorkspace)
@@ -730,6 +752,18 @@ export function pushConflicts(folder: string, items: { path: string; sha256?: st
   return out;
 }
 
+/** A push's new versions checked against a file's versions for the day before any byte moves (429, as the commit's). */
+export function checkVersionsRoom(folder: string, items: { path: string; sha256?: string }[]): void {
+  const ref = areaRefOf(folder);
+  const a = ref ? readArea(ref.id) : null;
+  if (!a) return;
+  const byPath = new Map(a.files.map((e) => [caseKey(e.path), e]));
+  for (const it of items) {
+    const e = byPath.get(caseKey(it.path));
+    if (e && !(it.sha256 && e.hash === it.sha256)) checkVersionRoom(e);
+  }
+}
+
 /**
  * The bytes the commit of `items` would add to what counts toward the plan (bytes neither counted nor waiting for a
  * commit now): what a plan checks before a push, a commit or a restore.
@@ -745,24 +779,42 @@ export function bytesToCount(items: { sha256: string; size: number }[]): number 
 }
 
 /**
- * What bringing a file back would start counting toward the plan: a trashed file's bytes, an older version's, a trashed
- * folder's files' (0 when they count already). Throws 404 for nothing of that id.
+ * What bringing a file back would add to what counts toward the plan: what counts after it, less what counts now — so
+ * the share of the safety net's excess it holds already (`over`, counted now) isn't counted twice. A trashed file, a
+ * trashed folder's files, or an older version brought back as the newest; 0 when nothing more would count. Throws 404.
  */
 export function bytesToRestore(id: string, v?: number): number {
+  const areas = listAreas();
+  const at = isoLocal();
+  let changed: FileArea | null = null;
   if (DIR_ID.test(id)) {
     const found = findDir(id);
     if (!found) throw notFound();
     if (!found.trashed) return 0;
     const t = found.dir as TrashedDir;
-    const { files } = trashedGroup(found.area, t.with_dir ?? t.id);
-    return bytesToCount(files.map((f) => ({ sha256: f.hash, size: f.size })));
+    const back = new Set(trashedGroup(found.area, t.with_dir ?? t.id).files.map((f) => f.id));
+    changed = structuredClone(found.area);
+    changed.files.push(...changed.trash.filter((f) => back.has(f.id)));
+    changed.trash = changed.trash.filter((f) => !back.has(f.id));
+  } else {
+    const found = findFile(id);
+    if (!found) throw notFound();
+    changed = structuredClone(found.area);
+    if (found.trashed) {
+      changed.files.push(...changed.trash.filter((f) => f.id === id));
+      changed.trash = changed.trash.filter((f) => f.id !== id);
+    } else {
+      const e = changed.files.find((f) => f.id === id) as FileEntry;
+      const old = v === undefined ? null : e.older?.find((x) => x.v === v);
+      if (!old || old.hash === e.hash) return 0;
+      e.older = [asOlder(e, at), ...(e.older ?? [])];
+      e.hash = old.hash;
+      e.size = old.size;
+    }
   }
-  const found = findFile(id);
-  if (!found) throw notFound();
-  const e = found.entry;
-  if (found.trashed) return bytesToCount([{ sha256: e.hash, size: e.size }]);
-  const old = v === undefined ? null : e.older?.find((x) => x.v === v);
-  return old ? bytesToCount([{ sha256: old.hash, size: old.size }]) : 0;
+  const before = countedNow(areas);
+  const after = countedNow(areas.map((a) => (a.id === changed?.id ? changed : a)));
+  return Math.max(0, after - before);
 }
 
 // ---------------------------------------------------------------- folders inside an area
@@ -1086,6 +1138,7 @@ export function restoreFile(id: string, v: number | undefined, stamp: FileStampI
     if (!old || !blob) throw new FileError(404, `V${v} of this file isn’t kept any more`);
     // its bytes are the file's now already: nothing to bring back, no version made
     if (old.hash === e.hash) return { file: fileInfo(e, scope), state: 'same' };
+    checkVersionRoom(e);
     e.older = [asOlder(e, at), ...(e.older ?? [])];
     trimOlder(e);
     setCurrent(e, { v: e.v + 1, hash: old.hash, size: old.size, ...stamped(stamp, at) }, blob.type);
@@ -1203,8 +1256,8 @@ export function trashedInfo(t: TrashedFile, area: string, early: Map<string, num
   };
 }
 
-function versionInfo(x: FileVersion, current: boolean, key = '', early: Map<string, number> = new Map()): FileVersionInfo {
-  const goes = x.replaced ? Math.min(Date.parse(x.replaced) + keptMs, early.get(key) ?? Number.POSITIVE_INFINITY) : 0;
+function versionInfo(x: FileVersion, current: boolean, key = '', early: Map<string, number> = new Map(), until = Number.POSITIVE_INFINITY): FileVersionInfo {
+  const goes = x.replaced ? Math.min(Date.parse(x.replaced) + keptMs, early.get(key) ?? Number.POSITIVE_INFINITY, until) : 0;
   return {
     v: x.v,
     size: x.size,
@@ -1373,7 +1426,19 @@ export function historyOf(id: string): FileHistory {
   const early = earlyTimes();
   return {
     file: found.trashed ? trashedInfo(e as TrashedFile, scopeOf(area), early) : fileInfo(e, scopeOf(area)),
-    versions: [versionInfo(e, true), ...(e.older ?? []).map((x) => versionInfo(x, false, `v:${e.id}:${x.v}`, early))],
+    // a trashed file's older versions go with it: when it does, or when they would on their own if that is sooner
+    versions: [
+      versionInfo(e, true),
+      ...(e.older ?? []).map((x) =>
+        versionInfo(
+          x,
+          false,
+          found.trashed ? `t:${e.id}` : `v:${e.id}:${x.v}`,
+          early,
+          found.trashed ? Date.parse((e as TrashedFile).trashed_at) + keptMs : undefined,
+        ),
+      ),
+    ],
     changes: journalOf(area.id, (c) => c.id === id, FILE_LIMITS.history),
   };
 }
@@ -1522,6 +1587,12 @@ function netState(areas: FileArea[], now = Date.now(), cap?: number | null) {
   const items = netItems(areas);
   const plan = limit === null ? { when: new Map<string, number>(), over: 0 } : netPlan(items, counted, limit, now);
   return { counted, pending, cap: limit, items, ...plan };
+}
+
+/** What counts toward the plan now in `areas`: live files once, pinned versions, waiting uploads, the net's excess. */
+function countedNow(areas: FileArea[]): number {
+  const net = netState(areas);
+  return total(net.counted) + net.pending + net.over;
 }
 
 /** When each thing the safety net keeps would go early (by `t:<id>` / `v:<id>:<v>`), with the cap as the plan says. */
@@ -1697,7 +1768,8 @@ export async function purgeFiles({ now = Date.now(), cap }: { now?: number; cap?
 /** Every live file's and kept version's bytes in the workspace (the deletion's plan). */
 export function filesHeld(): { count: number; bytes: number } {
   const u = filesUsage();
-  return { count: u.files, bytes: u.bytes + u.kept };
+  // `over` is part of `kept` already
+  return { count: u.files, bytes: u.bytes - (u.over ?? 0) + u.kept };
 }
 
 /** The blob of `hash` when the workspace holds it now: a download checks it, and serves its type. */
