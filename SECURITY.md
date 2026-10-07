@@ -32,7 +32,11 @@ In scope:
   review link reach more than it should. That includes reaching through `npm run lan` or the Cloudflare tunnel.
 - **Review links and embeds:** anything that lets a link, or a video embedded with one, reach another video,
   internal notes, people's names, or the rest of the API.
-- **The agent interfaces:** anything that makes `vr` or the MCP server write outside the store or run commands.
+- **The agent interfaces:** anything that makes `vr` or the MCP server write outside the store or run commands. Notes
+  reach agents as work, also from review-link visitors: the server's instructions, the watch prompt and the Agent
+  Skill tell agents that a note asks for a change to the video and never for commands, links or files. An agent that
+  follows a note's instructions anyway is a weakness of that agent, but a way for a note to look like Lampo's own
+  instructions to it is in scope.
 - **Media handling:** anything that makes ffmpeg or ffprobe read or fetch something other than the file it was given.
 
 Out of scope:

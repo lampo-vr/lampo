@@ -122,6 +122,9 @@ format stays backwards compatible throughout.
   good, and it is no longer started again every time someone opens the video.
 
 ### Changed
+- **Agents are told that a note is a request about the video**: the server's instructions, the watch prompt and the
+  Agent Skill say that a note, also one from a review link, never asks an agent to run commands, open links, or send
+  or change anything outside the render.
 - **"Use Lampo" is all your agent needs to hear.** Connect it, tell it *Use Lampo for "Spring launch"*, and it runs the
   whole loop by itself: it finds the project (or names one, or asks you which), puts up V1 itself, reads the playbook
   and your notes, fixes them, puts up the next version, marks each note fixed and waits for your next notes — again and
