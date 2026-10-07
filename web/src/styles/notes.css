@@ -606,13 +606,32 @@ button.c-tc:hover {
 .side-views button.on {
   color: var(--fg);
 }
-/* Notes · Transcript · Agent: three views keep the row the head has (a narrow panel says them a step smaller) */
+/* Notes · Transcript · Agent: three views keep the one row the head has. They say less as the panel narrows, never
+   wrap or push + Note away: the views a step smaller and Auto-check its glyph and number (its words are in its label),
+   then the tools closer together and + Note its plus alone (named by its label). */
 .side-views.three {
   gap: var(--sp-2);
 }
-@container notes-head (max-width: 380px) {
+@container notes-head (max-width: 400px) {
   .side-views.three button {
     font-size: var(--fs-md);
+  }
+  .side-title:has(.side-views.three) :is(.ac-chip-name, .ac-chip-sep, .ac-chip-n) {
+    display: none;
+  }
+  .side-title:has(.side-views.three) .ac-chip-num {
+    display: inline;
+  }
+}
+@container notes-head (max-width: 340px) {
+  .side-title:has(.side-views.three) {
+    gap: var(--sp-1);
+  }
+  .side-title:has(.side-views.three) > .grow {
+    margin-left: 0;
+  }
+  .side-title:has(.side-views.three) .new-note-word {
+    display: none;
   }
 }
 .side-views button .side-view-kg {

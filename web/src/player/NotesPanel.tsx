@@ -388,8 +388,9 @@ export function NotesPanel(p: NotesPanelProps) {
                   onClick={p.onCompose}
                   disabled={!p.canCompose}
                   data-testid="new-note"
+                  aria-label={t('Note')}
                 >
-                  <I name="plus" size={14} /> {t('Note')}
+                  <I name="plus" size={14} /> <span className="new-note-word">{t('Note')}</span>
                 </button>
               </Tip>
             )}

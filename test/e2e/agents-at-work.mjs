@@ -163,6 +163,7 @@ try {
         if (review && req.method() === 'GET') {
           const s = decodeURIComponent(review[1]);
           const r = await real(req.url());
+          if (older) delete r.summary.run;
           if (!older) {
             r.summary.run = runOf(s) ? briefOf(runOf(s)) : null;
             if (s === slug) r.review.versions = r.review.versions.map((x) => (x.v === 2 ? { ...x, run: made.id } : x));
@@ -172,8 +173,10 @@ try {
         if (at === '/api/library' && req.method() === 'GET') {
           const r = await real(req.url());
           for (const v of r.videos) {
-            if (older) v.agent_status = v.slug === others.promo ? { text: 'rendering v2', by: 'agent:Claude Code', at: new Date().toISOString() } : null;
-            else v.run = runOf(v.slug) ? briefOf(runOf(v.slug)) : null;
+            if (older) {
+              v.agent_status = v.slug === others.promo ? { text: 'rendering v2', by: 'agent:Claude Code', at: new Date().toISOString() } : null;
+              delete v.run;
+            } else v.run = runOf(v.slug) ? briefOf(runOf(v.slug)) : null;
           }
           return json(req, r);
         }
@@ -219,6 +222,7 @@ try {
   };
   /** The library in one of its layouts (remembered per browser). */
   const layoutTo = async (p, layout) => {
+    if (!p.url().startsWith(BASE)) await p.goto(`${BASE}/#/`, { waitUntil: 'domcontentloaded' });
     await p.evaluate(
       (l) => localStorage.setItem('vr.library', JSON.stringify({ ...JSON.parse(localStorage.getItem('vr.library') || '{}'), layout: l })),
       layout,
@@ -264,8 +268,11 @@ try {
     // the first row stays where it was (the plan's line slot under each row is reserved once the work starts, then
     // nothing in the list moves while it goes on and when it ends)
     assert(seen.working.first.split(',')[0] === ready.first.split(',')[0], `the list's top: ${ready.first} → ${seen.working.first}`);
-    const rowsMoved = ['rendering', 'needs_you', 'done'].filter((st) => seen[st].rows !== seen.working.rows);
+    const rowsMoved = ['rendering', 'needs_you'].filter((st) => seen[st].rows !== seen.working.rows);
     assert(!rowsMoved.length, `note rows moved in: ${rowsMoved.join(', ')} (${seen.working.rows} → ${rowsMoved.map((s) => seen[s].rows).join(' | ')})`);
+    // done: the version is there (the player shows it), and Check fixes is the strip's: the list's own call to check
+    // gives way to it (one place to press)
+    assert(!!(await page.$('[data-testid=run-check]')) && !(await page.$('.verify-cta')), 'done: Check fixes on the strip, not twice');
   });
 
   await check('the strip says what happens in each state, with one raised button only where the person is needed', async () => {
@@ -328,7 +335,7 @@ try {
     await page.waitForFunction(() => document.querySelectorAll('[data-testid=agent-steps] li').length > 5);
     const after = await page.$eval('[data-testid=agent-steps]', (e) => e.getBoundingClientRect().height);
     assert(Math.abs(after - box) <= 1, `Show all keeps the box's height: ${box} → ${after}`);
-    assert(!!(await page.$('[data-testid=agent-tell]')) && !!(await page.$('[data-testid=agent-stop]')), 'Tell it… and Stop for the team');
+    assert(!!(await page.$('[data-testid=agent-tell]')) && !!(await page.$('[data-testid=run-stop]')), 'Tell it… and Stop for the team');
     await shot(page, '02-agent-view');
     // done: what it made, in its own words, and Check fixes stays the strip's
     await go(page, 'done');

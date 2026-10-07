@@ -920,12 +920,12 @@ function PlayerView({
   const runs = runsQ.runs;
   const newest: RunLike | null = runs?.[0] ?? brief ?? null;
   const asOf = runs ? runsQ.at : briefAt;
-  // what the strip speaks of: work going on, work that ended badly today, or work done while its fixes wait
+  // what the strip speaks of: work going on, or work that ended in the past day — badly (failed, stopped), or done while
+  // its fixes wait to be checked (as the card does, lib/runs.ts cardRun)
+  const recent = !!newest && Date.now() - Date.parse(newest.ended ?? newest.started) < DAY_MS;
   const stripRun =
     newest &&
-    (isOpen(newest) ||
-      ((newest.state === 'failed' || newest.state === 'stopped') && Date.now() - Date.parse(newest.ended ?? newest.started) < DAY_MS) ||
-      (newest.state === 'done' && verify.queue.length > 0))
+    (isOpen(newest) || (recent && (newest.state === 'failed' || newest.state === 'stopped')) || (recent && newest.state === 'done' && verify.queue.length > 0))
       ? newest
       : null;
   // the slot is there from the first paint wherever the video has an agent (assigned, or at work on it)

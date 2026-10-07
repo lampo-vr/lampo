@@ -215,7 +215,8 @@
   color: var(--fg-2);
 }
 .av-step time {
-  width: 3.4em;
+  min-width: 4.8em;
+  white-space: nowrap;
   font: var(--fw-ui) var(--fs-xs) var(--mono);
   font-stretch: 87.5%;
   font-variant-numeric: tabular-nums;

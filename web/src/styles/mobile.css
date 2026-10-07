@@ -576,6 +576,11 @@
     grid-area: run;
     min-width: 0;
   }
+  /* its buttons a step smaller than the band, their tap areas a finger's size (the ::after above) */
+  .run-strip.phone .run-act {
+    height: var(--h);
+    min-height: 0;
+  }
   .run-strip.phone {
     height: var(--h-touch);
     margin: 0;

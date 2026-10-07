@@ -152,7 +152,7 @@ export function AgentView(p: AgentViewProps) {
             aria-label={t('Tell {name}…', { name })}
             data-testid="agent-tell"
           />
-          <button type="submit" className="btn sm" disabled={!text.trim() || request.isPending} aria-label={t('Send')} data-keys="↵">
+          <button type="submit" className="btn sm" disabled={!text.trim() || request.isPending} aria-label={t('Send')}>
             <I name="send" size={14} />
           </button>
           {!p.reachable && <p className="av-tell-note">{t('It reads this when it next checks in.')}</p>}
@@ -206,7 +206,8 @@ function Shown({
     <>
       <section className="av-head" aria-label={run.agent.name}>
         <p className="av-meta">{[startedLine(whole ?? run, p.me), clock(worked), where].filter(Boolean).join(' · ')}</p>
-        {open && p.canSteer && (
+        {/* the strip above says Stop while it works; while it asks you, Answer is the strip's and Stop is here */}
+        {run.state === 'needs_you' && p.canSteer && (
           <button type="button" className="btn sm" onClick={onStop} disabled={busy} data-testid="agent-stop">
             <I name="stop" size={14} /> {t('Stop')}
           </button>
