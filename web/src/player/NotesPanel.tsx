@@ -497,7 +497,10 @@ export function NotesPanel(p: NotesPanelProps) {
                     onPlayRange={p.onPlayRange}
                     looping={!!p.rangeLoop && !!c.rangeHere && p.rangeLoop.in === c.rangeHere.in && p.rangeLoop.out === c.rangeHere.out}
                     checkMode={!!p.verifying}
-                    plan={p.plans?.get(c.id) ?? (p.planPending && c.status === 'open' && (!c.kind || c.kind === 'feedback') ? PLAN_PENDING : undefined)}
+                    plan={
+                      p.plans?.get(c.id) ??
+                      (p.planPending && (c.status === 'open' || c.status === 'fixed') && (!c.kind || c.kind === 'feedback') ? PLAN_PENDING : undefined)
+                    }
                     planName={p.planName}
                   />
                 )}

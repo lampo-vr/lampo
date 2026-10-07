@@ -299,3 +299,36 @@
   gap: var(--sp-4);
   justify-items: start;
 }
+/* Agent at work: each state's strip at the side panel's width, labelled */
+.sg-strips {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(392px, 1fr));
+  gap: var(--sp-3) var(--sp-6);
+}
+.sg-strip {
+  display: grid;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+.sg-strip-box {
+  max-width: 392px;
+  padding: 0 var(--sp-3);
+  border-radius: var(--r);
+  background: var(--ink-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+  overflow: hidden;
+}
+.sg-lines {
+  display: grid;
+  gap: var(--sp-2);
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.sg-poster {
+  position: relative;
+  width: 320px;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: var(--ink-0);
+}

@@ -933,11 +933,12 @@ function PlayerView({
   const reachable = listen === 'listening' || listen === 'working' || (listen === null && !!data.summary.sessionActive);
   const noteAtId = useCallback((id: string) => review.comments.find((c) => c.id === id)?.timecode ?? null, [review.comments]);
   const sayRun = useCallback((w: ActivityWords) => say(w, noteAtId), [noteAtId]);
-  // the plan's lines on the note rows, while the work goes on; before the runs arrive, open notes keep their room
-  const planRun = runs?.[0] && isOpen(runs[0]) ? runs[0] : null;
+  // the plan's lines on the note rows while the strip speaks of the work (going on, or done with fixes to check: the
+  // lines stay, so no row moves when it ends); before the runs arrive, the notes it likely holds keep their room
+  const planRun = runs?.[0] && stripRun?.id === runs[0].id ? runs[0] : null;
   const plans = useMemo(() => new Map((planRun?.plan ?? []).map((x) => [x.id, x])), [planRun]);
-  const planPending = !runs && !!brief && isOpen(brief);
-  const inHand = planRun?.plan.find((x) => x.state === 'doing')?.id ?? null;
+  const planPending = !runs && !!stripRun;
+  const inHand = planRun && isOpen(planRun) ? (planRun.plan.find((x) => x.state === 'doing')?.id ?? null) : null;
   // the Agent view: its code when it is first opened, or as soon as the strip is pointed at
   const [warm, setWarm] = useState(false);
   const AgentUI = useLoaded(agentViewCode, view === 'agent' || warm);

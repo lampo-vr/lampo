@@ -1267,6 +1267,8 @@ export default function Timeline({
         data-view={zoomed ? `${Math.round(v0 * 100) / 100}-${Math.round(v1 * 100) / 100}` : undefined}
         data-cells={cells || undefined}
         data-writing={(writing && !!section) || undefined}
+        // the note an agent has in hand (its keyframe is the hourglass)
+        data-in-hand={inHand ?? undefined}
       >
         <canvas ref={cv} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} style={{ cursor }} />
         <Playhead

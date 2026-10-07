@@ -144,7 +144,8 @@ const BoardCard = memo(function BoardCard({ v, where, home, folders, lifted, lan
   const Now = useLoaded(agentNow, usePainted());
   // the agent's work on it, when the server keeps it (lib/types.ts Run): its line, its edge, and Answer when it asks
   const run = cardRun(v);
-  const asks = run?.state === 'needs_you' && run.needs?.note ? run.needs.note : null;
+  // a question or options waiting: Answer opens the video on it (a permission is said where it can be explained)
+  const asks = run?.state === 'needs_you' && run.needs?.kind !== 'permission' && run.needs?.kind !== 'sign_in';
   const line = <span className="bcard-text">{yours ? happened(v.stage) : boardLine(v.stage)}</span>;
   const share = v.stage.share && (v.stage.stage === 'team_approved' || v.stage.stage === 'with_client');
   const menu = (open: boolean) => {
@@ -220,7 +221,12 @@ const BoardCard = memo(function BoardCard({ v, where, home, folders, lifted, lan
         {ask && moveCode.ready ? (
           <moveCode.ready.MoveNote a={ask} />
         ) : asks ? (
-          <button type="button" className="btn sm bcard-next" onClick={() => go(v.slug, `c=${encodeURIComponent(asks)}`)} data-testid="bcard-answer">
+          <button
+            type="button"
+            className="btn sm bcard-next"
+            onClick={() => go(v.slug, run?.needs?.note ? `c=${encodeURIComponent(run.needs.note)}` : undefined)}
+            data-testid="bcard-answer"
+          >
             {t('Answer')}
           </button>
         ) : (

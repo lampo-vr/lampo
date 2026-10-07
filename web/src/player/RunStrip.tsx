@@ -58,6 +58,8 @@ export interface RunStripProps {
   open?: boolean;
   /** Warms the Agent view's code up (pointer or focus on the strip). */
   onWarm?: () => void;
+  /** A still picture (the styleguide): this moment, and no clock that counts. */
+  still?: number;
 }
 
 /** What one action is called (literal keys for the translations). */
@@ -94,7 +96,8 @@ export const RunStrip = memo(function RunStrip(p: RunStripProps) {
   const { stop, retry, nudge } = useRunActions(p.slug);
   const run = p.run;
   const counting = !!run && (run.state === 'queued' || run.state === 'starting' || (run.state === 'working' && !run.progress?.pct));
-  const now = useTick(counting);
+  const ticked = useTick(counting && p.still === undefined);
+  const now = p.still ?? ticked;
   const said: RunSaid | null = run
     ? runSaid(run, { now, asOf: p.asOf, nextV: p.nextV, say: p.say, toCheck: p.toCheck })
     : p.session
@@ -120,7 +123,7 @@ export const RunStrip = memo(function RunStrip(p: RunStripProps) {
   };
   const primary = (a: RunAction) => a === 'answer' || a === 'check';
   return (
-    <div className={`run-strip${p.phone ? ' phone' : ''}${p.open ? ' open' : ''}`} data-testid="run-strip" data-phase={said.phase}>
+    <div className={`run-strip${p.phone ? ' phone' : ''}${p.open ? ' open' : ''}`} data-testid="run-strip" data-phase={said.phase} data-run={run?.id}>
       <button
         type="button"
         className="run-main"

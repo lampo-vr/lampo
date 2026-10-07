@@ -2,18 +2,24 @@
 // look before adding a class, and what test/e2e/styleguide.mjs photographs in both themes. Only in dev and test builds
 // (VR_STYLEGUIDE=0 leaves it out: the Dockerfile does). A tool page for people building the app, so its words are plain
 // English, not translated.
-import { type ReactNode, useState } from 'react';
+import { type CSSProperties, type ReactNode, useState } from 'react';
 import { AGENT_KIND_LABELS, AGENT_KINDS } from '../../../lib/agentKind.ts';
-import type { Stage } from '../../../lib/types.ts';
+import type { RunPlanItem, Stage } from '../../../lib/types.ts';
+import { RunStrip } from '../player/RunStrip.tsx';
+import { say } from '../sessions/activityWords.ts';
+import { RunLine } from '../sessions/RunLine.tsx';
+import { planSaid } from '../sessions/runWords.ts';
 import '../styles/styleguide.css';
 import { Badge, type Tone } from '../ui/Badge.tsx';
 import { Avatar, Checkbox, Progress, Slider, Switch } from '../ui/controls.tsx';
 import type { EmptyArtName } from '../ui/emptyArt.tsx';
 import { AgentMark, BrandMark, I, Wordmark } from '../ui/icons.tsx';
+import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { IconButton, Kbd, Segmented } from '../ui/primitives.tsx';
 import { Select } from '../ui/select.tsx';
 import { Button, Chip, EmptyState, ListRow, PageHeader, Panel, SectionHeader } from '../ui/system.tsx';
 import { ThemeSwitch } from '../ui/ThemeSwitch.tsx';
+import { RUN_STATES, runFixtures } from './runStates.ts';
 
 const TONES: Tone[] = ['neutral', 'must', 'should', 'nice', 'idea', 'ok', 'claude'];
 const STAGES: [Stage, string][] = [
@@ -56,6 +62,84 @@ const SIZES = [
   ['xs', '11 · chips, captions'],
 ] as const;
 const SPACE = ['0_5', '1', '2', '3', '4', '6', '8', '12'] as const;
+
+const noop = () => {};
+const SESSION = { name: 'Claude Code', id: 'mcp-sg', cwd: null, assigned: '2026-10-07T09:00:00.000Z', by: 'Sam', agent: 'claude-code' as const };
+const PLAN: RunPlanItem[] = [
+  { id: 'a', state: 'doing' },
+  { id: 'b', state: 'fixed' },
+  { id: 'c', state: 'fixed', v: 3 },
+  { id: 'd', state: 'asked' },
+  { id: 'e', state: 'wontfix' },
+  { id: 'f', state: 'todo', added: true },
+];
+
+/** An agent at work on a video, in every state (design §5.2): the player's strip, the library's line, a note's plan line. */
+function AgentAtWork() {
+  const [now] = useState(() => Date.now());
+  const runs = runFixtures('sg', ['n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7'], 3, now);
+  const strip = (key: string, run: (typeof runs)[keyof typeof runs]['run'] | null, reachable = true) => (
+    <div key={key} className="sg-strip" data-state={key}>
+      <span className="sg-label">{key}</span>
+      <div className="sg-strip-box">
+        <RunStrip
+          slug="sg"
+          run={run}
+          asOf={now}
+          session={SESSION}
+          reachable={reachable}
+          copyable
+          toCheck={run?.state === 'done' ? 5 : 0}
+          nextV={4}
+          canSteer
+          canCheck
+          say={(w) => say(w)}
+          onOpen={noop}
+          onAnswer={noop}
+          onCheck={noop}
+          still={now}
+        />
+      </div>
+    </div>
+  );
+  return (
+    <>
+      <div className="sg-strips" data-testid="sg-strips">
+        {strip('ready', null)}
+        {strip('unreachable', null, false)}
+        {RUN_STATES.map((k) => strip(k, runs[k].run))}
+      </div>
+      <Row label="card line">
+        <div className="sg-lines">
+          {RUN_STATES.map((k) => (
+            <RunLine key={k} run={runs[k].run} say={(w) => say(w)} />
+          ))}
+        </div>
+      </Row>
+      <Row label="on a poster">
+        <div className="sg-poster film-poster">
+          <div className="film-over bottom">
+            <RunLine run={runs.rendering.run} chip />
+          </div>
+          <span className="run-edge" style={{ '--edge': 0.42 } as CSSProperties} />
+        </div>
+      </Row>
+      <Row label="plan lines">
+        <div className="sg-lines">
+          {PLAN.map((p) => {
+            const l = planSaid(p, 'Claude Code', 3);
+            return (
+              <span key={p.id} className="nr-plan" data-state={p.state}>
+                {l && <KeyGlyph shape={l.shape} className={`nav-kg run-kg ${l.tone}`} />}
+                <span className="nr-plan-words">{l?.words ?? 'next (nothing to say yet)'}</span>
+              </span>
+            );
+          })}
+        </div>
+      </Row>
+    </>
+  );
+}
 
 function Block({ title, note, children }: { title: string; note?: string; children: ReactNode }) {
   return (
@@ -436,6 +520,13 @@ export default function Styleguide() {
               </span>
             </div>
           </div>
+        </Block>
+
+        <Block
+          title="Agent at work"
+          note="What an agent's work on a video says, in every state: one line in a fixed slot (states swap words, never heights), a 2 px edge that fills while a render or an upload reports, a keyframe glyph for the state. Only what needs you earns the raised button. No noun for the work: the words say what happens."
+        >
+          <AgentAtWork />
         </Block>
 
         <Block title="Rows" note="40 px, dense 32: a leading visual, the text, trailing bits.">

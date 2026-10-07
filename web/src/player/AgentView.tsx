@@ -218,7 +218,10 @@ function Shown({
         <section className="av-sec" aria-label={t('Your notes')}>
           <div className="av-label">
             <span>{t('Your {n} note|Your {n} notes', { n: plan.length })}</span>
-            <span className="av-count">{t('{n} of {total}', { n: counts.answered, total: counts.total })}</span>
+            {/* the strip's count: the note it is on while it works, the ones answered once it ended */}
+            <span className="av-count">
+              {t('{n} of {total}', { n: open ? Math.min(counts.total, counts.answered + Math.max(1, counts.doing)) : counts.answered, total: counts.total })}
+            </span>
           </div>
           <ul className="av-plan" data-testid="agent-plan">
             {plan.map((item) => {
