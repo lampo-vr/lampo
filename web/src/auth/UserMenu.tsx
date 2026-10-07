@@ -14,7 +14,7 @@ import { billingCode } from '../billing/code.ts';
 import { useLoaded, usePainted } from '../lib/lazy.ts';
 import type { SettingsSection } from '../lib/nav.ts';
 import { toastError } from '../lib/toast.ts';
-import { getStartedCode, openGetStarted, sidebarShown, useFirstRun } from '../onboarding/state.ts';
+import { getStartedCode, useFirstRun } from '../onboarding/state.ts';
 import { I } from '../ui/icons.tsx';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { Avatar } from '../ui/plain.tsx';
@@ -47,19 +47,13 @@ export function UserMenu() {
   const billing = useBilling(false).data;
   const B = useLoaded(billingCode, usePainted(!!billing));
   const run = useFirstRun();
-  // A desk's sidebar on screen: the steps open at its foot, where they live from now on, and you stay where you are
-  // (the inbox, a project). Anywhere else (the player, Settings, a tablet, an empty library) the card comes back above
-  // All videos. Either way what was hidden for good shows again.
-  const getStarted = () => {
-    const here = sidebarShown();
-    if (here) setTimeout(openGetStarted);
-    else location.hash = '#/';
-    if (run.o?.dismissed || (!here && run.o?.hidden))
-      getStartedCode
-        .load()
-        .then((m) => m.comeBack(qc, !here))
-        .catch(toastError);
-  };
+  const done = run.steps.filter((x) => x.done).length;
+  // the steps at the sidebar's foot where it shows, else the card back above All videos (onboarding/Panel.tsx fromMenu)
+  const getStarted = () =>
+    getStartedCode
+      .load()
+      .then((m) => m.fromMenu(qc))
+      .catch(toastError);
   // Not known yet: the same chip, idle (signed out, there is no top bar to put it in).
   if (!status)
     return (
@@ -97,7 +91,7 @@ export function UserMenu() {
           resumable(run.o) && {
             label: t('Get started'),
             mark: <KeyGlyph shape="outline" size={10} />,
-            shortcut: run.count ? t('{done} of {n}', { done: run.count.done, n: run.count.of }) : undefined,
+            shortcut: t('{done} of {n}', { done, n: run.steps.length }),
             onClick: getStarted,
           },
           allowed('agents') && { label: t('Connected agents'), icon: 'terminal', onClick: () => open('agents') },

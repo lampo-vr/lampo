@@ -174,6 +174,7 @@ and the same pixels everywhere but where the titles sit.
   English and German; `test/e2e/getstarted.mjs` holds the card and the library under it still to the pixel.
 - What is inside Get started's panes is styled by `web/src/styles/getstarted.css`, which comes with its code: it
   uses the app's own controls and never another chunk's stylesheet.
-- The sidebar's row is in the first paint as its face alone (`web/src/onboarding/Row.tsx`), its room held by the
-  count this browser saw last (`chromeHint.ts`); the panel, the live count and the end come with Get started's code
-  (`Panel.tsx`, `startpanel.css`). `test/e2e/getstarted-sidebar.mjs` checks it; `quality-load.mjs` holds its room.
+- The sidebar's row is in the first paint as its room alone (`web/src/onboarding/Row.tsx`), held when this browser
+  saw the row last time (`chromeHint.ts`), as the trial line holds its own; the row's face, the panel, the live count
+  and the end come with Get started's code right after it (`Panel.tsx`, `startpanel.css`).
+  `test/e2e/getstarted-sidebar.mjs` checks it; `quality-load.mjs` holds its room.

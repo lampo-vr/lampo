@@ -25,15 +25,15 @@ import { posterUrl } from '../lib/posterUrl.ts';
 import { toast, toastError } from '../lib/toast.ts';
 import { I } from '../ui/icons.tsx';
 import { AGENTS, agentLabel, ConnectBlock, Mark, PickIcon, seenLine, useConnected, useWhere } from './connect.tsx';
-import { comeBack, linkVideos, makeSample, onboardingKey, pickAgent, removeSample, setHidden, useFolders, useOnboarding } from './data.ts';
-import { SideRow, StartPanel } from './Panel.tsx';
+import { linkVideos, makeSample, onboardingKey, pickAgent, removeSample, setHidden, useFolders, useOnboarding } from './data.ts';
+import { fromMenu, SideRow } from './Panel.tsx';
 import { Cmd, CopyButton, isEmail, KG, Live, OIcon, SampleKeys, Track } from './parts.tsx';
 import { StepPic } from './pictures.tsx';
 import { connecting, type FirstRun, FOLD, readFold, useFirstRun } from './state.ts';
 import '../styles/getstarted.css';
 
 // for the account menu and the video menu, which load this chunk when they're used; the sidebar's row and its panel
-export { comeBack, removeSample, SideRow, StartPanel, setHidden };
+export { fromMenu, removeSample, SideRow, setHidden };
 
 export interface GetStartedProps {
   /** Adds a video the way the library does (the add dialog at the machine, else the file picker); null: may not. */

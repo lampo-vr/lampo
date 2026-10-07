@@ -504,6 +504,10 @@
   outline: 2px solid var(--fg-2);
   outline-offset: -2px;
 }
+/* its room while the row's code arrives: the same box, empty and inert */
+.ob-side-row.ob-side-room {
+  pointer-events: none;
+}
 .ob-side-row .ob-side-kg {
   --kg-size: 10px;
   grid-row: 1 / 3;

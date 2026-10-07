@@ -309,17 +309,17 @@ try {
         ],
       },
       {
-        // Get started at the sidebar's foot (onboarding/Row.tsx): its row stands from the first paint, where it ends up,
-        // by what this browser saw last (the count from its last visit); the inbox has no card above it to move it.
+        // Get started at the sidebar's foot (onboarding/Row.tsx): its room stands from the first paint where the row ends
+        // up, by what this browser saw last; the inbox has no card above it to move it.
         name: 'get started row',
         base: q.firstStrip.base,
         url: '/#/inbox',
-        chrome: { start: [1, 4] },
+        chrome: { start: true },
         ready: ready.inbox,
         marks: [
           ...top,
           ...nav,
-          { name: 'get started row', sel: '.nav [data-testid=ob-row]', every: true },
+          { name: 'get started row', sel: '.nav [data-testid=ob-row-wrap]', every: true },
           { name: 'settings link', sel: '.nav .nav-settings', every: true },
         ],
       },

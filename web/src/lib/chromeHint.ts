@@ -12,8 +12,8 @@ interface Hint {
   firstRun?: boolean;
   /** What the library held last time: an empty one has no sidebar, so its loading state has none either. */
   library?: 'empty' | 'full';
-  /** The sidebar's Get started row showed, with this many steps done of all (onboarding/Row.tsx). */
-  start?: [number, number];
+  /** The sidebar's Get started row showed (onboarding/Row.tsx). */
+  start?: boolean;
 }
 const read = (): Hint => {
   try {
@@ -52,13 +52,10 @@ export function rememberRole(role: Role, firstRun = false) {
   remember({ role, ...(firstRun ? { firstRun } : {}), ...(library ? { library } : {}), ...(start ? { start } : {}) });
 }
 
-/** The sidebar's Get started row as it showed last time (done of all), or null: none (onboarding/Row.tsx). */
-export const chromeStart = (): [number, number] | null => {
-  const s = read().start;
-  return Array.isArray(s) && s.length === 2 && s[1] > 0 ? s : null;
-};
+/** The sidebar's Get started row showed here last time (onboarding/Row.tsx). */
+export const chromeStart = (): boolean => read().start === true;
 
-export function rememberStart(start: [number, number] | null) {
+export function rememberStart(start: boolean) {
   const { start: _, ...rest } = read();
   remember(start ? { ...rest, start } : rest);
 }

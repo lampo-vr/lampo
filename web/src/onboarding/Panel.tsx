@@ -1,23 +1,76 @@
-// Get started from the sidebar's foot: the row once its code is here (Row.tsx draws its face in the first paint) and the
+// Get started from the sidebar's foot: the row once its code is here (Row.tsx holds its room in the first paint) and the
 // steps in a compact panel above it, each with the card's own pane (GetStarted.tsx Pane, never a copy) — the small ones
 // done right here (an agent connected, a review link made, a teammate invited, a file linked), the big ones taken where
 // they live (the sample in check mode, the library's upload). The steps' list stays put and every pane stands in one
 // cell under it, the selected one shown, so the panel keeps one height from step to step. A step ticks the moment the
 // server finds it done, in the panel and on the row. The panel's foot hides Get started for good (the card and the row,
 // with Undo). From a phone's or tablet's drawer the panel is a sheet (a popover can't open over the drawer).
-import { useQueryClient } from '@tanstack/react-query';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
-import type { OnboardingStep } from '../../../lib/types.ts';
+import { type QueryClient, useQueryClient } from '@tanstack/react-query';
+import { type ComponentProps, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import type { AuthStatus, OnboardingStep } from '../../../lib/types.ts';
+import { authKeys } from '../api/auth.ts';
 import { t } from '../i18n/index.ts';
+import { toastError } from '../lib/toast.ts';
 import { I } from '../ui/icons.tsx';
-import { useChanged } from '../ui/KeyGlyph.tsx';
+import { KeyGlyph, useChanged } from '../ui/KeyGlyph.tsx';
 import { Modal, Popover } from '../ui/primitives.tsx';
-import { hideForGood, useOnboarding } from './data.ts';
+import { comeBack, hideForGood, useOnboarding } from './data.ts';
 import { type GetStartedProps, Pane, titleOf, useKeysMoved, useLive, usePaneCtx } from './GetStarted.tsx';
 import { KG } from './parts.tsx';
-import type { RowFaceProps } from './Row.tsx';
-import { askSteps, useFirstRun, useStepsAsked } from './state.ts';
+import { useFirstRun } from './state.ts';
 import '../styles/startpanel.css';
+
+// The steps asked for from the account menu: the row on screen opens them (it may have just come back).
+let asked = false;
+const askers = new Set<() => void>();
+const ask = (v: boolean) => {
+  asked = v;
+  for (const f of askers) f();
+};
+const useAsked = () =>
+  useSyncExternalStore(
+    (f) => {
+      askers.add(f);
+      return () => askers.delete(f);
+    },
+    () => asked,
+  );
+
+/** A desk's sidebar is on screen (not an empty library's page, not a phone's or tablet's drawer, not the player). */
+const sidebarShown = () => !!document.querySelector('.lib > .nav')?.getClientRects().length;
+
+/**
+ * The account menu's "Get started": with a desk's sidebar on screen the steps open at its foot, where they live, and you
+ * stay where you are (the inbox, a project); anywhere else (the player, Settings, a tablet, an empty library) the card
+ * comes back above All videos. Either way what was hidden for good shows again.
+ */
+export function fromMenu(qc: QueryClient): void {
+  const o = qc.getQueryData<AuthStatus>(authKeys.status)?.user?.prefs?.onboarding;
+  const here = sidebarShown();
+  // after the menu has handed the focus back to its button
+  if (here) setTimeout(() => ask(true));
+  else location.hash = '#/';
+  if (o?.dismissed || (!here && o?.hidden)) comeBack(qc, !here).catch(toastError);
+}
+
+/** The row's face — the keyframe, the words, the steps as frames on a line — in the room Row.tsx held for it. */
+function RowFace({ count, all, pop, ...button }: { count: { done: number; of: number }; all?: boolean; pop?: boolean } & ComponentProps<'button'>) {
+  return (
+    <button type="button" className={`ob-side-row ${all ? 'ob-all' : ''}`} aria-haspopup="dialog" data-testid="ob-row" {...button}>
+      <KeyGlyph key={count.done} shape={all ? 'diamond' : count.done ? 'half' : 'outline'} pop={pop} className="ob-side-kg" />
+      <span className="ob-side-label">{all ? t('You’re set') : t('Get started')}</span>
+      <span className="ob-side-count" data-testid="ob-row-count">
+        {t('{done} of {n}', { done: count.done, n: count.of })}
+      </span>
+      <span className="ob-side-line" aria-hidden="true">
+        {Array.from({ length: count.of }, (_, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: a step's place on the line
+          <i key={i} className={i < count.done ? 'ob-on' : undefined} />
+        ))}
+      </span>
+    </button>
+  );
+}
 
 /** Folds the row away: its height eases to nothing, so the foot settles once instead of jumping. */
 function fold(el: HTMLElement | null): Promise<unknown> {
@@ -38,9 +91,9 @@ function fold(el: HTMLElement | null): Promise<unknown> {
  * The sidebar's row with its code: the panel above it (a sheet in the drawer), its count kept live while it shows, and
  * — when the last step ticks while it shows — "You're set" for as long as the card says it, then it folds away.
  */
-export function SideRow({ Face, ...props }: GetStartedProps & { Face: (p: RowFaceProps) => ReactNode }) {
+export function SideRow(props: GetStartedProps) {
   const run = useFirstRun();
-  const count = run.count;
+  const count = run.steps.length ? { done: run.steps.filter((s) => s.done).length, of: run.steps.length } : null;
   const all = !!count && count.done === count.of;
   const [open, setOpen] = useState<'pop' | 'sheet' | null>(null);
   // shown with steps open in this visit: when the last one ticks it says so before it goes
@@ -51,7 +104,7 @@ export function SideRow({ Face, ...props }: GetStartedProps & { Face: (p: RowFac
   const wrap = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const popped = useChanged(count?.done);
-  const want = useStepsAsked();
+  const want = useAsked();
   useEffect(() => {
     if (run.side && !all) setStay(true);
   }, [run.side, all]);
@@ -79,12 +132,19 @@ export function SideRow({ Face, ...props }: GetStartedProps & { Face: (p: RowFac
   // asked from elsewhere (the row clicked before this code arrived, the account menu): the row on screen opens
   useEffect(() => {
     if (want && show && button.current?.getClientRects().length) {
-      askSteps(false);
+      ask(false);
       setOpen(sheet() ? 'sheet' : 'pop');
     }
   });
 
-  if (!show || !count) return null;
+  if (!show) return null;
+  // the account not heard yet (the room held from what this browser saw last): the row's box, empty
+  if (!count)
+    return (
+      <div className="ob-side" aria-hidden="true" data-testid="ob-row-wrap">
+        <span className="ob-side-row ob-side-room" />
+      </div>
+    );
   const close = () => setOpen(null);
   const title = all ? t('You’re set') : t('Get started');
   const panel = (inSheet: boolean) => <StartPanel {...props} sheet={inSheet} onClose={close} />;
@@ -95,7 +155,7 @@ export function SideRow({ Face, ...props }: GetStartedProps & { Face: (p: RowFac
         open={open === 'pop'}
         onOpenChange={(o) => setOpen(o ? 'pop' : null)}
         trigger={
-          <Face
+          <RowFace
             ref={button}
             count={count}
             all={all}

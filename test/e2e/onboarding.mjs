@@ -330,6 +330,7 @@ try {
     await sleep(500);
     assert(!(await a.$('[data-testid=ob-gs]')), 'still away after a reload');
     // the sidebar's row stays (getstarted-sidebar.mjs has the rest of it)
+    await a.waitForSelector('[data-testid=ob-row-count]', { timeout: 10000 });
     assert((await a.$eval('[data-testid=ob-row-count]', (e) => e.textContent)) === '3 of 4', 'the sidebar’s row stays');
     const items = await menuItems(a);
     assert(items.find((i) => i.startsWith('Get started'))?.includes('3 of 4'), `account menu: ${items}`);
