@@ -7,6 +7,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { cutChars } from './names.ts';
 import { isoLocal } from './paths.ts';
 import { chainOf, HOUSE, listPlaybooks, playbookFile, playbookRoot, readPlaybook, stampFor } from './playbookFiles.ts';
 import { changedSince, cleanText, PLAYBOOK_LIMITS, parseSkill, SKILL_FILE, type SkillText, scopeLabel, skillMarkdown, skillProblem } from './playbookText.ts';
@@ -150,7 +151,7 @@ function revise(p: Playbook, c: Change): PlaybookRevision {
     by: c.by,
     ...(c.accepted_by ? { accepted_by: c.accepted_by } : {}),
     ...(c.proposal ? { proposal: c.proposal } : {}),
-    message: cleanText(c.message || '').slice(0, PLAYBOOK_LIMITS.message) || defaultMessage(c.section, c.before, c.after),
+    message: cutChars(cleanText(c.message || ''), PLAYBOOK_LIMITS.message) || defaultMessage(c.section, c.before, c.after),
     section: c.section,
     before: c.before,
     after: c.after,
@@ -506,9 +507,7 @@ export function rejectProposal(id: string, o: { by: string; reason?: string }): 
     const prop = p.proposals.find((x) => x.id === id);
     if (!prop) throw new PlaybookError(404, 'no such suggestion');
     if (prop.status !== 'pending') throw new PlaybookError(409, `this suggestion was ${prop.status} already`);
-    const why = cleanText(o.reason || '')
-      .trim()
-      .slice(0, PLAYBOOK_LIMITS.reason);
+    const why = cutChars(cleanText(o.reason || '').trim(), PLAYBOOK_LIMITS.reason);
     Object.assign(prop, { status: 'rejected', decided_by: o.by, decided_at: isoLocal(), ...(why ? { reject_reason: why } : {}) });
     trimDecided(p);
     return prop;

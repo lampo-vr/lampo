@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { archivedIn, ProjectArchivedError } from './archived.ts';
+import { wellFormed } from './names.ts';
 import { dataDir } from './paths.ts';
 import type { ArchivedProject, FoldersFile, Review } from './types.ts';
 
@@ -47,7 +48,8 @@ export function parseFolders(text: string, file = foldersFile()): Partial<Folder
   }
   if (!f || typeof f !== 'object' || (f.folders !== undefined && !Array.isArray(f.folders)))
     throw new FoldersUnreadableError(`${file} is damaged (no list of folders in it)`);
-  return f;
+  // a folder an older version kept with a lone surrogate reads well-formed, as its videos' (lib/store.ts shownNames)
+  return wellFormed(f);
 }
 
 /**
@@ -62,7 +64,8 @@ export function cleanArchived(raw: unknown): Record<string, ArchivedProject> {
     if (!name || name.includes('/') || !x || typeof x !== 'object' || typeof x.at !== 'string') continue;
     out[name] = { at: x.at, ...(typeof x.by === 'string' ? { by: x.by } : {}), ...(typeof x.by_id === 'string' ? { by_id: x.by_id } : {}) };
   }
-  return out;
+  // the project's name and who archived it well-formed, as every folder's (parseFolders), also from a damaged file
+  return wellFormed(out);
 }
 
 // Asked on every request through a folder link and before every write into a project: parsed again only when the file

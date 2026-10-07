@@ -8,6 +8,7 @@ import path from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
 import { ACTIVITY_FILE, type ActivityRecord } from '../lib/activity.ts';
 import { agentName, isActivityKey } from '../lib/activityText.ts';
+import { cutChars } from '../lib/names.ts';
 import { currentWorkspace, isoLocal, slugify } from '../lib/paths.ts';
 import * as store from '../lib/store.ts';
 import { compareTime, oneLine } from '../lib/time.ts';
@@ -62,10 +63,7 @@ function slugFor(video: string | null | undefined): string | null {
   return hit ? slugify(hit.video) : null;
 }
 
-const line = (s: unknown, max: number) =>
-  oneLine(String(s ?? ''))
-    .trim()
-    .slice(0, max);
+const line = (s: unknown, max: number) => cutChars(oneLine(String(s ?? '')).trim(), max);
 
 /** A template's fill-ins as sent: a few short one-line values (a file, a note id, a frame), nothing else. */
 function cleanVars(v: unknown): Record<string, string | number> | undefined {
@@ -86,7 +84,7 @@ export function cleanActivity(a: ActivityRecord): (AgentActivity & { video?: str
   if (!agent || !KINDS.has(a.kind)) return null;
   const text = line(a.text, 160);
   if (!text) return null;
-  const target = typeof a.target === 'string' ? a.target.slice(0, 40) : null;
+  const target = typeof a.target === 'string' ? cutChars(a.target, 40) : null;
   const at = typeof a.at === 'string' && !Number.isNaN(Date.parse(a.at)) ? a.at : isoLocal();
   const pct = typeof a.pct === 'number' && Number.isFinite(a.pct) ? Math.max(0, Math.min(100, Math.round(a.pct))) : undefined;
   const key = isActivityKey(a.key) ? a.key : undefined;

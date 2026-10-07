@@ -11,6 +11,7 @@ import path from 'node:path';
 import { projectOfFolder } from './archived.ts';
 import { moveAskFolders } from './asks.ts';
 import { checkNotArchived, cleanArchived, FoldersUnreadableError, foldersFile, newFolderId, parseFolders, readFoldersText } from './folderIds.ts';
+import { cutChars } from './names.ts';
 import { dataDir, isoLocal, projectOf, slugify, USER } from './paths.ts';
 import { movePlaybooks, playbookRoot } from './playbookFiles.ts';
 import { bindShareTargets, folderLinks, moveShareFolders, revokeShares } from './shares.ts';
@@ -35,14 +36,18 @@ const LOCK_DIR = (): string => path.join(dataDir(), '.folders');
 
 /**
  * One name of a folder path: one line — control characters (NEL among them) and the line and paragraph separators fold
- * to spaces like any other whitespace —, at most 60 characters.
+ * to spaces like any other whitespace —, well-formed (a lone surrogate, which JSON can carry, would break every URL of
+ * the folder and of its videos' slugs), at most 60 characters, never cut through one.
  */
 const cleanName = (s: string): string =>
-  s
-    .replace(/[\p{Cc}\p{Zl}\p{Zp}]/gu, ' ')
-    .trim()
-    .replace(/\s+/g, ' ')
-    .slice(0, 60);
+  cutChars(
+    s
+      .toWellFormed()
+      .replace(/[\p{Cc}\p{Zl}\p{Zp}]/gu, ' ')
+      .trim()
+      .replace(/\s+/g, ' '),
+    60,
+  );
 
 /**
  * A folder path named for a write (made, moved into, uploaded into, asked on): "/"-separated names cleaned by
@@ -396,7 +401,8 @@ const STRING = String.raw`"((?:[^"\\]|\\.)*)"`;
 function recover(text: string): { folders: string[]; ids: [string, string][]; archived: Record<string, ArchivedProject> } {
   const str = (raw: string): string | null => {
     try {
-      const s = JSON.parse(`"${raw}"`) as string;
+      // well-formed as parseFolders reads a whole file: a name kept with a lone surrogate is recovered, not dropped
+      const s = (JSON.parse(`"${raw}"`) as string).toWellFormed();
       return folderName(s) === s ? s : null;
     } catch {
       return null;

@@ -10,6 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { addDraftRefs, listDrafts } from './drafts.ts';
 import { heavy, PRIORITY } from './jobs.ts';
+import { cutChars } from './names.ts';
 import { isoLocal } from './paths.ts';
 import { type AudioProbe, FFMPEG, isVideoContainer, probe, probeAudio, run } from './probe.ts';
 import { grabFrame } from './shots.ts';
@@ -123,7 +124,7 @@ export interface RefAttached {
   slug: string;
 }
 
-const cleanCaption = (c: string | undefined): string | undefined => c?.trim().slice(0, REF_LIMITS.caption) || undefined;
+const cleanCaption = (c: string | undefined): string | undefined => (c ? cutChars(c.trim(), REF_LIMITS.caption) : '') || undefined;
 
 function base(kind: NoteRef['kind'], req: RefRequest): NoteRef {
   const caption = cleanCaption(req.caption);

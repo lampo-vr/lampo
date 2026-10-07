@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { checkKey, localOwner, startingName } from './auth.ts';
 import { archivedProjectOf, checkNotArchived, checkReviewOpen, FoldersUnreadableError, folderIdOf } from './folderIds.ts';
+import { cutChars } from './names.ts';
 import { currentWorkspace, DATA, DEFAULT_WORKSPACE, dataDir, inWorkspace, isoLocal, slugify, USER, WORKSPACE_ID } from './paths.ts';
 import { summarizeActivity } from './shareActivity.ts';
 import { approvalsOf } from './stage.ts';
@@ -1026,7 +1027,9 @@ export function shareInfo(s: ShareWithToken): ShareInfo {
 }
 
 export const guestName = (name: unknown): string =>
-  String(name || '')
-    .replace(/[^\p{L}\p{N} ._-]/gu, '')
-    .trim()
-    .slice(0, 40) || 'client';
+  cutChars(
+    String(name || '')
+      .replace(/[^\p{L}\p{N} ._-]/gu, '')
+      .trim(),
+    40,
+  ) || 'client';

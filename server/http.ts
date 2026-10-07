@@ -2,6 +2,7 @@
 import { type NextFunction, type Request, type Response, Router } from 'express';
 import { z } from 'zod';
 import { ProjectArchivedError } from '../lib/archived.ts';
+import { wellFormed } from '../lib/names.ts';
 import { type Audience, publicMessage, statusOf } from '../lib/publicError.ts';
 
 /** Review-link paths (also server/guard.ts): nobody on them is identified, so nobody there is the owner. /e/<token> is
@@ -48,9 +49,12 @@ export const audienceOf = (req: Request): Audience => (req.auth?.via === 'local'
  */
 export const router = (): Router => Router({ caseSensitive: true, strict: true });
 
-/** Validates `value` against `schema`; bad input is a 400 that says which field and why. */
+/**
+ * Validates `value` against `schema`; bad input is a 400 that says which field and why. Every string in it comes out
+ * well-formed (`wellFormed`): a JSON body can carry a lone surrogate, and a name kept with one breaks every URL of it.
+ */
 export function parse<S extends z.ZodType>(schema: S, value: unknown, what = 'request'): z.output<S> {
-  const r = schema.safeParse(value);
+  const r = schema.safeParse(wellFormed(value));
   if (r.success) return r.data;
   const issue = r.error.issues[0];
   const where = issue?.path.length ? `${issue.path.join('.')}: ` : '';

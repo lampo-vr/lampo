@@ -43,6 +43,10 @@ format stays backwards compatible throughout.
   open on the server; and a version's file says when it was made, so a browser can resume a download.
 - A video whose file name held a broken character no longer breaks the library for the whole workspace: names are made
   well-formed when they come in.
+- The same holds for folders: a folder name with a broken character, or a long one cut in the middle of an emoji, no
+  longer breaks the inbox, search, *For you* and the library. Everything people and agents send in — folder and link
+  names, display names, notes — comes in well-formed, names are shortened between characters, never through one, and
+  a store that already holds such a name reads it whole.
 - The skill dialog's instructions field was one line high until you typed.
 - A playbook opened on its suggestions (the inbox's *Open the playbook*) put the focus on Reject, so Enter opened the
   reject form instead of accepting: Accept has it now, on the suggestion the inbox showed.

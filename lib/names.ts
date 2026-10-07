@@ -46,9 +46,64 @@ const LOOKALIKE: Record<string, string> = {
   '׃': ':',
 };
 
-/** NFKC, without control or invisible formatting characters (bidi overrides, zero-width joiners), single spaces. */
+/**
+ * `s` cut to at most `max` characters, never through one: `slice` counts UTF-16 units, so it keeps half of a letter
+ * outside the BMP (an emoji) — a lone surrogate, and every URL built from the text then throws (encodeURIComponent).
+ */
+export function cutChars(s: string, max: number): string {
+  if (s.length <= max) return s;
+  let end = 0;
+  let n = 0;
+  for (const ch of s) {
+    if (n === max) break;
+    end += ch.length;
+    n++;
+  }
+  return s.slice(0, end);
+}
+
+/** How deep `wellFormed` looks: no input is nested deeper, and a walk of a deeper one would run out of stack. */
+const WELL_FORMED_DEPTH = 64;
+
+/** ES2024's String methods, which the browser build's lib doesn't declare: Node has them (the browser uses `cutChars`). */
+type Es2024String = { isWellFormed(): boolean; toWellFormed(): string };
+
+/**
+ * `value` (parsed JSON: a request's body, an MCP tool's arguments, a file) with every string in it well-formed, keys
+ * too: JSON can carry a lone surrogate (`"\ud800"`), and a name kept with one makes every URL built from it throw. Each
+ * becomes U+FFFD, as it does on the disk. What needs no change comes back as it is (the same object).
+ */
+export function wellFormed<T>(value: T, depth = 0): T {
+  if (typeof value === 'string') {
+    const s = value as unknown as Es2024String;
+    return (s.isWellFormed() ? value : s.toWellFormed()) as T;
+  }
+  if (value === null || typeof value !== 'object' || depth >= WELL_FORMED_DEPTH) return value;
+  if (Array.isArray(value)) {
+    const out = value.map((v) => wellFormed(v, depth + 1));
+    return (out.some((w, i) => w !== value[i]) ? out : value) as T;
+  }
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) return value; // a Buffer, a Date: not parsed JSON
+  let changed = false;
+  const entries = Object.entries(value).map(([k, v]) => {
+    const [wk, wv] = [wellFormed(k), wellFormed(v, depth + 1)];
+    if (wk !== k || wv !== v) changed = true;
+    return [wk, wv] as const;
+  });
+  if (!changed) return value;
+  // fromEntries defines each key as the object's own, `__proto__` too (as JSON.parse does): it never sets a prototype
+  const out = Object.fromEntries(entries);
+  return (proto === null ? Object.setPrototypeOf(out, null) : out) as T;
+}
+
+/**
+ * NFKC, without control or invisible formatting characters (bidi overrides, zero-width joiners), single spaces,
+ * well-formed (a lone surrogate becomes U+FFFD).
+ */
 export function cleanDisplayName(raw: string): string {
-  return raw
+  return (raw as unknown as Es2024String)
+    .toWellFormed()
     .normalize('NFKC')
     .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, '')
     .replace(/\s+/g, ' ')
@@ -77,7 +132,7 @@ export function cleanAuthor(raw: string): string {
 }
 
 // What makes a stored name unfit to show as it is: a control or invisible formatting character (a bidi override, a
-// zero-width one), a line or paragraph separator — or more characters than any name takes now.
+// zero-width one), a line or paragraph separator, a lone surrogate — or more characters than any name takes now.
 const UNFIT = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
 const SHOWN_MAX = 'agent:'.length + AGENT_NAME_MAX;
 
@@ -88,13 +143,13 @@ const SHOWN_MAX = 'agent:'.length + AGENT_NAME_MAX;
  * returned as it is, so names people chose never change (A12 VA2-5).
  */
 export function shownName(name: string): string {
-  if (!UNFIT.test(name) && [...name].length <= SHOWN_MAX) return name;
+  if (!UNFIT.test(name) && (name as unknown as Es2024String).isWellFormed() && [...name].length <= SHOWN_MAX) return name;
   const agent = name.startsWith('agent:');
   return (agent ? cleanAuthor(name) : cleanAgentName(name)) || (agent ? 'agent:unnamed' : 'unnamed');
 }
 
 /** A folder an agent says it works in: its characters as they are (it may be resumed there), minus line breaks and controls. */
-export const cleanFolderLine = (raw: string, max = 1000): string => raw.replace(/[\p{Cc}\p{Zl}\p{Zp}]/gu, '').slice(0, max);
+export const cleanFolderLine = (raw: string, max = 1000): string => cutChars(raw.replace(/[\p{Cc}\p{Zl}\p{Zp}]/gu, ''), max);
 
 /** What a name looks like to a reader: two names with the same skeleton can't be told apart on screen. */
 export function nameSkeleton(name: string): string {

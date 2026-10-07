@@ -1,6 +1,7 @@
 // Answers an agent offers with a question ("Yes, correct" · "No, it's …"): the person picks one with a click, or types.
 // Browser-safe (no Node imports): the store keeps them clean, the route and MCP check them with these limits, the UI
 // shows them. A picked choice is sent as an ordinary answer (its text), so agents read it like a typed one.
+import { cutChars } from './names.ts';
 
 /** At least two to choose from, at most four buttons. */
 export const CHOICES_MIN = 2;
@@ -19,12 +20,13 @@ export function cleanChoices(input: unknown): string[] | null {
   const seen = new Set<string>();
   for (const raw of input) {
     if (typeof raw !== 'string') continue;
-    const s = raw
-      .replace(/[\p{Cc}\u2028\u2029\u0085]/gu, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, CHOICE_MAX)
-      .trim();
+    const s = cutChars(
+      raw
+        .replace(/[\p{Cc}\u2028\u2029\u0085]/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim(),
+      CHOICE_MAX,
+    ).trim();
     const key = s.toLocaleLowerCase();
     if (!s || seen.has(key)) continue;
     seen.add(key);

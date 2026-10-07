@@ -26,6 +26,7 @@
 import { pathToFileURL } from 'node:url';
 import type { Request } from 'express';
 import { recordStep } from '../lib/funnel.ts';
+import { wellFormed } from '../lib/names.ts';
 import { RateLimit } from '../lib/rateLimit.ts';
 import { currentWorkspace, inWorkspace } from '../lib/scope.ts';
 import * as store from '../lib/store.ts';
@@ -585,7 +586,7 @@ export function hostRequest(req: Request, raw = false): HostRequest {
     method: req.method,
     path: req.path,
     headers,
-    ...(raw ? { rawBody: Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0) } : { body: req.body }),
+    ...(raw ? { rawBody: Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0) } : { body: wellFormed(req.body) }),
     ip: req.ip,
   };
 }

@@ -17,7 +17,7 @@ import { pointersOf } from './elementMaps.ts';
 import { legendLine, onWords, pointerIn } from './elements.ts';
 import { isInboxEvent, statusLabel } from './eventLine.ts';
 import { archivedProjectOf, checkReviewOpen } from './folderIds.ts';
-import { cleanAgentName, cleanFolderLine, shownName } from './names.ts';
+import { cleanAgentName, cleanFolderLine, cutChars, shownName } from './names.ts';
 import { answeredAlready, checkPicks, cleanPrompt, OPTION_LIMITS, optionLines, optionRefs, picksLine, picksToRender } from './options.ts';
 import { changeableReply } from './ownership.ts';
 import { fullAtOrBefore, MAX_HANDLES, PART_HANDLES, partLine, partOk, partOkWords } from './part.ts';
@@ -208,6 +208,10 @@ function shownNames(r: Review): Review {
   for (const a of r.approvals || []) if (a.by) a.by = shownName(a.by);
   if (r.final?.by) r.final.by = shownName(r.final.by);
   for (const f of r.finals || []) if (f.by) f.by = shownName(f.by);
+  // A path or folder an older version kept with a lone surrogate reads well-formed: the same directory on the disk (Node
+  // writes one as U+FFFD), and the slug and every URL built from it can be encoded.
+  if (typeof r.video === 'string') r.video = r.video.toWellFormed();
+  if (typeof r.folder === 'string') r.folder = r.folder.toWellFormed();
   return r;
 }
 
@@ -622,14 +626,19 @@ export function folderParts(raw: string, clean: (name: string) => string): strin
   return parts;
 }
 
-/** A folder path from an upload: "/"-separated names, none of them "." or "..", within FOLDER_LIMITS. */
+/**
+ * A folder path from an upload: "/"-separated names, none of them "." or "..", within FOLDER_LIMITS. Well-formed, each
+ * name cut at 60 characters, never through one (as uploadName: a lone surrogate in the slug breaks every URL of it).
+ */
 export function uploadFolder(folder: string | null | undefined): string | null {
-  const parts = folderParts(String(folder || ''), (s) =>
-    s
-      .replace(/\p{Cc}/gu, '')
-      .trim()
-      .replace(/\s+/g, ' ')
-      .slice(0, 60),
+  const parts = folderParts(String(folder || '').toWellFormed(), (s) =>
+    cutChars(
+      s
+        .replace(/\p{Cc}/gu, '')
+        .trim()
+        .replace(/\s+/g, ' '),
+      60,
+    ),
   );
   if (parts.some((p) => p === '.' || p === '..')) throw new Error('folder names cannot be "." or ".."');
   if (parts.some((p) => p.includes('\\'))) throw new Error('folder names cannot contain a backslash');
@@ -1051,8 +1060,8 @@ export function cleanPart(p: PartRequest | undefined | null, frames: number): Pa
 
 /** A text edit as kept: both sides trimmed and bounded; null when there are no words to change. */
 const cleanTextEdit = (e: TextEdit | undefined): TextEdit | null => {
-  const from = (e?.from || '').trim().slice(0, TEXT_EDIT_MAX);
-  return e && from ? { from, to: (e.to || '').trim().slice(0, TEXT_EDIT_MAX) } : null;
+  const from = cutChars((e?.from || '').trim(), TEXT_EDIT_MAX);
+  return e && from ? { from, to: cutChars((e.to || '').trim(), TEXT_EDIT_MAX) } : null;
 };
 
 /**
@@ -1171,7 +1180,7 @@ export interface CommentPatch {
 export function answerOf(c: Pick<Comment, 'options'>, a: OptionAnswer): OptionAnswer {
   if (!c.options?.length) throw new Error('this note offers no options to pick from');
   const picks = checkPicks(c.options, a.picks || {});
-  const note = (a.note || '').trim().slice(0, OPTION_LIMITS.note);
+  const note = cutChars((a.note || '').trim(), OPTION_LIMITS.note);
   if (!Object.keys(picks).length && !note) throw new Error('pick something, or say what you want instead');
   return { picks, ...(note ? { note } : {}) };
 }
@@ -1214,7 +1223,7 @@ export function updateComment(id: string, patch: CommentPatch): Comment {
     if (patch.tags !== undefined) edits.tags = patch.tags;
     if (patch.severity !== undefined) edits.severity = patch.severity;
     if (patch.drawing !== undefined) edits.drawing = patch.drawing;
-    if (patch.text_edit_to !== undefined && c.text_edit) edits.text_edit = { from: c.text_edit.from, to: patch.text_edit_to.trim().slice(0, TEXT_EDIT_MAX) };
+    if (patch.text_edit_to !== undefined && c.text_edit) edits.text_edit = { from: c.text_edit.from, to: cutChars(patch.text_edit_to.trim(), TEXT_EDIT_MAX) };
     if (Object.keys(edits).length) {
       Object.assign(c, edits);
       c.edited = isoLocal();
@@ -2066,6 +2075,10 @@ export function shownEvent(e: ReviewEvent): ReviewEvent {
   if (typeof e.by === 'string') e.by = shownName(e.by);
   if (typeof e.session === 'string') e.session = shownName(e.session);
   if (e.type === 'assigned' && typeof e.text === 'string' && e.text.startsWith(ASSIGNED)) e.text = ASSIGNED + shownName(e.text.slice(ASSIGNED.length));
+  // as a review's own (shownNames): a slug an older version logged with a lone surrogate still makes a URL
+  if (typeof e.slug === 'string') e.slug = e.slug.toWellFormed();
+  if (typeof e.video === 'string') e.video = e.video.toWellFormed();
+  if (typeof e.folder === 'string') e.folder = e.folder.toWellFormed();
   return e;
 }
 

@@ -3,6 +3,7 @@
 // per group (or several) and writes what else matters; the answer goes back as an ordinary answer to the question,
 // one line an agent parses: `PICKED voice=v3 music=m1 · note: "lampo.app on the end card"`.
 // Browser-safe (no Node imports): the store and the routes check with these rules, the UI levels and shows with them.
+import { cutChars } from './names.ts';
 import { compareTime, instant, oneLine } from './time.ts';
 import type { Comment, NoteRef, OptionAnswer, OptionGroup, OptionSeen, RefLoudness, Reply } from './types.ts';
 
@@ -45,12 +46,13 @@ export interface OptionGroupInput {
 // One line, no control characters, at most `max` characters.
 const line = (s: unknown, max: number): string =>
   typeof s === 'string'
-    ? s
-        .replace(/[\p{Cc}\u2028\u2029\u0085]/gu, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .slice(0, max)
-        .trim()
+    ? cutChars(
+        s
+          .replace(/[\p{Cc}\u2028\u2029\u0085]/gu, ' ')
+          .replace(/\s+/g, ' ')
+          .trim(),
+        max,
+      ).trim()
     : '';
 
 /**

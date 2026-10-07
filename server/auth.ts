@@ -13,6 +13,7 @@ import { voidLinks } from '../lib/accountLinks.ts';
 import * as auth from '../lib/auth.ts';
 import { AVATAR_FILE, AVATAR_LIMITS, avatarKey, people, removeAvatar, saveAvatar } from '../lib/avatars.ts';
 import type { Config } from '../lib/config.ts';
+import { wellFormed } from '../lib/names.ts';
 import { afterNewPassword } from '../lib/newPassword.ts';
 import { vrTokenName } from '../lib/oauth/clients.ts';
 import { GrantError, listApps, redeemVrCode } from '../lib/oauth/store.ts';
@@ -371,8 +372,9 @@ const UserPatch = z.object({
   current_password: z.string().max(1024).optional(),
 });
 
+// well-formed like every body (server/http.ts parse): a name kept with a lone surrogate breaks every URL built from it
 const parse = <S extends z.ZodType>(schema: S, value: unknown): z.output<S> => {
-  const r = schema.safeParse(value ?? {});
+  const r = schema.safeParse(wellFormed(value ?? {}));
   if (r.success) return r.data;
   const issue = r.error.issues[0];
   throw fail(400, `invalid body: ${issue?.path.length ? `${issue.path.join('.')}: ` : ''}${issue?.message || 'malformed'}`);
