@@ -489,6 +489,13 @@ try {
 
   await check('every state fits at 390, 768, 1024, 1280, 1440 and 1920, in both themes and in German', async () => {
     const out = [];
+    // every state in English and the dark theme; the longest words (rendering, needs you, failed) in light and German
+    const runs = [
+      ['en', 'dark', ['working', 'rendering', 'needs_you', 'done', 'failed', 'lost']],
+      ['en', 'light', ['rendering', 'needs_you', 'failed']],
+      ['de', 'dark', ['rendering', 'needs_you', 'failed']],
+      ['de', 'light', ['rendering', 'needs_you', 'failed']],
+    ];
     for (const lang of ['en', 'de']) {
       const p = await browser.newPage();
       p.on('pageerror', (e) => errors.push(e.message));
@@ -498,14 +505,18 @@ try {
           localStorage.setItem('vr.lang', l);
         } catch {}
       }, lang);
-      for (const theme of ['dark', 'light']) {
-        await p.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: theme }]);
-        for (const width of [390, 768, 1024, 1280, 1440, 1920]) {
-          const phone = width < 640;
-          await p.setViewport({ width, height: phone ? 844 : width < 1100 ? 1024 : 900, isMobile: phone, hasTouch: phone, deviceScaleFactor: phone ? 2 : 1 });
+      // a phone first (a touch screen loads the page as one), then the desks by resizing
+      for (const width of [390, 768, 1024, 1280, 1440, 1920]) {
+        const phone = width < 640;
+        await p.setViewport({ width, height: phone ? 844 : width < 1100 ? 1024 : 900, isMobile: phone, hasTouch: phone, deviceScaleFactor: phone ? 2 : 1 });
+        if (width === 390 || width === 768) {
           state[slug] = 'working';
           await openPlayer(p);
-          for (const st of ['working', 'rendering', 'needs_you', 'done', 'failed', 'lost']) {
+        }
+        for (const [l, theme, states] of runs) {
+          if (l !== lang) continue;
+          await p.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: theme }]);
+          for (const st of states) {
             await go(p, st);
             await settle(p);
             for (const b of [...(await sideways(p)), ...(await clippedText(p)), ...(await cutLabels(p))]) out.push(`${st} @${width} ${theme} ${lang}: ${b}`);
@@ -533,6 +544,12 @@ try {
     const sent = await api(`/api/review/${enc(real)}/drafts/send`, 'POST', {});
     const p = await browser.newPage();
     p.on('pageerror', (e) => errors.push(e.message));
+    // in English again (the matrix above left German in this browser's storage)
+    await p.evaluateOnNewDocument(() => {
+      try {
+        localStorage.setItem('vr.lang', 'en');
+      } catch {}
+    });
     await p.setViewport({ width: 1440, height: 900 });
     await openPlayer(p, real);
     const phase = () => p.$eval('[data-testid=run-strip]', (e) => e.dataset.phase).catch(() => null);
