@@ -24,7 +24,7 @@ import { isProject } from '../lib/folders.ts';
 import { fileName } from '../lib/format.ts';
 import { loader, screen, useLoaded, usePainted } from '../lib/lazy.ts';
 import { crumbs, goView, type LibraryView, leaf } from '../lib/nav.ts';
-import { usePrefs } from '../lib/prefs.ts';
+import { readPrefs, usePrefs } from '../lib/prefs.ts';
 import { copyText, toast, toastError, toastUndo } from '../lib/toast.ts';
 import { WINDOW_FROM } from '../lib/windowing.ts';
 import { getStartedCode, roomOf, useFirstRun } from '../onboarding/state.ts';
@@ -43,7 +43,7 @@ import { ArchivedBanner } from './ArchivedBanner.tsx';
 import { AskLead, useFolderAsk } from './AskLead.tsx';
 import { archivedCode, useArchived } from './archiving.ts';
 import { arrowNav } from './arrowNav.ts';
-import { Board, BoardPending } from './Board.tsx';
+import { BoardPending } from './BoardFrame.tsx';
 import { downloadFolder } from './downloadFolder.ts';
 import { Film, FilmPending } from './Film.tsx';
 import { FilmGrid } from './FilmGrid.tsx';
@@ -88,6 +88,10 @@ const InboxView = screen(inboxViewCode);
 const insightsCode = loader(() => import('./Insights.tsx'));
 if (/^#\/insights\b/.test(location.hash)) void insightsCode.load().catch(() => {});
 const Insights = screen(insightsCode);
+// The board is a chunk of its own (Board.tsx): asked for with the library's when it is the layout — the first render
+// waits for both (App.tsx) —, right after the first paint otherwise; its lanes stand meanwhile (BoardFrame.tsx).
+const boardCode = loader(() => import('./Board.tsx'));
+export const boardFirst: Promise<unknown> = readPrefs(LIBRARY_PREFS, LIBRARY_PER_TAB).layout === 'board' ? boardCode.load().catch(() => {}) : Promise.resolve();
 // Add video opens on a click or a drop, never in the first paint: its code (and the folder picker's) comes right after.
 const addVideoCode = loader(() => import('./AddVideo.tsx'));
 // The Archived page comes at once when the page opens on it.
@@ -517,7 +521,8 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
   const qc = useQueryClient();
   const [prefs, setPref] = usePrefs(LIBRARY_PREFS, LIBRARY_PER_TAB);
   const [adding, setAdding] = useState(false);
-  const Add = useLoaded(addVideoCode, usePainted(!pending) || adding);
+  const painted = usePainted(!pending);
+  const Add = useLoaded(addVideoCode, painted || adding);
   const [sharingFolder, setSharingFolder] = useState<string | null>(null);
   // Phones and small tablets: the sidebar lives in a drawer; any navigation closes it.
   const [navOpen, setNavOpen] = useState(false);
@@ -610,6 +615,7 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
   const layout = pick<Layout>(prefs.layout, LAYOUTS, 'grid');
   const moveTo = useMoves(can, useSettle());
   const onBoard = layout === 'board';
+  const BoardCode = useLoaded(boardCode, onBoard || painted);
   const kit = useMemo<CardKit>(() => ({ can, actions: actionsRef, move: moveTo, board: onBoard }), [can, moveTo, onBoard]);
   const group = pick<GroupBy>(prefs.group, ['folder', 'stage', 'none'], 'folder');
   const sort = pick<SortBy>(prefs.sort, ['recent', 'name', 'stage', 'open'], 'recent');
@@ -822,7 +828,8 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
           {page.empty.body}
         </EmptyState>
       );
-    if (layout === 'board') return <Board videos={shown} where={(v) => whereFor(v)} home={info?.home} folders={openFolders} />;
+    if (layout === 'board')
+      return BoardCode ? <BoardCode.Board videos={shown} where={(v) => whereFor(v)} home={info?.home} folders={openFolders} /> : <BoardPending />;
     if (layout === 'list')
       return (
         <FilmList

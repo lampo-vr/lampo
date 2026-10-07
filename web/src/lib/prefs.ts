@@ -18,6 +18,9 @@ const reach = (get: () => KeyValueStore): KeyValueStore => {
 };
 const stores = (): PrefStores => ({ kept: reach(() => localStorage), tab: reach(() => sessionStorage) });
 
+/** A screen's preferences as they are kept now, outside React (what a screen's code asks for before it renders). */
+export const readPrefs = (key: string, perTab: readonly string[] = []): Prefs => loadPrefs(stores(), key, perTab);
+
 /** Sets one preference from outside the screen that owns it (the command palette, a redirect); a mounted screen follows. */
 export function storePref(key: string, k: string, val: string | boolean | undefined, perTab: readonly string[] = []) {
   const next = savePref(stores(), key, k, val, perTab);
@@ -26,9 +29,9 @@ export function storePref(key: string, k: string, val: string | boolean | undefi
 }
 
 export function usePrefs(key: string, perTab: readonly string[] = []) {
-  const [prefs, setPrefs] = useState<Prefs>(() => loadPrefs(stores(), key, perTab));
+  const [prefs, setPrefs] = useState<Prefs>(() => readPrefs(key, perTab));
   useEffect(() => {
-    const f = (e: Event) => (e as CustomEvent<string>).detail === key && setPrefs(loadPrefs(stores(), key, perTab));
+    const f = (e: Event) => (e as CustomEvent<string>).detail === key && setPrefs(readPrefs(key, perTab));
     window.addEventListener(CHANGED, f);
     return () => window.removeEventListener(CHANGED, f);
   }, [key, perTab]);

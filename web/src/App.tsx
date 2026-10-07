@@ -18,7 +18,8 @@ import { Shell } from './ui/shell.tsx';
 // shows before the player code has arrived (it is prefetched right after). A screen whose code is here renders at
 // once (lib/lazy.ts): boot.tsx waits for the route's chunk before the first render, so the first paint is the screen.
 const playerCode = loader(() => import('./player/Player.tsx'));
-const libraryCode = loader(() => import('./library/Library.tsx'));
+// (the library with the board's code when the board is its layout: Library.tsx boardFirst)
+const libraryCode = loader(() => import('./library/Library.tsx').then((m) => m.boardFirst.then(() => m)));
 const guestCode = loader(() => import('./guest/Guest.tsx'));
 const Library = screen(libraryCode);
 const Player = screen(playerCode);
