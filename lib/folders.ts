@@ -4,7 +4,8 @@
 //                              "archived": {"ACME": {"at": "…", "by": "…"}}  (projects put away: lib/archived.ts)
 //   review.json "folder"       "ACME/Spring Sale" or null (= Unsorted)
 // A folder path is "/"-separated; top-level folders are shown as projects. Nothing changes inside an archived project
-// (made, renamed, moved, deleted, moved into) until it is restored; only its owners and admins take a video out of it.
+// (made, renamed, moved, deleted, moved into) until it is restored; only its owners and admins take a video out of it,
+// as people (never an API token): the callers decide (`moveVideo`'s `out`).
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -210,8 +211,8 @@ function setFolderInto(review: Review, folder: string | null, by: string): void 
 
 /**
  * Files a video in `folder` (null: no project). Never into an archived project; out of one only with `out` — the
- * caller may take videos out of archived projects (owners and admins: the `archive` action) — and never to another
- * place in it.
+ * caller may take videos out of archived projects (owners and admins, the `archive` action, as people: never an API
+ * token, since only a person restores one) — and never to another place in it.
  */
 export function moveVideo(slug: string, folder: unknown, by = USER, { out = false }: { out?: boolean } = {}): Review {
   const f = normFolder(folder);

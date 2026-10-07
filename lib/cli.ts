@@ -875,7 +875,7 @@ const commands: Record<string, Command> = {
     const { slug, video } = await b.resolve(pos[0] || die('missing <video>'));
     if (!opt.none && !pos[1]) die('say where: vr move <video> "Project/Folder"  (or --none for Unsorted)');
     if (!opt.none) newFolder(pos[1]);
-    // out of an archived project: the machine's owner may (a server decides by the token's role)
+    // out of an archived project: the machine's owner may (a server refuses a token: a person takes one out in the app)
     const r = await b.move(slug, opt.none ? null : pos[1], author(opt), { out: true });
     out(oneLine(`${video} → ${r.folder || 'Unsorted'}`));
   },

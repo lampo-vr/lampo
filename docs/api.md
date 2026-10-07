@@ -457,9 +457,9 @@ Details:
   reference, suggestion or decision on the playbook of the project or a folder in it, a change, publish or retry of a
   post of one of its videos. Each is refused with `423` and one sentence, `{archived: "<project>", error: "the project
   \"<project>\" is archived: it is read-only until a person restores it"}`. Owners and admins can still move a video
-  out (`PUT /api/review/:slug/folder`); removing a video, cancelling or deleting a post and downloading work as before.
-  Its review links play watch only meanwhile ([sharing.md](sharing.md#what-a-link-allows)). Storage counts toward the
-  plan as before.
+  out (`PUT /api/review/:slug/folder`), signed in in the app (an API token gets `403`, as for restoring); removing a
+  video, cancelling or deleting a post and downloading work as before. Its review links play watch only meanwhile
+  ([sharing.md](sharing.md#what-a-link-allows)). Storage counts toward the plan as before.
 - **Removing** needs the remove action, or being the one who added the video. A video with notes is archived and can
   be restored. A video without notes is deleted: its review and its stored copies, uploads included. A linked file on
   disk is never touched.

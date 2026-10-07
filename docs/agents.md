@@ -617,7 +617,8 @@ person's, in the app). `vr ls`, `vr folders`, `list_videos` and `list_folders` l
 (`--archived`, `archived: true`), the `vr://review` resources don't list it, and its videos still open by name. Any write into it — a note, a
 reply, a fix, a reference, a render (`vr push`, `vr sync`, `track_video`, an upload URL), a move into it, a status, a
 playbook suggestion, a post's draft — is refused before anything is begun, with one sentence: `the project "Acme" is
-archived: it is read-only until a person restores it`.
+archived: it is read-only until a person restores it`. Taking a video out of it is a person's too, in the app: a
+server refuses it to an API token.
 
 Approving and marking final are people's decisions; agents never do either. Review links are people's too: an API
 token lists a video's links without their tokens and can't make, change or revoke one (a link would let it approve as

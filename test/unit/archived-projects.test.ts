@@ -1,11 +1,12 @@
 // Archived projects (lib/archived.ts) on a hosted server. Owners and admins archive a project and restore it, in the app
 // (people only). While it is archived nothing new goes into it — notes, replies, statuses, drafts, stage changes,
-// versions and uploads, moves into it, review links, questions, agent status — each refused with one sentence (423,
-// `archived`), over HTTP and to agents (MCP, `vr`) alike, before anything is begun (no screenshot left behind,
-// nothing tracked); owners and admins still take a video out. Its review links play watch only and get their rights
-// back once it is restored; embeds keep playing. The lists leave it out unless asked: search keeps its matches apart,
-// the inbox, Insights' "now" lists and the status page drop it, `list_videos`, `list_folders`, `vr ls` and
-// `vr folders` show it with their `archived` flag.
+// versions and uploads, moves into it, review links, questions, agent status, playbook changes, posts — each refused
+// with one sentence (423, `archived`), over HTTP and to agents (MCP, `vr`) alike, before anything is begun (no
+// screenshot left behind, nothing tracked); owners and admins still take a video out, in the app (never with a token).
+// Its review links play watch only and get their rights back once it is restored; embeds keep playing. The lists leave
+// it out unless asked: search keeps its matches apart, the inbox, Insights' "now" lists and the status page drop it,
+// `list_videos`, `list_folders`, `vr ls` and `vr folders` show it with their `archived` flag. Any name a project can
+// have works, `constructor` and `__proto__` among them.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -194,13 +195,18 @@ test('nothing new in an archived project: every kind of write is refused with on
   store.deleteComment(note.id);
 });
 
-test('owners and admins take a video out of an archived project; nobody puts one in, and members take none out', async () => {
+test('owners and admins take a video out of an archived project, in the app; nobody puts one in, and members take none out', async () => {
   await restore();
   json(await archive());
   const move = (slug: string, folder: string | null, who: Record<string, string>) =>
     request('PUT', `/api/review/${enc(slug)}/folder`, { body: { folder }, headers: who });
   refused(await move(teaser, null, as.member), 'a member takes one out');
   refused(await move(teaser, 'ACME/Reels', as.owner), 'moved within it');
+  // an owner's API token neither: restoring is a person's, so is emptying the project (an agent can't take all out)
+  const token = await move(teaser, 'Globex', as.ownerToken);
+  assert.equal(token.status, 403, token.text);
+  assert.equal(token.json().person, true);
+  assert.equal(must(store.loadReview(teaser)).folder, 'ACME', 'still in it');
   json(await move(teaser, 'Globex', as.admin));
   assert.equal(must(store.loadReview(teaser)).folder, 'Globex', 'out, where it can be worked on');
   refused(await move(teaser, 'ACME', as.owner), 'and not back in');
@@ -282,15 +288,18 @@ test('agents get the same sentence (MCP, vr), and their lists leave an archived 
   } finally {
     await agent.close();
   }
-  // the owner's agent takes a video out (move_video), as the owner does in the app
+  // the owner's agent takes no video out (move_video): that is a person's, in the app, as restoring is
   const owners = await mcp('owner');
   try {
     const out = await owners.call('move_video', { video: teaser, folder: '' });
-    assert.ok(!out.error, out.text);
-    assert.equal(must(store.loadReview(teaser)).folder, null);
+    assert.ok(out.error, out.text);
+    assert.equal(out.text, `Error: ${SENTENCE}`);
+    assert.equal(must(store.loadReview(teaser)).folder, 'ACME');
   } finally {
     await owners.close();
   }
+  json(await request('PUT', `/api/review/${enc(teaser)}/folder`, { body: { folder: null }, headers: as.owner }));
+  assert.equal(must(store.loadReview(teaser)).folder, null);
 
   const ls = await vr(['ls']);
   assert.equal(ls.code, 0, ls.err);
