@@ -1,24 +1,21 @@
-// Agents connected right now: MCP clients calling /mcp (Claude Code, Codex, …) and Claude Code sessions that run
-// `vr watch` against this server. They are what a video can be assigned to; the server cannot see sessions on people's
-// machines otherwise. Each says whether it hears new notes: an MCP client only while it waits for them
-// (server/agents.ts), so one that doesn't gets the command that starts it.
+// Agents connected right now: MCP clients calling /mcp (Claude Code, Codex, …) and the `vr watch` of older setups. They
+// are what a video can be assigned to; the server cannot see sessions on people's machines otherwise. Each says whether
+// it waits for notes: an MCP client hears them only while it waits (server/agents.ts), so one that doesn't gets the
+// sentence that starts it. Connecting one is Connect an agent's: one snippet and one sentence per agent.
 import type { ConnectedAgent } from '../../../lib/types.ts';
 import { useAgents } from '../api/auth.ts';
-import { useInfo } from '../api/queries.ts';
 import { t } from '../i18n/index.ts';
-import { T } from '../i18n/T.tsx';
 import { StartListening } from '../sessions/listening.tsx';
 import { AgentMark, I } from '../ui/icons.tsx';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { RowsSkeleton, SkeletonRegion } from '../ui/Skeleton.tsx';
 import { EmptyState } from '../ui/system.tsx';
-import { Card, Code, serverUrl, when } from './parts.tsx';
+import { Card, when } from './parts.tsx';
 
-/** An agent's state in words: listening, working on what it got, or connected without listening. */
-const stateWords = (a: ConnectedAgent) => (a.state === 'idle' ? t('not listening') : a.state === 'working' ? t('working') : t('listening'));
+/** An agent's state in words: connected, waiting for the person's notes, or working on what it got. */
+const stateWords = (a: ConnectedAgent) => (a.state === 'idle' ? t('connected') : a.state === 'working' ? t('working') : t('waiting for your notes'));
 
 export function Agents() {
-  const url = serverUrl(useInfo()?.public_url);
   const { data } = useAgents();
   const agents = data?.agents ?? null;
   // The first one that doesn't listen: how to start it, below the list.
@@ -28,12 +25,9 @@ export function Agents() {
       <header className="set-head">
         <h1>{t('Connected agents')}</h1>
         <p>
-          <T
-            k={
-              'An agent shows up here while it talks to Lampo (over MCP, or with <0>vr watch</0>), and you can hand videos to it. It hears new notes only while it listens; it disappears about a minute after it stops.'
-            }
-            tags={[(c) => <code>{c}</code>]}
-          />
+          {t(
+            'An agent shows up here while it talks to Lampo, and you can hand videos to it. It hears new notes only while it waits for them; it disappears about a minute after it stops.',
+          )}
         </p>
       </header>
 
@@ -69,35 +63,10 @@ export function Agents() {
         )}
       </Card>
 
-      <Card
-        title={t('Connect an agent')}
-        lede={t('On the machine where the agent works: vr login opens your browser, and you allow it there (or it takes a token from API tokens).')}
-      >
-        <ol className="set-steps">
-          <li>
-            <span>{t('Sign this machine in:')}</span>
-            <Code>{`vr login ${url}`}</Code>
-          </li>
-          <li>
-            <span>
-              {t('Inside the Claude Code session, keep this running (e.g. under a Monitor): new notes arrive as lines, and the session becomes assignable.')}
-            </span>
-            <Code>{t('vr watch')}</Code>
-          </li>
-          <li>
-            <span>{t('Put videos up for review from there:')}</span>
-            <Code>{'vr push export/film.mp4 --folder "Acme/Reels"'}</Code>
-          </li>
-        </ol>
-        <div className="set-sub" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <I name="terminal" size={14} />
-          <span>
-            <T
-              k={'MCP clients work the same way with <0>VR_SERVER</0> and <1>VR_TOKEN</1>; see API tokens.'}
-              tags={[(c) => <code>{c}</code>, (c) => <code>{c}</code>]}
-            />
-          </span>
-        </div>
+      <Card title={t('Connect an agent')} lede={t('One snippet in your agent, then one sentence: Use Lampo for your project.')}>
+        <a className="btn" href="#/settings/mcp" data-testid="agents-connect">
+          <I name="plug" size={14} /> {t('Connect an agent')}
+        </a>
       </Card>
     </>
   );

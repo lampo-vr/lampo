@@ -116,7 +116,7 @@ Acting
   vr assign <video> (--me | --session <name> | --none)
   vr sync <video>                       register a re-render now (otherwise automatic)
   vr render [--to <video> --out <file>] [--detach] -- <command>   render with its progress in Lampo, then put
-                                        <file> up as the next version; two lines back (docs/agents.md)
+                                        <file> up as the next version (--folder <project>: a new video's V1)
   vr render wait <id>                   a --detach render (past ~8 min): waits ≤ 9 min, says how far it is
   vr diff <video> [--v N]               what changed from v(N-1) to vN: changed ranges (with screen region), audio, retimes
   vr taste <video|folder>               the reviewer's taste for that project: read it before you render

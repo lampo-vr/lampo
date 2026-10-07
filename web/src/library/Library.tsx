@@ -4,11 +4,13 @@
 // names, posters) waits as placeholders of its own size — so nothing moves when the data arrives.
 import { useQueryClient } from '@tanstack/react-query';
 import { lazy, type ReactNode, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { AGENT_KIND_LABELS } from '../../../lib/agentKind.ts';
 import { archivedIn } from '../../../lib/archived.ts';
 import { can as roleCan } from '../../../lib/permissions.ts';
 import { LANES } from '../../../lib/stage.ts';
 import { compareTime } from '../../../lib/time.ts';
-import { useAuthStatus, useCan, useLikelyRole } from '../api/auth.ts';
+import type { AgentKind } from '../../../lib/types.ts';
+import { useAgents, useAuthStatus, useCan, useLikelyRole } from '../api/auth.ts';
 import { useSettle, useVideoActions } from '../api/mutations.ts';
 import { usePlaybooks } from '../api/playbooks.ts';
 import { useBilling, useFolderSuggestion, useInfo, useLibrary } from '../api/queries.ts';
@@ -100,74 +102,92 @@ const UploadDialog = lazy(() => import('../uploads/UploadDialog.tsx').then((m) =
 
 /** What "Make one with an agent" copies: the person's agent makes the video with whatever it has, puts it up for review
  * and works the notes; an agent that isn't connected yet asks the person to connect it. No tool named, no token. */
-const makePrompt = (upload: boolean) =>
-  upload
+// What the person hands their agent to make a first video: "use Lampo" is the whole loop (the server's instructions say
+// how, the one way this agent works), so it names no command.
+const makePrompt = (project: string | null) =>
+  project
     ? t(
-        'Make a short video: <what it’s for, who it’s for, how long>. When it’s rendered, put it into Lampo for review with `vr push <file> --folder "<Project>"`, then read my notes with `vr open <video>` and fix them. If `vr` isn’t set up yet, ask me to connect you in Lampo (Settings → Connect an agent).',
+        'Make a short video: <what it’s for, who it’s for, how long>. Then use Lampo for it: put it up as V1 in {project} and work my notes there until I approve.',
+        {
+          project,
+        },
       )
     : t(
-        'Make a short video: <what it’s for, who it’s for, how long>. When it’s rendered, put it into Lampo for review with `vr track <file> --me`, then read my notes with `vr open <video>` and fix them.',
+        'Make a short video: <what it’s for, who it’s for, how long>. Then use Lampo for it: put it up as V1 in a project and work my notes there until I approve.',
       );
 
-// Empty library: the first render dropping onto an empty layer, what to do, the one button — and, with no video yet,
-// the person's agent making one (its prompt copied). `upload`: whoever opens it uploads (not at the machine itself, or
-// a hosted server); at the machine a render is linked. Reviewers can't add videos: they wait for someone who can.
-function EmptyLibrary({ onAdd, upload, connect, locked }: { onAdd: (() => void) | null; upload: boolean; connect: boolean; locked?: boolean }) {
+/** A connected agent by what it is ("Claude Code"), its name as listed when its client is no known one. */
+const agentWord = (a: { name: string; kind?: AgentKind }) =>
+  a.kind && !['mcp', 'cli', 'api'].includes(a.kind) ? AGENT_KIND_LABELS[a.kind] : a.name.split(' · ')[0] || a.name;
+
+/**
+ * The agent's way to a first video, an empty page's main action: with the person's agent connected, it is asked by name
+ * (the one prompt copied, to paste into it: Lampo can't type into its chat); with none yet, Connect an agent. `quiet`:
+ * something else leads the page (a question an agent waits on).
+ */
+function MakeWithAgent({ project, quiet }: { project: string | null; quiet?: boolean }) {
+  const me = useAuthStatus().data?.user?.name;
+  const agents = useAgents(30_000, usePainted()).data?.agents;
+  const mine = agents?.find((a) => !a.user || a.user === me);
+  const cls = `btn ${quiet ? '' : 'primary'}`;
+  if (!mine)
+    return (
+      <a className={cls} href="#/settings/mcp" data-testid="make-with-agent">
+        <I name="spark" size={14} /> {t('Make one with an agent')}
+      </a>
+    );
+  const name = agentWord(mine);
+  const prompt = makePrompt(project);
+  return (
+    <Tip content={prompt}>
+      <button
+        type="button"
+        className={cls}
+        data-testid="make-with-agent"
+        data-agent={mine.kind ?? 'mcp'}
+        onClick={async () => {
+          if (await copyText(prompt)) toast(t('Copied: paste it into {agent} and say what the video is for', { agent: name }), 'ok');
+        }}
+      >
+        <I name="spark" size={14} /> {t('Ask {agent} to make one', { agent: name })}
+      </button>
+    </Tip>
+  );
+}
+
+// Empty library: the first render dropping onto an empty layer, and the agent's way first — the person's agent makes the
+// video and puts it here (MakeWithAgent); adding one yourself is the quiet second, with its key and the drop hint.
+// `upload`: whoever opens it uploads (not at the machine itself, or a hosted server); at the machine a render is linked.
+// Reviewers can't add videos: they wait for someone who can.
+function EmptyLibrary({ onAdd, upload, agents, locked }: { onAdd: (() => void) | null; upload: boolean; agents: boolean; locked?: boolean }) {
   if (!onAdd)
     return (
       <EmptyState art="library" titleAs="h2" className="empty-library" title={t('Nothing to review yet')}>
         {t('Videos show up here as soon as someone on the team uploads them.')}
       </EmptyState>
     );
+  const own = upload ? (
+    <Button variant="secondary" icon={locked ? 'lock' : 'upload'} onClick={onAdd}>
+      {t('Upload video')} <kbd>U</kbd>
+    </Button>
+  ) : (
+    <Button variant="secondary" icon="plus" onClick={onAdd}>
+      {t('Add video')} <kbd>A</kbd>
+    </Button>
+  );
   return (
     <EmptyState
       art="library"
       titleAs="h2"
       className="empty-library"
       title={t('Nothing to review yet')}
-      action={
-        upload ? (
-          <Button variant={locked ? 'secondary' : 'primary'} icon={locked ? 'lock' : 'upload'} onClick={onAdd}>
-            {t('Upload video')} <kbd>U</kbd>
-          </Button>
-        ) : (
-          <Button variant="primary" icon="plus" onClick={onAdd}>
-            {t('Add video')} <kbd>A</kbd>
-          </Button>
-        )
-      }
-      secondary={
-        <Tip content={makePrompt(upload)}>
-          <button
-            type="button"
-            className="btn ghost"
-            data-testid="make-with-agent"
-            onClick={async () => {
-              if (await copyText(makePrompt(upload))) toast(t('Prompt copied: paste it to your agent and fill in what the video is for'), 'ok');
-            }}
-          >
-            <I name="spark" size={14} /> {t('Make one with an agent')}
-          </button>
-        </Tip>
-      }
+      action={agents ? <MakeWithAgent project={null} /> : own}
+      secondary={agents ? own : undefined}
       tips={[t('Drop video files anywhere on this page')]}
-      foot={
-        <>
-          {t('No video yet? Your agent can make one and put it here for review.')}
-          {connect && (
-            <>
-              {' '}
-              <a className="btn-link" href="#/settings/mcp">
-                {t('Connect an agent')}
-              </a>
-            </>
-          )}
-        </>
-      }
     >
-      {upload
-        ? t('Upload a video, and every note you pin reaches the agent that made it, frame-exact.')
-        : t('Add a video, assign the agent that made it, and every note you pin reaches it frame-exact.')}
+      {agents
+        ? t('Your agent makes the video and puts it here. Every note you pin reaches it, frame-exact.')
+        : t('Upload a video, and every note you pin stays on its frame.')}
     </EmptyState>
   );
 }
@@ -776,6 +796,19 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
   // the videos down when it comes.
   const folderAsk = useFolderAsk(base, !pending);
 
+  // an empty project, folder or library offers a way to its first video: the agent's first, adding one yourself second
+  const addHere = (view.kind === 'folder' || view.kind === 'all') && mayUpload && !shutHere;
+  const addOwn = (variant: 'primary' | 'secondary' = 'secondary') => (
+    <Button variant={variant} icon={locked ? 'lock' : linkHere ? 'plus' : 'upload'} onClick={add}>
+      {view.kind === 'all'
+        ? linkHere
+          ? t('Add video')
+          : t('Upload video')
+        : linkHere
+          ? t('Add a video to {title}', { title: page.title })
+          : t('Upload a video to {title}', { title: page.title })}
+    </Button>
+  );
   const content = () => {
     if (!shown.length)
       return filtering ? (
@@ -801,17 +834,13 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
           className={folderAsk.lead ? 'asked' : ''}
           title={page.empty.title}
           action={
-            (view.kind === 'folder' || view.kind === 'all') && mayUpload && !shutHere ? (
-              // a question waiting above is the one thing to do here: adding a video steps back
-              <Button variant={locked || folderAsk.lead ? 'secondary' : 'primary'} icon={locked ? 'lock' : linkHere ? 'plus' : 'upload'} onClick={add}>
-                {view.kind === 'all'
-                  ? linkHere
-                    ? t('Add video')
-                    : t('Upload video')
-                  : linkHere
-                    ? t('Add a video to {title}', { title: page.title })
-                    : t('Upload a video to {title}', { title: page.title })}
-              </Button>
+            addHere ? (
+              // the agent's way first (a question waiting above is the one thing to do here: everything steps back)
+              can('agents') ? (
+                <MakeWithAgent project={base ? (base.split('/')[0] as string) : null} quiet={!!folderAsk.lead} />
+              ) : (
+                addOwn(locked || folderAsk.lead ? 'secondary' : 'primary')
+              )
             ) : (
               page.empty.toLibrary && (
                 <a className="btn primary" href="#/">
@@ -820,12 +849,10 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
               )
             )
           }
-          tips={[
-            ...(page.empty.tip ? [page.empty.tip] : []),
-            ...((view.kind === 'folder' || view.kind === 'all') && mayUpload && !shutHere ? [t('Drop video files anywhere on this page')] : []),
-          ]}
+          secondary={addHere && can('agents') ? addOwn() : undefined}
+          tips={[...(page.empty.tip ? [page.empty.tip] : []), ...(addHere ? [t('Drop video files anywhere on this page')] : [])]}
         >
-          {page.empty.body}
+          {addHere && can('agents') ? t('Your agent makes the video and puts it here. Every note you pin reaches it, frame-exact.') : page.empty.body}
         </EmptyState>
       );
     if (layout === 'board')
@@ -978,7 +1005,7 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
               ) : bare ? (
                 <>
                   {firstRun.shown && !firstRun.setup && (Ob ? <Ob.GetStarted {...obProps} /> : <div {...obRoom} aria-hidden="true" />)}
-                  <EmptyLibrary onAdd={mayUpload ? add : null} upload={!linkHere} connect={can('agents')} locked={locked} />
+                  <EmptyLibrary onAdd={mayUpload ? add : null} upload={!linkHere} agents={can('agents')} locked={locked} />
                 </>
               ) : (
                 <>

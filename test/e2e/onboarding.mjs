@@ -194,6 +194,9 @@ try {
     const live = await a.$eval('[data-testid=ob-live]', (e) => e.textContent);
     assert(live.includes('Connected · Claude Code'), live);
     assert((await api('/api/onboarding')).onboarding.agent === 'claude-code', 'the pick kept on the account');
+    // then the one sentence that sets it to work: "use Lampo" (no /lampo:watch, no vr command)
+    const tell = await a.$eval('[data-testid=ob-start-cmd]', (e) => e.textContent);
+    assert(/^Use Lampo for (".+"|this project)/.test(tell), tell);
     await shot(a, '03-agent-connected');
     await onScale(a, 'agent');
   });
@@ -378,23 +381,39 @@ try {
     await p.browserContext().close();
   });
 
-  // A new account with no video yet was offered only Upload: making one with their agent is the other way in
-  await check('an empty library offers making a video with an agent: its prompt is copied, the line under it says so', async () => {
-    const p = await fresh();
-    await p.browserContext().overridePermissions(old.base, ['clipboard-read', 'clipboard-write', 'clipboard-sanitized-write']);
-    await open(p, '#/', '.empty-library', old.base);
-    const text = await p.$eval('.empty-library', (e) => e.textContent);
-    assert(text.includes('No video yet? Your agent can make one and put it here for review.'), text);
-    await p.click('[data-testid=make-with-agent]');
-    await p.waitForFunction(() => document.body.textContent.includes('Prompt copied'), { timeout: 5000 });
-    const copied = await p.evaluate(() => navigator.clipboard.readText());
-    // whoever uploads puts it up with vr push; at the machine itself a render is linked (vr track): either way, and then
-    // the notes with vr open
-    const put = copied.includes('vr push <file> --folder') || copied.includes('vr track <file> --me');
-    assert(copied.startsWith('Make a short video:') && put && copied.includes('vr open <video>'), copied);
-    await shot(p, '00-empty-library');
-    await p.browserContext().close();
-  });
+  // An empty library leads with the agent: it makes the video and puts it here; adding one yourself is the quiet second
+  await check(
+    'an empty library leads with the agent: Make one with an agent (to Connect an agent, none yet), then a heartbeat names it and copies its prompt',
+    async () => {
+      const p = await fresh();
+      await p.browserContext().overridePermissions(old.base, ['clipboard-read', 'clipboard-write', 'clipboard-sanitized-write']);
+      await open(p, '#/', '.empty-library', old.base);
+      const text = await p.$eval('.empty-library', (e) => e.textContent);
+      assert(text.includes('Your agent makes the video and puts it here.'), text);
+      assert(!text.includes('No video yet?'), 'no second line saying the same');
+      // no agent connected yet: the primary leads to Connect an agent; adding a video (the machine links one) is second
+      const first = await p.$eval('.empty-library [data-testid=make-with-agent]', (e) => ({
+        cls: e.className,
+        text: e.textContent.trim(),
+        href: e.getAttribute('href'),
+      }));
+      assert(first.cls.includes('primary') && first.text === 'Make one with an agent' && first.href === '#/settings/mcp', JSON.stringify(first));
+      const add = await p.$$eval('.empty-library button', (bs) => bs.map((b) => `${b.className} ${b.textContent.trim()}`).find((x) => x.includes('Add video')));
+      assert(add && !add.includes('primary') && add.includes('A'), `the quiet second, with its key: ${add}`);
+      // an agent connects (what `vr watch` says every 30 s): the primary names it and copies the one prompt to paste into it
+      await api('/api/agents/heartbeat', 'POST', { session_id: 'e2e-empty', name: 'spot-edit', kind: 'claude-code' }, old.base);
+      await p.waitForFunction(() => document.querySelector('[data-testid=make-with-agent]')?.textContent.includes('Ask Claude Code to make one'), {
+        timeout: 40000,
+      });
+      await p.click('[data-testid=make-with-agent]');
+      await p.waitForFunction(() => document.body.textContent.includes('Copied: paste it into Claude Code'), { timeout: 5000 });
+      const copied = await p.evaluate(() => navigator.clipboard.readText());
+      // "use Lampo" is the whole loop: no command in it
+      assert(copied.startsWith('Make a short video:') && copied.includes('use Lampo for it') && !/\bvr\b/.test(copied), copied);
+      await shot(p, '00-empty-library');
+      await p.browserContext().close();
+    },
+  );
 
   // ---------------------------------------------------------------- German
   await check('German: Welcome, skipped to the library; Get started speaks German', async () => {

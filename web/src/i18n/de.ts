@@ -520,8 +520,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'An agent is on it': 'Ein Agent ist dran',
   'an agent needs a decision from you': 'ein Agent braucht eine Entscheidung von dir',
   'an agent replied to your note': 'ein Agent hat auf deine Notiz geantwortet',
-  'An agent shows up here while it talks to Lampo (over MCP, or with <0>vr watch</0>), and you can hand videos to it. It hears new notes only while it listens; it disappears about a minute after it stops.':
-    'Ein Agent erscheint hier, solange er mit Lampo spricht (über MCP oder mit <0>vr watch</0>), und du kannst ihm Videos geben. Neue Notizen hört er nur, solange er zuhört; etwa eine Minute, nachdem er aufhört, verschwindet er wieder.',
   'analysing loudness and freezes…': 'Lautheit und Standbilder werden analysiert …',
   'Android phone': 'Android-Smartphone',
   'Android tablet': 'Android-Tablet',
@@ -794,8 +792,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Inbox, {n} waiting': 'Posteingang, {n} wartend',
   'Inbox: everything waiting for you': 'Posteingang: alles, was auf dich wartet',
   Info: 'Info',
-  'Inside the Claude Code session, keep this running (e.g. under a Monitor): new notes arrive as lines, and the session becomes assignable.':
-    'Lass das in der Claude-Code-Session laufen (z. B. unter einem Monitor): Neue Notizen kommen als Zeilen an, und die Session lässt sich zuweisen.',
   Insights: 'Insights',
   'Instagram Reels': 'Instagram Reels',
   'Integrated loudness (EBU R128)': 'Integrierte Lautheit (EBU R128)',
@@ -884,8 +880,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   Marks: 'Markierungen',
   'Matched in V{v}': 'Stimmt in V{v}',
   'MCP client': 'MCP-Client',
-  'MCP clients work the same way with <0>VR_SERVER</0> and <1>VR_TOKEN</1>; see API tokens.':
-    'MCP-Clients funktionieren genauso mit <0>VR_SERVER</0> und <1>VR_TOKEN</1>; siehe API-Tokens.',
   Member: 'Mitglied',
   Message: 'Nachricht',
   'Mia Keller': 'Mia Keller',
@@ -974,8 +968,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'On {name}.': 'Auf {name}.',
   'On iPhone and iPad, tap Share, then “Add to Home Screen”, and open the app from there.':
     'Tippe auf iPhone und iPad auf „Teilen“, dann auf „Zum Home-Bildschirm“, und öffne die App von dort.',
-  'On the machine where the agent works: vr login opens your browser, and you allow it there (or it takes a token from API tokens).':
-    'Auf dem Rechner, auf dem der Agent arbeitet: vr login öffnet deinen Browser, und du erlaubst es dort (oder es nimmt ein Token aus den API-Tokens).',
   // vr login in the browser: the consent screen when vr asks (web/src/auth/AuthScreens.tsx ConsentScreen)
   '<0>vr</0> on <1>{machine}</1> wants to work with your reviews in {brand}, as <2>{name}</2>.':
     '<0>vr</0> auf <1>{machine}</1> möchte in {brand} mit deinen Reviews arbeiten, als <2>{name}</2>.',
@@ -1243,7 +1235,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Sign out and use the invite': 'Abmelden und Einladung nutzen',
   'Sign out everywhere': 'Überall abmelden',
   'Sign out everywhere?': 'Überall abmelden?',
-  'Sign this machine in:': 'Diesen Rechner anmelden:',
   signed: 'signiert',
   'Signed in as <0>{email}</0> · <1>{x}</1> · since {when}': 'Angemeldet als <0>{email}</0> · <1>{x}</1> · seit {when}',
   'Signing secret (optional)': 'Signatur-Secret (optional)',
@@ -1391,7 +1382,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Voice notes need https or localhost: the browser keeps the microphone off on a plain http address.':
     'Sprachnotizen brauchen https oder localhost: Auf einer reinen http-Adresse lässt der Browser das Mikrofon aus.',
   'vr on the agent’s machine': 'vr auf dem Rechner des Agenten',
-  'vr watch': 'vr watch',
   vs: 'vs.',
   'Waiting for fixes from {name}': 'Wartet auf Korrekturen von {name}',
   'Waiting for the link to be opened': 'Wartet darauf, dass der Link geöffnet wird',
@@ -1720,16 +1710,8 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   '{app} connects over the internet: it needs this app on a server with an https address.':
     '{app} verbindet sich übers Internet: Dafür muss diese App auf einem Server mit https-Adresse laufen.',
   '{n} more': '{n} weitere',
-  '<0>Push over HTTP</0>: clients that listen (<1>subscriptions/listen</1>) hear the moment a video’s notes change.':
-    '<0>Push über HTTP</0>: Clients, die zuhören (<1>subscriptions/listen</1>), erfahren sofort, wenn sich die Notizen eines Videos ändern.',
-  '<0>vr watch</0>: one line per new note or reply, for terminals (a Claude Code session runs it under a Monitor).':
-    '<0>vr watch</0>: eine Zeile pro neuer Notiz oder Antwort, fürs Terminal (eine Claude-Code-Sitzung lässt es unter einem Monitor laufen).',
-  '<0>wait_for_feedback</0>: any MCP client can wait for new feedback and gets it as it arrives.':
-    '<0>wait_for_feedback</0>: Jeder MCP-Client kann auf neues Feedback warten und bekommt es, sobald es da ist.',
-  'Add it, then ask {name} anything about your videos: it shows up here.': 'Hinzufügen, dann {name} irgendetwas zu deinen Videos fragen: Er erscheint hier.',
   'Add the connector': 'Connector hinzufügen',
   'Add {name} to it': '{name} hinzufügen',
-  'Agents hear about new notes without asking': 'Agenten erfahren von neuen Notizen, ohne zu fragen',
   'Any (JSON)': 'Beliebig (JSON)',
   'Chat app': 'Chat-App',
   'Claude desktop app · Settings → Developer → Edit Config': 'Claude-Desktop-App · Einstellungen → Entwickler → Konfiguration bearbeiten',
@@ -1741,7 +1723,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
     'Claudes Sandbox lädt Videos hierher hoch: Füge sie in Claude unter Einstellungen → Funktionen zu den erlaubten Domains hinzu. Bei Team- und Enterprise-Plänen fügt sie der Owner der Organisation hinzu.',
   'Cursor offers to connect: sign in when it asks.': 'Cursor bietet an, sich zu verbinden: Melde dich an, wenn es fragt.',
   Editor: 'Editor',
-  'How updates arrive': 'Wie Neuigkeiten ankommen',
   'In ChatGPT: turn on developer mode in Settings → Security and login, then select + at chatgpt.com/plugins and create an app with this address.':
     'In ChatGPT: unter Einstellungen → Sicherheit und Anmeldung den Entwicklermodus einschalten, dann auf chatgpt.com/plugins + wählen und eine App mit dieser Adresse anlegen.',
   'In Claude: Customize → Connectors → + Add → Add custom connector, with this address.':
@@ -1755,25 +1736,16 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Pick your agent': 'Wähle deinen Agenten',
   'Restart Claude afterwards. Claude on the web connects once the app runs on a server with an https address.':
     'Danach Claude neu starten. Claude im Web verbindet sich, sobald die App auf einem Server mit https-Adresse läuft.',
-  'See it connect': 'Verbindung prüfen',
   Terminal: 'Terminal',
   'Terminal or app': 'Terminal oder App',
   'The first time, run /mcp in Claude Code and sign in.': 'Beim ersten Mal in Claude Code /mcp ausführen und anmelden.',
   'Then sign in once: codex mcp login {name}': 'Dann einmal anmelden: codex mcp login {name}',
   'Waiting for it to connect…': 'Warte auf die Verbindung …',
-  'Your agent reads the notes on the frames, fixes them and answers. Nothing here changes its settings: you copy what it needs.':
-    'Dein Agent liest die Notizen an den Frames, behebt sie und antwortet. Hier wird nichts an seinen Einstellungen geändert: Du kopierst, was er braucht.',
   '{field} is {a} or {b}': '{field} ist {a} oder {b}',
   '{n} fix waiting|{n} fixes waiting': '{n} Korrektur wartet|{n} Korrekturen warten',
   'Or let it start its own server': 'Oder ihn seinen eigenen Server starten lassen',
   'Other client': 'Anderer Client',
-  'Make a short video: <what it’s for, who it’s for, how long>. When it’s rendered, put it into Lampo for review with `vr push <file> --folder "<Project>"`, then read my notes with `vr open <video>` and fix them. If `vr` isn’t set up yet, ask me to connect you in Lampo (Settings → Connect an agent).':
-    'Mach ein kurzes Video: <wofür, für wen, wie lang>. Wenn es gerendert ist, stell es mit `vr push <Datei> --folder "<Projekt>"` zur Prüfung in Lampo, lies dann meine Notizen mit `vr open <Video>` und setz sie um. Wenn `vr` noch nicht eingerichtet ist, bitte mich, dich in Lampo zu verbinden (Einstellungen → Agent verbinden).',
-  'Make a short video: <what it’s for, who it’s for, how long>. When it’s rendered, put it into Lampo for review with `vr track <file> --me`, then read my notes with `vr open <video>` and fix them.':
-    'Mach ein kurzes Video: <wofür, für wen, wie lang>. Wenn es gerendert ist, stell es mit `vr track <Datei> --me` zur Prüfung in Lampo, lies dann meine Notizen mit `vr open <Video>` und setz sie um.',
   'Make one with an agent': 'Mit einem Agenten machen',
-  'No video yet? Your agent can make one and put it here for review.': 'Noch kein Video? Dein Agent kann eins machen und es hier zur Prüfung einstellen.',
-  'Prompt copied: paste it to your agent and fill in what the video is for': 'Prompt kopiert: gib ihn deinem Agenten und trag ein, wofür das Video ist',
   '{n} day ago|{n} days ago': 'vor {n} Tag|vor {n} Tagen',
   'All versions, to switch and compare': 'Alle Versionen, zum Wechseln und Vergleichen',
   'Approve or request changes': 'Freigeben oder Änderungen anfordern',
@@ -1790,7 +1762,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'More for {label}': 'Mehr zu {label}',
   'VS Code, Zed and more': 'VS Code, Zed und mehr',
   'It works while the app is closed, but gets no updates pushed.': 'Das geht auch, wenn die App zu ist, aber Neuigkeiten kommen nicht von selbst.',
-  'Add it, then ask it anything about your videos: it shows up here.': 'Hinzufügen, dann ihn irgendetwas zu deinen Videos fragen: Er erscheint hier.',
   'Share V{latestV}': 'V{latestV} teilen',
   // review links: the card and its activity
   '{n} visit|{n} visits': '{n} Besuch|{n} Besuche',
@@ -2213,18 +2184,11 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Sent to {name}. It isn’t listening: it gets this once you start it.': 'An {name} gesendet. Hört gerade nicht zu: bekommt es, sobald du ihn startest.',
   'To start it, type this in Claude Code:': 'Zum Starten gib das in Claude Code ein:',
   'To start it, tell it:': 'Zum Starten sag ihm:',
-  'Type this in Claude Code': 'Gib das in Claude Code ein',
   'Tell your agent': 'Sag deinem Agenten',
-  'Then start it: type this in Claude Code': 'Dann starte ihn: Gib das in Claude Code ein',
-  'Then start it: tell it': 'Dann starte ihn: Sag ihm',
   '{name} isn’t listening: it gets your notes once you type {cmd} in Claude Code.':
     '{name} hört nicht zu: Er bekommt deine Notizen, sobald du {cmd} in Claude Code eingibst.',
   '{name} isn’t listening: it gets your notes once you tell it to work on them.':
     '{name} hört nicht zu: Er bekommt deine Notizen, sobald du ihm sagst, dass er sie bearbeiten soll.',
-  'An agent acts only when you tell it to: this has it work the notes assigned to it, then keep listening for new ones.':
-    'Ein Agent handelt nur, wenn du es ihm sagst: Damit bearbeitet er die Notizen, die ihm zugewiesen sind, und hört danach auf neue.',
-  'An agent acts only when you tell it to. This has it work the notes assigned to it, then keep listening for new ones until you say stop.':
-    'Ein Agent handelt nur, wenn du es ihm sagst. Damit bearbeitet er die Notizen, die ihm zugewiesen sind, und hört danach auf neue, bis du Stopp sagst.',
   'Share a review link': 'Einen Review-Link teilen',
   'The open notes with their frames and pictures, to paste into any agent': 'Die offenen Notizen mit Frames und Bildern, zum Einfügen in jeden Agenten',
   'Why? It is kept in the history with your decision.': 'Warum? Das steht mit deiner Entscheidung im Verlauf.',
@@ -2255,8 +2219,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'a new version with fixes, once per version': 'eine neue Version mit Korrekturen, einmal pro Version',
   'a new version, no notes on it yet': 'eine neue Version, noch ohne Notizen',
   'notes not sent yet: send the one you are in · send them all': 'noch nicht gesendete Notizen: die, in der du bist, senden · alle senden',
-  'Add a video, assign the agent that made it, and every note you pin reaches it frame-exact.':
-    'Füge ein Video hinzu, weise ihm den Agenten zu, der es gebaut hat – und jede Notiz, die du setzt, landet framegenau bei ihm.',
   'Add your name': 'Namen eintragen',
   'also versions without fixes': 'auch Versionen ohne Korrekturen',
   'Approve V{v}': 'V{v} freigeben',
@@ -2302,14 +2264,11 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Pictures, links and moments of approved videos that show what “right” looks like.':
     'Bilder, Links und Momente freigegebener Videos, die zeigen, wie „richtig“ aussieht.',
   'previous / next note': 'vorherige / nächste Notiz',
-  'Put videos up for review from there:': 'Videos von dort zum Review einstellen:',
   'Still wrong — {name} takes another look': 'Stimmt noch nicht – {name} schaut es sich nochmal an',
   'Still wrong — back to the agent': 'Stimmt noch nicht – zurück an den Agenten',
   'Still wrong in V{latestV}.': 'In V{latestV} stimmt es noch nicht.',
   'Still wrong: back to the agent': 'Stimmt noch nicht: zurück an den Agenten',
   'The videos it puts up show up here.': 'Videos, die er einstellt, erscheinen hier.',
-  'Upload a video, and every note you pin reaches the agent that made it, frame-exact.':
-    'Lade ein Video hoch, und jede Notiz, die du setzt, erreicht framegenau den Agenten, der es gebaut hat.',
   'Videos you mark final land here.': 'Videos, die du final setzt, landen hier.',
   'voice note: talk while it plays, release to pin it (written out and tagged)':
     'Sprachnotiz: sprechen, während es läuft, loslassen zum Anheften (verschriftlicht und getaggt)',
@@ -2621,6 +2580,7 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Uploading a new version': 'Lädt eine neue Version hoch',
   'Using {tool}': 'Nutzt {tool}',
   'Waiting for your answer': 'Wartet auf deine Antwort',
+  'waiting for your notes': 'wartet auf deine Notizen',
   'Watching for feedback': 'Wartet auf Feedback',
   'Writing {file}': 'Schreibt {file}',
   // the inbox, cleared where it is (Rows.tsx): Später, Erledigt, Auswahl
@@ -3469,7 +3429,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'After that, {plan} is {price} a member a month; agents and review links are free.':
     'Danach kostet {plan} {price} pro Mitglied und Monat; Agents und Review-Links sind kostenlos.',
   'After that, {plan} is {price} a month; agents and review links are free.': 'Danach kostet {plan} {price} im Monat; Agents und Review-Links sind kostenlos.',
-  'Agents can add videos too: <0>vr track out/film.mp4</0>': 'Auch Agents können Videos hinzufügen: <0>vr track out/film.mp4</0>',
   'All set': 'Alles bereit',
   'Already in the list.': 'Steht schon in der Liste.',
   'An agency or studio. The brands you make videos for review through a link.':
@@ -3503,6 +3462,7 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Connect the agent you have': 'Verbinde den Agent, den du hast',
   'Connect your team’s agents': 'Verbinde die Agents deines Teams',
   Connected: 'Verbunden',
+  connected: 'verbunden',
   'Connected · {name}': 'Verbunden · {name}',
   Continue: 'Weiter',
   'Create {n} invite|Create {n} invites': '{n} Einladung erstellen|{n} Einladungen erstellen',
@@ -4634,6 +4594,61 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Stopped {name}': '{name} gestoppt',
   'Try again: {video}': 'Erneut versuchen: {video}',
   'Waiting for your OK': 'Warten auf dein OK',
+  // close the loop: the first project, the agent puts up V1, the one sentence that sets it to work
+  'Ask {agent} to make one': '{agent} eins machen lassen',
+  'Copied: paste it into {agent} and say what the video is for': 'Kopiert: Füg es in {agent} ein und sag, wofür das Video ist',
+  'In Claude Code, <0>{command}</0> does the same.': 'In Claude Code macht <0>{command}</0> dasselbe.',
+  'Make a short video: <what it’s for, who it’s for, how long>. Then use Lampo for it: put it up as V1 in {project} and work my notes there until I approve.':
+    'Mach ein kurzes Video: <wofür, für wen, wie lang>. Nutz dann Lampo dafür: Stell es als V1 in {project} ein und arbeite dort meine Notizen ab, bis ich freigebe.',
+  'Upload a video, and every note you pin stays on its frame.': 'Lade ein Video hoch, und jede Notiz, die du anheftest, bleibt auf ihrem Frame.',
+  'Your agent makes the video and puts it here. Every note you pin reaches it, frame-exact.':
+    'Dein Agent macht das Video und stellt es hier ein. Jede Notiz, die du anheftest, erreicht ihn, auf den Frame genau.',
+  'Meanwhile: try the sample': 'Bis dahin: Beispiel ausprobieren',
+  'An agent shows up here while it talks to Lampo, and you can hand videos to it. It hears new notes only while it waits for them; it disappears about a minute after it stops.':
+    'Ein Agent erscheint hier, solange er mit Lampo spricht, und du kannst ihm Videos geben. Neue Notizen hört er nur, während er auf sie wartet; etwa eine Minute nachdem er aufhört, verschwindet er.',
+  'Make a short video: <what it’s for, who it’s for, how long>. Then use Lampo for it: put it up as V1 in a project and work my notes there until I approve.':
+    'Mach ein kurzes Video: <wofür, für wen, wie lang>. Nutz dann Lampo dafür: Stell es als V1 in ein Projekt ein und arbeite dort meine Notizen ab, bis ich freigebe.',
+  'One snippet in your agent, then one sentence: Use Lampo for your project.': 'Ein Snippet in deinem Agenten, dann ein Satz: Nutz Lampo für dein Projekt.',
+  'Your agent puts its exports up too, once you tell it to use Lampo.': 'Dein Agent stellt seine Exporte auch ein, sobald du ihm sagst, er soll Lampo nutzen.',
+  '{name} is in review.': '{name} ist im Review.',
+  '{name} is ready for your agent': '{name} ist bereit für deinen Agenten',
+  '{name} is ready: your agent puts its V1 there.': '{name} ist bereit: Dein Agent stellt seine V1 dort ein.',
+  '{name} puts it here': '{name} stellt sie hier ein',
+  '{name} puts up V1': '{name} stellt V1 ein',
+  '<0>Your first project</0>, for your agent’s V1': '<0>Dein erstes Projekt</0>, für die V1 deines Agenten',
+  'Add a video yourself': 'Selbst ein Video hinzufügen',
+  'Add it, then tell {name} the sentence above: it shows up here.': 'Füg es hinzu und sag {name} den Satz oben: Dann erscheint er hier.',
+  'Add it, then tell it the sentence above: it shows up here.': 'Füg es hinzu und sag ihm den Satz oben: Dann erscheint er hier.',
+  'Add Lampo to your agent, then tell it to use Lampo: it puts up V1, fixes the notes on the frames and puts up the next version until you approve. Nothing here changes its settings: you copy what it needs.':
+    'Füg Lampo zu deinem Agenten hinzu und sag ihm, er soll Lampo nutzen: Er stellt V1 ein, korrigiert die Notizen auf den Frames und stellt die nächste Version ein, bis du freigibst. An seinen Einstellungen ändert sich hier nichts: Du kopierst, was er braucht.',
+  'brief · rules': 'Briefing · Regeln',
+  'connect it first: the step before': 'verbinde ihn zuerst: der Schritt davor',
+  'Create project': 'Projekt anlegen',
+  'from your agent': 'von deinem Agenten',
+  'Leave it empty to go on with {name}.': 'Lass es leer, um mit {name} weiterzumachen.',
+  'Now tell it': 'Jetzt sag es ihm',
+  'on exact frames': 'auf genauen Frames',
+  'One film, campaign or channel. Your agent puts its versions here, and every note stays on its frame.':
+    'Ein Film, eine Kampagne oder ein Kanal. Dein Agent stellt seine Versionen hier ein, und jede Notiz bleibt auf ihrem Frame.',
+  'Pin your notes on its frames and send them: they go to {agent}, and it puts up the next version.':
+    'Heft deine Notizen an seine Frames und sende sie: Sie gehen an {agent}, und er stellt die nächste Version ein.',
+  'Rename it any time in the sidebar.': 'Umbenennen kannst du es jederzeit in der Seitenleiste.',
+  'See it work': 'Sieh ihm bei der Arbeit zu',
+  'Spring launch': 'Frühjahrs-Launch',
+  'Start your first project': 'Leg dein erstes Projekt an',
+  'Tell {name}': 'Sag {name}',
+  'Tell it this. It renders, puts up V1 in {project} and waits for your notes.':
+    'Sag ihm das. Er rendert, stellt V1 in {project} ein und wartet auf deine Notizen.',
+  'Tell it this. It renders, puts up V1 in a project and waits for your notes.':
+    'Sag ihm das. Er rendert, stellt V1 in einem Projekt ein und wartet auf deine Notizen.',
+  'That one sentence is the whole loop: it finds the project, puts up V1 itself, works your notes and keeps waiting for the next ones until you approve.':
+    'Dieser eine Satz ist der ganze Ablauf: Er findet das Projekt, stellt V1 selbst ein, arbeitet deine Notizen ab und wartet auf die nächsten, bis du freigibst.',
+  'Then tell it': 'Dann sag ihm',
+  'Where your agent puts its versions.': 'Wo dein Agent seine Versionen einstellt.',
+  'working on it': 'arbeitet daran',
+  'your agent puts it here': 'dein Agent stellt sie hier ein',
+  'Your agent puts up V1': 'Dein Agent stellt V1 ein',
+  'Your project': 'Dein Projekt',
 };
 
 export const de: Record<Key, string> = { ...owner, ...client };

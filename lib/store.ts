@@ -677,6 +677,8 @@ export interface IngestOptions {
   part?: VersionPart;
   /** The first run's sample (lib/sample.ts): a new review is marked as one from the start, so none of its events is logged. */
   sample?: SampleMark;
+  /** The agent that put a new video up (an MCP client's upload URL): the video is its from the first version on. */
+  session?: SessionInput | null;
 }
 
 export interface IngestResult {
@@ -905,6 +907,8 @@ async function ingestReserved(
       ...(part ? { part } : {}),
     });
     if (created) logEvent({ type: 'added', by, review, v: 1, text: `uploaded (${review.width}×${review.height}, ${review.fps} fps)` });
+    // an agent's own V1 is its video: the person's notes on it go to that agent (a later version keeps whoever it has)
+    if (created && o.session) assignInto(review, o.session, by);
     saveReview(review);
     return { review, created, version, duplicate: false };
   });

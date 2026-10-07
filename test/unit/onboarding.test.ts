@@ -13,18 +13,24 @@ const T0 = '2026-10-02T09:00:00.000+02:00';
 const T1 = '2026-10-02T09:05:00.000+02:00';
 
 test('each role gets its own steps; at the machine there is nobody to invite', () => {
-  assert.deepEqual(stepsFor('owner'), ['sample', 'video', 'agent', 'invite', 'share'], 'a self-hosted server: the first video before agents and invites');
-  assert.deepEqual(stepsFor('admin'), ['sample', 'video', 'agent', 'invite', 'share']);
-  assert.deepEqual(stepsFor('member'), ['sample', 'agent', 'video', 'share'], 'members don’t invite');
+  // agent work (any pick but "None yet", or none made yet): a project, the agent, and the agent puts up V1 itself
+  assert.deepEqual(stepsFor('owner'), ['project', 'agent', 'agent_video', 'invite', 'share'], 'a self-hosted server: the invites before a link');
+  assert.deepEqual(stepsFor('admin', { agent: 'codex' }), ['project', 'agent', 'agent_video', 'invite', 'share']);
+  assert.deepEqual(stepsFor('member'), ['agent', 'agent_video', 'share'], 'members work in the team’s projects and don’t invite');
   assert.deepEqual(stepsFor('reviewer'), ['sample', 'note', 'approve'], 'reviewers don’t add videos, hand work to agents or share');
-  assert.deepEqual(stepsFor('owner', { machine: true }), ['sample', 'video', 'agent', 'share']);
+  assert.deepEqual(stepsFor('reviewer', { agent: 'claude-code' }), ['sample', 'note', 'approve']);
+  assert.deepEqual(stepsFor('owner', { machine: true }), ['sample', 'video', 'agent', 'share'], 'the machine links its renders: its own first run');
   assert.deepEqual(stepsFor('reviewer', { machine: true }), ['sample', 'note', 'approve']);
-  assert.deepEqual(stepsFor('owner', { signupWorkspace: true }), ['sample', 'agent', 'video', 'share', 'invite'], 'Cloud: the agent first, the invite last');
+  assert.deepEqual(stepsFor('owner', { signupWorkspace: true }), ['project', 'agent', 'agent_video', 'share', 'invite'], 'Cloud: the invite last');
+  // "None yet": people first — the sample, a video of their own, a link
+  assert.deepEqual(stepsFor('owner', { agent: 'none' }), ['sample', 'video', 'invite', 'share']);
+  assert.deepEqual(stepsFor('member', { agent: 'none' }), ['sample', 'video', 'share']);
+  assert.deepEqual(stepsFor('owner', { signupWorkspace: true, agent: 'none' }), ['sample', 'video', 'share', 'invite']);
 });
 
 test('a fact ticks its step once and keeps the first time; nothing new is the same object (no write)', () => {
   const o = startOnboarding(T0);
-  const steps = stepsFor('member');
+  const steps = stepsFor('member', { agent: 'none' });
   assert.equal(recordFacts(o, steps, {}, T1), o, 'nothing found: unchanged');
   const a = recordFacts(o, steps, { video: true, invite: true }, T0);
   assert.deepEqual(a.done, { video: T0 }, 'a step the role doesn’t have is not recorded');
@@ -47,24 +53,24 @@ test('finished once every step of the role is done, and only then', () => {
 });
 
 test('state, next step and progress from what was recorded', () => {
-  const o = { since: T0, done: { sample: T0, agent: T1 } };
+  const o = { since: T0, done: { project: T0, agent_video: T1 } };
   const s = stateOf(o, stepsFor('owner'));
   assert.deepEqual(
     s.map((x) => [x.id, x.done]),
     [
-      ['sample', true],
-      ['video', false],
-      ['agent', true],
+      ['project', true],
+      ['agent', false],
+      ['agent_video', true],
       ['invite', false],
       ['share', false],
     ],
   );
-  assert.equal(nextOf(s), 'video', 'the first one not done, in order');
+  assert.equal(nextOf(s), 'agent', 'the first one not done, in order');
   assert.deepEqual(progressOf(s), { done: 2, of: 5 });
   assert.equal(nextOf(stateOf({ since: T0, done: { sample: T0, note: T0, approve: T0 } }, stepsFor('reviewer'))), null);
   assert.deepEqual(
     stateOf(null, stepsFor('member')).map((x) => x.done),
-    [false, false, false, false],
+    [false, false, false],
   );
 });
 

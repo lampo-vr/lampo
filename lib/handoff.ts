@@ -25,6 +25,13 @@ export function cursorAt(events: readonly ReviewEvent[], now: number): string {
 /** The last line of an MCP answer that hands something to the person: wait now, from this moment. */
 export const waitNowLine = (cursor: string): string => `Now call wait_for_feedback with since "${cursor}": ${ON_SEND}.`;
 
+/**
+ * The last line of an answer that leaves the agent nothing to do (a list with nothing open, a video's notes all
+ * answered): the next step, so a read never ends the loop. Put up a version it has (V1 into an empty project), then wait.
+ */
+export const nothingWaitingLine = (cursor: string): string =>
+  `Nothing waiting for you: put up any version you have, then call wait_for_feedback with since "${cursor}".`;
+
 /** The same for `vr`: its own way to wait (`vr watch` follows from when it starts; it takes no cursor). */
 export const WATCH_NOW_LINE = `Now listen with vr watch (keep it running): ${ON_SEND}.`;
 

@@ -1,26 +1,28 @@
-// Connect an agent, in four steps: pick it (Claude Code, Codex, Cursor, ChatGPT, Claude, any other MCP client), copy
-// the one snippet it needs, watch it connect (the connected-agents registry: every client over /mcp and every
-// `vr watch` announces itself), and start it — an agent acts only when told, so the last step is the one command that
-// has it work its notes and keep listening (the server's `watch` prompt). How updates reach it is folded away. Copy-only: nothing here writes an agent's
-// configuration (`vr mcp config <client>` prints the same). At the machine the app runs on, clients reach the running
-// app without signing in; they may also start the MCP server themselves (then they don't show up in the registry).
+// Connect an agent, one page per agent: pick it (Claude Code, Codex, Cursor, ChatGPT, Claude, any other MCP client),
+// copy the one snippet or connector address it needs, then tell it one sentence — "Use Lampo for <project>" is the
+// whole loop (the server's instructions: it finds the project, puts up V1, works the notes and keeps waiting for the
+// next ones until the person approves) — and see it work, live (the connected-agents registry: every client over /mcp
+// and every `vr watch` announces itself). Copy-only: nothing here writes an agent's configuration (`vr mcp config
+// <client>` prints the same). At the machine the app runs on, clients reach the running app without signing in; they
+// may also start the MCP server themselves (then they don't show up in the registry).
 import { useState } from 'react';
 import { WAKE_DEFAULT } from '../../../lib/agentRun.ts';
 import { BRAND_NAME } from '../../../lib/brand.ts';
-import { MCP_NAME, type McpClient, type McpTarget, mcpSnippet } from '../../../lib/mcpConfig.ts';
+import { lampoFor, MCP_NAME, type McpClient, type McpTarget, mcpSnippet } from '../../../lib/mcpConfig.ts';
 import { compareTime } from '../../../lib/time.ts';
-import type { AgentKind, WakePref } from '../../../lib/types.ts';
+import type { AgentKind, AgentListenState, WakePref } from '../../../lib/types.ts';
 import { useAgents, useAuthStatus, useUpdateMe } from '../api/auth.ts';
-import { useInfo } from '../api/queries.ts';
+import { useInfo, useLibrary } from '../api/queries.ts';
 import { t } from '../i18n/index.ts';
 import { T } from '../i18n/T.tsx';
+import { projectsOf } from '../lib/projects.ts';
 import { toastError } from '../lib/toast.ts';
-import { WATCH_COMMAND, WATCH_WORDS } from '../sessions/listening.tsx';
+import { WATCH_COMMAND } from '../sessions/listening.tsx';
 import { Badge } from '../ui/Badge.tsx';
 import { AgentMark } from '../ui/icons.tsx';
 import { Segmented } from '../ui/primitives.tsx';
 import { AGENT_TILES, type AgentPick, AgentTiles, clientOf, OtherClients } from './AgentChoice.tsx';
-import { Card, Code, Details, when } from './parts.tsx';
+import { Card, Code, when } from './parts.tsx';
 
 const KNOWN: AgentKind[] = ['claude-code', 'codex', 'cursor', 'chatgpt', 'claude'];
 /** The domain of an origin (what a client's list of allowed domains takes), or null. */
@@ -105,7 +107,14 @@ function setup(
   return { code: { label: `${s.label} · ${s.where}`, text: s.text }, notes, live: target.kind === 'http' };
 }
 
-/** Step 3: waiting, or who connected and when (newest first). */
+/** A connected agent's state, as the page says it after its name. */
+const STATE: Record<AgentListenState, () => string> = {
+  idle: () => t('connected'),
+  listening: () => t('waiting for your notes'),
+  working: () => t('working'),
+};
+
+/** The last step: waiting for it to connect, or who connected, when, and what it does now (newest first). */
 function ConnectState({ pick, live }: { pick: AgentPick; live: boolean }) {
   const agents = useAgents(live ? 3000 : 30_000).data?.agents;
   const mine = (agents ?? []).filter((a) => isAgent(pick, a.kind)).sort((a, b) => compareTime(b.last_seen, a.last_seen));
@@ -118,14 +127,14 @@ function ConnectState({ pick, live }: { pick: AgentPick; live: boolean }) {
     );
   const first = mine[0];
   return (
-    <div className="set-voice" data-testid="agent-state" aria-live="polite">
+    <div className="set-voice" data-testid="agent-state" data-state={first?.state ?? 'none'} aria-live="polite">
       {first ? (
         <>
           <AgentMark kind={first.kind ?? 'cli'} size={16} />
           <Badge tone="ok">{t('Connected: {name}', { name: first.name })}</Badge>
           <span className="set-sub">
             {t('seen {when}', { when: when(first.last_seen) })}
-            {first.state && ` · ${first.state === 'idle' ? t('not listening') : first.state === 'working' ? t('working') : t('listening')}`}
+            {first.state && ` · ${STATE[first.state]()}`}
             {mine.length > 1 && ` · ${t('{n} more', { n: mine.length - 1 })}`}
           </span>
         </>
@@ -136,12 +145,46 @@ function ConnectState({ pick, live }: { pick: AgentPick; live: boolean }) {
           </Badge>
           <span className="set-sub">
             {pick === 'other'
-              ? t('Add it, then ask it anything about your videos: it shows up here.')
-              : t('Add it, then ask {name} anything about your videos: it shows up here.', { name })}
+              ? t('Add it, then tell it the sentence above: it shows up here.')
+              : t('Add it, then tell {name} the sentence above: it shows up here.', { name })}
           </span>
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * The sentence that sets it to work, for the project it is about: one of the person's projects (picked when there are
+ * several), else "this project" — the agent names one from the work it is in.
+ */
+function TellIt({ pick }: { pick: AgentPick }) {
+  const projects = projectsOf(useLibrary().data);
+  const [chosen, setChosen] = useState<string | null>(null);
+  const project = chosen && projects.includes(chosen) ? chosen : (projects[0] ?? null);
+  const name = AGENT_TILES().find((x) => x.id === pick)?.label ?? '';
+  return (
+    <>
+      {projects.length > 1 && (
+        <fieldset className="set-chips" data-testid="agent-projects">
+          <legend className="sr-only">{t('Project')}</legend>
+          {projects.slice(0, 8).map((p) => (
+            <label key={p} className="set-chip">
+              <input type="radio" name="agent-project" value={p} className="sr-only" checked={p === project} onChange={() => setChosen(p)} />
+              {p}
+            </label>
+          ))}
+        </fieldset>
+      )}
+      <Code label={pick === 'other' ? t('Tell your agent') : t('Tell {name}', { name })} testid="agent-tell-it">
+        {lampoFor(project)}
+      </Code>
+      {pick === 'claude-code' && (
+        <p className="set-hint set-sub" data-testid="agent-shortcut">
+          <T k="In Claude Code, <0>{command}</0> does the same." values={{ command: WATCH_COMMAND }} tags={[(c) => <code>{c}</code>]} />
+        </p>
+      )}
+    </>
   );
 }
 
@@ -162,7 +205,11 @@ export function Mcp() {
     <>
       <header className="set-head">
         <h1>{t('Connect an agent')}</h1>
-        <p>{t('Your agent reads the notes on the frames, fixes them and answers. Nothing here changes its settings: you copy what it needs.')}</p>
+        <p>
+          {t(
+            'Add Lampo to your agent, then tell it to use Lampo: it puts up V1, fixes the notes on the frames and puts up the next version until you approve. Nothing here changes its settings: you copy what it needs.',
+          )}
+        </p>
       </header>
 
       <Card step={1} title={t('Pick your agent')}>
@@ -202,45 +249,25 @@ export function Mcp() {
       </Card>
 
       {s && !s.blocked && (
-        <Card step={3} title={t('See it connect')}>
+        <Card
+          step={3}
+          title={t('Now tell it')}
+          lede={t(
+            'That one sentence is the whole loop: it finds the project, puts up V1 itself, works your notes and keeps waiting for the next ones until you approve.',
+          )}
+          testid="agent-tell"
+        >
+          <TellIt pick={pick} />
+        </Card>
+      )}
+
+      {s && !s.blocked && (
+        <Card step={4} title={t('See it work')}>
           <ConnectState pick={pick} live={s.live} />
         </Card>
       )}
 
-      {s && !s.blocked && !chat && (
-        <Card
-          step={4}
-          title={t('Start it')}
-          lede={t('An agent acts only when you tell it to. This has it work the notes assigned to it, then keep listening for new ones until you say stop.')}
-          testid="agent-start"
-        >
-          <Code label={pick === 'claude-code' ? t('Type this in Claude Code') : t('Tell your agent')}>
-            {pick === 'claude-code' ? WATCH_COMMAND : WATCH_WORDS}
-          </Code>
-        </Card>
-      )}
-
       {atMachine && info?.capabilities?.wakeAgents && <WakeSetting />}
-
-      <Details title={t('How updates arrive')} hint={t('Agents hear about new notes without asking')} testid="agent-updates">
-        <ul className="set-updates">
-          <li>
-            <T
-              k={'<0>Push over HTTP</0>: clients that listen (<1>subscriptions/listen</1>) hear the moment a video’s notes change.'}
-              tags={[(c) => <b>{c}</b>, (c) => <code>{c}</code>]}
-            />
-          </li>
-          <li>
-            <T k={'<0>wait_for_feedback</0>: any MCP client can wait for new feedback and gets it as it arrives.'} tags={[(c) => <code>{c}</code>]} />
-          </li>
-          <li>
-            <T
-              k={'<0>vr watch</0>: one line per new note or reply, for terminals (a Claude Code session runs it under a Monitor).'}
-              tags={[(c) => <code>{c}</code>]}
-            />
-          </li>
-        </ul>
-      </Details>
     </>
   );
 }

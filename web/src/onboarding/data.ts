@@ -139,6 +139,16 @@ export async function removeSample(qc: QueryClient): Promise<void> {
   await refresh(qc);
 }
 
+/**
+ * A project made in the setup or in Get started (a top-level folder: POST /api/folders, as the sidebar's New project
+ * does): its name as the server keeps it. The agent is told to use Lampo for it and puts up V1 there.
+ */
+export async function makeProject(qc: QueryClient, name: string): Promise<string> {
+  const r = await api<{ folder: string }>('/api/folders', { method: 'POST', body: { path: name.trim().replace(/\//g, '-') } });
+  await refresh(qc);
+  return r.folder;
+}
+
 /** A self-hosted server's health check (whoever runs it: lib/operator.ts). */
 export const healthKey = ['server-health'] as const;
 export const useServerHealth = (enabled: boolean) =>

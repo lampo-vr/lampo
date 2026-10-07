@@ -55,12 +55,10 @@ try {
   const cookie = (made.headers.getSetCookie?.() ?? []).find((c) => c.startsWith('vr_session='))?.split(';')[0];
   const mia = (p, method, body) => call(BASE, p, method, body, cookie);
   await mia('/api/onboarding', 'PUT', { setup: 'done' });
-  // 2 of 5: the sample's fix checked, a teammate invited
-  const sample = await until(async () => {
-    const s = (await mia('/api/onboarding')).sample;
-    return s?.check ? s : null;
-  }, 'the sample, its fix waiting for a check');
-  await mia(`/api/comments/${sample.check}`, 'PATCH', { status: 'verified' });
+  // 2 of 5 (agent work: a project, the agent, its V1, the team, a link): a project made, a teammate invited; the sample
+  // is there to share (made with the first run)
+  await until(async () => (await mia('/api/onboarding')).sample, 'the sample');
+  await mia('/api/folders', 'POST', { path: 'Spring launch' });
   await mia('/api/admin/invites', 'POST', { role: 'member', email: 'jonas@e2e.test' });
   const steps0 = (await mia('/api/onboarding')).steps;
   assert(steps0.filter((s) => s.done).length === 2 && steps0.length === 5, `2 of 5: ${JSON.stringify(steps0)}`);
@@ -343,6 +341,8 @@ try {
 
   await check('a phone with an empty library (no sidebar): the card stays, the account menu carries the count', async () => {
     await mia('/api/onboarding/sample', 'DELETE');
+    // and the project made above: nothing in the library at all
+    await mia(`/api/folders?path=${encodeURIComponent('Spring launch')}`, 'DELETE');
     const m = await fresh({ width: 390, height: 844, mobile: true });
     await m.goto(`${BASE}/#/`, { waitUntil: 'domcontentloaded' });
     await m.waitForSelector('.empty-library', { timeout: 15000 });

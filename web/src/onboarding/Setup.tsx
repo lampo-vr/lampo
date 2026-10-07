@@ -19,7 +19,7 @@ import { Health } from './Health.tsx';
 import { Track } from './parts.tsx';
 import { LightTable } from './pictures.tsx';
 import { useFirstRun } from './state.ts';
-import { AgentStep, finish, Persona as PersonaStep, Renders, Try, Welcome, Workspace } from './steps.tsx';
+import { AgentStep, finish, Persona as PersonaStep, ProjectStep, Renders, Try, Welcome, Workspace } from './steps.tsx';
 import { type InviteRow, Team } from './Team.tsx';
 import '../styles/setup.css';
 
@@ -32,6 +32,9 @@ export interface SetupState {
   rows: InviteRow[] | null;
   /** The renders folder picked (the machine). */
   folder: string | null;
+  /** The first project's name as typed, and the project made (or kept): the agent is told to use Lampo for it. */
+  projectName: string | null;
+  project: string | null;
 }
 
 export interface StepProps {
@@ -61,7 +64,16 @@ export default function Setup({ step }: { step: string | null }) {
   const info = useInfo();
   const run = useFirstRun();
   const o = run.o;
-  const [s, setS] = useState<SetupState>({ ws: null, personas: null, personaOther: '', agent: o?.agent ?? null, rows: null, folder: null });
+  const [s, setS] = useState<SetupState>({
+    ws: null,
+    personas: null,
+    personaOther: '',
+    agent: o?.agent ?? null,
+    rows: null,
+    folder: null,
+    projectName: null,
+    project: null,
+  });
   const set = (p: Partial<SetupState>) => setS((cur) => ({ ...cur, ...p }));
   // the server's answer: who invited (an invited teammate's Welcome), the sample to open (the machine's last step)
   useOnboarding(!!status?.user);
@@ -180,6 +192,8 @@ export default function Setup({ step }: { step: string | null }) {
       return <Workspace {...props} variant={run.variant} />;
     case 'persona':
       return <PersonaStep {...props} />;
+    case 'project':
+      return <ProjectStep {...props} />;
     case 'agent':
     case 'agents':
       return <AgentStep {...props} variant={run.variant} id={at} onPick={choose} />;

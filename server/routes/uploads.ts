@@ -115,9 +115,15 @@ export function uploadRoutes(ctx: ServerContext): Router {
 
   // A finished upload (tus or ticket) becomes the next version of its review; the file (and tus's metadata file next
   // to it) is gone afterwards either way.
-  async function ingest(file: string, { name, folder, slug, part }: UploadMeta, by: string, byId?: string): Promise<UploadResult> {
+  async function ingest(
+    file: string,
+    { name, folder, slug, part }: UploadMeta,
+    by: string,
+    byId?: string,
+    session?: store.SessionInput,
+  ): Promise<UploadResult> {
     try {
-      const o = { name, folder, slug, by, byId };
+      const o = { name, folder, slug, by, byId, ...(session ? { session } : {}) };
       const { review, created, version, duplicate } = part ? await ingestPart(file, { ...o, ...part }) : await store.ingestUpload(file, o);
       const s = slugify(review.video);
       // the workspace's first video of its own (the sample is made elsewhere): the funnel's step (lib/funnel.ts)
@@ -532,7 +538,7 @@ export function uploadRoutes(ctx: ServerContext): Router {
             ? optionFile(file, target.option, t.by)
             : target.kind === 'file'
               ? ingestProjectFile(file, target.file)
-              : ingest(file, target.meta, t.by, target.byId),
+              : ingest(file, target.meta, t.by, target.byId, target.session),
     );
     const job = ctx.inflight.track(work).then(
       (result) => {

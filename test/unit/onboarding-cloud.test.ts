@@ -109,7 +109,8 @@ test('who the videos are for: the owner says it, zod checks it, the workspace ke
   const put = (body: unknown, headers = ana) => send('PUT', '/api/workspaces/current/persona', body, headers);
   assert.deepEqual(
     (await get('/api/onboarding', ana)).json().steps.map((s: { id: string }) => s.id),
-    ['sample', 'agent', 'video', 'share', 'invite'],
+    ['project', 'agent', 'agent_video', 'share', 'invite'],
+    'Claude Code picked: a project, the agent, its V1',
   );
   const r = await put({ personas: ['inhouse', 'other'], personaOther: '  Training\nvideos  ' });
   assert.equal(r.status, 200, r.text);
@@ -119,15 +120,15 @@ test('who the videos are for: the owner says it, zod checks it, the workspace ke
   assert.equal(ws.getWorkspace(status.workspace.id)?.personaOther, 'Training videos');
   assert.deepEqual(
     (await get('/api/onboarding', ana)).json().steps.map((s: { id: string }) => s.id),
-    ['sample', 'agent', 'invite', 'video', 'share'],
-    'an in-house team invites before it uploads',
+    ['project', 'agent', 'agent_video', 'invite', 'share'],
+    'an in-house team invites before it shares',
   );
   // "something else" without its pick is not kept
   const plain = await put({ personas: ['creator'], personaOther: 'ignored' });
   assert.deepEqual([plain.json().workspace.personas, plain.json().workspace.personaOther], [['creator'], undefined]);
   assert.deepEqual(
     (await get('/api/onboarding', ana)).json().steps.map((s: { id: string }) => s.id),
-    ['sample', 'agent', 'video', 'share'],
+    ['project', 'agent', 'agent_video', 'share'],
     'a channel alone invites nobody',
   );
   // zod: unknown kinds, a pick twice, too many, extra fields, too many words

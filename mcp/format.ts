@@ -8,7 +8,7 @@ import { cacheRoot } from '../lib/backend/credentials.ts';
 import type { Backend } from '../lib/backend/types.ts';
 import { describeShape } from '../lib/drawing.ts';
 import { onWords } from '../lib/elements.ts';
-import { cursorAt, stillOpenLine, waitNowLine } from '../lib/handoff.ts';
+import { cursorAt, nothingWaitingLine, stillOpenLine, waitNowLine } from '../lib/handoff.ts';
 import { SAMPLE_FOR_AGENTS } from '../lib/onboarding.ts';
 import { optionLines } from '../lib/options.ts';
 import { partLine, partOk, partOkWords } from '../lib/part.ts';
@@ -35,9 +35,26 @@ export const reviewUri = (slug: string): string => `vr://review/${encodeURICompo
  * moment (lib/handoff.ts). The log is read before the clock: an event of this second that lands meanwhile is heard.
  */
 export async function handOff(b: Backend): Promise<string> {
-  const events = await b.events(200, { since: new Date(Date.now() - 2000).toISOString() });
-  return waitNowLine(cursorAt(events, Date.now()));
+  return waitNowLine(await cursorNow(b));
 }
+
+/** A cursor for this moment: the log is read before the clock, so an event of this second that lands meanwhile is heard. */
+async function cursorNow(b: Backend): Promise<string> {
+  const events = await b.events(200, { since: new Date(Date.now() - 2000).toISOString() });
+  return cursorAt(events, Date.now());
+}
+
+// Answers that leave the agent with nothing to do: the toolkit ends them with the next step (mcp/toolkit.ts), unless a
+// line about its run says more (the person stopped it, or sent notes meanwhile).
+const idleAnswers = new WeakSet<CallToolResult>();
+/** Marks an answer as leaving nothing to do (a list with nothing open, a video with no note open). */
+export const idle = (r: CallToolResult): CallToolResult => {
+  idleAnswers.add(r);
+  return r;
+};
+export const isIdle = (r: CallToolResult): boolean => idleAnswers.has(r);
+/** The next step after such an answer: put up any version, then wait, from this moment (lib/handoff.ts). */
+export const nextStep = async (b: Backend): Promise<string> => nothingWaitingLine(await cursorNow(b));
 
 /** After a note is closed by its agent (fixed, won't fix): how many of the video's notes are still open, or wait now. */
 export async function afterClosed(b: Backend, slug: string): Promise<string> {

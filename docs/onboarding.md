@@ -28,9 +28,9 @@ depends on where the app runs (`setupVariant`, `setupStepsFor` in [lib/setupFlow
 
 | Where | Steps after Welcome |
 |---|---|
-| **A workspace made at sign-up** (its owner, on Lampo Cloud or any server open to sign-ups) | the workspace's name · who the videos are for · the agent · the team |
+| **A workspace made at sign-up** (its owner, on Lampo Cloud or any server open to sign-ups) | the workspace's name · who the videos are for · the first project · the agent · the team |
 | **Invited** into someone else's workspace | the agent (Welcome names the workspace and who invited them) |
-| **A self-hosted server** (whoever runs it, as an owner or admin of its first workspace) | the workspace's name · the health check · the team · the team's agents |
+| **A self-hosted server** (whoever runs it, as an owner or admin of its first workspace) | the workspace's name · the health check · the team · the first project · the team's agents |
 | **The machine** (the app on the person's own computer) | where exports land · the agent installed · the sample |
 
 - **Welcome**, where a billing module runs (Lampo Cloud), shows the trial it gives ("Team trial · 14 days · no
@@ -39,9 +39,12 @@ depends on where the app runs (`setupVariant`, `setupStepsFor` in [lib/setupFlow
 - **Who the videos are for** (for other brands, for our own brand, for my channel, something else in a few words; several at
   once) is kept on the workspace (`personas`, `personaOther`). It changes a few words, the role an invite starts with
   (in-house teams invite reviewers) and Get started's order. A channel alone has no team step.
+- **The first project** (before the agent): one film, campaign or channel, made at *Continue* the way the sidebar's *New
+  project* makes one (one already there can be kept). The agent is told to use Lampo for it and puts its V1 there.
 - **The agent**: Claude Code, Codex, Cursor, ChatGPT, Claude or any MCP client, or none yet. Picking one shows its connect
-  block in place (the line or the file it needs, made from the same snippets as Settings → Connect an agent), and its
-  status is live: "Waiting for Claude Code…" turns into "Connected · Claude Code from Mia's MacBook" the moment it
+  block in place (the line or the file it needs, made from the same snippets as Settings → Connect an agent), then the
+  one sentence that sets it to work, `Use Lampo for "<project>"` — the whole loop: it finds the project, puts up V1
+  itself, works the notes and keeps waiting for the next ones until the person approves —, and its status is live: "Waiting for Claude Code…" turns into "Connected · Claude Code from Mia's MacBook" the moment it
   calls (the connected-agents registry, over the live events; no polling). On a hosted server "Use an API token
   instead" makes one in place. At the machine the agents installed say *Found* (looked for on PATH and in the usual
   places, never run).
@@ -82,12 +85,17 @@ Each role gets the steps that make sense for it, in an order that follows where 
 | Who | Steps |
 |---|---|
 | reviewer | Try the sample · Leave a note on a frame · Approve a version |
-| member | Try the sample · Connect your agent · Add your first video · Share a review link |
+| member | Connect your agent · Your agent puts up V1 · Share a review link |
 | the machine's owner | Try the sample · Link your first video · Connect your agent · Share a review link |
-| the owner of a workspace made at sign-up | Try the sample · Connect your agent · Add your first video · Share a review link · Invite a teammate (in-house: the invite before the video; a channel alone: no invite) |
-| a self-hosted server's owner or admin | Try the sample · Add your first video · Connect your agent · Invite a teammate · Share a review link |
+| the owner of a workspace made at sign-up | Start your first project · Connect your agent · Your agent puts up V1 · Share a review link · Invite a teammate (in-house: the invite before the link; a channel alone: no invite) |
+| a self-hosted server's owner or admin | Start your first project · Connect your agent · Your agent puts up V1 · Invite a teammate · Share a review link |
+| anyone who picked *None yet* for the agent | Try the sample · Add your first video · (Invite a teammate ·) Share a review link: people first |
 
-"Connect your agent" names the agent picked in the setup ("Connect Claude Code"). The steps go by the person's role
+Whoever works with an agent (any pick but *None yet*, and while nothing is picked) starts from a project and lets the
+agent put up V1: the V1 step's pane holds the sentence for the project and where the agent stands (connected, waiting
+for your notes); *Add a video yourself* is its second choice, and *Meanwhile: try the sample* fills the wait. The machine
+keeps its own order: its renders are linked where they land (the setup's first step). "Connect your agent" and "… puts
+up V1" name the agent picked in the setup ("Connect Claude Code", "Claude Code puts up V1"). The steps go by the person's role
 **in the workspace they work in** and count only what happens there: its videos, notes, links, invites, agents, tokens
 and apps.
 
@@ -97,7 +105,9 @@ each step the first time it sees it done, so deleting the video later doesn't ta
 | Step | Done when |
 |---|---|
 | sample | the person checked the sample's fix (*Looks right* or *Still wrong*) or answered its agent's question |
+| project | the workspace has a project (a top-level folder) that isn't archived and isn't only the sample's |
 | video | the library has a video that isn't the sample |
+| agent_video | a video (not the sample) that an agent is on: its own V1 (an agent's upload makes the new video its own) or one handed to it |
 | note | a note of the person's own (by account) on any video, the sample included |
 | agent | an agent connected for the person (over `/mcp` or `vr watch`; at the machine, any local agent), one of their API tokens or connected apps was used, or — at the machine — the live monitor saw an agent at work |
 | share | a review link they made (revoked ones count) |

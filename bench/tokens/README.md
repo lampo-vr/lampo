@@ -103,6 +103,18 @@ instead); a failure one line with the tool's last words (≤ 200 characters). On
 render goes on: 32. `SKILL.md` 1449 → 1490 (+41: step 3 says to render through `vr render`, and how to wait for a long
 one; budget 1450 → 1550). New budgets: `vr render`'s two lines 50, a still-rendering wait 36.
 
+One loop, told to the end (2026-10-07): agents connected after "use Lampo" read the folders, the playbook and their
+videos and stopped. The server's instructions now tell the whole loop in their first read — the project, V1, the
+playbook and notes, the next version, mark fixed, wait until the person approves — the way each kind of agent works it
+(`mcp/loop.ts`): 345 → 374 tokens for chat and desktop apps (MCP only, 1,391 characters), 440 for coding agents and the
+machine (`vr render` and `track_video` named, 1,590 and 1,610 characters; Claude Code cuts at 2,048). Sent once per
+connection: one loop 50985 → 51038 (+53). A read that leaves the agent nothing to do (`list_videos`, `list_folders`
+with nothing open, `get_open_notes` with nothing left) ends with one line, `Nothing waiting for you: put up any
+version you have, then call wait_for_feedback with since "<cursor>".`, 41 tokens (budget 45, as the hand-off line's);
+the fixture's reads have notes open, so they are unchanged (168, 22). The tool list 5718 → 5712 (lean 2932 → 2926:
+`mark_fixed`'s description no longer names `vr push`); `SKILL.md` 1490 → 1491 (MCP first, `vr render` for renders).
+New budgets: the instructions 480 tokens and 2,048 characters, the next-step line 45.
+
 The largest tools before: `add_note` 1605, `attach_preview` 657, `attach_reference` 598, `reply` 529,
 `propose_playbook_change` 484. After: `add_note` 796, `attach_preview` 431, `propose_playbook_change` 309,
 `attach_reference` 296, `set_render_source` 288.

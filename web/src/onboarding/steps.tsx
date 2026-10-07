@@ -8,16 +8,17 @@ import { PERSONAS, type SetupStep, setupStepsFor } from '../../../lib/setupFlow.
 import type { AuthStatus, MyWorkspace, Persona as PersonaKind, SetupAgent } from '../../../lib/types.ts';
 import { authKeys, useAgents, useAuthStatus } from '../api/auth.ts';
 import { api } from '../api/client.ts';
-import { useBilling, useBrowse, useInfo } from '../api/queries.ts';
+import { useBilling, useBrowse, useInfo, useLibrary } from '../api/queries.ts';
 import { useRenameWorkspace, workspacesKey } from '../api/workspaces.ts';
 import { perLang, t } from '../i18n/index.ts';
 import { T } from '../i18n/T.tsx';
+import { projectsOf } from '../lib/projects.ts';
 import { toast, toastError } from '../lib/toast.ts';
 import { I, type IconName } from '../ui/icons.tsx';
 import { AgentTiles, agentLabel, ConnectBlock, isPick, Mark, setupOf, useConnected, useConnectToast, useWhere } from './connect.tsx';
-import { finishSetup, linkVideos, useFolders, useOnboarding } from './data.ts';
+import { finishSetup, linkVideos, makeProject, useFolders, useOnboarding } from './data.ts';
 import { KG, Said, SampleKeys } from './parts.tsx';
-import { SceneAgent, SceneJoin, SceneLoop, ScenePersona, SceneRenders, SceneWorkspace, Switcher } from './pictures.tsx';
+import { SceneAgent, SceneJoin, SceneLoop, ScenePersona, SceneProject, SceneRenders, SceneWorkspace, Switcher } from './pictures.tsx';
 import type { StepProps } from './Setup.tsx';
 import { useFirstRun } from './state.ts';
 
@@ -93,8 +94,9 @@ export function Welcome({ frame, next, variant, steps, onSkip }: StepProps & { v
     cloud: [
       <T k="<0>Name</0> your workspace" key="1" tags={[(c) => <b>{c}</b>]} />,
       <T k="<0>Who</0> the videos are for" key="2" tags={[(c) => <b>{c}</b>]} />,
-      <T k="<0>Which agent</0> you use" key="3" tags={[(c) => <b>{c}</b>]} />,
-      <T k="<0>Who</0> works with you" key="4" tags={[(c) => <b>{c}</b>]} />,
+      <T k="<0>Your first project</0>, for your agent’s V1" key="3" tags={[(c) => <b>{c}</b>]} />,
+      <T k="<0>Which agent</0> you use" key="4" tags={[(c) => <b>{c}</b>]} />,
+      <T k="<0>Who</0> works with you" key="5" tags={[(c) => <b>{c}</b>]} />,
     ],
     local: [
       <T k="<0>Where</0> your exports land" key="1" tags={[(c) => <b>{c}</b>]} />,
@@ -109,7 +111,8 @@ export function Welcome({ frame, next, variant, steps, onSkip }: StepProps & { v
       <T k="<0>Name</0> the workspace" key="1" tags={[(c) => <b>{c}</b>]} />,
       <T k="<0>Check</0> the server" key="2" tags={[(c) => <b>{c}</b>]} />,
       <T k="<0>Invite</0> the team" key="3" tags={[(c) => <b>{c}</b>]} />,
-      <T k="<0>Connect</0> agents" key="4" tags={[(c) => <b>{c}</b>]} />,
+      <T k="<0>Your first project</0>, for your agent’s V1" key="4" tags={[(c) => <b>{c}</b>]} />,
+      <T k="<0>Connect</0> agents" key="5" tags={[(c) => <b>{c}</b>]} />,
     ],
     invited: [
       <T k="<0>Your agent</0>, connected in a line" key="1" tags={[(c) => <b>{c}</b>]} />,
@@ -376,6 +379,109 @@ export function Eyebrow({ id }: { id: SetupStep }) {
   );
 }
 
+// ---------------------------------------------------------------- the first project
+
+/**
+ * The first project, before the agent: the agent is told to use Lampo for it and puts up V1 there. Made at Continue
+ * (POST /api/folders, as the sidebar's New project); a project already there can be kept instead.
+ */
+export function ProjectStep({ frame, next, s, set, last }: StepProps) {
+  const qc = useQueryClient();
+  const projects = projectsOf(useLibrary().data);
+  const have = projects[0] ?? null;
+  const value = s.projectName ?? '';
+  const [err, setErr] = useState('');
+  const [shake, setShake] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (matchMedia('(pointer: fine)').matches) input.current?.focus({ preventScroll: true });
+  }, []);
+  const go = async () => {
+    const name = value.trim();
+    if (!name) {
+      if (have) {
+        set({ project: have });
+        return next();
+      }
+      setErr(t('Type a name first.'));
+      setShake((n) => n + 1);
+      input.current?.focus();
+      return;
+    }
+    setBusy(true);
+    try {
+      set({ project: await makeProject(qc, name) });
+      next();
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const shown = value.trim() || have || t('Spring launch');
+  return frame({
+    pictureId: 'project',
+    picture: <SceneProject name={shown} agent={agentLabel(s.agent)} />,
+    caption: t('Where your agent puts its versions.'),
+    body: (
+      <>
+        <div className="ob-su-head">
+          <Eyebrow id="project" />
+          <h1>{t('Start your first project')}</h1>
+          <p className="ob-lede">{t('One film, campaign or channel. Your agent puts its versions here, and every note stays on its frame.')}</p>
+        </div>
+        <form
+          className={`ob-fld ${err ? 'ob-bad' : ''}`}
+          noValidate
+          onSubmit={(e) => {
+            e.preventDefault();
+            void go();
+          }}
+        >
+          <label htmlFor="ob-project-name">{t('Project name')}</label>
+          <input
+            ref={input}
+            key={shake}
+            className={`ob-inp ob-big ${shake ? 'ob-shake' : ''}`}
+            id="ob-project-name"
+            name="project"
+            value={value}
+            placeholder={have ?? t('Spring launch')}
+            autoComplete="off"
+            spellCheck={false}
+            maxLength={120}
+            aria-describedby="ob-err-project ob-project-hint"
+            aria-invalid={err ? true : undefined}
+            onChange={(e) => {
+              set({ projectName: e.target.value });
+              if (err && e.target.value.trim()) setErr('');
+            }}
+            data-testid="ob-project-name"
+          />
+          <span className="ob-hint" id="ob-project-hint">
+            {have ? t('Leave it empty to go on with {name}.', { name: have }) : t('Rename it any time in the sidebar.')}
+          </span>
+        </form>
+        <div className="ob-su-acts ob-sticky">
+          <p className="ob-err" id="ob-err-project" role="alert">
+            {err || ' '}
+          </p>
+          <div className="ob-row2">
+            <button type="button" className="ob-lk" onClick={next} data-testid="ob-project-later">
+              {t('Later')}
+            </button>
+            <button type="button" className="ob-btn ob-go ob-lg" onClick={() => void go()} disabled={busy} data-testid="ob-next">
+              {last ? t('Go to the library') : t('Continue')}
+              <I name="right" size={15} className="ob-chev" />
+            </button>
+          </div>
+        </div>
+      </>
+    ),
+  });
+}
+
 // ---------------------------------------------------------------- who the videos are for
 
 const PERSONA_WORDS = perLang(
@@ -566,6 +672,8 @@ export function AgentStep({
     (['claude-code', 'codex', 'cursor', 'chatgpt', 'claude', 'other'] as SetupAgent[]).filter((k) => agents.some((a) => isPick(k, a.kind))),
   );
   const found = useFound(variant === 'local');
+  // the project it is told to use Lampo for: the one just made, else the newest there is
+  const projects = projectsOf(useLibrary().data);
   const setup = pick && pick !== 'none' && where ? setupOf(pick, where, null) : null;
   const live = !!setup?.live;
   // the moment it connects the loop plays over to V2 once; afterwards it rests there
@@ -620,7 +728,7 @@ export function AgentStep({
         </div>
         <AgentTiles value={pick} onPick={onPick} found={found} connectedKinds={connectedKinds} atMachine={variant === 'local'} />
         <div className="ob-reveal" ref={grow}>
-          {pick && where && <ConnectBlock pick={pick} where={where} connected={connected} />}
+          {pick && where && <ConnectBlock pick={pick} where={where} connected={connected} project={s.project ?? projects[0] ?? null} />}
         </div>
         <div className="ob-su-acts ob-sticky">
           <div className="ob-row2">
@@ -744,9 +852,7 @@ export function Renders({ frame, next, s, set }: StepProps) {
             }}
           />
         )}
-        <p className="ob-fine">
-          <T k="Agents can add videos too: <0>vr track out/film.mp4</0>" tags={[(c) => <code>{c}</code>]} />
-        </p>
+        <p className="ob-fine">{t('Your agent puts its exports up too, once you tell it to use Lampo.')}</p>
         <div className="ob-su-acts ob-sticky">
           <div className="ob-row2">
             <button type="button" className="ob-lk" onClick={next}>

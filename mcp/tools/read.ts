@@ -21,6 +21,7 @@ import {
   changedAt,
   framePosition,
   header,
+  idle,
   markedPicture,
   noteLines,
   ok,
@@ -66,14 +67,16 @@ export function registerReadingTools({ b, o, tool, openReview, me }: ToolKit): v
         reviews = reviews.filter((r) => matchesSession(r.session, who));
       }
       reviews.sort((a, c) => compareTime(c.updated, a.updated));
-      if (!reviews.length) return ok(text('No videos match.'));
+      // nothing open on any of them (or none at all): the answer ends with the next step (mcp/toolkit.ts)
+      const quiet = (answer: ReturnType<typeof ok>) => (reviews.some((r) => counts(r).open > 0 && b.stage(r).stage !== 'final') ? answer : idle(answer));
+      if (!reviews.length) return quiet(ok(text('No videos match.')));
       const lines = reviews.map((r) => {
         const n = counts(r);
         const st = b.stage(r);
         // Two lines per video, each its own: a file name, a folder, a session or a status can't start a third.
         return `${oneLine(r.video)}\n  ${oneLine(`v${r.versions.at(-1)?.v} · open ${n.open} (must ${n.must}) · fixed ${n.fixed} · done ${n.done} · folder ${r.folder || 'Unsorted'} · session ${r.session?.name || '-'}${r.agent_status ? ` · status "${r.agent_status.text}"` : ''} · stage ${st.stage} (${st.detail})${away(r) ? ' · archived' : ''}`)}`;
       });
-      return ok(text(lines.join('\n')));
+      return quiet(ok(text(lines.join('\n'))));
     },
   );
 
@@ -181,7 +184,10 @@ export function registerReadingTools({ b, o, tool, openReview, me }: ToolKit): v
         budget -= refs.filter((x) => x.type === 'image').length;
         content.push(...refs);
       }
-      return { ...ok(content), structuredContent: structured };
+      const answer = { ...ok(content), structuredContent: structured };
+      // nothing left to work on here (no work item, no idea, no pick to render with): the next step (mcp/toolkit.ts)
+      const left = b.stage(review).stage !== 'final' && review.comments.some((c) => (c.status === 'open' && (isRequired(c) || isIdea(c))) || picked(c));
+      return left ? answer : idle(answer);
     },
   );
 
@@ -327,7 +333,9 @@ export function registerReadingTools({ b, o, tool, openReview, me }: ToolKit): v
       });
       const unsorted = reviews.filter((r) => !r.folder).length;
       if (unsorted) lines.push(`Unsorted  (${unsorted})`);
-      return ok(text(lines.join('\n') || 'No folders yet.'));
+      const answer = ok(text(lines.join('\n') || 'No folders yet.'));
+      // nothing open anywhere (an empty project waits for its V1): the next step (mcp/toolkit.ts)
+      return reviews.some((r) => counts(r).open > 0 && b.stage(r).stage !== 'final') ? answer : idle(answer);
     },
   );
 }

@@ -42,8 +42,8 @@ test('a new owner starts with the first run: five steps, none done, a sample to 
   const s = await steps(owner);
   assert.deepEqual(
     s.steps.map((x: { id: string }) => x.id),
-    ['sample', 'video', 'agent', 'invite', 'share'],
-    'a self-hosted server’s owner: the first video before agents and invites',
+    ['project', 'agent', 'agent_video', 'invite', 'share'],
+    'agent work until said otherwise: a project, the agent, and the agent puts up V1; then the team',
   );
   assert.deepEqual(done(s), []);
   assert.deepEqual([s.sample, s.video, s.can_sample, s.plan, s.invited_by], [null, null, true, null, null]);
@@ -108,6 +108,12 @@ test('the sample is no video of the person’s: the video step stays open, the s
 });
 
 test('a note on the sample is no step of an owner’s; answering its agent’s question ticks “Try the sample”, and the tick is kept', async () => {
+  // reviewing with people first ("None yet" for the agent): the sample, a video of their own, the team, a link
+  const none = await request('PUT', '/api/onboarding', { body: { agent: 'none' }, ...as(owner) });
+  assert.deepEqual(
+    none.json().steps.map((x: { id: string }) => x.id),
+    ['sample', 'video', 'invite', 'share'],
+  );
   const r = await request('POST', `/api/review/${encodeURIComponent(sampleSlug)}/comments`, {
     body: { frame: 40, text: 'Let the opening settle a beat longer', severity: 'nice' },
     ...as(owner),
@@ -136,24 +142,20 @@ test('a real upload ticks “Add your first video”, and the steps go to it fro
   assert.equal(s.video.slug, realSlug);
 });
 
-test('a review link, an invite and an agent’s call tick the rest; then it is finished', async () => {
+test('a review link and an invite tick the rest; then it is finished', async () => {
   assert.equal((await request('POST', `/api/review/${encodeURIComponent(realSlug)}/shares`, { body: { label: 'Client' }, ...as(owner) })).status, 200);
   assert.deepEqual(done(await steps(owner)), ['sample', 'video', 'share']);
   const inv = await request('POST', '/api/admin/invites', { body: { role: 'reviewer' }, ...as(owner) });
   assert.equal(inv.status, 200, inv.text);
-  assert.deepEqual(done(await steps(owner)), ['sample', 'video', 'invite', 'share']);
-  // an agent talks to Lampo with the person's token (vr, an MCP client)
-  const tok = (await request('POST', '/api/auth/tokens', { body: { name: 'claude' }, ...as(owner) })).json().token;
-  assert.equal((await request('GET', '/api/library', { headers: { Authorization: `Bearer ${tok}` } })).status, 200);
   const s = await steps(owner);
-  assert.deepEqual(done(s), ['sample', 'video', 'agent', 'invite', 'share']);
+  assert.deepEqual(done(s), ['sample', 'video', 'invite', 'share']);
   assert.match(s.onboarding.complete, /^\d{4}-/);
 });
 
 test('a step done once stays done when what did it is gone', async () => {
   const del = await request('DELETE', `/api/library/${encodeURIComponent(realSlug)}`, as(owner));
   assert.equal(del.status, 200, del.text);
-  assert.deepEqual(done(await steps(owner)), ['sample', 'video', 'agent', 'invite', 'share']);
+  assert.deepEqual(done(await steps(owner)), ['sample', 'video', 'invite', 'share']);
 });
 
 test('put away and brought back; only the account’s own, never through the profile', async () => {
@@ -270,4 +272,39 @@ test('an admin invited into the server’s first workspace gets an invited teamm
   };
   assert.equal(await variant(cookieFrom(acc)), 'invited');
   assert.equal(await variant(owner), 'server', 'the owner who set the server up still gets its setup');
+});
+
+test('agent work: a member’s agent connects, and the video it is on ticks “puts up V1”; the sample never does', async () => {
+  const made = await request('POST', '/api/admin/invites', { body: { role: 'member', email: 'theo@example.com' }, ...as(owner) });
+  const token = /inv_[A-Za-z0-9_-]{32}/.exec(made.json().url)?.[0];
+  assert.ok(token, made.json().url);
+  const acc = await request('POST', '/api/auth/invite/accept', {
+    body: { token, name: 'Theo', email: 'theo@example.com', password: 'yet another fine password' },
+    headers: origin,
+  });
+  assert.equal(acc.status, 200, acc.text);
+  const theo = cookieFrom(acc);
+  const s = await steps(theo);
+  assert.deepEqual(
+    s.steps.map((x: { id: string }) => x.id),
+    ['agent', 'agent_video', 'share'],
+    'a member works in the team’s projects: its agent, its V1, a link',
+  );
+  assert.deepEqual(done(s), [], 'the sample has an agent on it, and is no video of theirs');
+  // an agent talks to Lampo with the person's token (vr, an MCP client)
+  const tok = (await request('POST', '/api/auth/tokens', { body: { name: 'claude' }, ...as(theo) })).json().token;
+  assert.equal((await request('GET', '/api/library', { headers: { Authorization: `Bearer ${tok}` } })).status, 200);
+  assert.deepEqual(done(await steps(theo)), ['agent']);
+  // a video that isn't an agent's yet ticks nothing; once its agent is on it, it does
+  const file = makeVideo(path.join(dir, 'in/teaser.mp4'), { dur: 1 });
+  const up = await tusUpload(request, file, { filename: 'teaser.mp4', folder: 'Launch' }, as(theo).headers);
+  assert.ok(up.status === 200 || up.status === 204, up.text);
+  const slug = (await request('GET', '/api/library', as(theo))).json().videos.find((v: { video: string }) => v.video.endsWith('/teaser.mp4')).slug;
+  assert.deepEqual(done(await steps(theo)), ['agent']);
+  const assign = await request('PUT', `/api/review/${encodeURIComponent(slug)}/session`, {
+    body: { name: 'claude-code · Theo', agent: 'claude-code' },
+    ...as(theo),
+  });
+  assert.equal(assign.status, 200, assign.text);
+  assert.deepEqual(done(await steps(theo)), ['agent', 'agent_video']);
 });

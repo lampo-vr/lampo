@@ -16,8 +16,8 @@ import { IconButton } from '../ui/primitives.tsx';
 
 /** Claude Code lists the server's `watch` prompt as this command (typing /mcp__lampo__watch runs it too). */
 export const WATCH_COMMAND = `/${MCP_NAME}:watch`;
-/** What any other agent is told instead: the prompt in a sentence (agent-facing, so in English). */
-export const WATCH_WORDS = 'Work on my Lampo notes, then keep calling wait_for_feedback until I say stop.';
+/** What any other agent is told instead: "use Lampo", the whole loop in a sentence (agent-facing, so in English). */
+export const WATCH_WORDS = 'Use Lampo: work my notes, then keep listening until I approve or say stop.';
 
 /** A connected agent's state, or `offline` when it isn't connected now; null where Lampo can't tell. */
 export type Listen = AgentListenState | 'offline';

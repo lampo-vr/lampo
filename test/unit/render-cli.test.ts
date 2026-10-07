@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
+import { WATCH_NOW_LINE } from '../../lib/handoff.ts';
 import type { AgentActivity } from '../../lib/types.ts';
 import { FFMPEG, isolatedEnv, makeVideo, tmpdir, until, type VrResult, vr, vrAsync } from '../lib/helpers.ts';
 
@@ -192,6 +193,44 @@ test('a video put up before: the render goes up as its next version (as vr push 
   assert.equal(linked.code, 1);
   assert.match(linked.err, /clip\.mp4 is linked to its file on this machine: render to it \(--out .*clip\.mp4\)/);
   assert.ok(!fs.existsSync(path.join(work, 'elsewhere.mp4')), 'nothing was rendered');
+});
+
+test('--folder: a new video’s V1 into a project, tracked where it is; then wait for the person', () => {
+  const r = run([
+    'render',
+    '--folder',
+    'Acme/Launch',
+    '--out',
+    'launch.mp4',
+    '--',
+    FFMPEG,
+    '-y',
+    '-i',
+    'src.mp4',
+    '-vf',
+    'hflip',
+    '-c:v',
+    'libx264',
+    '-pix_fmt',
+    'yuv420p',
+    'launch.mp4',
+  ]);
+  assert.equal(r.code, 0, r.err);
+  const lines = r.out.trim().split('\n');
+  assert.match(lines[0], /^V1 rendered in \d+s and put up for review in Acme\/Launch \(50 frames\)\.$/);
+  assert.equal(lines[1], WATCH_NOW_LINE);
+  const ls = JSON.parse(run(['ls', '--json'], env).out) as { video: string; v: number; folder: string | null }[];
+  const v1 = ls.find((x) => x.video === path.join(work, 'launch.mp4'));
+  assert.deepEqual([v1?.v, v1?.folder], [1, 'Acme/Launch'], 'linked where it lies, in the project');
+  // the next version is a re-render to that path
+  assert.equal(versions(path.join(work, 'launch.mp4')), 1);
+  // refused before anything runs: --folder with --to, without --out, without a name
+  const marker = path.join(work, 'ran-folder');
+  const touch = [process.execPath, '-e', `require('fs').writeFileSync(${JSON.stringify(marker)}, '')`];
+  assert.match(run(['render', '--folder', 'Acme', '--to', clip, '--out', clip, '--', ...touch]).err, /--to puts up a next version, --folder a new video's V1/);
+  assert.match(run(['render', '--folder', 'Acme', '--', ...touch]).err, /--folder needs --out/);
+  assert.match(run(['render', '--folder', ' / ', '--out', 'x.mp4', '--', ...touch]).err, /--folder names the project/);
+  assert.ok(!fs.existsSync(marker), 'nothing ran');
 });
 
 test('a failed render: the tool’s exit code, one line, the error in Lampo with its redacted words', () => {

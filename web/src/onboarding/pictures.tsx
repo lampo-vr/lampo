@@ -225,7 +225,7 @@ export function MiniLoop({ mode = 'cycle' }: { mode?: 'cycle' | 'v1' | 'v2' }) {
   );
 }
 
-export type StepPicKind = 'sample' | 'drop' | 'file' | 'video' | 'agent' | 'team' | 'share' | 'note' | 'approve';
+export type StepPicKind = 'sample' | 'drop' | 'file' | 'project' | 'video' | 'agent' | 'team' | 'share' | 'note' | 'approve';
 
 /** A keyframe on the picture's timeline lane, at a share of its length. */
 const Key = ({ at, shape = 'diamond', tone }: { at: number; shape?: Shape; tone?: string }) => (
@@ -249,6 +249,7 @@ export function StepPic({
   me = '',
   done,
   host,
+  name,
 }: {
   kind: StepPicKind;
   /** The person's own video, where the step is about it. */
@@ -264,6 +265,8 @@ export function StepPic({
   done?: boolean;
   /** share: the host the link opens on. */
   host?: string;
+  /** project: its name, once there is one. */
+  name?: string | null;
 }) {
   const still = (f: number) => (poster ? <img src={poster} alt="" decoding="async" /> : <span className="ob-smp-still" style={bg(f)} />);
   let thumb: ReactNode = null;
@@ -316,6 +319,15 @@ export function StepPic({
         <>
           <I name="upload" size={20} />
           <span>{t('Drop a video here')}</span>
+        </>
+      );
+      break;
+    case 'project':
+      slot = true;
+      thumb = (
+        <>
+          <I name={name ? 'folderOpen' : 'folderPlus'} size={20} />
+          <span>{name ?? t('Your project')}</span>
         </>
       );
       break;
@@ -764,6 +776,49 @@ export function SceneRenders({ path, files, picked }: { path: string; files: { n
       </span>
       <span className="ob-lt-l" style={{ left: 40, top: 104 + 46 + Math.min(6, files.length) * 26 + 22 }}>
         {t('Linked where it is · nothing copied')}
+      </span>
+    </>
+  );
+}
+
+/**
+ * The project step: the project as a folder on the table — its playbook and its notes — and the place its V1 lands,
+ * still empty: the agent puts it there.
+ */
+export function SceneProject({ name, agent }: { name: string; agent: string | null }) {
+  return (
+    <>
+      <Glow />
+      <svg className="ob-lt-svg" viewBox="0 0 640 520" aria-hidden="true">
+        <path className="ob-wire ob-on" d="M344 190 C380 190 372 234 404 234" />
+        <path className="ob-arrow ob-on" d="M402 229 l7 5 -7 5z" />
+      </svg>
+      <div className="ob-sheet ob-prev-dir" style={{ left: 40, top: 124 }}>
+        <div className="ob-dh">
+          <I name="folder" size={14} />
+          {name}
+        </div>
+        <ul>
+          <li className="ob-on">
+            <I name="film" size={13} />
+            <span>V1</span>
+            <small>{agent ? t('from {name}', { name: agent }) : t('from your agent')}</small>
+          </li>
+          <li>
+            <I name="playbook" size={13} />
+            <span>{t('Playbook')}</span>
+            <small>{t('brief · rules')}</small>
+          </li>
+          <li>
+            <I name="notes" size={13} />
+            <span>{t('Notes')}</span>
+            <small>{t('on exact frames')}</small>
+          </li>
+        </ul>
+      </div>
+      <div className="ob-fr ob-dashed" style={{ left: 412, top: 192, width: 180, height: 102 }} />
+      <span className="ob-lt-l" style={{ left: 412, top: 306 }}>
+        <b>V1</b> · {agent ? t('{name} puts it here', { name: agent }) : t('your agent puts it here')}
       </span>
     </>
   );

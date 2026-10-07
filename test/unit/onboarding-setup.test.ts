@@ -34,12 +34,13 @@ test('where a setup runs: the machine, a sign-up’s own workspace, the server�
 });
 
 test('the setup’s steps per variant; a channel alone has no team to invite', () => {
-  assert.deepEqual(setupStepsFor('cloud'), ['workspace', 'persona', 'agent', 'team']);
-  assert.deepEqual(setupStepsFor('cloud', ['creator']), ['workspace', 'persona', 'agent']);
-  assert.deepEqual(setupStepsFor('cloud', ['creator', 'agency']), ['workspace', 'persona', 'agent', 'team']);
-  assert.deepEqual(setupStepsFor('cloud', ['creator', 'other']), ['workspace', 'persona', 'agent', 'team'], 'something else may need a team');
-  assert.deepEqual(setupStepsFor('local'), ['renders', 'agent', 'try']);
-  assert.deepEqual(setupStepsFor('server'), ['workspace', 'health', 'team', 'agents']);
+  // the project before the agent: the agent is told to use Lampo for it, and puts up V1 there
+  assert.deepEqual(setupStepsFor('cloud'), ['workspace', 'persona', 'project', 'agent', 'team']);
+  assert.deepEqual(setupStepsFor('cloud', ['creator']), ['workspace', 'persona', 'project', 'agent']);
+  assert.deepEqual(setupStepsFor('cloud', ['creator', 'agency']), ['workspace', 'persona', 'project', 'agent', 'team']);
+  assert.deepEqual(setupStepsFor('cloud', ['creator', 'other']), ['workspace', 'persona', 'project', 'agent', 'team'], 'something else may need a team');
+  assert.deepEqual(setupStepsFor('local'), ['renders', 'agent', 'try'], 'the machine links its renders where they land');
+  assert.deepEqual(setupStepsFor('server'), ['workspace', 'health', 'team', 'project', 'agents']);
   assert.deepEqual(setupStepsFor('invited'), ['agent']);
 });
 
@@ -59,13 +60,18 @@ test('personas: the kinds apart from “something else”, the channel alone, th
 
 test('Get started’s order follows the personas in a sign-up’s workspace (Cloud) only', () => {
   const cloud = (personas?: Persona[]) => stepsFor('owner', { signupWorkspace: true, personas });
-  assert.deepEqual(cloud(), ['sample', 'agent', 'video', 'share', 'invite']);
-  assert.deepEqual(cloud(['agency']), ['sample', 'agent', 'video', 'share', 'invite']);
-  assert.deepEqual(cloud(['inhouse']), ['sample', 'agent', 'invite', 'video', 'share'], 'in-house teams invite before they upload');
-  assert.deepEqual(cloud(['agency', 'inhouse']), ['sample', 'agent', 'invite', 'video', 'share']);
-  assert.deepEqual(cloud(['creator']), ['sample', 'agent', 'video', 'share'], 'a channel alone invites nobody');
-  assert.deepEqual(stepsFor('owner', { personas: ['creator'] }), ['sample', 'video', 'agent', 'invite', 'share'], 'a self-hosted server ignores them');
-  assert.deepEqual(stepsFor('member', { signupWorkspace: true, personas: ['inhouse'] }), ['sample', 'agent', 'video', 'share']);
+  assert.deepEqual(cloud(), ['project', 'agent', 'agent_video', 'share', 'invite']);
+  assert.deepEqual(cloud(['agency']), ['project', 'agent', 'agent_video', 'share', 'invite']);
+  assert.deepEqual(cloud(['inhouse']), ['project', 'agent', 'agent_video', 'invite', 'share'], 'in-house teams invite before they share');
+  assert.deepEqual(cloud(['agency', 'inhouse']), ['project', 'agent', 'agent_video', 'invite', 'share']);
+  assert.deepEqual(cloud(['creator']), ['project', 'agent', 'agent_video', 'share'], 'a channel alone invites nobody');
+  assert.deepEqual(
+    stepsFor('owner', { signupWorkspace: true, personas: ['inhouse'], agent: 'none' }),
+    ['sample', 'video', 'invite', 'share'],
+    'no agent yet: people first',
+  );
+  assert.deepEqual(stepsFor('owner', { personas: ['creator'] }), ['project', 'agent', 'agent_video', 'invite', 'share'], 'a self-hosted server ignores them');
+  assert.deepEqual(stepsFor('member', { signupWorkspace: true, personas: ['inhouse'] }), ['agent', 'agent_video', 'share']);
 });
 
 test('the setup shows on a new account’s first visits until it is over; never on an account from before it', () => {

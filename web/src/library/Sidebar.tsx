@@ -5,7 +5,6 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import { type DragEvent, type ReactElement, type ReactNode, useEffect, useMemo, useState } from 'react';
-import { agentKindOfRef } from '../../../lib/agentKind.ts';
 import { archivedIn } from '../../../lib/archived.ts';
 import { useAuthStatus, useCan } from '../api/auth.ts';
 import { enc } from '../api/client.ts';
@@ -25,12 +24,10 @@ import { forgetGone, RECENT_SHOWN, useRecent } from '../lib/recent.ts';
 import { toast, toastError, toastUndo } from '../lib/toast.ts';
 import type { GetStartedProps } from '../onboarding/GetStarted.tsx';
 import { StartRow } from '../onboarding/Row.tsx';
-import { cardRun, LOOK, mostUrgent, phaseOf, type RunLike, shortLine } from '../sessions/runState.ts';
-import { SessionHover } from '../sessions/Sessions.tsx';
 import { LazyShareModal } from '../share/LazyShareModal.tsx';
 import { stageLabel } from '../status/stageText.ts';
 import { STAGE_SHAPE } from '../ui/glyphs.ts';
-import { AgentMark, I, type IconName } from '../ui/icons.tsx';
+import { I, type IconName } from '../ui/icons.tsx';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { ScrollArea } from '../ui/plain.tsx';
 import { Confirm, ContextMenu, IconButton, Menu, type MenuEntry } from '../ui/primitives.tsx';
@@ -173,7 +170,7 @@ const PendingRecent = ({ w }: { w: string }) => (
   </div>
 );
 const PENDING_WIDTHS = ['62%', '48%', '70%', '54%', '66%'];
-/** What agents are doing now (sessions/Live.tsx), for the Agents rows: loaded after the first paint. */
+/** The Agents section and what each agent is doing now (sessions/SidebarAgents.tsx, with Live.tsx): after the first paint. */
 const agentNow = loader(() => import('../sessions/Live.tsx'));
 
 /**
@@ -340,23 +337,8 @@ export function Sidebar({ videos: loaded, folders: all = NONE, archived = NO_ARC
     }
     return m;
   }, [folders, live]);
-  const sessions = useMemo(() => {
-    const m = new Map<string, { n: number; active: boolean; ref: NonNullable<VideoSummary['session']>; runs: RunLike[] }>();
-    for (const v of live) {
-      if (!v.session) continue;
-      const s = m.get(v.session.name) || { n: 0, active: false, ref: v.session, runs: [] };
-      s.n++;
-      s.active ||= !!v.sessionActive;
-      // its work on its videos: the row says the one that matters most (needs you, failed … before working)
-      const r = cardRun(v);
-      if (r) s.runs.push(r);
-      m.set(v.session.name, s);
-    }
-    return [...m.entries()].map(([name, s]) => [name, { ...s, run: mostUrgent(s.runs) }] as const).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [live]);
-  // What each agent is doing now, in its row: its code and data come after the first paint (the start's budget), and
-  // nothing shows until an agent does something.
-  const Now = useLoaded(agentNow, usePainted() && sessions.length > 0 && can('agents'));
+  // The agents, with what each does now: their code and data come after the first paint (the start's budget).
+  const Now = useLoaded(agentNow, usePainted());
 
   const create = async (parent: string, name: string) => {
     setEditing(null);
@@ -584,51 +566,7 @@ export function Sidebar({ videos: loaded, folders: all = NONE, archived = NO_ARC
             )}
           </div>
 
-          {sessions.length > 0 && (
-            <div className="nav-section">
-              <div className="nav-head">{t('Agents')}</div>
-              {sessions.map(([name, s]) => {
-                // with work going on (or ended badly), its state in a word or two and its glyph; else what it does now
-                const look = s.run ? LOOK[phaseOf(s.run)] : null;
-                return (
-                  <NavItem
-                    key={name}
-                    lead={<AgentMark kind={agentKindOfRef(s.ref)} size={15} />}
-                    label={
-                      <>
-                        {name}
-                        {s.run ? (
-                          <span className="nav-now" data-testid="agent-now-row" data-phase={phaseOf(s.run)}>
-                            {shortLine(s.run)}
-                          </span>
-                        ) : (
-                          Now && <Now.AgentNowText agent={name} idle={s.active ? t('ready') : null} />
-                        )}
-                      </>
-                    }
-                    count={s.n}
-                    countOf={t('video|videos', { n: s.n })}
-                    dot={
-                      look ? (
-                        <KeyGlyph shape={look.shape} className={`nav-kg run-kg ${look.tone}`} />
-                      ) : Now ? (
-                        <Now.AgentNowDot agent={name} active={s.active} />
-                      ) : (
-                        <KeyGlyph shape={s.active ? 'ease' : 'outline'} className={`nav-kg ${s.active ? 'live' : ''}`} />
-                      )
-                    }
-                    active={view.kind === 'session' && view.id === name}
-                    onClick={() => goView({ kind: 'session', id: name })}
-                    wrap={(row) => (
-                      <SessionHover session={s.ref} active={s.active} videos={s.n} side="right">
-                        {row}
-                      </SessionHover>
-                    )}
-                  />
-                );
-              })}
-            </div>
-          )}
+          {Now && <Now.SidebarAgents videos={live} view={view} Item={NavItem} />}
         </div>
       </ScrollArea>
 

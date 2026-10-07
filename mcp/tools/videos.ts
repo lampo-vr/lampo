@@ -40,7 +40,7 @@ const uploadPage = (slug: string | null, folder: string | null | undefined): str
   return f ? `#/folder/${encodeURIComponent(f)}` : '#/';
 };
 
-export function registerVideoTools({ b, o, tool, author, accountOf, byArg }: ToolKit): void {
+export function registerVideoTools({ b, o, tool, author, accountOf, byArg, me }: ToolKit): void {
   // Tracking a path only makes sense where the file is: stdio on this machine, or the local app over loopback.
   if (o.principal.via === 'local')
     tool(
@@ -131,10 +131,13 @@ export function registerVideoTools({ b, o, tool, author, accountOf, byArg }: Too
       async ({ filename, folder, video, part_at, handles }) => {
         const slug = video ? (await b.resolve(video)).slug : null;
         if (part_at !== undefined && !slug) throw new Error('a part needs the video it patches (video)');
+        // a new video the agent puts up (its V1) is assigned to it: the person's notes on it go to this agent
+        const who = slug ? null : me();
         const t = requestUpload({
           filename,
           folder,
           slug,
+          ...(who?.name ? { session: { name: who.name, sessionId: who.sessionId, ...(who.kind ? { agent: who.kind } : {}) } } : {}),
           ...(part_at !== undefined ? { part_at } : {}),
           ...(handles !== undefined ? { handles } : {}),
         });

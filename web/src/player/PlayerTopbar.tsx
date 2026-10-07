@@ -132,7 +132,6 @@ export const PlayerTopbar = memo(function PlayerTopbar({
       sessionActive={summary.sessionActive}
       sessionListening={summary.sessionListening}
       latestV={latestV}
-      uploaded={uploaded}
       home={home}
       canAsk={canAsk}
       canAssign={canAssign}

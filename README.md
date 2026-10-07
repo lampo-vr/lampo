@@ -215,58 +215,49 @@ to check a running instance.
 
 ## For agents
 
-Everything an agent needs is plain files and one CLI; the UI and the server don't have to run. The full reference is
+**Connect your agent, then tell it one sentence: "Use Lampo for <project>".** That is the whole loop: Lampo's MCP
+server tells every agent that connects what to do, in its first read. The full reference is
 [docs/agents.md](docs/agents.md) (every command, the MCP tools, the data format).
 
-- **`vr`** (on your PATH via `npm run link`): every read command but `vr prompt` takes `--json`, and paths in the
-  output are absolute, so screenshots open directly.
-- **MCP, for any agent** (Claude Code, Codex, Cursor, VS Code, Antigravity, Windsurf, Gemini CLI, Zed, …): the same actions as
-  tools, with the marked frames returned as images — over stdio (`bin/vr-mcp`) or Streamable HTTP at `/mcp` (the
-  local app, or a hosted server by signing in or with an API token). `vr mcp config <client>` prints a ready config
-  ([docs/mcp.md](docs/mcp.md)).
+### The loop
+
+1. **The project**: `list_folders`, the one the person named or the work belongs to (none: a new name becomes the
+   project with V1; several fit: ask once, with options).
+2. **V1**: no version there yet, the agent puts it up itself. It is its video from then on.
+3. **Read** the playbook and the taste (`get_playbook`, `get_taste`), then the open notes (`get_open_notes`; drawn
+   notes come with their frame, cropped).
+4. **Fix**, put up the next version, `mark_fixed` each note with what changed. Never verify: people do.
+5. **Wait** in `wait_for_feedback` with the last cursor, again after every answer, until the person approves (sign-off
+   is theirs) or says stop.
+
+Every answer says what comes next: a hand-off ends with `Now call wait_for_feedback with since "<cursor>"…`, a read
+that leaves nothing to do with `Nothing waiting for you: …`. The person sees the agent from its first call, in the
+sidebar's Agents and in Settings → Connect an agent. Claude Code's `/lampo:watch` is a shortcut for the same loop.
+
+### One way per kind of agent
+
+| The agent | Lampo through | A version goes up with |
+|---|---|---|
+| Claude, ChatGPT, Cursor's chat, any MCP client | MCP only | `request_upload` (one `PUT`) |
+| Claude Code, Codex | MCP | `vr render --to <video> --out <file> -- <render command>` (`--folder <project>` for V1): the person sees the progress |
+| the agent on the machine Lampo runs on | MCP (stdio or the app) | `track_video`, then re-renders to the same path |
+| scripts without MCP | `vr` (`npm run link`; `--json` on every read) | `vr render`, `vr push` |
+
+- **Connect:** Settings → Connect an agent gives each client its one snippet (or a chat app its connector address);
+  `vr mcp config <client>` prints the same ([docs/mcp.md](docs/mcp.md)): stdio (`bin/vr-mcp`) or Streamable HTTP at
+  `/mcp` (the local app, or a hosted server by signing in or with an API token).
 
   ```sh
   claude mcp add lampo -- /path/to/lampo/bin/vr-mcp
   vr mcp config codex   # or claude, cursor, vscode, antigravity, windsurf, gemini, zed, json
   ```
-- **Live feedback without polling:** the MCP tool `wait_for_feedback` returns new notes as they arrive (with a
-  cursor), and clients that listen for change notifications (`subscriptions/listen`, and over stdio also
-  `resources/subscribe`) hear when `vr://inbox` changes. `show_review` shows the review inline in hosts that render
-  MCP Apps.
-- **One command starts an agent:** an MCP client acts only when prompted, so it hears notes only while it waits.
-  `/lampo:watch` in Claude Code (the server's `watch` prompt) has it work what is assigned to it and keep listening;
-  the app shows whether each agent listens ([docs/mcp.md](docs/mcp.md#start-your-agent-it-hears-notes-only-while-it-listens)).
 - **Few tokens:** pictures only for notes with a drawing, cropped to it; only what changed when an agent hands back
   what it was told (`since`, `known`); a lean tool set on request (`VR_MCP_TOOLS=lean`). Measured in
   [bench/tokens](bench/tokens/README.md).
-- **An [Agent Skill](skills/lampo/SKILL.md)** teaches the whole loop to agents that load skills.
-- **A hosted server:** `vr login <url>` once, then every `vr` command and the MCP server work against it. Screenshots
-  are downloaded, so the printed paths still open like local files.
-
-### The loop
-
-1. The reviewer adds a render and assigns it to your session, or you put up your own:
-   `vr track <file> --me [--folder "Project/Sub"]` (on a server: `vr push <file>`).
-2. **Run `vr watch` under a Monitor** (or call the MCP tool `wait_for_feedback` in your loop). Inside a Claude Code
-   session it shows only videos assigned to *your* session: one line per new note (clients' notes too), reply, status
-   change, new render, approval, or `REQUEST` from the reviewer.
-3. **Before rendering, read the playbook and the taste file:** `vr playbook <video|folder>`, `vr taste <video|folder>`.
-4. `vr open <video>` lists the open notes, required work first. Look at the `marked` PNG first; `clean` is the
-   untouched frame. `IDEA` notes are the reviewer's optional suggestions: your call.
-5. Optional, for a long step: `vr status <video> "rendering v4" [--eta 90]` shows on the card. It clears when the
-   render lands.
-6. Re-render **to the same path** (or `vr push` it). It becomes the next version, and open notes carry forward with
-   `check_again: true`. Through `vr render --to <video> --out <file> -- <your render command>` the person watches the
-   render's progress in Lampo and you read two lines ([docs/agents.md](docs/agents.md#rendering-through-vr-render-the-person-sees-the-progress)). Render only a stretch when a note says `PART RENDER OK` (`vr push --part-at`; see
-   [docs/agents.md](docs/agents.md#partial-renders-only-when-a-note-says-part-render-ok)), never otherwise.
-7. `vr diff <video>` shows what actually changed on screen and whether cuts moved; compare it with what you intended.
-   `vr qa <video>` runs the same Auto-check the reviewer sees.
-8. `vr fix <id> --note "what changed, where"`. **Never set `verified`**: that is the reviewer's call. Questions go on
-   the frame: `vr add <video> --frame N --text "…" [--box x,y,w,h]` (a question by default; `--kind info` to say what
-   you changed). The answer arrives as `ANSWERED` in `vr watch`. Never file your own notes as must/should/nice.
-9. Working in a project (After Effects, Premiere, Resolve…)? Show fixes before rendering: `vr source <video> --app
-   "After Effects" --comp Main` once, then per note `vr preview <id> <still.png> --fixed --note "…"`, and render once
-   when the batch is done; the new render is compared with each preview. See [docs/agents.md](docs/agents.md).
+- **An [Agent Skill](skills/lampo/SKILL.md)** teaches the same loop to agents that load skills.
+- **A hosted server:** `vr login <url>` once, then every `vr` command and the stdio MCP server work against it.
+  Screenshots are downloaded, so the printed paths still open like local files. `show_review` shows the review inline
+  in hosts that render MCP Apps.
 
 On your machine, `data/INBOX.md` is the one file for "what did the reviewer say since last time": the newest 150
 events from people, newest first, tagged `→ <session>`. `vr inbox --mine [--since <iso>]` gives the same as lines,

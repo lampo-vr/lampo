@@ -4227,12 +4227,14 @@ export interface UserPrefs {
 }
 
 /**
- * A step of the first run's Get started; which ones an account has depends on its role, where the app runs and the
- * workspace's personas (lib/onboarding.ts stepsFor). `sample`: the sample's fix checked or its question answered.
- * `workspace`, `note` and `check` are no longer listed (the setup names the workspace, the sample teaches notes and
- * checks) but stay readable in accounts that recorded them.
+ * A step of the first run's Get started; which ones an account has depends on its role, where the app runs, the
+ * workspace's personas and whether the person works with an agent (lib/onboarding.ts stepsFor). `sample`: the sample's
+ * fix checked or its question answered. `project`: a project of its own (a top-level folder). `agent_video`: a video an
+ * agent is on — put up by the agent itself (its V1 is assigned to it) or handed to one. `workspace`, `note` and `check`
+ * are no longer listed (the setup names the workspace, the sample teaches notes and checks) but stay readable in
+ * accounts that recorded them.
  */
-export type OnboardingStep = 'sample' | 'workspace' | 'video' | 'note' | 'agent' | 'share' | 'invite' | 'check' | 'approve';
+export type OnboardingStep = 'sample' | 'workspace' | 'project' | 'video' | 'note' | 'agent' | 'agent_video' | 'share' | 'invite' | 'check' | 'approve';
 
 /** The agent a person picked in the setup (web/src/onboarding/), or `none` (none yet). */
 export type SetupAgent = 'claude-code' | 'codex' | 'cursor' | 'chatgpt' | 'claude' | 'other' | 'none';

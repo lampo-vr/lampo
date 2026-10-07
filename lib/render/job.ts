@@ -11,8 +11,9 @@ import type { ActivityRecord, ActivitySink } from '../activity.ts';
 import { type ActivityKey, excerpt, words } from '../activityText.ts';
 import type { Backend } from '../backend/types.ts';
 import { stillOpenLine, WATCH_NOW_LINE } from '../handoff.ts';
-import { isoLocal } from '../paths.ts';
+import { isoLocal, slugify } from '../paths.ts';
 import { probe } from '../probe.ts';
+import type { SessionInput } from '../store.ts';
 import { isRequired, oneLine } from '../time.ts';
 import type { ActivityWords, AgentActivityKind, Review, RunProgress } from '../types.ts';
 import { etaOf } from './eta.ts';
@@ -30,6 +31,11 @@ export interface RenderJob {
   /** The video it becomes the next version of: its slug, the number it will get, and whether `out` is the very file
    * tracked on this machine (then it is registered where it is). */
   to: { slug: string; next: number; same: boolean } | null;
+  /**
+   * Or a new video's V1 (`--folder`): the project (or folder) it goes into, and the agent's own session it is assigned
+   * to (inside a Claude Code session, as `vr track --me` does). Never both `to` and `into`.
+   */
+  into?: { folder: string; session?: SessionInput | null } | null;
   /** The agent it reports as; null for a person's own `vr render` (nothing is recorded). */
   agent: string | null;
   /** The author of the version (`vr push`'s `--by`). */
@@ -89,11 +95,11 @@ const probeInput = async (file: string) => {
 
 export async function executeRender(job: RenderJob, hooks: RenderHooks): Promise<RenderOutcome> {
   const { sink } = hooks;
-  const v = job.to?.next ?? null;
+  const v = job.to?.next ?? (job.into ? 1 : null);
   const told = !!(sink && job.agent);
   const say = (kind: AgentActivityKind, w: ActivityWords, more: Partial<ActivityRecord> = {}) => {
     if (!sink || !job.agent) return;
-    sink.record({ ...w, ...more, kind, at: isoLocal(), agent: job.agent, target: more.target ?? null, video: job.to?.slug ?? null });
+    sink.record({ ...w, ...more, kind, at: isoLocal(), agent: job.agent, target: more.target ?? null, video: more.video ?? job.to?.slug ?? null });
   };
 
   // ---- progress: per stage, its own ETA; to Lampo at most every `every` ms. A new stage goes at once, after the last
@@ -179,6 +185,7 @@ export async function executeRender(job: RenderJob, hooks: RenderHooks): Promise
     const why = `it finished, but ${path.basename(job.out)} isn't there: check --out`;
     return fail(1, why, why, words('Stopped with an error', undefined, why));
   }
+  if (job.into) return putUpNew(job, job.into, { hooks, elapsed, frames, sees, say, report, latest });
   if (!job.to) {
     say('render', words('Rendered in {time}', { time: elapsed }));
     const what = job.outShown ? ` ${job.outShown}` : '';
@@ -236,5 +243,60 @@ export async function executeRender(job: RenderJob, hooks: RenderHooks): Promise
       `V${got} rendered in ${elapsed} and put up for review${n ? ` (${n} frames)` : ''}.${open ? ' Now mark each note fixed.' : ''}`,
       open ? stillOpenLine(open) : WATCH_NOW_LINE,
     ],
+  };
+}
+
+/**
+ * `--folder`: the render becomes a new video's V1 in that project — on this machine tracked where it is (re-render to
+ * the same path for V2), on a server uploaded — assigned to the agent's own session when it runs in one. One line and
+ * the hand-off line, as for a next version.
+ */
+async function putUpNew(
+  job: RenderJob,
+  into: NonNullable<RenderJob['into']>,
+  ctx: {
+    hooks: RenderHooks;
+    elapsed: string;
+    frames: number | undefined;
+    sees: string;
+    say: (kind: AgentActivityKind, w: ActivityWords, more?: Partial<ActivityRecord>) => void;
+    report: (r: Reading, b?: number, force?: boolean) => void;
+    latest: { p: RunProgress | null };
+  },
+): Promise<RenderOutcome> {
+  const b = ctx.hooks.backend;
+  const out = job.out as string;
+  let review: Review;
+  try {
+    if (b.kind === 'local') {
+      ctx.report({ stage: 'checking', pct: null }, undefined, true);
+      review = (await b.track(out, { by: job.by, folder: into.folder, ...(into.session ? { session: into.session } : {}) })).review;
+    } else {
+      ctx.report({ stage: 'uploading', pct: 0 }, undefined, true);
+      const r = await b.push(out, {
+        by: job.by,
+        folder: into.folder,
+        onProgress: (sent, total) => {
+          if (sent >= total) ctx.report({ stage: 'checking', pct: null });
+          else ctx.report({ stage: 'uploading', pct: total > 0 ? (sent / total) * 100 : null });
+        },
+      });
+      review = r.review;
+      if (into.session && r.created) await b.assign(slugify(review.video), into.session, job.by);
+    }
+  } catch (e) {
+    const why = redact(oneLine((e as Error).message)).slice(0, ERROR_MAX);
+    ctx.say('error', words('Stopped with an error', undefined, why), ctx.latest.p ? { progress: ctx.latest.p } : {});
+    return { ok: false, code: 1, lines: [oneLine(`Rendered in ${ctx.elapsed}, but putting it up failed: ${why.replace(/[.\s]+$/, '')}.${ctx.sees}`)] };
+  }
+  const ver = review.versions.at(-1);
+  const got = ver?.v ?? 1;
+  ctx.say('upload', words('Put a new version up for review'), { target: `v${got}`, video: slugify(review.video) });
+  const n = ver?.frames ?? ctx.frames;
+  return {
+    ok: true,
+    code: 0,
+    v: got,
+    lines: [oneLine(`V${got} rendered in ${ctx.elapsed} and put up for review in ${review.folder || 'Unsorted'}${n ? ` (${n} frames)` : ''}.`), WATCH_NOW_LINE],
   };
 }

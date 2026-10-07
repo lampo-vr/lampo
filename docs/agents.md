@@ -3,19 +3,46 @@
 This page is for the agent's side: how Claude Code, Codex, a script or any other MCP client gets the notes people pin
 to frames, fixes them and answers. The README's [For agents](../README.md#for-agents) section is the short version.
 
-There are three ways in. All of them read and write the same notes, and every write is locked and atomic, so the app,
-several agents and the CLI can work at the same time.
+## The loop, in one list
 
-| Way in | Use it when | How to start |
+The person connects their agent (Settings → Connect an agent: one snippet) and tells it one sentence: **Use Lampo for
+"<project>"**. That is all an agent needs: the MCP server's instructions carry the loop, read when it connects, and
+Claude Code's `/lampo:watch` is a shortcut that says the same.
+
+1. **The project.** `list_folders`: the project the person named, or the one this work belongs to. None fits: a new
+   name becomes the project with V1. Several fit: ask once, with the options.
+2. **V1.** No version there yet: the agent puts it up itself. The new video is its own: the person's notes on it are
+   sent to that agent.
+3. **Read** `get_playbook` (and `get_taste`) before rendering, then `get_open_notes`.
+4. **Fix**, put up the next version of the same video, then `mark_fixed` each note with what changed. Never verify.
+5. **Wait**: `wait_for_feedback` with the cursor the last answer gave, and again after every answer, until the person
+   approves (sign-off is theirs) or says stop. Work what it hands you the same way.
+
+No answer leaves the agent without a next step: a hand-off (a version put up, the last note fixed) ends with `Now call
+wait_for_feedback with since "<cursor>"…`, and a read that leaves nothing to do (`list_videos` or `list_folders` with
+nothing open, `get_open_notes` with nothing left) ends with `Nothing waiting for you: put up any version you have, then
+call wait_for_feedback with since "<cursor>".` The person sees the agent from its first call: in the sidebar's Agents
+("Claude Code · connected", then "ready" while it waits for their notes) and in Settings → Connect an agent.
+
+## One way per kind of agent
+
+| The agent | Talks to Lampo through | Puts up a version with |
 |---|---|---|
-| **The `vr` command** | the agent has a shell (Claude Code, Codex, scripts) | `npm run link` links `vr` into `~/.local/bin` (it makes the folder, and says when your shell needs it on its PATH) |
-| **MCP** | the agent speaks MCP (Claude Code, Codex, Cursor, VS Code, …) | Settings → Connect an agent, or `vr mcp config <client>` ([mcp.md](mcp.md)) |
-| **Files** | reading only, on the machine the notes live on | the `data/` folder ([data-format.md](data-format.md)) |
+| **Chat and desktop apps**: Claude, ChatGPT, Cursor's chat, any other MCP client | MCP only: its instructions name no command | `request_upload`: one `PUT` to the URL it gives (a new video with `folder`, its next version with `video`) |
+| **Coding agents**: Claude Code, Codex | MCP for everything | `vr render --to <video> --out <file> -- <your render command>` (V1: `--folder <project>` instead of `--to`): the person sees the render's progress, and it puts the file up. Without `vr`: `request_upload` |
+| **The agent on the machine Lampo runs on** (stdio, or `/mcp` from that machine) | MCP | `track_video` puts a render up where it is; the next version is a re-render to the same path, through `vr render` |
+| **Scripts and agents without MCP** | the `vr` command: `npm run link` links it into `~/.local/bin` | `vr render`, `vr push`, `vr track` ([below](#the-loop-with-vr)) |
 
-On your own machine, `vr` and the MCP server work on the files directly, so the app doesn't have to run. After
-`vr login` they work against a hosted server instead ([below](#working-against-a-hosted-server)).
+Lampo tells each kind its own way (the instructions by the client's own name). All of them read and write the same
+notes, and every write is locked and atomic, so the app, several agents and the CLI can work at the same time; on the
+machine the notes live on, the `data/` folder can also be read directly ([data-format.md](data-format.md)). On your own
+machine, `vr` and the MCP server work on the files directly, so the app doesn't have to run. After `vr login` they work
+against a hosted server instead ([below](#working-against-a-hosted-server)). How to connect each client:
+[mcp.md](mcp.md).
 
-## The loop
+## The loop with `vr`
+
+For a script or an agent that has a shell but no MCP connection. An agent connected over MCP follows the list above.
 
 1. **Get the render under review.** The reviewer adds it in the app and assigns it to your agent, or you put it up
    yourself:
@@ -38,11 +65,9 @@ On your own machine, `vr` and the MCP server work on the files directly, so the 
    [14:05:40] REQUEST launch.mp4 →launch-edit v1 from alex — "Work through all open notes"
    ```
 
-   Inside a Claude Code session it shows only the videos assigned to that session. Over MCP, call `wait_for_feedback`
-   instead, and again after every answer: you hear new notes only while you wait, and the app shows the person whether
-   you listen. The person starts you with the server's `watch` prompt (`/lampo:watch` in Claude Code); when you connect,
-   offer to start listening. Don't poll `vr open` or `vr ls` in a loop: a watcher costs nothing until something
-   happens.
+   Inside a Claude Code session it shows only the videos assigned to that session. Over MCP it is `wait_for_feedback`,
+   again after every answer (the list above). Don't poll `vr open` or `vr ls` in a loop: a watcher costs nothing until
+   something happens.
 
 3. **Read the playbook and the taste before you render.** The playbook is what the team decided on purpose, the taste
    is what the notes taught so far ([Playbook and taste](#playbook-and-taste)).
@@ -748,6 +773,10 @@ V4 rendered in 3m12s and put up for review (900 frames). Now mark each note fixe
 - **Stages:** bundling → rendering → encoding → uploading → checking; the percentage starts again at each. The time
   left comes from the rate over the last ten seconds, and is left out for the first 5 % of a stage and while the rate
   swings by more than half.
+- **A new video's V1**: `--folder <project>` instead of `--to` (with `--out`) puts the file up as a new video in that
+  project, made with it when it is new: tracked where it lies on the machine (re-render to that path for V2), uploaded
+  to a server, and assigned to your own Claude Code session when you run in one. `V1 rendered in 1m04s and put up for
+  review in Spring launch (240 frames).` and the hand-off line.
 - **On success** with `--to`, `--out` becomes the next version: a video linked to its file on this machine is
   registered where it is (render to that file: another `--out` is refused before anything runs), anything else goes up
   as `vr push --to` does, against a server with the upload's progress. Then one line, and the line that says what to do
@@ -936,8 +965,11 @@ cropped to the drawing, so the model sees exactly what was drawn. It runs over s
   proxy means it never reached Lampo (a chat app's sandbox allows only some domains): ask the person to allow the URL's
   host in their client's network settings, or give them the app link the answer ends with, where they upload it
   themselves ([mcp.md](mcp.md#claude-and-chatgpt)).
-- The `watch` prompt (`/lampo:watch` in Claude Code) is the person's one command for "work my notes and keep listening"
-  ([mcp.md](mcp.md#start-your-agent-it-hears-notes-only-while-it-listens)).
+- "Use Lampo" is enough: the instructions tell the whole loop the way this kind of agent works it
+  ([One way per kind of agent](#one-way-per-kind-of-agent)). The `watch` prompt (`/lampo:watch` in Claude Code) is a
+  shortcut for it ([mcp.md](mcp.md#start-your-agent-it-hears-notes-only-while-it-listens)).
+- A read that leaves you nothing to do ends with the next step (`Nothing waiting for you: …`), never with silence.
+- A new video you put up with `request_upload` is yours: it is assigned to you from V1 on.
 - Hand back what an answer gave you (`get_open_notes` with `since`, `get_playbook` and `get_taste` with `known`) and
   you read only what changed.
 

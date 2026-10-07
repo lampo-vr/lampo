@@ -1,11 +1,12 @@
 // Connecting an agent, one block for every place that offers it (the setup's agent step on Cloud, at the machine and on
 // a self-hosted server, and Get started's agent step): the tiles to pick it, the one snippet it needs for this app
-// (lib/mcpConfig.ts, the same Settings → Connect an agent and `vr mcp config` hand out) with Copy, and its live status
-// from the connected-agents registry (GET /api/agents, refetched when the `sessions` event says one arrived: every
-// client over /mcp and every `vr watch` announces itself). Copy-only: nothing here writes an agent's configuration.
+// (lib/mcpConfig.ts, the same Settings → Connect an agent and `vr mcp config` hand out) with Copy, the one sentence
+// that sets it to work ("Use Lampo for <project>": the whole loop), and its live status from the connected-agents
+// registry (GET /api/agents, refetched when the `sessions` event says one arrived: every client over /mcp and every
+// `vr watch` announces itself). Copy-only: nothing here writes an agent's configuration.
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { BRAND_NAME } from '../../../lib/brand.ts';
-import { MCP_NAME, type McpTarget, mcpSnippet } from '../../../lib/mcpConfig.ts';
+import { lampoFor, MCP_NAME, type McpTarget, mcpSnippet } from '../../../lib/mcpConfig.ts';
 import { compareTime } from '../../../lib/time.ts';
 import type { AgentKind, ConnectedAgent, SetupAgent } from '../../../lib/types.ts';
 import { useAgents, useAuthStatus, useTokenActions } from '../api/auth.ts';
@@ -14,7 +15,6 @@ import { perLang, t } from '../i18n/index.ts';
 import { T } from '../i18n/T.tsx';
 import { ago } from '../lib/format.ts';
 import { toast, toastError } from '../lib/toast.ts';
-import { WATCH_COMMAND, WATCH_WORDS } from '../sessions/listening.tsx';
 import { AgentMark } from '../ui/icons.tsx';
 import { Cmd, KG, Live, OIcon, Said } from './parts.tsx';
 
@@ -226,6 +226,7 @@ export function ConnectBlock({
   testid = 'ob-connect',
   headless,
   more,
+  project = null,
 }: {
   pick: SetupAgent;
   where: Where;
@@ -233,6 +234,8 @@ export function ConnectBlock({
   testid?: string;
   headless?: boolean;
   more?: ReactNode;
+  /** The project the agent is told to use Lampo for (null: "this project", the one it works in). */
+  project?: string | null;
 }) {
   const [token, setToken] = useState<string | null>(null);
   const [useToken, setUseToken] = useState(false);
@@ -317,13 +320,19 @@ export function ConnectBlock({
           <Cmd text={headless && s.code.startsWith('{') ? s.code.replace(/\n\s*/g, ' ') : s.code} testid="ob-snippet" />
         </div>
       )}
-      {s.live && pick !== 'claude' && pick !== 'chatgpt' && (
+      {(s.code || s.steps) && (
         <div className="ob-block" data-testid="ob-start">
           <div className="ob-block-h">
-            <span>{pick === 'claude-code' ? t('Then start it: type this in Claude Code') : t('Then start it: tell it')}</span>
+            <span>{t('Then tell it')}</span>
           </div>
-          <Cmd text={pick === 'claude-code' ? WATCH_COMMAND : WATCH_WORDS} testid="ob-start-cmd" />
-          <p className="ob-fine">{t('An agent acts only when you tell it to: this has it work the notes assigned to it, then keep listening for new ones.')}</p>
+          <Cmd text={lampoFor(project)} testid="ob-start-cmd" />
+          {!headless && (
+            <p className="ob-fine">
+              {t(
+                'That one sentence is the whole loop: it finds the project, puts up V1 itself, works your notes and keeps waiting for the next ones until you approve.',
+              )}
+            </p>
+          )}
         </div>
       )}
       {s.notes.length > 0 && (

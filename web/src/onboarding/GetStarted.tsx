@@ -12,6 +12,7 @@
 // its styles come with it (styles/getstarted.css): it never leans on another chunk's stylesheet.
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { lampoFor } from '../../../lib/mcpConfig.ts';
 import { compareTime } from '../../../lib/time.ts';
 import type { OnboardingResponse, OnboardingStep, Role, SetupAgent, ShareInfo } from '../../../lib/types.ts';
 import { pageLang, useAuthStatus, useCan } from '../api/auth.ts';
@@ -22,10 +23,11 @@ import { t } from '../i18n/index.ts';
 import { T } from '../i18n/T.tsx';
 import { loader, useLoaded } from '../lib/lazy.ts';
 import { posterUrl } from '../lib/posterUrl.ts';
+import { projectsOf } from '../lib/projects.ts';
 import { toast, toastError } from '../lib/toast.ts';
 import { I } from '../ui/icons.tsx';
 import { AGENTS, agentLabel, ConnectBlock, Mark, PickIcon, seenLine, useConnected, useWhere } from './connect.tsx';
-import { linkVideos, makeSample, onboardingKey, pickAgent, removeSample, setHidden, useFolders, useOnboarding } from './data.ts';
+import { linkVideos, makeProject, makeSample, onboardingKey, pickAgent, removeSample, setHidden, useFolders, useOnboarding } from './data.ts';
 import { fromMenu, SideRow } from './Panel.tsx';
 import { Cmd, CopyButton, isEmail, KG, Live, OIcon, SampleKeys, Track } from './parts.tsx';
 import { StepPic } from './pictures.tsx';
@@ -132,6 +134,10 @@ export function titleOf(id: OnboardingStep, agent: SetupAgent | null | undefined
       return t('Approve a version');
     case 'workspace':
       return t('Name your workspace');
+    case 'project':
+      return t('Start your first project');
+    case 'agent_video':
+      return agentLabel(agent) ? t('{name} puts up V1', { name: agentLabel(agent) ?? '' }) : t('Your agent puts up V1');
   }
 }
 
@@ -456,8 +462,12 @@ export function Pane({ id, ctx }: { id: OnboardingStep; ctx: PaneCtx }) {
   switch (id) {
     case 'sample':
       return <SamplePane ctx={ctx} />;
+    case 'project':
+      return <ProjectPane ctx={ctx} />;
     case 'agent':
       return <AgentPane ctx={ctx} />;
+    case 'agent_video':
+      return <AgentVideoPane ctx={ctx} />;
     case 'video':
       return ctx.upload ? <UploadPane ctx={ctx} /> : <LinkPane ctx={ctx} />;
     case 'share':
@@ -540,6 +550,7 @@ function SamplePane({ ctx }: { ctx: PaneCtx }) {
 function AgentPane({ ctx }: { ctx: PaneCtx }) {
   const qc = useQueryClient();
   const where = useWhere();
+  const projects = projectsOf(useLibrary().data);
   const pick = ctx.agent;
   const connected = useConnected(pick);
   const label = agentLabel(pick) ?? '';
@@ -586,6 +597,7 @@ function AgentPane({ ctx }: { ctx: PaneCtx }) {
         pick={pick}
         where={where}
         connected={connected}
+        project={projects[0] ?? null}
         headless
         more={
           <button type="button" className="ob-lk" onClick={() => pickAgent(qc, 'none').catch(toastError)} data-testid="ob-agent-change">
@@ -593,6 +605,164 @@ function AgentPane({ ctx }: { ctx: PaneCtx }) {
           </button>
         }
       />
+    </Step>
+  );
+}
+
+/** The first project: a name and Create (as the sidebar's New project); the agent is told to use Lampo for it. */
+function ProjectPane({ ctx }: { ctx: PaneCtx }) {
+  const qc = useQueryClient();
+  const projects = projectsOf(useLibrary().data);
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const make = async () => {
+    if (!name.trim()) return;
+    setBusy(true);
+    try {
+      const made = await makeProject(qc, name);
+      setName('');
+      toast(t('{name} is ready for your agent', { name: made }), 'ok');
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const id = `ob-gs-project-${ctx.where}`;
+  return (
+    <Step
+      title={t('Start your first project')}
+      lede={t('One film, campaign or channel. Your agent puts its versions here, and every note stays on its frame.')}
+      said={ctx.done && <DoneNote>{projects[0] ? t('{name} is ready: your agent puts its V1 there.', { name: projects[0] }) : t('Done.')}</DoneNote>}
+      pic={<StepPic kind="project" name={projects[0] ?? null} />}
+    >
+      {!ctx.done && (
+        <form
+          className="ob-gs-inline"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void make();
+          }}
+        >
+          <label className="sr-only" htmlFor={id}>
+            {t('Project name')}
+          </label>
+          <input
+            id={id}
+            className="input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t('Spring launch')}
+            autoComplete="off"
+            spellCheck={false}
+            maxLength={120}
+            data-testid="ob-gs-project-name"
+          />
+          <button type="submit" className="ob-btn ob-raised" disabled={busy || !name.trim()} data-testid="ob-gs-project-make">
+            <I name="folderPlus" size={14} />
+            {t('Create project')}
+          </button>
+        </form>
+      )}
+    </Step>
+  );
+}
+
+/**
+ * The agent puts up V1: the one sentence that sets it to work, for the newest project, and where it stands — connected,
+ * waiting for its render — until its version lands (the step ticks). Adding a video yourself is the second choice; the
+ * sample fills the wait.
+ */
+function AgentVideoPane({ ctx }: { ctx: PaneCtx }) {
+  const qc = useQueryClient();
+  const where = useWhere();
+  const pick = ctx.agent && ctx.agent !== 'none' ? ctx.agent : null;
+  const connected = useConnected(pick);
+  const project = projectsOf(useLibrary().data)[0] ?? null;
+  const name = agentLabel(pick) ?? t('your agent');
+  const [making, setMaking] = useState(false);
+  const sample = async () => {
+    if (ctx.sample) {
+      location.hash = sampleHref(ctx.sample);
+      return;
+    }
+    setMaking(true);
+    try {
+      location.hash = `#/v/${encodeURIComponent(await makeSample(qc))}`;
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setMaking(false);
+    }
+  };
+  if (ctx.done)
+    return (
+      <Step
+        title={titleOf('agent_video', pick, ctx.upload)}
+        mark={pick ? <Mark id={pick} size={16} /> : undefined}
+        lede={t('Pin your notes on its frames and send them: they go to {agent}, and it puts up the next version.', { agent: name })}
+        acts={
+          ctx.video && (
+            <a className="ob-btn ob-raised" href={`#/v/${encodeURIComponent(ctx.video.slug)}`} data-testid="ob-open-v1">
+              {t('Open {name}', { name: ctx.video.name })}
+            </a>
+          )
+        }
+        said={<DoneNote>{ctx.video ? t('{name} is in review.', { name: ctx.video.name }) : t('Done.')}</DoneNote>}
+        pic={
+          ctx.poster ? (
+            <StepPic kind="video" poster={ctx.poster} badge={ctx.badge} />
+          ) : (
+            <StepPic kind="agent" on mark={pick ? <Mark id={pick} size={12} /> : null} />
+          )
+        }
+      />
+    );
+  const state = connected?.state;
+  return (
+    <Step
+      title={titleOf('agent_video', pick, ctx.upload)}
+      mark={pick ? <Mark id={pick} size={16} /> : undefined}
+      lede={
+        project
+          ? t('Tell it this. It renders, puts up V1 in {project} and waits for your notes.', { project })
+          : t('Tell it this. It renders, puts up V1 in a project and waits for your notes.')
+      }
+      acts={
+        <>
+          {ctx.add && (
+            <button type="button" className="ob-btn" onClick={ctx.add} data-testid="ob-act-video">
+              <I name={ctx.upload ? 'upload' : 'plus'} size={14} />
+              {t('Add a video yourself')}
+            </button>
+          )}
+          {(ctx.sample || ctx.canSample) && (
+            <button type="button" className="ob-lk" onClick={() => void sample()} disabled={making} data-testid="ob-v1-sample">
+              {making ? t('Making the sample…') : t('Meanwhile: try the sample')}
+            </button>
+          )}
+        </>
+      }
+      pic={<StepPic kind="agent" on={!!connected} mark={pick ? <Mark id={pick} size={12} /> : null} />}
+    >
+      <Cmd text={lampoFor(project)} testid="ob-v1-tell" />
+      {pick && where && (
+        <Live
+          compact
+          on={!!connected}
+          label={agentLabel(pick) ?? t('your MCP client')}
+          sub={
+            !connected
+              ? t('connect it first: the step before')
+              : state === 'working'
+                ? t('working on it')
+                : state === 'listening'
+                  ? t('waiting for your notes')
+                  : seenLine(connected, where.atMachine)
+          }
+          testid="ob-v1-live"
+        />
+      )}
     </Step>
   );
 }

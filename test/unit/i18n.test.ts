@@ -79,6 +79,9 @@ const RENDER_THE_VERB = new Set([
   // the first run: an agent that renders the next version
   'It reads your notes, fixes the video and renders the next version. Pick it, and connect it right here.',
   'Pin a note to the exact frame. Your agent fixes it and renders V2. <0>You check before and after.</0>',
+  // Get started: the agent puts up V1 itself
+  'Tell it this. It renders, puts up V1 in {project} and waits for your notes.',
+  'Tell it this. It renders, puts up V1 in a project and waits for your notes.',
 ]);
 // The OAuth consent screen: an app's own claim about itself is "not verified" — not a fix being checked.
 const APP_NOT_VERIFIED = /: not verified\. Continue only if/;

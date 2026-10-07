@@ -81,7 +81,10 @@ export function useFirstRun(): FirstRun {
   const o = user?.prefs?.onboarding ?? null;
   const personas = status?.workspace?.personas ?? [];
   // the role in the workspace this session works in (/api/auth/status says it), and whether that one was made at sign-up
-  const steps = user && o ? stateOf(o, stepsFor(user.role, { machine: status?.via === 'local', signupWorkspace: !!status?.workspace?.signup, personas })) : [];
+  const steps =
+    user && o
+      ? stateOf(o, stepsFor(user.role, { machine: status?.via === 'local', signupWorkspace: !!status?.workspace?.signup, personas, agent: o.agent }))
+      : [];
   const setup = !!user && setupDue(o) && !setupEndedHere.has(user.id);
   return {
     o,

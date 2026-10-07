@@ -80,7 +80,8 @@ export function registerPlaybookTools({ b, o, tool, author, byArg, openReview }:
             : null;
           lines.push(oneLine(`- ${f.name} (${Math.max(1, Math.round(f.size / 1024))} KB)${local ? ` → ${local}` : url ? ` → ${url}` : ''}`));
         }
-        if (o.principal.via !== 'local') lines.push('(`vr playbook export` writes the skill with its files to a folder on your machine)');
+        // a coding agent's shell has `vr` (mcp/loop.ts); everyone else is told the MCP way only
+        if (o.principal.via !== 'local' && o.way === 'coding') lines.push('(`vr playbook export` writes the skill with its files to a folder on your machine)');
       }
       return ok(text(lines.join('\n')));
     },

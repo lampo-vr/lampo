@@ -6,6 +6,8 @@ import express, { type Request, type Router } from 'express';
 import { z } from 'zod';
 import { agentsFound } from '../../lib/agentsFound.ts';
 import * as auth from '../../lib/auth.ts';
+import { archivedNow } from '../../lib/folderIds.ts';
+import { allFolders } from '../../lib/folders.ts';
 import { needJobRoom } from '../../lib/jobs.ts';
 import { listApps } from '../../lib/oauth/store.ts';
 import { type OnboardingFacts, recordFacts, stateOf, stepsFor } from '../../lib/onboarding.ts';
@@ -18,7 +20,7 @@ import { currentWorkspace } from '../../lib/scope.ts';
 import { isSetupAgent, SETUP_AGENTS } from '../../lib/setupFlow.ts';
 import { madeALink, revokeVideoLinks } from '../../lib/shares.ts';
 import * as store from '../../lib/store.ts';
-import { compareTime } from '../../lib/time.ts';
+import { compareTime, isAgent } from '../../lib/time.ts';
 import type { Comment, OnboardingAgentsFound, OnboardingFolders, OnboardingPrefs, OnboardingResponse, Review, Role, SetupAgent } from '../../lib/types.ts';
 import { getWorkspace, roleIn, workspaceNamed } from '../../lib/workspaces.ts';
 import type { ServerContext } from '../context.ts';
@@ -59,7 +61,13 @@ export function factsFor(ctx: ServerContext, req: Request, user: Person): Onboar
     sample: !!sample && sample.comments.some((c) => (c.replies ?? []).some((x) => sampleReplyBy(x, user, c))),
     // a name a person chose (a sign-up's workspace starts with a placeholder: theirs)
     workspace: workspaceNamed(ws),
+    // a project of their own: a top-level folder that isn't archived, and not only the sample's
+    project: hasProject(reviews),
     video: reviews.some((r) => !r.onboarding_sample && !r.archived),
+    // a video an agent is on: put up by the agent itself (its V1 is its own: lib/store.ts) or handed to one
+    agent_video: reviews.some(
+      (r) => !r.onboarding_sample && !r.archived && r.versions.length > 0 && (!!r.session || r.versions.some((v) => !!v.run || isAgent(v.by))),
+    ),
     note: reviews.some((r) => r.comments.some((c) => mine(r, c))),
     agent: agentConnected(ctx, user, machine, ws),
     share: madeALink(user),
@@ -68,6 +76,14 @@ export function factsFor(ctx: ServerContext, req: Request, user: Person): Onboar
     check: reviews.some((r) => r.comments.some((c) => c.replies?.some((x) => (x.status === 'verified' || x.status === 'open') && said(x.by)))),
     approve: reviews.some((r) => (r.approvals ?? []).some((a) => a.party === 'team' && said(a.by)) || said(r.approval?.by)),
   };
+}
+
+/** A project of the workspace's own: a top-level folder, not archived, holding more than the first run's sample. */
+function hasProject(reviews: Review[]): boolean {
+  const archived = archivedNow();
+  const sampleOnly = new Set(reviews.filter((r) => r.onboarding_sample && r.folder).map((r) => (r.folder as string).split('/')[0]));
+  for (const r of reviews) if (!r.onboarding_sample && r.folder) sampleOnly.delete(r.folder.split('/')[0] as string);
+  return allFolders(reviews).some((f) => !f.includes('/') && !Object.hasOwn(archived, f) && !sampleOnly.has(f));
 }
 
 /** A reply on the sample that closes its loop for this person: a check of its fix, or an answer to its question. */
@@ -90,11 +106,11 @@ function agentConnected(ctx: ServerContext, user: Person, machine: boolean, ws: 
   return machine && ctx.activity.live().length > 0;
 }
 
-/** The asker's steps: by their role in this workspace, and whether it was made at their sign-up. */
-const stepsOf = (req: Request) => {
+/** The asker's steps: by their role in this workspace, whether it was made at their sign-up, and the agent they picked. */
+const stepsOf = (req: Request, o: OnboardingPrefs | null) => {
   const role = (req.auth?.role ?? 'reviewer') as Role;
   const ws = getWorkspace(currentWorkspace());
-  return stepsFor(role, { machine: req.auth?.via === 'local', signupWorkspace: !!ws?.signup, personas: ws?.personas });
+  return stepsFor(role, { machine: req.auth?.via === 'local', signupWorkspace: !!ws?.signup, personas: ws?.personas, agent: o?.agent });
 };
 
 const named = (r: Review) => ({ slug: slugify(r.video), name: r.video.split('/').pop() || r.video });
@@ -127,7 +143,7 @@ export function onboardingRoutes(ctx: ServerContext): Router {
 
   const answer = (req: Request, o: OnboardingPrefs | null): OnboardingResponse => {
     const user = req.auth?.user;
-    const steps = user && o ? stepsOf(req) : [];
+    const steps = user && o ? stepsOf(req, o) : [];
     const sample = findSample();
     const video = newestVideo();
     return {
@@ -146,7 +162,7 @@ export function onboardingRoutes(ctx: ServerContext): Router {
     let o = user ? (auth.getUser(user.id)?.prefs?.onboarding ?? null) : null;
     // what was done since the last look is recorded now (once; a finished first run is left alone)
     if (user && o && !o.complete) {
-      const steps = stepsOf(req);
+      const steps = stepsOf(req, o);
       const facts = factsFor(ctx, req, user);
       const now = isoLocal();
       o = auth.updateOnboarding(user.id, (cur) => recordFacts(cur, steps, facts, now))?.prefs?.onboarding ?? o;

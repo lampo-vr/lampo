@@ -13,6 +13,9 @@ import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { type NoteAt, phrase, say } from './activityWords.ts';
 import { RunLine } from './Wake.tsx';
 
+// The sidebar's Agents section rides this chunk (it loads after the first paint anyway).
+export { SidebarAgents } from './SidebarAgents.tsx';
+
 /** An agent's own words in the UI's language, for the cards' run lines once this module is here (RunLine.tsx). */
 export const sayWords = (w: ActivityWords): string => say(w);
 

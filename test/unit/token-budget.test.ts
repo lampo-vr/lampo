@@ -27,6 +27,12 @@ const BUDGET = {
   waitNone: 58,
   /** The line a hand-off ends with (track_video; mark_fixed and wont_fix once nothing is left open): lib/handoff.ts. */
   handOff: 45,
+  /** The line a read that leaves the agent nothing to do ends with (list_videos, list_folders, get_open_notes): the next step. */
+  nextStep: 45,
+  /** The server's instructions, once per connection: the whole loop, the way each kind of agent works it (345 until the
+   * loop told to the end, projects and V1 first: bench/tokens/README.md). Claude Code cuts them at 2,048 characters. */
+  instructions: 480,
+  instructionChars: 2048,
   /** The line an agent's next answer ends with when the person sent notes while it worked, once (lib/runs.ts). */
   newNotes: 48,
   /** The line an agent's next answer ends with after the person stopped its work, once (lib/runs.ts stopLine). */
@@ -128,6 +134,22 @@ test('a wait that ends with nothing new, and the line a hand-off ends with', asy
   const { waitNowLine } = await import('../../lib/handoff.ts');
   const line = approxTokens(waitNowLine((/cursor: (\S+)/.exec(textOf(none)) || [])[1] as string));
   assert.ok(line <= BUDGET.handOff, `the hand-off line: ${line} tokens > ${BUDGET.handOff}`);
+});
+
+test('the instructions, the way each kind of agent is told them, and the next-step line', async () => {
+  const { instructionsFor } = await import('../../mcp/loop.ts');
+  for (const way of ['machine', 'coding', 'chat'] as const) {
+    const told = instructionsFor(way);
+    assert.ok(told.length <= BUDGET.instructionChars, `${way}: ${told.length} characters > ${BUDGET.instructionChars}`);
+    assert.ok(approxTokens(told) <= BUDGET.instructions, `${way}: ${approxTokens(told)} tokens > ${BUDGET.instructions}`);
+    // the loop is in the first 512 characters (what ChatGPT reads most closely)
+    assert.match(told.slice(0, 512), /run this loop to the end/);
+  }
+  // the stdio server here is the machine's: it is told the machine's way
+  assert.equal(client.getInstructions(), instructionsFor('machine'));
+  const { nothingWaitingLine } = await import('../../lib/handoff.ts');
+  const line = approxTokens(nothingWaitingLine('2026-10-07T12:00:00.000Z#0'));
+  assert.ok(line <= BUDGET.nextStep, `the next-step line: ${line} tokens > ${BUDGET.nextStep}`);
 });
 
 test('the new-notes line, appended once when the person sent notes while the agent works', async () => {

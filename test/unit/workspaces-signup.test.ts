@@ -109,14 +109,15 @@ test('open sign-up: confirmed, the person owns a workspace of their own, empty, 
   assert.equal((await get(`/api/review/${encodeURIComponent(teamLib.videos[0].slug)}`, pia)).status, 404, 'and it is nothing to the newcomer');
   assert.equal((await post('/api/workspaces/switch', { id: 'w1' }, pia)).status, 404);
 
-  // the first run: Cloud's steps (the setup names the workspace); nothing of the team's counts as theirs
+  // the first run: Cloud's steps for agent work (the setup names the workspace); nothing of the team's counts as theirs
+  // — not its project, not its video, not an agent on it
   const first = (await get('/api/onboarding', pia)).json();
   assert.deepEqual(
     first.steps.map((s: { id: string; done: boolean }) => [s.id, s.done]),
     [
-      ['sample', false],
+      ['project', false],
       ['agent', false],
-      ['video', false],
+      ['agent_video', false],
       ['share', false],
       ['invite', false],
     ],

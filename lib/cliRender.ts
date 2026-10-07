@@ -1,6 +1,6 @@
-// `vr render [--to <video>] [--out <file>] [--detach] -- <command> [args…]`: the agent's own render command, run here
-// on its machine (an argument list, never a shell: nothing in it comes from a server), with its progress shown in
-// Lampo and its result put up as the next version (lib/render/). The model reads two lines, not the tool's output.
+// `vr render [--to <video> | --folder <project>] [--out <file>] [--detach] -- <command> [args…]`: the agent's own
+// render command, run here on its machine (an argument list, never a shell: nothing in it comes from a server), with
+// its progress shown in Lampo and its result put up as the next version, or as a new video's V1 (lib/render/). The model reads two lines, not the tool's output.
 // `vr render wait <id>`: a detached render, at most 9 minutes at a time.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,6 +11,7 @@ import type { Backend } from './backend/types.ts';
 import { newRenderId, RENDER_ID, startDetached, WAIT_MAX_MS, waitFor } from './render/detach.ts';
 import { executeRender, type RenderJob } from './render/job.ts';
 import type { ToolRun } from './render/run.ts';
+import { currentSession } from './sessions.ts';
 import { isUpload } from './store.ts';
 import { oneLine } from './time.ts';
 
@@ -29,7 +30,7 @@ export interface RenderIo {
   by: string;
 }
 
-const USAGE = 'usage: vr render [--to <video> --out <file>] [--detach] -- <command> [args…] · vr render wait <id>';
+const USAGE = 'usage: vr render [--to <video> | --folder <project>] [--out <file>] [--detach] -- <command> [args…] · vr render wait <id>';
 
 /** Progress to Lampo at most this often: every 500 ms on this machine, every 2 s to a server. */
 const everyMs = (): number => (readCredentials() ? 2000 : 500);
@@ -65,11 +66,22 @@ export async function render({ pos, opt, cmd }: RenderArgs, b: Backend, io: Rend
   }
   if (pos.length) io.fail(`the command goes after --: vr render --to ${oneLine(pos[0])} --out <file> -- <command> …\n${USAGE}`);
   if (!cmd.length) io.fail(`what to run? vr render --to <video> --out <file> -- npx remotion render …\n${USAGE}`);
-  if (opt.to === true || opt.out === true) io.fail(`--to and --out each name something: --to <video> --out <file>\n${USAGE}`);
+  if (opt.to === true || opt.out === true || opt.folder === true) io.fail(`--to, --folder and --out each name something: --to <video> --out <file>\n${USAGE}`);
   const shownOut = str(opt.out) ?? null;
   const out = shownOut ? path.resolve(shownOut) : null;
   const toArg = str(opt.to);
   if (toArg && !out) io.fail(`--to needs --out <file>: the file your command writes, put up as the next version\n${USAGE}`);
+  // A new video's V1 into a project (made with it when it's new): the render, then the file put up there.
+  const folderArg = str(opt.folder)
+    ?.trim()
+    .replace(/^\/+|\/+$/g, '');
+  if (folderArg !== undefined && toArg) io.fail(`--to puts up a next version, --folder a new video's V1: name one of them\n${USAGE}`);
+  if (folderArg !== undefined && !folderArg) io.fail(`--folder names the project: --folder "Acme/Launch"\n${USAGE}`);
+  if (folderArg && !out) io.fail(`--folder needs --out <file>: the file your command writes, put up as V1\n${USAGE}`);
+  if (folderArg) {
+    const project = archivedIn(folderArg, await b.archivedProjects());
+    if (project) io.fail(`${archivedWords(project)}: nothing new goes in until then`);
+  }
 
   // The video it becomes the next version of, checked before a frame is rendered.
   let to: RenderJob['to'] = null;
@@ -90,8 +102,11 @@ export async function render({ pos, opt, cmd }: RenderArgs, b: Backend, io: Rend
 
   // Who it reports as: the agent running vr (its session, VR_BY, LAMPO_RUN); a person's own render records nothing.
   const agent = cliAgent();
-  const job: RenderJob = { argv: cmd, cwd: process.cwd(), out, outShown: shownOut, to, agent, by: io.by };
-  const label = to ? `V${to.next}` : '';
+  // inside a Claude Code session the new video is that session's, as `vr track --me` makes it
+  const own = currentSession();
+  const into = folderArg ? { folder: folderArg, session: own?.name ? { name: own.name, sessionId: own.sessionId, cwd: own.cwd } : null } : null;
+  const job: RenderJob = { argv: cmd, cwd: process.cwd(), out, outShown: shownOut, to, into, agent, by: io.by };
+  const label = to ? `V${to.next}` : into ? 'V1' : '';
 
   if (opt.detach) {
     const id = newRenderId();

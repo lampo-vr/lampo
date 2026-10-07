@@ -16,11 +16,12 @@ import { MCP_NAME } from '../lib/mcpConfig.ts';
 import { forAgents } from '../lib/onboarding.ts';
 import { slugify } from '../lib/paths.ts';
 import { publicMessage } from '../lib/publicError.ts';
-import { keepLines, oneLine } from '../lib/time.ts';
+import { keepLines } from '../lib/time.ts';
 import { allowed, audienceOf, backendFor } from './access.ts';
 import { registerReviewApp } from './app.ts';
 import { registerFeedback } from './feedback.ts';
 import { markedPicture, preview, reviewUri } from './format.ts';
+import { instructionsFor, WATCH_PROMPT, watchPromptText, wayOf } from './loop.ts';
 import { createToolKit, type ReviewServerOptions } from './toolkit.ts';
 import { registerAskTools } from './tools/asks.ts';
 import { registerFootageTools } from './tools/footage.ts';
@@ -32,18 +33,11 @@ import { registerVideoTools } from './tools/videos.ts';
 
 export { type Access, allowed, backendFor, NO_FILES, type Principal, TOOL_ACCESS } from './access.ts';
 export { reviewUri } from './format.ts';
+export { type AgentWay, instructionsFor, WATCH_PROMPT, watchPromptText, wayOf } from './loop.ts';
 export type { ReviewServerOptions } from './toolkit.ts';
 
 const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version?: string };
 export const SERVER_VERSION = pkg.version || '0.0.0';
-
-// Sent once per connection; every tool description is sent on every turn, so the loop is told here, once.
-const INSTRUCTIONS = `${BRAND_NAME}: frame-exact video review. People pin notes (with drawings) to exact frames of your renders.
-Loop: get_playbook before rendering → get_open_notes (a note with a drawing comes with its frame, cropped; get_note shows one in full) → fix → re-render to the same path (or vr push) → mark_fixed with what changed (never verify: people do) → wait_for_feedback with its cursor. Don't poll: wait_for_feedback blocks until something is new.
-You hear new notes only while you wait in wait_for_feedback. Asked to work on Lampo notes (or the watch prompt): list_videos({session:"me"}) shows what is assigned to you; work it, then call wait_for_feedback again after every answer until the person says stop (or its answer does). When you connect, offer to start listening.
-Hear only what changed: since (get_open_notes) and known (get_playbook, get_taste) take what an earlier answer said.
-Every question for the person goes to Lampo, never your own chat: add_note (kind question, choices) on the frame, ask_options for what they must see or hear first; wait_for_feedback brings the answer. In a project (After Effects, Premiere…), attach_preview shows a fix before you render; render once a batch is done.
-Frames are 0-based, timecode mm:ss:ff, drawings in video pixels.`;
 
 /** Builds one MCP server instance over a backend. Tools report errors as results, so a bad id never breaks a session. */
 export function createReviewServer(options: ReviewServerOptions): McpServer {
@@ -54,7 +48,8 @@ export function createReviewServer(options: ReviewServerOptions): McpServer {
     // `name` is the identifier (the key people give it in their configs, MCP_NAME); `title` is what a client shows.
     { name: MCP_NAME, title: BRAND_NAME, version: SERVER_VERSION, ...(o.sourceUrl ? { websiteUrl: o.sourceUrl } : {}) },
     {
-      instructions: INSTRUCTIONS,
+      // Sent once per connection (every tool description goes on every turn): the loop, told the way this agent works.
+      instructions: instructionsFor(o.way ?? wayOf(o.principal.via, null)),
       capabilities: { resources: { subscribe: true, listChanged: true } },
       cacheHints: { 'tools/list': { ttlMs: 3_600_000, cacheScope: 'private' } },
     },
@@ -154,22 +149,6 @@ export function createReviewServer(options: ReviewServerOptions): McpServer {
   );
 
   return server;
-}
-
-/** The prompt `watch` (Claude Code: /lampo:watch, also /mcp__lampo__watch): "work on my notes and keep listening". */
-export const WATCH_PROMPT = 'watch';
-
-/**
- * What a person types to set their agent to work: MCP clients show a server's prompts as commands (Claude Code as
- * `/mcp__lampo__watch`). An MCP client acts only when prompted, so without this (or the same in words) notes wait
- * unread: the text has it work what is assigned to it, then wait for more until told to stop.
- */
-export function watchPromptText(video?: string | null): string {
-  const only = video ? ` Only this video: ${oneLine(video)}.` : '';
-  return `Work on my ${BRAND_NAME} notes, then keep listening for new ones until I say stop.${only}
-1. list_videos({session: "me", open_only: true}) shows the videos assigned to you. For each: get_playbook, get_open_notes, fix every note, re-render to the same path (or upload the next version), then mark_fixed with what you changed. Ask me in ${BRAND_NAME} (add_note, kind question) when only I can decide, not in this chat.
-2. Then call wait_for_feedback, and again after every answer, each time with the cursor of the last one. "No new feedback" means: call it again (unless it says to stop: then tell me). Work whatever it hands you the same way, then wait again.
-While you don't wait, new notes wait unread: keep listening until I say stop.`;
 }
 
 function registerWatchPrompt(server: McpServer, log?: (line: string) => void): void {

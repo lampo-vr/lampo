@@ -255,11 +255,11 @@ test('the watch prompt sets an agent to work and keeps it listening, in one comm
   const text = promptText(got);
   assert.match(text, /list_videos\(\{session: "me"/);
   assert.match(text, /wait_for_feedback/);
-  assert.match(text, /until I say stop/);
+  assert.match(text, /until I approve or say stop/);
   const one = await c.getPrompt({ name: 'watch', arguments: { video: 'reel-a.mp4' } });
   assert.match(promptText(one), /Only this video: reel-a\.mp4/);
-  // The server's instructions tell an agent that connects to offer it.
-  assert.match(c.getInstructions() ?? '', /offer to start listening/);
+  // The server's instructions tell the same loop, so "use Lampo" is enough without it: wait again after every answer.
+  assert.match(c.getInstructions() ?? '', /wait_for_feedback with the cursor the last answer gave, and again after every answer/);
 });
 
 test('one log line per tool call: the agent, the tool, how long, how a wait ended — never what was said', async () => {

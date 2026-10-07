@@ -3,8 +3,8 @@
 // Browser end-to-end test of a new account's setup on a hosted server (web/src/onboarding/Setup.tsx): Lampo Cloud — an
 // open sign-up from the website's ?plan= link, confirmed by its mailed link, lands on Welcome (the Team trial, from a
 // stand-in billing provider), names the workspace, says who the videos are for (saved on the workspace and applied to
-// the invite role and Get started's order), connects an agent whose live status turns on a real MCP connection, and
-// invites the team row by row (a pasted list splits, each row checks itself, Send sends); an invited teammate gets
+// the invite role and Get started's order), makes the first project, connects an agent whose live status turns on a
+// real MCP connection (and is told to use Lampo for that project), and invites the team row by row (a pasted list splits, each row checks itself, Send sends); an invited teammate gets
 // Welcome and the agent only; a self-hosted server's owner gets the health check with mail off (its fix, invites as
 // links) and on (a stand-in relay: Email works, the test mail arrives). Phones and the dark theme fit.
 import path from 'node:path';
@@ -165,7 +165,7 @@ try {
     await ana.waitForSelector('[data-testid=ob-trial]', { timeout: 10000 });
     const badge = await ana.$eval('[data-testid=ob-trial]', (e) => e.textContent.replace(/\s+/g, ' '));
     assert(badge.includes('Team trial') && badge.includes('14 days') && badge.includes('no card'), badge);
-    assert((await ana.$$('.ob-hello-steps li')).length === 4, 'four steps ahead');
+    assert((await ana.$$('.ob-hello-steps li')).length === 5, 'five steps ahead');
     const o = await inPage(ana, '/api/onboarding');
     assert(o.json?.plan === 'cloud-team', `the plan rode along: ${JSON.stringify(o.json?.plan)}`);
     assert((await ana.$$('h1')).length === 1, 'one h1');
@@ -202,7 +202,7 @@ try {
     assert(!avatars.includes('CL'), `initials in the picture: ${avatars}`);
     await shot(ana, '03-persona');
     await ana.click('[data-testid=ob-next]');
-    await atStep(ana, 'agent');
+    await atStep(ana, 'project');
     const ws = await until(async () => {
       const w = (await inPage(ana, '/api/auth/status')).json?.workspace;
       return w?.personas?.length ? w : null;
@@ -210,11 +210,28 @@ try {
     assert(JSON.stringify(ws.personas) === '["inhouse","other"]' && ws.personaOther === 'Trade fair loops', JSON.stringify(ws));
   });
 
+  await check('Project: before the agent; an empty name says so, a name and Continue make it (the sidebar’s New project)', async () => {
+    assert((await ana.$eval('[data-testid=ob-project-name]', (e) => e.value)) === '', 'empty: no project yet');
+    await ana.click('[data-testid=ob-next]');
+    assert((await textOf(ana)).includes('Type a name first.'), 'an empty name says so (none to keep)');
+    await ana.type('[data-testid=ob-project-name]', 'Spring launch');
+    const shown = await ana.$eval('[data-testid=ob-panel] .ob-prev-dir .ob-dh', (e) => e.textContent);
+    assert(shown.includes('Spring launch'), `the picture names it as it is typed: ${shown}`);
+    await shot(ana, '03b-project');
+    await ana.click('[data-testid=ob-next]');
+    await atStep(ana, 'agent');
+    const lib = await inPage(ana, '/api/library');
+    assert(lib.json.folders.includes('Spring launch'), `made: ${JSON.stringify(lib.json.folders)}`);
+  });
+
   await check('Agent: the connect block in place, its status live — a real MCP connection named claude-code turns it on', async () => {
     await ana.click('[data-agent=claude-code] input');
     await ana.waitForSelector('[data-testid=ob-connect][data-connect-id=claude-code] [data-testid=ob-live][data-state=waiting]');
     const snippet = await ana.$eval('[data-testid=ob-snippet]', (e) => e.textContent);
     assert(snippet.includes(`claude mcp add --transport http lampo ${cloud.base}/mcp`), snippet);
+    // then the one sentence, for the project just made: the whole loop, no command
+    const tell = await ana.$eval('[data-testid=ob-start-cmd]', (e) => e.textContent);
+    assert(tell.startsWith('Use Lampo for "Spring launch"'), tell);
     assert((await ana.$eval('[data-testid=ob-next]', (e) => e.innerText)).includes('connect later'), 'Continue — connect later while waiting');
     const widthWaiting = await ana.$eval('[data-testid=ob-next]', (e) => e.getBoundingClientRect().width);
     assert((await ana.$eval('[data-testid=ob-loop]', (e) => e.dataset.mode)) === 'v1', 'the loop waits at V1');
@@ -327,9 +344,22 @@ try {
     const o = await inPage(ana, '/api/onboarding');
     assert(o.json.onboarding.setup_done, 'the setup is over');
     const steps = await ana.$$eval('[data-testid=ob-step]', (els) => els.map((e) => e.dataset.step));
-    assert(JSON.stringify(steps) === '["sample","agent","invite","video","share"]', `in-house invites before it uploads: ${steps}`);
+    // agent work: the project, the agent, the agent's V1 — in-house invites before it shares
+    assert(JSON.stringify(steps) === '["project","agent","agent_video","invite","share"]', `in-house invites before it shares: ${steps}`);
+    await ana.waitForSelector('[data-testid=ob-step][data-step=project][data-done]', { timeout: 15000 });
     await ana.waitForSelector('[data-testid=ob-step][data-step=invite][data-done]', { timeout: 15000 });
     await ana.waitForSelector('[data-testid=ob-step][data-step=agent][data-done]', { timeout: 15000 });
+    // the next step is the agent's V1: the sentence for the project, adding a video yourself only second
+    const pane = await ana.$eval('[data-testid=ob-pane]', (e) => e.dataset.pane);
+    assert(pane === 'agent_video', `the next step open: ${pane}`);
+    assert(
+      (await ana.$eval('[data-testid=ob-pane] [data-testid=ob-v1-tell]', (e) => e.textContent)).startsWith('Use Lampo for "Spring launch"'),
+      'its sentence',
+    );
+    assert(
+      !(await ana.$eval('[data-testid=ob-pane] [data-testid=ob-act-video]', (e) => e.className)).includes('ob-raised'),
+      'adding one yourself is the quiet second',
+    );
     const plan = await ana.$eval('[data-testid=ob-plan]', (e) => [e.textContent, e.getAttribute('href')]);
     assert(plan[0].includes('You picked Team') && plan[1] === '#/settings/billing?plan=cloud-team', JSON.stringify(plan));
     const lib = await inPage(ana, '/api/library');
@@ -372,7 +402,8 @@ try {
     await jonas.click('[data-testid=ob-next]');
     await jonas.waitForSelector('[data-testid=ob-gs] [data-testid=ob-step]', { timeout: 15000 });
     const steps = await jonas.$$eval('[data-testid=ob-step]', (els) => els.map((e) => e.dataset.step));
-    assert(JSON.stringify(steps) === '["sample","agent","video","share"]', `a member's steps: ${steps}`);
+    // "None yet": people first — the sample, a video, a link (an agent picked: the agent and its V1)
+    assert(JSON.stringify(steps) === '["sample","video","share"]', `a member's steps: ${steps}`);
     await jonas.browserContext().close();
   });
 
@@ -382,7 +413,7 @@ try {
       const p = await fresh({ width: 390, height: 844, mobile: true, theme });
       const c = (await ana.cookies(cloud.base)).find((x) => x.name.includes('vr_session'));
       await p.setCookie({ name: c.name, value: c.value, url: cloud.base });
-      for (const s of ['workspace', 'persona', 'agent', 'team']) {
+      for (const s of ['workspace', 'persona', 'project', 'agent', 'team']) {
         await p.goto(`${cloud.base}/#/welcome/${s}`, { waitUntil: 'domcontentloaded' });
         await atStep(p, s);
         const band = await p.$eval('[data-testid=ob-panel]', (e) => e.getBoundingClientRect().height);
@@ -411,7 +442,7 @@ try {
     const c = (await ana.cookies(cloud.base)).find((x) => x.name.includes('vr_session'));
     await p.setCookie({ name: c.name, value: c.value, url: cloud.base });
     const bad = [];
-    for (const s of ['welcome', 'workspace', 'persona', 'agent', 'team']) {
+    for (const s of ['welcome', 'workspace', 'persona', 'project', 'agent', 'team']) {
       await p.goto(`${cloud.base}/#/welcome${s === 'welcome' ? '' : `/${s}`}`, { waitUntil: 'domcontentloaded' });
       await atStep(p, s);
       if (s === 'agent') {
@@ -427,7 +458,7 @@ try {
 
   await check('a desk at 1024, 1440 and 1920: every step’s heading starts at the same left edge (Cloud)', async () => {
     const c = (await ana.cookies(cloud.base)).find((x) => x.name.includes('vr_session'));
-    const moved = await movesAt(cloud.base, ['welcome', 'workspace', 'persona', 'agent', 'team'], c);
+    const moved = await movesAt(cloud.base, ['welcome', 'workspace', 'persona', 'project', 'agent', 'team'], c);
     assert(!moved.length, `the heading moves sideways between steps:\n        ${moved.join('\n        ')}`);
   });
 
@@ -524,6 +555,10 @@ try {
     assert(lines < 40, `an invite link breaks over lines (${lines} px tall: one line is 30)`);
     assert(!outbox(server).some((m) => m.to === 'lea@e2e.test' && m.kind === 'invite'), 'nothing mailed');
     await mia.click('[data-testid=ob-next]');
+    // the first project, then its agents
+    await atStep(mia, 'project');
+    await mia.type('[data-testid=ob-project-name]', 'Launch film');
+    await mia.click('[data-testid=ob-next]');
     await atStep(mia, 'agents');
     assert((await textOf(mia)).includes('Connect your team’s agents'), 'the server’s words');
     await mia.click('[data-agent=codex] input');
@@ -532,7 +567,7 @@ try {
     await mia.click('[data-testid=ob-next]');
     await mia.waitForSelector('[data-testid=ob-gs] [data-testid=ob-step]', { timeout: 15000 });
     const steps = await mia.$$eval('[data-testid=ob-step]', (els) => els.map((e) => e.dataset.step));
-    assert(JSON.stringify(steps) === '["sample","video","agent","invite","share"]', `a server's order: ${steps}`);
+    assert(JSON.stringify(steps) === '["project","agent","agent_video","invite","share"]', `a server's order: ${steps}`);
   });
 
   await check('a wide screen (1920, 2560): the column stands in the pane’s middle, Back · track · Skip line up with it', async () => {
@@ -610,7 +645,7 @@ try {
 
   await check('a desk at 1024, 1440 and 1920: every step’s heading starts at the same left edge (a server)', async () => {
     const c = (await mia.cookies(server.base)).find((x) => x.name.includes('vr_session'));
-    const moved = await movesAt(server.base, ['welcome', 'workspace', 'health', 'team', 'agents'], c);
+    const moved = await movesAt(server.base, ['welcome', 'workspace', 'health', 'team', 'project', 'agents'], c);
     assert(!moved.length, `the heading moves sideways between steps:\n        ${moved.join('\n        ')}`);
   });
 

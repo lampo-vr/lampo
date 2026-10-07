@@ -23,8 +23,9 @@ import { currentWorkspace, DEFAULT_WORKSPACE, inWorkspace } from '../../lib/scop
 import { SCOPE_LIST, scopeAllows, scopeFor } from '../../lib/scopes.ts';
 import { grabCount } from '../../lib/shots.ts';
 import * as store from '../../lib/store.ts';
+import type { AgentKind } from '../../lib/types.ts';
 import * as workspaces from '../../lib/workspaces.ts';
-import { type Access, allowed, createReviewServer, type Principal, reviewUri, TOOL_ACCESS } from '../../mcp/core.ts';
+import { type Access, allowed, createReviewServer, type Principal, reviewUri, TOOL_ACCESS, wayOf } from '../../mcp/core.ts';
 import { type Hold, type QuietRun, quietIn, toldIn, type Wake } from '../../mcp/feedback.ts';
 import type { Auth } from '../auth.ts';
 import { sessionOf } from '../auth.ts';
@@ -48,6 +49,8 @@ const LOG_CALLS = process.env.VR_MCP_LOG !== 'off';
 interface CallingAgent {
   session_id: string;
   name: string;
+  /** What its client says it is: how it is told the loop (mcp/loop.ts). */
+  kind: AgentKind;
 }
 /**
  * What one connection and one person may hold open at once: waits (`wait_for_feedback`) and `subscriptions/listen`
@@ -220,12 +223,14 @@ export function mcpRoutes(ctx: ServerContext): Router {
         return createReviewServer({
           backend,
           principal,
+          // the loop as this kind of agent works it: a coding agent renders through `vr render`, any other uses MCP only
+          way: wayOf(principal.via, agent?.kind),
           wake,
           hold: holdFor(holder),
           ...(quietKey ? { quiet: quietIn(quietMap, `${ws}\u0000${quietKey}`) } : {}),
           ...(agent
             ? {
-                me: { name: agent.name, sessionId: agent.session_id },
+                me: { name: agent.name, sessionId: agent.session_id, kind: agent.kind },
                 onWait: () => ctx.agents.wait(agent.session_id),
                 told: toldIn(toldMap, `${ws}\u0000${agent.session_id}`),
               }
@@ -248,7 +253,8 @@ export function mcpRoutes(ctx: ServerContext): Router {
             : { frameGrabs: grabCount(ctx.frameGrabs, principal.id ? `account:${principal.id}` : `${principal.via}:${principal.name}`) }),
           // Used later, maybe by a shell elsewhere: the caller is asked again then — still let in (token, app, account,
           // membership) and still allowed the action in the URL's workspace (A12 VA2-3).
-          requestUpload: (input) => ctx.uploadTickets.issue(input, principal.name || ctx.cfg.user, appUrl, principal.id, guardFor(principal, issuer, 'upload')),
+          requestUpload: (input) =>
+            ctx.uploadTickets.issue(input, principal.name || ctx.cfg.user, appUrl, principal.id, guardFor(principal, issuer, 'upload'), input.session),
           requestPreviewUpload: (target, by) => ctx.uploadTickets.issuePreview(target, by, appUrl, guardFor(principal, issuer, 'resolve')),
           requestRefUpload: (target, by) => ctx.uploadTickets.issueRef(target, by, appUrl, guardFor(principal, issuer, 'comment')),
           requestOptionUpload: (target, by, offered) => ctx.uploadTickets.issueOption(target, by, appUrl, guardFor(principal, issuer, 'comment'), offered),
@@ -376,7 +382,7 @@ export function mcpRoutes(ctx: ServerContext): Router {
     // A long wait_for_feedback keeps it listed (heartbeats expire after 90 s).
     const timer = setInterval(() => ctx.agents.heartbeat(agent), 30_000);
     res.on('close', () => clearInterval(timer));
-    return { session_id: agent.session_id, name: agent.name };
+    return { session_id: agent.session_id, name: agent.name, kind: agent.kind };
   }
   // What each agent's waits told it was waiting for it (mcp/feedback.ts Told): by workspace and agent, bounded.
   const toldMap = new Recent<number>(20_000);

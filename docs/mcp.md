@@ -9,11 +9,12 @@ Windsurf, Gemini CLI, Zed, Claude, ChatGPT and any other MCP client.
 **In the app**, open **Settings → Connect an agent**:
 
 1. Pick your agent.
-2. Copy the one snippet it needs (a command, or a few lines for its config file).
-3. Watch it connect: the page shows the agent as soon as it calls.
-4. Start it: in Claude Code, type `/lampo:watch`; any other agent, tell it to work on your Lampo notes and keep
-   listening. An agent acts only when you tell it to, so until you do, new notes wait for it
+2. Copy the one snippet it needs (a command, a few lines for its config file, or a chat app's connector address).
+3. Tell it one sentence: **Use Lampo for "<project>"**. That is the whole loop: it finds the project, puts up V1
+   itself, works your notes and keeps waiting for the next ones until you approve
    ([Start your agent](#start-your-agent-it-hears-notes-only-while-it-listens)).
+4. See it work: the page (and the sidebar's Agents) shows it as soon as it calls, "connected", then waiting for your
+   notes.
 
 ![Settings → Connect an agent with Claude Code picked: the command that adds Lampo, and “Connected: claude-code”, seen just now](assets/settings-connect-agent.webp)
 
@@ -76,8 +77,9 @@ claude mcp add --transport http lampo https://review.example.com/mcp
 Then sign in: run `/mcp` in Claude Code and follow the steps in your browser (or run `claude mcp login lampo`).
 The server is added for the current project; add `--scope user` to have it in every project.
 
-Then start it: type `/lampo:watch` (Claude Code lists Lampo's `watch` prompt as a command; `/mcp__lampo__watch` runs
-it too). It works the notes on the videos assigned to it, then keeps waiting for new ones until you say stop.
+Then tell it: `Use Lampo for "<project>"`. It runs the whole loop: puts up V1, works your notes and keeps waiting for
+new ones until you approve or say stop. `/lampo:watch` is its shortcut (Claude Code lists Lampo's `watch` prompt as a
+command; `/mcp__lampo__watch` runs it too).
 
 ### Codex
 
@@ -298,14 +300,23 @@ Instead of an address, the client can start `bin/vr-mcp` itself:
 
 ## Typical loop
 
-1. `get_playbook` and `get_taste` before rendering. Next time pass `known`: while nothing changed, the answer is one
+The server's instructions tell it to every agent that connects, in its first read, the way that kind of agent works
+([agents.md](agents.md#one-way-per-kind-of-agent)): chat and desktop apps hear MCP only and put versions up with
+`request_upload`; coding agents (Claude Code, Codex) render through `vr render`; the agent on the machine the app runs
+on tracks its renders where they are.
+
+1. `list_folders`: the project the person named or the work belongs to (none: a new name becomes the project with V1;
+   several fit: ask once, with options). No version there yet: put up V1 yourself.
+2. `get_playbook` and `get_taste` before rendering. Next time pass `known`: while nothing changed, the answer is one
    line.
-2. `get_open_notes`, fix each note, re-render to the same path (or upload the new version), then `mark_fixed` with what
-   changed: `mark_fixed({id, note: "caption moved to y 1392"})`. Working in a project (After Effects, …)? Call
+3. `get_open_notes`, fix each note, put up the next version, then `mark_fixed` with what changed:
+   `mark_fixed({id, note: "caption moved to y 1392"})`. Working in a project (After Effects, …)? Call
    `set_render_source` once, then `attach_preview` with `fixed: true` per note, and render once when the batch is done.
-3. `wait_for_feedback` with the last cursor, for what the reviewer says next. Never a loop of reads. Whatever hands
-   work to the person tells you to, with a cursor from that moment ([Wait right after handing over](#wait-right-after-handing-over)).
-4. Back to the notes with `get_open_notes` and `since`: only what changed.
+4. `wait_for_feedback` with the last cursor, for what the reviewer says next, until they approve or say stop. Never a
+   loop of reads. Whatever hands work to the person tells you to, with a cursor from that moment
+   ([Wait right after handing over](#wait-right-after-handing-over)), and so does a read that leaves you nothing to do:
+   `Nothing waiting for you: put up any version you have, then call wait_for_feedback with since "<cursor>".`
+5. Back to the notes with `get_open_notes` and `since`: only what changed.
 
 People check the fixes; agents never mark a note verified. The [Agent Skill](../skills/lampo/SKILL.md) teaches
 this loop to agents that load skills.
@@ -313,24 +324,25 @@ this loop to agents that load skills.
 ## Start your agent: it hears notes only while it listens
 
 An MCP client acts only when someone prompts it. Lampo can't wake an idle Claude Code (or Codex, Cursor …) session:
-the agent hears new notes while it sits in `wait_for_feedback`, and at no other time. Connecting it and assigning it a
-video is not enough; tell it to start:
+the agent hears new notes while it sits in `wait_for_feedback`, and at no other time. Connecting it is not enough; tell
+it one sentence:
 
-- **Claude Code:** type `/lampo:watch`. It is the server's `watch` prompt, which Claude Code lists among its commands
-  (as `/<the key you gave the server>:watch`; `/mcp__lampo__watch` works too). `/lampo:watch launch.mp4` limits it to
-  one video.
-- **Any other agent:** say "Work on my Lampo notes, then keep calling wait_for_feedback until I say stop." Clients that
-  show MCP prompts offer the same `watch` prompt.
+- **Any agent:** "Use Lampo for "<project>"" (or "Use Lampo: work my notes, then keep listening until I approve or say
+  stop."). The server's instructions carry the whole loop, so that is all it needs.
+- **Claude Code** has a shortcut for the same: `/lampo:watch`, the server's `watch` prompt, which Claude Code lists among
+  its commands (as `/<the key you gave the server>:watch`; `/mcp__lampo__watch` works too). `/lampo:watch launch.mp4`
+  limits it to one video. Clients that show MCP prompts offer the same prompt.
 
 The prompt has the agent call `list_videos({session: "me", open_only: true})` for the videos assigned to it, work
-their notes, then call `wait_for_feedback` again after every answer, each time with the last cursor. The server's
-instructions tell an agent the same and to offer it when it connects.
+their notes, then call `wait_for_feedback` again after every answer, each time with the last cursor, until the person
+approves or says stop.
 
 What waited while it didn't listen isn't lost: the first `wait_for_feedback` without a cursor answers at once with
 what came in for it meanwhile (below), and `get_open_notes` always has every open note.
 
-**The app shows whether an agent listens**, from the waits it holds open: in the agent menu of a video, on its card,
-where you assign one, and in Settings → Connected agents.
+**The app shows whether an agent listens**, from the waits it holds open: in the sidebar's Agents from its first call
+(before it is on any video), in the agent menu of a video, on its card, where you assign one, and in Settings →
+Connect an agent and Connected agents ("connected", "waiting for your notes", "working").
 
 | State | Means |
 |---|---|
@@ -352,7 +364,7 @@ An agent hears about new feedback without asking:
 |---|---|
 | **`wait_for_feedback`** | any MCP client: one call waits until a person says something new |
 | **Change notifications** | clients that listen (`subscriptions/listen`; over stdio also `resources/subscribe`): `vr://inbox` and `vr://review/<slug>` changed |
-| **`vr watch`** | terminal agents such as Claude Code: one line per new note, reply or request ([agents.md](agents.md#what-vr-watch-prints)) |
+| **`vr watch`** | scripts and agents without MCP: one line per new note, reply or request ([agents.md](agents.md#what-vr-watch-prints)) |
 | **INBOX.md** | agents that read files on your own machine (a hosted server doesn't write it): rewritten on every event from a person ([agents.md](agents.md#what-vr-watch-prints)) |
 
 **`wait_for_feedback`** waits until a person leaves new feedback (a note, a reply, an edit, a check or reopen, an
@@ -437,17 +449,21 @@ The person writes notes as drafts and sends them in one batch (on a video with a
 the composer keeps each note, and "Send 3 to <agent>" sends them), so the agent gets them in one answer and starts
 once. While it waits, the player says so beside Send: "<agent> is waiting · gets your notes when you send".
 
-### Two lines an answer may end with
+### Lines an answer may end with
 
 What an agent does on a video is one piece of work for the person, a run
 ([agents.md](agents.md#your-work-as-the-person-sees-it-runs)). Two things about it reach the agent as one line at the
-end of its next answer from any tool, once:
+end of its next answer from any tool, once, and a third keeps a read from ending the loop. An answer ends with one of
+them at most: the stop first, then the new notes, then nothing to do.
 
 - **Notes sent while it works** join the same run: `2 new notes on launch.mp4 since you started: get_open_notes since
   "<time>".` Read them and fold them into the same version.
 - **The person stopped the work**: `The person stopped this work on launch.mp4: stop now, render nothing, mark
   nothing, and say you stopped.` Stop then. A wait (`wait_for_feedback`) never carries it: an agent that went back to
   waiting is done with the work anyway.
+- **Nothing to do**: `list_videos` or `list_folders` with nothing open, `get_open_notes` with nothing left: `Nothing
+  waiting for you: put up any version you have, then call wait_for_feedback with since "<cursor>".` (only for agents,
+  and only where `wait_for_feedback` is offered).
 
 ## The review card (MCP App)
 
@@ -598,8 +614,8 @@ review.md). Both can be subscribed to. For anyone but the machine itself, they n
 data file) by URL instead of a path on the server's disk. `ui://video-review/review.html` is the review card's own
 page (an MCP App resource; hosts load it for `show_review`).
 
-**Prompts:** `watch` (one optional argument, `video`): work the notes on the videos assigned to you, then keep calling
-`wait_for_feedback` until the person says stop. Clients show it as a command — Claude Code as `/lampo:watch`
+**Prompts:** `watch` (one optional argument, `video`): "use Lampo" in one command — work the notes on the videos
+assigned to you, then keep calling `wait_for_feedback` until the person approves or says stop. Clients show it as a command — Claude Code as `/lampo:watch`
 ([Start your agent](#start-your-agent-it-hears-notes-only-while-it-listens)). It is offered wherever
 `wait_for_feedback` is, and costs nothing until someone uses it: no client sends prompts with every turn.
 

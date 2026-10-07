@@ -120,6 +120,27 @@ format stays backwards compatible throughout.
   good, and it is no longer started again every time someone opens the video.
 
 ### Changed
+- **"Use Lampo" is all your agent needs to hear.** Connect it, tell it *Use Lampo for "Spring launch"*, and it runs the
+  whole loop by itself: it finds the project (or names one, or asks you which), puts up V1 itself, reads the playbook
+  and your notes, fixes them, puts up the next version, marks each note fixed and waits for your next notes — again and
+  again until you approve. Lampo tells it so the moment it connects, and no answer leaves it standing: when there is
+  nothing to do it is told to wait for you. `/lampo:watch` in Claude Code still works, as a shortcut for the same.
+- **One way in for each kind of agent.** Chat and desktop apps (Claude, ChatGPT, Cursor's chat) work through Lampo's
+  connection alone and are never told about commands they can't run; Claude Code and Codex render through `vr render`,
+  so you watch the render's progress; the agent on your own machine puts its renders up where they are. A video an
+  agent puts up is its own from V1 on, so your notes on it go straight to that agent.
+- **You see your agent the moment it connects.** The sidebar's Agents lists it before it is on any video — "Claude
+  Code · connected", then "ready" while it waits for your notes — and so does Settings → Connect an agent. From there
+  its page and Assign agent… are one click away.
+- **Connect an agent is one page per agent**: the one snippet or connector address it needs, then the sentence to tell
+  it, then what it is doing, live. The command recipes beside it are gone.
+- **The first run starts from your project, and your agent puts up V1.** If you work with an agent, the setup asks for
+  your first project before the agent, and Get started goes: start your first project → connect your agent → your agent
+  puts up V1 (it ticks when its version lands) → invite and share. Adding a video yourself is still there, as the second
+  choice, and the sample fills the wait. Picking *None yet* keeps the people-first steps; your own machine keeps its own.
+- **Empty pages lead with your agent.** An empty library, project or folder now offers *Make one with an agent* first —
+  *Ask Claude Code to make one* once yours is connected, with the prompt copied to paste into it — and uploading a video
+  yourself second.
 - **Get started is one click away on every library page.** While steps are open, the sidebar's foot says *Get started
   · 2 of 5* with a thin line of the steps. A click opens them right there: connect your agent, make a review link,
   invite someone or link a file without leaving the page you're on; the sample and uploading take you where they live.

@@ -16,7 +16,8 @@ import { startServer } from './lib/server.mjs';
 const LABEL = 'getstarted e2e';
 requireChrome(LABEL);
 const PW = 'a long enough password';
-const STEPS = ['sample', 'video', 'agent', 'invite', 'share'];
+// a server's owner who works with an agent (nothing picked yet): the project, the agent, its V1, the team, a link
+const STEPS = ['project', 'agent', 'agent_video', 'invite', 'share'];
 
 const servers = [];
 let browser;
@@ -198,7 +199,7 @@ try {
       await p.setViewport({ width, height: 900 });
       await settle(p);
       const seen = [];
-      for (const id of [...STEPS, 'sample']) {
+      for (const id of [...STEPS, STEPS[0]]) {
         await pick(p, id);
         seen.push({ id, ...(await where(p)) });
       }

@@ -5,8 +5,8 @@
 // server (local mode, temp store, free port) + headless Chrome. The sidebar and ⌘K lead there; the sections are the
 // hosted ones (Profile first: set a first password here to sign in elsewhere); Appearance holds the theme and language;
 // Voice notes says whether they are written down, keeps the languages you speak on your account and folds the engine away; Auto-check lists what it looks at and the
-// store's dictionary file; Connect an agent is three steps (pick the agent, copy its snippet, see it connect) with how
-// agents hear about notes folded away; About has the version, the store's folders and the notices. English in a German browser until German is chosen,
+// store's dictionary file; Connect an agent is one page per agent (pick it, copy its snippet, tell it the one sentence,
+// see it work); About has the version, the store's folders and the notices. English in a German browser until German is chosen,
 // then German labels; every section fits at phone, tablet and desktop.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -353,7 +353,7 @@ try {
     assert(dictionary === path.join(dir, 'data', 'qa-dictionary.txt'), `dictionary ${dictionary}`);
   });
 
-  await check('Connect an agent: pick the agent, copy its one snippet, watch it connect; how updates arrive is folded away', async () => {
+  await check('Connect an agent: pick the agent, copy its one snippet, tell it one sentence, see it work; no CLI recipe beside it', async () => {
     await open('#/settings/mcp', '[data-testid="agent-tiles"]');
     const tiles = await page.$$eval('[data-testid="agent-tiles"] .set-tile b', (b) => b.map((e) => e.textContent));
     assert(JSON.stringify(tiles) === JSON.stringify(['Claude Code', 'Codex', 'Cursor', 'ChatGPT', 'Claude', 'Other client']), `${tiles}`);
@@ -362,9 +362,17 @@ try {
     const state = () => text('[data-testid="agent-state"]');
     const pick = (id) => page.click(`[data-testid="agent-tiles"] input[value="${id}"]`);
     const until = (fn, what) => page.waitForFunction(fn, { polling: 100, timeout: 8000 }).catch(() => assert(false, what));
-    // Claude Code first, through the running app: it gets updates pushed and shows up in step 3.
+    // Claude Code first, through the running app: it gets updates pushed and shows up in the last step.
     assert((await snippet()) === `claude mcp add --transport http lampo ${BASE}/mcp`, `http ${await snippet()}`);
     assert((await state()).includes('Waiting for it to connect'), await state());
+    // then the one sentence that sets it to work — the whole loop — for a project of the library's (none yet: this one);
+    // Claude Code's /lampo:watch is named as its shortcut
+    const tell = () => page.$eval('[data-testid="agent-tell-it"] pre', (e) => e.textContent).catch(() => null);
+    assert(/^Use Lampo for (".+"|this project)$/.test((await tell()) ?? ''), `the sentence: ${await tell()}`);
+    assert((await text('[data-testid="agent-tell-it"]')).startsWith('Tell Claude Code'), await text('[data-testid="agent-tell-it"]'));
+    assert((await text('[data-testid="agent-shortcut"]')).includes('/lampo:watch'), 'the shortcut named');
+    const cards = await page.$$eval('.set-card h2', (h) => h.map((e) => e.textContent.replace(/^\d/, '')));
+    assert(JSON.stringify(cards.slice(0, 4)) === JSON.stringify(['Pick your agent', 'Add Lampo to it', 'Now tell it', 'See it work']), `${cards}`);
     // Or the client starts its own server: works while the app is closed, but it can't show up here.
     await page.evaluate(() =>
       [...document.querySelectorAll('[data-testid="agent-snippet"] button')].find((b) => b.textContent.startsWith('Or let it')).click(),
@@ -388,12 +396,16 @@ try {
     });
     assert(beat.ok, `heartbeat ${beat.status}`);
     await until(() => document.querySelector('[data-testid="agent-state"]')?.textContent.includes('Connected: codex-mcp-client'), 'Connected: the Codex');
+    // what it does now, in the sidebar's words: it follows the notes (vr watch), so it waits for them
+    assert((await state()).includes('waiting for your notes'), await state());
+    assert(!(await page.$('[data-testid="agent-shortcut"]')), 'the shortcut is Claude Code’s only');
     await shot('03-agents');
     // ChatGPT needs the app on the internet (https): the page says so instead of a snippet that can't work.
     await pick('chatgpt');
     await until(() => !document.querySelector('[data-testid="agent-snippet"] pre'), 'no snippet for ChatGPT without https');
     assert((await text('[data-testid="agent-snippet"]')).includes('https address'), await text('[data-testid="agent-snippet"]'));
     assert(!(await page.$('[data-testid="agent-state"]')), 'no waiting for something that cannot connect');
+    assert(!(await page.$('[data-testid="agent-tell"]')), 'nothing to tell what cannot connect');
     // Claude at the machine: its desktop app starts the server itself. No domain to allow in Claude: a media host is a
     // hosted server's (set for this server, and ignored on the machine).
     await page.evaluate(() =>
@@ -408,10 +420,9 @@ try {
     // Any other client: its format, one tab each.
     await pick('other');
     await until(() => document.querySelector('[data-testid="agent-snippet"] pre')?.textContent.includes('"servers"'), 'the VS Code config');
-    // How updates arrive: folded, three one-liners.
-    assert(await page.$('[data-testid="agent-updates"]:not([open])'), 'folded');
-    const updates = await text('[data-testid="agent-updates"]');
-    assert(updates.includes('subscriptions/listen') && updates.includes('wait_for_feedback') && updates.includes('vr watch'), updates);
+    // one path per agent: no vr recipe or "how updates arrive" beside it
+    assert(!(await page.$('[data-testid="agent-updates"]')), 'no CLI recipe');
+    assert(!(await text('main')).includes('vr watch'), 'no vr watch on the page');
   });
 
   // On a wide screen the section stood pinned beside the sidebar with the rest of the window empty (~1,550 px at 2560):

@@ -434,6 +434,8 @@ try {
       /1 agent working|2 agents working|agent working/.test(await text(page, '[data-testid=lane-note]')),
       `the lane's count: ${await text(page, '[data-testid=lane-note]')}`,
     );
+    // the Agents section comes right after the first paint
+    await page.waitForSelector('.nav-section [data-testid=agent-now-row]', { timeout: 20000 });
     const rows = await page.$$eval('.nav-section [data-testid=agent-now-row]', (rs) => rs.map((r) => r.textContent));
     assert(rows.length === 1 && /needs you/.test(rows[0]), `the sidebar's Agents row says what matters most: ${rows}`);
     assert(!(await page.$('.bcard .spinner, .film-over .spinner, .lwhere .spinner')), 'no spinner on a card');

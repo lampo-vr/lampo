@@ -20,17 +20,20 @@ export const SETUP_AGENTS: readonly SetupAgent[] = ['claude-code', 'codex', 'cur
 export const isSetupAgent = (x: unknown): x is SetupAgent => (SETUP_AGENTS as readonly unknown[]).includes(x);
 
 /** A setup step after Welcome (web/src/onboarding/Setup.tsx). */
-export type SetupStep = 'workspace' | 'persona' | 'agent' | 'team' | 'renders' | 'try' | 'health' | 'agents';
+export type SetupStep = 'workspace' | 'persona' | 'project' | 'agent' | 'team' | 'renders' | 'try' | 'health' | 'agents';
 
-/** The setup's steps after Welcome, in order. Every one can be skipped; Back moves within them. */
+/**
+ * The setup's steps after Welcome, in order. Every one can be skipped; Back moves within them. Where the work starts
+ * from a project, the project comes before the agent: the agent is told to use Lampo for it, and puts up V1 there.
+ */
 export function setupStepsFor(variant: SetupVariant, personas?: readonly Persona[]): SetupStep[] {
   switch (variant) {
     case 'cloud':
-      return ['workspace', 'persona', 'agent', ...(onlyCreator(personas) ? [] : (['team'] as const))];
+      return ['workspace', 'persona', 'project', 'agent', ...(onlyCreator(personas) ? [] : (['team'] as const))];
     case 'local':
       return ['renders', 'agent', 'try'];
     case 'server':
-      return ['workspace', 'health', 'team', 'agents'];
+      return ['workspace', 'health', 'team', 'project', 'agents'];
     case 'invited':
       return ['agent'];
   }

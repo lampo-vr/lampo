@@ -191,7 +191,7 @@ try {
     // Connected: still not listening — an MCP client acts only when prompted — and what to tell it, to copy.
     await until(async () => /Connected, not listening/.test(await text('[data-testid=agent-listen]')), 'connected, not listening', 40_000);
     const how = await text('[data-testid=listen-how]');
-    assert(/To start it, tell it:/.test(how) && /Work on my Lampo notes/.test(how), how);
+    assert(/To start it, tell it:/.test(how) && /Use Lampo: work my notes/.test(how), how);
     assert(!(await page.$('[data-testid=agent-button] .kg.live')), 'no turning keyframe for an agent that doesn’t listen');
     await shot('monitor-not-listening', '.claude-pop');
     await page.keyboard.press('Escape');

@@ -25,7 +25,7 @@ export function registerNoteTools({ b, o, tool, author, accountOf, byArg }: Tool
     {
       title: 'Mark a note fixed',
       description:
-        'After you re-rendered to the same path (or vr push): mark a note fixed, saying what you changed and where (e.g. "caption moved to y 1392"). Uses the newest version unless v; waits for a render still being written. Never verify: the reviewer does.',
+        'After you put up the next version: mark a note fixed, saying what you changed and where (e.g. "caption moved to y 1392"). Uses the newest version unless v; waits for a render still being written. Never verify: the reviewer does.',
       inputSchema: z.object({
         id: z.string(),
         note: noteText,

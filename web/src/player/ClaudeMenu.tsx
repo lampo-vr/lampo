@@ -22,18 +22,14 @@ import { AgentMark, I } from '../ui/icons.tsx';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { IconButton, Popover } from '../ui/primitives.tsx';
 
-// Uploaded renders (hosted server) come back as an upload (vr push), local ones as a re-render to the same file.
-const QUICK = (v: number, uploaded: boolean): [string, string][] => [
+// Requests in the agent's own words (agent-facing, so in English): what to do, never which command — it knows its way
+// (the server's instructions: MCP, or `vr render` for a coding agent's renders).
+const QUICK = (v: number): [string, string][] => [
   [
-    'Look this render over before I watch it: run vr diff and vr open, look at the changed ranges and pin anything off as questions with vr add.',
+    'Look this render over before I watch it: check what changed from the version before, and ask me on the frame about anything that looks off.',
     t('Look it over before I watch'),
   ],
-  [
-    uploaded
-      ? 'Work through all open notes, upload the next version with vr push, then mark each with vr fix.'
-      : 'Work through all open notes, re-render to the same path, then mark each with vr fix.',
-    t('Fix all open notes'),
-  ],
+  ['Work through all open notes, put up the next version, then mark each one fixed.', t('Fix all open notes')],
   [`Tell me in one reply what you changed in v${v} and why.`, t('Summarise what changed in V{v}', { v })],
 ];
 
@@ -51,8 +47,6 @@ interface AgentMenuProps {
   /** Whether it hears new notes by itself (an agent connected over MCP only while it waits for them). */
   sessionListening?: boolean | null;
   latestV: number;
-  /** The video is an upload (hosted server), not a file on this machine. */
-  uploaded: boolean;
   home?: string | null;
   /** May send requests and copy the notes for an agent (`agents`). */
   canAsk: boolean;
@@ -83,7 +77,6 @@ export function AgentMenu({
   sessionActive,
   sessionListening,
   latestV,
-  uploaded,
   home,
   canAsk,
   canAssign,
@@ -293,7 +286,7 @@ export function AgentMenu({
                 <div className="label">{t('Ask {name}', { name: session.name })}</div>
                 {/* What people ask most, as quiet answers to pick (the notes panel's Choices), then anything else. */}
                 <div className="choices">
-                  {QUICK(latestV, uploaded).map(([req, label]) => (
+                  {QUICK(latestV).map(([req, label]) => (
                     <button type="button" key={label} className="btn sm choice" onClick={() => send(req)} data-testid="agent-ask">
                       {label}
                     </button>

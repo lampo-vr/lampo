@@ -151,3 +151,39 @@ test('a failed render reaches Lampo as an error, its words redacted; nothing goe
   }, 'the error in Lampo');
   assert.match(live.current?.quote ?? '', /\[redacted\]@cdn\.example\.com refused/);
 });
+
+test('--folder: a new video’s V1 goes up into the project on the server (made with it), with the upload’s progress', async () => {
+  const from = posted.length;
+  const r = await vr([
+    'render',
+    '--folder',
+    'Acme/Launch',
+    '--out',
+    'launch.mp4',
+    '--',
+    FFMPEG,
+    '-y',
+    '-i',
+    'src.mp4',
+    '-vf',
+    'hflip',
+    '-c:v',
+    'libx264',
+    '-pix_fmt',
+    'yuv420p',
+    'launch.mp4',
+  ]);
+  assert.equal(r.code, 0, r.err + r.out);
+  const lines = r.out.trim().split('\n');
+  assert.match(lines[0], /^V1 rendered in \d+s and put up for review in Acme\/Launch \(50 frames\)\.$/);
+  assert.match(lines[1], /^Now listen with vr watch/);
+  const sent = posted.slice(from).flat();
+  assert.ok(
+    sent.some((l) => l.kind === 'render' && l.progress?.v === 1),
+    JSON.stringify(sent),
+  );
+  assert.equal(sent.at(-1)?.text, 'Put a new version up for review');
+  const ls = JSON.parse((await vr(['ls', '--json'])).out) as { video: string; v: number; folder: string | null }[];
+  const v1 = ls.find((x) => x.video.endsWith('/launch.mp4'));
+  assert.deepEqual([v1?.v, v1?.folder], [1, 'Acme/Launch'], JSON.stringify(ls));
+});

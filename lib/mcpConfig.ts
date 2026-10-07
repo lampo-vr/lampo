@@ -2,10 +2,18 @@
 // shows the same, so there is one source. Formats follow each client's documentation (October 2026). Shared with
 // the browser: no Node imports.
 
-import { MCP_NAME } from './brand.ts';
+import { BRAND_NAME, MCP_NAME } from './brand.ts';
 
 // The key people give the server (lib/brand.ts, where the first paint can read it without the setups below).
 export { MCP_NAME };
+
+/**
+ * What a person tells their agent once it is connected, any agent in any client: "use Lampo" is the whole loop (the
+ * server's instructions, mcp/loop.ts) — it finds or names the project, puts up V1, works the notes and keeps waiting
+ * for the next ones until the person approves. Agent-facing, so in English. No project yet: the one it works in.
+ */
+export const lampoFor = (project?: string | null): string =>
+  project ? `Use ${BRAND_NAME} for "${project.replace(/["\n]/g, ' ').trim()}"` : `Use ${BRAND_NAME} for this project`;
 
 export const MCP_CLIENTS = ['claude', 'codex', 'cursor', 'vscode', 'antigravity', 'windsurf', 'gemini', 'zed', 'json'] as const;
 export type McpClient = (typeof MCP_CLIENTS)[number];

@@ -66,6 +66,13 @@
 .ob-gs-acts .ob-fine {
   margin: 0;
 }
+/* a name and its button on one line (the first project): the field takes the room, the button keeps its words */
+.ob-gs-inline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-2);
+  max-width: 420px;
+}
 /* what a step says back: done, with its keyframe */
 .ob-gs-done-note {
   display: flex;

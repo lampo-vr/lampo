@@ -5,7 +5,7 @@
 // existed have no `onboarding` and count as done: someone who already uses Lampo never sees it. A new account also
 // gets the setup (Welcome and a few skippable steps, `setupStepsFor`) on its first visit: `setup_due` until it is over.
 // Browser-safe: the account menu counts with it, the server records with it.
-import type { OnboardingPrefs, OnboardingStep, Persona, Review, Role } from './types.ts';
+import type { OnboardingPrefs, OnboardingStep, Persona, Review, Role, SetupAgent } from './types.ts';
 
 /** The picks that are one of the three kinds, in the order they were picked ("Something else" kept apart). */
 export const personaKinds = (personas: readonly Persona[] | undefined): Persona[] => (personas ?? []).filter((k) => k !== 'other');
@@ -58,25 +58,30 @@ export const setupDue = (o: OnboardingPrefs | null | undefined): boolean => !!o?
 /**
  * Get started's steps for an account in the workspace it works in, in order:
  * - reviewers: the sample (a fix to check, a question to answer), a note of their own, an approval;
- * - members: the sample, their agent, a first video, a review link;
- * - owners and admins add the invite — at the machine there is nobody to invite (and its renders are linked, so the
- *   video comes before the agent); in a workspace made at sign-up (`signupWorkspace`, Cloud) the personas order it:
- *   in-house teams invite before they upload, a channel alone invites nobody; on a self-hosted server the team's
- *   first video comes before the agents and the invites.
+ * - whoever works with an agent (any pick but "None yet" in the setup, `agent`): the agent puts up V1 itself — owners
+ *   and admins make a project, connect the agent, and it puts up V1 (adding a video yourself is the pane's second
+ *   choice); members connect theirs into the team's projects;
+ * - "None yet": people first — the sample, a first video, a review link;
+ * - owners and admins add the invite; in a workspace made at sign-up (`signupWorkspace`, Cloud) the personas order it:
+ *   in-house teams invite before they share, a channel alone invites nobody;
+ * - the machine keeps its own: its renders are linked where they land (the setup's first step), so the video comes
+ *   before the agent and nobody is invited.
  */
 export function stepsFor(
   role: Role,
-  { machine = false, signupWorkspace = false, personas }: { machine?: boolean; signupWorkspace?: boolean; personas?: readonly Persona[] } = {},
+  {
+    machine = false,
+    signupWorkspace = false,
+    personas,
+    agent,
+  }: { machine?: boolean; signupWorkspace?: boolean; personas?: readonly Persona[]; agent?: SetupAgent | null } = {},
 ): OnboardingStep[] {
   if (role === 'reviewer') return ['sample', 'note', 'approve'];
-  if (role === 'member') return ['sample', 'agent', 'video', 'share'];
   if (machine) return ['sample', 'video', 'agent', 'share'];
-  if (signupWorkspace) {
-    if (onlyCreator(personas)) return ['sample', 'agent', 'video', 'share'];
-    if ((personas ?? []).includes('inhouse')) return ['sample', 'agent', 'invite', 'video', 'share'];
-    return ['sample', 'agent', 'video', 'share', 'invite'];
-  }
-  return ['sample', 'video', 'agent', 'invite', 'share'];
+  const first: OnboardingStep[] = agent === 'none' ? ['sample', 'video'] : role === 'member' ? ['agent', 'agent_video'] : ['project', 'agent', 'agent_video'];
+  if (role === 'member' || (signupWorkspace && onlyCreator(personas))) return [...first, 'share'];
+  if (!signupWorkspace || (personas ?? []).includes('inhouse')) return [...first, 'invite', 'share'];
+  return [...first, 'share', 'invite'];
 }
 
 /** What the server found done right now (each true fact ticks its step). */

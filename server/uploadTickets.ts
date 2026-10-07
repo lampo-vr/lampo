@@ -100,7 +100,7 @@ export type Outcome =
  * a fix preview, or a reference on a note.
  */
 export type TicketTarget =
-  | { kind: 'render'; meta: UploadMeta; byId?: string }
+  | { kind: 'render'; meta: UploadMeta; byId?: string; session?: store.SessionInput }
   | { kind: 'preview'; preview: PreviewTarget }
   | { kind: 'ref'; ref: RefTarget }
   /** The file of an item a question with options offers (lib/askOptions.ts). */
@@ -216,7 +216,7 @@ export interface UploadTickets {
    * A one-time upload URL for `by` (account `byId`), who must be allowed to upload (the caller checks now, `guard` when
    * it is used). Throws on bad metadata.
    */
-  issue(input: TicketRequest, by: string, base: string | null, byId: string | undefined, guard: TicketGuard): IssuedTicket;
+  issue(input: TicketRequest, by: string, base: string | null, byId: string | undefined, guard: TicketGuard, session?: store.SessionInput | null): IssuedTicket;
   /** A one-time URL for a fix preview of a note; `by` must be allowed to resolve notes (the caller checks; `guard` again at use). */
   issuePreview(target: PreviewTarget, by: string, base: string | null, guard: TicketGuard): IssuedTicket;
   /** A one-time URL for an image or clip reference on a note; `by` may add it (the caller checks; `guard` again at use). */
@@ -267,12 +267,14 @@ export function createUploadTickets({ origin = null }: { origin?: string | null 
   }
   const issued = ({ token: _token, ...x }: IssuedTicket & { token: string }): IssuedTicket => x;
   return {
-    issue: (input, by, base, byId, guard) => {
+    issue: (input, by, base, byId, guard, session) => {
       const meta = uploadMeta(input);
       // nothing new in an archived project: no URL for it at all (the upload checks again when it lands)
       if (meta.slug) checkReviewOpen(store.loadReview(meta.slug));
       else checkNotArchived(meta.folder);
-      return issued(mint({ kind: 'render', meta, ...(byId ? { byId } : {}) }, by, base, guard));
+      // the agent that asked: a new video it puts up is its own (only a new one: a next version keeps its agent)
+      const own = session && !meta.slug ? { session } : {};
+      return issued(mint({ kind: 'render', meta, ...(byId ? { byId } : {}), ...own }, by, base, guard));
     },
     issuePreview(target, by, base, guard) {
       const hit = store.findComment(target.comment);

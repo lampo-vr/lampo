@@ -15,15 +15,22 @@ import { publicMessage } from '../lib/publicError.ts';
 import type { RefTarget } from '../lib/refs.ts';
 import { currentSession } from '../lib/sessions.ts';
 import type { GrabCount } from '../lib/shots.ts';
-import type { OptionGroup, Review, ReviewEvent } from '../lib/types.ts';
+import type { SessionInput } from '../lib/store.ts';
+import type { AgentKind, OptionGroup, Review, ReviewEvent } from '../lib/types.ts';
 import { allowed, audienceOf, type Principal, TOOL_ACCESS } from './access.ts';
 import type { Hold, Quiet, Told, Wake } from './feedback.ts';
-import { clientName, fail } from './format.ts';
+import { clientName, fail, isIdle, nextStep } from './format.ts';
 import { toolFilter, trimmed } from './lean.ts';
+import type { AgentWay } from './loop.ts';
 
 export interface ReviewServerOptions {
   backend: Backend;
   principal: Principal;
+  /**
+   * How this agent puts up versions, and so how it is told the loop (mcp/loop.ts): the machine itself, a coding agent
+   * with a shell, or any other client (MCP only). Default: the machine for `via: local`, else the MCP way.
+   */
+  way?: AgentWay;
   /** Stdio inside a Claude Code session: attribute writes to that session (never for a shared HTTP server). */
   sessionAuthor?: boolean;
   /** Resolves early when new events may exist; wait_for_feedback re-checks either way. Default: plain polling. */
@@ -39,7 +46,15 @@ export interface ReviewServerOptions {
   /** The inbox as this client may see it (hosted: rendered with screenshot URLs); default: the backend's INBOX.md. */
   inboxMarkdown?: () => Promise<string>;
   /** The HTTP server hands out one-time upload URLs (`request_upload`); absent over stdio, where `vr push` exists. */
-  requestUpload?: (input: { filename: string; folder?: string | null; slug?: string | null; part_at?: number; handles?: number }) => {
+  requestUpload?: (input: {
+    filename: string;
+    folder?: string | null;
+    slug?: string | null;
+    part_at?: number;
+    handles?: number;
+    /** The agent asking: a new video it puts up is assigned to it. */
+    session?: SessionInput | null;
+  }) => {
     url: string;
     expires: string;
   };
@@ -77,7 +92,7 @@ export interface ReviewServerOptions {
    * server/routes/mcp.ts). `session: "me"` and the first wait's "waiting for you" go by it; over stdio inside a Claude
    * Code session the session itself is (lib/sessions.ts currentSession).
    */
-  me?: { name: string; sessionId: string | null } | null;
+  me?: { name: string; sessionId: string | null; kind?: AgentKind } | null;
   /** A wait_for_feedback started: the app shows the agent as listening until the release (server/agents.ts). */
   onWait?: () => (o?: { handed?: boolean }) => void;
   /** What a wait already told this agent was waiting for it (mcp/feedback.ts Told): each thing once. */
@@ -122,7 +137,7 @@ export interface ToolKit {
   /** Records a call as live activity, for tools registered outside `tool` (the wait, the review card). */
   activity(name: string, args: Record<string, unknown>, ctx: ServerContext): string | null;
   /** The agent this connection is (`session: "me"`): null when the server can't tell (a client nobody assigns to). */
-  me(): { name: string | null; sessionId: string | null } | null;
+  me(): { name: string | null; sessionId: string | null; kind?: AgentKind } | null;
   /** The agent a call comes from, by its activity name (null: a person's client, or no name). */
   agentName(ctx: ServerContext): string | null;
   /** A wait handed over work on these videos (the `handed` option, by this connection's agent). */
@@ -159,8 +174,12 @@ export function createToolKit(server: McpServer, o: ReviewServerOptions): ToolKi
         const out = await fn(given, ctx);
         if (out.isError) return out;
         // the person stopped its work: one line at the end of this answer, once (and nothing else is news then);
-        // else notes the person added to its run while it worked: one line at the end of its next answer, once
-        const line = noteActivity(name, given as Record<string, unknown>, ctx) || newsFor(name, given as Record<string, unknown>, ctx);
+        // else notes the person added to its run while it worked: one line at the end of its next answer, once;
+        // else, when the answer leaves an agent nothing to do, the next step (a read never ends the loop)
+        const line =
+          noteActivity(name, given as Record<string, unknown>, ctx) ||
+          newsFor(name, given as Record<string, unknown>, ctx) ||
+          (isIdle(out) && offers('wait_for_feedback') && agentOf(ctx) ? await nextStep(b).catch(() => null) : null);
         return line ? { ...out, content: [...out.content, { type: 'text', text: line }] } : out;
       } catch (e) {
         return fail(publicMessage(e, audienceOf(o.principal), { status: 400, where: `mcp ${name}` }));
@@ -270,7 +289,7 @@ export function createToolKit(server: McpServer, o: ReviewServerOptions): ToolKi
 }
 
 /** The agent a connection is (ReviewServerOptions.me), else the Claude Code session the stdio server runs in. */
-export function meOf(o: Pick<ReviewServerOptions, 'me' | 'sessionAuthor'>): { name: string | null; sessionId: string | null } | null {
+export function meOf(o: Pick<ReviewServerOptions, 'me' | 'sessionAuthor'>): { name: string | null; sessionId: string | null; kind?: AgentKind } | null {
   if (o.me) return o.me;
   const s = o.sessionAuthor ? currentSession() : null;
   return s && (s.name || s.sessionId) ? { name: s.name, sessionId: s.sessionId } : null;
