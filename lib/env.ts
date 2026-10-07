@@ -178,6 +178,54 @@ export function spelledAs(name: SettingName, env: Env = process.env): string {
   return old !== null && env[old] !== undefined && env[old] !== '' ? old : name;
 }
 
+/**
+ * Settings that only make sense together (a server and its token), from one spelling: the LAMPO_ pair when either of
+ * it is set, else the VR_ pair. Never one spelling's server with the other's token.
+ */
+export function settingPair(a: SettingName, b: SettingName, env: Env = process.env): [string | undefined, string | undefined] {
+  const given = (n: string | null) => (n !== null && env[n] !== undefined && env[n] !== '' ? env[n] : undefined);
+  if (given(a) !== undefined || given(b) !== undefined) return [given(a), given(b)];
+  return [given(oldSpelling(a)), given(oldSpelling(b))];
+}
+
+/**
+ * What the Docker image sets for itself in the older spelling (its ENV, kept VR_ so a run-time value of either
+ * spelling wins): a LAMPO_ value given at run time is meant to replace these, so it is no conflict.
+ */
+export const IMAGE_DEFAULTS: Readonly<Record<string, string>> = {
+  VR_MODE: 'server',
+  VR_HOME: '/data',
+  VR_PORT: '4747',
+  VR_STT_PREFETCH: '1',
+  VR_USER: 'admin',
+};
+
+/**
+ * Settings given in both spellings, differently, by name (never a value): an empty LAMPO_ one leaves the VR_ one in
+ * force, a non-empty one replaces it. Either can surprise someone halfway through renaming an env file.
+ */
+export function spellingConflicts(env: Env = process.env): { name: string; old: string; empty: boolean }[] {
+  const out: { name: string; old: string; empty: boolean }[] = [];
+  for (const rest of RENAMED) {
+    const name = NEW + rest;
+    const old = OLD + rest;
+    const now = env[name];
+    const before = env[old];
+    if (now === undefined || before === undefined || before === '' || now === before) continue;
+    if (now !== '' && IMAGE_DEFAULTS[old] === before) continue;
+    out.push({ name, old, empty: now === '' });
+  }
+  return out;
+}
+
+/** One line a server says at start for each of them. */
+export const spellingWarnings = (env: Env = process.env): string[] =>
+  spellingConflicts(env).map((c) =>
+    c.empty
+      ? `warning: ${c.name} is empty, so ${c.old} still applies (an empty LAMPO_ setting leaves the older one in force): remove ${c.old}, or give ${c.name} a value`
+      : `warning: ${c.name} and ${c.old} are both set, differently: ${c.name} applies; remove ${c.old}`,
+  );
+
 /** Every setting by its LAMPO_ name, each read as `setting()` reads it. */
 export type Settings = { readonly [K in SettingName]?: string };
 

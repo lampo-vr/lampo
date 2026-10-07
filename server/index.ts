@@ -12,7 +12,7 @@ import { forgetHeldChanges, listUsers, localOwner, secret, sweepUnconfirmed } fr
 import { migrateAvatars } from '../lib/avatars.ts';
 import { loadConfig, startupProblems } from '../lib/config.ts';
 import { jobsInterrupted } from '../lib/crashGuard.ts';
-import { settings, spelledAs } from '../lib/env.ts';
+import { settings, spelledAs, spellingWarnings } from '../lib/env.ts';
 import { bindShareLinks } from '../lib/folders.ts';
 import { unknownOperators } from '../lib/operator.ts';
 import { CACHE, DATA, openToOthers, ROOT, VERSIONS } from '../lib/paths.ts';
@@ -224,6 +224,8 @@ console.log(`data: ${DATA}`);
 // tell who connects, reach the app on localhost as you: SECURITY.md).
 const open = SERVER ? null : openToOthers(DATA);
 if (open) console.warn(`warning: ${open}: chmod 700 it if anyone else signs in to this machine (SECURITY.md)`);
+// A setting given in both spellings, differently (names only): an emptied LAMPO_ one would leave the VR_ one in force.
+for (const line of spellingWarnings()) console.warn(line);
 const owner = SERVER ? null : localOwner();
 if (owner)
   console.log(

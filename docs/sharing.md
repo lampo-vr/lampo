@@ -357,7 +357,7 @@ every writer (the app, `lampo`, MCP), because they follow `data/events.jsonl`.
 
 ### What arrives
 
-- **Slack:** `{"text": "Mia (client) left a note on spot.mp4 v2 at 00:03:00: “Logo später” <https://…|Open>"}`
+- **Slack:** `{"text": "Mia (via review link) left a note on spot.mp4 V2 at 00:03:00: “Logo später” <https://…|Open>"}`
 - **Discord:** `{"content": "…\nhttps://…", "username": "Lampo", "allowed_mentions": {"parse": []}}`
 - **JSON:** `{"event": <the event as in events.jsonl>, "text": "…", "url": "https://…/#/v/<slug>?c=<id>"}`.
   Screenshot paths become full URLs on the app's public URL (on your own machine without one, `localhost`), never

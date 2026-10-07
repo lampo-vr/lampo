@@ -57,6 +57,8 @@ services:
     environment:
       # LAMPO_DOMAIN, else the older VR_DOMAIN of an .env from before
       LAMPO_DOMAIN: ${LAMPO_DOMAIN:-${VR_DOMAIN:?set LAMPO_DOMAIN in .env}}
+      # the media host, for deploy/Caddyfile.cdn only (behind a CDN: docs/go-live.md); the plain Caddyfile ignores it
+      LAMPO_MEDIA_DOMAIN: ${LAMPO_MEDIA_DOMAIN:-${VR_MEDIA_DOMAIN:-}}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

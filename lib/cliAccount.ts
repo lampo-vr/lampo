@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import * as auth from './auth.ts';
-import { type Credentials, clearCredentials, readCredentials, saveCredentials } from './backend/credentials.ts';
+import { type Credentials, clearCredentials, envLogin, readCredentials, saveCredentials, savedLogins } from './backend/credentials.ts';
 import { createApi } from './backend/remote.ts';
 import { BROWSER_WAIT_MS, browserCommand, browserLogin, LoginEnded, launchBrowser } from './browserLogin.ts';
 import { loadConfig } from './config.ts';
@@ -215,7 +215,7 @@ async function signInWithBrowser(server: string, days: number | null) {
     });
   } catch (e) {
     if (e instanceof LoginEnded && e.reason === 'cancelled') {
-      process.stderr.write(`\nvr: ${e.message}\n`);
+      process.stderr.write(`\nlampo: ${e.message}\n`);
       process.exitCode = 130;
       return null;
     }
@@ -239,14 +239,22 @@ async function readSecretLine(): Promise<string> {
 export async function logout(): Promise<void> {
   const c = readCredentials();
   if (!c) return out('not signed in to a server; lampo uses the local store.');
-  if (settings.LAMPO_SERVER && settings.LAMPO_TOKEN)
-    return out('LAMPO_SERVER / LAMPO_TOKEN are set in the environment; unset them to go back to the local store.');
-  if (c.token_id)
-    await createApi(c)
-      .call('DELETE', `/api/auth/tokens/${encodeURIComponent(c.token_id)}`)
-      .catch(() => {});
+  const [server, token] = envLogin();
+  if (server && token)
+    return out('a server and its token are set in the environment (LAMPO_SERVER / LAMPO_TOKEN, or VR_); unset them to go back to the local store.');
+  // Every saved login is forgotten, an older `vr login`'s too: each token is revoked on its own server (best effort),
+  // or one left behind in the older file would stay valid with nothing on this machine holding it.
+  const logins = savedLogins();
+  for (const l of logins)
+    if (l.token_id)
+      await createApi(l)
+        .call('DELETE', `/api/auth/tokens/${encodeURIComponent(l.token_id)}`)
+        .catch(() => {});
   clearCredentials();
-  out(`signed out of ${c.server}${c.token_id ? ' (token revoked)' : ''}; lampo uses the local store again.`);
+  const more = logins.filter((l) => l.token_id && (l.server !== c.server || l.token !== c.token)).length;
+  out(
+    `signed out of ${c.server}${c.token_id ? ' (token revoked)' : ''}${more ? `, and an older login's token revoked too` : ''}; lampo uses the local store again.`,
+  );
 }
 
 export async function whoami({ opt }: { opt: Opts }, author: string): Promise<void> {

@@ -239,10 +239,16 @@ format stays backwards compatible throughout.
   the MCP resources `lampo://inbox` and `lampo://review/<slug>`, and the npm package `@lampo-vr/lampo`. Nothing you set
   up before breaks: `vr` and `vr-mcp` keep working and print the same (only a person typing `vr` in a terminal is told
   the new name), `VR_*` settings are still read wherever the `LAMPO_` one is unset, the `vr://` addresses still answer,
-  and a login saved by `vr login` is still read. To switch: `npm run link` (puts `lampo` beside `vr` in
+  and a login saved by `vr login` is still read (`lampo logout` signs out of it too, its token revoked on its own
+  server). To switch: `npm run link` once more, also on a machine linked before (it puts `lampo` beside `vr` in
   `~/.local/bin`), `lampo mcp config <client>` for a new MCP setup (it starts `bin/lampo-mcp` and reads
   `$LAMPO_TOKEN`), and rename `VR_` to `LAMPO_` in your env files when convenient. The login moves to
   `~/.config/lampo/` and downloads to `~/.cache/lampo/`; the store stays where it is (`~/.video-review`, `data/`).
+- **Settings in both spellings.** `LAMPO_SERVER` and `LAMPO_TOKEN` are taken as a pair, both `LAMPO_` when either is
+  set, else both `VR_`, so one server's token never goes to another. A server that finds a setting in both spellings
+  with different values says so once at start, by name only; an empty `LAMPO_` setting, which leaves the `VR_` one in
+  force, is named too. The Docker setup hands `LAMPO_MEDIA_DOMAIN` (or an older `VR_MEDIA_DOMAIN`) to the proxy, so
+  the config for running behind a CDN needs no extra line in `docker-compose.yml`.
 - Agents named by their MCP client (`claude-code · Mia`) read as the agent's name (`Claude Code · Mia`) on the Connect
   page, in the agent menus, Settings → Connected agents and Insights.
 - **"Use Lampo" is all your agent needs to hear.** Connect it, tell it *Use Lampo for "Spring launch"*, and it runs the

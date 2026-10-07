@@ -1,13 +1,14 @@
 // Webhooks against a local receiver: signatures, the three formats, retries (and when not to), timeouts, which
 // events a hook wants, hooks managed in Settings, and the whole path from a client's note to a Slack-style message.
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
 import type { ReviewEvent } from '../../lib/types.ts';
 import { startApp } from '../lib/app.ts';
-import { age, isolatedEnv, makeVideo, sleep } from '../lib/helpers.ts';
+import { age, isolatedEnv, makeVideo, ROOT, sleep } from '../lib/helpers.ts';
 
 const { dir } = isolatedEnv();
 const hooks = await import('../../lib/webhooks.ts');
@@ -82,6 +83,9 @@ test('json deliveries are signed so receivers can check them, with the event and
   assert.equal(json.url, 'https://review.example.com/#/v/__work__Acme__spot.mp4?c=c_0a1b2c');
   assert.match(json.text, /^Mia \(via review link\) left a note on spot\.mp4 V2 at 00:03:00/);
   assert.equal(json.event.by, 'guest:Mia');
+  // docs/sharing.md shows this very line as the Slack example: it reads as it arrives
+  const shown = /\*\*Slack:\*\* `\{"text": "([^"<]*?) “/.exec(fs.readFileSync(path.join(ROOT, 'docs/sharing.md'), 'utf8'))?.[1];
+  assert.equal(shown, /^(.*?) “/.exec(json.text)?.[1], 'the docs’ example says what a hook sends');
 });
 
 test('slack and discord get a readable line; slack markup is escaped, discord mentions are off', async () => {

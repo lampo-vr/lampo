@@ -73,8 +73,9 @@ With the app host behind a CDN proxy, the steps change in a few places; the back
 - **The proxy's config.** [`deploy/Caddyfile.cdn`](../deploy/Caddyfile.cdn) does the above with Caddy for Cloudflare:
   only the CDN's ranges reach the app host (authenticated origin pulls are there, commented, and recommended), the
   visitor's address comes from `CF-Connecting-IP`, and the media host gets its own certificate. Mount it in place of
-  `deploy/Caddyfile` (the `caddy` service's volume in `docker-compose.yml`), give that service `LAMPO_MEDIA_DOMAIN` beside
-  `LAMPO_DOMAIN`, and the origin certificate and key in `/etc/caddy/certs/`.
+  `deploy/Caddyfile` (the `caddy` service's volume in `docker-compose.yml`), set `LAMPO_MEDIA_DOMAIN` in `.env` beside
+  `LAMPO_DOMAIN` (the compose file hands both to that service; an `.env` from before the rename may still say
+  `VR_MEDIA_DOMAIN`, which is read too), and put the origin certificate and key in `/etc/caddy/certs/`.
 - **Caching.** Let the CDN cache `/assets/` (hashed names, a year) and bypass its cache for everything else: the app
   marks what may be kept, and pictures and screenshots are private (a CDN caches `.png` and `.jpg` by extension).
 - **Rewriting.** Turn off whatever rewrites pages or injects scripts (Rocket Loader, email obfuscation, automatic HTTPS

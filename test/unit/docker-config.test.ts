@@ -91,3 +91,17 @@ test('the image skips onnxruntime’s GPU download and keeps one platform’s bi
   const pkg = JSON.parse(read('package.json'));
   assert.ok(pkg.optionalDependencies['onnxruntime-node'], 'optional: the app runs without it (footage search off)');
 });
+
+// Caddy reads only what the compose file hands its service: every {$LAMPO_…} in either Caddyfile is mapped there, the
+// older VR_ spelling of an .env from before the rename as the fallback (or the CDN config would serve no media host).
+test('every setting a Caddyfile reads reaches the proxy, in either spelling', () => {
+  const compose = read('docker-compose.yml');
+  const caddy = compose.slice(compose.indexOf('  caddy:'), compose.indexOf('\nvolumes:'));
+  const names = new Set([...`${read('deploy/Caddyfile')}\n${read('deploy/Caddyfile.cdn')}`.matchAll(/\{\$(\w+)\}/g)].map((m) => m[1]));
+  assert.ok(names.has('LAMPO_DOMAIN') && names.has('LAMPO_MEDIA_DOMAIN'), [...names].join(' '));
+  for (const name of names) {
+    assert.match(name, /^LAMPO_/, `${name}: a Caddyfile says LAMPO_`);
+    const old = name.replace(/^LAMPO_/, 'VR_');
+    assert.match(caddy, new RegExp(`^ {6}${name}: \\$\\{${name}:-\\$\\{${old}:[-?]`, 'm'), `${name} reaches the caddy service, ${old} as the fallback`);
+  }
+});

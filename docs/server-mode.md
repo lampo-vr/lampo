@@ -52,7 +52,8 @@ Settings, `--token -` asks for it or reads it from a pipe. Don't type the token 
 process list and your shell's history would keep it. `lampo login` refuses a plain `http://` address on another machine
 (the password, the token and every note would cross the network unencrypted) unless you add `--insecure`, for a
 network that is yours alone; `http://localhost` needs nothing. `lampo logout` goes back to the local store: a token
-`lampo login` made is revoked, one you pasted is only forgotten (revoke it in Settings → API tokens). In CI or a
+`lampo login` made is revoked, one you pasted is only forgotten (revoke it in Settings → API tokens), and so is a
+login `vr login` saved before the rename, on its own server. In CI or a
 container, `LAMPO_SERVER` and `LAMPO_TOKEN` do the same as `lampo login` without a file; `LAMPO_REMOTE=0` keeps `lampo` on the local
 store.
 

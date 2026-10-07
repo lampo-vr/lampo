@@ -149,7 +149,7 @@ try {
   cli.push({ item: `lampo watch, one NEW line (avg of ${events.length})`, tokens: avg(events.map(eventLine)) });
   const lines = await import('../../lib/eventLine.ts');
   if ('shortEventLine' in lines) cli.push({ item: 'lampo watch --brief, one NEW line (= wait_for_feedback)', tokens: avg(events.map(lines.shortEventLine)) });
-  const inbox = fs.readFileSync(path.join(env.VR_DATA as string, 'INBOX.md'), 'utf8'); // isolatedEnv's store
+  const inbox = fs.readFileSync(path.join(dir, 'data', 'INBOX.md'), 'utf8'); // isolatedEnv's store
   const inboxNotes = (inbox.match(/^### /gm) || []).length || events.length;
   cli.push({ item: `INBOX.md per note (avg of ${inboxNotes})`, tokens: Math.round(approxTokens(inbox) / Math.max(1, inboxNotes)) });
   // what an agent's next answer ends with, once, after a person stopped its work (lib/runs.ts)

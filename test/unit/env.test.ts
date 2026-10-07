@@ -3,13 +3,28 @@
 // name born LAMPO_ has no older spelling, every reader goes through lib/env.ts, and the image's defaults stay in the
 // old spelling so that either spelling given at run time wins over them.
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
-import { isolatedEnv, ROOT } from '../lib/helpers.ts';
+import { freePort, isolatedEnv, ROOT, tmpdir, until } from '../lib/helpers.ts';
 
 isolatedEnv();
-const { bothSpellings, LAMPO_NAMES, LAMPO_ONLY, oldSpelling, RENAMED, RENAMED_DEV, setting, settingsIn, spelledAs } = await import('../../lib/env.ts');
+const {
+  bothSpellings,
+  IMAGE_DEFAULTS,
+  LAMPO_NAMES,
+  LAMPO_ONLY,
+  oldSpelling,
+  RENAMED,
+  RENAMED_DEV,
+  setting,
+  settingPair,
+  settingsIn,
+  spelledAs,
+  spellingConflicts,
+  spellingWarnings,
+} = await import('../../lib/env.ts');
 const { loadConfig } = await import('../../lib/config.ts');
 const { envHook } = await import('../../lib/webhooks.ts');
 const { endpointsFrom } = await import('../../lib/publish/net.ts');
@@ -156,6 +171,80 @@ test('a message names a setting the way the operator wrote it; one to set by its
   }
 });
 
+test('settings that belong together come from one spelling', () => {
+  assert.deepEqual(settingPair('LAMPO_SERVER', 'LAMPO_TOKEN', { LAMPO_SERVER: 'b', VR_SERVER: 'a', VR_TOKEN: 'ta' }), ['b', undefined]);
+  assert.deepEqual(settingPair('LAMPO_SERVER', 'LAMPO_TOKEN', { VR_SERVER: 'a', VR_TOKEN: 'ta' }), ['a', 'ta']);
+  assert.deepEqual(settingPair('LAMPO_SERVER', 'LAMPO_TOKEN', { LAMPO_SERVER: '', VR_SERVER: 'a', VR_TOKEN: 'ta' }), ['a', 'ta'], 'empty is unset');
+});
+
+test('a setting in both spellings, differently, is said by name: an emptied LAMPO_ one leaves the VR_ one in force', () => {
+  const env = { LAMPO_TRUST_PROXY: '', VR_TRUST_PROXY: 'loopback', LAMPO_ORG_NAME: 'New', VR_ORG_NAME: 'Old', LAMPO_STT: 'off', VR_STT: 'off' };
+  assert.deepEqual(spellingConflicts(env), [
+    { name: 'LAMPO_TRUST_PROXY', old: 'VR_TRUST_PROXY', empty: true },
+    { name: 'LAMPO_ORG_NAME', old: 'VR_ORG_NAME', empty: false },
+  ]);
+  const said = spellingWarnings(env).join('\n');
+  assert.match(said, /LAMPO_TRUST_PROXY is empty, so VR_TRUST_PROXY still applies/);
+  assert.match(said, /LAMPO_ORG_NAME and VR_ORG_NAME are both set, differently: LAMPO_ORG_NAME applies/);
+  assert.doesNotMatch(said, /loopback|New|Old/, 'names, never values');
+  // the image's own defaults (VR_, so either spelling given at run time wins) are no conflict
+  assert.deepEqual(spellingConflicts({ LAMPO_PORT: '5000', VR_PORT: '4747', LAMPO_MODE: 'server', VR_MODE: 'server' }), []);
+  assert.deepEqual(spellingConflicts({ LAMPO_PORT: '', VR_PORT: '4747' }), [{ name: 'LAMPO_PORT', old: 'VR_PORT', empty: true }], 'emptied, it still says so');
+  const docker = fs.readFileSync(path.join(ROOT, 'Dockerfile'), 'utf8');
+  const image = Object.fromEntries([...docker.matchAll(/^\s+(VR_[A-Z_]+)=(\S+?)\s*\\?$/gm)].map((m) => [m[1], m[2]]));
+  assert.deepEqual(image, IMAGE_DEFAULTS, 'the list is the image’s ENV');
+});
+
+test('the server says them at start, by name only', async () => {
+  const store = tmpdir('vr-spellings-');
+  fs.writeFileSync(path.join(store, 'config.json'), '{}');
+  const child = spawn(process.execPath, [path.join(ROOT, 'server/index.ts')], {
+    env: {
+      PATH: process.env.PATH,
+      HOME: store,
+      XDG_CONFIG_HOME: path.join(store, 'xdg'),
+      XDG_CACHE_HOME: path.join(store, 'xdg-cache'),
+      LAMPO_DATA: path.join(store, 'data'),
+      LAMPO_CACHE: path.join(store, 'cache'),
+      LAMPO_CONFIG: path.join(store, 'config.json'),
+      LAMPO_HOST: '127.0.0.1',
+      LAMPO_PORT: String(await freePort()),
+      LAMPO_STT: 'off',
+      LAMPO_FOOTAGE: 'off',
+      LAMPO_ONBOARDING_SAMPLE: 'off',
+      LAMPO_TRUST_PROXY: '',
+      VR_TRUST_PROXY: 'loopback',
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let log = '';
+  child.stdout.on('data', (d) => {
+    log += d;
+  });
+  child.stderr.on('data', (d) => {
+    log += d;
+  });
+  try {
+    await until(
+      () => /LAMPO_TRUST_PROXY is empty/.test(log) || child.exitCode !== null,
+      () => log,
+    );
+    assert.match(log, /warning: LAMPO_TRUST_PROXY is empty, so VR_TRUST_PROXY still applies/, log);
+    assert.doesNotMatch(
+      log
+        .split('\n')
+        .filter((l) => l.includes('VR_TRUST_PROXY'))
+        .join('\n'),
+      /loopback/,
+      'never the value',
+    );
+  } finally {
+    child.kill();
+    await new Promise((r) => (child.exitCode === null ? child.on('close', r) : r(null)));
+    fs.rmSync(store, { recursive: true, force: true });
+  }
+});
+
 /** Lines of source without their comments (a comment may name a variable it explains). */
 const code = (file: string) =>
   fs
@@ -164,14 +253,28 @@ const code = (file: string) =>
     .filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l));
 
 test('every setting is read through lib/env.ts: no reader knows both spellings', () => {
-  const dirs = ['lib', 'server', 'mcp', 'scripts', 'bin'];
+  // the guard itself: what it finds and what it lets be
+  const probe = (l: string) =>
+    /\b(?:process\.)?env(?:\.|\[['"`])(?:VR|LAMPO)_[A-Z0-9_]/.test(
+      l.replace(/(?:delete\s+)?process\.env(?:\.|\[['"`])(?:VR|LAMPO)_[A-Z0-9_${}]*['"`\]]*\s*(?:=(?!=)|;)/g, ''),
+    ) || /\{[^}]*\b(?:VR|LAMPO)_[A-Z0-9_]+[^}]*\}\s*=\s*(?:process\.)?env\b/.test(l);
+  assert.ok(probe('const { VR_DATA, LAMPO_CACHE } = process.env;'), 'taken apart');
+  assert.ok(probe("const d = env['VR_DATA'];"));
+  assert.ok(probe('if (process.env.LAMPO_X === "1") go();'), 'a comparison is a read');
+  assert.ok(!probe("process.env.LAMPO_DATA = path.join(tmp, 'data');"), 'setting one for what follows');
+  assert.ok(!probe("delete process.env['VR_DATA'];"), 'nor one taken away');
+  const dirs = ['lib', 'server', 'mcp', 'scripts', 'bin', 'bench'];
   const files = dirs.flatMap((d) => fs.readdirSync(path.join(ROOT, d), { recursive: true, encoding: 'utf8' }).map((f) => path.join(d, f)));
   files.push('web/vite.config.ts');
+  // a read: `env.VR_X`, `env['LAMPO_X']`, or taken apart (`const { VR_X } = process.env`); setting one for a process
+  // that follows (`process.env.LAMPO_X = …`, `delete process.env[…]`) is no read
   const read = /\b(?:process\.)?env(?:\.|\[['"`])(?:VR|LAMPO)_[A-Z0-9_]/;
+  const write = /(?:delete\s+)?process\.env(?:\.|\[['"`])(?:VR|LAMPO)_[A-Z0-9_${}]*['"`\]]*\s*(?:=(?!=)|;)/g;
+  const takenApart = /\{[^}]*\b(?:VR|LAMPO)_[A-Z0-9_]+[^}]*\}\s*=\s*(?:process\.)?env\b/;
   const found: string[] = [];
   for (const f of files.filter((f) => /\.(ts|mjs|js)$/.test(f) || f.startsWith('bin/'))) {
-    if (f === 'lib/env.ts' || fs.statSync(path.join(ROOT, f)).isDirectory()) continue;
-    for (const l of code(path.join(ROOT, f))) if (read.test(l)) found.push(`${f}: ${l.trim()}`);
+    if (f === 'lib/env.ts' || f.includes('node_modules') || fs.statSync(path.join(ROOT, f)).isDirectory()) continue;
+    for (const l of code(path.join(ROOT, f))) if (read.test(l.replace(write, '')) || takenApart.test(l)) found.push(`${f}: ${l.trim()}`);
   }
   // bin/launch.js must load on any Node, so it can't import lib/env.ts: its one setting, both spellings in one line.
   assert.deepEqual(found, ['bin/launch.js: process.env.LAMPO_NODE || process.env.VR_NODE,']);

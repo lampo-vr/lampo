@@ -495,13 +495,13 @@ test('vr login over SSH prints the address to open elsewhere and takes the one t
   assert.equal(await vr(['logout']).done, 0);
 });
 
-test('Ctrl-C while vr waits for the browser: it says so, keeps nothing, exits 130', async () => {
+test('Ctrl-C while lampo waits for the browser: it says so, keeps nothing, exits 130', async () => {
   fs.rmSync(credentials, { force: true });
   const run = vr(['login', base], { BROWSER: browser });
   await until(() => run.err().includes('Waiting for you to allow it in the browser'), 'waiting');
   run.p.kill('SIGINT');
   assert.equal(await run.done, 130, run.err());
-  assert.match(run.err(), /\nvr: cancelled; nothing was saved\n$/);
+  assert.match(run.err(), /\nlampo: cancelled; nothing was saved\n$/);
   assert.ok(!fs.existsSync(credentials));
 });
 

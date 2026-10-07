@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { settings } from '../env.ts';
+import { settingPair, settings } from '../env.ts';
 
 export interface Credentials {
   server: string;
@@ -55,13 +55,28 @@ export function adoptOldCache(root = cacheRoot(), old = oldCacheRoot()): void {
 
 export function readCredentials(): Credentials | null {
   if (settings.LAMPO_REMOTE === '0') return null;
-  if (settings.LAMPO_SERVER && settings.LAMPO_TOKEN) return { server: settings.LAMPO_SERVER, token: settings.LAMPO_TOKEN };
+  const [server, token] = envLogin();
+  if (server && token) return { server, token };
   try {
     const c = JSON.parse(fs.readFileSync(savedLogin(), 'utf8')) as Credentials;
     return c.server && c.token ? c : null;
   } catch {
     return null;
   }
+}
+
+/** A server and its token from the environment, as a pair from one spelling (never VR_TOKEN sent to LAMPO_SERVER). */
+export const envLogin = (env: NodeJS.ProcessEnv = process.env): [string | undefined, string | undefined] => settingPair('LAMPO_SERVER', 'LAMPO_TOKEN', env);
+
+/** Every login saved on this machine (this command's, then an older `vr login`'s), each once. */
+export function savedLogins(): Credentials[] {
+  const out: Credentials[] = [];
+  for (const file of [credentialsFile(), oldCredentialsFile()])
+    try {
+      const c = JSON.parse(fs.readFileSync(file, 'utf8')) as Credentials;
+      if (c.server && c.token && !out.some((o) => o.server === c.server && o.token === c.token)) out.push(c);
+    } catch {}
+  return out;
 }
 
 export function saveCredentials(c: Credentials): string {

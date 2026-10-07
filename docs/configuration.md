@@ -81,7 +81,10 @@ You can move single folders too:
 
 Every variable is named `LAMPO_…`. Its older spelling, `VR_…` (the command was `vr` before it was `lampo`), is still
 read wherever the `LAMPO_` one is unset or empty, so an env file from before works unchanged; where both are set,
-`LAMPO_` wins. The checks at start name a setting the way you wrote it.
+`LAMPO_` wins. The checks at start name a setting the way you wrote it. A setting given in both spellings with different
+values is named once in the log at start (names only, never the values), and so is an empty `LAMPO_` setting that
+leaves its `VR_` one in force: remove the older line, or give the new one a value. `LAMPO_SERVER` and `LAMPO_TOKEN`
+come as a pair: both `LAMPO_` when either is set, else both `VR_`, so one server's token never goes to another.
 
 ### Running the app
 
@@ -277,7 +280,7 @@ These are read on the machine where the agent works.
 
 | Variable | Default | What it does |
 |---|---|---|
-| `LAMPO_SERVER` with `LAMPO_TOKEN` | none | Work against that hosted server with that API token, without `lampo login` (CI, containers). |
+| `LAMPO_SERVER` with `LAMPO_TOKEN` | none | Work against that hosted server with that API token, without `lampo login` (CI, containers). Both in one spelling: a `VR_TOKEN` never goes with a `LAMPO_SERVER`. |
 | `LAMPO_TOKEN` | none | On its own: the token `lampo login <url>` signs in with when given neither `--email` nor `--token`. |
 | `LAMPO_REMOTE` | | `0` ignores `lampo login` and `LAMPO_SERVER`, and uses the local store. |
 | `LAMPO_WORKSPACE` | `w1` | The workspace `lampo` and the stdio MCP server use on a hosted server's own store ([server-mode.md](server-mode.md#workspaces)); an id the store has no workspace for is refused at the start. After `lampo login`, a token acts in its own workspace instead. |

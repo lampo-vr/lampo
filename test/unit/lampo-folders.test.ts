@@ -1,12 +1,16 @@
 // `lampo login` keeps its login in $XDG_CONFIG_HOME/lampo/ and a hosted server's downloads in $XDG_CACHE_HOME/lampo/.
 // A login an older `vr login` saved in video-review/ is read while the new folder has none, and never written: a new
 // login goes to the new folder, a logout forgets both (or the old one would keep the machine signed in). An unfinished
-// upload's resume list comes along into a new cache; the old folders stay as they were.
+// upload's resume list comes along into a new cache; the old folders stay as they were. A logout revokes both logins'
+// tokens, each on its own server; a server and a token from the environment come as a pair from one spelling.
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import { test } from 'node:test';
-import { isolatedEnv } from '../lib/helpers.ts';
+import { isolatedEnv, ROOT } from '../lib/helpers.ts';
 
 const { env } = isolatedEnv();
 for (const k of ['REMOTE', 'SERVER', 'TOKEN']) {
@@ -88,4 +92,62 @@ test('an older cache: its unfinished uploads come along once, nothing else, and 
   const fresh = path.join(cache, 'fresh', 'lampo');
   adoptOldCache(fresh, path.join(cache, 'fresh', 'video-review'));
   assert.ok(!fs.existsSync(fresh));
+});
+
+test('a server and its token from the environment are one pair from one spelling, never VR_TOKEN sent to LAMPO_SERVER', () => {
+  const keep = { ...process.env };
+  const set = (vars: Record<string, string>) => {
+    for (const k of ['SERVER', 'TOKEN']) {
+      delete process.env[`VR_${k}`];
+      delete process.env[`LAMPO_${k}`];
+    }
+    Object.assign(process.env, vars);
+  };
+  try {
+    set({ LAMPO_SERVER: 'https://b.example.com', VR_SERVER: 'https://a.example.com', VR_TOKEN: 'a-token' });
+    assert.equal(readCredentials(), null, "A's token never goes to B: LAMPO_SERVER without LAMPO_TOKEN is no login");
+    set({ LAMPO_TOKEN: 'b-token', VR_SERVER: 'https://a.example.com', VR_TOKEN: 'a-token' });
+    assert.equal(readCredentials(), null, "and B's token never goes to A");
+    set({ VR_SERVER: 'https://a.example.com', VR_TOKEN: 'a-token' });
+    assert.deepEqual(readCredentials(), { server: 'https://a.example.com', token: 'a-token' }, 'the older pair alone still works');
+    set({ LAMPO_SERVER: 'https://b.example.com', LAMPO_TOKEN: 'b-token', VR_SERVER: 'https://a.example.com', VR_TOKEN: 'a-token' });
+    assert.deepEqual(readCredentials(), { server: 'https://b.example.com', token: 'b-token' });
+  } finally {
+    for (const k of ['SERVER', 'TOKEN']) {
+      delete process.env[`VR_${k}`];
+      delete process.env[`LAMPO_${k}`];
+    }
+    Object.assign(process.env, keep);
+  }
+});
+
+test('logout revokes the token of every saved login, an older vr login too, each on its own server', async () => {
+  const asked: string[] = [];
+  const serve = (name: string) =>
+    new Promise<http.Server>((resolve) => {
+      const s = http.createServer((req, res) => {
+        asked.push(`${name} ${req.method} ${req.url} ${req.headers.authorization}`);
+        res.writeHead(204).end();
+      });
+      s.listen(0, '127.0.0.1', () => resolve(s));
+    });
+  const [a, b] = await Promise.all([serve('A'), serve('B')]);
+  const url = (s: http.Server) => `http://127.0.0.1:${(s.address() as AddressInfo).port}`;
+  try {
+    write(oldCredentialsFile(), { server: url(a), token: 'old-token', token_id: 't_old' });
+    write(credentialsFile(), { server: url(b), token: 'new-token', token_id: 't_new' });
+    const child = spawn(process.execPath, [path.join(ROOT, 'bin/lampo'), 'logout'], { env: { ...process.env }, stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '';
+    child.stdout.on('data', (d) => {
+      out += d;
+    });
+    const code = await new Promise((r) => child.on('close', r));
+    assert.equal(code, 0, out);
+    assert.deepEqual(asked.sort(), ['A DELETE /api/auth/tokens/t_old Bearer old-token', 'B DELETE /api/auth/tokens/t_new Bearer new-token']);
+    assert.match(out, /signed out of http:\/\/127\.0\.0\.1:\d+ \(token revoked\), and an older login's token revoked too/);
+    assert.ok(!fs.existsSync(credentialsFile()) && !fs.existsSync(oldCredentialsFile()), 'both forgotten');
+  } finally {
+    a.close();
+    b.close();
+  }
 });
