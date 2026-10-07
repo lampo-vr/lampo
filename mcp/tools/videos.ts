@@ -14,7 +14,7 @@ import type { SessionInput } from '../../lib/store.ts';
 import { describeSource, uploadFolder } from '../../lib/store.ts';
 import { oneLine } from '../../lib/time.ts';
 import type { RenderSource } from '../../lib/types.ts';
-import { NO_FILES } from '../access.ts';
+import { allowed, NO_FILES } from '../access.ts';
 import { handOff, ok, text } from '../format.ts';
 import type { ToolKit } from '../toolkit.ts';
 
@@ -159,7 +159,8 @@ export function registerVideoTools({ b, o, tool, author, accountOf, byArg }: Too
     },
     async ({ video, folder, by }, ctx) => {
       const { slug } = await b.resolve(video);
-      const r = await b.move(slug, folder || null, author(by, ctx));
+      // out of an archived project: its owners' and admins' (never into one: the store refuses)
+      const r = await b.move(slug, folder || null, author(by, ctx), { out: allowed(o.principal, 'archive') });
       return ok(text(oneLine(`${r.video} → ${r.folder || 'Unsorted'}`)));
     },
   );

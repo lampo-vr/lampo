@@ -3,6 +3,7 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { projectOfFolder } from '../../../lib/archived.ts';
 import { stretchOf } from '../../../lib/findings.ts';
 import { isOwner } from '../../../lib/ownership.ts';
 import { rangeOnGrid } from '../../../lib/range.ts';
@@ -10,7 +11,7 @@ import { renderKey } from '../../../lib/renderKey.ts';
 import { SETUP_AGENT_LABELS } from '../../../lib/sampleLoop.ts';
 import { approvalsOf, verdictOn } from '../../../lib/stage.ts';
 import { isAgent, isQuestion, isRequired, timecode, timeToFrame } from '../../../lib/time.ts';
-import { useAuthStatus, useCan } from '../api/auth.ts';
+import { ReadOnlyScope, useAuthStatus, useCan } from '../api/auth.ts';
 import { api, enc } from '../api/client.ts';
 import { useSSE } from '../api/events.ts';
 import { type NewComment, useCommentActions } from '../api/mutations.ts';
@@ -28,6 +29,7 @@ import { usePhone } from '../lib/media.ts';
 import { backToLibrary } from '../lib/nav.ts';
 import { usePrefs } from '../lib/prefs.ts';
 import { errorMessage, toast, toastError } from '../lib/toast.ts';
+import { archivedCode, useHeldArchive } from '../library/archiving.ts';
 import { inlineBody, sendRef } from '../refs/api.ts';
 import { GOTO_FRAME, type GotoFrame } from '../refs/model.ts';
 import { useListening, useListenNudge } from '../sessions/listening.tsx';
@@ -211,7 +213,12 @@ function PlayerView({
 }) {
   const { review, media } = data;
   const info = useInfo();
-  const allowed = useCan();
+  // A video in an archived project (lib/archived.ts) is read only here: watch, read, download — nothing new. Restored
+  // (or archived) a moment ago in this tab, it is so at once (library/archiving.ts).
+  const held = useHeldArchive(projectOfFolder(review.folder));
+  const frozen = held === undefined ? !!data.summary.project_archived : !!held;
+  const qc = useQueryClient();
+  const allowed = useCan(frozen);
   const lang = useLang();
   // the first run's sample: its agent wears the name of the agent picked in the setup, and closing its loop says so
   const picked = useAuthStatus().data?.user?.prefs?.onboarding?.agent;
@@ -467,6 +474,7 @@ function PlayerView({
 
   // ---------------------------------------------------------------- comments
   const openComposer = () => {
+    if (frozen) return;
     pb.pause();
     setComposer((c) => c || { shapes: [], tool: 'box' });
     if (phone) setSheet((x) => (x === 'peek' ? 'half' : x));
@@ -965,11 +973,11 @@ function PlayerView({
     toggleLoop: () => pb.setLoop((x) => !x),
     toggleMute: () => pb.setMuted((x) => !x),
     compose: () => !recorder.active && openComposer(),
-    verify: verify.start,
+    verify: frozen ? () => {} : verify.start,
     togglePhone: () => setPref('phone', !prefs.phone),
     change: jumpChange,
-    talk: () => !recorder.active && walkie.start(),
-    record: () => (speech && m?.ready && !composer ? recorder.toggle() : undefined),
+    talk: () => !frozen && !recorder.active && walkie.start(),
+    record: () => (!frozen && speech && m?.ready && !composer ? recorder.toggle() : undefined),
     stopTalking: walkie.stop,
     cyclePreset: () => {
       const i = presetList.findIndex((p) => p.id === preset.id);
@@ -1130,306 +1138,324 @@ function PlayerView({
     />
   );
   return (
-    <main className={phone ? `player phone-player ps-${sheet}` : 'player'} style={{ '--ar': H / W } as CSSProperties}>
-      <PlayerTopbar
-        phone={phone}
-        data={data}
-        v={ver.v}
-        latestV={latestV}
-        abOn={!!ab}
-        approved={approved}
-        home={info?.home}
-        onVersion={setV}
-        onToggleAb={toggleAb}
-        onCompareWith={compareWith}
-        strip={phone && ab && !verifying ? compareBar : null}
-        onShare={onShare}
-        onVerify={verify.start}
-        onPublish={allowed('post') ? onPublish : undefined}
-        frameNow={pb.live.get}
-      />
+    // everything inside reads it: an archived project's video takes nothing new (api/auth.ts useCan)
+    <ReadOnlyScope value={frozen}>
+      <main className={phone ? `player phone-player ps-${sheet}` : 'player'} style={{ '--ar': H / W } as CSSProperties}>
+        <PlayerTopbar
+          phone={phone}
+          data={data}
+          v={ver.v}
+          latestV={latestV}
+          abOn={!!ab}
+          approved={approved}
+          home={info?.home}
+          onVersion={setV}
+          onToggleAb={toggleAb}
+          onCompareWith={compareWith}
+          strip={phone && ab && !verifying ? compareBar : null}
+          onShare={onShare}
+          onVerify={verify.start}
+          onPublish={allowed('post') ? onPublish : undefined}
+          frameNow={pb.live.get}
+          archived={
+            frozen
+              ? {
+                  onRestore: allowed('archive')
+                    ? () => void archivedCode.load().then((x) => x.restoreProject(qc, projectOfFolder(review.folder) as string), toastError)
+                    : undefined,
+                }
+              : null
+          }
+        />
 
-      <Stage
-        panes={panes}
-        preset={preset.id === 'none' ? null : preset}
-        phone={device}
-        zones={phoneView.zones}
-        message={message}
-        reserveBottom={verify.active && !phone ? 190 : 0}
-        reserveTop={ab && !verifying && !phone ? 52 : 0}
-        pad={phone ? 10 : undefined}
-        stack={stack}
-      />
-      <div className="stage-overlay">
-        <WalkieHud state={walkie.state} level={walkie.level} timecodeOf={(f) => timecode(f, fps)} />
-        {/* the drawing tools sit on the picture while a note is written (not for the transcript's words, not about the
+        <Stage
+          panes={panes}
+          preset={preset.id === 'none' ? null : preset}
+          phone={device}
+          zones={phoneView.zones}
+          message={message}
+          reserveBottom={verify.active && !phone ? 190 : 0}
+          reserveTop={ab && !verifying && !phone ? 52 : 0}
+          pad={phone ? 10 : undefined}
+          stack={stack}
+        />
+        <div className="stage-overlay">
+          <WalkieHud state={walkie.state} level={walkie.level} timecodeOf={(f) => timecode(f, fps)} />
+          {/* the drawing tools sit on the picture while a note is written (not for the transcript's words, not about the
             whole video, not while it plays: a note's marks are on the paused frame) */}
-        {composer && composer.words == null && !composer.whole && !pb.playing && !walkie.state && (
-          <DrawBar
-            tools={COMPOSER_TOOLS()}
-            tool={composer.tool}
-            onTool={(tool) => setComposer((c) => (c ? { ...c, tool } : c))}
-            onUndo={() => setComposer((c) => (c ? { ...c, shapes: c.shapes.slice(0, -1) } : c))}
-            canUndo={composer.shapes.length > 0}
-            label={t('Drawing tool')}
-            undoLabel={t('Undo last shape')}
-            under={!!ab && !verifying && !phone}
-          />
-        )}
-        {(recorder.active || recorder.phase === 'saving') && RecordUI && <RecordUI.RecordBar rec={recorder} />}
-        {!phone && verifyPanel}
-        {walk && walkNote && !verify.active && (
-          <ReviewHud
-            note={walkNote}
-            index={walk.i}
-            total={walk.ids.length}
-            onPrev={() => stepReview(-1)}
-            onNext={() => stepReview(1)}
-            onPlay={() => playAround(walkNote)}
-            onExit={() => setWalk(null)}
-          />
-        )}
-        {ab && !verifying && !phone && compareBar}
-        {Loop && !verify.active && <Loop slug={slug} toCheck={verify.queue.length} />}
-        {stack && (
-          <div className="stack-label badge">
-            {panes[stack.show]?.label || ''} {t('· swipe')}
-          </div>
-        )}
-      </div>
+          {composer && composer.words == null && !composer.whole && !pb.playing && !walkie.state && (
+            <DrawBar
+              tools={COMPOSER_TOOLS()}
+              tool={composer.tool}
+              onTool={(tool) => setComposer((c) => (c ? { ...c, tool } : c))}
+              onUndo={() => setComposer((c) => (c ? { ...c, shapes: c.shapes.slice(0, -1) } : c))}
+              canUndo={composer.shapes.length > 0}
+              label={t('Drawing tool')}
+              undoLabel={t('Undo last shape')}
+              under={!!ab && !verifying && !phone}
+            />
+          )}
+          {(recorder.active || recorder.phase === 'saving') && RecordUI && <RecordUI.RecordBar rec={recorder} />}
+          {!phone && verifyPanel}
+          {walk && walkNote && !verify.active && (
+            <ReviewHud
+              note={walkNote}
+              index={walk.i}
+              total={walk.ids.length}
+              onPrev={() => stepReview(-1)}
+              onNext={() => stepReview(1)}
+              onPlay={() => playAround(walkNote)}
+              onExit={() => setWalk(null)}
+            />
+          )}
+          {ab && !verifying && !phone && compareBar}
+          {Loop && !verify.active && <Loop slug={slug} toCheck={verify.queue.length} />}
+          {stack && (
+            <div className="stack-label badge">
+              {panes[stack.show]?.label || ''} {t('· swipe')}
+            </div>
+          )}
+        </div>
 
-      <div className="dock grain">
-        {phone ? (
-          <PhoneTransport pb={pb} fps={fps} N={N} />
-        ) : (
-          <Transport
-            pb={pb}
+        <div className="dock grain">
+          {phone ? (
+            <PhoneTransport pb={pb} fps={fps} N={N} />
+          ) : (
+            <Transport
+              pb={pb}
+              fps={fps}
+              N={N}
+              srcMap={srcMap}
+              srcFile={tracks?.timeline ?? null}
+              presets={presetList}
+              preset={preset}
+              onPreset={(id) => setPref(presetKey, id)}
+              phone={phoneView}
+              onIn={markIn}
+              onOut={markOut}
+              zoomSlot={setZoomSlot}
+            />
+          )}
+          <Timeline
+            zoomAt={phone ? undefined : zoomSlot}
+            zoomTipWaits={verify.active || !!walk || recorder.active}
+            frames={N}
             fps={fps}
-            N={N}
-            srcMap={srcMap}
-            srcFile={tracks?.timeline ?? null}
-            presets={presetList}
-            preset={preset}
-            onPreset={(id) => setPref(presetKey, id)}
-            phone={phoneView}
-            onIn={markIn}
-            onOut={markOut}
-            zoomSlot={setZoomSlot}
+            frame={frame}
+            live={pb.live}
+            onSeek={seek}
+            inPt={pb.inPt}
+            outPt={pb.outPt}
+            peaks={wave?.peaks}
+            rms={wave?.rms}
+            comments={byStatus.all.filter((c) => c.scope !== 'video')}
+            freezes={freezeMarks}
+            words={phone ? null : words}
+            segments={phone ? null : segments}
+            selected={selected}
+            changes={diff?.ranges}
+            retimes={diff?.retimes}
+            findings={findings}
+            onPickFinding={(key) => {
+              const x = qa.suggestions?.find((q) => q.key === key);
+              if (x) {
+                qa.setPick(x);
+                seek(x.frame);
+                setFindingAsked((n) => n + 1);
+              }
+            }}
+            sprite={sprite}
+            aspect={W / H}
+            onRange={m?.ready && !frozen ? onTimelineRange : undefined}
+            onRangeEdge={(edge, f) => (edge === 'in' ? pb.setIn(f) : pb.setOut(f))}
+            writing={!!composer && !composer.whole}
+            onMarkNote={m?.ready && !recorder.active && !frozen ? openComposer : undefined}
+            onMarkClear={() => {
+              clearMarks();
+              rangeForNote.current = false;
+            }}
+            zoomMemory={zoomMemory}
+            views={band && audience ? audience : null}
+            patch={patch}
+            onSelect={(id) => {
+              // A range note's bar plays its range (from in, stopping on out); a point note is a place to go to.
+              const c = placed.find((x) => x.id === id);
+              if (c?.rangeHere) playRange(c, 'once');
+              else if (c) selectComment(c);
+            }}
           />
-        )}
-        <Timeline
-          zoomAt={phone ? undefined : zoomSlot}
-          zoomTipWaits={verify.active || !!walk || recorder.active}
-          frames={N}
-          fps={fps}
+          {phone && <PhoneTools pb={pb} fps={fps} presets={presetList} preset={preset} onPreset={(id) => setPref(presetKey, id)} phone={phoneView} />}
+          <DockFoot
+            analysis={analysis}
+            wave={wave}
+            freezes={freezes}
+            flaggedFreezes={qa.suggestions && !qa.pending ? freezeMarks.filter((r) => !r.quiet).length : null}
+            v={ver.v}
+            diff={diff}
+            diffPending={diffPending}
+            onNextFreeze={nextFreeze}
+            onNextChange={() => jumpChange(1)}
+            onPlayChanges={playChanges}
+            onHelp={() => setHelp(true)}
+            audience={audience}
+            band={prefs.views === true}
+            onBand={() => setPref('views', prefs.views !== true)}
+            readOnly={frozen}
+          />
+        </div>
+
+        <NotesPanel
+          slug={slug}
+          videoName={fileName(review.video)}
+          v={ver.v}
+          latestV={latestV}
           frame={frame}
           live={pb.live}
-          onSeek={seek}
-          inPt={pb.inPt}
-          outPt={pb.outPt}
-          peaks={wave?.peaks}
-          rms={wave?.rms}
-          comments={byStatus.all.filter((c) => c.scope !== 'video')}
-          freezes={freezeMarks}
-          words={phone ? null : words}
-          segments={phone ? null : segments}
+          filter={filter}
+          setFilter={setFilter}
+          counts={counts}
+          list={list}
           selected={selected}
-          changes={diff?.ranges}
-          retimes={diff?.retimes}
-          findings={findings}
-          onPickFinding={(key) => {
-            const x = qa.suggestions?.find((q) => q.key === key);
-            if (x) {
-              qa.setPick(x);
-              seek(x.frame);
-              setFindingAsked((n) => n + 1);
-            }
+          onSelect={selectComment}
+          playing={pb.playing}
+          tags={tags}
+          tag={tag}
+          setTag={setTag}
+          onLightbox={onLightbox}
+          fps={fps}
+          onPlayRange={playRange}
+          rangeLoop={pb.rangeLoop}
+          canCompose={!composer && !!m?.ready && !recorder.active}
+          readOnly={frozen}
+          quietNew={unsentShown && unsent.count > 0}
+          onCompose={openComposer}
+          verifyCount={frozen ? 0 : verify.queue.length}
+          verifying={verify.active}
+          onVerify={verify.start}
+          onReview={() => (walk ? setWalk(null) : stepReview(1))}
+          reviewing={!!walk}
+          sheet={
+            phone
+              ? {
+                  state: sheet,
+                  setState: setSheet,
+                  mic: frozen ? null : <MicButton state={walkie.state} level={walkie.level} start={walkie.start} stop={walkie.stop} />,
+                }
+              : undefined
+          }
+          top={phone ? verifyPanel : undefined}
+          view={view}
+          setView={setView}
+          transcript={{
+            base: trBase,
+            onSeek: seek,
+            onPlay: playWords,
+            onChangeWords: m?.ready && !frozen ? changeWords : undefined,
+            onRerun: allowed('qa') ? rerunTranscript : undefined,
+            edits: textEdits,
           }}
-          sprite={sprite}
-          aspect={W / H}
-          onRange={m?.ready ? onTimelineRange : undefined}
-          onRangeEdge={(edge, f) => (edge === 'in' ? pb.setIn(f) : pb.setOut(f))}
-          writing={!!composer && !composer.whole}
-          onMarkNote={m?.ready && !recorder.active ? openComposer : undefined}
-          onMarkClear={() => {
-            clearMarks();
-            rangeForNote.current = false;
-          }}
-          zoomMemory={zoomMemory}
-          views={band && audience ? audience : null}
-          patch={patch}
-          onSelect={(id) => {
-            // A range note's bar plays its range (from in, stopping on out); a point note is a place to go to.
-            const c = placed.find((x) => x.id === id);
-            if (c?.rangeHere) playRange(c, 'once');
-            else if (c) selectComment(c);
-          }}
-        />
-        {phone && <PhoneTools pb={pb} fps={fps} presets={presetList} preset={preset} onPreset={(id) => setPref(presetKey, id)} phone={phoneView} />}
-        <DockFoot
-          analysis={analysis}
-          wave={wave}
-          freezes={freezes}
-          flaggedFreezes={qa.suggestions && !qa.pending ? freezeMarks.filter((r) => !r.quiet).length : null}
-          v={ver.v}
-          diff={diff}
-          diffPending={diffPending}
-          onNextFreeze={nextFreeze}
-          onNextChange={() => jumpChange(1)}
-          onPlayChanges={playChanges}
-          onHelp={() => setHelp(true)}
-          audience={audience}
-          band={prefs.views === true}
-          onBand={() => setPref('views', prefs.views !== true)}
-        />
-      </div>
-
-      <NotesPanel
-        slug={slug}
-        videoName={fileName(review.video)}
-        v={ver.v}
-        latestV={latestV}
-        frame={frame}
-        live={pb.live}
-        filter={filter}
-        setFilter={setFilter}
-        counts={counts}
-        list={list}
-        selected={selected}
-        onSelect={selectComment}
-        playing={pb.playing}
-        tags={tags}
-        tag={tag}
-        setTag={setTag}
-        onLightbox={onLightbox}
-        fps={fps}
-        onPlayRange={playRange}
-        rangeLoop={pb.rangeLoop}
-        canCompose={!composer && !!m?.ready && !recorder.active}
-        quietNew={unsentShown && unsent.count > 0}
-        onCompose={openComposer}
-        verifyCount={verify.queue.length}
-        verifying={verify.active}
-        onVerify={verify.start}
-        onReview={() => (walk ? setWalk(null) : stepReview(1))}
-        reviewing={!!walk}
-        sheet={
-          phone
-            ? { state: sheet, setState: setSheet, mic: <MicButton state={walkie.state} level={walkie.level} start={walkie.start} stop={walkie.stop} /> }
-            : undefined
-        }
-        top={phone ? verifyPanel : undefined}
-        view={view}
-        setView={setView}
-        transcript={{
-          base: trBase,
-          onSeek: seek,
-          onPlay: playWords,
-          onChangeWords: m?.ready ? changeWords : undefined,
-          onRerun: allowed('qa') ? rerunTranscript : undefined,
-          edits: textEdits,
-        }}
-        autoCheck={
-          <AutoCheck
-            slug={slug}
-            v={ver.v}
-            fps={fps}
-            aspect={W / H}
-            items={qa.suggestions}
-            pending={qa.pending}
-            failed={qa.failed}
-            progress={qa.progress}
-            language={qa.language}
-            spelling={qa.spelling}
-            timecodeOf={(f) => timecode(f, fps)}
-            active={qa.pick?.key}
-            asked={findingAsked}
-            onPlay={showFinding}
-            onAccept={qa.accept}
-            onIntended={allowed('qa') ? qa.intended : undefined}
-            onRerun={allowed('qa') ? qa.rerun : undefined}
-          />
-        }
-        record={<RecordButton rec={recorder} speech={speech} ready={!!m?.ready && !composer} compact />}
-        recording={
-          UnsentUI && unsentShown ? (
-            <UnsentUI.Unsent
+          autoCheck={
+            <AutoCheck
               slug={slug}
-              fps={fps}
               v={ver.v}
-              unsent={unsent}
-              agent={review.session?.name ?? null}
-              folder={wake.folder}
-              onSeek={seek}
-              onFocus={setDraftFocus}
-              composing={!!composer}
-              batch={batch}
-              waiting={!!waiting}
-              recordings={
-                RecordUI
-                  ? unsent.recordings.map((rec) => (
-                      <RecordUI.Drafts
-                        key={rec.id}
-                        slug={slug}
-                        rec={rec}
-                        fps={fps}
-                        onSeek={seek}
-                        onFocus={setDraftFocus}
-                        register={unsent.register}
-                        sending={unsent.sending}
-                        going={unsent.going}
-                        onSend={sendOneDraft}
-                      />
-                    ))
-                  : null
-              }
-            />
-          ) : null
-        }
-        composer={
-          composer && (
-            <Composer
-              // other words picked: a composer for them
-              key={composer.words ?? ''}
-              words={composer.words ?? null}
-              frame={frame}
               fps={fps}
-              frames={N}
-              range={range}
-              onRange={(r) => setRange(r)}
-              live={pb.live}
-              onSeek={seek}
-              shapeCount={composer.shapes.length}
-              onClear={() => setComposer((c) => (c ? { ...c, shapes: [] } : c))}
-              onWhole={(whole) => setComposer((c) => (c ? { ...c, whole } : c))}
-              onCancel={() => {
-                setComposer(null);
-                dropNoteRange();
-              }}
-              onSave={saveComment}
-              unsent={unsent.count}
-              batch={batch}
-              waiting={waiting}
-              whisper={info?.whisper}
-              video={{ slug, name: fileName(review.video) }}
-              v={ver.v}
-              focusKey={composer.focus ?? 0}
+              aspect={W / H}
+              items={qa.suggestions}
+              pending={qa.pending}
+              failed={qa.failed}
+              progress={qa.progress}
+              language={qa.language}
+              spelling={qa.spelling}
+              timecodeOf={(f) => timecode(f, fps)}
+              active={qa.pick?.key}
+              asked={findingAsked}
+              onPlay={showFinding}
+              onAccept={frozen ? undefined : qa.accept}
+              onIntended={allowed('qa') ? qa.intended : undefined}
+              onRerun={allowed('qa') ? qa.rerun : undefined}
             />
-          )
-        }
-      />
+          }
+          record={frozen ? null : <RecordButton rec={recorder} speech={speech} ready={!!m?.ready && !composer} compact />}
+          recording={
+            UnsentUI && unsentShown ? (
+              <UnsentUI.Unsent
+                slug={slug}
+                fps={fps}
+                v={ver.v}
+                unsent={unsent}
+                agent={review.session?.name ?? null}
+                folder={wake.folder}
+                onSeek={seek}
+                onFocus={setDraftFocus}
+                composing={!!composer}
+                batch={batch}
+                waiting={!!waiting}
+                recordings={
+                  RecordUI
+                    ? unsent.recordings.map((rec) => (
+                        <RecordUI.Drafts
+                          key={rec.id}
+                          slug={slug}
+                          rec={rec}
+                          fps={fps}
+                          onSeek={seek}
+                          onFocus={setDraftFocus}
+                          register={unsent.register}
+                          sending={unsent.sending}
+                          going={unsent.going}
+                          onSend={sendOneDraft}
+                        />
+                      ))
+                    : null
+                }
+              />
+            ) : null
+          }
+          composer={
+            composer && (
+              <Composer
+                // other words picked: a composer for them
+                key={composer.words ?? ''}
+                words={composer.words ?? null}
+                frame={frame}
+                fps={fps}
+                frames={N}
+                range={range}
+                onRange={(r) => setRange(r)}
+                live={pb.live}
+                onSeek={seek}
+                shapeCount={composer.shapes.length}
+                onClear={() => setComposer((c) => (c ? { ...c, shapes: [] } : c))}
+                onWhole={(whole) => setComposer((c) => (c ? { ...c, whole } : c))}
+                onCancel={() => {
+                  setComposer(null);
+                  dropNoteRange();
+                }}
+                onSave={saveComment}
+                unsent={unsent.count}
+                batch={batch}
+                waiting={waiting}
+                whisper={info?.whisper}
+                video={{ slug, name: fileName(review.video) }}
+                v={ver.v}
+                focusKey={composer.focus ?? 0}
+              />
+            )
+          }
+        />
 
-      {sharing && <ShareModal slug={slug} name={fileName(review.video)} onClose={() => setSharing(false)} />}
-      {publishing && Publishing && <Publishing data={data} focus={publishing} live={pb.live} onClose={closePublish} />}
-      {lightbox && (
-        // biome-ignore lint/a11y/useKeyWithClickEvents: click anywhere to close; Esc closes it too (useShortcuts)
-        // biome-ignore lint/a11y/noStaticElementInteractions: see above
-        <div className="backdrop" onClick={() => setLightbox(null)}>
-          <img className="lightbox" src={lightbox} alt="" />
-        </div>
-      )}
-      {help && <HelpModal onClose={() => setHelp(false)} />}
-      {SampleEnd && <SampleEnd review={review} me={me?.name ?? ''} agent={sampleAgent} />}
-    </main>
+        {sharing && <ShareModal slug={slug} name={fileName(review.video)} onClose={() => setSharing(false)} />}
+        {publishing && Publishing && <Publishing data={data} focus={publishing} live={pb.live} onClose={closePublish} />}
+        {lightbox && (
+          // biome-ignore lint/a11y/useKeyWithClickEvents: click anywhere to close; Esc closes it too (useShortcuts)
+          // biome-ignore lint/a11y/noStaticElementInteractions: see above
+          <div className="backdrop" onClick={() => setLightbox(null)}>
+            <img className="lightbox" src={lightbox} alt="" />
+          </div>
+        )}
+        {help && <HelpModal onClose={() => setHelp(false)} />}
+        {SampleEnd && <SampleEnd review={review} me={me?.name ?? ''} agent={sampleAgent} />}
+      </main>
+    </ReadOnlyScope>
   );
 }

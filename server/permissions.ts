@@ -3,8 +3,11 @@
 // writing route is missing from the table. Rules that depend on the content (whose note, which status) stay in the
 // route and use the same actions.
 import type { NextFunction, Request, Response } from 'express';
+import { archivedWords } from '../lib/archived.ts';
 import { isGated } from '../lib/auth.ts';
+import { archivedProjectOf } from '../lib/folderIds.ts';
 import { type Action, can } from '../lib/permissions.ts';
+import { findComment, loadReview } from '../lib/store.ts';
 import type { Role } from '../lib/types.ts';
 import { suspensionOf } from '../lib/workspaces.ts';
 import { GUEST_PATH } from './guard.ts';
@@ -122,6 +125,9 @@ export const ROUTE_ACTIONS: [string, string, Rule][] = [
   ['PATCH', '/api/folders', 'organize'],
   ['DELETE', '/api/folders', 'organize'],
   ['POST', '/api/folders/auto', 'organize'],
+  // Archiving a project and restoring it: its owners' and admins' (lib/archived.ts; people only, below).
+  ['POST', '/api/folders/archive', 'archive'],
+  ['POST', '/api/folders/restore', 'archive'],
   ['PUT', '/api/review/:slug/folder', 'organize'],
   ['PUT', '/api/review/:slug/session', 'organize'],
   ['POST', '/api/review/:slug/sync', 'organize'],
@@ -274,6 +280,9 @@ export const PERSON_ONLY: [string, string][] = [
   ['POST', '/api/operator/accounts/:id/enable'],
   ['POST', '/api/review/:slug/shares'],
   ['POST', '/api/folder-shares'],
+  // Putting a project away and bringing it back is a person's call: an agent is told "a person can restore it".
+  ['POST', '/api/folders/archive'],
+  ['POST', '/api/folders/restore'],
   ['PATCH', '/api/shares/:token'],
   ['DELETE', '/api/shares/:token'],
   // A device that gets the account's notifications (note texts on a lock screen) is a lasting way out too; agents have
@@ -366,6 +375,43 @@ function refuseIfSuspended(req: Request, rule: Rule | 'none' | 'module'): void {
   if (ws && suspensionOf(ws)) throw fail(423, SUSPENDED_ERROR, { suspended: true });
 }
 
+// The routes about one video: /api/review/<slug>/…, /api/qa/<slug>/…; and about one note: /api/comments/<id>/….
+const VIDEO_PATH = /^\/api\/(?:review|qa)\/([^/]+)(\/.*)?$/;
+const NOTE_PATH = /^\/api\/comments\/([^/]+)(?:\/|$)/;
+
+const decodedSegment = (s: string): string => {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+};
+
+/**
+ * A write about a video or a note in an archived project (lib/archived.ts): refused (423, `archived`: the project)
+ * before the route runs, so nothing is begun — no screenshot grabbed, no reference stored. Reading goes on (`view`, a
+ * watch report among them), and so do two writes the routes decide themselves: where a video goes (an owner or admin
+ * takes one out), and throwing away one's own unsent drafts and recordings. The store refuses the same writes on
+ * every other way in (MCP, `vr`, review links: lib/folderIds.ts checkNotArchived).
+ */
+function refuseIfArchived(req: Request, rule: Rule | 'none'): void {
+  const method = req.method === 'HEAD' ? 'GET' : req.method;
+  if (!WRITES.has(method) || rule === 'self' || rule === 'public' || rule === 'view') return;
+  let folder: string | null | undefined;
+  const video = VIDEO_PATH.exec(req.path);
+  if (video) {
+    const rest = video[2] ?? '';
+    if (rest === '/folder' || (method === 'DELETE' && /^\/(drafts|recordings)\//.test(rest))) return;
+    folder = loadReview(decodedSegment(video[1] as string))?.folder;
+  } else {
+    const note = NOTE_PATH.exec(req.path);
+    if (!note) return;
+    folder = findComment(decodedSegment(note[1] as string))?.review.folder;
+  }
+  const project = archivedProjectOf(folder);
+  if (project) throw fail(423, archivedWords(project), { archived: project });
+}
+
 /** owner > admin > member > reviewer: a module route's `role` is the lowest that may call it. */
 const ROLE_RANK: Record<Role, number> = { reviewer: 0, member: 1, admin: 2, owner: 3 };
 
@@ -395,6 +441,7 @@ export function authorize({ own }: { own?: (method: string, path: string) => Mod
         if (rule !== 'self' && rule !== 'public' && !can(req.auth.role, rule)) throw fail(403, `your role (${req.auth.role}) can't do that`);
         if (req.auth.via === 'token' && personOnly(req.method, req.path)) throw fail(403, PERSON_ONLY_ERROR, { person: true });
         refuseIfSuspended(req, rule);
+        refuseIfArchived(req, rule);
       }
     }
     next();

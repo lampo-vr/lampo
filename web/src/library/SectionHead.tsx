@@ -11,15 +11,16 @@ interface Props {
   section: Section;
   collapsed: boolean;
   onToggle: () => void;
-  onDropVideo: (slug: string, folder: string) => void;
+  /** Absent: the heading takes no video (an archived project's). */
+  onDropVideo?: (slug: string, folder: string) => void;
   /** The heading of the folder that is open (its own videos): no link to itself. */
   current?: boolean;
 }
 
 export function SectionHead({ section: s, collapsed, onToggle, onDropVideo, current }: Props) {
-  const drop = useDrop((d) => d.video && s.folder && onDropVideo(d.video, s.folder));
+  const drop = useDrop((d) => d.video && s.folder && onDropVideo?.(d.video, s.folder));
   return (
-    <div className={`shead ${drop.over ? 'drop' : ''}`} {...(s.folder ? drop.props : {})}>
+    <div className={`shead ${drop.over ? 'drop' : ''}`} {...(s.folder && onDropVideo ? drop.props : {})}>
       <IconButton
         className="shead-toggle"
         label={collapsed ? t('Show {title}', { title: s.title }) : t('Hide {title}', { title: s.title })}

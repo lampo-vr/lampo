@@ -431,8 +431,10 @@ export const CommentCard = memo(function CommentCard({
   const actions = useCommentActions(slug);
   const allowed = useCan();
   const me = useAuthStatus().data?.user ?? null;
-  // Your own notes are yours to change; someone else's need the edit-notes right (reviewers don't have it).
-  const mine = allowed('edit-notes') || isOwner(c.author, c.author_id, me);
+  // Your own notes are yours to change; someone else's need the edit-notes right (reviewers don't have it). Nothing
+  // changes in an archived project (`comment` is no one's there: api/auth.ts ReadOnlyScope).
+  const may = allowed('comment');
+  const mine = may && (allowed('edit-notes') || isOwner(c.author, c.author_id, me));
   const busy = actions.patch.isPending;
   const closed = c.status === 'verified' || c.status === 'wontfix';
   const role = roleOf(c.author);
@@ -588,11 +590,11 @@ export const CommentCard = memo(function CommentCard({
         setEditing(true);
       },
     },
-    { label: t('Reply'), icon: 'reply', onClick: () => open('reply') },
+    may && { label: t('Reply'), icon: 'reply', onClick: () => open('reply') },
     c.status === 'open' &&
       feedback &&
       allowed('resolve') && { label: c.severity === 'idea' ? t('Not now…') : t("Won't fix…"), icon: 'wontfix', onClick: () => open('wontfix') },
-    closed && { label: t('Reopen…'), icon: 'reopen', onClick: () => open('reopen') },
+    closed && may && { label: t('Reopen…'), icon: 'reopen', onClick: () => open('reopen') },
     'sep',
     { label: t('Copy note id'), icon: 'copy', onClick: async () => (await copyText(c.id)) && toast(t('{id} copied', { id: c.id }), 'ok') },
     {
@@ -930,7 +932,7 @@ export const CommentCard = memo(function CommentCard({
             <OptionsAsk id={c.id} text={c.text} by={c.author} groups={optionsSeen(c.options)} answered={c.status !== 'open'} />
           </div>
         ) : null}
-        {asks && c.status === 'open' && !mode && !c.options?.length && (
+        {asks && c.status === 'open' && !mode && !c.options?.length && may && (
           <div className="note-answer">
             {c.choices?.length ? (
               <Choices
@@ -958,7 +960,7 @@ export const CommentCard = memo(function CommentCard({
           </div>
         )}
 
-        {checking && !editing && !checkMode && (
+        {checking && !editing && !checkMode && may && (
           <CheckDecision
             id={c.id}
             small
@@ -994,10 +996,10 @@ export const CommentCard = memo(function CommentCard({
         ) : (
           !editing &&
           !reopening &&
-          (workflow || (selected && !asks)) && (
+          (workflow || (selected && !asks && may)) && (
             <div className={`c-actions${checking ? ' c-reply' : ''}`}>
               {workflow}
-              {selected && !asks && (
+              {selected && !asks && may && (
                 <button type="button" className="reply-stub" onClick={() => open('reply')}>
                   {checking ? t('Reply without changing the status…') : t('Reply…')}
                 </button>

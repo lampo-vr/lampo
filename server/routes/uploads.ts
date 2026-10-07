@@ -15,6 +15,7 @@ import express, { type Response, type Router } from 'express';
 import { excerpt, words } from '../../lib/activityText.ts';
 import { attachOptionFile, type OptionAttached, type OptionTarget } from '../../lib/askOptions.ts';
 import { getUser } from '../../lib/auth.ts';
+import { checkNotArchived, checkReviewOpen } from '../../lib/folderIds.ts';
 import { cursorAt, waitNowLine } from '../../lib/handoff.ts';
 import { unlessBusy } from '../../lib/jobs.ts';
 import { ingestPart } from '../../lib/parts.ts';
@@ -95,6 +96,8 @@ export function uploadRoutes(ctx: ServerContext): Router {
 
   /** What a plan may limit before bytes are taken: the upload's size, and a new video (server/extension.ts). */
   async function plan(ws: string, meta: UploadMeta, size: number): Promise<void> {
+    // nothing new in an archived project (no new video, no next version): refused before a byte is taken
+    inWorkspace(ws, () => (meta.slug ? checkReviewOpen(store.loadReview(meta.slug)) : checkNotArchived(meta.folder)));
     await ctx.extension.check(ws, 'upload', size);
     if (!meta.part && inWorkspace(ws, () => store.uploadMakesVideo(meta))) await ctx.extension.check(ws, 'video');
   }

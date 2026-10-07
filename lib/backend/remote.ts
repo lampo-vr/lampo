@@ -541,6 +541,10 @@ export function createRemoteBackend(c: Credentials, { cacheRoot }: { cacheRoot: 
       return (await api.get<{ folders: string[] }>('/api/folders')).folders;
     },
 
+    async archivedProjects() {
+      return (await api.get<{ archived_projects?: Record<string, { at: string; by?: string }> }>('/api/folders')).archived_projects ?? {};
+    },
+
     async assign(slug, session, by) {
       await api.call(
         'PUT',

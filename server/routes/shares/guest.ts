@@ -761,7 +761,7 @@ export function guestRoutes(ctx: ServerContext): Router {
               // The file arrives later: a link revoked, expired or made watch-only in between takes nothing.
               check: () => {
                 const now = resolveShare(share.token);
-                if (!now || isExpired(now) || !settingsOf(now).comment) throw fail(410, 'This review link is not valid any more.');
+                if (!now || isExpired(now) || !perms(now).comment) throw fail(410, 'This review link is not valid any more.');
               },
               // a visitor holds only so many open at once, and the link's visitors together (server/uploadTickets.ts)
               owner: `guest:${share.token}|${ipOf(req)}`,

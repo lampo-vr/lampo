@@ -56,7 +56,8 @@ export async function patchLibrary(qc: QueryClient, slugs: string[]): Promise<vo
     const videos = old.videos.flatMap((v) => (asked.has(v.slug) ? (fresh.has(v.slug) ? [fresh.get(v.slug) as (typeof got.videos)[number]] : []) : [v]));
     const known = new Set(old.videos.map((v) => v.slug));
     for (const v of got.videos) if (!known.has(v.slug)) videos.push(v);
-    return { folders: got.folders, videos };
+    // the folders and which projects are archived as the server says them now (every answer carries both)
+    return { folders: got.folders, videos, ...(got.archived_projects ? { archived_projects: got.archived_projects } : {}) };
   });
 }
 

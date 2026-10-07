@@ -5,6 +5,7 @@
 // compared with its same frames, the way fix previews are (lib/previews.ts).
 import { cachedCuts } from './cuts.ts';
 import { analysisSize, BLOCK_CHANGED, blockDiff, greyFilter } from './diff.ts';
+import { checkReviewOpen } from './folderIds.ts';
 import { MAX_HANDLES, onGrid, PART_HANDLES, partBounds, partEnd, partSpan, partsBefore } from './part.ts';
 import { isoLocal, slugify } from './paths.ts';
 import { checkIncoming, FFMPEG, isVideoContainer, probe, run } from './probe.ts';
@@ -79,6 +80,7 @@ export async function ingestPart(file: string, o: store.IngestOptions & PartPush
   if (!o.slug) throw refuse('a part needs the video it patches (--to <video>)', 400);
   const review = store.loadReview(o.slug);
   if (!review) throw refuse('no such video', 404);
+  checkReviewOpen(review);
   const { part } = await planPart(review, file, o);
   const seam = await checkSeam(review, part, file);
   return store.ingestUpload(file, { ...o, part: { ...part, ...(seam ? { seam } : {}) } });

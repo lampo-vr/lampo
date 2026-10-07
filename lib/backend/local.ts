@@ -9,6 +9,7 @@ import { localOwner } from '../auth.ts';
 import { loadConfig } from '../config.ts';
 import { computeDiff } from '../diff.ts';
 import { attachElements, pointersOf } from '../elementMaps.ts';
+import { archivedNow, checkReviewOpen } from '../folderIds.ts';
 import { moveVideo, normFolder, shownFolders } from '../folders.ts';
 import { ingestPart } from '../parts.ts';
 import { cacheDir, dataDir, projectDirOf, reviewDir, slugify } from '../paths.ts';
@@ -159,6 +160,8 @@ export function createLocalBackend(): Backend {
     async track(videoPath, { by, byId, session, folder }) {
       // A folder that can't be made is refused before the video is tracked, not after.
       if (folder) normFolder(folder);
+      // a video in an archived project takes nothing new: a re-render waits on disk until the project is restored
+      checkReviewOpen(store.loadReview(slugify(path.resolve(videoPath))));
       let { review, created } = store.createOrGetReview(videoPath, { by, byId, session });
       if (folder !== undefined) review = moveVideo(slugify(review.video), folder, by);
       return { review, created };
@@ -174,7 +177,8 @@ export function createLocalBackend(): Backend {
       return attachElements(review, v, map);
     },
     pointers: async (review, comments) => pointersOf(review, comments),
-    move: async (slug, folder, by) => moveVideo(slug, folder, by),
+    move: async (slug, folder, by, o) => moveVideo(slug, folder, by, { out: !!o?.out }),
+    archivedProjects: async () => archivedNow(),
     folders: async (reviews) => shownFolders(reviews).folders,
     async assign(slug, session, by) {
       store.assignSession(slug, session, by);

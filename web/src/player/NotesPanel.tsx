@@ -93,6 +93,8 @@ interface NotesPanelProps {
   quietNew?: boolean;
   onCompose: () => void;
   verifyCount: number;
+  /** An archived project's video (lib/archived.ts): its notes are read, nothing new is written. */
+  readOnly?: boolean;
   verifying: boolean;
   onVerify: () => void;
   /** Review mode: start (or leave) stepping through the open notes. */
@@ -356,11 +358,19 @@ export function NotesPanel(p: NotesPanelProps) {
             )}
             {sheet?.mic}
             {p.record}
-            <Tip content={t('New note')} shortcut="C">
-              <button type="button" className={p.quietNew ? 'btn sm' : 'btn sm primary'} onClick={p.onCompose} disabled={!p.canCompose} data-testid="new-note">
-                <I name="plus" size={14} /> {t('Note')}
-              </button>
-            </Tip>
+            {!p.readOnly && (
+              <Tip content={t('New note')} shortcut="C">
+                <button
+                  type="button"
+                  className={p.quietNew ? 'btn sm' : 'btn sm primary'}
+                  onClick={p.onCompose}
+                  disabled={!p.canCompose}
+                  data-testid="new-note"
+                >
+                  <I name="plus" size={14} /> {t('Note')}
+                </button>
+              </Tip>
+            )}
           </div>
           {words ? (
             <TranscriptTools find={find} setFind={setFind} v={p.v} base={base} />
@@ -482,7 +492,7 @@ export function NotesPanel(p: NotesPanelProps) {
                   art={filter === 'active' && !n.all ? 'note' : EMPTY()[filter].art}
                   title={filter === 'active' && !n.all ? t('No notes yet') : EMPTY()[filter].title}
                   tips={
-                    filter === 'active' && !sheet
+                    filter === 'active' && !sheet && !p.readOnly
                       ? [
                           <T k="<0>C</0> writes a note on this frame" key="c" tags={[(c) => <kbd>{c}</kbd>]} />,
                           <T k="Set <0>I</0> and <1>O</1> first to note a range" key="r" tags={[(c) => <kbd>{c}</kbd>, (c) => <kbd>{c}</kbd>]} />,
@@ -491,6 +501,7 @@ export function NotesPanel(p: NotesPanelProps) {
                   }
                 >
                   {filter === 'active' &&
+                    !p.readOnly &&
                     (sheet
                       ? t('Pause on a frame, tap + Note, draw on it — or hold the mic and talk.')
                       : t('Pause on a frame and say what should change: the note stays on that exact frame.'))}

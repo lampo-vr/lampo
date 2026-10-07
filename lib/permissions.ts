@@ -13,6 +13,7 @@ export const ACTIONS = {
   upload: 'upload videos and new versions, add videos by path',
   organize: 'folders, moving videos, assigning Claude sessions, checking for new renders',
   remove: 'remove any video (members may remove what they uploaded)',
+  archive: 'archive a project and restore it; take videos out of an archived project',
   share: 'create, change and revoke client links',
   download: 'download videos (any version, as rendered) and whole folders (originals or previews) from the library',
   agents: 'requests to agents, agent status, connecting agents, writing as agent:…',

@@ -27,6 +27,8 @@ interface DockFootProps {
   audience?: VideoAudience | null;
   band?: boolean;
   onBand?: () => void;
+  /** An archived project's video: no note is written here, so the keys don't offer one. */
+  readOnly?: boolean;
 }
 
 export function DockFoot({
@@ -44,6 +46,7 @@ export function DockFoot({
   audience = null,
   band = false,
   onBand,
+  readOnly = false,
 }: DockFootProps) {
   const loud = analysis?.loudness;
   // a phone scrolls this row sideways: a soft edge where there is more, never a chip cut off at the screen's edge
@@ -102,10 +105,17 @@ export function DockFoot({
       <span className="grow" />
       <Tip content={t('All keyboard shortcuts')} shortcut="?">
         <button type="button" className="hint muted hide-sm" onClick={onHelp}>
-          <T
-            k={'<0>C</0> note <1>←</1><2>→</2> frame <3>I</3><4>O</4> section <5>?</5> all keys'}
-            tags={[(c) => <kbd>{c}</kbd>, (c) => <kbd>{c}</kbd>, (c) => <kbd>{c}</kbd>, (c) => <kbd>{c}</kbd>, (c) => <kbd>{c}</kbd>, (c) => <kbd>{c}</kbd>]}
-          />
+          {readOnly ? (
+            <T
+              k={'<0>←</0><1>→</1> frame <2>I</2><3>O</3> section <4>?</4> all keys'}
+              tags={[(c) => <kbd>{c}</kbd>, (c) => <kbd>{c}</kbd>, (c) => <kbd>{c}</kbd>, (c) => <kbd>{c}</kbd>, (c) => <kbd>{c}</kbd>]}
+            />
+          ) : (
+            <T
+              k={'<0>C</0> note <1>←</1><2>→</2> frame <3>I</3><4>O</4> section <5>?</5> all keys'}
+              tags={[(c) => <kbd>{c}</kbd>, (c) => <kbd>{c}</kbd>, (c) => <kbd>{c}</kbd>, (c) => <kbd>{c}</kbd>, (c) => <kbd>{c}</kbd>, (c) => <kbd>{c}</kbd>]}
+            />
+          )}
         </button>
       </Tip>
     </div>

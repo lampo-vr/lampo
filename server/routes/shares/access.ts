@@ -4,7 +4,7 @@
 import type { Request } from 'express';
 import { addressKey, type RateLimit, type Recent } from '../../../lib/rateLimit.ts';
 import { currentWorkspace } from '../../../lib/scope.ts';
-import { covers, isExpired, isUnlocked, resolveShare, settingsOf, sharerName, slugOfGuestId, visibleVerdicts } from '../../../lib/shares.ts';
+import { archivedFor, covers, isExpired, isUnlocked, resolveShare, settingsOf, sharerName, slugOfGuestId, visibleVerdicts } from '../../../lib/shares.ts';
 import { verdictOn } from '../../../lib/stage.ts';
 import * as store from '../../../lib/store.ts';
 import type { Approval, GuestPerms, Review, ShareWithToken, Version } from '../../../lib/types.ts';
@@ -123,13 +123,17 @@ export function version(share: ShareWithToken, review: Review, v: unknown): Vers
   return ver;
 }
 
+/**
+ * What a link lets its visitors do now: its settings — watch only while its project is archived (lib/shares.ts
+ * archivedFor: they watch, and download what it offers, but leave no note or decision). Restored, it is as it was.
+ */
 export const perms = (share: ShareWithToken): GuestPerms => {
   const { expires: _e, ...p } = settingsOf(share);
-  return p;
+  return archivedFor(share) ? { ...p, comment: false, approve: false } : p;
 };
 
 export const may = (share: ShareWithToken, what: 'comment' | 'approve'): void => {
-  if (!settingsOf(share)[what]) throw fail(403, what === 'comment' ? 'This link is for watching only.' : 'This link does not ask for an approval.');
+  if (!perms(share)[what]) throw fail(403, what === 'comment' ? 'This link is for watching only.' : 'This link does not ask for an approval.');
 };
 
 // What a client sees as "approved": the clients' own verdict on that version, never the team's (a team approval must

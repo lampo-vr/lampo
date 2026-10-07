@@ -10,11 +10,13 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { ProjectArchivedError } from './archived.ts';
 import { cleanChoices } from './choices.ts';
 import { describeShape } from './drawing.ts';
 import { pointersOf } from './elementMaps.ts';
 import { legendLine, onWords, pointerIn } from './elements.ts';
 import { isInboxEvent, statusLabel } from './eventLine.ts';
+import { archivedProjectOf, checkReviewOpen } from './folderIds.ts';
 import { cleanAgentName, cleanFolderLine, shownName } from './names.ts';
 import { answeredAlready, checkPicks, cleanPrompt, OPTION_LIMITS, optionLines, optionRefs, picksLine, picksToRender } from './options.ts';
 import { changeableReply } from './ownership.ts';
@@ -432,6 +434,8 @@ export interface SyncResult {
   carried?: number;
   /** The file looks mid-render; try again later. */
   pending?: boolean;
+  /** A new render is on disk, but its project is archived (lib/archived.ts): it isn't registered until it is restored. */
+  archived?: string;
 }
 
 interface NewVersion {
@@ -521,6 +525,9 @@ export function syncVersions(review: Review, { force = false, by = 'system' } = 
     return { changed: true };
   }
   if (!force && Date.now() - st.mtimeMs < 3000) return { changed, pending: true };
+  // nothing new in an archived project: the render waits on disk, and comes in as the next version once it is restored
+  const shut = archivedProjectOf(review.folder);
+  if (shut) return { changed, archived: shut };
   let meta: ProbeResult;
   try {
     meta = probeSync(review.video);
@@ -770,6 +777,9 @@ export const partSample = (sample: string, base: Pick<Version, 'sample' | 'hash'
  */
 export function ingestUpload(file: string, o: IngestOptions): Promise<IngestResult> {
   const target = uploadTarget(o);
+  // nothing new in an archived project: no new video, no next version
+  const shut = archivedProjectOf(target.folder);
+  if (shut) return Promise.reject(new ProjectArchivedError(shut));
   const queueKey = wsKey(target.slug);
   const before = ingesting.get(queueKey) || Promise.resolve();
   const job = before.catch(() => {}).then(() => ingest(file, target, o));
@@ -968,6 +978,8 @@ export function sync(slug: string): (SyncResult & { review: Review }) | null {
 }
 
 function assignInto(review: Review, session: SessionInput | null, by: string): void {
+  // no new work in an archived project: an agent is taken off it, never put on it
+  if (session) checkReviewOpen(review);
   const prev = review.session?.name || null;
   // Whatever named the session (the app, `vr`, an MCP client, a heartbeat's agent): one line, short (A12-D3).
   const name = session ? cleanAgentName(session.name) : '';
@@ -1109,6 +1121,7 @@ export function buildComment(review: Review, input: CommentInput): Comment {
 
 export function addComment(slug: string, input: CommentInput): Comment {
   return mutate(slug, (review) => {
+    checkReviewOpen(review);
     const c = buildComment(review, input);
     review.comments.push(c);
     logEvent({ type: 'comment', by: c.author, review, comment: c });
@@ -1122,6 +1135,7 @@ export function addComment(slug: string, input: CommentInput): Comment {
  */
 export function addComments(slug: string, inputs: CommentInput[]): Comment[] {
   return mutate(slug, (review) => {
+    checkReviewOpen(review);
     const made = inputs.map((input) => buildComment(review, input));
     for (const c of made) {
       review.comments.push(c);
@@ -1180,6 +1194,7 @@ export function updateComment(id: string, patch: CommentPatch): Comment {
   if (!hit) throw new Error(`no comment ${id}`);
   const by = patch.by || USER;
   return mutate(hit.slug, (review) => {
+    checkReviewOpen(review);
     const c = review.comments.find((x) => x.id === id);
     if (!c) throw new Error(`no comment ${id}`);
     if (patch.preview && !c.previews?.some((p) => p.id === patch.preview)) throw new Error(`${id} has no preview ${patch.preview}`);
@@ -1244,6 +1259,7 @@ export function setOptionRef(id: string, group: string, item: string, ref: NoteR
   const hit = findComment(id);
   if (!hit) throw new Error(`no note ${id}`);
   return mutate(hit.slug, (review) => {
+    checkReviewOpen(review);
     const c = review.comments.find((x) => x.id === id);
     const it = c?.options?.find((g) => g.id === group)?.items.find((x) => x.id === item);
     if (!c || !it) throw new Error(`${id} has no item ${group}/${item}`);
@@ -1261,6 +1277,7 @@ export function addRefs(id: string, refs: NoteRef[], o: { by: string; by_id?: st
   const hit = findComment(id);
   if (!hit) throw new Error(`no note ${id}`);
   return mutate(hit.slug, (review) => {
+    checkReviewOpen(review);
     const c = review.comments.find((x) => x.id === id);
     if (!c) throw new Error(`no note ${id}`);
     if ((c.refs?.length || 0) + refs.length > REFS_PER_NOTE) throw new Error(`a note carries at most ${REFS_PER_NOTE} references`);
@@ -1281,6 +1298,7 @@ export function setRefCaption(id: string, refId: string, caption: string, by = U
   const hit = findComment(id);
   if (!hit) throw new Error(`no note ${id}`);
   return mutate(hit.slug, (review) => {
+    checkReviewOpen(review);
     const c = review.comments.find((x) => x.id === id);
     const ref = c?.refs?.find((r) => r.id === refId);
     if (!c || !ref) throw new Error(`${id} has no reference ${refId}`);
@@ -1298,6 +1316,7 @@ export function removeRef(id: string, refId: string, by = USER): Comment {
   const hit = findComment(id);
   if (!hit) throw new Error(`no note ${id}`);
   return mutate(hit.slug, (review) => {
+    checkReviewOpen(review);
     const c = review.comments.find((x) => x.id === id);
     const ref = c?.refs?.find((r) => r.id === refId);
     if (!c || !ref) throw new Error(`${id} has no reference ${refId}`);
@@ -1318,6 +1337,7 @@ export function deleteComment(id: string, by = USER): Comment {
   const hit = findComment(id);
   if (!hit) throw new Error(`no comment ${id}`);
   return mutate(hit.slug, (review) => {
+    checkReviewOpen(review);
     const i = review.comments.findIndex((x) => x.id === id);
     if (i < 0) throw new Error(`no comment ${id}`);
     const [c] = review.comments.splice(i, 1);
@@ -1366,6 +1386,7 @@ export function editReply(id: string, n: number, at: string, text: string, by = 
   const hit = findComment(id);
   if (!hit) throw failWith(404, `no comment ${id}`);
   return mutate(hit.slug, (review) => {
+    checkReviewOpen(review);
     const c = review.comments.find((x) => x.id === id);
     if (!c) throw failWith(404, `no comment ${id}`);
     const r = replyAt(c, n, at);
@@ -1385,6 +1406,7 @@ export function deleteReply(id: string, n: number, at: string, by = USER): Comme
   const hit = findComment(id);
   if (!hit) throw failWith(404, `no comment ${id}`);
   return mutate(hit.slug, (review) => {
+    checkReviewOpen(review);
     const c = review.comments.find((x) => x.id === id);
     if (!c) throw failWith(404, `no comment ${id}`);
     const r = replyAt(c, n, at);
@@ -1630,6 +1652,7 @@ export function setApproval(
   o: { party?: ApprovalParty; share?: string; v?: number; keep?: number } = {},
 ): Approval | null {
   return mutate(slug, (review) => {
+    checkReviewOpen(review);
     const v = approval?.v || o.v || (review.versions.at(-1) as Version).v;
     const party = o.party || partyOf(by);
     const note = (approval?.note || '').trim() || null;
@@ -1656,6 +1679,7 @@ export function setApproval(
  */
 export function carryApproval(slug: string, from: number, by = USER, to?: number): Approval | null {
   return mutate(slug, (review) => {
+    checkReviewOpen(review);
     const v = (review.versions.at(-1) as Version).v;
     if (to !== undefined && to !== v) throw Object.assign(new Error(`v${v} arrived since v${to} was compared: review it instead`), { status: 409 });
     const history = approvalsOf(review);
@@ -1679,6 +1703,7 @@ export const partNotFinal = (ver: Version): string =>
 
 export function setFinal(slug: string, o: { v?: number; note?: string | null } = {}, by = USER): Review {
   return mutate(slug, (review) => {
+    checkReviewOpen(review);
     const v = o.v || (review.versions.at(-1) as Version).v;
     const ver = review.versions.find((x) => x.v === v);
     if (!ver) throw new Error(`no v${v}`);
@@ -1699,6 +1724,7 @@ export function setFinal(slug: string, o: { v?: number; note?: string | null } =
 /** Records where a render was made (Version.source), e.g. the After Effects comp it came from. */
 export function setVersionSource(slug: string, v: number | undefined, source: RenderSource | null, by = USER): Version {
   return mutate(slug, (review) => {
+    checkReviewOpen(review);
     const ver = v ? review.versions.find((x) => x.v === v) : review.versions.at(-1);
     if (!ver) throw new Error(`no v${v}`);
     if (source) ver.source = { ...source, ...(source.project ? { project: fileName(source.project) } : {}) };
@@ -1716,6 +1742,7 @@ export function describeSource(s: RenderSource): string {
 /** Takes the final mark back (a newer render needs review, or the client wants one more change). */
 export function reopenFinal(slug: string, o: { note?: string | null } = {}, by = USER): Review {
   return mutate(slug, (review) => {
+    checkReviewOpen(review);
     const was = review.final;
     if (!was) throw new Error('this video is not final');
     const note = (o.note || '').trim() || null;
@@ -1738,6 +1765,7 @@ export const stageFor = (review: Review) => stageOf(review, stageContextOf(revie
 export function addRequest(slug: string, text: string, by = USER, part?: PartRequest | null): string {
   const review = loadReview(slug);
   if (!review) throw new Error(`no review for ${slug}`);
+  checkReviewOpen(review);
   const latest = review.versions.at(-1);
   const p = part && latest ? cleanPart(part, latest.frames) : null;
   const said = String(text).trim();

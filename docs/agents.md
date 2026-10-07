@@ -160,8 +160,8 @@ or the environment variable `VR_BY=agent:<name>` changes that.
 
 | Command | Does |
 |---|---|
-| `vr ls [--open] [--mine \| --session <name>] [--folder <f>] [--archived]` | the videos under review, with their counts and stage |
-| `vr folders` | the project and folder tree, with counts |
+| `vr ls [--open] [--mine \| --session <name>] [--folder <f>] [--archived]` | the videos under review, with their counts and stage. Archived videos and archived projects' videos only with `--archived`, marked `(archived)` |
+| `vr folders [--archived]` | the project and folder tree, with counts; archived projects only with `--archived`, marked `(archived)` |
 | `vr open <video> [--all] [--brief]` | one video's open notes, required work first. `--all`: every status. `--brief`: the screenshots' folder once, not three paths per note |
 | `vr show <id>` | one note in full: every reply, its files and references |
 | `vr inbox [--mine \| --session <name>] [--since <iso>] [--limit N]` | the newest feedback from people, across videos (50 lines unless `--limit`) |
@@ -611,6 +611,12 @@ approved or final. What each one means: [workflow.md](workflow.md).
 - `vr open` prints it under the header: `stage: CHECK FIXES — 2 fixes to check in V2`.
 - The MCP tools `get_open_notes` and `get_note` print it as `stage <stage> · <detail>`; `list_videos` ends each
   line with `· stage <stage> (<detail>)`.
+
+**An archived project** is read only until a person restores it (agents can't: archiving and restoring are a
+person's, in the app). `vr ls`, `vr folders`, `list_videos` and `list_folders` leave it out unless asked
+(`--archived`, `archived: true`), the `vr://review` resources don't list it, and its videos still open by name. Any write into it — a note, a
+reply, a fix, a render (`vr push`, `vr sync`, `track_video`, an upload URL), a move into it, a status — is refused
+with one sentence: `the project "Acme" is archived: it is read-only until a person restores it`.
 
 Approving and marking final are people's decisions; agents never do either. Review links are people's too: an API
 token lists a video's links without their tokens and can't make, change or revoke one (a link would let it approve as

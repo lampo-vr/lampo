@@ -4,13 +4,26 @@ import path from 'node:path';
 import express, { type Router } from 'express';
 import { z } from 'zod';
 import { AGENT_KINDS } from '../../lib/agentKind.ts';
-import { allFolders, createFolder, deleteFolder, folderName, moveVideo, normFolder, renameFolder, shownFolders, suggestFolder } from '../../lib/folders.ts';
+import { archivedNow } from '../../lib/folderIds.ts';
+import {
+  allFolders,
+  archiveProject,
+  createFolder,
+  deleteFolder,
+  folderName,
+  moveVideo,
+  normFolder,
+  renameFolder,
+  restoreProject,
+  shownFolders,
+  suggestFolder,
+} from '../../lib/folders.ts';
 import { DEV, HOME, ROOT, reviewFile, slugify, untildify, VIDEO_EXT } from '../../lib/paths.ts';
 import { can } from '../../lib/permissions.ts';
 import { search } from '../../lib/search.ts';
 import { revokeVideoLinks } from '../../lib/shares.ts';
 import * as store from '../../lib/store.ts';
-import type { AgentKind, BrowseEntry, BrowseResponse, LibraryResponse, SearchResponse } from '../../lib/types.ts';
+import type { AgentKind, ArchivedProject, BrowseEntry, BrowseResponse, LibraryResponse, SearchResponse } from '../../lib/types.ts';
 import type { ServerContext } from '../context.ts';
 import { countStep } from '../funnel.ts';
 import { accountOf, agentView, getReview, isOwn, summary } from '../helpers.ts';
@@ -36,6 +49,12 @@ const AddVideo = z.object({
 });
 
 const FolderPath = z.object({ path: folderPath });
+
+/** The archived projects as callers see them: when, and by whom (a name; never the account). */
+export function archivedList(all: Readonly<Record<string, ArchivedProject>> = archivedNow()): LibraryResponse['archived_projects'] {
+  const list = Object.entries(all);
+  return list.length ? Object.fromEntries(list.map(([name, a]) => [name, { at: a.at, ...(a.by ? { by: a.by } : {}) }])) : undefined;
+}
 const FolderRename = z.object({ from: folderPath, to: folderPath });
 const FolderQuery = z.object({ path: folderPath.optional() });
 const MoveVideo = z.object({ folder: folderPath.nullish() });
@@ -78,9 +97,12 @@ export function libraryRoutes(ctx: ServerContext): Router {
     const reviews = store.listReviews();
     const listed = wanted ? reviews.filter((rv) => wanted.has(slugify(rv.video))) : reviews;
     const shown = shownFolders(reviews);
+    const archived = archivedNow();
+    const projects = archivedList(archived);
     const out: LibraryResponse = {
-      videos: listed.map((rv) => agentView.summary(req, summary(rv, sessions))),
+      videos: listed.map((rv) => agentView.summary(req, summary(rv, sessions, archived))),
       folders: shown.folders,
+      ...(projects ? { archived_projects: projects } : {}),
       ...(shown.degraded ? { degraded: ['folders' as const] } : {}),
     };
     res.json(out);
@@ -187,14 +209,37 @@ export function libraryRoutes(ctx: ServerContext): Router {
     // Suggestions come from where a linked file sits on disk; uploads (and hosted servers) have no such thing.
     const suggest = video && ctx.capabilities.linkFiles && !video.startsWith('/@uploads/');
     const shown = shownFolders();
-    res.json({ folders: shown.folders, ...(shown.degraded ? { degraded: ['folders'] } : {}), ...(suggest ? { suggestion: suggestFolder(video) } : {}) });
+    const projects = archivedList();
+    res.json({
+      folders: shown.folders,
+      ...(projects ? { archived_projects: projects } : {}),
+      ...(shown.degraded ? { degraded: ['folders'] } : {}),
+      ...(suggest ? { suggestion: suggestFolder(video) } : {}),
+    });
   });
 
   // One video moved: its library entry (the answer carries the folder list too); otherwise the whole library.
   const foldersChanged = (res: express.Response, extra: object = {}, slug?: string) => {
     broadcast('library', slug ? { slug } : {});
-    res.json({ folders: allFolders(), ...extra });
+    const projects = archivedList();
+    res.json({ folders: allFolders(), ...(projects ? { archived_projects: projects } : {}), ...extra });
   };
+
+  // Archiving a project and restoring it (lib/archived.ts): every open player of a video in it reads its state again
+  // (one `review` for all: it happens once in a while, never per request), and the library its folders.
+  const archiveChanged = (res: express.Response, extra: object) => {
+    broadcast('review', {});
+    foldersChanged(res, extra);
+  };
+  r.post('/api/folders/archive', express.json(), (req, res) => {
+    const who = ctx.actor(req);
+    const done = archiveProject(body(FolderPath, req).path, { name: who, id: accountOf(req, who) });
+    archiveChanged(res, { project: done.project, archived: { at: done.archived.at, ...(done.archived.by ? { by: done.archived.by } : {}) } });
+  });
+  r.post('/api/folders/restore', express.json(), (req, res) => {
+    const done = restoreProject(body(FolderPath, req).path);
+    archiveChanged(res, { project: done.project, restored: done.restored });
+  });
 
   r.post('/api/folders', express.json(), (req, res) => foldersChanged(res, { folder: createFolder(body(FolderPath, req).path) }));
 
@@ -214,10 +259,12 @@ export function libraryRoutes(ctx: ServerContext): Router {
   // One click for "Unsorted": file each unsorted video where suggestFolder() says it belongs (files on disk only).
   r.post('/api/folders/auto', (req, res) => {
     let moved = 0;
+    const archived = archivedNow();
     for (const rv of store.listReviews()) {
       if (rv.folder || rv.archived || store.isUpload(rv)) continue;
       const s = suggestFolder(rv.video);
-      if (!s.folder) continue;
+      // never into an archived project: such a video stays where it is
+      if (!s.folder || Object.hasOwn(archived, s.folder.split('/')[0] as string)) continue;
       moveVideo(slugify(rv.video), s.folder, ctx.actor(req));
       moved++;
     }
@@ -226,7 +273,8 @@ export function libraryRoutes(ctx: ServerContext): Router {
 
   r.put('/api/review/:slug/folder', express.json(), (req, res) => {
     getReview(req.params.slug);
-    const moved = moveVideo(req.params.slug, body(MoveVideo, req).folder ?? null, ctx.actor(req));
+    // out of an archived project: its owners' and admins' (the role in this workspace), never into one
+    const moved = moveVideo(req.params.slug, body(MoveVideo, req).folder ?? null, ctx.actor(req), { out: can(req.auth?.role, 'archive') });
     broadcast('review', { slug: req.params.slug });
     foldersChanged(res, { folder: moved.folder }, req.params.slug);
   });

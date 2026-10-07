@@ -1,6 +1,7 @@
 // Looking back across reviews: analytics, who watched what, and the reviewer's taste for a project.
 import express, { type Router } from 'express';
 import { z } from 'zod';
+import { archivedNow } from '../../lib/folderIds.ts';
 import { insights } from '../../lib/insights.ts';
 import { watchingOf } from '../../lib/insightsWatch.ts';
 import { slugify } from '../../lib/paths.ts';
@@ -53,6 +54,8 @@ export function insightRoutes(ctx: ServerContext): Router {
         rulesFor: (scope) => [...layersFor(scope).map((x) => x.rules), loadPlaybook(scope).rules].join('\n'),
         // an agent's mark: a session listed without a kind is a Claude Code session (lists from before kinds)
         connected: new Map(sessions.flatMap((s) => (s.name ? [[s.name, s.agent ?? 'claude-code'] as const] : []))),
+        // what waits now leaves an archived project out (lib/archived.ts)
+        archived: archivedNow(),
       }),
     );
   });

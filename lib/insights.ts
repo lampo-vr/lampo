@@ -6,6 +6,7 @@
 // server: it reads the views and the links). `flow`'s hours, `repeats`, `speed`, `patterns` and `projects` stay for API
 // users; so does `attention` (the inbox lists stalled videos, lib/foryou.ts, with `attentionOf` from here). The older
 // all-time totals, tags, convergence and turnaround stay for the API too.
+import { archivedIn } from './archived.ts';
 import { agentKinds, agentsOf, flowOf, type LinkSpan, partyOf, repeatsOf, waitingSince } from './insightsFlow.ts';
 import { causesOf, firstTimeOf, stillWrongOf, toApprovalOf, turnaroundOf } from './insightsRounds.ts';
 import { slugify } from './paths.ts';
@@ -14,6 +15,7 @@ import { approvalsOf, isApprovedStage, stageOf } from './stage.ts';
 import { compareTime, isRequired, noteKind, TAGS } from './time.ts';
 import type {
   AgentKind,
+  ArchivedProject,
   Comment,
   CommentStatus,
   Insights,
@@ -84,6 +86,11 @@ export interface InsightsOptions {
   rulesFor?: (scope: string) => string;
   /** Agents connected now, by name: their kind, for agents no video is assigned to. */
   connected?: ReadonlyMap<string, AgentKind>;
+  /**
+   * The archived projects (lib/archived.ts): put away, so nothing of theirs is listed as waiting now (`attention`,
+   * `stuck`); what happened in them still counts for the period.
+   */
+  archived?: Readonly<Record<string, ArchivedProject>>;
 }
 
 /** Videos listed as waiting longest now. */
@@ -282,8 +289,9 @@ function board(
   const severity: Record<Severity, number> = { must: 0, should: 0, nice: 0, idea: 0 };
   for (const { c } of written) severity[c.severity] = (severity[c.severity] || 0) + 1;
 
-  // Needs attention: right now, whatever the period.
-  const attention = live
+  // Needs attention: right now, whatever the period (an archived project's videos wait for nobody).
+  const unshut = live.filter((r) => !archivedIn(r.folder, opts.archived));
+  const attention = unshut
     .map((r) => attentionOf(r, stages.get(r) as StageInfo, now))
     .filter((a): a is InsightsAttention => !!a)
     .sort(
@@ -314,7 +322,7 @@ function board(
   for (const { r, slug } of slugs) {
     const stage = stages.get(r) as StageInfo;
     const party = partyOf(stage.next.kind);
-    if (!party) continue;
+    if (!party || archivedIn(r.folder, opts.archived)) continue;
     const wait = waitingSince(r, slug, now, links);
     stuck.push({
       slug,

@@ -3,7 +3,7 @@
 // the rest is used.
 
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback } from 'react';
+import { createContext, useCallback, useContext } from 'react';
 import { type Action, can } from '../../../lib/permissions.ts';
 import { currentLang } from '../i18n/index.ts';
 import { chromeRole } from '../lib/chromeHint.ts';
@@ -90,10 +90,18 @@ export function useLikelyRole(): Role | null {
   return status ? (status.user?.role ?? null) : chromeRole();
 }
 
-/** What the current role may do (lib/permissions.ts; the server enforces the same table). */
-export function useCan(): (action: Action) => boolean {
+/**
+ * Inside an archived project (lib/archived.ts) everything is read only: watching, downloading and restoring it are
+ * what's left. A screen about one video or folder of it says so for everything it holds (the player: its value).
+ */
+export const ReadOnlyScope = createContext(false);
+const READ_ONLY_MAY: ReadonlySet<Action> = new Set<Action>(['view', 'download', 'archive']);
+
+/** What the current role may do (lib/permissions.ts; the server enforces the same table); `readOnly`: as ReadOnlyScope. */
+export function useCan(readOnly = false): (action: Action) => boolean {
   const role = useRole();
-  return useCallback((action: Action) => can(role, action), [role]);
+  const frozen = useContext(ReadOnlyScope) || readOnly;
+  return useCallback((action: Action) => can(role, action) && (!frozen || READ_ONLY_MAY.has(action)), [role, frozen]);
 }
 
 // Other tabs share the cookie: when one signs in or out, the others follow instead of showing stale screens.

@@ -1,6 +1,7 @@
 // HTTP plumbing shared by all routes: typed errors, request validation, the one error handler.
 import { type NextFunction, type Request, type Response, Router } from 'express';
 import { z } from 'zod';
+import { ProjectArchivedError } from '../lib/archived.ts';
 import { type Audience, publicMessage, statusOf } from '../lib/publicError.ts';
 
 /** Review-link paths (also server/guard.ts): nobody on them is identified, so nobody there is the owner. /e/<token> is
@@ -28,7 +29,11 @@ export const fail = (status: number, message: string, details?: Record<string, u
  * and anyone else gets a plain sentence when the cause is a tool's output or names a path (lib/publicError.ts).
  */
 export const failFrom = (status: number, e: unknown, message = (e as Error)?.message ?? String(e)): HttpError =>
-  Object.assign(new HttpError(status, message), { cause: e });
+  // a write into an archived project stays what it is, whatever the route would make of another failure
+  e instanceof ProjectArchivedError ? archivedFail(e) : Object.assign(new HttpError(status, message), { cause: e });
+
+/** A refusal for an archived project (lib/archived.ts): 423, with the project beside the sentence. */
+const archivedFail = (e: ProjectArchivedError): HttpError => Object.assign(new HttpError(423, e.message, { archived: e.project }), { cause: e });
 
 /**
  * Who a request's answer is for (lib/publicError.ts): the machine's owner at the machine, or anyone else. A review link's
@@ -98,7 +103,9 @@ export const loggedPath = (p: string): string =>
  * `hosted` only decides what else goes to the log (a hosted server logs throttling, the machine every error).
  */
 export function createErrorHandler({ hosted = false } = {}) {
-  return (err: StatusError, req: Request, res: Response, next: NextFunction): void => {
+  return (thrown: StatusError, req: Request, res: Response, next: NextFunction): void => {
+    // the store's refusal for an archived project, as a route's own would be (lib/folderIds.ts checkNotArchived)
+    const err: StatusError = thrown instanceof ProjectArchivedError ? archivedFail(thrown) : thrown;
     // An internal error's own status is someone else's (an object store's 403): to the caller it is this server's fault.
     const status = err instanceof HttpError ? err.status : statusOf(err);
     if (res.headersSent) {

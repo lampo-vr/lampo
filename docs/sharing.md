@@ -89,6 +89,11 @@ browser out of the link.
 
 **Revoking** a link stops it at once, also where it is open right now. Notes that came in through it stay.
 
+**An archived project's links** ([workflow.md](workflow.md#in-the-library)) play watch only while it is archived:
+visitors watch, and download what the link offers, but leave no note, reply, check or decision. Nothing of the link
+itself changes: restored, it takes notes and decisions again as it did. No new link is made into an archived project;
+an Embed link keeps playing.
+
 **Every link that is still out there** is listed in *Settings → Review links*, newest first, with *Copy link* and
 *Revoke*. That includes a link whose video or folder went some other way (a hand-edited store, an older version of the
 app): it says so, opens nothing, and can be revoked there. The API is `GET /api/shares`. An agent with an API token

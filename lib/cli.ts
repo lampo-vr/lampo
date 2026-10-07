@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { openActivitySink, processAgent } from './activity.ts';
 import { cliActivity } from './activityText.ts';
+import { archivedIn, archivedWords } from './archived.ts';
 import { readCredentials } from './backend/credentials.ts';
 import { type Backend, openBackend } from './backend/index.ts';
 import type { PlaybookWhere, RefInput } from './backend/types.ts';
@@ -74,7 +75,7 @@ const help = (where: string) => `vr — frame-exact video feedback for agents ($
 
 Reading
   vr ls [--open] [--mine | --session <name>] [--folder <f>] [--archived]   videos under review with counts
-  vr folders                                                 the project/folder tree with counts
+  vr folders [--archived]                                    the project/folder tree with counts
   vr open <video|slug> [--all] [--brief]                     open comments of one video (--all: every status; --brief:
                                                              screenshot paths once, in the header)
   vr show <id>                                               one comment in full
@@ -447,7 +448,10 @@ const commands: Record<string, Command> = {
   async ls({ opt }, b) {
     const filt = sessionFilter(opt);
     // the onboarding sample is a demo for the person, never an agent's work (ONB-5)
-    let reviews = forAgents(await b.listReviews()).filter((r) => (opt.archived ? true : !r.archived));
+    // archived videos and archived projects' (lib/archived.ts) only with --archived, marked (archived)
+    const shut = await b.archivedProjects();
+    const away = (r: Review) => !!r.archived || !!archivedIn(r.folder, shut);
+    let reviews = forAgents(await b.listReviews()).filter((r) => (opt.archived ? true : !away(r)));
     if (filt) reviews = reviews.filter((r) => matchesSession(r.session, filt));
     if (opt.open) reviews = reviews.filter((r) => counts(r).open > 0);
     const folder = str(opt.folder);
@@ -469,7 +473,7 @@ const commands: Record<string, Command> = {
             counts: counts(r),
             stage: b.stage(r).stage,
             stage_detail: b.stage(r).detail,
-            archived: !!r.archived,
+            archived: away(r),
             missing: !!r.missing,
           })),
           null,
@@ -481,7 +485,7 @@ const commands: Record<string, Command> = {
       const n = counts(r);
       out(
         oneLine(
-          `${String(n.open).padStart(3)} open ${String(n.must).padStart(2)} must ${String(n.fixed).padStart(2)} fixed ${String(n.done).padStart(3)} done  v${r.versions.at(-1)?.v}  ${(r.session?.name || '-').padEnd(14)} ${r.video}${r.folder ? `  [${r.folder}]` : ''}${r.missing ? ' (missing)' : ''}${r.archived ? ' (archived)' : ''}  stage:${b.stage(r).stage}`,
+          `${String(n.open).padStart(3)} open ${String(n.must).padStart(2)} must ${String(n.fixed).padStart(2)} fixed ${String(n.done).padStart(3)} done  v${r.versions.at(-1)?.v}  ${(r.session?.name || '-').padEnd(14)} ${r.video}${r.folder ? `  [${r.folder}]` : ''}${r.missing ? ' (missing)' : ''}${away(r) ? ' (archived)' : ''}  stage:${b.stage(r).stage}`,
         ),
       );
     }
@@ -871,19 +875,22 @@ const commands: Record<string, Command> = {
     const { slug, video } = await b.resolve(pos[0] || die('missing <video>'));
     if (!opt.none && !pos[1]) die('say where: vr move <video> "Project/Folder"  (or --none for Unsorted)');
     if (!opt.none) newFolder(pos[1]);
-    const r = await b.move(slug, opt.none ? null : pos[1], author(opt));
+    // out of an archived project: the machine's owner may (a server decides by the token's role)
+    const r = await b.move(slug, opt.none ? null : pos[1], author(opt), { out: true });
     out(oneLine(`${video} → ${r.folder || 'Unsorted'}`));
   },
 
   async folders({ opt }, b) {
-    const reviews = forAgents(await b.listReviews()).filter((r) => !r.archived);
-    const folders = await b.folders(reviews);
+    // archived projects (and what is in them) only with --archived, marked (archived)
+    const shut = await b.archivedProjects();
+    const reviews = forAgents(await b.listReviews()).filter((r) => !r.archived && (opt.archived || !archivedIn(r.folder, shut)));
+    const folders = (await b.folders(reviews)).filter((f) => opt.archived || !archivedIn(f, shut));
     const count = (f: string) => reviews.filter((r) => r.folder && (r.folder === f || r.folder.startsWith(`${f}/`)));
     const openIn = (l: Review[]) => l.reduce((s, r) => s + counts(r).open, 0);
     if (opt.json)
       return out(
         JSON.stringify(
-          folders.map((f) => ({ folder: f, videos: count(f).length, open: openIn(count(f)) })),
+          folders.map((f) => ({ folder: f, videos: count(f).length, open: openIn(count(f)), ...(archivedIn(f, shut) === f ? { archived: true } : {}) })),
           null,
           2,
         ),
@@ -892,7 +899,11 @@ const commands: Record<string, Command> = {
     for (const f of folders) {
       const l = count(f);
       const depth = f.split('/').length - 1;
-      out(oneLine(`${'  '.repeat(depth)}${f.split('/').at(-1)}  (${l.length} video${l.length === 1 ? '' : 's'}, ${openIn(l)} open)`));
+      out(
+        oneLine(
+          `${'  '.repeat(depth)}${f.split('/').at(-1)}  (${l.length} video${l.length === 1 ? '' : 's'}, ${openIn(l)} open)${archivedIn(f, shut) === f ? ' (archived)' : ''}`,
+        ),
+      );
     }
     const unsorted = reviews.filter((r) => !r.folder).length;
     if (unsorted) out(`Unsorted  (${unsorted})`);
@@ -910,6 +921,8 @@ const commands: Record<string, Command> = {
     const r = (await b.sync(slug)) || die(`no review for ${slug}`);
     const latest = latestOf(r.review);
     if (r.version) out(`registered v${latest.v}${r.carried ? `, ${r.carried} open comment(s) carried forward` : ''}`);
+    // a new render waits on disk: nothing new in an archived project
+    else if (r.archived) die(archivedWords(r.archived));
     else if (r.pending) out(`the file is still being written; try again in a moment (current v${latest.v})`);
     else out(`unchanged, v${latest.v}`);
   },

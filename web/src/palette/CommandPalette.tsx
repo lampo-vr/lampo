@@ -84,6 +84,7 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
   // The videos opened last, named from the library this app already holds (no request of their own).
   const openedSlugs = useRecent();
   const library = useLibrary(false).data;
+  const archivedAny = Object.keys(library?.archived_projects ?? {}).length > 0;
   const { data, isFetching } = useQuery({
     queryKey: keys.search(term),
     queryFn: () => api<SearchResponse>(`/api/search?q=${enc(term)}&limit=6`),
@@ -129,6 +130,15 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
       },
       { id: 'go:library', group: t('Go to'), label: t('All videos'), icon: 'film', keywords: 'library dailies home', run: (t) => goHash('#/', t) },
       { id: 'go:insights', group: t('Go to'), label: t('Insights'), icon: 'chart', keywords: 'stats', run: (t) => goHash('#/insights', t) },
+      // the archived projects (lib/archived.ts), while there are some
+      archivedAny && {
+        id: 'go:archived',
+        group: t('Go to'),
+        label: t('Archived'),
+        icon: 'archive',
+        keywords: 'archive archived projects restore put away',
+        run: (t) => goHash('#/archived', t),
+      },
       {
         id: 'go:settings',
         group: t('Go to'),
@@ -161,7 +171,7 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
       },
     ];
     return list.filter((x): x is Item => !!x);
-  }, [can, upload, chooseTheme, lang]);
+  }, [can, upload, chooseTheme, lang, archivedAny]);
 
   const items = useMemo((): Item[] => {
     const found = (it: Item) => !words.length || words.every((w) => fold(`${it.label} ${it.keywords ?? ''}`).includes(w));
@@ -170,7 +180,7 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
       ? []
       : openedSlugs
           .map((s) => bySlug.get(s))
-          .filter((v) => !!v && !v.archived)
+          .filter((v) => !!v && !v.archived && !v.project_archived)
           .slice(0, RECENT_SHOWN)
           .map((v) => {
             const s = v as NonNullable<typeof v>;
@@ -218,8 +228,31 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
       icon: n.kind === 'question' ? 'help' : 'notes',
       run: (t) => goHash(`#/v/${enc(n.slug)}?c=${enc(n.id)}`, t),
     }));
+    // what matches in archived projects comes last, apart (the server keeps it out of the groups above)
+    const shut: Item[] = [
+      ...(data?.archived?.folders ?? []).map(
+        (f): Item => ({
+          id: `af:${f.folder}`,
+          group: t('Archived'),
+          label: f.name,
+          sub: `${f.folder.includes('/') ? `${crumbs(f.folder)} · ` : ''}${t('{n} video|{n} videos', { n: f.videos })}`,
+          icon: 'archive',
+          run: (t) => goHash(`#/folder/${enc(f.folder)}`, t),
+        }),
+      ),
+      ...(data?.archived?.videos ?? []).map(
+        (v): Item => ({
+          id: `av:${v.slug}`,
+          group: t('Archived'),
+          label: v.name,
+          sub: [v.folder ? crumbs(v.folder) : '', `V${v.v}`].filter(Boolean).join(' · '),
+          thumb: v.poster,
+          run: (t) => goHash(`#/v/${enc(v.slug)}`, t),
+        }),
+      ),
+    ];
     const current = data?.q === live;
-    const matches = current ? [...videos.filter((v) => !shown.has(v.id)), ...folders, ...notes] : [];
+    const matches = current ? [...videos.filter((v) => !shown.has(v.id)), ...folders, ...notes, ...shut] : [];
     // Nothing typed: where to go first (and adding a video), then the videos you opened last, those that changed
     // lately, then the rest; typed: the matches
     if (!words.length) {

@@ -958,6 +958,18 @@ export interface FoldersFile {
   /** Ids of the folders review links were made on (lib/folderIds.ts), by path: they move with their folder and end
    * with it, so a folder deleted and made again under the same name is another folder. Absent in older stores. */
   ids?: Record<string, string>;
+  /**
+   * Projects (top-level folders) put away, by name (lib/archived.ts): out of the lists, read-only until restored.
+   * Absent in older stores and while none is.
+   */
+  archived?: Record<string, ArchivedProject>;
+}
+
+/** When a project was archived, and by whom (a name to show; the account too, for newer records). */
+export interface ArchivedProject {
+  at: string;
+  by?: string;
+  by_id?: string;
 }
 
 export type ShareNotes = 'own' | 'all';
@@ -2368,6 +2380,8 @@ export interface VideoSummary {
   mtime: string | null;
   missing: boolean;
   archived: string | null;
+  /** Its project is archived (lib/archived.ts): since when. Read-only until restored; absent while it isn't. */
+  project_archived?: string;
   added: string;
   updated: string | undefined;
   lastComment: string;
@@ -2377,7 +2391,10 @@ export interface VideoSummary {
 
 export interface LibraryResponse {
   videos: VideoSummary[];
+  /** Every folder, archived projects' included (`archived_projects` says which are). */
   folders: string[];
+  /** The archived projects by name: when, and by whom (a name). Absent while none is, and from older servers. */
+  archived_projects?: Record<string, Omit<ArchivedProject, 'by_id'>>;
   /**
    * What is shown in part only: `folders` — the workspace's folders.json can't be read right now, so `folders` holds only
    * the folders videos are filed in (no empty ones) and folders can't be changed until it can (`vr admin
@@ -2393,6 +2410,11 @@ export interface SearchResponse {
   videos: SearchVideo[];
   folders: SearchFolder[];
   notes: SearchNote[];
+  /**
+   * What matches in archived projects, apart (the palette's Archived group): their projects and folders, and their
+   * videos. Only for a query, and only when something matches; the groups above never hold any of it.
+   */
+  archived?: { folders: SearchFolder[]; videos: SearchVideo[] };
 }
 
 export interface SearchVideo {

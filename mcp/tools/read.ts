@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
+import { archivedIn } from '../../lib/archived.ts';
 import { legendLine, pointerFields, pointerIn } from '../../lib/elements.ts';
 import { folderName } from '../../lib/inputs.ts';
 import { forAgents } from '../../lib/onboarding.ts';
@@ -46,10 +47,15 @@ export function registerReadingTools({ b, o, tool, openReview, me }: ToolKit): v
         open_only: z.boolean().optional(),
         folder: folderName.optional().describe('e.g. "Acme/Reels" (with subfolders)'),
         session: z.string().optional().describe('a session name, or "me": assigned to you'),
+        // archived projects' videos too (for the few who need them: accepted, not announced — mcp/lean.ts)
+        archived: z.boolean().optional().meta({ hidden: true }),
       }),
     },
-    async ({ open_only, folder, session }) => {
-      let reviews = forAgents(await b.listReviews()).filter((r) => !r.archived);
+    async ({ open_only, folder, session, archived }) => {
+      // archived videos and archived projects' only when asked (read-only: nothing to work on there)
+      const shut = await b.archivedProjects();
+      const away = (r: { archived?: string; folder?: string | null }) => !!r.archived || !!archivedIn(r.folder, shut);
+      let reviews = forAgents(await b.listReviews()).filter((r) => archived || !away(r));
       if (open_only) reviews = reviews.filter((r) => counts(r).open > 0);
       if (folder) reviews = reviews.filter((r) => r.folder && (r.folder === folder || r.folder.startsWith(`${folder}/`)));
       if (session) {
@@ -65,7 +71,7 @@ export function registerReadingTools({ b, o, tool, openReview, me }: ToolKit): v
         const n = counts(r);
         const st = b.stage(r);
         // Two lines per video, each its own: a file name, a folder, a session or a status can't start a third.
-        return `${oneLine(r.video)}\n  ${oneLine(`v${r.versions.at(-1)?.v} · open ${n.open} (must ${n.must}) · fixed ${n.fixed} · done ${n.done} · folder ${r.folder || 'Unsorted'} · session ${r.session?.name || '-'}${r.agent_status ? ` · status "${r.agent_status.text}"` : ''} · stage ${st.stage} (${st.detail})`)}`;
+        return `${oneLine(r.video)}\n  ${oneLine(`v${r.versions.at(-1)?.v} · open ${n.open} (must ${n.must}) · fixed ${n.fixed} · done ${n.done} · folder ${r.folder || 'Unsorted'} · session ${r.session?.name || '-'}${r.agent_status ? ` · status "${r.agent_status.text}"` : ''} · stage ${st.stage} (${st.detail})${away(r) ? ' · archived' : ''}`)}`;
       });
       return ok(text(lines.join('\n')));
     },
@@ -303,17 +309,20 @@ export function registerReadingTools({ b, o, tool, openReview, me }: ToolKit): v
     {
       title: 'Project/folder tree',
       description: 'The folder tree with video and open-note counts.',
-      inputSchema: z.object({}),
+      // archived projects too: accepted, not announced (mcp/lean.ts)
+      inputSchema: z.object({ archived: z.boolean().optional().meta({ hidden: true }) }),
     },
-    async () => {
-      const reviews = forAgents(await b.listReviews()).filter((r) => !r.archived);
-      const folders = await b.folders(reviews);
+    async ({ archived }) => {
+      // archived projects (and what is in them) only when asked
+      const shut = await b.archivedProjects();
+      const reviews = forAgents(await b.listReviews()).filter((r) => !r.archived && (archived || !archivedIn(r.folder, shut)));
+      const folders = (await b.folders(reviews)).filter((f) => archived || !archivedIn(f, shut));
       const inside = (f: string) => reviews.filter((r) => r.folder && (r.folder === f || r.folder.startsWith(`${f}/`)));
       const lines = folders.map((f) => {
         const l = inside(f);
         // a folder's name is a person's (or an agent's: organize): one line, whatever it holds
         return oneLine(
-          `${'  '.repeat(f.split('/').length - 1)}${f.split('/').at(-1)}  (${l.length} video${l.length === 1 ? '' : 's'}, ${l.reduce((s, r) => s + counts(r).open, 0)} open)  [${f}]`,
+          `${'  '.repeat(f.split('/').length - 1)}${f.split('/').at(-1)}  (${l.length} video${l.length === 1 ? '' : 's'}, ${l.reduce((s, r) => s + counts(r).open, 0)} open)  [${f}]${archivedIn(f, shut) === f ? '  archived' : ''}`,
         );
       });
       const unsorted = reviews.filter((r) => !r.folder).length;

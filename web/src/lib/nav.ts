@@ -1,4 +1,4 @@
-// Hash routes:  #/v/<slug>?c=&f=&v=  player · #/print/<slug> · #/ #/inbox #/unsorted #/insights
+// Hash routes:  #/v/<slug>?c=&f=&v=  player · #/print/<slug> · #/ #/inbox #/unsorted #/insights #/archived
 // #/folder/<path> #/playbook/<path>[?tab=…] #/session/<name>  library views (old addresses: #/for-you and #/verify open
 // #/inbox, #/open opens All videos on the Being fixed lane) · #/status (where every video stands) · #/settings[/<section>] · #/invite/<token> ·
 // #/signup · #/forgot · #/reset/<token> · #/verify/<token> (what emailed links open, server mode) · #/oauth/<request> and
@@ -116,8 +116,8 @@ export function parseRoute(hash: string, pathname: string): Route {
   if (pb) return { name: 'library', view: { kind: 'playbook', id: decoded(pb[1]) } };
   const s = /^#\/session\/(.+)$/.exec(hash);
   if (s) return { name: 'library', view: { kind: 'session', id: decoded(s[1]) } };
-  const k = /^#\/(inbox|unsorted|insights)$/.exec(hash);
-  return { name: 'library', view: { kind: k ? (k[1] as 'inbox' | 'unsorted' | 'insights') : 'all' } };
+  const k = /^#\/(inbox|unsorted|insights|archived)$/.exec(hash);
+  return { name: 'library', view: { kind: k ? (k[1] as 'inbox' | 'unsorted' | 'insights' | 'archived') : 'all' } };
 }
 
 /**

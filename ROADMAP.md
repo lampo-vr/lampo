@@ -188,6 +188,9 @@ website's clips.
   server renders it and it lands as the next version without an upload. Before it is built: one sandbox per render
   (the bundle is the customer's code; network only for its assets), and how assets (fonts, clips) travel with it.
 - Live presence: who else is watching, and their playheads.
+- **Cold storage for archived projects.** An archived project's versions still count toward the plan's storage (and
+  its videos under review toward the plan's count) as they did: move its renders to a cheaper bucket class (or a
+  bundle the workspace keeps) while it is archived, back when it is restored, and say so in Settings → Billing.
 - **Voice notes on replies.** "Still wrong" can be said now, but only its words are kept (replies have no `voice`):
   keep the clip as the reply's voice note (`Reply.voice`, the agent formats naming it like a note's), and give review
   links' guest notes and their "still not right" the same voice button.

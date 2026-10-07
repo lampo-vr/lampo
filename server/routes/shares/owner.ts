@@ -4,6 +4,7 @@
 import express, { type Router } from 'express';
 import QRCode from 'qrcode';
 import { z } from 'zod';
+import { checkNotArchived } from '../../../lib/folderIds.ts';
 import { allFolders, folderIdFor, folderName } from '../../../lib/folders.ts';
 import {
   allShares,
@@ -132,6 +133,8 @@ export function ownerShareRoutes(ctx: ServerContext): Router {
       // A link is on a folder that exists (one from before the limits on folders made now too): nothing is made here.
       const folder = folderName(b.folder);
       if (!folder || !allFolders().includes(folder)) throw fail(404, 'no such folder');
+      // no new link into an archived project: refused before its folder is given an id
+      checkNotArchived(folder);
       const { folder: _f, ...input } = b;
       // The link is on this folder by its id: wherever it moves, and never on another folder made under its name later.
       const s = refusable(() => createShare({ folder, folder_id: folderIdFor(folder) }, { ...input, by: ctx.actor(req), byId: req.auth?.user?.id }));

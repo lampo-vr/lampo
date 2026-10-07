@@ -172,18 +172,23 @@ export const activity = (v: VideoSummary): string | null =>
     .sort((a, b) => compareTime(a, b))
     .at(-1) ?? null;
 
-/** The videos a sidebar view is about, before any filter. Folder views include their subfolders. */
+/**
+ * The videos a sidebar view is about, before any filter. Folder views include their subfolders. An archived project's
+ * videos are put away (lib/archived.ts): only its own page and the Archived view show them.
+ */
 export function scope(videos: VideoSummary[], view: LibraryView): VideoSummary[] {
   switch (view.kind) {
     case 'unsorted':
       return videos.filter((v) => !v.folder);
     case 'session':
-      return videos.filter((v) => v.session?.name === view.id);
+      return videos.filter((v) => v.session?.name === view.id && !v.project_archived);
     case 'folder':
     case 'playbook':
       return videos.filter((v) => within(v.folder, view.id));
+    case 'archived':
+      return videos.filter((v) => !!v.project_archived);
     default:
-      return videos;
+      return videos.filter((v) => !v.project_archived);
   }
 }
 

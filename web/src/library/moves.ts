@@ -103,7 +103,8 @@ export function stageAfter(v: VideoSummary, steps: Step[], { by = '', now = Date
  * while a fix exists only on a preview. Each write needs its action (`can`).
  */
 export function planMove(v: VideoSummary, to: LaneId, can: (a: Action) => boolean, o: MoveOptions = {}): Move | null {
-  if (v.archived) return null;
+  // nothing moves in an archived project (lib/archived.ts), nor a removed video
+  if (v.archived || v.project_archived) return null;
   const s = v.stage;
   const from = laneOf(s.stage);
   if (from === to) return null;

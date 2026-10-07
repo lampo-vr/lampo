@@ -95,7 +95,8 @@
     .range-more,
     .topbar.bare .user-chip,
     .ac-chip,
-    .tagf
+    .tagf,
+    .arch-banner-act
   ) {
     position: relative;
   }
@@ -122,7 +123,8 @@
     .range-more,
     .topbar.bare .user-chip,
     .ac-chip,
-    .tagf
+    .tagf,
+    .arch-banner-act
   )::after {
     content: '';
     position: absolute;
