@@ -221,7 +221,7 @@ test('discovery: protected resource metadata (both well-known paths) and authori
     const m = (await r.json()) as { resource: string; authorization_servers: string[]; scopes_supported: string[] };
     assert.equal(m.resource, `${base}/mcp`);
     assert.deepEqual(m.authorization_servers, [base]);
-    assert.deepEqual(m.scopes_supported, ['review:read', 'review:comment', 'review:act', 'post:draft']);
+    assert.deepEqual(m.scopes_supported, ['review:read', 'review:comment', 'review:act', 'post:draft', 'files:read', 'files:write']);
   }
   const as = (await (await fetch(`${base}/.well-known/oauth-authorization-server`)).json()) as Record<string, unknown>;
   assert.equal(as.issuer, base);
@@ -239,7 +239,7 @@ test('SDK client with dynamic registration: 401 → metadata → register → co
   assert.equal(view.client_name, 'Test Agent');
   assert.equal(view.verified, false, 'a self-registered name is not vouched for');
   assert.equal(view.local_redirect, true);
-  assert.deepEqual(view.scopes, ['review:read', 'review:comment', 'review:act', 'post:draft']);
+  assert.deepEqual(view.scopes, ['review:read', 'review:comment', 'review:act', 'post:draft', 'files:read', 'files:write']);
   assert.deepEqual(view.capped, []);
   assert.match(p.saved?.access_token || '', /^vro_/);
   assert.match(p.saved?.refresh_token || '', /^vrr_/);
@@ -256,7 +256,7 @@ test('SDK client with dynamic registration: 401 → metadata → register → co
     apps: { id: string; client_name: string; scopes: string[] }[];
   };
   const mine = apps.find((a) => a.client_name === 'Test Agent');
-  assert.ok(mine && mine.scopes.length === 4);
+  assert.ok(mine && mine.scopes.length === 6);
   assert.equal((await fetch(`${base}/api/admin/apps`, { headers: { cookie: owner } })).status, 200);
   assert.equal((await fetch(`${base}/api/admin/apps`, { headers: { cookie: reviewer } })).status, 403);
   // An admin manages everyone's connected apps but an owner's (like the owner themselves).

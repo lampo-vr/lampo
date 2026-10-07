@@ -328,17 +328,19 @@ export async function sendDownload(req: Request, res: Response, src: Source, fil
 // pins one of the 6 HTTP/1.1 connections per host (the SSE stream already takes one per tab).
 // `cache`: the Cache-Control to send instead (a signed URL is good until it ends). `whole`: a download, which gets
 // every byte a range asks for (one that picks up where it broke off wants the rest, not a player's next chunk).
+// `type`: the Content-Type to send (a project file's), else a render's by its extension.
 // A HEAD gets the headers only: Express answers it with the GET route, and Node drops the body but would still read
 // every byte of the file to throw them away.
 export function streamFile(
   req: Request,
   res: Response,
   file: string,
-  { immutable = false, cache, whole = false }: { immutable?: boolean; cache?: string; whole?: boolean } = {},
+  { immutable = false, cache, whole = false, type }: { immutable?: boolean; cache?: string; whole?: boolean; type?: string } = {},
 ): void {
   const st = fs.statSync(file);
   const ext = path.extname(file).toLowerCase();
-  res.setHeader('Content-Type', ext === '.webm' ? 'video/webm' : ext === '.mkv' ? 'video/x-matroska' : ext === '.m4a' ? 'audio/mp4' : 'video/mp4');
+  // `type`: what the caller knows the bytes are (a project file: lib/files.ts), else a render's by its extension
+  res.setHeader('Content-Type', type ?? (ext === '.webm' ? 'video/webm' : ext === '.mkv' ? 'video/x-matroska' : ext === '.m4a' ? 'audio/mp4' : 'video/mp4'));
   res.setHeader('Accept-Ranges', 'bytes');
   // a version's bytes never change under the same name: the date lets a browser resume a download it broke off
   res.setHeader('Last-Modified', st.mtime.toUTCString());

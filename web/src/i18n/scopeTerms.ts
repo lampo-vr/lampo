@@ -5,7 +5,14 @@ import { currentLang, t } from './index.ts';
 
 /** An OAuth scope on the consent screen and in the connected-apps list. */
 export const scopeLabel = (s: Scope): string =>
-  ({ 'review:read': t('Read reviews'), 'review:comment': t('Write notes'), 'review:act': t('Act on feedback'), 'post:draft': t('Draft posts') })[s];
+  ({
+    'review:read': t('Read reviews'),
+    'review:comment': t('Write notes'),
+    'review:act': t('Act on feedback'),
+    'post:draft': t('Draft posts'),
+    'files:read': t('Read project files'),
+    'files:write': t('Add project files'),
+  })[s];
 
 export const scopeHint = (s: Scope): string =>
   ({
@@ -14,6 +21,8 @@ export const scopeHint = (s: Scope): string =>
     'review:comment': t('Ask questions, leave notes on frames and reply to notes.'),
     'review:act': t('Mark notes fixed or won’t fix, add and file versions, and report what the agent is doing.'),
     'post:draft': t('Write post drafts of final videos for YouTube, Instagram and Facebook. A person publishes them.'),
+    'files:read': t('List and download the project files: footage, audio, fonts and project files.'),
+    'files:write': t('Add, replace, rename, move and trash project files. Every change is a version anyone can bring back.'),
   })[s];
 
 /** A scope inside a sentence ("read reviews" / "Reviews lesen"). */

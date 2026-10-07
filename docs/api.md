@@ -928,6 +928,58 @@ Details:
   `409 {by, changed_rev, base_rev, rev}` when someone changed that section after the suggestion was made: accepting
   would replace their change, so reject it or ask for a new one.
 
+## Project files
+
+The material a project is made from: footage, music, fonts, project files ([files.md](files.md)). Files attach to the
+House, a project or a folder, named by `folder` (a folder path; empty or left out: the House). The shapes are in
+[`lib/types.ts`](../lib/types.ts) ("project files"); paths inside an area follow
+[`lib/fileText.ts`](../lib/fileText.ts) `cleanFilePath` (`400` otherwise).
+
+Reading needs `files`, every change `files-write` (owners, admins and members). **Reviewers get `404`** on every
+route here: they don't see files. Review links never reach them. OAuth apps need `files:read` or `files:write`. Ids
+are `fl_…` (a file) or `fd_…` (a folder inside an area); another workspace's answer `404`. Every change broadcasts
+`files` (`{area, rev}`) on `/api/events`, to streams that may read files only.
+
+| Route | What it does |
+|---|---|
+| `GET /api/files?folder=&path=&deep=&own=&kind=&q=&limit=&cursor=` | `FilesListing`: the chain's areas (deepest first: `area`, `rev`, `files`, `bytes`, `trash`, `trash_bytes`), the folders directly under `path` (`dirs`: `id`, `area`, `path`, `files`, `bytes`; empty ones too), and a page of files (`FileInfo`): directly in `path`, or every one under it with `deep=1` (and with `q`, a part of the path, or `kind`). A deeper area's path hides the same path above. `own=1`: the folder's own area only. `limit` ≤ 1000 (default 200); `cursor` from the last page |
+| `GET /api/files/summary?folder=` | `FilesSummary`: per area of the chain, its top-level folders and files with counts, bytes and kinds |
+| `GET /api/files/trash?folder=` | `FilesTrash`: the area's trash, newest first (`purge_at` on each), and folders trashed whole (`dirs`) |
+| `GET /api/files/usage` | `FilesUsage`: live files, the bytes that count, the bytes kept and not counted (trash, replaced versions), the safety net's cap |
+| `GET /api/files/:id` | `FileInfo` (`TrashedFileInfo` in the trash; `FileDirInfo` for a folder's id) |
+| `GET /api/files/:id/history` | `FileHistory`: its versions (newest first; `kept_until` on older ones) and its journal (`changes`) |
+| `GET /api/files/:id/download?v=&inline=` | the version's bytes: a `302` to a short-lived signed URL on the media host, else streamed. An attachment (`application/octet-stream`, `nosniff`, `sandbox`) with ranges; `inline=1` shows pictures, video, sound, PDF and text as themselves, never SVG or HTML. `410` when the bytes are gone |
+| `POST /api/files/urls` | `{ids, v?}` (≤ 100) → `FileUrls`: a signed URL per file for one pull step (an hour for an API token, six for a person) and the ids not found (`missing`) |
+| `POST /api/files/missing` | `{hashes}` (≤ 5,000 sha256) → `{missing}`: the bytes this workspace doesn't hold |
+| `POST /api/files/uploads` | `FileUploadRequest` `{folder?, files: [{path, size, sha256?, base?}], commit?, conflict?, agent?, agent_kind?, via?, machine?}` (≤ 1,000 files) → `FileUploadAnswer`: per file `stored: true` (its bytes are here: commit it) or a one-time `url` and `ticket` (15 minutes), and the `tus` endpoint |
+| `POST /api/files/commit` | `{folder?, add: [{path, sha256, size, base?}], conflict?, agent?, …}` → `FileCommitAnswer`: files whose bytes are stored, as one change |
+| `POST /api/files/dirs` | `{folder?, path}` → `FileDirInfo`: an empty folder inside the area (one there already answers as it is) |
+| `PATCH /api/files/:id` | `{path?, folder?}`: rename, move inside the area, or move to another area (`folder`, `''` the House) → `FileInfo`; a folder's id moves everything under it → `FileDirInfo`. `409` when the place is taken |
+| `DELETE /api/files/:id` | to the trash → `TrashedFileInfo` (a folder's id: with everything under it → `TrashedDirInfo`). Members trash what they added (`403` otherwise) |
+| `POST /api/files/:id/restore` | `{}`: out of the trash (beside its old path as `name (restored)` when that is taken) · `{v}`: an older version back as the newest → `FileInfo` (a folder's id: `FileDirInfo`) |
+
+Details:
+
+- **The version check.** Each file of a push names `base`, the version it replaces: absent or `0` for a new file. A
+  path that is taken (also one differing only in case) without a base, or with an older one, is a conflict: `409` with
+  `FileConflictAnswer` (`{error, conflicts: [{path, id, v, base, by, agent?, at}]}`), checked by `uploads` before any
+  byte and again when the bytes arrive or are committed. Nothing is written. `conflict: "copy"` keeps the file beside
+  it instead (`state: "copy"`, `asked`: the path pushed to). The same bytes again are `state: "same"`.
+- **The bytes.** A ticket takes one `PUT` (`curl -T file <url>`; the URL is its own credential, on the media host when
+  there is one) or one tus upload at `/api/uploads` with `Upload-Metadata: ticket <b64>, filename <b64>`, signed in as
+  the account that asked (another account or workspace: `404`). The ticket is spent when the upload is made; the
+  upload then resumes for a day. The `PUT` and the last `PATCH` answer `FileUploadResult` (`{stored, commit?}`), or the
+  `409` above; `202 {pending, id}` when hashing a big file takes longer (the result at `/api/upload-results/:id`). The
+  bytes are hashed on arrival: a mismatch with the named `sha256` or `size` is `400`, nothing kept.
+- **Refusals before any byte**: `402` with the plan's refusal (`reason`, `needed`, `room`, `fits`: [plan
+  limits](#workspaces-and-plan-limits)) for the bytes that would start counting, `507` when the server's disk is short,
+  `423` in an archived project, `429` past the open tickets one account may hold.
+- **Attribution.** `agent` (cleaned, ≤ 80 characters) and `agent_kind` are kept for callers who may write as agents;
+  `via` (`vr`, `mcp`) and `machine` say how it came. Every version carries `by` and `by_id` of the account.
+- **Signed URLs** (`/media/f/…` on the media host) ask again on every request whether whoever they were handed to may
+  still read files, and answer CORS: any origin for an attachment (a render may stream it), the app's own for a
+  preview.
+
 ## Sessions, agents and the inbox
 
 | Route | What it does |
@@ -1146,6 +1198,7 @@ answers `429` with `Retry-After`. The events:
 | `posts` | `{slug}` | a post of a final video changed: drafted, published, sending, out or failed |
 | `connections` | | a publishing connection was added, checked, changed or removed |
 | `footage` | `{slug}` | a video's footage index changed: its newest version indexed, or failed |
+| `files` | `{area, rev}` | an area's project files changed (`area`: its folder's path, `''` the House); only streams that may read files hear it |
 | `moment` | `{id}` | a conversion moment waits for you (where a billing provider runs): sent only to your own streams |
 
 ## Review links

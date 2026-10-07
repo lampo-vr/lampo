@@ -162,6 +162,27 @@ async function signIn(email: string, workspace?: string): Promise<string> {
   }
   return cookie;
 }
+/**
+ * A project file pushed into a folder (lib/files.ts): the push names it, its one-time URL takes its bytes. Its id, its
+ * folder's id inside the area, and its bytes' sha256 (the blob's name in the workspace's tree).
+ */
+async function pushFile(headers: Record<string, string>, folder: string, filePath: string, data: Buffer): Promise<{ id: string; dir: string; sha256: string }> {
+  const sha256 = crypto.createHash('sha256').update(data).digest('hex');
+  const asked = ok(
+    await request('POST', '/api/files/uploads', { body: { folder, files: [{ path: filePath, size: data.length, sha256 }] }, headers }),
+    `push ${filePath}`,
+  );
+  const slot = asked.json().uploads[0] as { url?: string };
+  assert.ok(slot.url, 'new bytes: a URL to send them to');
+  ok(await request('PUT', new URL(slot.url).pathname, { body: data, headers: { 'content-length': String(data.length) } }), `bytes of ${filePath}`);
+  const listing = ok(await request('GET', `/api/files?folder=${enc(folder)}&deep=1&own=1`, { headers }), 'files').json();
+  const file = listing.files.find((f: { path: string }) => f.path === filePath);
+  const top = ok(await request('GET', `/api/files?folder=${enc(folder)}&own=1`, { headers }), 'folders').json();
+  const dir = top.dirs.find((d: { path: string }) => filePath.startsWith(`${d.path}/`));
+  assert.ok(file?.id && dir?.id, `${filePath} and its folder listed`);
+  return { id: file.id, dir: dir.id, sha256 };
+}
+
 const ok = (r: Reply, what: string) => {
   assert.ok(r.status >= 200 && r.status < 300, `${what}: ${r.status} ${r.text.slice(0, 200)}`);
   return r;
@@ -447,6 +468,9 @@ before(async () => {
   ).json();
   const askBFile = ok(await request('GET', `/api/asks/${askB.id}`, { headers: asBob }), 'B question').json().options[0].items[0].ref.file as string;
   owned(askB.id, askBFile);
+  // A project file in B's own folder (lib/files.ts): asked for by its id, its folder's id and its bytes, never served to A
+  const fileB = await pushFile(asBob, 'Bravo-only', 'BRAVO cut/bravo-take.txt', Buffer.from('BRAVO project file\n'));
+  owned(fileB.id, fileB.dir, fileB.sha256);
   // An agent's run (lib/runs.ts: data/<slug>/runs.jsonl) on the video both workspaces hold: Bob's request to its agent.
   ok(
     await request('PUT', `/api/review/${enc(ids.slugIntro)}/session`, { body: { name: 'BRAVO agent', sessionId: 'mcp-b0b0b0b0b0b0' }, headers: asBob }),
@@ -577,6 +601,8 @@ before(async () => {
     { ...base, what: 'footage shot', id: shotB, query: `?ids=${shotB}&q=bravo` },
     { ...base, what: 'elements map', id: 'bravoLogo' },
     { ...base, what: 'agent run', id: runB, query: `?slug=${enc(ids.slugIntro)}` },
+    { ...base, what: 'project file', id: fileB.id, query: '?folder=Bravo-only' },
+    { ...base, what: 'project folder', id: fileB.dir, query: '?folder=Bravo-only' },
   ].map((x) => ({ ...x, control: madeUp(x) }));
   // one of each, named: the walks below look for every one of them
   assert.ok([ref.id, ref.file, pbRef.id, recording.id, fix.id, fix.file, picture.avatar].every(Boolean), JSON.stringify(ids.ownedB));
@@ -663,6 +689,8 @@ before(async () => {
   ).json();
   const askAFile = ok(await request('GET', `/api/asks/${askA.id}`, { headers: asAlice }), 'A question').json().options[0].items[0].ref.file as string;
   ownA(askA.id, askAFile);
+  const fileA = await pushFile(asAlice, 'Alpha', 'ALPHA cut/alpha-take.txt', Buffer.from('ALPHA project file\n'));
+  ownA(fileA.id, fileA.dir, fileA.sha256);
   // A's own run on the video both hold (the same slug as B's)
   ok(
     await request('PUT', `/api/review/${enc(ids.slugIntro)}/session`, { body: { name: 'ALPHA agent', sessionId: 'mcp-a0a0a0a0a0a0' }, headers: asAlice }),
@@ -802,6 +830,8 @@ before(async () => {
     { ...baseA, what: 'footage shot in A', id: shotA, query: `?ids=${shotA}&q=alpha` },
     { ...baseA, what: 'elements map in A', id: 'alphaLogo' },
     { ...baseA, what: 'agent run in A', id: runA, query: `?slug=${enc(ids.slugIntro)}` },
+    { ...baseA, what: 'project file in A', id: fileA.id, query: '?folder=Alpha' },
+    { ...baseA, what: 'project folder in A', id: fileA.dir, query: '?folder=Alpha' },
   ].map((x) => ({ ...x, control: madeUp(x) }));
 
   // What each workspace's people read of their own files: the walks look for what must not show; these are what must.
@@ -815,6 +845,7 @@ before(async () => {
     ['A playbook reference', `/api/playbook/refs/${pbRefA.file}?folder=Alpha`, asAlice, A, pbRefA.file],
     ['A skill file', '/api/playbook/skill/files?folder=Alpha&skill=alpha-export&name=preset.epr', asAlice, A, 'preset.epr'],
     ['A question’s file', `/api/asks/${askA.id}/files/${askAFile}`, asAlice, A, askAFile],
+    ['A project file', `/api/files/${fileA.id}/download`, asAlice, A, fileA.sha256],
     ['B reference', `/api/refs/${enc(ids.slugB2)}/${ref.file}`, asBobS, B, ref.file],
     ['B reference still', `/api/refs/${enc(ids.slugB2)}/${ref.still}`, asBobS, B, ref.still],
     ['B fix preview', `/api/previews/${enc(ids.slugB2)}/${fix.file}`, asBobS, B, fix.file],
@@ -822,6 +853,7 @@ before(async () => {
     ['B playbook reference', `/api/playbook/refs/${pbRef.file}?folder=Bravo-only`, asBobS, B, pbRef.file],
     ['B skill file', '/api/playbook/skill/files?folder=Bravo-only&skill=bravo-export&name=preset.epr', asBobS, B, 'preset.epr'],
     ['B question’s file', `/api/asks/${askB.id}/files/${askBFile}`, asBobS, B, askBFile],
+    ['B project file', `/api/files/${fileB.id}/download`, asBobS, B, fileB.sha256],
   ];
   for (const [what, url, who, w, name] of files) ids.ownFiles.push({ what, url, who, bytes: fileIn(w, name) });
 });
@@ -1234,6 +1266,8 @@ function kindsOf(root: string, skip: (rel: string) => boolean = () => false): Se
       ? '<slug>'
       : seg
           .replace(/[0-9a-f]{6,}/gi, '#')
+          // a store's shards by the first two hex characters of a hash (project files' blobs and their index)
+          .replace(/^[0-9a-f]{2}(?=\.json$|$)/, '#')
           .replace(/^([a-z]+)_[A-Za-z0-9-]+/, '$1_#')
           .replace(/#[#_-]*#/g, '#');
   const out = new Set<string>();
@@ -1293,7 +1327,16 @@ test('B holds every kind of file A holds: a feature stored in A alone would be o
   }
   assert.deepEqual(missing, [], `A holds kinds of files B doesn't — give B one of each in the setup above:\n${missing.join('\n')}`);
   // …and B keeps what it was given for the walks: everything a workspace stores of its own.
-  for (const kind of [/\/refs\//, /\/recordings\//, /\/previews\//, /\/drafts\//, /playbooks\/.*skills\//, /transcripts\//, /for-you\.json$/])
+  for (const kind of [
+    /\/refs\//,
+    /\/recordings\//,
+    /\/previews\//,
+    /\/drafts\//,
+    /playbooks\/.*skills\//,
+    /transcripts\//,
+    /for-you\.json$/,
+    /^data\/files\/sha256\//,
+  ])
     assert.ok(
       ofB.some((k) => kind.test(k)),
       `B holds no ${kind}:\n${ofB.join('\n')}`,
@@ -1573,7 +1616,8 @@ test('the route walk with roles per workspace: Carol owns B but is a reviewer in
       if (rule === 'self' || rule === 'public' || rule === 'none' || can('reviewer', rule)) continue;
       for (const who of ['carol in A (session)', 'carol in A (token)']) {
         const r = await ask(method, url, caller[who] as Record<string, string>, ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) ? '{}' : undefined);
-        if (r.status !== 403) problems.push(`${who} ${method} ${url} (needs ${rule}) → ${r.status}`);
+        // the project files are the one thing a role doesn't see at all: nothing there (404), never "not for you"
+        if (r.status !== (rule === 'files' || rule === 'files-write' ? 404 : 403)) problems.push(`${who} ${method} ${url} (needs ${rule}) → ${r.status}`);
       }
     }
   }

@@ -15,17 +15,20 @@ import express, { type Response, type Router } from 'express';
 import { excerpt, words } from '../../lib/activityText.ts';
 import { attachOptionFile, type OptionAttached, type OptionTarget } from '../../lib/askOptions.ts';
 import { getUser } from '../../lib/auth.ts';
+import { type FileTarget, ingestFile } from '../../lib/files.ts';
+import { FILE_LIMITS, nameOf } from '../../lib/fileText.ts';
 import { checkNotArchived, checkReviewOpen } from '../../lib/folderIds.ts';
 import { cursorAt, waitNowLine } from '../../lib/handoff.ts';
 import { unlessBusy } from '../../lib/jobs.ts';
 import { ingestPart } from '../../lib/parts.ts';
 import { CACHE, isoLocal, slugify } from '../../lib/paths.ts';
+import { can } from '../../lib/permissions.ts';
 import { type Attached, attachPreview, PREVIEW_LIMITS, type PreviewTarget } from '../../lib/previews.ts';
 import { publicMessage, statusOf } from '../../lib/publicError.ts';
 import { attachDraftRefFile, attachRefFile, REF_LIMITS, type RefAttached, type RefTarget } from '../../lib/refs.ts';
 import { currentWorkspace, DEFAULT_WORKSPACE, inWorkspace } from '../../lib/scope.ts';
 import * as store from '../../lib/store.ts';
-import type { UploadResult } from '../../lib/types.ts';
+import type { FileUploadResult, Role, UploadResult } from '../../lib/types.ts';
 import * as workspaces from '../../lib/workspaces.ts';
 import type { ServerContext } from '../context.ts';
 import { countStep } from '../funnel.ts';
@@ -89,7 +92,7 @@ export function uploadRoutes(ctx: ServerContext): Router {
   // The Express request behind a tus hook (it carries req.auth from the guard).
   const nodeReq = (req: Request) =>
     (req as Request & { runtime?: { node?: { req: IncomingMessage } } }).runtime?.node?.req as IncomingMessage & {
-      auth?: { name: string; user: { id: string } | null; workspace: string; via?: string };
+      auth?: { name: string; user: { id: string } | null; workspace: string; via?: string; role?: Role };
     };
   /** The workspace and account an upload belongs to (written into its metadata when it was made). */
   const ownerOf = (upload: Partial<Pick<Upload, 'metadata'>>) => ({ ws: upload.metadata?.vr_ws || DEFAULT_WORKSPACE, by: upload.metadata?.vr_by || '' });
@@ -127,6 +130,22 @@ export function uploadRoutes(ctx: ServerContext): Router {
       ctx.broadcast('library', { slug: s });
       ctx.broadcast('review', { slug: s });
       return { slug: s, v: version.v, created, duplicate, video: review.video, ...(version.part ? { part: version.part } : {}) };
+    } finally {
+      fs.rmSync(file, { force: true });
+      fs.rmSync(`${file}.json`, { force: true });
+    }
+  }
+
+  /**
+   * A project file's bytes arrived (a ticket's PUT, or tus with its ticket): stored once per workspace, committed at its
+   * path when its ticket says so (lib/files.ts); the file (and tus's metadata file next to it) is gone afterwards either
+   * way. Its area hears it live (the team's streams only: reviewers don't see files).
+   */
+  async function ingestProjectFile(file: string, target: FileTarget): Promise<FileUploadResult> {
+    try {
+      const out = await ingestFile(file, target);
+      if (out.commit) ctx.broadcast('files', { area: out.commit.folder, rev: out.commit.rev }, 'files');
+      return out;
     } finally {
       fs.rmSync(file, { force: true });
       fs.rmSync(`${file}.json`, { force: true });
@@ -210,7 +229,8 @@ export function uploadRoutes(ctx: ServerContext): Router {
   const tus = new Server({
     path: '/api/uploads',
     datastore,
-    maxSize: ctx.cfg.upload_max_bytes,
+    // a render is held to upload_max_bytes when it is made (onUploadCreate); a project file to FILE_LIMITS.fileBytes
+    maxSize: Math.max(ctx.cfg.upload_max_bytes, FILE_LIMITS.fileBytes),
     relativeLocation: true,
     respectForwardedHeaders: ctx.hosted && !!ctx.cfg.trust_proxy,
     // Same origin only: no Access-Control-Allow-Origin header at all.
@@ -222,29 +242,55 @@ export function uploadRoutes(ctx: ServerContext): Router {
     async onUploadCreate(req, upload) {
       const who = nodeReq(req)?.auth;
       const ws = who?.workspace ?? currentWorkspace();
-      const meta = inWorkspace(ws, () => validate(upload.metadata));
+      // what the server writes into an upload's metadata is its own: nothing a client sends under those names is kept
+      const sent = Object.fromEntries(Object.entries(upload.metadata ?? {}).filter(([k]) => !k.startsWith('vr_')));
       if (upload.size === undefined) throw reject(400, 'the upload size must be known up front');
       const size = upload.size;
       const by = who?.user?.id ?? '';
-      await oneAtATime(async () => {
-        const open = await underWay();
-        const mine = by ? open.filter((o) => o.kind === 'tus' && o.by === by).length : 0;
-        if (mine >= OPEN_UPLOADS_PER_ACCOUNT)
-          throw reject(429, `${mine} of your uploads are under way (the most one account may have): let some finish, or cancel them`);
-        if (!fitsBeside(size, { ws, by }, open)) throw reject(507, 'not enough disk space on the server for this upload');
+      // A project file's bytes: its one-time ticket (POST /api/files/uploads) says where they go, and is spent now; the
+      // upload then resumes for its day like any other, for the same account in the same workspace.
+      const ticket = sent.ticket ? ctx.uploadTickets.get(sent.ticket) : null;
+      if (sent.ticket) {
+        const t = ticket;
+        if (t?.target.kind !== 'file' || t.ws !== ws || (t.target.file.stamp.by_id ?? '') !== by)
+          throw reject(404, 'unknown or expired upload ticket: ask for a new one');
+        if (t.used || Date.now() > t.expires) throw reject(410, 'this upload ticket was used or has expired; ask for a new one');
+        if (size !== t.target.file.size) throw reject(400, `this ticket is for ${t.target.file.size} bytes, not ${size}`);
         try {
-          // the plan sees the workspace's uploads under way as stored already
-          await plan(ws, meta, size + declaredIn(open, ws));
+          if (t.check) inWorkspace(t.ws, t.check);
         } catch (e) {
-          const { status = 402, details } = e as { status?: number; details?: Record<string, unknown> };
-          // A person's browser reads the refusal's reason and numbers (the limit's sheet); an agent and `vr` keep the sentence.
-          const said = who?.via !== 'token' && status === 402 && details ? JSON.stringify({ error: (e as Error).message, ...details }) : (e as Error).message;
-          throw reject(status, said);
+          throw reject(403, (e as Error).message);
         }
-        held.set(upload.id, { id: upload.id, kind: 'tus', ws, by, size, offset: 0, moved: Date.now(), at: Date.now() });
-      });
-      if (who?.via === 'token') uploaders.set(upload.id, { agent: who.name, name: meta.name, slug: meta.slug ?? null, ws });
-      return { metadata: { ...upload.metadata, vr_ws: ws, vr_by: who?.user?.id ?? '' } };
+        t.used = true;
+      } else if (size > ctx.cfg.upload_max_bytes) throw reject(413, 'the file is larger than this server accepts');
+      const file = ticket?.target.kind === 'file' ? ticket.target.file : null;
+      try {
+        const meta = file ? null : inWorkspace(ws, () => validate(upload.metadata));
+        await oneAtATime(async () => {
+          const open = await underWay();
+          const mine = by ? open.filter((o) => o.kind === 'tus' && o.by === by).length : 0;
+          if (mine >= OPEN_UPLOADS_PER_ACCOUNT)
+            throw reject(429, `${mine} of your uploads are under way (the most one account may have): let some finish, or cancel them`);
+          if (!fitsBeside(size, { ws, by }, open)) throw reject(507, 'not enough disk space on the server for this upload');
+          try {
+            // the plan sees the workspace's uploads under way as stored already
+            if (meta) await plan(ws, meta, size + declaredIn(open, ws));
+            else await ctx.extension.check(ws, 'upload', size + declaredIn(open, ws));
+          } catch (e) {
+            const { status = 402, details } = e as { status?: number; details?: Record<string, unknown> };
+            // A person's browser reads the refusal's reason and numbers (the limit's sheet); an agent and `vr` keep the sentence.
+            const said = who?.via !== 'token' && status === 402 && details ? JSON.stringify({ error: (e as Error).message, ...details }) : (e as Error).message;
+            throw reject(status, said);
+          }
+          held.set(upload.id, { id: upload.id, kind: 'tus', ws, by, size, offset: 0, moved: Date.now(), at: Date.now() });
+        });
+        if (who?.via === 'token')
+          uploaders.set(upload.id, { agent: who.name, name: file ? nameOf(file.path) : (meta?.name ?? ''), slug: meta?.slug ?? null, ws });
+      } catch (e) {
+        if (ticket) ticket.used = false; // nothing was made: the ticket works again while it is valid
+        throw e;
+      }
+      return { metadata: { ...sent, vr_ws: ws, vr_by: by, ...(file ? { vr_file: JSON.stringify(file) } : {}) } };
     },
     // An upload is reached only by whom it belongs to, in its workspace: anyone else (another team's token guessing an
     // id) finds nothing.
@@ -259,6 +305,8 @@ export function uploadRoutes(ctx: ServerContext): Router {
       const who = nodeReq(req)?.auth;
       const o = ownerOf(upload);
       if (!who || o.ws !== who.workspace || (o.by && o.by !== (who.user?.id ?? ''))) throw reject(404, 'Upload not found');
+      // a project file's: only while its account may still write files there (not after its role was taken away)
+      if (upload.metadata?.vr_file && !can(who.role, 'files-write')) throw reject(404, 'Upload not found');
       // The room it was given at its start may have gone since (something else filled the disk, it stood still and others
       // took the room, or it holds more than its share): its rest must still fit beside the others, or nothing more of it
       // is written.
@@ -284,26 +332,37 @@ export function uploadRoutes(ctx: ServerContext): Router {
       const by = who?.name || ctx.cfg.user;
       remember(upload.id, { status: 'processing' }, owner.ws, owner.by);
       // Registered in the workspace the upload belongs to, whatever the request around it.
+      const target = upload.metadata?.vr_file ? (JSON.parse(upload.metadata.vr_file) as FileTarget) : null;
       const job = ctx.inflight
-        .track(inWorkspace(owner.ws, () => Promise.resolve().then(() => ingest(path.join(dir, upload.id), validate(upload.metadata), by, who?.user?.id))))
+        .track(
+          inWorkspace(owner.ws, () =>
+            Promise.resolve().then(
+              (): Promise<UploadResult | FileUploadResult> =>
+                target ? ingestProjectFile(path.join(dir, upload.id), target) : ingest(path.join(dir, upload.id), validate(upload.metadata), by, who?.user?.id),
+            ),
+          ),
+        )
         .then(
           (result) => {
             remember(upload.id, { status: 'done', result }, owner.ws, owner.by);
             return result;
           },
-          (e: Error & { body?: string; status?: number }) => {
+          (e: Error & { body?: string; status?: number; details?: Record<string, unknown> }) => {
             const status = statusOf(e, 422);
             const error = e.body || publicMessage(e, who?.via === 'local' ? 'owner' : 'other', { status, where: 'upload' });
-            // 409: a part that can't be one; ≥ 500: the server's fault (its storage), never "your file"
-            remember(upload.id, { status: 'failed', error, ...(status === 409 || status >= 500 ? { code: status } : {}) }, owner.ws, owner.by);
-            throw Object.assign(e, { body: error });
+            // 409: a part that can't be one, or a project file changed since its base (with who changed it); ≥ 500: the
+            // server's fault (its storage), never "your file"; a project file's other refusals keep their own status
+            const code = status === 409 || status >= 500 || target ? status : undefined;
+            const details = target && status === 409 && e.details ? e.details : undefined;
+            remember(upload.id, { status: 'failed', error, ...(code ? { code } : {}), ...(details ? { details } : {}) }, owner.ws, owner.by);
+            throw Object.assign(e, { body: error, answer: details ? { ...details, error } : null });
           },
         );
       let timer: NodeJS.Timeout | undefined;
       const quick = await Promise.race([
         job.then(
           (x) => ({ x }),
-          (e: Error & { body?: string }) => ({ e }),
+          (e: Error & { body?: string; answer?: object | null }) => ({ e }),
         ),
         new Promise<null>((res) => {
           timer = setTimeout(res, ctx.uploadWaitMs, null);
@@ -313,9 +372,11 @@ export function uploadRoutes(ctx: ServerContext): Router {
       job.catch(() => {});
       const json = { 'Content-Type': 'application/json' };
       if (!quick) return { status_code: 202, headers: json, body: JSON.stringify({ pending: true, id: upload.id }) };
-      // 409: a partial render that can't be one (lib/parts.ts says why: send a full render).
+      // 409: a partial render that can't be one (lib/parts.ts says why: send a full render), or a project file that
+      // changed since its base: the body is its FileConflictAnswer. A project file's other refusals keep their status.
       if ('e' in quick) {
         const status = statusOf(quick.e, 422);
+        if (target) throw { status_code: status, headers: json, body: JSON.stringify(quick.e.answer ?? { error: quick.e.body || quick.e.message }) };
         throw reject(status === 409 || status >= 500 ? status : 422, quick.e.body || quick.e.message);
       }
       return { status_code: 200, headers: json, body: JSON.stringify(quick.x) };
@@ -347,7 +408,7 @@ export function uploadRoutes(ctx: ServerContext): Router {
   };
   const answer = (res: Response, o: Outcome) => {
     if (o.status === 'done') return void res.json(o.result);
-    if (o.status === 'failed') return void res.status(o.code ?? 422).json({ error: o.error });
+    if (o.status === 'failed') return void res.status(o.code ?? 422).json({ ...o.details, error: o.error });
     res.status(202).json({ pending: true });
   };
 
@@ -422,8 +483,11 @@ export function uploadRoutes(ctx: ServerContext): Router {
         ? PREVIEW_LIMITS.uploadBytes
         : t.target.kind === 'ref' || t.target.kind === 'option'
           ? REF_LIMITS.clipBytes
-          : ctx.cfg.upload_max_bytes;
+          : t.target.kind === 'file'
+            ? FILE_LIMITS.fileBytes
+            : ctx.cfg.upload_max_bytes;
     if (size > max) throw fail(413, 'the file is larger than this server accepts');
+    if (t.target.kind === 'file' && size !== t.target.file.size) throw fail(400, `this URL is for ${t.target.file.size} bytes, not ${size}`);
     // Taken before the first await (the plan's check may wait on a lookup): a second PUT sent at the same moment finds
     // it used. A refusal gives it back, as a broken stream does below (sweep 2 MH-3).
     t.used = true;
@@ -433,7 +497,7 @@ export function uploadRoutes(ctx: ServerContext): Router {
       await oneAtATime(async () => {
         // the uploads under way hold their room here too (A13 MEDIA-5)
         const open = await underWay();
-        const by = target.kind === 'render' ? (target.byId ?? '') : '';
+        const by = target.kind === 'render' ? (target.byId ?? '') : target.kind === 'file' ? (target.file.stamp.by_id ?? '') : '';
         if (!fitsBeside(size, { ws: t.ws, by }, open)) throw fail(507, 'not enough disk space on the server for this upload');
         // The plan of the workspace the URL was handed out in (a 402 with its sentence).
         const pending = declaredIn(open, t.ws);
@@ -459,14 +523,16 @@ export function uploadRoutes(ctx: ServerContext): Router {
     }
     t.outcome = { status: 'processing' };
     // A one-time URL works in the workspace it was handed out in.
-    const work: Promise<UploadResult | Attached | RefAttached | OptionAttached> = inWorkspace(t.ws, () =>
+    const work: Promise<UploadResult | Attached | RefAttached | OptionAttached | FileUploadResult> = inWorkspace(t.ws, () =>
       target.kind === 'preview'
         ? preview(file, target.preview, t.by)
         : target.kind === 'ref'
           ? reference(file, target.ref, t.by)
           : target.kind === 'option'
             ? optionFile(file, target.option, t.by)
-            : ingest(file, target.meta, t.by, target.byId),
+            : target.kind === 'file'
+              ? ingestProjectFile(file, target.file)
+              : ingest(file, target.meta, t.by, target.byId),
     );
     const job = ctx.inflight.track(work).then(
       (result) => {
@@ -481,12 +547,16 @@ export function uploadRoutes(ctx: ServerContext): Router {
                 : result,
         };
       },
-      (e: Error & { status?: number }) => {
+      (e: Error & { status?: number; details?: Record<string, unknown> }) => {
         // Whoever holds a one-time URL (a review-link visitor, an agent elsewhere) is never identified: never the owner.
+        const status = statusOf(e, 422);
+        // a project file's refusals keep their status, and a conflict its files (FileConflictAnswer)
+        const file = target.kind === 'file';
         t.outcome = {
           status: 'failed',
-          error: publicMessage(e, 'other', { status: statusOf(e, 422), where: 'upload ticket' }),
-          ...(statusOf(e, 422) === 409 || statusOf(e, 422) >= 500 ? { code: statusOf(e, 422) } : {}),
+          error: publicMessage(e, 'other', { status, where: 'upload ticket' }),
+          ...(status === 409 || status >= 500 || file ? { code: status } : {}),
+          ...(file && status === 409 && e.details ? { details: e.details } : {}),
         };
       },
     );

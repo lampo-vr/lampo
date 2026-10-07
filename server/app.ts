@@ -23,6 +23,7 @@ import { askRoutes } from './routes/asks.ts';
 import { downloadRoutes } from './routes/downloads.ts';
 import { draftRoutes } from './routes/drafts.ts';
 import { elementRoutes } from './routes/elements.ts';
+import { fileRoutes } from './routes/files.ts';
 import { footageRoutes } from './routes/footage.ts';
 import { insightRoutes } from './routes/insights.ts';
 import { libraryRoutes } from './routes/library.ts';
@@ -185,6 +186,7 @@ export function createApp(ctx: ServerContext, { ui }: AppOptions = {}): Express 
     footageRoutes,
     shareRoutes,
     downloadRoutes,
+    fileRoutes,
     statusRoutes,
     voiceRoutes,
     recordingRoutes,

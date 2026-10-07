@@ -27,6 +27,7 @@ import { callerOf, hostContext, installExtension, loadExtension, ModuleRouteErro
 import { startServerFeed } from './feed.ts';
 import { lanIps } from './guard.ts';
 import { listen, serverTimeouts } from './listen.ts';
+import { purgeEveryWorkspace } from './routes/files.ts';
 import { cleanVoiceCache } from './routes/voice.ts';
 import { drain } from './shutdown.ts';
 import { onSignup } from './signup.ts';
@@ -267,6 +268,11 @@ const sweep = () => {
 };
 sweep();
 setInterval(sweep, 6 * 3600e3).unref();
+// Project files' safety net (the trash, replaced versions: 30 days, at most a quarter of the plan) and bytes nothing
+// names any more, every workspace in turn: a few minutes after start, then hourly.
+const purgeFiles = () => void purgeEveryWorkspace(ctx);
+setTimeout(purgeFiles, 5 * 60e3).unref();
+setInterval(purgeFiles, 3600e3).unref();
 inWorkspace(DEFAULT_WORKSPACE, () => {
   ctx.watchers.refresh();
   ctx.sessions.refresh();

@@ -2021,6 +2021,453 @@ export interface PlaybookSummary {
   pending: number;
 }
 
+// ---------------------------------------------------------------- project files (lib/files.ts, docs/files.md)
+// The material a project is made from that isn't a render: footage, music, fonts, logos, project files. Files attach
+// where playbooks do — the House, a project, a folder — and a video's folder sees its own and everything above it,
+// deepest first. A workspace keeps each file's bytes once (by SHA-256); every write is a version, attributed and
+// recoverable. Reviewers and review links never see files.
+
+/** What a file is, from its bytes and its name (lib/fileText.ts `kindOf`): how lists group it, how agents filter. */
+export type FileKind = 'footage' | 'audio' | 'image' | 'graphic' | 'font' | 'project' | 'document' | 'archive' | 'other';
+
+/** How a version came in: the app, the CLI (`vr`/`lampo`), an agent's MCP tool, a transfer or an import. */
+export type FileVia = 'browser' | 'vr' | 'mcp' | 'transfer' | 'import';
+
+/** What a push does when the file changed since the version it was based on: refuse (409), or keep it as a copy beside. */
+export type FileConflictMode = 'refuse' | 'copy';
+
+/** Who made a version, and how: the person's name then and their account, and the agent that did it with it. */
+export interface FileStamp {
+  by: string;
+  by_id?: string;
+  /** The agent's cleaned name (`cleanAgentName`) when an agent wrote it with its person's account. */
+  agent?: string;
+  /** What kind of agent that was (its mark in the app), when it said or is known. */
+  agent_kind?: AgentKind;
+  via: FileVia;
+  /** The machine the CLI ran on, as it names itself (never a path). */
+  machine?: string;
+  at: string;
+}
+
+/** One version of a file: its bytes and who made it. */
+export interface FileVersion extends FileStamp {
+  /** 1, 2, …: the file's own count. */
+  v: number;
+  /** sha256 of the bytes (hex): the blob's key in the workspace's store. */
+  hash: string;
+  size: number;
+  /** Phase 2: what was made from it and keeps it (`<video id>@v<N>` of final versions): kept and counted while pinned. */
+  pinned?: string[];
+  /** When it stopped being the current version: an older version is kept 30 days from then, and not counted. */
+  replaced?: string;
+}
+
+/** Phase 2: someone is editing the file. Others' pushes then land beside it as a copy until it ends (never refused). */
+export interface FileLease {
+  by: string;
+  by_id?: string;
+  agent?: string;
+  machine?: string;
+  since: string;
+  renewed: string;
+  /** It ends by itself then (8 hours after its last renewal). */
+  until: string;
+}
+
+/** A live file in an area's catalog: its current version's fields, its place, and its older versions. */
+export interface FileEntry extends FileVersion {
+  /** fl_<12 hex>: the same through renames, moves and new versions. */
+  id: string;
+  /** Its path inside the area, as uploaded: '/'-separated names, NFC (lib/fileText.ts `cleanFilePath`). */
+  path: string;
+  /** The media type its bytes say (magic numbers), never what a client or the name claims. */
+  type: string;
+  kind: FileKind;
+  /** Who added the file (its first version): a member may trash what they added, owners and admins anything. */
+  added_by: string;
+  added_by_id?: string;
+  /** Earlier versions, newest first: kept 30 days after each was replaced (or while pinned). */
+  older?: FileVersion[];
+  editing?: FileLease;
+}
+
+/** A file in an area's trash: kept 30 days (or until the safety net passes its share of the plan), then purged. */
+export interface TrashedFile extends FileEntry {
+  trashed_at: string;
+  trashed_by: string;
+  trashed_by_id?: string;
+  trashed_agent?: string;
+  /** `folder`: its folder was deleted and it came here with it (its path starts with that folder's name). */
+  why?: 'removed' | 'folder';
+  /** Trashed with a folder inside the area (that folder's id, FileDir): restored with it. */
+  with_dir?: string;
+}
+
+/**
+ * A folder inside an area's paths ("Footage/Day 1"), an entry of its own: made by "New folder" or by the first file
+ * under it, and kept when it is empty. Renamed, moved, trashed and restored with everything under it.
+ */
+export interface FileDir {
+  /** fd_<12 hex>: the same through renames and moves. */
+  id: string;
+  path: string;
+  at: string;
+  by: string;
+  by_id?: string;
+  agent?: string;
+}
+
+/** A folder in an area's trash, with what was trashed with it (`TrashedFile.with_dir`, and its folders' `with_dir`). */
+export interface TrashedDir extends FileDir {
+  trashed_at: string;
+  trashed_by: string;
+  trashed_by_id?: string;
+  trashed_agent?: string;
+  why?: 'removed' | 'folder';
+  /** A folder inside one trashed with it: the outer folder's id (restored with it). */
+  with_dir?: string;
+}
+
+/** data/files/areas/<id>.json: one area's catalog, written under the workspace's files lock, atomically. */
+export interface FileArea {
+  /** fa_house, or fa_ + the 12 hex of its folder's id (folders.json `ids`). */
+  id: string;
+  /** The folder it belongs to (folders.json `ids`): it follows the folder through renames and moves. null: the House. */
+  folder_id: string | null;
+  /** The folder's path now ('' = the House), kept in step when the folder is renamed or moved. */
+  scope: string;
+  /** +1 per committed change. */
+  rev: number;
+  files: FileEntry[];
+  trash: TrashedFile[];
+  /** Folders inside it (every folder a file's path has, and empty ones made on purpose). */
+  dirs?: FileDir[];
+  trash_dirs?: TrashedDir[];
+}
+
+/** What a change did to a file (an area's journal, `FileChange.op`). */
+export type FileOp = 'add' | 'version' | 'move' | 'trash' | 'restore' | 'revert' | 'purge';
+
+/** One line of an area's journal (data/files/areas/<id>.log.jsonl, append-only): history and audit. */
+export interface FileChange {
+  rev: number;
+  at: string;
+  op: FileOp;
+  id: string;
+  path: string;
+  /** A move: where it was (in this area, or `from_area`'s path when it came from another). */
+  from?: string;
+  /** A move between areas: the other area's path ('' = the House). */
+  from_area?: string;
+  to_area?: string;
+  v?: number;
+  hash?: string;
+  size?: number;
+  by: string;
+  by_id?: string;
+  agent?: string;
+  agent_kind?: AgentKind;
+  via?: FileVia;
+  /** A folder of the area's paths (FileDir), not a file: `id` is its fd_ id. */
+  dir?: true;
+}
+
+/** A file as the API answers it. */
+export interface FileInfo {
+  id: string;
+  /** The area it lives in: its folder's path ('' = the House). In a chain, inherited files have a shorter one. */
+  area: string;
+  path: string;
+  v: number;
+  size: number;
+  sha256: string;
+  type: string;
+  kind: FileKind;
+  by: string;
+  by_id?: string;
+  agent?: string;
+  agent_kind?: AgentKind;
+  via: FileVia;
+  at: string;
+  added_by: string;
+  /** Versions kept: the current one and the older ones. */
+  versions: number;
+  editing?: FileLease;
+}
+
+/** A file in the trash, as the API answers it: when it goes for good. */
+export interface TrashedFileInfo extends FileInfo {
+  trashed_at: string;
+  trashed_by: string;
+  trashed_agent?: string;
+  why?: 'removed' | 'folder';
+  /** When it is purged (30 days after it was trashed; earlier when the safety net is full). */
+  purge_at: string;
+}
+
+/** One version of a file, as its history shows it. */
+export interface FileVersionInfo {
+  v: number;
+  size: number;
+  sha256: string;
+  by: string;
+  by_id?: string;
+  agent?: string;
+  agent_kind?: AgentKind;
+  via: FileVia;
+  at: string;
+  /** The version the file is now. */
+  current?: true;
+  /** An older version: when it goes (30 days after it was replaced); absent while pinned. */
+  kept_until?: string;
+  pinned?: string[];
+}
+
+/** One area of a chain, in numbers: its folder's path ('' = the House), its revision, what it holds. */
+export interface FileAreaInfo {
+  area: string;
+  rev: number;
+  files: number;
+  bytes: number;
+  trash: number;
+  trash_bytes: number;
+}
+
+/** A folder inside an area's paths, in numbers (everything under it). */
+export interface FileDirInfo {
+  /** Its id (fd_…): what PATCH, DELETE and restore at /api/files/:id take for a folder. */
+  id?: string;
+  /** The area it is in ('' = the House). */
+  area?: string;
+  /** The path without a trailing slash ("Footage/Day 1"). */
+  path: string;
+  files: number;
+  bytes: number;
+}
+
+/** A folder in the trash, as the API answers it (`POST /api/files/:id/restore` brings it back with what came with it). */
+export interface TrashedDirInfo {
+  id: string;
+  area: string;
+  path: string;
+  /** Files trashed with it, and their bytes. */
+  files: number;
+  bytes: number;
+  trashed_at: string;
+  trashed_by: string;
+  trashed_agent?: string;
+  why?: 'removed' | 'folder';
+  purge_at: string;
+}
+
+/** POST /api/files/dirs {folder, path}: an empty folder inside an area (one that is there already answers as it is). */
+export interface FileDirRequest {
+  folder?: string | null;
+  path: string;
+}
+
+/**
+ * GET /api/files?folder=&path=&deep=&own=&kind=&q=&limit=&cursor= — the files that apply in a folder: its own and every
+ * area above it, deepest first (a path in a deeper area hides the same path above), the folders directly under `path`,
+ * and a page of files: directly in `path`, or every one under it with `deep` (and with `q` or `kind`).
+ */
+export interface FilesListing {
+  /** The folder asked for ('' = the House). */
+  folder: string;
+  /** The chain's areas, deepest first (only `folder`'s own with `own=1`). */
+  areas: FileAreaInfo[];
+  path: string;
+  dirs: FileDirInfo[];
+  files: FileInfo[];
+  /** Files that match in all (every page). */
+  total: number;
+  /** There is more: pass it back as `cursor`. */
+  cursor?: string;
+}
+
+/** One top-level entry of an area: a folder of paths ("Footage/") or a file at the top, in numbers. */
+export interface FileTop {
+  path: string;
+  dir: boolean;
+  files: number;
+  bytes: number;
+  kinds: FileKind[];
+}
+
+/** GET /api/files/summary?folder= — the tree in short: per area of the chain (deepest first), its top-level entries. */
+export interface FilesSummary {
+  folder: string;
+  areas: (FileAreaInfo & { tops: FileTop[] })[];
+}
+
+/** GET /api/files/trash?folder= — one area's trash, newest first. */
+export interface FilesTrash {
+  folder: string;
+  files: TrashedFileInfo[];
+  bytes: number;
+  /** Folders trashed whole (their files are in `files` too, with `with_dir`). */
+  dirs?: TrashedDirInfo[];
+}
+
+/** GET /api/files/:id/history — a file's versions (newest first) and what happened to it (its journal, newest first). */
+export interface FileHistory {
+  file: FileInfo;
+  versions: FileVersionInfo[];
+  changes: FileChange[];
+}
+
+/**
+ * GET /api/files/usage — what the workspace's files hold. Counted toward the plan: every live file's current bytes
+ * once per workspace (the same bytes in two places count once) and pinned versions. Kept and not counted: the trash
+ * and replaced versions (the safety net: 30 days, at most `kept_cap`).
+ */
+export interface FilesUsage {
+  files: number;
+  bytes: number;
+  kept: number;
+  kept_files: number;
+  /** The most the safety net holds (a quarter of the plan's storage); null: no plan says. */
+  kept_cap: number | null;
+}
+
+/** One file a push names: its path in the area, its size, its bytes' sha256, and the version it was based on. */
+export interface FileUploadItem {
+  path: string;
+  size: number;
+  sha256?: string;
+  /** The version of the file at `path` this one replaces; 0 or absent: a new file (refused when the path is taken). */
+  base?: number | null;
+}
+
+/** POST /api/files/uploads: room for a push, checked once for all of it, and a way in for each file's bytes. */
+export interface FileUploadRequest {
+  /** The area: a folder's path ('' or absent = the House). */
+  folder?: string | null;
+  files: FileUploadItem[];
+  /** The bytes become the file once they arrive (default); false: only stored, a later POST /api/files/commit names them. */
+  commit?: boolean;
+  conflict?: FileConflictMode;
+  /** The agent that writes with this account (agents only; `cleanAgentName`), and its kind. */
+  agent?: string;
+  agent_kind?: AgentKind;
+  via?: 'vr' | 'mcp';
+  machine?: string;
+}
+
+/** One file's way in: nothing to send (`stored`), or a one-time upload (a plain PUT to `url`, or tus with `ticket`). */
+export interface FileUploadSlot {
+  path: string;
+  /** Its bytes are in the workspace already: commit it (POST /api/files/commit), nothing to send. */
+  stored?: true;
+  /** One plain PUT of the bytes (`curl -T file <url>`), once, until `expires`; answers FileUploadResult (or 409). */
+  url?: string;
+  /**
+   * The same upload resumable: tus at `FileUploadAnswer.tus` with `Upload-Metadata: ticket <b64>, filename <b64>`; the
+   * ticket is spent when the upload is made (until `expires`), the upload then resumes for 24 hours (HEAD + PATCH, the
+   * same account), and its last PATCH answers FileUploadResult (or a 409 FileConflictAnswer).
+   */
+  ticket?: string;
+  expires?: string;
+}
+
+export interface FileUploadAnswer {
+  folder: string;
+  uploads: FileUploadSlot[];
+  /** Where tus uploads with a `ticket` go (the session or token that asked signs them in). */
+  tus: string;
+}
+
+/** What one file of a commit became. */
+export interface FileCommitItem {
+  /** Where it is now (a copy: its own path). */
+  path: string;
+  id: string;
+  v: number;
+  /** added: a new file · version: the next version at that path · same: it had these bytes already · copy: the path
+   * changed since `base`, so it was kept beside it (conflict 'copy') */
+  state: 'added' | 'version' | 'same' | 'copy';
+  /** A copy: the path it was pushed to. */
+  asked?: string;
+  sha256: string;
+  size: number;
+}
+
+/** POST /api/files/commit {folder, add, conflict?} and a committed upload: the area's new revision and each file. */
+export interface FileCommitAnswer {
+  folder: string;
+  rev: number;
+  files: FileCommitItem[];
+}
+
+/** POST /api/files/commit: files whose bytes the workspace has (stored by an upload, or there already), as one change. */
+export interface FileCommitRequest {
+  folder?: string | null;
+  add: { path: string; sha256: string; size: number; base?: number | null }[];
+  conflict?: FileConflictMode;
+  agent?: string;
+  agent_kind?: AgentKind;
+  via?: 'vr' | 'mcp';
+  machine?: string;
+}
+
+/** What an upload's bytes became (a PUT's answer, tus's last PATCH, GET /api/upload-results/:id). */
+export interface FileUploadResult {
+  stored: { path: string; sha256: string; size: number; type: string; kind: FileKind };
+  /** The ticket committed it (FileUploadRequest.commit, the default). */
+  commit?: FileCommitAnswer;
+}
+
+/** A push that would overwrite a version it didn't see: the file there now and who made it. */
+export interface FileConflict {
+  path: string;
+  id: string;
+  v: number;
+  /** The version the push was based on (null: none named — the path was taken). */
+  base: number | null;
+  by: string;
+  agent?: string;
+  at: string;
+}
+
+/** The body of a 409 from a push, a commit, a move or an upload's PUT: nothing was written. */
+export interface FileConflictAnswer {
+  error: string;
+  conflicts: FileConflict[];
+}
+
+/**
+ * PATCH /api/files/:id: a new path, another area (`folder`), or both. Answers FileInfo (409 when the path is taken); for
+ * a folder's id (fd_), FileDirInfo, everything under it moved with it.
+ */
+export interface FileMoveRequest {
+  path?: string;
+  folder?: string | null;
+}
+
+/** POST /api/files/urls {ids, v?}: signed download URLs for one pull step (≤ 100). */
+export interface FileUrl {
+  id: string;
+  area: string;
+  path: string;
+  v: number;
+  size: number;
+  sha256: string;
+  url: string;
+  expires: string;
+}
+
+export interface FileUrls {
+  urls: FileUrl[];
+  /** Ids (or versions) not found: never another workspace's, whatever they are. */
+  missing: string[];
+}
+
+/** POST /api/files/missing {hashes}: which of them the workspace doesn't hold (dedupe before a push). */
+export interface FilesMissing {
+  missing: string[];
+}
+
 // ---------------------------------------------------------------- status workflow (lib/stage.ts, docs/workflow.md)
 
 /**
@@ -3131,6 +3578,8 @@ export interface WorkspaceDeletionPlan {
   invites: number;
   tokens: number;
   apps: number;
+  /** Its project files (lib/files.ts): live files and the bytes they hold, trash and older versions included. */
+  files?: { count: number; bytes: number };
 }
 
 /** `GET /api/operator/workspaces`. */
@@ -3205,7 +3654,8 @@ export interface BillingInfo {
   endsAt?: string;
   interval?: 'month' | 'year';
   /** What the workspace uses, and what its plan holds (null: no limit). */
-  usage: { members: number; bytes: number; activeVideos: number };
+  /** `bytes` counts renders and project files; `files` says what of it is files (`bytes`) and what the files' safety net keeps, not counted (`kept`). */
+  usage: { members: number; bytes: number; activeVideos: number; files?: { bytes: number; kept: number } };
   limits: { members: number | null; bytes: number | null; activeVideos: number | null };
   /** Members billed on a per-member plan. */
   seats?: number;
@@ -3704,6 +4154,8 @@ export type ServerEvent =
   | 'connections'
   /** A video's footage index changed (lib/footage/: its newest version indexed, or failed): `{slug}`. */
   | 'footage'
+  /** An area's project files changed (lib/files.ts): `{area, rev}`, `area` its folder's path ('' = the House). */
+  | 'files'
   /** A conversion moment waits for you (`{id}`, lib/moments.ts): sent only to your own streams (EventHub.tell). */
   | 'moment';
 

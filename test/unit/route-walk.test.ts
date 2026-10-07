@@ -237,7 +237,9 @@ test('the canonical path: signed out, only the public routes answer; reviewers g
       if (isPublic(pattern) || rule === 'self' || rule === 'public' || (rule !== 'none' && can(reviewerRole, rule))) continue;
       // Writes need the site's own origin for a session; the token caller is the cleaner probe of the table.
       const r = await ask(method, url, callers['reviewer (token)'], body);
-      if (r.status !== 403) problems.push(`reviewer ${method} ${url} (needs ${rule}) → ${r.status}`);
+      // the project files are the one thing a role doesn't see at all: nothing there (404), never "not for you"
+      const refused = rule === 'files' || rule === 'files-write' ? 404 : 403;
+      if (r.status !== refused) problems.push(`reviewer ${method} ${url} (needs ${rule}) → ${r.status}`);
     }
   }
   assert.deepEqual(problems, [], problems.join('\n'));

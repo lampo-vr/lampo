@@ -110,8 +110,8 @@ export const requestHost = (req: Request): string =>
     .replace(/:\d+$/, '')
     .replace(/^\[|\]$/g, '');
 
-/** What the app's own media host (VR_MEDIA_ORIGIN, lib/storage/mediaHost.ts) answers: signed files and folder zips. */
-export const SIGNED_MEDIA_PATH = /^\/media\/[sz]\/[\w-]+\/[^/]+$/;
+/** What the app's own media host (VR_MEDIA_ORIGIN, lib/storage/mediaHost.ts) answers: signed files, folder zips, project files. */
+export const SIGNED_MEDIA_PATH = /^\/media\/[szf]\/[\w-]+\/[^/]+$/;
 /** The media host's name, when one is configured. */
 export const mediaHostOf = (mediaOrigin: string | null | undefined): string | null => {
   try {
@@ -292,7 +292,9 @@ export function createGuard(opts: GuardOptions) {
   function mediaRequest(req: Request, res: Response): boolean {
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('Referrer-Policy', 'no-referrer');
-    const signed = (req.method === 'GET' || req.method === 'HEAD') && SIGNED_MEDIA_PATH.test(req.path);
+    // a project file's URL is also asked about first by the app's pages (a preview's Range: CORS)
+    const signed =
+      (req.method === 'GET' || req.method === 'HEAD' || (req.method === 'OPTIONS' && req.path.startsWith('/media/f/'))) && SIGNED_MEDIA_PATH.test(req.path);
     if (signed || TICKET_PATH.test(req.path)) return true;
     res.setHeader('Cache-Control', 'no-store');
     res.status(404).json({ error: 'not found' });

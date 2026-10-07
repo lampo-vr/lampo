@@ -140,14 +140,14 @@ function drainedOrGone(res: Response): Promise<void> {
 
 /**
  * A path as it may go to the log: review-link tokens, one-time upload tickets and signed media URLs are credentials
- * that sit in the path itself (/g/<token>, /e/<token>, /api/g/<token>/…, /api/uploads/direct/<ticket>, /media/s/<sealed>/…), so
+ * that sit in the path itself (/g/<token>, /e/<token>, /api/g/<token>/…, /api/uploads/direct/<ticket>, /media/[szf]/<sealed>/…), so
  * they are cut out — whoever reads the log must not be able to open the link.
  */
 export const loggedPath = (p: string): string =>
   p
     .replace(/^\/((?:api\/|media\/|data\/)?g|e)\/[^/]+/, '/$1/…')
     .replace(/^\/api\/uploads\/direct\/[^/]+/, '/api/uploads/direct/…')
-    .replace(/^\/media\/([sz])\/[^/]+/, '/media/$1/…');
+    .replace(/^\/media\/([szf])\/[^/]+/, '/media/$1/…');
 
 /**
  * Every error ends here as {error: message}. Errors from body parsers carry their own status (400, 413). What the

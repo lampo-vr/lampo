@@ -16,6 +16,8 @@ export const ACTIONS = {
   archive: 'archive a project and restore it; take videos out of an archived project',
   share: 'create, change and revoke client links',
   download: 'download videos (any version, as rendered) and whole folders (originals or previews) from the library',
+  files: 'see, list and download the project files (footage, music, fonts, project files) of the House, projects and folders',
+  'files-write': 'add, replace, rename, move, trash and restore project files, every change a version (trashing what someone else added needs remove)',
   agents: 'requests to agents, agent status, connecting agents, writing as agent:…',
   qa: 'rerun the pre-review, dismiss its suggestions',
   playbook: "edit playbooks (the House's and projects'), accept or reject what agents suggest",
@@ -38,6 +40,8 @@ const EDITOR: Action[] = [
   'organize',
   'share',
   'download',
+  'files',
+  'files-write',
   'agents',
   'qa',
   'playbook',
@@ -47,7 +51,8 @@ const EDITOR: Action[] = [
 /**
  * reviewer: people who give feedback (producers, colleagues on the client side). They watch, comment, confirm fixes
  * and approve, but don't change what exists, don't hand work to agents (which costs time and money) and don't open
- * the project to outsiders.
+ * the project to outsiders. Nor do they see the project files (`files`): the material, often confidential, is the
+ * team's — the one thing a role decides seeing, not only doing (their routes answer 404).
  */
 export const ROLE_ACTIONS: Record<Role, ReadonlySet<Action>> = {
   owner: new Set(Object.keys(ACTIONS) as Action[]),

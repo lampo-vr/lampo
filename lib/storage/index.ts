@@ -5,6 +5,8 @@
 //   scrub/<key>.mp4, proxies/<key>.mp4     playback copies (regenerable; lib/renderKey.ts)
 //   avatars/<user>-<hash>.jpg     profile pictures (accounts belong to no workspace: rootStorage(); locally data/avatars)
 //   asks/<c_id>/<r_id>[.t|.s].<ext>   pictures, clips and sounds of a question asked on a folder (lib/asks.ts; data/asks)
+//   files/sha256/<ab>/<sha256>    project files' bytes, once per workspace (lib/files.ts; NOT regenerable; data/files):
+//                                 through filesStorage(), the seam where a bucket of their own plugs in
 // Every workspace but #1 has its keys under `w/<id>/` (lib/workspaces.ts): `storage()` hands out a view that adds the
 // prefix of the workspace running now, so no key of one team can name another's file. Workspace #1's keys stay as
 // they always were.
@@ -128,7 +130,7 @@ export function localPathOf(key: string): string {
   }
   // Playbooks' files (skill attachments, reference images) and profile pictures come from people: data/, never the
   // disposable cache (which backups skip).
-  if (k.startsWith('playbooks/') || k.startsWith('avatars/') || k.startsWith('asks/')) return path.join(root.data, k);
+  if (k.startsWith('playbooks/') || k.startsWith('avatars/') || k.startsWith('asks/') || k.startsWith('files/')) return path.join(root.data, k);
   return path.join(root.cache, k);
 }
 
@@ -415,4 +417,39 @@ export function storage(): Storage {
 export function setStorage(s: Storage | null): void {
   current = s;
   views.clear();
+}
+
+// ---------------------------------------------------------------- project files
+
+let filesRoot: Storage | null = null;
+const filesViews = new Map<string, { base: Storage; view: Storage }>();
+
+/**
+ * Where project files' bytes live, keys as given (lib/files.ts: `files/sha256/<ab>/<sha256>`). For now the storage
+ * renders use — the server's disk, `data/files/…` (never the disposable cache), with the app's media host in front.
+ * This is the seam for a bucket of their own: a setting that builds another `createStorage(…)` sets it here
+ * (`setFilesStorage`), and every read, write, URL and removal of a file's bytes follows, because they all go through
+ * `filesStorage()`; the catalogs and the index of what is stored stay in `data/files/` either way.
+ */
+export function rootFilesStorage(): Storage {
+  return filesRoot ?? rootStorage();
+}
+
+/** The files' storage as the workspace running now sees it (keys under `w/<id>/` for any but #1, like `storage()`). */
+export function filesStorage(): Storage {
+  const base = rootFilesStorage();
+  if (base === rootStorage()) return storage();
+  const ws = currentWorkspace();
+  if (ws === DEFAULT_WORKSPACE) return base;
+  const hit = filesViews.get(ws);
+  if (hit?.base === base) return hit.view;
+  const view = workspaceStorage(base, ws);
+  filesViews.set(ws, { base, view });
+  return view;
+}
+
+/** A storage of their own for project files (a bucket later; tests), or null for the renders' one. */
+export function setFilesStorage(s: Storage | null): void {
+  filesRoot = s;
+  filesViews.clear();
 }

@@ -25,6 +25,18 @@ export const SCOPES = {
     hint: 'write post drafts of final videos for YouTube, Instagram and Facebook (a person publishes them)',
     actions: ['view', 'post'],
   },
+  // Project files are their own scopes: an app connected with review:act (which uploads renders) must not silently
+  // gain the project's footage. An app connected before these existed has neither.
+  'files:read': {
+    label: 'Read project files',
+    hint: 'list and download the project files (footage, audio, fonts, project files)',
+    actions: ['files'],
+  },
+  'files:write': {
+    label: 'Add project files',
+    hint: 'add, replace, rename, move and trash project files; every change is a version anyone can bring back',
+    actions: ['files', 'files-write'],
+  },
 } as const satisfies Record<string, { label: string; hint: string; actions: readonly Action[] }>;
 
 export type Scope = keyof typeof SCOPES;

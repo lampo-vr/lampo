@@ -46,6 +46,9 @@ data/
   footage.json                footage search on or off for this workspace, who said so and
                               when (footage.md)
   playbooks/                  the House's and the folders' playbooks
+  files/                      project files (files.md): areas/<area>.json catalogs and
+                              their journals, blobs/<ab>.json (which bytes are held),
+                              sha256/<ab>/<sha256> the bytes, once per workspace
   taste/<scope>.md, .json     taste files, made on demand (taste.md)
   qa-dictionary.txt           optional: words Auto-check's spelling check accepts, one per line
   for-you.json                what people cleared or put aside in their inbox
@@ -97,7 +100,9 @@ cache/agent-activity.jsonl    what agents on this machine did through vr and
   `data/avatars/` at its next start.
 - **In a bucket.** With Bunny or S3 storage, versions, fix previews, references, profile pictures, playbook files and
   playback copies live in the bucket (`versions/<slug>/vN.<ext>`, `previews/<slug>/…`, `refs/<slug>/…`,
-  `avatars/…`, `playbooks/<id>/…`, `scrub/…`, `proxies/…`), and the cache keeps working copies of them. A workspace
+  `avatars/…`, `playbooks/<id>/…`, `scrub/…`, `proxies/…`), and the cache keeps working copies of them. Project files'
+  bytes (`files/sha256/…`) go through the same adapter, by one function (`filesStorage()`) that can give them a bucket
+  of their own; their catalogs stay in `data/files/`. A workspace
   other than #1 keeps its keys under `w/<workspace id>/`; profile pictures belong to no workspace.
 
 **Slugs.** A video's slug is its absolute path with every `/` replaced by `__`

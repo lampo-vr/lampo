@@ -27,7 +27,7 @@ import { DATA, DEFAULT_WORKSPACE, isoLocal, slugify, workspaceRoot } from './pat
 import { forgetDevicesOf } from './push/index.ts';
 import { listRecordings, removeRecording } from './recordings.ts';
 import { inWorkspace } from './scope.ts';
-import { rootStorage } from './storage/index.ts';
+import { rootFilesStorage, rootStorage } from './storage/index.ts';
 import { listReviews, withLock, writeAtomic } from './store.ts';
 import { forgetTeamViewer } from './views.ts';
 
@@ -207,13 +207,15 @@ export async function afterAccountGone(u: Pick<User, 'id' | 'avatar'>, workspace
 }
 
 /**
- * A deleted workspace's files: its storage prefix through the adapter (every render, preview, reference and playbook
- * file under `w/<id>/`; on this disk the workspace's versions, data and cache folders), then its data and cache folders
+ * A deleted workspace's files: its storage prefix through the adapter (every render, preview, reference, playbook file
+ * and project file under `w/<id>/`; on this disk the workspace's versions, data and cache folders), then its data and cache folders
  * (reviews, events, links, playbooks, the inbox: the app's own files). Only a workspace other than #1, by its id.
  */
 export async function eraseWorkspaceFiles(ws: string): Promise<void> {
   if (ws === DEFAULT_WORKSPACE || !OTHER_WORKSPACE.test(ws)) throw new Error(`refusing to erase the files of ${JSON.stringify(ws).slice(0, 40)}`);
   await rootStorage().remove(`w/${ws}/`);
+  // its project files' bytes, when they live in a storage of their own (lib/storage/index.ts filesStorage)
+  if (rootFilesStorage() !== rootStorage()) await rootFilesStorage().remove(`w/${ws}/`);
   const root = workspaceRoot(ws);
   for (const dir of [root.data, root.cache, root.versions]) fs.rmSync(dir, { recursive: true, force: true });
 }

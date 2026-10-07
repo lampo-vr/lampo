@@ -12,6 +12,7 @@
 // first); it leaves the workspaces others go on with, the workspaces it alone works in go with it, then the account.
 import * as auth from './auth.ts';
 import { eraseWorkspaceFiles, erasuresSettled, listErasures, recordErasure } from './erasure.ts';
+import { filesHeld } from './files.ts';
 import { dropJobsOf } from './jobs.ts';
 import { forgetGrants, listApps } from './oauth/store.ts';
 import { DEFAULT_WORKSPACE } from './paths.ts';
@@ -42,6 +43,7 @@ export function planWorkspaceDeletion(ws: string): WorkspaceDeletionPlan {
   let videos = 0;
   let bytes = 0;
   let links = 0;
+  let files = { count: 0, bytes: 0 };
   inWorkspace(ws, () => {
     for (const r of listReviews()) {
       if (r.onboarding_sample) continue;
@@ -49,6 +51,11 @@ export function planWorkspaceDeletion(ws: string): WorkspaceDeletionPlan {
       for (const v of r.versions) bytes += Number.isFinite(v.size) ? v.size : 0;
     }
     links = listShares().filter((s) => !s.revoked).length;
+    try {
+      files = filesHeld();
+    } catch {
+      // catalogs that can't be read are deleted with the rest; the plan only can't count them
+    }
   });
   return {
     id: w.id,
@@ -61,6 +68,7 @@ export function planWorkspaceDeletion(ws: string): WorkspaceDeletionPlan {
     invites: auth.listInvites(ws).filter((i) => i.status === 'pending').length,
     tokens: auth.listTokens().filter((t) => auth.tokenWorkspace(t) === ws).length,
     apps: listApps(undefined, ws).length,
+    files,
   };
 }
 

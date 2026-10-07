@@ -1111,6 +1111,12 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
     'Neue Videos, Fragen von Agenten, zu prüfende Korrekturen und Feedback aus Review-Links landen hier.',
   'Questions from agents, waiting for your answer': 'Fragen von Agenten, die auf deine Antwort warten',
   'Read reviews': 'Reviews lesen',
+  'Read project files': 'Projektdateien lesen',
+  'Add project files': 'Projektdateien hinzufügen',
+  'List and download the project files: footage, audio, fonts and project files.':
+    'Die Projektdateien auflisten und herunterladen: Footage, Audio, Schriften und Projektdateien.',
+  'Add, replace, rename, move and trash project files. Every change is a version anyone can bring back.':
+    'Projektdateien hinzufügen, ersetzen, umbenennen, verschieben und in den Papierkorb legen. Jede Änderung ist eine Version, die jeder zurückholen kann.',
   Recent: 'Zuletzt geöffnet',
   'Recently changed': 'Zuletzt geändert',
   'Recent invites': 'Letzte Einladungen',

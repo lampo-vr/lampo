@@ -506,11 +506,13 @@ it on every request, and the app hides what a role can't do.
 | projects and folders, moving videos, assigning agents | | ✓ | ✓ | ✓ |
 | make review links | | ✓ | ✓ | ✓ |
 | download a video (any version, as rendered) or whole folders from the library | | ✓ | ✓ | ✓ |
+| see, list and download project files ([files.md](files.md)) | | ✓ | ✓ | ✓ |
+| add, replace, rename, move and restore project files; trash the ones they added | | ✓ | ✓ | ✓ |
 | requests to agents, agent status, connecting agents, writing as `agent:…` | | ✓ | ✓ | ✓ |
 | rerun Auto-check, dismiss its findings | | ✓ | ✓ | ✓ |
 | edit playbooks; accept or reject what agents suggest | | ✓ | ✓ | ✓ |
 | draft posts of a final video, download the publish kit ([publishing.md](publishing.md)) | | ✓ | ✓ | ✓ |
-| remove any video | | | ✓ | ✓ |
+| remove any video; trash anyone's project files | | | ✓ | ✓ |
 | archive a project and restore it; move a video out of an archived project | | | ✓ | ✓ |
 | connect publishing accounts; publish, schedule, cancel or retry posts | | | ✓ | ✓ |
 | turn footage search on or off for the workspace ([footage.md](footage.md)) | | | ✓ | ✓ |
@@ -518,9 +520,10 @@ it on every request, and the app hides what a role can't do.
 | hide the Lampo badge on review links (where a [billing provider](#a-billing-provider) allows it) | | | ✓ | ✓ |
 | delete the workspace ([Deleting](#deleting-and-exporting)) | | | | ✓ |
 
-*Reviewers* are people on your side who give feedback: producers, colleagues, freelancers. They see everything in the
-workspace like everyone else, but they don't hand work to agents (it costs time and money) or open the project to
-outsiders, and they aren't shown where connected agents run (their folder and machine). Everyone manages their own
+*Reviewers* are people on your side who give feedback: producers, colleagues, freelancers. They see the videos, notes
+and folders like everyone else, but they don't hand work to agents (it costs time and money) or open the project to
+outsiders, and they aren't shown where connected agents run (their folder and machine). The one thing they don't see
+at all is the project files: the material is the team's, often confidential, and its routes answer them 404. Everyone manages their own
 profile, password and API tokens; a reviewer's token carries a reviewer's rights. Only owners manage owners, and the
 last owner can't be removed, demoted or disabled.
 
@@ -721,6 +724,11 @@ the person who allowed it, so a reviewer's app can't mark notes fixed, whatever 
 | `review:comment` | the above, plus ask questions, leave notes on frames, and reply |
 | `review:act` | the above, plus mark notes fixed or won't fix, add and file renders, report what the agent is doing |
 | `post:draft` | list videos and read notes, plus draft posts of final videos for YouTube, Instagram and Facebook and download the publish kit (a person publishes them) |
+| `files:read` | list and download the project files ([files.md](files.md)) |
+| `files:write` | the above, plus add, replace, rename, move and trash project files (every change a version anyone can bring back) |
+
+The project files have scopes of their own, so an app connected with `review:act` (which uploads renders) never gains
+a project's footage without being asked for it; an app connected before they existed has neither.
 
 Apps never check fixes, approve, mark final, edit other people's notes, remove videos, make review links, download
 folders, edit playbooks, publish or administer the server. A call outside the granted scopes gets 403 with an

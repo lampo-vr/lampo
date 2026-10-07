@@ -8,6 +8,7 @@ import type { Request } from 'express';
 import { z } from 'zod';
 import { hasItem, type OptionAttached, type OptionTarget } from '../lib/askOptions.ts';
 import * as auth from '../lib/auth.ts';
+import type { FileTarget } from '../lib/files.ts';
 import { checkNotArchived, checkReviewOpen } from '../lib/folderIds.ts';
 import { fileName, folderName, slugName } from '../lib/inputs.ts';
 import { listApps } from '../lib/oauth/store.ts';
@@ -18,7 +19,7 @@ import type { RefAttached, RefTarget } from '../lib/refs.ts';
 import { currentWorkspace } from '../lib/scope.ts';
 import { scopeAllows } from '../lib/scopes.ts';
 import * as store from '../lib/store.ts';
-import type { GuestRef, OptionGroup, UploadResult } from '../lib/types.ts';
+import type { FileUploadResult, GuestRef, OptionGroup, UploadResult } from '../lib/types.ts';
 import { roleIn } from '../lib/workspaces.ts';
 import { sessionOf } from './auth.ts';
 import { fail } from './http.ts';
@@ -87,9 +88,12 @@ export interface GuestRefAnswer {
 
 export type Outcome =
   | { status: 'processing' }
-  | { status: 'done'; result: UploadResult | Attached | RefAttached | GuestRefAnswer | OptionAttached }
-  /** `code`: the status to answer with (409: a part that can't be one), else 422. */
-  | { status: 'failed'; error: string; code?: number };
+  | { status: 'done'; result: UploadResult | Attached | RefAttached | GuestRefAnswer | OptionAttached | FileUploadResult }
+  /**
+   * `code`: the status to answer with (409: a part that can't be one, a project file that changed since its base), else
+   * 422. `details`: the answer's other fields (a file's conflicts).
+   */
+  | { status: 'failed'; error: string; code?: number; details?: Record<string, unknown> };
 
 /**
  * What the PUT becomes: a render (the next version of a video, or a new one; `byId`: the account of the ticket's `by`),
@@ -100,7 +104,9 @@ export type TicketTarget =
   | { kind: 'preview'; preview: PreviewTarget }
   | { kind: 'ref'; ref: RefTarget }
   /** The file of an item a question with options offers (lib/askOptions.ts). */
-  | { kind: 'option'; option: OptionTarget };
+  | { kind: 'option'; option: OptionTarget }
+  /** A project file's bytes (lib/files.ts): stored, and committed at its path when the target says so. */
+  | { kind: 'file'; file: FileTarget };
 
 export interface Ticket {
   by: string;
@@ -131,6 +137,8 @@ export interface TicketGuard {
   owner?: string;
   /** Whose open URLs it counts among in its workspace (the team, one review link's visitors): OPEN_PER_POOL. */
   pool?: string;
+  /** Other limits than OPEN_PER_OWNER / OPEN_PER_POOL (a push of project files: a ticket per file). */
+  limits?: { owner: number; pool: number };
 }
 
 /** Upload URLs one account (or one review-link visitor) may hold open at once. */
@@ -219,6 +227,11 @@ export interface UploadTickets {
    * no question behind) — else the item is looked up.
    */
   issueOption(target: OptionTarget, by: string, base: string | null, guard: TicketGuard, offered?: OptionGroup[]): IssuedTicket;
+  /**
+   * A one-time URL for a project file's bytes (lib/files.ts FileTarget: the area, the path, what was named); `by` may
+   * write files (the caller checks; `guard` again at use). Its token also starts a tus upload (`ticket` in its metadata).
+   */
+  issueFile(target: FileTarget, by: string, base: string | null, guard: TicketGuard): IssuedTicket & { ticket: string };
   /** Takes back a URL handed out for something that wasn't made after all: it neither works nor counts as open. */
   drop(url: string): void;
   /** The ticket behind a URL's last segment, or null (unknown, malformed, or gone). */
@@ -229,7 +242,7 @@ export interface UploadTickets {
 export function createUploadTickets({ origin = null }: { origin?: string | null } = {}): UploadTickets {
   const tickets = new Map<string, Ticket>();
   const hashOf = (t: string) => crypto.createHash('sha256').update(t).digest('hex');
-  function mint(target: TicketTarget, by: string, base: string | null, guard: TicketGuard): IssuedTicket {
+  function mint(target: TicketTarget, by: string, base: string | null, guard: TicketGuard): IssuedTicket & { token: string } {
     // Kept an hour past expiry, so the outcome can still be read.
     for (const [k, t] of tickets) if (Date.now() > t.expires + 3600_000) tickets.delete(k);
     const ws = currentWorkspace();
@@ -241,41 +254,48 @@ export function createUploadTickets({ origin = null }: { origin?: string | null 
         if (guard.owner && t.owner === guard.owner) mine++;
         if (guard.pool && t.pool === guard.pool && t.ws === ws) pooled++;
       }
-      if (mine >= OPEN_PER_OWNER)
-        throw Object.assign(fail(429, `${OPEN_PER_OWNER} upload URLs are open already: use them, or wait until they expire`), { retryAfter: 60 });
-      if (pooled >= OPEN_PER_POOL) throw Object.assign(fail(429, 'too many upload URLs are open here right now: try again in a minute'), { retryAfter: 60 });
+      const max = guard.limits ?? { owner: OPEN_PER_OWNER, pool: OPEN_PER_POOL };
+      if (mine >= max.owner)
+        throw Object.assign(fail(429, `${max.owner} upload URLs are open already: use them, or wait until they expire`), { retryAfter: 60 });
+      if (pooled >= max.pool) throw Object.assign(fail(429, 'too many upload URLs are open here right now: try again in a minute'), { retryAfter: 60 });
     }
     const token = `vrup_${crypto.randomBytes(24).toString('base64url')}`;
     const expires = Date.now() + TICKET_MS;
-    tickets.set(hashOf(token), { by, ws, target, expires, used: false, ...guard });
-    return { url: `${origin || base || ''}/api/uploads/direct/${token}`, expires: new Date(expires).toISOString() };
+    const { limits: _limits, ...kept } = guard;
+    tickets.set(hashOf(token), { by, ws, target, expires, used: false, ...kept });
+    return { url: `${origin || base || ''}/api/uploads/direct/${token}`, expires: new Date(expires).toISOString(), token };
   }
+  const issued = ({ token: _token, ...x }: IssuedTicket & { token: string }): IssuedTicket => x;
   return {
     issue: (input, by, base, byId, guard) => {
       const meta = uploadMeta(input);
       // nothing new in an archived project: no URL for it at all (the upload checks again when it lands)
       if (meta.slug) checkReviewOpen(store.loadReview(meta.slug));
       else checkNotArchived(meta.folder);
-      return mint({ kind: 'render', meta, ...(byId ? { byId } : {}) }, by, base, guard);
+      return issued(mint({ kind: 'render', meta, ...(byId ? { byId } : {}) }, by, base, guard));
     },
     issuePreview(target, by, base, guard) {
       const hit = store.findComment(target.comment);
       if (!hit) throw new Error(`no note ${target.comment}`);
       checkReviewOpen(hit.review);
-      return mint({ kind: 'preview', preview: target }, by, base, guard);
+      return issued(mint({ kind: 'preview', preview: target }, by, base, guard));
     },
     issueRef(target, by, base, guard) {
       const hit = target.draft ? null : store.findComment(target.comment);
       if (!target.draft && !hit) throw new Error(`no note ${target.comment}`);
       checkReviewOpen(hit ? hit.review : store.loadReview(target.draft?.slug ?? ''));
-      return mint({ kind: 'ref', ref: target }, by, base, guard);
+      return issued(mint({ kind: 'ref', ref: target }, by, base, guard));
     },
     issueOption(target, by, base, guard, offered) {
       const has = offered
         ? offered.some((g) => g.id === target.group && g.items.some((it) => it.id === target.item))
         : hasItem(target.ask, target.group, target.item);
       if (!has) throw new Error(`no item ${target.group}/${target.item} on ${target.ask}`);
-      return mint({ kind: 'option', option: target }, by, base, guard);
+      return issued(mint({ kind: 'option', option: target }, by, base, guard));
+    },
+    issueFile(target, by, base, guard) {
+      const { token, ...issued } = mint({ kind: 'file', file: target }, by, base, guard);
+      return { ...issued, ticket: token };
     },
     drop(url) {
       const raw = url.split('/').pop() ?? '';

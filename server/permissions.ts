@@ -147,6 +147,26 @@ export const ROUTE_ACTIONS: [string, string, Rule][] = [
   ['GET', '/api/folders/download/info', 'download'],
   ['GET', '/api/review/:slug/download', 'download'],
   ['GET', '/api/review/:slug/download/info', 'download'],
+  // Project files (server/routes/files.ts, docs/files.md): the team's material. Reading is `files` (a POST for many
+  // download URLs at once too), every change `files-write` — each a version, nothing lost; trashing what someone else
+  // added needs `remove` as well (the route checks). Reviewers have neither and are answered 404: they don't see files.
+  // Review links never reach them. The bytes come in through a one-time upload (`/api/uploads/direct/:ticket`, or tus
+  // at `/api/uploads` with the ticket in its metadata) and go out from the media host (`/media/f/…`, its own credential).
+  ['GET', '/api/files', 'files'],
+  ['GET', '/api/files/summary', 'files'],
+  ['GET', '/api/files/trash', 'files'],
+  ['GET', '/api/files/usage', 'files'],
+  ['POST', '/api/files/urls', 'files'],
+  ['POST', '/api/files/missing', 'files-write'],
+  ['POST', '/api/files/uploads', 'files-write'],
+  ['POST', '/api/files/commit', 'files-write'],
+  ['POST', '/api/files/dirs', 'files-write'],
+  ['GET', '/api/files/:id', 'files'],
+  ['GET', '/api/files/:id/history', 'files'],
+  ['GET', '/api/files/:id/download', 'files'],
+  ['PATCH', '/api/files/:id', 'files-write'],
+  ['DELETE', '/api/files/:id', 'files-write'],
+  ['POST', '/api/files/:id/restore', 'files-write'],
   // MCP: connecting needs 'view'; every tool then checks its own action against the same table (mcp/core.ts allowed()).
   ['*', '/mcp', 'view'],
   // Your own devices' notifications; "Got it" in For you only hides things for you.
@@ -377,12 +397,13 @@ export const SUSPENDED_ERROR =
 
 /**
  * A write in a workspace the server's operator suspended: refused (423) — every action of the table but reading
- * (`view`: what you watched, what you put away), your own account and its sessions (`self`), and what authenticates
+ * (`view`: what you watched, what you put away; `files`: download URLs), your own account and its sessions (`self`), and what authenticates
  * itself (`public`). A module's routes (billing) are refused too.
  */
 function refuseIfSuspended(req: Request, rule: Rule | 'none' | 'module'): void {
   const method = req.method === 'HEAD' ? 'GET' : req.method;
-  if (!WRITES.has(method) || rule === 'self' || rule === 'public' || rule === 'view') return;
+  // `files` is reading too: download URLs asked for many at once are a POST
+  if (!WRITES.has(method) || rule === 'self' || rule === 'public' || rule === 'view' || rule === 'files') return;
   const ws = req.auth?.workspace;
   if (ws && suspensionOf(ws)) throw fail(423, SUSPENDED_ERROR, { suspended: true });
 }
@@ -425,6 +446,9 @@ function refuseIfArchived(req: Request, rule: Rule | 'none'): void {
   if (project) throw fail(423, archivedWords(project), { archived: project });
 }
 
+/** The project files' actions: a role without them is answered as if there were nothing (404), never 403. */
+const FILE_RULES: ReadonlySet<Rule> = new Set<Rule>(['files', 'files-write']);
+
 /** owner > admin > member > reviewer: a module route's `role` is the lowest that may call it. */
 const ROLE_RANK: Record<Role, number> = { reviewer: 0, member: 1, admin: 2, owner: 3 };
 
@@ -451,7 +475,11 @@ export function authorize({ own }: { own?: (method: string, path: string) => Mod
       } else {
         const { rule } = ruleFor(req.method, req.path);
         if (rule === 'none') throw fail(403, 'not in the permission table');
-        if (rule !== 'self' && rule !== 'public' && !can(req.auth.role, rule)) throw fail(403, `your role (${req.auth.role}) can't do that`);
+        if (rule !== 'self' && rule !== 'public' && !can(req.auth.role, rule)) {
+          // the project files are the one thing a role doesn't see at all (reviewers): nothing there, not "not for you"
+          if (FILE_RULES.has(rule)) throw fail(404, 'not found');
+          throw fail(403, `your role (${req.auth.role}) can't do that`);
+        }
         if (req.auth.via === 'token' && personOnly(req.method, req.path)) throw fail(403, PERSON_ONLY_ERROR, { person: true });
         refuseIfSuspended(req, rule);
         refuseIfArchived(req, rule);

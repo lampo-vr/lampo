@@ -3,8 +3,9 @@
 // it the app is self-hosted and complete: no limits, no extra routes, hooks that do nothing.
 //
 // What the open app asks, and where:
-//   check(ws, 'upload', bytes)  renders (tus, one-time URLs), the team's references on notes, fix previews, playbook
-//                               files — not voice notes, recordings or a client's references: notes keep working
+//   check(ws, 'upload', bytes)  renders (tus, one-time URLs), project files (a push's bytes, at once and per file), the
+//                               team's references on notes, fix previews, playbook files — not voice notes,
+//                               recordings or a client's references: notes keep working
 //   check(ws, 'video')          a new video
 //   check(ws, 'member')         an invite made or accepted, an account added
 //   check(ws, 'share')          a new review link
@@ -25,6 +26,7 @@
 // The shapes mirror the module's contract (framework-neutral; Express is adapted here, in one place).
 import { pathToFileURL } from 'node:url';
 import type { Request } from 'express';
+import { filesUsage } from '../lib/files.ts';
 import { recordStep } from '../lib/funnel.ts';
 import { wellFormed } from '../lib/names.ts';
 import { RateLimit } from '../lib/rateLimit.ts';
@@ -48,8 +50,16 @@ export interface Caller {
 
 /** What the open app counts for a workspace (the module never walks the store itself). */
 export interface Usage {
-  /** Bytes of the renders kept for the workspace (not caches). */
+  /**
+   * Bytes the plan's storage counts: the renders kept for the workspace (not caches) and its project files' counted
+   * bytes (`files.bytes`). Renders and files share the plan's GB.
+   */
   bytes: number;
+  /**
+   * Its project files (lib/files.ts): what counts (`bytes`: live files once per workspace, pinned versions), what the
+   * safety net keeps and doesn't count (`kept`: the trash and replaced versions), and how many live files.
+   */
+  files: { bytes: number; kept: number; count: number };
   /** People with an account in the workspace (clients on review links and agents never count). */
   members: number;
   /** Videos under review: not final, not archived. */
@@ -182,6 +192,11 @@ export interface EntitlementsProvider {
    * Optional: a module without it, and a server without a module, show the badge on every link.
    */
   canHideBadge?(workspace: string): Promise<boolean>;
+  /**
+   * The storage the workspace's plan includes, in bytes (null: no limit). Optional: the project files' safety net (the
+   * trash and replaced versions, not counted) is held to a quarter of it; without it, only to 30 days.
+   */
+  storageBytes?(workspace: string): Promise<number | null>;
 }
 
 export interface WorkspaceEvent {
@@ -314,6 +329,8 @@ export interface Extension {
   entitlements(workspace: string): Promise<unknown>;
   /** The workspace's plan lets its admins hide "Powered by Lampo" (false without a module, or when the module fails). */
   badgeOptional(workspace: string): Promise<boolean>;
+  /** The plan's storage in bytes, as the module tells it (null without a module, one that doesn't say, or a failure). */
+  storageBytes(workspace: string): Promise<number | null>;
   /** The module's routes (mounted by the app under its guard; `public` ones are reachable signed out). */
   routes: Route[];
   /** The module's sign-up answer (server/signup.ts's seam), or null to keep the app's own. */
@@ -336,6 +353,7 @@ export const NO_EXTENSION: Extension = {
   check: async () => {},
   entitlements: async () => null,
   badgeOptional: async () => false,
+  storageBytes: async () => null,
   routes: [],
   onSignup: null,
   billing: false,
@@ -346,8 +364,9 @@ export const NO_EXTENSION: Extension = {
 };
 
 /**
- * What the open app counts for a workspace: its renders' bytes, its people, its videos under review, and the room it
- * could make (final or archived videos and their bytes: what a limit sheet offers to archive or remove instead).
+ * What the open app counts for a workspace: its renders' and project files' bytes, its people, its videos under review,
+ * and the room it could make (final or archived videos and their bytes: what a limit sheet offers to archive or remove
+ * instead).
  */
 export function usageOf(workspace: string): Usage {
   return inWorkspace(workspace, () => {
@@ -366,7 +385,14 @@ export function usageOf(workspace: string): Usage {
         room.bytes += size;
       }
     }
-    return { bytes, members: workspaces.membersOf(workspace).length, activeVideos, room };
+    const f = filesUsage();
+    return {
+      bytes: bytes + f.bytes,
+      files: { bytes: f.bytes, kept: f.kept, count: f.files },
+      members: workspaces.membersOf(workspace).length,
+      activeVideos,
+      room,
+    };
   });
 }
 
@@ -510,6 +536,16 @@ export function createExtension(module: CloudModule, host: HostContext): Extensi
       } catch (e) {
         host.log('extension.badge.failed', { workspace, error: (e as Error)?.message });
         return false;
+      }
+    },
+    // a module's failure keeps the safety net as it is (30 days): nothing is purged early on billing's mistake
+    storageBytes: async (workspace) => {
+      try {
+        const n = await module.entitlements.storageBytes?.(workspace);
+        return typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : null;
+      } catch (e) {
+        host.log('extension.storage.failed', { workspace, error: (e as Error)?.message });
+        return null;
       }
     },
     routes: module.routes,

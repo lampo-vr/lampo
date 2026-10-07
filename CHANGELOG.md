@@ -8,6 +8,13 @@ format stays backwards compatible throughout.
 ## [Unreleased]
 
 ### Added
+- **Project files, in the API** (the app's Files tab and the agents' tools come next). Footage, music, fonts and project
+  files kept per House, project and folder, so a team and its agents work from the same material on any machine: a
+  folder sees its own files and everything above it, paths stay as uploaded, each workspace keeps the same bytes once.
+  Every change is a version with who made it (and which agent); a push that would replace a version it didn't see is
+  refused or kept beside it as a copy; the trash and replaced versions are kept 30 days. Files count toward the plan's
+  storage once per workspace, the trash doesn't. Reviewers and review links don't see files; apps need the new
+  `files:read` or `files:write` scope. `/api/files…` (docs/files.md, docs/api.md).
 - **An agent's work on a video is kept, from start to end.** When you send notes to the video's agent (Send, Ask,
   a nudge, your answer to its question, Try again), Lampo keeps what it does with them as one piece of work: the notes
   you sent as its plan (which it is on, which it fixed, asked about or left), what it is doing now, how long it worked

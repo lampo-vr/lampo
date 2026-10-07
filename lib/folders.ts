@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { projectOfFolder } from './archived.ts';
 import { moveAskFolders } from './asks.ts';
+import { dropFolderAreas, followFolders } from './fileAreas.ts';
 import { checkNotArchived, cleanArchived, FoldersUnreadableError, folderRecord, foldersFile, newFolderId, parseFolders, readFoldersText } from './folderIds.ts';
 import { cutChars } from './names.ts';
 import { dataDir, isoLocal, projectOf, slugify, USER } from './paths.ts';
@@ -242,6 +243,8 @@ export function renameFolder(from: unknown, to: unknown, by = USER): string {
     const { folders, ids, archived } = loadFile();
     save([...folders.map(map), ...ancestors(b)], moveIds(ids, map), archived);
   });
+  // Its project files follow its id already (lib/fileAreas.ts); their catalogs say where they are now.
+  filesFollow(() => followFolders(a));
   // Its playbooks go with it (and those of its subfolders), and so do review links and the questions asked on it.
   withLock(playbookRoot(), () => movePlaybooks(a, map));
   moveShareFolders(map);
@@ -251,6 +254,18 @@ export function renameFolder(from: unknown, to: unknown, by = USER): string {
     if (r?.folder && inside(r.folder, a)) mutate(slug, (rv) => setFolderInto(rv, rv.folder && map(rv.folder), by));
   }
   return b;
+}
+
+/**
+ * Project files following their folder: the folder changes anyway when their catalogs can't be read (a damaged file
+ * waits to be put right; their area still has the folder's id), as playbooks' and questions' do.
+ */
+function filesFollow(fn: () => void): void {
+  try {
+    fn();
+  } catch (e) {
+    console.error(`files: the files of a folder weren’t moved with it (${(e as Error).message})`);
+  }
 }
 
 /** `to`, the new path of folder `from`: within FOLDER_LIMITS, or no deeper and no longer than `from` was. */
@@ -291,6 +306,20 @@ export function deleteFolder(p: unknown, by = USER): string | null {
       archived,
     );
   });
+  // Its project files (and those of a subfolder that merged into one already there) go to the trash whole, nothing lost:
+  // into the parent's (or the House's), under the deleted folder's name; a merged one's into the folder it fell into.
+  const parentOrHouse = parent ?? '';
+  filesFollow(() =>
+    dropFolderAreas(
+      a,
+      (scope) =>
+        scope !== a && merges(scope)
+          ? { folder: lift(scope) as string, prefix: '' }
+          : { folder: parentOrHouse, prefix: `${scope.slice(parent ? parent.length + 1 : 0)}/` },
+      folderIdFor,
+      { name: by },
+    ),
+  );
   for (const slug of listSlugs()) {
     const r = loadReview(slug);
     if (r?.folder && inside(r.folder, a)) mutate(slug, (rv) => setFolderInto(rv, rv.folder && lift(rv.folder), by));

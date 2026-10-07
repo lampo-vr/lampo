@@ -2,10 +2,12 @@
 // its request worked in, and every event to the workspace of the work that told it (lib/scope.ts): a stream only ever
 // hears its own workspace. An event told outside any workspace on a server with several reaches nobody.
 import type { Request, Response } from 'express';
+import { type Action, can } from '../lib/permissions.ts';
 import { currentWorkspace, DEFAULT_WORKSPACE } from '../lib/scope.ts';
 import type { ServerEvent } from '../lib/types.ts';
 
-export type Broadcast = (type: ServerEvent, data?: object) => void;
+/** `need`: only streams whose role may do that hear it (the project files' changes: `files`, never a reviewer). */
+export type Broadcast = (type: ServerEvent, data?: object, need?: Action) => void;
 
 /**
  * Live streams one person holds open at once (A12-D13): their browsers (one per browser: the tabs share it), `vr watch`
@@ -28,7 +30,7 @@ export interface EventHub {
   /** To the streams of the workspace the work telling it runs for. */
   broadcast: Broadcast;
   /** To the streams of workspace `ws` (work that knows its workspace without running in it). */
-  broadcastTo: (ws: string, type: ServerEvent, data?: object) => void;
+  broadcastTo: (ws: string, type: ServerEvent, data?: object, need?: Action) => void;
   /**
    * To one account's own streams only (its browsers): what is nobody else's business, like its drafts. Never heard by
    * in-process listeners (MCP), never by an API token's stream.
@@ -54,18 +56,18 @@ export function createEventHub({ stillAllowed }: { stillAllowed?: (req: Request)
   const perPerson = new Map<string, number>();
   const listeners = new Set<(type: ServerEvent, data: object, ws: string) => void>();
   const streamWorkspace = (req: Request) => req.auth?.workspace ?? DEFAULT_WORKSPACE;
-  const broadcastTo = (ws: string, type: ServerEvent, data: object = {}) => {
+  const broadcastTo = (ws: string, type: ServerEvent, data: object = {}, need?: Action) => {
     const msg = `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`;
-    for (const [res, req] of clients) if (streamWorkspace(req) === ws) res.write(msg);
+    for (const [res, req] of clients) if (streamWorkspace(req) === ws && (!need || can(req.auth?.role, need))) res.write(msg);
     for (const fn of listeners) {
       try {
         fn(type, data, ws);
       } catch {}
     }
   };
-  const broadcast: Broadcast = (type, data = {}) => {
+  const broadcast: Broadcast = (type, data = {}, need) => {
     const ws = tellingWorkspace();
-    if (ws) broadcastTo(ws, type, data);
+    if (ws) broadcastTo(ws, type, data, need);
   };
   return {
     broadcast,
