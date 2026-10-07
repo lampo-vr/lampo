@@ -912,7 +912,21 @@ export interface AgentRunLive {
 
 // ---------------------------------------------------------------- what agents are doing (lib/activity*.ts)
 
-export type AgentActivityKind = 'read' | 'note' | 'fix' | 'reply' | 'ask' | 'upload' | 'render' | 'wait' | 'playbook' | 'status' | 'tool' | 'say' | 'run';
+export type AgentActivityKind =
+  | 'read'
+  | 'note'
+  | 'fix'
+  | 'reply'
+  | 'ask'
+  | 'upload'
+  | 'render'
+  | 'wait'
+  | 'playbook'
+  | 'status'
+  | 'tool'
+  | 'say'
+  | 'run'
+  | 'error';
 
 /** Words the UI says in its own language: `text` is the English line, `key` its template (`ACTIVITY_KEYS` in
  * lib/activityText.ts, `{name}` placeholders) with `vars` filled in; `quote` is someone's own words after it, as they
@@ -938,6 +952,11 @@ export interface AgentActivity extends ActivityWords {
   since?: string;
   /** An upload's progress, 0–100. */
   pct?: number;
+  /** A render or upload under way (`vr render`, uploads): stage, %, frames, time left. `pct` stays for older readers. */
+  progress?: RunProgress;
+  /** The run this came from (`LAMPO_RUN` of a run Lampo started). A hint only: the server binds it to that run only
+   * when the run is the same agent's, on the same video, in the same workspace. */
+  run?: string;
 }
 
 /** What one agent is doing on one video (or anywhere, `slug` null), newest first. */
