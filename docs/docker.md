@@ -46,6 +46,8 @@ after each, is [go-live.md](go-live.md).
    ```
 
    Set `LAMPO_DOMAIN` (the domain Caddy gets a certificate for) and `LAMPO_PUBLIC_URL` (the address people open).
+   Without a domain (`LAMPO_DOMAIN`, or `VR_DOMAIN` in an `.env` from before) Caddy doesn't start, and
+   `docker compose logs caddy` says so.
    `LAMPO_TRUST_PROXY=uniquelocal` is already set: Caddy reaches the app over the compose network, and an https address
    needs it. Every other setting in the file is optional and explained there; the full list is in
    [configuration.md](configuration.md).

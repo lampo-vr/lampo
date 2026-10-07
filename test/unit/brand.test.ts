@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { AGENT_KIND_LABELS, AGENT_KINDS, agentKindOf, agentKindOfRef, agentShown } from '../../lib/agentKind.ts';
+import { AGENT_KIND_LABELS, AGENT_KINDS, agentKindOf, agentKindOfRef, agentShown, namesItsKind } from '../../lib/agentKind.ts';
 import { BRAND_NAME as LIB_NAME } from '../../lib/brand.ts';
 import { MCP_NAME } from '../../lib/mcpConfig.ts';
 import { AGENT_LOGOS } from '../../web/src/ui/agentLogos.ts';
@@ -222,4 +222,20 @@ test('an agent named by its MCP client’s id reads as its kind’s name; names 
   assert.equal(agentShown('promo-edit', 'claude-code'), 'promo-edit', 'a Claude Code session’s own name');
   assert.equal(agentShown('my-script · Mia', 'mcp'), 'my-script · Mia', 'only an MCP client: its own name');
   assert.equal(agentShown('agent:vr', 'cli'), 'agent:vr');
+  // a name someone gave that has the kind's word in it stays as it was given: only a client's own id is replaced
+  assert.equal(agentShown('codex-cuts', 'codex'), 'codex-cuts');
+  assert.equal(agentShown('claude-review · Mia', 'claude-code'), 'claude-review · Mia');
+  assert.equal(agentShown('cursor-grade', 'cursor'), 'cursor-grade');
+  assert.equal(agentShown('gemini-cli-mcp-client', 'gemini'), 'Gemini');
+  assert.equal(agentShown('cursor-vscode · Sam', 'cursor'), 'Cursor · Sam');
+  assert.equal(agentShown('codex', 'codex'), 'Codex');
+});
+
+test('a kind beside a name only where the name doesn’t say it already: never "Codex Codex"', () => {
+  assert.equal(namesItsKind(agentShown('codex-mcp-client', 'codex'), 'codex'), true);
+  assert.equal(namesItsKind(agentShown('claude-code · Mia', 'claude-code'), 'claude-code'), true);
+  assert.equal(namesItsKind(agentShown('codex-cuts', 'codex'), 'codex'), false);
+  assert.equal(namesItsKind(agentShown('launch-edit', 'claude-code'), 'claude-code'), false);
+  assert.equal(namesItsKind('Claude Code · Mia', 'claude'), false, 'Claude is not Claude Code');
+  assert.equal(namesItsKind('render-bot', null), false);
 });

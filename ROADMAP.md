@@ -281,6 +281,13 @@ Findings of audit A13 (2026-10-05, `AUDITS.md`) and its verification rounds that
   older routes. Extend it, hosted with a media origin.
 - **A13 WS-4** (info, tests): the workspace isolation walk doesn't cover the moments, the funnel and sprites. Run it with
   a stand-in billing module and seed those in both workspaces.
+- **A13 AGENT-3, across videos** (low): a cursor reused for another video, or for all of them, skips notes on other
+  videos that landed during the wait. An append-only cursor that carries the other videos' positions.
+- **A13 AGENT-2's rest** (low): an MCP agent's id is 48 bits of an unkeyed SHA-1. Key it with a server secret (HMAC) or
+  lengthen it, and keep an `mcp-` key's account past its TTL.
+- **A13 INV-1** (info): on the machine, `lampo post list --json` gives its owner the sentence, not the detail.
+- **A13 FILES, infos** (info): a ticket for a non-copy upload on a stale base gets 429 ("24 h") instead of 409 before
+  any byte moves; a revert's 429 suggests `conflict: 'copy'`, which a restore ignores.
 
 ## Open decisions
 

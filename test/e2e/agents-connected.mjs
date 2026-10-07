@@ -166,8 +166,8 @@ try {
     await open(p, '#/settings/agents');
     await p.waitForSelector('[data-testid=connected-agents] .set-row', { timeout: 15000 });
     const line = await p.$eval('[data-testid=connected-agents] .set-row', (e) => e.textContent);
-    assert(line.includes('waiting for your notes') && !line.includes('vr watch'), line);
-    assert(!(await p.$eval('main', (e) => e.textContent)).includes('vr watch'), 'no vr recipe');
+    assert(line.includes('waiting for your notes') && !/\b(vr|lampo) watch\b/.test(line), line);
+    assert(!/\b(vr|lampo) watch\b/.test(await p.$eval('main', (e) => e.textContent)), 'no command recipe');
     await p.browserContext().close();
   });
 

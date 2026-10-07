@@ -434,6 +434,9 @@ try {
       JSON.stringify(rows),
     );
     assert(/^launch-edit Claude Code · \d+ fixes \d+% \d+ of \d+ right the first time /.test(by['launch-edit']?.text ?? ''), by['launch-edit']?.text);
+    // a name someone gave stays as given, its kind beside it once (never "Codex Codex", never the name swapped for it)
+    assert(/^codex-cuts Codex · \d+ fixes · \d+ questions \d+% /.test(by['codex-cuts']?.text ?? ''), by['codex-cuts']?.text);
+    assert(!rows.some((r) => /^(Claude Code|Codex|Cursor|MCP client) \1\b/.test(r.text)), 'no kind twice');
     assert(by['launch-edit']?.back.length === 2 && by['codex-cuts']?.back.length === 2, 'the topics that came back, two chips');
     assert(/^render-bot MCP client · \d+ questions No fixes/.test(by['render-bot']?.text ?? '') && !by['render-bot']?.bar, by['render-bot']?.text);
     assert(

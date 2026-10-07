@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
-import { freePort, isolatedEnv, ROOT, tmpdir, until } from '../lib/helpers.ts';
+import { isolatedEnv, ROOT, tmpdir } from '../lib/helpers.ts';
 
 isolatedEnv();
 const {
@@ -195,7 +195,9 @@ test('a setting in both spellings, differently, is said by name: an emptied LAMP
   assert.deepEqual(image, IMAGE_DEFAULTS, 'the list is the image’s ENV');
 });
 
-test('the server says them at start, by name only', async () => {
+// Said before the checks refuse a start (one may be the reason for a refusal): a refused start shows them, and the
+// test needs no server listening, nor the UI built.
+test('the server says them at start, by name only, a refused start too', async () => {
   const store = tmpdir('vr-spellings-');
   fs.writeFileSync(path.join(store, 'config.json'), '{}');
   const child = spawn(process.execPath, [path.join(ROOT, 'server/index.ts')], {
@@ -208,7 +210,7 @@ test('the server says them at start, by name only', async () => {
       LAMPO_CACHE: path.join(store, 'cache'),
       LAMPO_CONFIG: path.join(store, 'config.json'),
       LAMPO_HOST: '127.0.0.1',
-      LAMPO_PORT: String(await freePort()),
+      LAMPO_PORT: 'no-port',
       LAMPO_STT: 'off',
       LAMPO_FOOTAGE: 'off',
       LAMPO_ONBOARDING_SAMPLE: 'off',
@@ -225,11 +227,11 @@ test('the server says them at start, by name only', async () => {
     log += d;
   });
   try {
-    await until(
-      () => /LAMPO_TRUST_PROXY is empty/.test(log) || child.exitCode !== null,
-      () => log,
-    );
+    const code = await new Promise((r) => child.on('close', r));
+    assert.notEqual(code, 0, log);
+    assert.match(log, /LAMPO_PORT must be a port number/, 'refused');
     assert.match(log, /warning: LAMPO_TRUST_PROXY is empty, so VR_TRUST_PROXY still applies/, log);
+    assert.ok(log.indexOf('LAMPO_TRUST_PROXY is empty') < log.indexOf('LAMPO_PORT must be'), `the warning comes first: ${log}`);
     assert.doesNotMatch(
       log
         .split('\n')
@@ -240,7 +242,6 @@ test('the server says them at start, by name only', async () => {
     );
   } finally {
     child.kill();
-    await new Promise((r) => (child.exitCode === null ? child.on('close', r) : r(null)));
     fs.rmSync(store, { recursive: true, force: true });
   }
 });

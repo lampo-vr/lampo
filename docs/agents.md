@@ -252,7 +252,7 @@ or the environment variable `LAMPO_BY=agent:<name>` changes that.
 | `lampo login <url> [--expires 90d]` | sign in through your browser: it opens the server, you sign in there if you aren't and press Allow on a page that names this machine and the API token it gets (`lampo on <machine>`, in the workspace you work in there). Over SSH it prints the address to open on any device; after Allow, paste the address that browser ends on. `--expires`: the token stops working after that many days. Ctrl-C cancels; it gives up after 5 minutes |
 | `lampo login <url> --email you@example.com [--expires 90d] [--workspace <id>]` | sign in with your password (asked for, hidden), where no browser can reach (CI, scripts); the same token. `--workspace`: on a server with several workspaces, the one the token acts in (else your first) |
 | `lampo login <url> --token -` | sign in with an API token from Settings → API tokens, pasted at a hidden prompt or piped in (`lampo login <url> --token - < token-file`) |
-| `lampo logout` | back to the local store: a token `lampo login` made is revoked, one you pasted is only forgotten (revoke it in Settings → API tokens); a login `vr login` saved before the rename is signed out of too |
+| `lampo logout` | back to the local store: a token `lampo login` made is revoked, one you pasted is only forgotten (revoke it in Settings → API tokens); a login `vr login` saved before the rename is signed out of too. The logins are forgotten first; a server that doesn't confirm the revoke within 5 s is named, and its token stays valid until you revoke it there |
 | `lampo whoami` | which store or server this `lampo` uses, and as whom |
 
 Accounts are managed on the server itself, with its data folder (these commands don't go through `lampo login`):

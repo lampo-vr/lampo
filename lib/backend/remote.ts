@@ -63,13 +63,14 @@ export class RemoteError extends Error {
 export function createApi(c: Credentials) {
   const base = c.server.replace(/\/+$/, '');
   const auth = { Authorization: `Bearer ${c.token}` };
-  async function call<T>(method: string, url: string, body?: unknown): Promise<T> {
+  async function call<T>(method: string, url: string, body?: unknown, signal?: AbortSignal): Promise<T> {
     let res: Response;
     try {
       res = await fetch(base + url, {
         method,
         headers: { ...auth, ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
         body: body === undefined ? undefined : JSON.stringify(body),
+        signal,
       });
     } catch (e) {
       throw new Error(`cannot reach ${base}: ${(e as Error).cause ? String((e as Error & { cause: Error }).cause.message) : (e as Error).message}`);

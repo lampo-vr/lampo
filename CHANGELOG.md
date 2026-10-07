@@ -100,13 +100,17 @@ format stays backwards compatible throughout.
   command runs on the agent's own machine, never on a server ([docs/agents.md](docs/agents.md)).
 
 ### Fixed
+- `lampo login <server>` signs in with a token from the environment only when no other server is named beside it
+  (`LAMPO_SERVER` with `LAMPO_TOKEN`): a token one server issued is never sent to another.
+- Settings → Users names the server's own command for a lost password only to whoever runs the server (on the machine
+  itself, or a hosted server's operator), not to someone signed in to a machine's app over the network.
 - A failed publishing kit says why in a sentence in every list of posts too, not only on its own page.
 - A reference a visitor adds with words through one review link no longer shows on another link that shows only its own
   visitors' notes.
 - An agent connected over MCP can't be spoken for by anyone else's check-in, however its id is spelled and however long
   it has been quiet.
-- An agent that waited for one video's notes and then waits for all of them, or another video's, misses none that came
-  meanwhile.
+- An agent that waited for one video's notes and then waits again picks up after the last note it was handed, instead
+  of skipping past everything it looked at.
 - Sent notes leave the "Not sent yet" area in one motion: the area no longer blinks out and back while they go.
 - **One person's many versions of a project file no longer hold up anyone else.** Each account has its own daily
   share of new versions of a file, and saving as a copy always works. An upload that can't become a version any more
@@ -255,18 +259,20 @@ format stays backwards compatible throughout.
   the MCP resources `lampo://inbox` and `lampo://review/<slug>`, and the npm package `@lampo-vr/lampo`. Nothing you set
   up before breaks: `vr` and `vr-mcp` keep working and print the same (only a person typing `vr` in a terminal is told
   the new name), `VR_*` settings are still read wherever the `LAMPO_` one is unset, the `vr://` addresses still answer,
-  and a login saved by `vr login` is still read (`lampo logout` signs out of it too, its token revoked on its own
-  server). To switch: `npm run link` once more, also on a machine linked before (it puts `lampo` beside `vr` in
+  and a login saved by `vr login` is still read (`lampo logout` forgets it too and asks its own server to revoke its
+  token; a server that doesn't confirm within 5 s is named, so you can revoke the token there). To switch: `npm run link` once more, also on a machine linked before (it puts `lampo` beside `vr` in
   `~/.local/bin`), `lampo mcp config <client>` for a new MCP setup (it starts `bin/lampo-mcp` and reads
   `$LAMPO_TOKEN`), and rename `VR_` to `LAMPO_` in your env files when convenient. The login moves to
   `~/.config/lampo/` and downloads to `~/.cache/lampo/`; the store stays where it is (`~/.video-review`, `data/`).
 - **Settings in both spellings.** `LAMPO_SERVER` and `LAMPO_TOKEN` are taken as a pair, both `LAMPO_` when either is
   set, else both `VR_`, so one server's token never goes to another. A server that finds a setting in both spellings
   with different values says so once at start, by name only; an empty `LAMPO_` setting, which leaves the `VR_` one in
-  force, is named too. The Docker setup hands `LAMPO_MEDIA_DOMAIN` (or an older `VR_MEDIA_DOMAIN`) to the proxy, so
-  the config for running behind a CDN needs no extra line in `docker-compose.yml`.
+  force, is named too. The Docker setup takes the domain in either spelling (`LAMPO_DOMAIN`, or `VR_DOMAIN` from an
+  `.env` from before; the proxy says so when neither is set) and hands `LAMPO_MEDIA_DOMAIN` (or `VR_MEDIA_DOMAIN`) to
+  the proxy, so the config for running behind a CDN needs no extra line in `docker-compose.yml`.
 - Agents named by their MCP client (`claude-code · Mia`) read as the agent's name (`Claude Code · Mia`) on the Connect
-  page, in the agent menus, Settings → Connected agents and Insights.
+  page, in the agent menus, Settings → Connected agents and Insights. A name someone gave (`codex-cuts`) stays as it
+  was given, and Insights shows an agent's kind beside its name only where the name doesn't say it already.
 - **"Use Lampo" is all your agent needs to hear.** Connect it, tell it *Use Lampo for "Spring launch"*, and it runs the
   whole loop by itself: it finds the project (or names one, or asks you which), puts up V1 itself, reads the playbook
   and your notes, fixes them, puts up the next version, marks each note fixed and waits for your next notes — again and

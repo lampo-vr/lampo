@@ -64,6 +64,9 @@ const cfg = (() => {
 })();
 // LAMPO_SIGNUP=open starts only once something gives each sign-up a workspace of its own (server/signup.ts).
 const problems = startupProblems(cfg, process.env, { signupSeam: !!onSignup });
+// A setting given in both spellings, differently (names only): an emptied LAMPO_ one would leave the VR_ one in force.
+// Said before a refusal too, since it may be the reason for one.
+for (const line of spellingWarnings()) console.warn(line);
 if (problems.length) fatal(problems);
 const SERVER = cfg.mode === 'server';
 const LAN = !SERVER && (args.includes('--lan') || settings.LAMPO_LAN === '1');
@@ -224,8 +227,6 @@ console.log(`data: ${DATA}`);
 // tell who connects, reach the app on localhost as you: SECURITY.md).
 const open = SERVER ? null : openToOthers(DATA);
 if (open) console.warn(`warning: ${open}: chmod 700 it if anyone else signs in to this machine (SECURITY.md)`);
-// A setting given in both spellings, differently (names only): an emptied LAMPO_ one would leave the VR_ one in force.
-for (const line of spellingWarnings()) console.warn(line);
 const owner = SERVER ? null : localOwner();
 if (owner)
   console.log(

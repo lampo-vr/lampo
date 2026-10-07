@@ -169,7 +169,8 @@ OpenAI-compatible server option: [docs/speech.md](docs/speech.md).
 ## Run it as a server
 
 A server is for a team, or for sharing reviews with clients without a tunnel. This repository is the whole app:
-self-hosted, it is complete and has no limits. The maintainers also run it as a hosted service, **Lampo Cloud**
+self-hosted, it is complete and has no limits, except that hiding the *Powered by Lampo* badge on review links is a
+feature of Lampo Cloud's paid plans. The maintainers also run it as a hosted service, **Lampo Cloud**
 ([lampo.video](https://lampo.video)), for those who'd rather not run their own; its plans and billing come from a
 separate module that is not part of this repository and that a self-hosted server doesn't need
 ([docs/server-mode.md](docs/server-mode.md#a-billing-provider)):

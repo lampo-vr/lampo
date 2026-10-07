@@ -9,7 +9,7 @@
 // own (Library.tsx); InsightsFrame.tsx holds the frame and the loading state, the rows each card showed last time.
 import { useQuery } from '@tanstack/react-query';
 import { type CSSProperties, type ReactNode, useEffect, useState } from 'react';
-import { AGENT_KIND_LABELS, agentShown } from '../../../lib/agentKind.ts';
+import { AGENT_KIND_LABELS, agentShown, namesItsKind } from '../../../lib/agentKind.ts';
 import type { AgentKind, BillingInfo } from '../../../lib/types.ts';
 import { useCan } from '../api/auth.ts';
 import { api, enc } from '../api/client.ts';
@@ -413,6 +413,7 @@ const CHIPS = 2;
  */
 function AgentRow({ a }: { a: InsightsAgent }) {
   const back = a.wrongTopics;
+  const shown = agentShown(a.name, a.kind);
   return (
     <li className="ins-row ag-row" data-testid="ag-row">
       <span className="ag-who">
@@ -420,10 +421,10 @@ function AgentRow({ a }: { a: InsightsAgent }) {
           <AgentMark kind={a.kind} size={16} />
         </span>
         <span className="ag-name">
-          <b>{agentShown(a.name, a.kind)}</b>
+          <b>{shown}</b>
           <span>
             {facts(
-              kindLabel(a.kind),
+              !namesItsKind(shown, a.kind) && kindLabel(a.kind),
               a.fixes > 0 && t('{n} fix|{n} fixes', { n: a.fixes }),
               a.questions > 0 && t('{n} question|{n} questions', { n: a.questions }),
             )}

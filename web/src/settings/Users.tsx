@@ -528,8 +528,9 @@ export function Users() {
             ))}
           </div>
         )}
-        {/* a command on the server's own machine: only for whoever runs it (the machine's owner, a hosted server's operator) */}
-        {(!here || status?.operator) && (
+        {/* a command on the server's own machine: only for whoever runs it (the machine itself, a hosted server's operator);
+            never someone signed in to it from elsewhere */}
+        {(status?.via === 'local' || status?.operator) && (
           <div className="set-sub" data-testid="locked-out">
             <T k={'Locked out yourself? On the server: <0>lampo admin reset-password --email you@example.com</0>'} tags={[(c) => <code>{c}</code>]} />
           </div>

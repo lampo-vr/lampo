@@ -505,6 +505,50 @@ test('Ctrl-C while lampo waits for the browser: it says so, keeps nothing, exits
   assert.ok(!fs.existsSync(credentials));
 });
 
+test('a token from the environment goes only to its own server: lampo login <another> asks the browser instead', async () => {
+  const { envTokenFor } = await import('../../lib/cliAccount.ts');
+  const quiet = (f: () => string | undefined) => {
+    const write = process.stderr.write;
+    process.stderr.write = () => true;
+    try {
+      return f();
+    } finally {
+      process.stderr.write = write;
+    }
+  };
+  const a = { LAMPO_SERVER: 'https://a.example.com', LAMPO_TOKEN: 'ta' };
+  assert.equal(envTokenFor('https://a.example.com', a), 'ta');
+  assert.equal(envTokenFor('https://A.example.com', { ...a, LAMPO_SERVER: 'a.example.com/' }), 'ta', 'the same server, written differently');
+  assert.equal(
+    quiet(() => envTokenFor('https://b.example.com', a)),
+    undefined,
+  );
+  assert.equal(
+    quiet(() => envTokenFor('https://b.example.com', { VR_SERVER: 'https://a.example.com', VR_TOKEN: 'ta' })),
+    undefined,
+    'the older pair too',
+  );
+  assert.equal(envTokenFor('https://b.example.com', { LAMPO_TOKEN: 'tb' }), 'tb', 'no server named beside it: the token is for this login');
+  assert.equal(envTokenFor('https://b.example.com', { LAMPO_TOKEN: 'tb', VR_SERVER: 'https://a.example.com' }), 'tb', 'nor in its own spelling');
+  assert.equal(envTokenFor('https://b.example.com', {}), undefined);
+
+  // the whole command: a token this server would take, but the environment says it is another server's
+  fs.rmSync(credentials, { force: true });
+  const token = auth.createToken(olivia.id, 'from the environment').token;
+  const run = vr(['login', base], { BROWSER: browser, VR_SERVER: 'https://elsewhere.example.com', VR_TOKEN: token });
+  await until(() => run.err().includes('Waiting for you to allow it in the browser'), 'the browser, not the token');
+  run.p.kill('SIGINT');
+  assert.equal(await run.done, 130, run.err());
+  assert.match(run.err(), /^lampo: VR_TOKEN belongs to https:\/\/elsewhere\.example\.com, so it isn't sent to http:\/\/127\.0\.0\.1:\d+$/m);
+  assert.ok(!run.err().includes(token) && !run.out().includes(token));
+  assert.ok(!fs.existsSync(credentials));
+  // with no server beside it, the same token signs in here
+  const own = vr(['login', base], { LAMPO_TOKEN: token });
+  assert.equal(await own.done, 0, own.err());
+  assert.match(own.out(), /^signed in to /);
+  assert.equal(await vr(['logout']).done, 0);
+});
+
 test('--email and --token - still sign in without a browser; --workspace without --email is refused', async () => {
   fs.rmSync(opened, { force: true });
   const byPassword = vr(['login', base, '--email', 'rita@example.com'], { BROWSER: browser, VR_PASSWORD: 'a long password' });

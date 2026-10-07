@@ -43,9 +43,46 @@ export const AGENT_KIND_LABELS: Record<AgentKind, string> = {
 export function agentShown(name: string, kind?: AgentKind | null): string {
   const [head = '', ...rest] = name.split(' · ');
   const k = kind ?? agentKindOf(head);
-  const id = /^[a-z0-9][a-z0-9._-]*$/.test(head);
-  if (!id || ['mcp', 'cli', 'api'].includes(k) || agentKindOf(head) !== k) return name;
+  if (!isClientId(head) || ['mcp', 'cli', 'api'].includes(k) || agentKindOf(head) !== k) return name;
   return [AGENT_KIND_LABELS[k], ...rest].join(' · ');
+}
+
+/**
+ * The words MCP clients' own ids are made of ("claude-code", "codex-mcp-client", "claude-ai", "gemini-cli",
+ * "cursor-vscode"). A name with any other word is one someone gave ("codex-cuts", "claude-review") and is shown as it is.
+ */
+const CLIENT_ID_WORDS = new Set([
+  'claude',
+  'code',
+  'ai',
+  'codex',
+  'cursor',
+  'vscode',
+  'chatgpt',
+  'openai',
+  'gemini',
+  'antigravity',
+  'windsurf',
+  'codeium',
+  'zed',
+  'copilot',
+  'mcp',
+  'client',
+  'cli',
+  'desktop',
+  'app',
+  'ide',
+]);
+const isClientId = (head: string) => /^[a-z0-9][a-z0-9._-]*$/.test(head) && head.split(/[-._]/).every((w) => CLIENT_ID_WORDS.has(w));
+
+/**
+ * Whether a shown name already says its kind ("Codex", "Claude Code · Mia"): then a label beside it would repeat it
+ * ("Codex Codex"); a name someone gave ("launch-edit") keeps its kind beside it.
+ */
+export function namesItsKind(shown: string, kind: AgentKind | null | undefined): boolean {
+  if (!kind) return false;
+  const label = AGENT_KIND_LABELS[kind];
+  return shown === label || shown.startsWith(`${label} · `);
 }
 
 /** An MCP client's own name (`clientInfo.name`, "codex-mcp-client", "claude-ai", "Cursor", "Visual Studio Code" …) → its kind. */

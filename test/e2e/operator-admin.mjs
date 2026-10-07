@@ -170,7 +170,7 @@ try {
       await page.waitForSelector('.set-rows .set-row', { timeout: 15000 });
       const hint = await page.$('[data-testid=locked-out]');
       assert(!!hint === shown, `${who}: ${hint ? 'shown' : 'not shown'}`);
-      if (shown) assert((await text('[data-testid=locked-out]')).includes('vr admin reset-password'), who);
+      if (shown) assert((await text('[data-testid=locked-out]')).includes('lampo admin reset-password'), who);
     }
   });
 

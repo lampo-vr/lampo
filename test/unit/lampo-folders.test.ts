@@ -151,3 +151,84 @@ test('logout revokes the token of every saved login, an older vr login too, each
     b.close();
   }
 });
+
+/** `lampo logout` in its own process: its exit code and what it said where. */
+async function runLogout(): Promise<{ code: unknown; out: string; err: string; ms: number }> {
+  const started = Date.now();
+  const child = spawn(process.execPath, [path.join(ROOT, 'bin/lampo'), 'logout'], { env: { ...process.env }, stdio: ['ignore', 'pipe', 'pipe'] });
+  let out = '';
+  let err = '';
+  child.stdout.on('data', (d) => {
+    out += d;
+  });
+  child.stderr.on('data', (d) => {
+    err += d;
+  });
+  const code = await new Promise((r) => child.on('close', r));
+  return { code, out, err, ms: Date.now() - started };
+}
+
+/** A stand-in server that answers every request with `status`, or never answers at all. */
+function standIn(status: number | 'never', onAsk: () => void = () => {}): Promise<http.Server> {
+  return new Promise((resolve) => {
+    const s = http.createServer((_req, res) => {
+      onAsk();
+      if (status === 204) res.writeHead(204).end();
+      else if (status !== 'never') res.writeHead(status, { 'content-type': 'application/json' }).end('{"error":"no"}');
+    });
+    s.listen(0, '127.0.0.1', () => resolve(s));
+  });
+}
+const urlOf = (s: http.Server) => `http://127.0.0.1:${(s.address() as AddressInfo).port}`;
+
+test('logout forgets both logins before any revoke, and a silent server holds it up 5 s at most', async () => {
+  let goneWhenAsked: boolean | null = null;
+  const silent = await standIn('never', () => {
+    goneWhenAsked = !fs.existsSync(credentialsFile()) && !fs.existsSync(oldCredentialsFile());
+  });
+  const ok = await standIn(204);
+  try {
+    write(oldCredentialsFile(), { server: urlOf(silent), token: 'old-token', token_id: 't_old' });
+    write(credentialsFile(), { server: urlOf(ok), token: 'new-token', token_id: 't_new' });
+    const r = await runLogout();
+    assert.equal(r.code, 0, r.err);
+    assert.equal(goneWhenAsked, true, 'nothing left on this machine while a server is waited for (a Ctrl-C there keeps nothing)');
+    assert.ok(r.ms < 20_000, `${r.ms} ms`);
+    assert.equal(r.out, `signed out of ${urlOf(ok)} (token revoked); lampo uses the local store again.\n`, 'the older one is not called revoked');
+    assert.equal(
+      r.err,
+      `lampo: warning: the token of an older login on ${urlOf(silent)} was not revoked (no answer within 5 s): revoke it there in Settings → API tokens\n`,
+    );
+  } finally {
+    silent.closeAllConnections();
+    silent.close();
+    ok.close();
+  }
+});
+
+test('logout says what each server answered: not reached, refused, already invalid', async () => {
+  const gone = await standIn(204);
+  const unreachable = urlOf(gone);
+  gone.close();
+  const invalid = await standIn(401);
+  const failing = await standIn(500);
+  try {
+    write(credentialsFile(), { server: unreachable, token: 'new-token', token_id: 't_new' });
+    write(oldCredentialsFile(), { server: urlOf(invalid), token: 'old-token', token_id: 't_old' });
+    let r = await runLogout();
+    assert.equal(r.code, 0, r.err);
+    assert.equal(
+      r.out,
+      `signed out of ${unreachable} (token not revoked), and an older login's token was no longer valid; lampo uses the local store again.\n`,
+    );
+    assert.match(r.err, /^lampo: warning: the token on http:\/\/127\.0\.0\.1:\d+ was not revoked \(the server could not be reached\): revoke it there/);
+    assert.ok(!fs.existsSync(credentialsFile()) && !fs.existsSync(oldCredentialsFile()));
+    write(credentialsFile(), { server: urlOf(failing), token: 'new-token', token_id: 't_new' });
+    r = await runLogout();
+    assert.equal(r.out, `signed out of ${urlOf(failing)} (token not revoked); lampo uses the local store again.\n`);
+    assert.match(r.err, /was not revoked \(the server answered 500\)/);
+  } finally {
+    invalid.close();
+    failing.close();
+  }
+});

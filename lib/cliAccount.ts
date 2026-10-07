@@ -4,10 +4,10 @@ import path from 'node:path';
 import readline from 'node:readline';
 import * as auth from './auth.ts';
 import { type Credentials, clearCredentials, envLogin, readCredentials, saveCredentials, savedLogins } from './backend/credentials.ts';
-import { createApi } from './backend/remote.ts';
+import { createApi, RemoteError } from './backend/remote.ts';
 import { BROWSER_WAIT_MS, browserCommand, browserLogin, LoginEnded, launchBrowser } from './browserLogin.ts';
 import { loadConfig } from './config.ts';
-import { settings } from './env.ts';
+import { settings, spelledAs } from './env.ts';
 import { FoldersUnreadableError } from './folderIds.ts';
 import { repairFolders } from './folders.ts';
 import { mailProblems } from './mail/config.ts';
@@ -112,7 +112,7 @@ export function tokenDays(raw: string | undefined): number | null {
  * The API token `lampo login` signs in with: `--token -` reads it from stdin (a hidden prompt on a terminal), since a
  * process's arguments are readable by other users of the machine while it runs (ps) and stay in the shell's history.
  */
-async function givenToken(opt: Opts): Promise<string | undefined> {
+async function givenToken(opt: Opts, server: string): Promise<string | undefined> {
   const flag = str(opt.token);
   if (flag === '-') {
     const token = (process.stdin.isTTY ? await hiddenPrompt('API token: ') : await nextPipedLine()).trim();
@@ -125,7 +125,27 @@ async function givenToken(opt: Opts): Promise<string | undefined> {
     );
     return flag;
   }
-  return settings.LAMPO_TOKEN && !str(opt.email) ? settings.LAMPO_TOKEN : undefined;
+  return str(opt.email) ? undefined : envTokenFor(server);
+}
+
+/**
+ * The environment's token for `lampo login <server>`: only when no server is named beside it (LAMPO_SERVER, or VR_SERVER
+ * with VR_TOKEN) or that one is this server. A token another server issued is never sent here.
+ */
+export function envTokenFor(server: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const [its, token] = envLogin(env);
+  if (!token) return undefined;
+  if (!its) return token;
+  const origin = (u: string) => {
+    try {
+      return new URL(serverUrl(u)).origin;
+    } catch {
+      return null;
+    }
+  };
+  if (origin(its) !== null && origin(its) === origin(server)) return token;
+  process.stderr.write(`lampo: ${spelledAs('LAMPO_TOKEN', env)} belongs to ${its}, so it isn't sent to ${server}\n`);
+  return undefined;
 }
 
 /**
@@ -147,7 +167,7 @@ export async function login({ pos, opt }: { pos: string[]; opt: Opts }): Promise
   }
   let creds: Credentials;
   const days = tokenDays(str(opt.expires));
-  const token = await givenToken(opt);
+  const token = await givenToken(opt, server);
   if (token) {
     creds = { server, token };
   } else if (opt.email !== undefined) {
@@ -242,19 +262,45 @@ export async function logout(): Promise<void> {
   const [server, token] = envLogin();
   if (server && token)
     return out('a server and its token are set in the environment (LAMPO_SERVER / LAMPO_TOKEN, or VR_); unset them to go back to the local store.');
-  // Every saved login is forgotten, an older `vr login`'s too: each token is revoked on its own server (best effort),
-  // or one left behind in the older file would stay valid with nothing on this machine holding it.
+  // Every saved login is forgotten first, an older `vr login`'s too: a Ctrl-C or a silent server during the revokes then
+  // leaves nothing on this machine. Then each token is revoked on its own server with its own token, each given
+  // REVOKE_WAIT_MS, and only what a server confirmed is called revoked.
   const logins = savedLogins();
-  for (const l of logins)
-    if (l.token_id)
-      await createApi(l)
-        .call('DELETE', `/api/auth/tokens/${encodeURIComponent(l.token_id)}`)
-        .catch(() => {});
   clearCredentials();
-  const more = logins.filter((l) => l.token_id && (l.server !== c.server || l.token !== c.token)).length;
-  out(
-    `signed out of ${c.server}${c.token_id ? ' (token revoked)' : ''}${more ? `, and an older login's token revoked too` : ''}; lampo uses the local store again.`,
-  );
+  const mine = (l: Credentials) => l.server === c.server && l.token === c.token;
+  let said = '';
+  const older: string[] = [];
+  for (const l of logins) {
+    if (!l.token_id) continue;
+    const r = await revoke(l, l.token_id);
+    if (r === 'revoked' || r === 'invalid') {
+      const what = r === 'revoked' ? 'token revoked' : 'token no longer valid';
+      if (mine(l)) said = ` (${what})`;
+      else older.push(r === 'revoked' ? `, and an older login's token revoked too` : `, and an older login's token was no longer valid`);
+      continue;
+    }
+    if (mine(l)) said = ' (token not revoked)';
+    process.stderr.write(
+      `lampo: warning: the token ${mine(l) ? '' : 'of an older login '}on ${l.server} was not revoked (${r}): revoke it there in Settings → API tokens\n`,
+    );
+  }
+  out(`signed out of ${c.server}${said}${older.join('')}; lampo uses the local store again.`);
+}
+
+/** How long logout waits for each server to revoke a token: a silent one never holds it up. */
+const REVOKE_WAIT_MS = 5000;
+
+/** Revokes a saved login's token on its own server: what happened, or why not, in a few words. */
+async function revoke(l: Credentials, id: string): Promise<'revoked' | 'invalid' | string> {
+  const signal = AbortSignal.timeout(REVOKE_WAIT_MS);
+  try {
+    await createApi(l).call('DELETE', `/api/auth/tokens/${encodeURIComponent(id)}`, undefined, signal);
+    return 'revoked';
+  } catch (e) {
+    if (e instanceof RemoteError && e.status === 401) return 'invalid'; // the server refuses the token already
+    if (signal.aborted) return `no answer within ${REVOKE_WAIT_MS / 1000} s`;
+    return e instanceof RemoteError ? `the server answered ${e.status}` : 'the server could not be reached';
+  }
 }
 
 export async function whoami({ opt }: { opt: Opts }, author: string): Promise<void> {

@@ -55,10 +55,17 @@ services:
       - "443:443"
       - "443:443/udp"
     environment:
-      # LAMPO_DOMAIN, else the older VR_DOMAIN of an .env from before
-      LAMPO_DOMAIN: ${LAMPO_DOMAIN:-${VR_DOMAIN:?set LAMPO_DOMAIN in .env}}
+      # LAMPO_DOMAIN, else the older VR_DOMAIN of an .env from before. Never an inner `:?`: Compose checks it even when
+      # LAMPO_DOMAIN is set, and would refuse every .env written with the new name.
+      LAMPO_DOMAIN: ${LAMPO_DOMAIN:-${VR_DOMAIN:-}}
       # the media host, for deploy/Caddyfile.cdn only (behind a CDN: docs/go-live.md); the plain Caddyfile ignores it
       LAMPO_MEDIA_DOMAIN: ${LAMPO_MEDIA_DOMAIN:-${VR_MEDIA_DOMAIN:-}}
+    # Without either name Caddy would misread its site block as global options: say what is missing instead (Compose
+    # can't require one of two names). Then the image's own command.
+    command:
+      - sh
+      - -c
+      - '[ -n "$$LAMPO_DOMAIN" ] || { echo "caddy: no domain: set LAMPO_DOMAIN in .env" >&2; exit 1; }; exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile'
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

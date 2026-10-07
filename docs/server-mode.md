@@ -53,7 +53,8 @@ process list and your shell's history would keep it. `lampo login` refuses a pla
 (the password, the token and every note would cross the network unencrypted) unless you add `--insecure`, for a
 network that is yours alone; `http://localhost` needs nothing. `lampo logout` goes back to the local store: a token
 `lampo login` made is revoked, one you pasted is only forgotten (revoke it in Settings → API tokens), and so is a
-login `vr login` saved before the rename, on its own server. In CI or a
+login `vr login` saved before the rename, on its own server. It forgets the logins first and waits 5 s for each server:
+one that doesn't confirm is named, and its token stays valid until you revoke it there. In CI or a
 container, `LAMPO_SERVER` and `LAMPO_TOKEN` do the same as `lampo login` without a file; `LAMPO_REMOTE=0` keeps `lampo` on the local
 store.
 
@@ -339,7 +340,8 @@ it is told so and lands in their library.
 
 ### A billing provider
 
-A self-hosted server is complete and unlimited. A hosted service that sells plans adds a module of its own, which the
+A self-hosted server is complete and unlimited, except that its review links always show the *Powered by Lampo*
+badge: hiding it is a feature of Lampo Cloud's paid plans. A hosted service that sells plans adds a module of its own, which the
 server loads when `LAMPO_CLOUD_MODULE` names its file (the one extension point, `server/extension.ts`; without it nothing
 below exists). Lampo Cloud ([lampo.video](https://lampo.video)) runs its plans and billing this way, in a module kept
 outside this repository. What such a module may do:

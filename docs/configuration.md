@@ -281,7 +281,7 @@ These are read on the machine where the agent works.
 | Variable | Default | What it does |
 |---|---|---|
 | `LAMPO_SERVER` with `LAMPO_TOKEN` | none | Work against that hosted server with that API token, without `lampo login` (CI, containers). Both in one spelling: a `VR_TOKEN` never goes with a `LAMPO_SERVER`. |
-| `LAMPO_TOKEN` | none | On its own: the token `lampo login <url>` signs in with when given neither `--email` nor `--token`. |
+| `LAMPO_TOKEN` | none | On its own: the token `lampo login <url>` signs in with when given neither `--email` nor `--token`. Beside a `LAMPO_SERVER` (or `VR_TOKEN` beside `VR_SERVER`) it belongs to that server and is never sent to another. |
 | `LAMPO_REMOTE` | | `0` ignores `lampo login` and `LAMPO_SERVER`, and uses the local store. |
 | `LAMPO_WORKSPACE` | `w1` | The workspace `lampo` and the stdio MCP server use on a hosted server's own store ([server-mode.md](server-mode.md#workspaces)); an id the store has no workspace for is refused at the start. After `lampo login`, a token acts in its own workspace instead. |
 | `LAMPO_BY` | `agent:` and the Claude Code session's name | The author of what `lampo` and the stdio MCP server write. The `--by` option wins. Outside a Claude Code session, `vr` writes as `agent:vr` and the MCP server as `agent:` and its client's name. |
