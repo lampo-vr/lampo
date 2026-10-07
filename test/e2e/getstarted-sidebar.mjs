@@ -159,7 +159,14 @@ try {
     const box = await p.evaluate(() => {
       const pop = document.querySelector('.ob-sp-pop').getBoundingClientRect();
       const row = document.querySelector('[data-testid=ob-row]').getBoundingClientRect();
-      return { above: pop.bottom <= row.top + 1, left: Math.round(pop.left - row.left), name: document.querySelector('.ob-sp-pop').getAttribute('aria-label') };
+      // the dialog's name: its headline (aria-labelledby), whose first words are the title
+      const box = document.querySelector('.ob-sp-pop');
+      const named = document.getElementById(box.getAttribute('aria-labelledby') ?? '');
+      return {
+        above: pop.bottom <= row.top + 1,
+        left: Math.round(pop.left - row.left),
+        name: named?.firstChild?.textContent ?? box.getAttribute('aria-label'),
+      };
     });
     assert(box.above, 'the panel opens upward, above the row');
     assert(Math.abs(box.left) <= 1, `anchored at the row’s start (${box.left} px off)`);
