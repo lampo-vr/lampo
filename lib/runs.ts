@@ -302,7 +302,8 @@ export function flushRuns(slug: string | null, now = Date.now()): boolean {
   const key = wsKey(slug ?? '');
   const h = held.get(key);
   if (!h?.dirty) return true;
-  if (slug !== null && !fs.existsSync(reviewFile(slug))) {
+  // a video removed (or a workspace deleted) takes its runs with it: never a folder made again for them
+  if (slug !== null ? !fs.existsSync(reviewFile(slug)) : !fs.existsSync(dataDir())) {
     held.delete(key);
     open.delete(key);
     return false;
@@ -822,16 +823,21 @@ export function untold(r: Run & { clock?: RunClock }): { ids: string[]; since: s
 }
 
 /**
- * The run a version registered now belongs to (registerVersion, under the video's lock): the open run an agent is at
- * on this video — the one whose agent wrote it when several are, else the one heard from last. A run nobody began
- * (queued) makes no version. Read only: it never writes.
+ * The run a version registered now belongs to (registerVersion, under the video's lock): the open run of the agent
+ * that registered it (`agent:<name>`, or the account its API token is: `<name> · <account>`'s account), or — for a
+ * re-render the file watcher found (`system`) — the run of the agent at the video, the one heard from last. A person
+ * putting up a version makes none an agent's, nor does a run nobody began (queued). Read only: it never writes.
  */
 export function versionRunOf(slug: string, by: string): string | undefined {
   try {
     const going = readRuns(slug).filter((r) => r.ended === null && r.state !== 'queued');
     if (!going.length) return undefined;
-    const own = going.find((r) => sameAgent(r.agent.name, by));
-    return (own ?? [...going].sort((a, b) => compareTime(b.seen, a.seen))[0])?.id;
+    const latest = (list: StoredRun[]) => [...list].sort((a, b) => compareTime(b.seen, a.seen))[0]?.id;
+    const own = going.filter((r) => sameAgent(r.agent.name, by));
+    if (own.length) return latest(own);
+    const account = going.filter((r) => !!by && ownerOf(r.agent.name) === by);
+    if (account.length) return latest(account);
+    return by === 'system' ? latest(going) : undefined;
   } catch {
     return undefined;
   }

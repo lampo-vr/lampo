@@ -326,6 +326,9 @@ test('a version registered while an agent is at the video names its run (and non
   runs.flushRuns(slug);
   assert.equal(runs.versionRunOf(slug, 'agent:spot-edit'), q.id);
   assert.equal(runs.versionRunOf(slug, 'agent:spot-edit · Sam'), q.id, 'by its name, whoever it is listed under');
+  assert.equal(runs.versionRunOf(slug, 'tester'), undefined, 'a version a person puts up is no agent’s');
+  assert.equal(runs.versionRunOf(slug, 'agent:someone-else'), undefined, 'nor another agent’s');
+  assert.equal(runs.versionRunOf(slug, 'system'), q.id, 'a re-render on disk is the working agent’s');
   // a re-render on disk: the store's own registerVersion stamps it
   fs.copyFileSync(makeVideo(path.join(dir, 'proj/export/spot-v2.mp4'), { dur: 1, pattern: 'rgbtestsrc' }), video);
   age(video);

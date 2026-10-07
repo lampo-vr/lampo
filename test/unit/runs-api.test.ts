@@ -8,7 +8,7 @@ import { before, test } from 'node:test';
 import type { LibraryResponse, Run, RunDetail, RunsResponse, VideoSummary } from '../../lib/types.ts';
 import { startApp } from '../lib/app.ts';
 import { isolatedEnv, makeVideo, until } from '../lib/helpers.ts';
-import { cookieFrom } from '../lib/http.ts';
+import { cookieFrom, tusUpload } from '../lib/http.ts';
 
 const PUBLIC = 'http://review.test';
 const { dir } = isolatedEnv({ vars: { VR_MODE: 'server', VR_PUBLIC_URL: PUBLIC } });
@@ -235,4 +235,29 @@ test('a run id an agent posts is a hint: never another account’s run, never an
   // Mallory's write opened her own agent's run (under her name), beside Mia's
   assert.ok((await runs()).some((x) => x.agent.name === 'cloud-cut · Mallory' && x.opened_by.how === 'agent'));
   assert.ok(!(await runs()).some((x) => x.agent.name.endsWith('· Bob')), 'nothing of B’s in this workspace');
+});
+
+test('the agent’s upload with its person’s token: its progress joins the run, and the version it makes names it', async () => {
+  const run = (await runs()).find((x) => x.ended === null && x.agent.name === AGENT) as Run;
+  const entries = [
+    { at: new Date().toISOString(), agent: 'cloud-cut', kind: 'read', text: 'Reading the open notes', key: 'Reading the open notes', video: slug },
+  ];
+  assert.equal((await request('POST', '/api/agents/activity', { body: { entries }, headers: as.miaToken })).status, 200);
+  await until(async () => (await runs()).find((x) => x.id === run.id)?.state === 'working', 'the run to begin');
+  const v2 = makeVideo(path.join(dir, 'renders/spot-v2.mp4'), { w: 160, h: 90, fps: 25, dur: 1, pattern: 'rgbtestsrc' });
+  const up = await tusUpload(request, v2, { filename: 'spot.mp4', slug }, as.miaToken);
+  assert.equal(up.status, 200, up.text);
+  // (a second workspace exists now: the test reads the first one's store by name)
+  const { inWorkspace } = await import('../../lib/scope.ts');
+  assert.equal(
+    inWorkspace('w1', () => store.loadReview(slug)?.versions.at(-1)?.run),
+    run.id,
+    'V2 names the run',
+  );
+  const after = await until(async () => {
+    const x = (await runs()).find((r) => r.id === run.id);
+    return x?.result?.v === 2 ? x : null;
+  }, 'the version as its result');
+  assert.equal(after.progress, null, 'its upload is done');
+  assert.ok(!(await runs()).some((x) => x.agent.name === 'Mia'), 'an upload under the account’s name opened no run of its own');
 });
