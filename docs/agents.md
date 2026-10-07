@@ -172,6 +172,7 @@ or the environment variable `VR_BY=agent:<name>` changes that.
 | `vr qa <video> [--v N] [--rerun]` | the Auto-check of a version: what it found, each with its frame and place on screen |
 | `vr transcript <video> [--v N] [--words \| --srt \| --vtt] [--rerun]` | what is said, line by line on its frames ([below](#changing-the-words-the-transcript)) |
 | `vr footage find "<request>" [--aspect 9:16] [--min 2] [--motion push-in] [--no-text] [--sheet] [--json]` | B-roll from the workspace's videos: shots with exact in and out frames ([below](#finding-b-roll-footage-search)) |
+| `vr footage sheet <id…>` · `status` · `on` · `off` · `index` | a contact sheet of some shots; how far the index is; footage search on or off; indexing now, without the app ([footage.md](footage.md)) |
 | `vr taste <video\|folder>` | the reviewer's taste for that project (also saved in `data/taste/`) |
 | `vr playbook [<video\|folder>]` | the playbook that applies; the House playbook without an argument |
 | `vr playbook skill <name> [<video\|folder>] [--files]` | one skill's SKILL.md; `--files` downloads its files here. Without a video or folder: the House's skills only |
@@ -188,6 +189,8 @@ or the environment variable `VR_BY=agent:<name>` changes that.
 | `vr wontfix <id> --note "reason"` | close a note as a deliberate choice; it becomes a "decision that stands" in the taste |
 | `vr reply <id> --note "…"` | reply without changing the status |
 | `vr add <video> --frame N --text "…"` | pin a question for the reviewer to a frame, with both screenshots (options below) |
+| `vr ask (<video> \| --folder "A/B") --text "…" --options f.json` | before a render: options for the person to audition and pick ([below](#options-before-you-render-let-the-person-pick)) |
+| `vr verify <id> [--note "…"]` · `vr reopen <id> [--note "…"]` | a person's: a fix confirmed, a note open again. Agents never verify |
 | `vr ref <id> <file\|url> [--caption "…"] [--note "…"]` | a reference on a note: an image, a clip (60 s at most) or a link |
 | `vr ref <id> --video <video> (--frame N \| --at mm:ss:ff) [--to N] [--v N]` | a moment (or stretch) of another video in the library as a reference |
 | `vr preview <id> <file> [--fixed --note "…"] [--frame N \| --at mm:ss:ff \| --t <s>] [--clip]` | a still or a clip of a fix before rendering, on the note's frame unless you name another ([below](#fixing-in-the-project-without-rendering-after-effects-premiere-resolve-)). `--app … --project … --comp … --time <s>`: where in the project it was exported from |
@@ -202,6 +205,7 @@ or the environment variable `VR_BY=agent:<name>` changes that.
 | `vr sync <video>` | register a re-render now (`vr fix` and the running app pick it up by themselves) |
 | `vr render [--to <video> --out <file>] [--detach] [--verbose] -- <command> [args…]` | run your render command with its progress shown in Lampo, then put `--out` up as the next version of `--to`; two lines back instead of the render's output ([below](#rendering-through-vr-render-the-person-sees-the-progress)) |
 | `vr render wait <id>` | wait (9 minutes at most) for a render started with `--detach`: how far it is, or how it ended |
+| `vr post draft <video> --platform yt\|ig\|fb [--title …] [--text …] [--at …]` · `vr post [<video>]` | after Final: draft a post of the final version (a person publishes it); where a video's posts stand ([below](#drafting-a-post-of-a-final-video)) |
 
 **Options of `vr add`**
 
@@ -235,6 +239,10 @@ Accounts are managed on the server itself, with its data folder (these commands 
 | `vr admin workspaces [list]` · `workspaces create --name n --owner e` · `workspaces migrate` | every workspace with how many members it has; a new one owned by an existing account; moving the store to workspaces (once, with a backup) |
 | `vr admin repair-folders [--write] [--take-back <link id,…>] [--workspace <id>]` | a damaged `folders.json` rebuilt from what it still says, the videos' folders and the review links' ids; a dry run without `--write`, and the damaged file is kept beside the new one. Each review link whose id the damage took is named: given back, ended, or a person's call (`--take-back`) ([data-format.md](data-format.md#foldersjson-and-sharesjson)) |
 | `vr admin mail-test <to> [--lang de]` | one test email, sent now through the server's mail settings ([email.md](email.md)) |
+| `vr admin delete-account <email\|id> [--yes]` · `delete-workspace <id> [--yes]` | what deleting an account or a workspace would take with it, deleting nothing; `--yes` deletes it and emails the people ([server-mode.md](server-mode.md#deleting-and-exporting)) |
+| `vr admin export-account <email\|id> --out data.zip` | an account's own data as one zip, the same as its *Export my data* |
+| `vr admin erasures [--apply]` | after restoring a backup: what is back that was deleted since; `--apply` deletes it again |
+| `vr export <out.tar> [--folder f]…` · `vr admin import <bundle.tar> --workspace <id> --owner <email> [--dry-run]` | moving your machine's reviews to a server: the first on your machine, the second on the server ([moving.md](moving.md)) |
 
 The workspace a command works in is `--workspace <id>` (on `invite`, `invites`, `revoke-invite`, `create-user`,
 `list-users` and `repair-folders`), else `VR_WORKSPACE`, else #1.
@@ -621,7 +629,8 @@ person's, in the app). `vr ls`, `vr folders`, `list_videos` and `list_folders` l
 reply, a fix, a reference, a render (`vr push`, `vr sync`, `track_video`, an upload URL), a move into it, a status, a
 playbook suggestion, a post's draft — is refused before anything is begun, with one sentence: `the project "Acme" is
 archived: it is read-only until a person restores it`. Taking a video out of it is a person's too, in the app: a
-server refuses it to an API token.
+server refuses it to an API token (on the machine itself, `vr move` and the machine's own `move_video` act as its
+owner and may).
 
 Approving and marking final are people's decisions; agents never do either. Review links are people's too: an API
 token lists a video's links without their tokens and can't make, change or revoke one (a link would let it approve as

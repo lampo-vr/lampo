@@ -21,8 +21,9 @@ The research behind it, with every number: [bench/footage/RESULTS.md](../bench/f
 ## What is indexed
 
 The newest version of every video in the workspace: uploaded or tracked, whatever it is (a camera take, a stock clip,
-an edited reel). Not the onboarding sample, and not archived videos (their index is kept for when they come back).
-Lampo never scans folders: what is searched is what people added.
+an edited reel). Not the onboarding sample, and not a video removed from the library that kept its notes (its index is
+kept for when it comes back); videos in an archived project stay indexed and can be found. Lampo never scans folders:
+what is searched is what people added.
 
 For each video, once per render (two videos holding the same file share it):
 
@@ -41,9 +42,9 @@ For each video, once per render (two videos holding the same file share it):
 
 A request is read the way the research measured: the filters it names (aspect, length, camera move, "no text", words
 on screen or said) are taken out of the words, and what is left — what the picture should show — is compared with
-every keyframe. A shot scores by its best keyframe; a matching move and matching words add to it; aspect, length and
-"no text" filter. The filters do as much as the model: asked the raw request, the same model finds a right shot first
-76 % of the time instead of 93 %.
+every keyframe. A shot scores by its best keyframe; a matching camera move (and its speed) and matching words add to
+it, a move that doesn't match takes a little off; aspect, length and "no text" filter. The filters do as much as the
+model: asked the raw request, the same model finds a right shot first 76 % of the time instead of 93 %.
 
 ## On, off, and where it runs
 
@@ -55,8 +56,8 @@ every keyframe. A shot scores by its best keyframe; a matching move and matching
 
 The index is built in the background by the app's one job queue, after everything a review needs (`PRIORITY.footage`,
 after sprites): a video's work is cut into jobs of a minute of video or 48 keyframes within a minute of each other,
-so a long take never holds a player's scrub copy back. Turned on, every video is queued; a new version is indexed when it arrives and the old
-one's shots leave the index. `vr footage status` says how far it is.
+so a long take never holds a player's scrub copy back. Turned on, every video is queued; a new version is indexed
+when it arrives and the old one's shots leave the index. `vr footage status` says how far it is.
 
 On a machine without the app running, `vr footage index` indexes in its own process (the model's worker included) and
 `vr footage find` reads what is there.
@@ -65,8 +66,10 @@ On a machine without the app running, `vr footage index` indexes in its own proc
 213 MB, downloaded once on first use into `<cache>/models/siglip-base-patch16-224/` (`VR_FOOTAGE_MODELS` moves it),
 from one pinned revision, every file checked by size and SHA-256 before it is used. Nothing downloads at install
 time. It runs in a process of its own through ONNX Runtime (`onnxruntime-node`, an optional dependency: without it,
-footage search answers by filters and words only), one picture at a time with half the cores (at most four), and stops
-after ten idle minutes (`VR_FOOTAGE_IDLE_MINUTES`). A copy of the files put in that folder by hand is checked and used.
+footage search answers by filters and words only), one picture at a time with half the cores (at most four;
+`VR_FOOTAGE_THREADS`), and stops after ten idle minutes (`VR_FOOTAGE_IDLE_MINUTES`). A copy of the files put in that
+folder by hand is checked and used. On a Mac footage is decoded with VideoToolbox (`VR_FOOTAGE_HWACCEL=off` decodes
+it in software). Every setting: [configuration.md](configuration.md#footage-search).
 
 **Vectors belong to a CPU family**: ONNX Runtime's int8 kernels differ between ARM and x86 (cosine 0.98–0.99), so every
 vector is tagged with its model and platform, and a store moved between a Mac and a Linux server is embedded again in

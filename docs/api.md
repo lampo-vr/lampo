@@ -102,12 +102,15 @@ browser only: an API token is told of its own workspace alone. On a hosted serve
 share 20,000 a minute (then `429` with `Retry-After`).
 
 **Plan limits.** A hosted service may limit what a workspace adds ([`server/extension.ts`](../server/extension.ts)):
-a new upload, video, member or review link is then refused with `402 {error, reason, upgrade?, messages?}`, and
-`error` is a sentence to show as it is (`messages`: the same sentence in other languages, by code). A self-hosted server
-has no such limits.
+a new upload, video, member or review link, a publishing connection or a post published is then refused with
+`402 {error, reason, upgrade?, messages?}`, and `error` is a sentence to show as it is (`messages`: the same sentence in
+other languages, by code). A self-hosted server has no such limits.
 
-**Billing** (a billing module's routes, behind the one extension point, [`server/extension.ts`](../server/extension.ts):
-a self-hosted server has none of them unless one is installed, [server-mode.md](server-mode.md#a-billing-provider)).
+**Billing.** The `/api/billing…` routes are not part of this repository. They belong to a separate billing module,
+which a hosted service that sells plans (Lampo Cloud does) loads through the one extension point (`VR_CLOUD_MODULE`,
+[`server/extension.ts`](../server/extension.ts), [server-mode.md](server-mode.md#a-billing-provider)). A self-hosted
+server has none of them. They are described here because the open web app's Settings → Billing calls them where a
+module provides billing.
 Where a billing provider runs, `/api/info` says `billing: true` and `GET /api/billing` answers the workspace's plan for
 Settings → Billing (`BillingInfo` in [`lib/types.ts`](../lib/types.ts)): its name and state (`trial`, `free`, `paid`,
 `grace`, `read-only`, with the dates that go with it), what the workspace uses of what the plan holds, and — for owners
@@ -154,12 +157,20 @@ input is read, `403` for an API token. Every answer is `no-store`.
 
 | Route | What it answers |
 |---|---|
-| `GET /api/operator/workspaces` | `OperatorWorkspaces`: `plans` (a billing module answers for them) and every workspace: id, name, created, its first active owner (id, name, email), members, videos, bytes, its log's newest event (`active`), and its `plan` with a module (`OperatorPlan`: plan, name, state, trial end, grace, storage, the override set by hand, `fixed`, `paying`) |
+| `GET /api/operator/workspaces` | `OperatorWorkspaces`: `plans` (a billing module answers for them) and every workspace: id, name, created, its first active owner (id, name, email), members, videos, bytes, its log's newest event (`active`), `suspended` (`{at, by, reason}`, while it is), and its `plan` with a module (`OperatorPlan`: plan, name, state, trial end, grace, storage, the override set by hand, `fixed`, `paying`) |
 | `GET /api/operator/workspaces/:id` | `OperatorWorkspaceDetail`: the same row, its members (name, email, role, since, suspended, disabled) and the plans set by hand, newest first |
 | `POST /api/operator/workspaces/:id/plan` | `{kind: 'complimentary', plan: 'solo'\|'team'\|'business', reason}`, `{kind: 'trial', until: 'YYYY-MM-DD', reason}` (to that day's end, UTC) or `{kind: 'normal', reason}`; a reason is one line of up to 300. Answers the detail; `409` with the module's `reason` (`fixed`, `paying`, `date`, `none`) or without a module |
+| `POST /api/operator/workspaces/:id/suspend` · `…/unsuspend` | `{reason}` (one line of up to 300) to suspend, `{}` to lift it; answers the detail. A suspended workspace is read-only for its people (below), and they are emailed both times. The server's own workspace: `409` |
+| `GET /api/operator/workspaces/:id/deletion` | `WorkspaceDeletionPlan`: what deleting it would take (members and how many accounts go with it, videos, bytes, review links, invites, tokens, apps), or `refused` for the server's own workspace |
+| `POST /api/operator/workspaces/:id/delete` | `{name, reason}`: `name` typed as the workspace is called (else `400 {name: true}`); deletes it with everything it holds and emails its people → `{deleted: {id, name}, plan, accountsGone}`. The server's own workspace: `409` |
 | `GET /api/operator/accounts` | `OperatorAccounts`: every account's id, name, email, created, `signedIn`, `disabled`, `unverified`, workspaces and roles, `operator`, `you` |
 | `GET /api/operator/accounts/:id` | `{account}` |
 | `POST /api/operator/accounts/:id/disable`, `…/enable` | `{}`; disabling ends its sessions, tokens and apps at once (never one's own: `409`); answers `{account}` |
+
+**A suspended workspace** keeps its people signed in and readable: they read, watch and download, but every other write
+in it answers `423 {suspended: true, error}` (their own account and sessions, what they watched and what they put away
+in the inbox excepted), its review links answer `410` like an ended link (oEmbed `404`), and `MyWorkspace.suspended`
+says since when (never the reason).
 
 ## Accounts
 
@@ -173,6 +184,9 @@ input is read, `403` for an API token. Every answer is `no-store`.
 | `POST /api/auth/token` | what `vr login` uses: `{email, password, name?, days?, workspace?}`, or from the browser `{code, code_verifier, redirect_uri}` ([below](#oauth-for-mcp-clients)) → `{token, info, user, several}` (`several`: the person works in more than one workspace) |
 | `GET` · `PATCH /api/auth/me` | your profile and preferences (below) |
 | `PUT` · `DELETE /api/auth/me/avatar` | your picture (below) |
+| `GET /api/auth/me/export` | your data as a zip, `lampo-data-<day>.zip` (below) |
+| `GET /api/auth/me/deletion` | what deleting your account means: `AccountDeletionPlan` (below) |
+| `POST /api/auth/me/delete` | `{password}`, or `{confirm: true}` after a recent sign-in: deletes your account (below) → `{deleted: true, workspaces}` |
 | `GET /api/people` | the pictures of the workspace's active members: `{people: [{name, avatar}]}` (`avatar` is a URL or `null`) |
 | `GET /api/avatars/:file` | one picture of a member of the workspace (`u_…-<hash>.jpg`); anything else is a `404` |
 | `GET` · `POST /api/auth/tokens` | your API tokens for the current workspace (`last_used`, `expires`; `workspace` when it isn't #1); `POST {name?, days?}` → `{token, info}` |
@@ -189,8 +203,8 @@ input is read, `403` for an API token. Every answer is `no-store`.
 Details:
 
 - **Status.** `user.role` is the role in `workspace`, the session's current one (`MyWorkspace`: `{id, name, created,
-  role, members, current}`); `workspaces` lists every workspace the account belongs to. Signing in answers the same
-  two.
+  role, members, current, suspended?}`); `workspaces` lists every workspace the account belongs to. Signing in answers
+  the same two.
 - **Profile.** `PATCH /api/auth/me` takes `{name?, email?, password?, current_password?, prefs?, lang?}`. A new email
   or password needs `current_password`, except the machine owner's first ones, set from the machine itself. On a server
   that can email, a new email is kept as `pending_email` and a link goes to it, unless another account has it (the
@@ -207,6 +221,17 @@ Details:
   the account hasn't used before.
 - **Picture.** `PUT {data}`: base64 PNG, JPEG, WebP or GIF, 8 MB and 8192 px a side at most → `{user}`. It is kept as a
   256 px square JPEG through the storage adapter (`avatars/…`). `DELETE` goes back to initials.
+- **Your data** ([server-mode.md](server-mode.md#deleting-and-exporting)). These are a person's, in the app: an API
+  token gets `403 {person: true}`. The export is JSON files and a README: your account, your workspaces and roles, your
+  tokens' names and dates (never the tokens), apps and devices, and per workspace what you wrote and made (notes with
+  your replies, your replies on others' notes by the note's id, drafts, unsent recordings with their audio, decisions,
+  the review links you made without their addresses, what you watched, what you uploaded without the videos). A few an
+  hour, then `429` with `Retry-After`. The deletion plan lists the workspaces that go with the account (`goWith`: only
+  you work there), those you leave (`leave`), those you must hand over or delete first (`blockedBy`: others work there
+  and you are the last owner), whether a password confirms it (`password`), and `refused` for the machine's own
+  account. Deleting needs your password (wrong ones count like failed sign-ins: `403 {password: true}`, then `429`) or,
+  for `{confirm: true}`, a sign-in in the last 10 minutes; `409` while `blockedBy` names a workspace, and on a person's
+  own machine. It signs this browser out (`Clear-Site-Data`) and emails you.
 - **Tokens.** A new token is shown once and acts in one workspace: the current one for `POST /api/auth/tokens`; for
   `POST /api/auth/token` (`vr login`), `workspace` (one the person is a member of, else `403`) or else their first.
   `days` (1–3650) makes it expire; `info.expires` says when. An API token can't make tokens or sign out everywhere
@@ -344,6 +369,8 @@ On a hosted server ([server-mode.md](server-mode.md#workspaces)); the app on a p
 | `PUT /api/workspaces/current/persona` | owners and admins, people only (`403` with an API token): `{personas, personaOther?}` says who the current workspace's videos are for → `{workspace}` |
 | `GET /api/workspaces/current/badge` | anyone in the workspace: `{shown, hidden, may}` — whether its review links show *Powered by Lampo*, whether its admins hid it, whether its plan may hide it (a billing provider says: a paid plan) |
 | `PUT /api/workspaces/current/badge` | owners and admins, people only: `{hidden}` → `{shown, hidden, may}`; hiding answers `402` unless the plan may (showing it again always works), `409` on a person's own machine |
+| `GET /api/workspaces/current/deletion` | its owners, people only: what deleting the current workspace takes with it (`WorkspaceDeletionPlan`, as on [the operator's pages](#workspaces-and-plan-limits)) |
+| `POST /api/workspaces/current/delete` | its owners, people only: `{name}`, typed as the workspace is called (else `400 {name: true}`) → `{deleted: true, account}` (below) |
 
 Details:
 
@@ -356,6 +383,10 @@ Details:
 - **Switching** needs a signed-in browser too. A workspace you aren't a member of, or one that doesn't exist, is a
   `404`.
 - **Renaming** answers `409` on a server without workspaces.
+- **Deleting** ([server-mode.md](server-mode.md#deleting-and-exporting)) is for an owner (an admin gets `403`), on a
+  hosted server with workspaces (`409` otherwise), never for the server's own workspace (`409`). Everything it holds
+  goes, its people are emailed, and accounts that worked nowhere else go with it: `account: true` when yours did (this
+  browser is then signed out).
 - **Who the videos are for**: `personas` is a list of `agency`, `inhouse`, `creator` and `other`, each once (an empty
   list clears them); `personaOther`, "something else" in a few words (at most 120 characters, kept on one line), only
   with `other`. The words, Get started's order and the role an invite starts with follow them. They show as
@@ -1171,23 +1202,25 @@ summed up from the link's records.
 | `POST /api/g/:token/approval` | the client's decision (below) → `{approval}` |
 | `GET /api/g/:token/embed` | Embed links: what the player at `/e/<token>` plays (`EmbedResponse`: `title`, `slug`, `v`, `fps`, `frames`, `width`, `height`, `duration`, `media`, `preparing?`, `busy?`, `poster`, `sprite`, `chapters` `[{frame, title}]`, `captions` URL or `null`, `captions_lang?`, `badge`; `chapters` as read when the version arrived); `404` for any other link, `410` expired, `429` when one address asks too often |
 | `GET /api/g/:token/captions/:id?v=` | Embed links: the transcript's lines as WebVTT; `404` when the version wasn't heard, `429` as above |
-| `GET /oembed?url=&format=json&maxwidth=&maxheight=` | oEmbed for an Embed link's `/e/<token>` or `/g/<token>` address on this server: `{version, type: video, title, html, width, height, thumbnail_url, thumbnail_width, thumbnail_height, provider_name?, provider_url?}`; `404` for anything else, `501` for another format; any origin may ask |
+| `GET /oembed?url=&format=json&maxwidth=&maxheight=` | oEmbed for an Embed link's `/e/<token>` or `/g/<token>` address on this server: `{version, type: video, title, html, width, height, thumbnail_url, thumbnail_width, thumbnail_height, provider_name?, provider_url?}`. The size is the video's own scaled down (never up) to fit `maxwidth` × `maxheight`, else 1280 × 1280; the thumbnail is the poster, 640 px on its long side; `provider_*` only while the workspace shows the badge. `404` for anything else, `501` for another format; any origin may ask |
+| `GET /e/:token` | the Embed link's player, a page of its own: the one page another site may frame ([sharing.md](sharing.md#embedding-a-video)) |
 
 Details:
 
 - **The link.** `GuestLinkResponse` has the label, who shared it (`reviewer`: a name they chose, `null` for a machine's
   owner still named after the computer's account), the team (`org`: `org_name`; on a hosted server with several
   workspaces, the name of the link's own workspace for all but workspace #1, and `null` while a sign-up's workspace
-  still has the name it started with, its owner's), the kind (`video` or `folder`), `folder` (a folder link's own
-  name, never the folders above it; `null` for a video link and while locked; each video's `folder` is where it sits
-  below it), `source` (where the instance's source is: `source_url`), `badge` (*Powered by Lampo* at the foot: `false`
-  only when the link's workspace is on a plan that may hide it and its admins did), `imprint_url` and `privacy_url` (the
-  operator's pages, [configuration.md → Legal pages](configuration.md#legal-pages)), the permissions and the videos.
-  A password link answers `locked: true` and no videos until it is unlocked; until then every other route answers
-  `401`. `404` when unknown or revoked; `410` with `{error, by, expired}` when it expired (whom to ask, and since
-  when). `reviewer_avatar` is reserved: pictures are for signed-in people. An Embed link's token is in other sites'
-  pages, so its answers name nobody: `label` `""`, `reviewer` and `org` `null` (here and in the video's answer), no
-  video's `updated` nor version's `registered`, no `by` when it expired, and none of the visitors' notes or decisions.
+  still has the name it started with, its owner's), the kind (`video` or `folder`), `folder` (a folder link's own name,
+  never the folders above it; `null` for a video link and while locked; each video's `folder` is where it sits below
+  it), `source` (where the instance's source is: `source_url`), `badge` (*Powered by Lampo* at the foot: `false` only
+  when the link's workspace is on a plan that may hide it and its admins did), `imprint_url` and `privacy_url` (the
+  operator's pages, [configuration.md → Legal pages](configuration.md#legal-pages)), the permissions and the videos. A
+  password link answers `locked: true` and no videos until it is unlocked; until then every other route answers `401`.
+  `404` when unknown or revoked; `410` with `{error, by, expired}` when it expired (whom to ask, and since when), and a
+  plain `410 {error}` on every route while the link's workspace is suspended. `reviewer_avatar` is reserved: pictures
+  are for signed-in people. An Embed link's token is in other sites' pages, so its answers name nobody: `label` `""`,
+  `reviewer` and `org` `null` (here and in the video's answer), no video's `updated` nor version's `registered`, no `by`
+  when it expired, and none of the visitors' notes or decisions.
 - **Visits and watching.** A visit counts once per visitor and half hour, never for the team checking its own link (the
   owner's machine, or a signed-in account). `visitor` is the random id the page keeps, `name` what the visitor typed,
   if anything (an Embed link's visits are anonymous: its visits and reports keep no `name`). 60 visits a minute per
@@ -1303,12 +1336,15 @@ Details:
 (`linkFiles`, `localAgents`, `reveal`, `visionOcr`, `projectFiles`, `inboxFile`, `tunnel`, `lan`, `wakeAgents`; all
 false on a hosted server), and `features` for older clients; `stt`, the speech engine (`backend`, `available`, `state`,
 `model`, `device`, `error`, `progress`, `languages`: `model` is the model's name and `error` only says that the engine
-isn't working, except for the server's operator ([whoever runs it](server-mode.md#the-operators-pages), signed in in
-the browser on a hosted server; the machine's owner at the machine), who reads the model's path and the engine's own words; the owner of another
-workspace gets the name only); `whisper`, `user` and `lan`; and for email and sign-up `mail` (email flows work here:
-there is a public URL to build links from), `signup` (`off`, `invite` or `open`), `terms_url` and `privacy_url`, plus,
-for admins, `mail_transport` (`log`: written to the server's outbox instead of sent, or `smtp`). Only a call from the
-machine itself also gets the LAN link with its key (`urls`, `qr`) and the machine's paths (`dataDir`, `home`, `root`).
+isn't working, except for the server's operator ([whoever runs it](server-mode.md#the-operators-pages), signed in in the
+browser on a hosted server; the machine's owner at the machine), who reads the model's path and the engine's own words;
+the owner of another workspace gets the name only); `whisper`, `user` and `lan`; and for email and sign-up `mail` (email
+flows work here: there is a public URL to build links from), `signup` (`off`, `invite` or `open`), the operator's legal
+pages (`terms_url`, `privacy_url`, `imprint_url`, `withdrawal_url`, `cancel_url`:
+[configuration.md](configuration.md#legal-pages); `null` when not set), `billing: true` where a billing provider runs,
+plus, for admins, `mail_transport` (`log`: written to the server's outbox instead of sent, or `smtp`). Only a call from
+the machine itself also gets the LAN link with its key (`urls`, `qr`) and the machine's paths (`dataDir`, `home`,
+`root`).
 
 `ServerHealth` (the server setup's health check): `public_url` `{ok, url}` (ok when set and https, or plain http on
 this machine); `storage` `{ok, kind, writable, free_bytes, where}` (a local disk is written to and read back, with its

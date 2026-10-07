@@ -33,6 +33,8 @@ app :4747 ── volume vr-data
 | Email | an SMTP relay (Brevo or any other) and a sender on a domain you control, for invites and password resets ([email.md](email.md)) |
 | Voice notes | `VR_STT=local` downloads a 740 MB speech model from Hugging Face at the first start; `VR_STT=off` for none |
 | Source offer | `VR_SOURCE_URL`: where people who use the instance get its source (AGPL-3.0 §13). The default, the project's repository, is right for an unmodified copy; a changed one points it at its own source |
+| Who runs it | the accounts that see the operator's pages (every workspace and account; suspending or deleting a workspace): `LAMPO_OPERATOR`, else the owner the setup makes ([server-mode.md](server-mode.md#the-operators-pages)) |
+| Legal pages | for an instance open to the public: your imprint, privacy policy and terms (`VR_IMPRINT_URL`, `VR_PRIVACY_URL`, `VR_TERMS_URL`), linked on the sign-in screens and review links. Open sign-up (`VR_SIGNUP=open`) doesn't start without the last two ([configuration.md](configuration.md#legal-pages)) |
 | Monitoring | an uptime check from outside (step 9) and who it alerts |
 | Your laptop | a checkout of the same commit and Node ≥ 22.18, which runs `scripts/smoke.ts` as it is |
 
@@ -109,6 +111,9 @@ VR_TRUST_PROXY=uniquelocal                 # Caddy reaches the app over the comp
 #VR_ORG_NAME=Northwind Studio              # shown to clients next to who shared a link
 #VR_STT=off                                # no voice notes (and no 740 MB model download)
 #VR_PUSH_SUBJECT=mailto:you@example.com    # the contact push services see
+#LAMPO_OPERATOR=you@example.com            # who runs it; unset: the owner the setup makes
+#VR_IMPRINT_URL=https://example.com/imprint   # your legal pages, linked where people sign in
+#VR_PRIVACY_URL=https://example.com/privacy
 # email; without these, messages wait in the outbox:
 VR_SMTP_URL=smtp://…%40smtp-brevo.com:…@smtp-relay.brevo.com:587   # STARTTLS
 VR_MAIL_FROM=Lampo <hello@review.example.com>
@@ -124,7 +129,8 @@ It sends one message now and prints the relay's answer.
 The server refuses to start, with one plain line saying why, on what would be unsafe or can't work: a URL with a path,
 plain http on another host (`http://` is only for this machine, or a closed test network with `VR_ALLOW_HTTP=1`), an
 https URL without `VR_TRUST_PROXY`, incomplete storage settings, a CDN without signed links, a mail relay without a
-sender, a store it can't write, a damaged key ([the full list](server-mode.md#configuration)). There are no secrets to
+sender, an open sign-up without your terms and privacy policy, a store it can't write, a damaged key ([the full
+list](server-mode.md#configuration)). There are no secrets to
 generate: the cookie and link keys are made in the volume at the first start (`data/secret.key`,
 `data/share-secret.key`, readable only by the app's user).
 
@@ -268,6 +274,11 @@ the first request. Remove the drill with `docker rm -f lampo-restore && docker v
 
 A real restore is the same into the live volume with the app stopped (`docker compose stop app`, copy, `chown`,
 `docker compose start app`). Keep the same `VR_PUBLIC_URL`: review links, invites and connected apps carry it.
+
+A backup keeps what people deleted after it was taken (their account, a workspace). Keep the newest
+`data/erasures.jsonl` aside before a real restore, put it back before the start, then run
+`docker compose exec app vr admin erasures --apply`: what was deleted since goes again
+([server-mode.md → Deleting and exporting](server-mode.md#deleting-and-exporting)).
 
 ## 9. Monitoring
 

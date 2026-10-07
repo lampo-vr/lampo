@@ -5,24 +5,23 @@ knows why it matters. Done work moves to `CHANGELOG.md`.
 
 ## Now
 
-**A real deployment: running** (2026-10-03, invite-only). The first hosted instance serves the app behind a CDN proxy
-with video from a media host of its own (`VR_MEDIA_ORIGIN`), mail from a verified sending domain, nightly backups, and
-the smoke test green; CI runs on GitHub's runners in the public repository (outside contributors' workflows wait for
+**A real deployment: running** (since 2026-10-03; open sign-up since 2026-10-06). The first hosted instance serves the
+app behind a CDN proxy with video from a media host of its own (`VR_MEDIA_ORIGIN`), mail from a verified sending
+domain, nightly backups, and the smoke test green; CI runs on GitHub's runners in the public repository (outside contributors' workflows wait for
 approval). Still to do there: the OAuth connectors in ChatGPT and Claude.ai for real, backups to a second
 place, an uptime check from outside, the Linux screenshot baselines from CI's artifact (then drop
 `VR_BASELINE_MISSING`), perf budgets measured on CI's runners (then drop `VR_PERF_TIMES`), a Parakeet voice note and an
 Auto-check run measured on x86, `npm audit` of the pinned versions. Open: whether review links speak the visitor's
 browser language (clients have no Settings, so today they always get English).
 
-**Lampo Cloud: sign-up and billing, next.** Open sign-up gives each person a workspace of their own on a trial, then
-the plans; it opens together with payments, not before. In the open app (CHANGELOG): the extension point answers
-sign-ups and mails a workspace's people for a module, Settings → Billing, the banner and the 402 sentences, and the
-in-app conversion: the trial's line and card, the banner at its end, read-only's locked Add video, the moments of value,
-limit sheets that pay in place, and the operator's first-party funnel. Left: a billing provider's keys and webhook in
-production, then the switch to open sign-up; a periodic check of seats against members; the module's side of the
-conversion (`host.funnel` for `trial_end` and `plan_paid`, `features` on BillingInfo, `POST /api/billing/storage`, the
-preview's `prorated`, a storage refusal's `room`); the real address behind Business's "Talk to us". Reverse charge is
-the provider's switch (`BillingInfo.reverseCharge`), off until the seller's VAT ID exists.
+**Lampo Cloud: sign-up and billing, open** (2026-10-06). Open sign-up gives each person a workspace of their own on a
+trial, then the plans, with payments live. In the open app (CHANGELOG): the extension point answers sign-ups and mails
+a workspace's people for a module, Settings → Billing, the banner and the 402 sentences, and the in-app conversion:
+the trial's line and card, the banner at its end, read-only's locked Add video, the moments of value, limit sheets that
+pay in place, and the operator's first-party funnel. Left: a periodic check of seats against members; the module's
+side of the conversion (`host.funnel` for `trial_end` and `plan_paid`, `features` on BillingInfo,
+`POST /api/billing/storage`, the preview's `prorated`, a storage refusal's `room`); the real address behind
+Business's "Talk to us".
 
 **Workspaces, next.** Several teams on one server, each seeing only its own projects, are in (CHANGELOG): the model,
 paths and migration, auth per workspace, everything scoped, the switcher and Settings → Workspace, the two-workspace
@@ -80,9 +79,9 @@ website's clips.
      search; a separate *Footage* library (files that aren't videos under review).
 
 - **Render progress, next** (done: `vr render -- <cmd>` with Remotion, ffmpeg, aerender and Blender, `--detach` and
-  `vr render wait`; CHANGELOG): DaVinci Resolve (`GetRenderJobStatus`) and Remotion Lambda (`getRenderProgress`); an
-  image sequence counted by its frames rather than its size; `vr render stop <id>` for a detached render (today its
-  supervisor stops on SIGTERM); the run strip and cards showing `progress` (Phase 1c).
+  `vr render wait`, the progress in the player's agent line and on the library's cards; CHANGELOG): DaVinci Resolve
+  (`GetRenderJobStatus`) and Remotion Lambda (`getRenderProgress`); an image sequence counted by its frames rather
+  than its size; `vr render stop <id>` for a detached render (today its supervisor stops on SIGTERM).
 
 - Options before a render, next (done: an agent asks, the person auditions and picks, the answer is one PICKED line;
   CHANGELOG): **options through a review link** — a client picks the narrator or the look on the link (a question
@@ -154,7 +153,7 @@ website's clips.
 - Speed, what is left (bench/perf/): the warm library paint's 300 ms goal at CPU 4× — it is ~0.4 s on the suites'
   chrome-headless-shell (budget 450 ms), of which ~80 ms compile the start again on every load and ~200 ms are the
   first render and layout of the page (sidebar, toolbar, the cards in view); less DOM on the first paint (the sidebar's
-  tree, the library chunk: the add dialog could load with its view, as Insights and the inbox view now do) is next;
+  tree, the library chunk: the add dialog could load with its view, as Insights, the inbox view and the board now do) is next;
   posters and sprites through the CDN with signed URLs in the library's answer (hosted); the player's first paint (it
   brings the Radix it uses along). Done: a light start (Radix after the first paint, 167 → 124 KB), cards without
   menus or tooltips of their own, windows that render their rows in the first pass, windowed notes and inbox lists.

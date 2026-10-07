@@ -13,12 +13,12 @@ don't follow (an export later brings videos that are new since, never more notes
 
 | Moves | Stays on your machine |
 |---|---|
-| every video (archived ones too), each version's bytes as they arrived | the onboarding sample |
+| every video (removed ones kept for their notes too), each version's bytes as they arrived | the onboarding sample |
 | notes: frames, ranges, drawings, tags, severities, kinds, choices and options, screenshots, voice clips | drafts and recordings not sent yet |
 | replies, statuses, fixes, checks, answers | review links and what they counted (opens, watching, downloads); the notes and decisions made through them come along, by name |
 | decisions: every approval, request for changes, final and reopen | the Claude Code sessions' ids and folders (the assigned agent's name comes along) |
 | references and fix previews, with their files | devices, push, your account, passwords, API tokens and keys |
-| folders, empty ones too; playbooks with their skills' files | publishing: connections and posts |
+| folders, empty ones too; playbooks with their skills' files | publishing: connections and posts; which projects are archived (they arrive in use: archive them again on the server) |
 | the history (`events.jsonl`) and the team's watching, for the inbox and Insights | questions asked on a folder before any video (`asks.json`) |
 | taste (written again on the server from the notes) | everything in `cache/`: the server makes its own posters, waveforms, proxies, analysis and transcripts |
 

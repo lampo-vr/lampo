@@ -47,7 +47,7 @@ format stays backwards compatible throughout.
   leaves the sidebar, All videos, the board, Recent, the Inbox and Insights' lists of what waits now, and the
   sidebar's *Archived* row (with how many) opens the archived projects; ⌘K finds them under *Archived*. Opened, an
   archived project and its videos say *Archived · Restore* where Share or the next step stands, and are read only:
-  you watch, read and download, but nothing new goes in — no version, note, reply, sign-off, playbook change, post,
+  you watch, read and download, but nothing new goes in — no version, note, reply, decision, playbook change, post,
   move into it or review link — until it is restored, in one click and as it was. Owners and admins can still take a
   video out, in the app. Its review links play watch only meanwhile and take notes and decisions again once it is
   back; embeds keep playing. Agents get one sentence for any write into it, and `list_videos`, `list_folders`, `vr ls`
@@ -140,9 +140,9 @@ format stays backwards compatible throughout.
 The first public release: what it has first, then everything that changed while it was made, newest first.
 
 ### Added
-- **Frame-exact review.** The frame the player shows is the frame ffmpeg decodes (tested in Chrome and in Safari's
-  engine, H.264 and ProRes, 23.976–60 fps); any codec plays through a proxy with the same frame numbers, long renders
-  scrub at once, and safe-zone overlays and a real-size phone view come with it.
+- **Frame-exact review.** The frame the player shows is the frame ffmpeg decodes (tested against ffmpeg's decode in
+  Chrome and in Safari's engine; screenshots at 23.976, 25 and 30 fps); any codec plays through a proxy with the
+  same frame numbers, long renders scrub at once, and safe-zone overlays and a real-size phone view come with it.
 - **Notes on a frame, a section or the whole video**: box, arrow and freehand drawings in video pixels, tags,
   severities (must, should, nice, idea) and kinds (feedback, question, info), threads with replies, references
   (pictures, clips, links, moments of any version), and a clean and a marked screenshot of the exact frame. A section
@@ -159,7 +159,7 @@ The first public release: what it has first, then everything that changed while 
 - **Auto-check** on every version: typos in on-screen text, safe zones, flash and black frames, freezes, clipping,
   silence and loudness. Each finding says what, where (with its frame), why, and whether it looks intended.
 - **Where every video stands.** One stage per video from to review to final, approvals per version by the team and
-  the client with their history, one next-step button, and a board where moving a card is the sign-off (with Undo).
+  the client with their history, one next-step button, and a board where moving a card is the decision (with Undo).
   A final version is locked for agents.
 - **Fix previews and partial renders.** An agent shows a fix as a still or short clip before it renders, or renders
   only the shots a note allows; the next full render is compared with what was approved.
@@ -170,8 +170,9 @@ The first public release: what it has first, then everything that changed while 
 - **Agents**: the `vr` CLI and an MCP server (stdio, and Streamable HTTP at `/mcp` on the 2026-07-28 spec, 2025
   clients still served) that hand over notes with their marked frames; `wait_for_feedback` and live subscriptions;
   the review as an MCP App (`show_review`); an Agent Skill; ready configs for Claude Code, Codex, Cursor, VS Code,
-  Windsurf, Gemini CLI, Zed and the Claude desktop app (`vr mcp config`). Agents ask questions with answers to pick,
-  answer per note (fixed, won't fix) and read the reviewer's taste.
+  Antigravity, Windsurf, Gemini CLI and Zed (`vr mcp config`), and the steps for Claude and ChatGPT
+  ([docs/mcp.md](docs/mcp.md)). Agents ask questions with answers to pick, answer per note (fixed, won't fix) and read
+  the reviewer's taste.
 - **Few tokens**: a lean tool set, pictures only for drawn notes, answers that name only what changed (`bench/tokens/`).
 - **See your agents.** Each agent with its kind and mark, what it is doing now (from what it already sends Lampo, at
   no token cost), and on your own machine a Claude Code session that isn't running can be started with the notes.
@@ -184,7 +185,7 @@ The first public release: what it has first, then everything that changed while 
   the actions on every row (done, looks right, still wrong, later), with Undo.
 - **Insights**: who watched how much of what, where the time goes (on you, on agents, on clients), how agents do,
   and the notes that keep coming up, a click from a playbook rule.
-- **On the phone**: an installable app, Web Push without a third-party service, a touch player and timeline, and
+- **On the phone**: an installable app, Web Push without a third-party push provider, a touch player and timeline, and
   bottom sheets for notes and menus.
 - **One app, on your machine or hosted.** On your machine you are signed in at the machine itself, renders stay where
   they are, and Claude Code sessions, a LAN link and a tunnel are a click away. Hosted (`VR_MODE=server`): accounts
@@ -207,8 +208,8 @@ The first public release: what it has first, then everything that changed while 
   and a reference to the log.
 - Agents never sign off, and API tokens never touch credentials, roles, members, invites, tokens, apps, webhooks,
   workspaces or review links: that is a person's, signed in in the app.
-- Review links name videos by opaque ids, keep their tokens only as hashes, and are rate-limited per visitor and per
-  link, with every record they keep bounded.
+- Review links name videos by opaque ids, keep their tokens hashed (and sealed, so their owner can copy them again),
+  and are rate-limited per visitor and per link, with every record they keep bounded.
 - Sign-in limits that can't lock a person out, sessions that end on sign-out and when idle, the same answer for every
   address, one-time links stored as hashes; a new password ends sessions, devices and connected apps.
 - What people write reaches agents on its own line, so a note can't forge another; names are cleaned.
@@ -223,7 +224,7 @@ The first public release: what it has first, then everything that changed while 
 - TypeScript that Node ≥ 22.18 runs directly; React 19.
 - Tests: unit, API, server mode, storage adapters against mocks, `vr` and MCP end to end, browser suites in both modes
   (Chrome and WebKit), layout and quality checks from phone to wide screens, speed budgets (`bench/perf/`); CI on
-  Linux and macOS.
+  Linux for every push and pull request, macOS on demand.
 - `npm run demo` and `npm run screenshots` on synthetic footage.
 
 ### Changed (the cookie box's two answers)
@@ -245,8 +246,8 @@ The first public release: what it has first, then everything that changed while 
 ### Added (your data in your hands, and a workspace taken down)
 - **Export my data** (Settings → Profile): one zip of plain files — your account, your workspaces and roles, your API
   tokens, apps and devices (never a token itself), and per workspace the notes and replies you wrote, your drafts,
-  unsent recordings with their audio, verdicts, the review links you made, what you watched and what you uploaded. Never
-  anyone else's words: a reply on someone else's note names that note by its id only.
+  unsent recordings with their audio, your approvals and change requests, the review links you made, what you watched
+  and what you uploaded. Never anyone else's words: a reply on someone else's note names that note by its id only.
 - **Delete my account** (Settings → Profile, a hosted server), confirmed with your password: the workspaces only you
   work in go with it, the others you leave. The last owner of a workspace others work in is told to hand it over or
   delete it first. **Delete workspace** (Settings → Workspace, its owner): its name typed; everyone in it is emailed.
@@ -364,9 +365,8 @@ The first public release: what it has first, then everything that changed while 
   own); *Play together* plays them all side by side and becomes *Pause* while they do; A/B for sounds is unchanged.
 
 ### Fixed (a watch-only link and other links' notes)
-- **A watch-only link that had "notes from all links" on showed its visitors every other link's notes and names**
-  while the dialog said it doesn't. A link that only plays now shows no one else's notes or
-  decisions, links made before included, and the dialog saves it that way.
+- **A watch-only link shows no one else's notes, names or decisions**, as its dialog says, links made before
+  included, and the dialog saves it that way.
 
 ### Added (the operator's admin)
 - **Whoever runs a hosted server sees every workspace and account on it**, at `#/operator/workspaces` and
@@ -457,10 +457,9 @@ The first public release: what it has first, then everything that changed while 
 - Settings → Agents says how `vr login` signs in now.
 
 ### Fixed (an invited admin's setup)
-- **Someone invited as admin or owner into a server's first workspace was shown the server's setup** (name the
-  workspace, check the server, invite the team, connect agents) — on a hosted server, the operator's workspace. An
-  account that joined through an invite now gets an invited teammate's setup, whatever role the invite gave it; the
-  server's setup stays its own owner's.
+- **The server's setup (name the workspace, check the server, invite the team, connect agents) is its own owner's
+  alone**: an account that joined through an invite gets an invited teammate's setup, whatever role the invite gave
+  it.
 
 ### Fixed (live updates after a restart)
 - **A tab left open across a server restart (a deploy) went deaf**: its live stream was refused once while the server
@@ -542,7 +541,7 @@ The first public release: what it has first, then everything that changed while 
   for the one person they are for, told live.
 
 ### Changed (Settings → Billing)
-- **Billing is one page in three parts** (the approved prototype): the plan as one panel (its name and state, the
+- **Billing is one page in three parts**: the plan as one panel (its name and state, the
   price, one sentence with the dates, the trial's or a grace period's days as a ruler, what Free would mean in a
   trial's last days, extra storage, three meters with a dashed track where there is no limit, and the one thing to
   do); the plans as tiles chosen like radio buttons whose prices and lists line up in any language, with one bar for
@@ -669,13 +668,13 @@ The first public release: what it has first, then everything that changed while 
 ### Fixed (review links)
 - **Compare: after a pause, B stops on A's frame.** It stayed where playing left it, a frame or two off (the owner's
   compare and check mode too); a B that comes while A plays now plays along instead of standing still.
-- The thank-you after a verdict lies at the picture's foot, centred on it, instead of over the drawing tools; a
+- The thank-you after a decision lies at the picture's foot, centred on it, instead of over the drawing tools; a
   delivery link shows its *Download* on a phone; a link without notes ends with its foot at the bottom of a phone's
   screen; no "No notes yet" under an open composer; the folder room fills wide screens and its cards on a phone lose
   the empty band under them.
 
 ### Fixed (Settings → Billing)
-- **Paying isn't set up / the payment provider refused** read as "something went wrong (ref …)" since the sweep-3
+- **Paying isn't set up / the payment provider refused** read as "something went wrong (ref …)" after an earlier
   change; a billing module may now mark exactly those two answers as meant for people, and a declined card says why.
 - **The payment form keeps its room while Stripe loads**, and Pay appears only once the card field is there.
 - **Stripe's form shows a card and nothing else**: no test-mode assistant over the page, no Link box, not every payment
@@ -778,13 +777,11 @@ The first public release: what it has first, then everything that changed while 
   `events.imported.jsonl` beside `events.jsonl`, which only what reads history reads (For you, a person's part
   opt-ins, the folders' repair, `vr export`). A store imported into before keeps its log as it is: the readers pass
   those lines by before they count.
-- **Only an upload may take hours to send**. The 6 hours a whole render in one PUT needs applied to every request.
-  Now a render's body (a tus piece, a one-time upload URL's PUT) has the 6 hours, every other body Node's own 5
-  minutes; an upload refused before its body is in has the rest thrown away within those 5 minutes.
-- **The check that keeps a module off the app's own routes can't be passed by a router under a path**.
-  The app's routes are read from its routers, which keep their paths without the one they are mounted under: a
-  router mounted at `/x` would have listed `/y` for what answers `/x/y`, out of sight of that check and the route
-  walk. None is mounted that way; one that is now stops the app from starting, so it can't come in unnoticed.
+- **Only an upload may take hours to send**: a render's body (a tus piece, a one-time upload URL's PUT) may take up
+  to 6 hours, every other request Node's own time limit, and an upload refused before its body is in is let go soon
+  after.
+- **The check that keeps a module off the app's own routes sees every route**: a router mounted under a path, whose
+  routes it couldn't read with their full paths, now stops the app from starting.
 
 ### Changed (Settings → Billing: paid on the page)
 - **Paying for a plan happens on Settings → Billing itself**, no longer on the provider's own page: the billing address,
@@ -842,53 +839,38 @@ The first public release: what it has first, then everything that changed while 
   versions carry their frame size (optional `width` and `height` in `GuestReviewResponse.versions`).
 
 ### Fixed
-- **A team's *Download all* link on the media host stops working for someone who lost access**. The zip
-  is put together when its URL is fetched, and that URL lived up to 7 hours with nothing but the folder in it: a member
-  removed meanwhile, a revoked API token or a signed-out session still got the folder, renders added since included.
-  The URL now carries who asked for it, and the media host asks again when the zip starts, as it does for one-time
-  upload URLs; it also carries what the folder held, so a zip never grows past it (a folder that changed: start the
-  download again). URLs made before this change are refused once; asking again gives a new one.
-- **A one-time upload URL takes one upload**. Two PUTs sent to it at the same moment both landed when
-  the plan's check took a moment (a billing lookup), each passing the size and plan checks on its own; the URL is now
-  taken before that check, and a refusal before any bytes arrive gives it back.
+- **A team's *Download all* link on the media host stops working for someone who lost access**: the media host
+  checks who asked for it when the zip starts, as it does for one-time upload URLs, and a zip holds only what the
+  folder held when it was asked for (a folder that changed: start the download again). URLs made before this change
+  are refused once; asking again gives a new one.
+- **A one-time upload URL takes one upload**, also when two arrive at the same moment; a refusal before any bytes
+  arrive gives it back.
 - **A whole render in one request no longer breaks off after 5 minutes**. Node's own request timeout cut
   a one-time upload URL's PUT (and a tus piece on a slow line) whose body took longer than 5 minutes to send; a
-  request's body may now take up to 6 hours, its headers still within a minute.
-- **An imported store's history is no news to agents**. `wait_for_feedback` handed the history a
-  `vr admin import` brought in out as new feedback, and one event dated in the future parked every agent's cursor
-  there, so real notes were never handed out. Imported events are now skipped by `wait_for_feedback`, INBOX.md,
-  `vr://inbox` and `vr inbox`, as they already were by `vr watch`, the live stream, webhooks and push; and a bundle
-  holding a time after it was made, or after the server's clock (10 minutes of drift aside), is refused.
-- **An imported playbook can't write over another playbook's files**. A bundle's playbook kept its own
-  ids, which decide where its skill files and reference pictures are stored: a bundle reusing an existing playbook's
-  ids replaced that playbook's files, even when the import was then refused. An imported playbook now gets new ids
-  (its own, its skills' and its suggestions'), nothing is put where a file is kept already, and its files go in only
-  after the videos are in, taken back if the playbook can't be written.
-- **What an import brings in passes the checks the app runs when it makes the same thing**. A link
-  reference must be http or https and keeps no user name or password (a `javascript:` or a protocol-handler link
-  refuses the bundle); a version's size, frames, frame rate and picture size are what ffprobe reads on the server, and
-  a version without bytes is in no bucket; a playbook comes in only for the House or a folder name the server takes,
-  within a playbook's normal limits.
-- **An imported partial render can't share another video's posters and analysis**. A part version's
-  sample, which names its derived files (posters, sprites, waveforms, analysis, scrub copies), was taken from the
-  bundle, so it could name another video's; it is now made from the part's bytes, the version it patches and where, as
-  an uploaded part's is.
-- **`vr admin import` prints nothing a bundle could use to hide or forge its report**. A bundle's app
-  version, warnings and the record keys named in a refusal reached the terminal as they were, escape sequences
-  included. The version must be a version, every string the report prints is one line without control characters, and
-  `vr`'s errors drop control characters.
-- **An extension module can't open one of the app's own routes**. A module route with the method and
-  path of an app route left the app's handler answering it while the guard and the role table went by the module's
-  word: a module declaring a public `GET /api/library` by mistake served the library signed out. Such a module is now
-  refused when the server starts, in one line; the route walk covers a module's routes too.
+  render's body may now take up to 6 hours.
+- **An imported store's history is no news to agents**: the history a `vr admin import` brought in is skipped by
+  `wait_for_feedback`, INBOX.md, `vr://inbox` and `vr inbox`, as it already was by `vr watch`, the live stream,
+  webhooks and push, and a bundle holding times from the future is refused, so real notes are always handed out.
+- **An imported playbook can't write over another playbook's files**: it gets new ids (its own, its skills' and its
+  suggestions'), nothing is put where a file is kept already, and its files go in only after the videos are in, taken
+  back if the playbook can't be written.
+- **What an import brings in passes the checks the app runs when it makes the same thing**: link references, a
+  version's facts (read by ffprobe on the server, not taken from the bundle) and playbooks (only for the House or a
+  folder name the server takes, within a playbook's normal limits).
+- **An imported partial render keeps to its own posters and analysis**: what names its derived files is made from
+  the part's bytes, the version it patches and where, as an uploaded part's is.
+- **`vr admin import`'s report can't be altered by the bundle it reports on**: every string it prints from the
+  bundle is one line of plain text, and `vr`'s errors drop control characters.
+- **An extension module can't take over one of the app's own routes**: a module that names a route the app answers
+  is refused when the server starts, in one line, and the route walk covers a module's routes too.
 - **An import that fails, is killed or meets an upload leaves nothing behind**. A video's history now
   goes into the log only once the video is in (it went first, and stayed for a video that didn't come in, to be
   inherited by a later upload of the same name); a video id is marked for the import under the same hold an upload
   takes, after checking it is free, so an upload of the same name under way is never written over or taken back
   (the import stops before writing anything); one import runs in a workspace at a time; and what a killed run of
   another bundle left is taken back by the next import.
-- **An import's limits and room check hold at their edges**. A bundle's history may be 500 MB (512 MB
-  was past the longest text Node can read, a crash rather than a refusal); the room an import needs counts its notes
+- **An import's limits and room check hold at their edges**. A bundle's history may be 500 MB; the room an import
+  needs counts its notes
   and history, on the disk of the store's data as well; and `vr admin import` on a hosted server no longer writes an
   INBOX.md the server never reads.
 
@@ -963,7 +945,7 @@ The first public release: what it has first, then everything that changed while 
 ### Added (moving to a server)
 - **`vr export <out.tar> [--folder <name>]…` packs your machine's reviews for a server; `vr admin import <bundle.tar>
   --workspace <id> --owner <email>` unpacks them into a workspace there** ([docs/moving.md](docs/moving.md)). Notes keep
-  their frames, ranges, drawings, replies and statuses, sign-off keeps its history, every version keeps its bytes, and
+  their frames, ranges, drawings, replies and statuses, approvals keep their history, every version keeps its bytes, and
   screenshots, voice clips, references, fix previews, folders, playbooks, the team's watching and the history (inbox,
   Insights) come along. No path of the machine travels: a video tracked from a file becomes an upload in its folder,
   under that new id everywhere it was named. Your machine's account and the names you wrote under become your account
@@ -1050,7 +1032,7 @@ The first public release: what it has first, then everything that changed while 
   isn't an origin of its own, plain http off this machine, or the public URL's host. `scripts/smoke.ts --media` checks
   it ([server-mode.md](docs/server-mode.md#a-host-of-its-own-for-video), [go-live.md](docs/go-live.md#behind-a-cdn-proxy)).
 - The page, the live stream and every answer that carries a secret say `Cache-Control: no-transform`: a CDN in front
-  neither compresses what the app leaves uncompressed on purpose (BREACH) nor rewrites the page its CSP pins.
+  neither compresses what the app leaves uncompressed on purpose nor rewrites the page its CSP pins.
 
 ### Changed (player: the phone view)
 - **The phone view looks like the phone and the app.** Each phone is drawn from its public dimensions: iPhone 15/16,
@@ -1090,7 +1072,7 @@ The first public release: what it has first, then everything that changed while 
 ### Fixed (review links)
 - On an iPhone, the page scrolled under the status bar and its clock ("Notes" behind the time): the bar now stays at
   the top and makes room for the status bar and the notch (`env(safe-area-inset-top)` with `viewport-fit=cover`), the
-  page's foot clears the home indicator, and the thank-you after a verdict hangs under the bar instead of over the
+  page's foot clears the home indicator, and the thank-you after a decision hangs under the bar instead of over the
   menus that rise from the bottom.
 
 ### Added (developing Lampo)
@@ -1151,7 +1133,7 @@ The first public release: what it has first, then everything that changed while 
   failed posts wait in the inbox with Try again, and a *Posts* push switch joins Notifications. Loaded on demand, in
   English and German, from phone to desktop.
 
-### Fixed (publishing, delta review)
+### Fixed (publishing)
 - **A post that went out is never posted twice by Lampo**. A posted or scheduled post whose later look
   failed for good (a revoked Google sign-in or posting key) turned "failed", and Retry uploaded it a second time; a
   post the posting API kept working on past six hours did the same, and a stop while YouTube's cover was set uploaded
@@ -1160,15 +1142,12 @@ The first public release: what it has first, then everything that changed while 
   person to look, instead of a new try; YouTube's upload session is kept until the video's id is; Retry asks the
   platform again about a post it holds, and sending one that went out before needs the person to say so (`again`).
   None of it depends on the posting API honouring its idempotency key.
-- **What goes out is what the person saw**. The publish confirmation named only the platform and account, so an
-  agent's edit to the caption, the time or the cover just before the click went out under the person's name. It now
-  carries the post's `digest` (every outgoing field, as shown); anything edited since is a `409` to look at again, and
-  every edit is in the post's history with who made it.
-- **One team's posts don't hold another's back on a hosted server**. The publish queue sent one workspace's due
-  posts all before the next workspace's, with a post's encode made inside the send slot every team shares, and a
-  platform answering a byte at a time could hold it past its timeout. Teams now take turns like the job queue's; the
-  file and cover a send needs are made before its turn; every platform request has a wall-clock deadline; a kit's
-  encode is a job under the workspace's cap (`503` when it is full) instead of owed work.
+- **What goes out is what the person saw**: the publish confirmation carries the post's `digest` (every outgoing
+  field, as shown); anything edited since is a `409` to look at again, and every edit is in the post's history with
+  who made it.
+- **One team's posts don't hold another's back on a hosted server**: teams take turns in the publish queue like the
+  job queue's; the file and cover a send needs are made before its turn; every platform request has a deadline; a
+  kit's encode is a job under the workspace's cap (`503` when it is full) instead of owed work.
 - Retry asks the plan's gate as Publish does. An agent's token changes and deletes drafts only: a failed or
   cancelled post — the inbox's work for who may publish — is a person's to change or delete, and a post that went out
   before is never deleted, by anyone.
@@ -1194,8 +1173,8 @@ The first public release: what it has first, then everything that changed while 
 - **Teams take turns with posts published mid-pass too**: the queue looks at what is due before every turn, so
   a post published while another team's uploads run waits behind one more of them at most, not the rest of that
   team's backlog; a send whose file is still being made takes its turn when the file is ready.
-- Publishing's hardening notes: adding a posting-API key or changing one counts against the checks' limit;
-  what a platform says about its accounts is kept one line per field, 120 characters, 100 accounts; the damaged
+- Publishing's smaller points, too: adding a posting-API key or changing one counts against the checks' limit;
+  what a platform says about its accounts is kept one line per field, and bounded; the damaged
   `secret.key` message and go-live's backup section say that a new key costs every publishing connection and any
   unfinished upload; docs/publishing.md says what reviewers read of posts, on purpose.
 
@@ -1271,7 +1250,7 @@ The first public release: what it has first, then everything that changed while 
   leaves the invites taken with the old one behind, so it now names them as left behind (who invited, which role),
   and the list of joins stays on the screen that asks for the original password, where it is true.
 
-- **A folder path has a depth limit, so no request can hold the server up making folders.** A folder path named for a
+- **A folder path has a limit.** A folder path named for a
   write is now at most 12 levels and 400 characters, refused with a 400 (never cut to fit) everywhere a folder comes
   in — `POST`, `PATCH` and `PUT` on folders, `POST /api/asks`, upload metadata and upload URLs, the MCP tools
   `move_video`, `track_video`, `request_upload` and `ask_options`, and `vr move`, `track`, `push` and `ask` before they
@@ -1285,9 +1264,8 @@ The first public release: what it has first, then everything that changed while 
   the old password behind and ends whatever it could have made; it says which workspace and inviter confirming would
   join. Signing up with a held address and another password sends a reset link instead of the link; with
   `VR_SIGNUP=invite` asking sends the invites made out to the address too.
-- An invite sign-up held from before the invite fix (made from an invited address alone, with the invite's role) whose
-  confirmation had been moved to another inbox can no longer be confirmed from there: the server drops such a pending
-  change of address and its link at start, so only the invited address's own inbox confirms the account.
+- An invite sign-up held from before the invite fix is confirmed only from the invited address's own inbox: the
+  server drops a pending change of address for such a sign-up at start.
 - Signing up a second time in the same browser (another address, or the same one again) no longer stops the first
   confirm link from signing that browser in: the browser keeps one mark for all its sign-ups and taken invites.
 - Two workspaces asking for the first run's sample within the seconds it takes to make one each get their own: the
@@ -1296,9 +1274,8 @@ The first public release: what it has first, then everything that changed while 
   webhooks (the operator's own team) reach private addresses, and every other workspace's stay on public addresses —
   when they are saved, tested and sent. A hook another workspace saved to a private address before stops being sent.
 - **Only the owners of workspace #1 make workspaces now, unless the instance says anyone may**
-  (`VR_WORKSPACE_CREATE` defaults to `owners`; it was `anyone`). Whoever runs a workspace invites and emails people and
-  takes turns in the job queue, so accounts made for the purpose could each run one and push other teams' posters and
-  previews back. With `VR_WORKSPACE_CREATE=anyone`, each account makes at most `VR_WORKSPACE_CREATE_LIMIT` (3; the
+  (`VR_WORKSPACE_CREATE` defaults to `owners`; it was `anyone`), so the server's work stays shared fairly between the
+  teams on it. With `VR_WORKSPACE_CREATE=anyone`, each account makes at most `VR_WORKSPACE_CREATE_LIMIT` (3; the
   workspace its sign-up gave it counts; #1's owners have none), counted on the server, and *New workspace…* is offered
   only while it may. Sign-up (`VR_SIGNUP=open`) still gives each person a workspace of their own.
 - An API token is told of its own workspace only: `/api/auth/status`, `/api/auth/me` and `/api/workspaces` no longer
@@ -1312,22 +1289,19 @@ The first public release: what it has first, then everything that changed while 
   written in Unicode or with a trailing dot) is that address, and letters from another script that look like ours,
   invisible characters and addresses no email can reach are refused for sign-ups, invites and new addresses. Accounts
   made before sign in as they did.
-- Whether an address has an account no longer shows in how busy the server is right after *Forgot password?*, a
-  sign-up, *Send it again* or taking an invite: the link and email for an existing address are made a moment later.
+- Whether an address has an account no longer shows after *Forgot password?*, a sign-up, *Send it again* or taking
+  an invite, in what the server answers or in how long it takes.
 - A plan's member limit (Lampo Cloud) holds when someone confirms an invite they took earlier: with no room left, the
   confirm link is refused and stays good for when there is.
-- Someone holding an invite link made out to an address can no longer find the address by trying one after another:
-  after a few wrong addresses the invite answers "try again later" for a while, whatever address is typed.
-- A sign-up waiting for its address to be confirmed can no longer find out the names of other teams' people by
-  renaming itself: its name is told apart in the workspaces it joins, when it joins them.
+- An invite link made out to an address keeps that address to itself: it can't be used to find the address out.
+- A sign-up waiting for its address to be confirmed learns nothing of other teams' people: its name is told apart
+  from theirs in a workspace only when it joins it.
 - Two people invited into one workspace under the same name no longer both join as it: the one confirming second is
   asked for another name on the confirm page (names tell people apart on notes).
 - A held account whose invite someone else took first is refused every time its confirm link is opened (*This invite
   can't be used*): a second try used to confirm it into no workspace at all.
-- **Disabling someone on a server with workspaces shuts them out of that workspace only.** A workspace's admin could
-  disable the account of anyone who worked only there, and the address was then dead on the whole server: no reset,
-  sign-up or other team's invite could bring it back. Now *Disable* suspends the membership — no role in that
-  workspace, its tokens and apps of theirs end — and the person keeps their account: they sign in, reset their
+- **Disabling someone on a server with workspaces shuts them out of that workspace only.** *Disable* suspends the
+  membership — no role in that workspace, its tokens and apps of theirs end — and the person keeps their account: they sign in, reset their
   password and join other workspaces as before. The admin can let them in again; a person in several workspaces can be
   disabled in one without the others hearing of it.
 - Links from outside the app name their workspace on a server with several: a notification, a chat webhook's link
@@ -1353,11 +1327,9 @@ The first public release: what it has first, then everything that changed while 
   labels: its source (`SOURCE_URL` build argument, the repository by default), licence and the commit it was built from
   (`REVISION`; CI passes it).
 - A review link names no folder above what it shares (folder names are often client and project names): a video link
-  sent its video's whole folder path, a folder link the full path of its folder, and a password link that path before
-  the password. Now a video link names no folder, a folder link its own name and where each video sits below it, and
-  a locked link none.
-- A newest-only review link no longer serves a still of an older version through a frame reference another link's
-  note brought in: the moment shows, its picture doesn't, and the file answers 404 there.
+  names no folder, a folder link its own name and where each video sits below it, and a locked link none.
+- A newest-only review link shows no picture of an older version, also where another link's note refers to a
+  moment of one: the moment shows, its picture doesn't.
 - Writing on a client's note says the client reads it: what the team writes there (a reply, a reason) and what an
   agent writes (its fix note too) reaches the client word for word. The reply field and check mode's reason on a
   client's note say "Mia can see this on the review link", and agents read `CLIENT: they read your replies and fix note
@@ -1406,22 +1378,19 @@ The first public release: what it has first, then everything that changed while 
   the app made at chatgpt.com/plugins.
 
 ### Fixed
-- `/oauth/authorize` no longer sends anyone to an app's address before they decided on the consent screen. Every
-  problem before the decision (an unknown client or address, PKCE, the response type, the resource, the scope) now
-  shows Lampo's page "The app can't connect", and that page shows its own words for a fixed set of codes: a link to it
-  can no longer put someone else's sentence in Lampo's frame.
+- `/oauth/authorize` sends nobody to an app's address before they decided on the consent screen: every problem
+  before the decision shows Lampo's page "The app can't connect", in Lampo's own words.
 - On a person's own machine, a page the owner opens on another site can no longer make the owner's requests. A request
   another site makes the browser send (and this machine on another port) is refused unless anyone may ask it: the
   app's pages, sign-in, OAuth and review links. Renders, frames, posters, screenshots and API answers also tell
   browsers that only this origin may load them (both modes). Agents, `vr` and the LAN link work as before.
-- `vr playbook skill --files` and `vr playbook export` no longer write a file wherever the server's name for it points.
-  Every skill and file name is now checked before the first file is written: a name that isn't plain, or that would
-  land outside the folder (also through a symbolic link already there), stops the command and nothing is written.
-- On a hosted server with Bunny or S3, a review link's video no longer keeps playing for up to 6 hours after the link
-  is revoked, expires or gets a password. The signed storage URLs a link's visitors get (renders, previews, reference
-  clips, downloads) now live 5 minutes; the bytes still come straight from the CDN or bucket, the server checks the
-  link every time it hands one out, and the player fetches a fresh one when an old one stops working and plays on from
-  the same frame. The team's player keeps its 6 hours.
+- `vr playbook skill --files` and `vr playbook export` write only inside the folder they write to: every skill and
+  file name is checked before the first file is written, and one that isn't plain stops the command with nothing
+  written.
+- On a hosted server with Bunny or S3, a review link's video stops playing soon after the link is revoked, expires or
+  gets a password: the signed storage URLs its visitors get are short-lived, the server checks the link every time it
+  hands one out, and the player fetches a fresh one when an old one stops working and plays on from the same frame.
+  The bytes still come straight from the CDN or bucket.
 - The MCP tools take the HTTP API's limits on what they write: a note, reply, fix note or reason over 20,000
   characters, a tag over 60, a status over 200, a render source, caption, link or playbook suggestion over the API's
   caps is refused instead of going into review.json. Both ways in share one set of schemas. A reference or fix
@@ -1429,27 +1398,22 @@ The first public release: what it has first, then everything that changed while 
   read-only workspace refuses it with its sentence. The tool list doesn't grow: the limits are checked, not announced.
 
 ### Fixed (options)
-- An option's file the server fails to store — the bucket refuses it, ffmpeg dies on it — no longer hands an API
-  token, an agent over MCP or anyone else but the machine's owner at the machine the bucket's error XML, the storage
-  key, an internal address or ffmpeg's output as a 422: they read a sentence with a reference (the details are in the
-  log under it), and a store's failure answers 5xx, the server's fault rather than the file's. The machine's owner
-  still reads which item failed and why.
-- A sound offered as an option can no longer keep the server's processor busy for long: its header must say at most
-  192 kHz and 8 channels (a clip's sound too, references on notes included) before anything decodes it, every ffmpeg
-  run on a reference's or an option's file stops at a time limit of its own, and a question's files go through the
-  server's job queue one at a time instead of all at once. A hosted workspace whose queue is full answers 503 with when
-  to try again, and keeps nothing of the question
- .
+- An option's file the server fails to store — the bucket refuses it, ffmpeg dies on it — tells its details only to
+  the machine's owner at the machine: everyone else reads a sentence with a reference (the details are in the log
+  under it), and a store's failure answers 5xx, the server's fault rather than the file's.
+- A sound offered as an option is checked before anything decodes it (at most 192 kHz and 8 channels; a clip's sound
+  and references on notes too), every ffmpeg run on a reference's or an option's file has a time limit of its own, and
+  a question's files go through the server's job queue one at a time. A hosted workspace whose queue is full answers
+  503 with when to try again, and keeps nothing of the question.
 - A question may show at most 8 moments of renders, and they are grabbed in the job queue like its files, not inside
   the request. More than 8 is refused before anything is grabbed.
-- Questions asked on folders can no longer grow their workspace's file without end: their number and the file's size
-  are bounded, answered ones go first, a question keeps at most 50 answers (on a video too) and 5,000 characters of
-  text, and the file is read once per change. A file of the wrong shape is no longer read as empty and written over;
-  asking waits until it is put right, and other people read a sentence instead of its path
- .
+- Questions asked on folders are bounded: their number and the file's size have a limit, answered ones go first, a
+  question keeps at most 50 answers (on a video too) and 5,000 characters of text, and the file is read once per
+  change. A file of the wrong shape is no longer read as empty and written over; asking waits until it is put right,
+  and other people read a sentence instead of its path.
 - A question whose project was deleted (it waits on no folder) reads as a folder's question in `vr watch`,
-  `wait_for_feedback` and INBOX.md (`ANSWERED c_… folder - by …`), no longer as a video's line with `undefined` in it
- .
+  `wait_for_feedback` and INBOX.md (`ANSWERED c_… folder - by …`), no longer as a video's line with `undefined` in
+  it.
 - An option's file that arrives through its upload URL after the person answered or closed the question is refused
   (409) instead of changing an item they already picked from without anyone hearing of it.
 - A question whose upload URLs are refused (too many open) is no longer stored and announced without them: the URLs are
@@ -1471,8 +1435,8 @@ The first public release: what it has first, then everything that changed while 
   HTTP says what fits inline there (≤ 700 KB, `/mcp` takes 1 MB a request) instead of 8 MB.
 
 ### Fixed
-- A storage key can no longer name a place outside the store: a render's key names its video by an id a review could
-  have (as fix previews and references did already), and no part of any key may be `..` or `.`.
+- Storage keys stay inside the store: a render's key names its video by an id (as fix previews and references did
+  already).
 - Deleting a video, a sample or a folder's files on S3 storage no longer leaves an object behind whose key holds an
   escaped character such as `&lt;` spelled out, or a control character: the listing's keys are read as XML text in one
   pass.
@@ -1484,9 +1448,8 @@ The first public release: what it has first, then everything that changed while 
   machine a hung `claude` CLI no longer holds the library's first load (up to an hour): the agents list waits a second,
   then comes when it comes, and `claude agents` gets 10 s before the session files are read instead. A tool stopped at
   its deadline whose children still held its output open is let go too.
-- A device's push service is reached only at a public address: besides naming one of the browsers' push services,
-  every address the endpoint's name resolves to must now be public, and the push connects to the one it checked (the
-  same guard as webhooks and OAuth metadata); a refusal is logged once and not retried.
+- A device's push service is reached only at a public address, through the same guard as webhooks and OAuth
+  metadata; a refusal is logged once and not retried.
 - On a machine other people sign in to, they can no longer read what your agents did: the logs of runs Lampo started
   (an agent's whole transcript) are 0600 in a 0700 folder, the live activity file is 0600, and `vr`'s download cache of
   a hosted server's screenshots is a 0700 folder. Ones made by an older version are closed on next use.
@@ -1494,24 +1457,22 @@ The first public release: what it has first, then everything that changed while 
   a word: it refuses and says why, unless you add `--insecure` (then it warns); this machine's own `http://localhost`
   and `127.0.0.1` work as before. `vr mcp config claude --with-token` warns that the command it prints holds your token
   and will stay in your shell's history.
-- On a hosted server, what one member's agent reports it did can no longer show under another's agent, or at a made-up
-  time: lines posted to the live monitor are listed as `<agent> · <account>`, like an MCP client's connection, and
-  their time is held to the last five minutes.
-- An unauthenticated `POST /oauth/revoke` with a made-up token, or a refresh with one, no longer makes every open MCP
-  wait and listen on the server ask again whether its caller still gets in, nor rewrites the server's list of app
-  connections: only a token one of the client's connections holds revokes, writes and tells the open streams. Signing
-  out everywhere an account that isn't there, and the sweep of unconfirmed sign-ups when there is none, tell nobody
-  either.
+- On a hosted server, what one member's agent reports it did shows under that member's agent and at about the time
+  it was posted: lines posted to the live monitor are listed as `<agent> · <account>`, like an MCP client's
+  connection.
+- Revoking or refreshing an app's token acts only on a token one of that app's connections holds: only then is
+  anything revoked, written down or told to the open MCP waits and listens. Signing out everywhere an account that
+  isn't there, and the clean-up of unconfirmed sign-ups when there is none, tell nobody either.
 - Access ended outside the server's own process (`vr admin reset-password`, a token revoked by `vr admin`, a restored
-  file) or by expiry (an API token's, an app's hour-long access token, a session's) no longer reaches an open MCP wait
-  for up to 5 s: an open wait or listen asks again whenever the files access is decided by have changed, and never
-  remembers a yes past its credential's own end, so the next note is held back from it.
-- Reviewers can no longer take every MCP wait of a workspace, nor its listens, and leave its owner's own agent
-  refused: the places are shared out by role, and a part is kept for owners and admins (docs/mcp.md).
+  file) or by expiry (an API token's, an app's hour-long access token, a session's) also ends open MCP waits and
+  listens: they ask again whenever the files access is decided by have changed, and never remember a yes past their
+  credential's own end, so the next note is held back from them.
+- A workspace's MCP waits and listens are shared out by role, and a part is kept for owners and admins, so their own
+  agents always find room (docs/mcp.md).
 - On the machine, each phone or tablet with the LAN link now has its own 4 MCP listens and waits; they shared one
   connection's 4 between them.
-- One account can no longer hold hundreds of `/api/events` live streams on a hosted server: the streams a person holds
-  at once are bounded, and one more answers `429`. A stdio MCP server signed in to a hosted server no longer reads the
+- The `/api/events` live streams a person holds at once on a hosted server are bounded; one more answers `429`. A
+  stdio MCP server signed in to a hosted server no longer reads the
   server's recent event log (2,000 events, ~888 KB) once a second for each `wait_for_feedback`: it sleeps until the
   live stream it already follows says something happened, then asks only for what is new since its cursor.
 - On a Linux machine other people sign in to, their programs can no longer use the local app as you: a request from
@@ -1519,5 +1480,4 @@ The first public release: what it has first, then everything that changed while 
   On macOS and Windows the system can't tell accounts apart, which SECURITY.md now says. A new store is made readable
   by you alone, and the app warns at start when the store's folder can be opened by other accounts.
 - An API token's "last used" no longer moves while an agent merely holds a wait, a listen or `/api/events` open with
-  it: asking again whether it still gets in isn't a use (it rewrote the account file about once a minute per token)
- .
+  it: asking again whether it still gets in isn't a use (it rewrote the account file about once a minute per token).

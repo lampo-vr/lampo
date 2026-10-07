@@ -11,4 +11,4 @@
 - [ ] `npm run check` and `npm run test:all` pass
 - [ ] Changes to seeking, timecodes, screenshots or versions come with a test against ffmpeg's decoded frame
 - [ ] Changes to the data contract (review.json, events.jsonl, INBOX.md, `vr` output) are backwards compatible and documented in docs/
-- [ ] I have signed the CLA (`CLA.md`; the CLA Assistant check asks on your first pull request)
+- [ ] I have signed the CLA (`CLA.md`; the CLA check asks for one comment on your first pull request)

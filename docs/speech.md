@@ -23,8 +23,10 @@ Everyone sets their own in **Settings → Voice notes**:
   sounds like a language you don't speak is heard again as your first.
 
 Until you choose, the server's list applies (`languages` below). Your choice is kept on your account and also applies
-to your recorded feedback. The same page says whether voice notes are written down at all and what is doing it; its
-*Details* name the engine, the model and the device, and show owners and admins where to change them.
+to your recorded feedback. The same page says whether voice notes are written down at all, and where: on the computer
+Lampo runs on, on the server the workspace is on, or by the speech service it is set up with. Whoever runs the app
+(the person at their own computer, or a hosted server's operator) also gets *Details*: the engine, the model, the
+device, and for an admin where to change them. A workspace on a hosted server can't change the engine.
 
 ![Settings → Voice notes: speech to text is on, My languages with English first and German, and Details folded](assets/voice-notes-settings.webp)
 

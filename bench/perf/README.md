@@ -13,8 +13,8 @@ node bench/perf/api.ts /tmp/vr-perf/run                    # endpoint timings, s
 node bench/perf/browser.mjs /tmp/vr-perf/run               # loads cold/warm, commits and input latency
 ```
 
-`test/e2e/perf.mjs` (`npm run test:perf`, part of `test:e2e`) is the short version that runs every time: a 300-video
-store, the CPU slowed down 4×, best of three tries per budget.
+`test/e2e/perf.mjs` (`npm run test:perf`; in `test:e2e` on CI, with `--perf` and in `test:all`) is the short version
+that runs every time: a 300-video store, the CPU slowed down 4×, best of three tries per budget.
 
 Load skews every timing: compare runs of one sitting, and only when `sysctl -n vm.loadavg` (or `uptime`) is low.
 Servers start on a free port with the store you give them — never a live store.
@@ -23,9 +23,10 @@ Servers start on a free port with the store you give them — never a live store
 
 ### The light start (2026-09-30)
 
-Before = main at `75cc312`, after = this change, measured in one sitting on chrome-headless-shell with the CPU slowed
-down 4× (each run started only at a load average below 8). The A/B rows alternate the two, round by round, on copies
-of one synthetic 1,000-video store (20,000 notes), six rounds each.
+Before = main just before this change (from before the repository's public history), after = this change, measured in
+one sitting on chrome-headless-shell with the CPU slowed down 4× (each run started only at a load average below 8).
+The A/B rows alternate the two, round by round, on copies of one synthetic 1,000-video store (20,000 notes), six
+rounds each.
 
 | | before | after |
 |---|---:|---:|

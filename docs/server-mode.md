@@ -99,6 +99,7 @@ The settings that matter most on a server. All the others, and where config.json
 | `VR_SMTP_URL`, `VR_MAIL_FROM` | `mail.smtp_url`, `mail.from` | none: the outbox | The mail relay invites, password resets and account notices go out through, and the sender people see. Without a relay, every email is written to the outbox in the cache instead ([email.md](email.md)). |
 | `VR_SIGNUP` | `signup` | off | Who may sign up on their own: `off`, `invite` or `open` ([below](#accounts-and-tokens)). |
 | `VR_IMPRINT_URL`, `VR_PRIVACY_URL`, `VR_TERMS_URL` | `imprint_url`, `privacy_url`, `terms_url` | none | Your imprint, privacy policy and terms, linked at the foot of the sign-in screens and of review links, and in *Settings → About* ([configuration.md → Legal pages](configuration.md#legal-pages)). `VR_SIGNUP=open` needs the terms and the privacy policy. |
+| `LAMPO_OPERATOR` | | the first workspace's owners | Who runs this server, by email address or account id ([below](#the-operators-pages)). |
 
 Where the store is on disk: [configuration.md → Where data lives](configuration.md#where-data-lives).
 
@@ -112,6 +113,7 @@ what to change:
 - a `VR_PUBLIC_URL` with a path, or without its scheme;
 - plain `http://` on a host other than this machine, without `VR_ALLOW_HTTP=1`;
 - an https `VR_PUBLIC_URL` without `VR_TRUST_PROXY`;
+- a `VR_MEDIA_ORIGIN` that isn't a host of its own: with a path, plain http off this machine, or the public URL's host;
 - `VR_BUNNY_CDN_URL` without `VR_BUNNY_TOKEN_KEY`;
 - an unknown `VR_STORAGE`, `VR_STT` or `VR_SIGNUP`, incomplete storage settings, or a port, size or `VR_TRUST_PROXY`
   entry it can't read;
@@ -120,7 +122,9 @@ what to change:
 - sign-up without a public URL, `VR_SIGNUP=open` anywhere but a hosted server, or `VR_SIGNUP=open` without
   `VR_TERMS_URL` and `VR_PRIVACY_URL` (strangers who sign up accept your terms and read your privacy policy first);
 - a store folder it can't write;
-- a damaged key file (`secret.key`, `share-secret.key`).
+- a damaged key file (`secret.key`, `share-secret.key`);
+- a `VR_CLOUD_MODULE` that can't be loaded, or one that names a route the server answers itself
+  ([below](#a-billing-provider)).
 
 Forwarding headers from a peer that `VR_TRUST_PROXY` doesn't name are reported once in the log: the proxy isn't
 named, or the app's port can be reached without it.
@@ -336,13 +340,16 @@ it is told so and lands in their library.
 
 A self-hosted server is complete and unlimited. A hosted service that sells plans adds a module of its own, which the
 server loads when `VR_CLOUD_MODULE` names its file (the one extension point, `server/extension.ts`; without it nothing
-below exists). What such a module may do:
+below exists). Lampo Cloud ([lampo.video](https://lampo.video)) runs its plans and billing this way, in a module kept
+outside this repository. What such a module may do:
 
 - **Limit what costs storage or a seat.** A new upload, video, member, review link or publishing connection is asked
   for first; a workspace whose plan has no room for it, or that is read-only, is refused with a `402` and the
   module's sentence ([api.md](api.md#workspaces-and-plan-limits)). Reviewing, notes, answers, approvals, downloads and the review links
   already sent keep working, and nothing is ever deleted for a plan.
-- **Hear** a workspace made and a member count changed (after the fact, never in the way).
+- **Hear** a workspace made or deleted and a member count changed (after the fact, never in the way).
+- **Let a workspace hide the badge.** Review links and embeds show a small *Powered by Lampo*; a module may let a
+  workspace's owners and admins hide it (Settings → Review links, on a paid plan). Without a module it always shows.
 - **Answer a sign-up** in place of the server's own: it places the person exactly as the server would ([Sign-up
   above](#workspaces): their own workspace on a server open to sign-ups, an invite's workspace otherwise) and then does
   what its plans give a newcomer, such as a trial. If it fails, the confirm link stays unused.
@@ -357,7 +364,10 @@ below exists). What such a module may do:
   would mean for the workspace, a grace period and its three ways on, or that the workspace is read-only (then Add
   video is a locked button that explains why instead of an upload that fails). The first fix checked on a video of the
   workspace's own and its first review link opened each show a short, dismissible note about the plan, once per
-  workspace. Nothing of it counts down in hours or blocks the work.
+  workspace. Nothing of it counts down in hours or blocks the work. The checkout tells a consumer from a business (a
+  consumer reads the withdrawal information, a business gives its name and VAT ID) and links your
+  [legal pages](configuration.md#legal-pages); it speaks of reverse charge only where the module says the seller offers
+  it (`reverseCharge`, [api.md](api.md#workspaces-and-plan-limits)).
 - **Name the origins its payment form loads from** (`contentSecurity`: https origins only, or the server doesn't
   start). The hosted app's own pages allow them in their Content-Security-Policy; review links and a person's own
   machine never do.
@@ -413,8 +423,8 @@ Whoever runs a hosted server has three pages nobody else sees, behind **Operator
 - **Its plan, set by hand** (with a billing module that offers it): complimentary on a plan (no limits, never billed),
   the trial run to a day, or back to normal billing, each with a reason. The module keeps the plan and a log of every
   change — who, when, what, why — and the page shows it. A workspace that pays keeps its subscription (end it first),
-  and the server's own workspace and those `LAMPO_COMPLIMENTARY` names are changed there. Without a module the pages list
-  the workspaces without plans.
+  and the server's own workspace, or one the module's own settings make complimentary (Lampo Cloud's:
+  `LAMPO_COMPLIMENTARY`), is changed in those settings. Without a module the pages list the workspaces without plans.
 - **Accounts** (`#/operator/accounts`): every account with its workspaces and roles, when it was made, its last sign-in
   and whether it is disabled; searched by name or email. **Disable** signs the account out everywhere and stops its API
   tokens and connected apps at once, in every workspace; its notes and memberships stay. **Enable** lets it sign in
@@ -436,15 +446,18 @@ LAMPO_OPERATOR=you@example.com,u_0a1b2c3d4e5f   # who runs this server; unset: #
 
 People's own data is theirs to take home and to end (GDPR Art. 15, 17, 20); the operator can do both for them.
 
-- **Export my data** (Settings → Profile): one zip of plain JSON files and a README — the account (name, address,
-  settings), its workspaces and roles, its API tokens (names and dates, never the tokens), connected apps and devices,
-  and per workspace the notes it wrote with its own replies, its replies on other people's notes (with that note's id,
-  never its words), its drafts, unsent recordings with their audio, verdicts, the review links it made (never their
-  addresses), what it watched and what it uploaded (file metadata: the videos stay the workspace's). Notes from before
-  accounts were recorded with them aren't in it. A few an hour.
+- **Export my data** (Settings → Profile, on your own machine too): one zip, `lampo-data-<day>.zip`, of plain JSON
+  files and a README — the account (name, address, settings, picture), its workspaces and roles, its API tokens (names
+  and dates, never the tokens), connected apps and devices, and per workspace the notes it wrote with its own replies,
+  its replies on other people's notes (with that note's id, never its words), its drafts, unsent recordings with their
+  audio, its approvals and requests for changes, the review links it made (never their addresses), what it watched and
+  what it uploaded (file metadata: the videos stay the workspace's). Notes from before accounts were recorded with them
+  aren't in it. A few an hour.
 - **Delete my account** (Settings → Profile, a hosted server): its password confirms it (or a sign-in in the last ten
   minutes). Refused while it is the last owner of a workspace others work in: make someone else an owner there, or
-  delete that workspace, first. It leaves the workspaces others go on with; the workspaces only it works in go with it.
+  delete that workspace, first. Refused too for an account that works alone in the server's own workspace, or alone in
+  a suspended one. It leaves the workspaces others go on with; the workspaces only it works in go with it. Its address
+  gets one last email.
 - **Delete workspace** (Settings → Workspace, its owners): its name typed. Its people are emailed; whoever worked
   nowhere else loses their account with it (the owner too).
 - **What goes with an account**, however it goes (deleted, removed from its last workspace, a sign-up nobody confirmed):
@@ -502,6 +515,8 @@ it on every request, and the app hides what a role can't do.
 | connect publishing accounts; publish, schedule, cancel or retry posts | | | ✓ | ✓ |
 | turn footage search on or off for the workspace ([footage.md](footage.md)) | | | ✓ | ✓ |
 | accounts, invites, everyone's API tokens | | | ✓ (not owners') | ✓ |
+| hide the Lampo badge on review links (where a [billing provider](#a-billing-provider) allows it) | | | ✓ | ✓ |
+| delete the workspace ([Deleting](#deleting-and-exporting)) | | | | ✓ |
 
 *Reviewers* are people on your side who give feedback: producers, colleagues, freelancers. They see everything in the
 workspace like everyone else, but they don't hand work to agents (it costs time and money) or open the project to
@@ -553,7 +568,8 @@ folders, the last video, zoom per video); the theme and language chosen on the d
 Send them as `Authorization: Bearer vr_…`. Whatever the role, a token can't make or change credentials, roles, members,
 invites, tokens, connected apps, webhooks, workspaces or review links, subscribe a device to notifications, connect
 publishing accounts or publish, schedule, cancel or retry a post, end a person's first run (`PUT /api/onboarding`),
-read the server's health check or send its test mail, or put away a person's conversion moments ([api.md](api.md)):
+read the server's health check or send its test mail, put away a person's conversion moments, archive or restore a
+project, export a person's data, delete an account or a workspace, or open the operator's pages ([api.md](api.md)):
 that takes a person signed in in the app. Sign-off is a person's too: a token never approves, requests changes,
 carries an approval over, marks a video final or reopens it.
 
@@ -747,7 +763,8 @@ every `vr` command and the stdio MCP server (`bin/vr-mcp`) talk to the server to
   and static files, `/healthz`, `/readyz`, `/robots.txt`, `/api/info`, signing in, setup and invites, what an emailed
   link or a signed-out person asks (signing up, confirming an address, sending the confirmation again, *Forgot
   password?*, a reset: each answers alike for every address), one-time upload addresses, review links (each limited
-  to its video or folder), and `/mcp`, `/oauth/*` and `/.well-known/*`, which check credentials themselves
+  to its video or folder; an Embed link's player `/e/<token>` and `/oembed` too), and `/mcp`, `/oauth/*` and
+  `/.well-known/*`, which check credentials themselves
   (`isPublicPath` in `server/guard.ts`). A new route is never public by accident.
 - **Workspaces.** Each team's files are a tree of their own, every request, job and event runs in its workspace, and
   another workspace's things answer 404 ([Workspaces](#workspaces)).
@@ -808,13 +825,16 @@ every `vr` command and the stdio MCP server (`bin/vr-mcp`) talk to the server to
 - **Downloads.** File names inside *Download all* zips are plain relative names that work on every system: no
   separators, dot segments, device names, control or direction characters, and at most 200 characters.
 - **Headers.** A strict Content-Security-Policy (video also from the configured CDN, bucket or media host; no inline
-  script but the theme's, by hash), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`,
+  script but the theme's, by hash), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` and
+  `frame-ancestors 'none'` (only an Embed link's player, `/e/<token>`, may be framed, by any site;
+  [sharing.md](sharing.md)), `Referrer-Policy`,
   `Cross-Origin-Opener-Policy` (`same-origin`; `unsafe-none` only on the way to an app's consent screen, so an app
   signing in in a popup keeps its opener) and `Permissions-Policy` (the microphone for the app itself only), HSTS when
   the public URL is https, and `X-Robots-Tag: noindex, nofollow`: nothing an instance serves is for search engines
   (`/robots.txt` lets crawlers fetch pages, so they see it). Your machine sends the same set, and so do the health
-  checks, `/robots.txt` and the 404 of a path spelled another way. The pages load nothing from anywhere else: fonts are
-  part of the build, and there is no analytics or telemetry.
+  checks, `/robots.txt` and the 404 of a path spelled another way. The pages load nothing from anywhere else (but a
+  billing module's payment form, [above](#a-billing-provider)): fonts are part of the build, and there is no analytics
+  or telemetry.
 - **Errors.** A 5xx answer says only "something went wrong on the server (ref …)"; the details go to the log under
   that reference. A 4xx or an MCP tool error that comes from ffmpeg's output or names a path is answered the same way
   ("that file could not be read or converted (ref …)"), and so is whatever the object store (its keys, the bucket's

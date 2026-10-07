@@ -78,8 +78,10 @@ docker compose exec app vr ls
 ```
 
 `vr admin` also has `create-user`, `reset-password`, `invites`, `revoke-invite`, `workspaces`
-([server-mode.md → Workspaces](server-mode.md#workspaces)) and `repair-folders`, which rebuilds a damaged
-`folders.json` ([go-live.md](go-live.md#13-when-something-else-goes-wrong)).
+([server-mode.md → Workspaces](server-mode.md#workspaces)), `import` (reviews from your own machine,
+[moving.md](moving.md)), `delete-account`, `delete-workspace`, `export-account` and `erasures`
+([server-mode.md → Deleting and exporting](server-mode.md#deleting-and-exporting)), and `repair-folders`, which
+rebuilds a damaged `folders.json` ([go-live.md](go-live.md#13-when-something-else-goes-wrong)).
 
 ## The /data volume
 
@@ -172,7 +174,8 @@ docker compose up -d app
 ```
 
 New versions read existing stores unchanged. The cache may be rebuilt after an upgrade; that costs time, not data.
-In production, follow a release tag rather than the main branch.
+In production, check out a fixed commit or release tag rather than following the main branch, and keep the previous
+image to roll back to ([go-live.md → Updates and rollback](go-live.md#11-updates-and-rollback)).
 
 ## Resources
 
@@ -213,6 +216,8 @@ In production, follow a release tag rather than the main branch.
   and the third-party notices. No tests, docs, benchmarks, `.env` files or data, and nothing `.gitignore` keeps
   private (local working files such as `*.local.md` notes, `cloud/`) even reaches the build context (see `.dockerignore`).
 - `docker images video-review` shows its size on your platform.
+- CI builds it (linux/amd64) on every push to main and every pull request, and checks that a container started from it
+  answers `/healthz` (`.github/workflows/ci.yml`).
 - Its OCI labels say where its source is (`org.opencontainers.image.source` and `.url`: the `SOURCE_URL` build
   argument, the project's repository by default), its licence (`AGPL-3.0-only`) and the commit it was built from
   (`.revision`: the `REVISION` build argument; CI passes it). Build with the commit:

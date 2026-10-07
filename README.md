@@ -59,8 +59,9 @@ the exact frame and what's on it. Lampo turns review into data an agent can act 
   on the frame, audio changes and moved cuts are marked on the timeline, and **Play changes** plays only those parts.
 - **Check mode** (<kbd>⇧V</kbd>) walks through every fix side by side, V(N-1) and VN at the same frame: <kbd>Y</kbd>
   looks right, <kbd>N</kbd> still wrong.
-- **Save, then send.** Keep notes as drafts only you see (<kbd>⌘S</kbd>), then send them together (<kbd>⌘↵</kbd>): the
-  agent gets them as one batch, not one at a time while you are still writing.
+- **Save, then send.** Keep notes as drafts only you see, then send them together: the agent gets them as one batch,
+  not one at a time while you are still writing. On a video with an agent, Save is the main button (<kbd>⌘↵</kbd>) and
+  <kbd>⇧⌘↵</kbd> sends; without one, <kbd>⌘↵</kbd> sends and <kbd>⌘S</kbd> saves.
 - **Quick check.** A note can let the agent render only the shots it is about. The part plays as the whole video, its
   seams are checked, and it can't be final ([docs/workflow.md](docs/workflow.md#partial-renders)).
 - **Auto-check.** Before you watch, every render is checked automatically. It reads burned-in text and flags probable
@@ -79,11 +80,19 @@ the exact frame and what's on it. Lampo turns review into data an agent can act 
   any screen. They draw on the frame, reply, check fixes and approve; you decide what each link allows (watch only,
   versions, downloads, expiry, a password) and see who opened it and how far they watched. Their notes reach the agent
   tagged `guest:<name>`, your internal notes stay hidden, and webhooks tell Slack or Discord right away
-  ([docs/sharing.md](docs/sharing.md)).
+  ([docs/sharing.md](docs/sharing.md)). An **Embed** link plays one video on your own site in the same frame-exact
+  player, with no notes and no cookie ([embedding](docs/sharing.md#embedding-a-video)).
 - **Where everything stands.** Every video is in one stage, from *To review* through *Check fixes*, *Approved* and
   *Approved via link* to *Final*. The library's cards, list and board and the player show the same one. Approvals
   are kept per version and per party (the team, and whoever decides through a review link); final locks a video for
-  agents ([docs/workflow.md](docs/workflow.md)).
+  agents ([docs/workflow.md](docs/workflow.md)). Members, admins and owners download any version as it was rendered,
+  from its ⋯ menu, and a project that is done can be **archived**: out of sight and read only until it is restored,
+  in one click.
+- **See what your agent is doing.** One line under the notes says where the video's agent is — fixing 3 of 6,
+  rendering V4 at 42 % with the time left, waiting for your answer, or not heard from — and the Agent view shows your
+  notes as its plan and the steps it took. A version an agent made says who made it and what it fixed. When an agent
+  fails, waits for a permission or goes quiet, the inbox (and your phone, if you like) says so
+  ([docs/agents.md](docs/agents.md#your-work-as-the-person-sees-it-runs)).
 - **Publish the final.** Post a final version to YouTube, Instagram and Facebook with your own keys, or download the
   publish kit (each platform's encode, captions, cover, copy). Agents draft the posts; a person publishes
   ([docs/publishing.md](docs/publishing.md)). New: tested against stand-ins, not yet against the real services.
@@ -158,9 +167,11 @@ OpenAI-compatible server option: [docs/speech.md](docs/speech.md).
 
 ## Run it as a server
 
-A server is for a team, or for sharing reviews with clients without a tunnel. The maintainers run one as a hosted
-service, **Lampo Cloud** ([app.lampo.video](https://app.lampo.video)), for those who'd rather not run their own;
-self-hosting stays free and complete:
+A server is for a team, or for sharing reviews with clients without a tunnel. This repository is the whole app:
+self-hosted, it is complete and has no limits. The maintainers also run it as a hosted service, **Lampo Cloud**
+([lampo.video](https://lampo.video)), for those who'd rather not run their own; its plans and billing come from a
+separate module that is not part of this repository and that a self-hosted server doesn't need
+([docs/server-mode.md](docs/server-mode.md#a-billing-provider)):
 
 ```sh
 cp .env.example .env      # set VR_DOMAIN and VR_PUBLIC_URL (VR_TRUST_PROXY=uniquelocal is
@@ -191,7 +202,7 @@ to check a running instance.
 | <kbd>←</kbd> <kbd>→</kbd> (⇧ ×10) · <kbd>Home</kbd> <kbd>End</kbd> | frame step · first/last frame |
 | <kbd>I</kbd> <kbd>O</kbd> · <kbd>Esc</kbd> <kbd>X</kbd> · <kbd>R</kbd> · <kbd>M</kbd> | mark a section's start or end, also while playing (⇧ jumps there) · clear it · loop it · mute |
 | drag | on the timeline's notes lane (⇧ anywhere on it): mark a section, and its note opens; drag its ends to adjust |
-| <kbd>C</kbd> <kbd>↵</kbd> | note on this frame, or on the marked section; in the note, <kbd>⌘↵</kbd> sends and <kbd>⌘S</kbd> keeps it as a draft; <kbd>⇧⌘↵</kbd> sends every note not sent yet |
+| <kbd>C</kbd> <kbd>↵</kbd> | note on this frame, or on the marked section; in the note, <kbd>⌘↵</kbd> presses the main button (Send, or Save on a video with an agent) and <kbd>⌘S</kbd> keeps it as a draft; <kbd>⇧⌘↵</kbd> sends every note not sent yet |
 | hold <kbd>T</kbd> · <kbd>⇧R</kbd> | voice note · record feedback while you watch (<kbd>⇧R</kbd> again: done) |
 | <kbd>D</kbd> · <kbd>⇧D</kbd> | next / previous change since the previous version |
 | <kbd>⇧V</kbd> | check mode: every fix, before and after |
@@ -319,8 +330,9 @@ accuracy is kept end to end. The HTTP API is in [docs/api.md](docs/api.md).
 ## Contributing
 
 Issues and pull requests are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) (setup, tests, the data
-contract) first. Contributions are accepted under a [Contributor License Agreement](CLA.md), and everyone involved
-follows the [Code of Conduct](CODE_OF_CONDUCT.md). Found a security problem? See [SECURITY.md](SECURITY.md) and
+contract) first. Contributions are accepted under a [Contributor License Agreement](CLA.md), which you sign once with
+a comment on your first pull request (the CLA check says which), and everyone involved follows the
+[Code of Conduct](CODE_OF_CONDUCT.md). Found a security problem? See [SECURITY.md](SECURITY.md) and
 please don't open a public issue.
 
 ## License

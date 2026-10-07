@@ -25,6 +25,7 @@ The data:
 | `lib/paths.ts`, `lib/config.ts` | where things live, and the settings |
 | `lib/workspaces.ts`, `lib/scope.ts` | workspaces on a hosted server: the registry and memberships; which workspace the work running now is for, carried by every request, job and stream it starts |
 | `lib/folders.ts`, `lib/shares.ts` | projects and folders; review links |
+| `lib/archived.ts` | archived projects: out of the lists, read only until a person restores them (shared with the UI) |
 | `lib/drafts.ts` | notes saved and not sent yet, kept beside the review (never in it) until their author sends them in one write |
 | `lib/stage.ts` | where a video stands (shared with the UI) |
 | `lib/foryou.ts` | the inbox: what waits for whom |
@@ -33,6 +34,7 @@ The data:
 | `lib/views.ts`, `lib/watch.ts` | who watched what, in hundredths of a version |
 | `lib/insights.ts`, `lib/insightsRounds.ts`, `lib/insightsFlow.ts`, `lib/insightsWatch.ts`, `lib/taste.ts` | Insights (why videos take so many rounds), and the taste file |
 | `lib/search.ts` | the ⌘K search: videos, folders and notes, every word matched, German spellings folded, best first |
+| `lib/bundle.ts`, `lib/bundleExport.ts`, `lib/bundleImport.ts` | moving a store's reviews to another one: `vr export` and `vr admin import` ([moving.md](moving.md)) |
 
 Media (ffmpeg):
 
@@ -49,6 +51,10 @@ Media (ffmpeg):
 | `lib/part.ts`, `lib/parts.ts`, `lib/splice.ts`, `lib/cuts.ts` | partial renders: the rules (shared with the UI), a part arriving and the comparison with the next full render, the whole video spliced together frame-exact, and where a render's shots begin |
 | `lib/stt/`, `lib/transcripts.ts`, `lib/transcript.ts` | speech: voice notes, and what is said in a render, on its frames |
 | `lib/recording.ts`, `lib/recordings.ts` | recorded feedback: what someone said while watching becomes draft notes |
+| `lib/elements.ts`, `lib/elementMaps.ts` | element maps: where each named element of a render is, frame by frame, so a note points at an element |
+| `lib/archive.ts`, `lib/zip.ts`, `server/routes/downloads.ts` | downloads: one version as it was rendered, and *Download all* as a store-only zip |
+| `lib/publish/` | publishing a final version: posts, the platforms' limits, connections, the queue, the publish kit ([publishing.md](publishing.md)) |
+| `lib/footage/` | footage search: shots, camera moves, keyframes and their embeddings, the search ([footage.md](footage.md)) |
 | `lib/jobs.ts` | the background queue ([below](#background-jobs)) |
 | `lib/storage/` | where renders live: local disk, Bunny Storage + CDN, or an S3-compatible bucket |
 
@@ -62,6 +68,8 @@ Accounts and the outside world:
 | `lib/oauth/`, `lib/scopes.ts` | sign-in for MCP clients, and what a connected app may do |
 | `lib/webhooks.ts`, `lib/push/`, `lib/netguard.ts` | webhooks, push notifications, and the guard on requests to addresses someone chose |
 | `lib/rateLimit.ts` | the one rate limiter (sign-in, invites, emailed links, OAuth, MCP, link passwords and notes), with bounded memory |
+| `lib/accountExport.ts`, `lib/deletion.ts`, `lib/erasure.ts` | a person's own data: the export (a zip), deleting an account or a workspace — from Settings, the operator's pages or `vr admin` — and what goes with it |
+| `lib/operator.ts`, `lib/legal.ts` | who runs a hosted server (its operator); the operator's legal pages, linked where people sign in, sign up and pay |
 
 Agents:
 
@@ -73,6 +81,8 @@ Agents:
 | `lib/eventLine.ts`, `lib/prompt.ts`, `lib/handoff.ts` | the lines agents parse (`vr watch`, `wait_for_feedback`), the *Copy for an agent* text, and the lines that say to wait (a hand-off's last line, a wait with nothing new, the stop after 30 minutes) |
 | `lib/sessions.ts`, `lib/agentKind.ts`, `lib/agentStatus.ts` | Claude Code sessions on this machine, what kind an agent is, "rendering v4" |
 | `lib/agentRun.ts`, `lib/runStream.ts`, `lib/activity.ts`, `lib/activityText.ts` | starting an assigned Claude Code session for a request, reading its output, and what agents do, live |
+| `lib/options.ts`, `lib/asks.ts` | options an agent offers before it renders, and questions on a folder before any render exists |
+| `lib/cliRender.ts`, `lib/render/` | `vr render`: an agent's own render command, run on its machine, its progress shown in the app and the result put up as the next version |
 
 The server:
 
@@ -83,8 +93,8 @@ The server:
 | `server/guard.ts`, `server/auth.ts`, `server/permissions.ts` | who is asking (the machine itself, a cookie, a token) and which action each route needs |
 | `server/workspace.ts` | runs every request in its workspace (a review link's own, else the caller's), with a request budget per workspace |
 | `server/signup.ts`, `server/accountMail.ts` | where a confirmed sign-up works from then on; which email goes out, to which address, in which language |
-| `server/extension.ts` | the one extension point: what a hosted service's module may limit (`402`) and hear, how it answers a sign-up, the workspace mail it may send, its billing routes; none on a self-hosted server |
-| `server/routes/` | the API. Review links are in `server/routes/shares/`: `access.ts` (what a request may reach through a link, used by every guest route), `owner.ts`, `guest.ts` (the link, visits, views, a visitor's writes), `media.ts` (playback, posters, screenshots, downloads) |
+| `server/extension.ts` | the one extension point: what a hosted service's module may limit (`402`) and hear, how it answers a sign-up, the workspace mail it may send, its billing routes. It is loaded only when `VR_CLOUD_MODULE` names one; a self-hosted server has none and is complete without it |
+| `server/routes/` | the API. Review links are in `server/routes/shares/`: `access.ts` (what a request may reach through a link, used by every guest route), `owner.ts`, `guest.ts` (the link, visits, views, a visitor's writes), `media.ts` (playback, posters, screenshots, downloads), `embed.ts` (an Embed link's player and oEmbed) |
 | `server/playback.ts` | what the browser plays: originals, playback proxies, scrub copies |
 | `server/background.ts` | the work done when a render arrives |
 | `server/watch.ts`, `server/feed.ts` | re-renders and outside writes to `data/`; every new line of `events.jsonl` sent out live |
@@ -92,10 +102,13 @@ The server:
 | `server/ready.ts`, `server/shutdown.ts` | `/readyz`, and finishing work before stopping |
 | `server/agentRuns.ts`, `server/activity.ts` | runs started on the machine; what agents are doing, live |
 | `lib/runs.ts`, `server/runs.ts`, `server/routes/runs.ts` | agents' runs: one stretch of an agent's work on a video (`data/<slug>/runs.jsonl`), its plan, state and result; what opens and moves them; the runs API |
+| `server/routes/yourData.ts`, `server/routes/operator.ts` | a person's own data (export, deleting the account or the workspace); the operator's pages (every workspace: its plan, suspend, delete; every account; the funnel) |
 
 The UI lives in `web/src/`: `api/` (TanStack Query and live updates), `library/`, `player/`, `inbox/`, `guest/` and
-`share/` (review links), `playbook/`, `auth/` (sign-in, accounts, workspaces), `onboarding/` (the first run),
-`settings/`, `uploads/`, `ui/` (the design system), `i18n/`, `styles/`.
+`share/` (review links), `embed/` (an Embed link's player, a page of its own: `web/embed.html`), `playbook/`,
+`publish/`, `auth/` (sign-in, accounts, workspaces), `onboarding/` (the first run), `settings/`, `operator/` (the
+operator's pages), `billing/` and `conversion/` (only where a billing module runs), `uploads/`, `ui/` (the design
+system), `i18n/`, `styles/`; [web/README.md](../web/README.md) has the whole tree.
 
 ## One app, two places
 
@@ -112,9 +125,10 @@ seconds, which makes the session assignable. A hosted server can hold several te
 ([below](#security-boundaries)). Details: [server-mode.md](server-mode.md).
 
 What the machine adds is a list of capabilities (`/api/info` → `capabilities`: linking files, local agents, Finder,
-macOS text recognition, project files, INBOX.md, the tunnel, the phone link). Features decide by capability, or by
-how a request was identified, rather than by the mode. Everything else is the same in both places: accounts, invites,
-uploads, the store format, notes and screenshots, versions and diffs, Auto-check and review links.
+macOS text recognition, project files, INBOX.md, the tunnel, the phone link, starting an assigned agent). Features
+decide by capability, or by how a request was identified, rather than by the mode. Everything else is the same in both
+places: accounts, invites, uploads, the store format, notes and screenshots, versions and diffs, Auto-check and review
+links.
 
 ## How a render flows
 
@@ -126,8 +140,8 @@ uploads, the store format, notes and screenshots, versions and diffs, Auto-check
    is registered, so a second process uploading the same video at the same moment is refused (409) instead of
    overwriting it.
 2. **Warm-up, in the background.** A poster, the loudness and freeze analysis, the diff against the previous version,
-   Auto-check, a check of fix previews, a transcript when the version before had one, and a scrub copy when the
-   render's keyframes are far apart.
+   Auto-check, a check of fix previews, a transcript when the version before had one, a scrub copy when the
+   render's keyframes are far apart, and footage search's index where it is on.
 3. **Playback.** The browser plays the original when it can decode it, or a playback proxy (ProRes and similar). Once
    the scrub copy is ready, the player switches to it while paused. A partial render plays as the whole video: the
    version it patches with the part's frames in their place, spliced once into the scrub copy's place, every frame
@@ -180,7 +194,10 @@ asks for the copy again by itself (5 s, doubling to a minute) instead of announc
 
 Background work also runs at a lower OS priority, so the reviewer's playback never competes with it. Posters and
 waveforms a browser asks for run outside the queue, three at a time, because someone is looking at the page; a cached
-one never touches the render (nor remote storage).
+one never touches the render (nor remote storage). Other ffmpeg runs someone waits for (a frame, a note's screenshots,
+a contact sheet, a reference) go through one gate outside the queue too: at most four at once, on two threads each,
+and on a hosted server with several workspaces at most two per workspace; past what may wait, the answer is a `503`
+with `Retry-After`.
 
 A job that takes the whole process down with it (the system's out-of-memory killer, a crash in native code) is not
 started again and again: each job of the warm-up leaves a marker in `cache/.jobs/` while it runs, the next start counts
@@ -307,7 +324,8 @@ after the first screenful), and no heading loses the tops or tails of its letter
   site may frame is an Embed link's player, `/e/<token>`: `frame-ancestors *` and no `X-Frame-Options`). Media, frames,
   posters, screenshots and API answers (`/api/`, `/media/`, `/data/`, review links' own included) carry
   `Cross-Origin-Resource-Policy: same-origin`, so no other site's page can load them as an image or a video — but for
-  an Embed link's poster, its oEmbed thumbnail, which says `cross-origin`.
+  an Embed link's poster, its oEmbed thumbnail, which says `cross-origin` (as does a media host of its own,
+  `VR_MEDIA_ORIGIN`, which answers signed URLs and nothing else).
 - **On your machine.** Only requests from the machine itself, with no proxy headers, are the owner without signing in.
   On Linux that is the app's own OS account (or root): the connecting socket's row in `/proc/net/tcp` names it
   (`peerUidFrom` in `server/auth.ts`). macOS and Windows can't tell accounts apart, so there every account on the
@@ -319,9 +337,10 @@ after the first screenful), and no heading loses the tops or tails of its letter
   on another port) is refused with `403` unless anyone may ask it: the app's pages and files (so links into the app and
   the LAN link still open), sign-in, OAuth and review links. Agents, `vr` and curl send no Fetch Metadata and aren't
   affected. Anything that names a path on the machine must come from the machine itself.
-- **Review links** (`/g/<token>`) reach only their video or folder and its notes for clients, everywhere, and name
-  videos by ids of their own. They, and the one-time upload addresses they give visitors for files, are the only
-  thing that answers through the optional Cloudflare tunnel.
+- **Review links** (`/g/<token>`) reach only their video or folder and the notes meant for their visitors,
+  everywhere, and name videos by ids of their own; an Embed link's player (`/e/<token>`) reaches its one video and
+  nothing else, no notes or names. They, the one-time upload addresses links give visitors for files, and oEmbed
+  are the only things that answer through the optional Cloudflare tunnel.
 - **Hosted** adds a required public URL, sign-in for everyone, ffmpeg held to the formats uploads may use, no access to
   the machine's files or sessions, and webhooks and push to public addresses only. See the
   [security model](server-mode.md#security-model) and [SECURITY.md](../SECURITY.md).

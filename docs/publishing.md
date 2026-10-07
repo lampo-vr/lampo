@@ -4,10 +4,10 @@ When a video is final, Lampo can post it to **YouTube**, **Instagram** and **Fac
 post it yourself. Agents write the posts; a person publishes them. TikTok, LinkedIn and X come through the same path
 later (see [Not built yet](#not-built-yet)).
 
-Phase 1 (this document): post drafts after Final, connections per workspace with your own keys, the publish queue,
-the kit, status and history. Nothing here was run against a real platform: the adapters are tested against local fakes
-(`test/lib/fakePlatforms.ts`), and the field names of the posting API are to be confirmed in a one-day test with a real
-account before anyone relies on them ([What is not confirmed](#what-is-not-confirmed)).
+What is built (this document): post drafts after Final, connections per workspace with your own keys, the publish
+queue, the kit, status and history. **None of it has been run against a real platform yet**: the adapters are tested
+against local fakes (`test/lib/fakePlatforms.ts`), and the field names of the posting API are to be confirmed in a
+one-day test with a real account before anyone relies on them ([What is not confirmed](#what-is-not-confirmed)).
 
 ## The steps
 
@@ -32,11 +32,11 @@ account before anyone relies on them ([What is not confirmed](#what-is-not-confi
 | Agents (MCP, `vr`, any API token) | drafts only (`draft_post`, scope `post:draft`): a failed or cancelled post is a person's to change or delete | never (`PERSON_ONLY`) | never |
 | A review link | nothing | nothing | nothing |
 
-Retry asks the plan's gate as Publish does. A post that went out before (`remote_id`) is never deleted, by anyone: it is
-the record of what the platform holds. While the video's project is archived its posts take no draft, change, publish
-or retry (`423`) until it is restored; cancelling and deleting still work. Reviewers read posts on purpose, as the team does: the connection's label, the
-account's name, a post's link (an unlisted or scheduled video's too) and who drafted and published it; the connections
-themselves are not theirs to read.
+Retry asks the plan's gate as Publish does. A post that went out before (`remote_id`) is never deleted, by anyone: it
+is the record of what the platform holds. While the video's project is archived its posts take no draft, change,
+publish or retry (`423`) until it is restored; cancelling and deleting still work. Reviewers read posts on purpose, as
+the team does: the connection's label, the account's name, a post's link (an unlisted or scheduled video's too) and
+who drafted and published it; the connections themselves are not theirs to read.
 
 The actions are `post` and `publish` in [`lib/permissions.ts`](../lib/permissions.ts); the routes are in
 [api.md](api.md#publishing). A plan may limit publishing on Lampo Cloud (`check(ws, 'publish')`, server/extension.ts).

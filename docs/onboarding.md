@@ -28,14 +28,14 @@ depends on where the app runs (`setupVariant`, `setupStepsFor` in [lib/setupFlow
 
 | Where | Steps after Welcome |
 |---|---|
-| **Lampo Cloud** (the owner of a workspace made at their own sign-up) | the workspace's name · who the videos are for · the agent · the team |
+| **A workspace made at sign-up** (its owner, on Lampo Cloud or any server open to sign-ups) | the workspace's name · who the videos are for · the agent · the team |
 | **Invited** into someone else's workspace | the agent (Welcome names the workspace and who invited them) |
-| **A self-hosted server** (an owner or admin of its first workspace) | the workspace's name · the health check · the team · the team's agents |
+| **A self-hosted server** (whoever runs it, as an owner or admin of its first workspace) | the workspace's name · the health check · the team · the team's agents |
 | **The machine** (the app on the person's own computer) | where exports land · the agent installed · the sample |
 
-- **Welcome** on Lampo Cloud shows the trial ("Team trial · 14 days · no card", from the billing provider); a sign-up from
-  the website's pricing (`?plan=cloud-solo|cloud-team|cloud-business` on the sign-up link, carried through the confirm
-  link) is still a Team trial, and Get started offers the plan picked.
+- **Welcome**, where a billing module runs (Lampo Cloud), shows the trial it gives ("Team trial · 14 days · no
+  card"); a sign-up from Lampo's pricing page (`?plan=cloud-solo|cloud-team|cloud-business` on the sign-up link,
+  carried through the confirm link) is still a Team trial, and Get started offers the plan picked.
 - **Who the videos are for** (for other brands, for our own brand, for my channel, something else in a few words; several at
   once) is kept on the workspace (`personas`, `personaOther`). It changes a few words, the role an invite starts with
   (in-house teams invite reviewers) and Get started's order. A channel alone has no team step.
@@ -59,22 +59,22 @@ The end of the setup (finished or skipped) is kept on the account (`setup_done`)
 
 ## Get started
 
-A card above All videos: the steps on a keyframe track on the left, the selected one at work on the right — connect the
-agent, link or upload a video, make a review link, invite someone, right there (an accordion on a phone). It folds to
-one line ("Next: Share a review link"), `×` puts the card away (with Undo; the sidebar's row stays, and the account
-menu's **Get started · 2 of 5** brings the card back while a step is open), and a workspace that picked a plan on the
-website sees "You picked Team · add a card any time" (to Settings → Billing). On the machine it offers `vr export` for
-later, to take everything to a server or Lampo Cloud. Once every step is done it says *You're set* and folds away for
-good.
+A card above All videos: the steps on a keyframe track on the left, the selected one at work on the right — connect
+the agent, link or upload a video, make a review link, invite someone, right there (an accordion on a phone). It folds
+to one line ("Next: Share a review link"), `×` puts the card away (with Undo; the sidebar's row stays, and the account
+menu's **Get started · 2 of 5** brings the card back while a step is open), and, where a billing module runs, a
+workspace that picked a plan on the website sees "You picked Team · add a card any time" (to Settings → Billing). On
+the machine it offers `vr export` for later, to take everything to a server or Lampo Cloud. Once every step is done it
+says *You're set* and folds away for good.
 
-**At the sidebar's foot**, above the trial's line, a row says **Get started · 2 of 5** with a 2 px line of the steps,
-on every library page while a step is open. A click opens the same steps in a panel above it (a sheet from the drawer
-on phones and tablets) with the card's own panes: an agent connected, a review link made, a teammate invited or a file
-linked right there; the sample and an upload go where they live (the sample in check mode, the library's picker). A
-step ticks the row the moment it's done. The panel's foot has **Hide for good**: the card and the row go (with Undo),
-and only the account menu brings them back. With the sidebar on screen the account menu opens the panel where you
-are; anywhere else (the player, Settings, an empty library) it brings the card back. When the last step is done the
-row says *You're set* with the card and folds away with it.
+**At the sidebar's foot**, above the trial's line where there is one, a row says **Get started · 2 of 5** with a 2 px
+line of the steps, on every library page while a step is open. A click opens the same steps in a panel above it (a
+sheet from the drawer on phones and tablets) with the card's own panes: an agent connected, a review link made, a
+teammate invited or a file linked right there; the sample and an upload go where they live (the sample in check mode,
+the library's picker). A step ticks the row the moment it's done. The panel's foot has **Hide for good**: the card and
+the row go (with Undo), and only the account menu brings them back. With the sidebar on screen the account menu opens
+the panel where you are; anywhere else (the player, Settings, an empty library) it brings the card back. When the last
+step is done the row says *You're set* with the card and folds away with it.
 
 Each role gets the steps that make sense for it, in an order that follows where the app runs and who the videos are for
 (`stepsFor` in [lib/onboarding.ts](../lib/onboarding.ts)):
@@ -84,7 +84,7 @@ Each role gets the steps that make sense for it, in an order that follows where 
 | reviewer | Try the sample · Leave a note on a frame · Approve a version |
 | member | Try the sample · Connect your agent · Add your first video · Share a review link |
 | the machine's owner | Try the sample · Link your first video · Connect your agent · Share a review link |
-| a Cloud workspace's owner | Try the sample · Connect your agent · Add your first video · Share a review link · Invite a teammate (in-house: the invite before the video; a channel alone: no invite) |
+| the owner of a workspace made at sign-up | Try the sample · Connect your agent · Add your first video · Share a review link · Invite a teammate (in-house: the invite before the video; a channel alone: no invite) |
 | a self-hosted server's owner or admin | Try the sample · Add your first video · Connect your agent · Invite a teammate · Share a review link |
 
 "Connect your agent" names the agent picked in the setup ("Connect Claude Code"). The steps go by the person's role

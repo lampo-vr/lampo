@@ -26,7 +26,7 @@ body:
       label: Mode
       options:
         - local
-        - local with LAN / client link
+        - local with LAN / tunnel / review link
         - server mode
     validations:
       required: true

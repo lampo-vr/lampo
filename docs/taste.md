@@ -21,7 +21,8 @@ What the team decides on purpose belongs in a [playbook](playbooks.md).
   filed anywhere under it, plus videos without a project that sit in a folder of the same name on disk.
 - Asked for a folder inside a project (*Acme/Reels*), it covers only the videos filed in that folder or below it.
 - People's notes count, clients' notes from review links too. Agents' own notes (their questions) aren't asks, and
-  archived videos and the first run's sample are left out.
+  videos removed from the library and the first run's sample are left out. A project that is archived keeps its
+  taste: its notes still count, and agents can still read it.
 
 ## What it says
 

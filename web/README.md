@@ -1,6 +1,7 @@
 # web/ — the review UI
 
-React 19 + TypeScript, built with Vite. The server serves `web/dist` (or runs Vite as middleware with `--dev`).
+React 19 + TypeScript, built with Vite. The server serves `web/dist` (or runs Vite as middleware with `--dev`). Two
+pages: `index.html`, the app, and `embed.html`, an Embed link's player at `/e/<token>`, an entry of its own.
 
 ```
 src/
@@ -37,6 +38,8 @@ src/
   playbook/              playbooks: the document, what agents read, their suggestions
   publish/               publishing a final version: the composer, the publish kit
   guest/                 the review link's pages behind /g/<token>
+  embed/                 an Embed link's player (/e/<token>, embed.html): the video alone,
+                         frame-exact, on another site's page; no notes, names or cookies
   share/                 review links: the dialog, their activity; the printable notes sheet
   auth/                  sign-in: the gate (setup / sign-in before anything else, 401 →
                          sign-in over the same route), its screens, the account menu,
@@ -48,12 +51,14 @@ src/
                          shows when the role may use it (workspace and billing: hosted)
   billing/, conversion/  where a billing provider runs: the plan, checkout, the trial and
                          the limits as they come up
+  consent/               the cookie settings, asked before a billing provider's payment form
   operator/              the server operator's pages: workspaces, accounts, the funnel
   pwa/                   the installed app: the service worker, push, the app icon's badge
   styleguide/            #/styleguide (dev and test builds only)
   assets/                the entrance's brand film frames
   styles/                the design system, split by area; index.css imports them in
                          cascade order
+  vendor/                third-party code kept as it was released, with its licence
 ```
 
 Frame accuracy lives in `player/usePlayback.ts` and `lib/seek.ts`: seeks go to the middle of a frame
@@ -94,7 +99,8 @@ where the chunk is usually already here: React holds content that replaces a fal
 the Dockerfile sets it, leaves the page and its chunk out); `test/e2e/styleguide.mjs` photographs it in both themes
 against `test/e2e/baseline/` (`VR_UPDATE_BASELINE=1` after a deliberate change). One baseline per platform: a
 machine without one records it on the first run, CI fails instead and uploads the screenshot
-(`new-screenshot-baselines`) to be committed.
+(`new-screenshot-baselines`) to be committed. Until the first Linux baselines are committed, CI reports the
+comparison as skipped (`VR_BASELINE_MISSING: skip` in `.github/workflows/ci.yml`), never as passed.
 
 ### The design system's families (`system.tsx`, drawn by `styles/system.css`)
 
@@ -163,7 +169,7 @@ never `.btn` or `.btn.special`), and no two sheets define the same class. A vari
 
 | Import | What for |
 |---|---|
-| `I` (`icons.tsx`) | Every icon: `<I name="trash" size={15} />`. Lucide glyphs behind names that say what they are for; the stroke is optically corrected per size. Add a name to `P` rather than importing Lucide in a screen. `BrandMark` is the mark (two loops meeting at a keyframe; geometry in `brandMark.ts`, also used by `scripts/icons.ts`), `Wordmark` the mark with the name. |
+| `I` (`icons.tsx`) | Every icon: `<I name="trash" size={15} />`. Lucide glyphs behind names that say what they are for; the stroke is optically corrected per size. Add a name to `P` rather than importing Lucide in a screen. `BrandMark` is the mark (the frame o; geometry in `brandMark.ts`, also used by `scripts/icons.ts`), `Wordmark` the logo, `lampo` with the frame o. |
 | `IconButton` | Any button that is only an icon. `label` is required (accessible name *and* tooltip); `shortcut="⇧V"` shows the key in the tooltip; `tip` for a longer tooltip. `className` defaults to `btn ghost icon-only`. Works as the trigger of a Menu, Popover or Dialog. |
 | `Tip`, `Kbd` (`tip.tsx`) | A tooltip on anything focusable (`<Tip content="…" shortcut="D">`); keys as key caps. Buttons with words don't need one unless the tooltip adds something (a shortcut, what happens). Tooltips open under the pointer or with keyboard focus, never on a dialog's programmatic focus. One tooltip layer shows them all (`layers.tsx` `TooltipLayer`); an element only carries its note. Inside an item that has its own `data-state` (a toggle), put the item outside: `<ToggleItem asChild><Tip><button/></Tip></ToggleItem>`. |
 | `Menu`, `ContextMenu`, `MenuEntry` | The ⋯ menu and the right-click / long-press menu, from the same `items` array: `{ label, icon, onClick, danger?, shortcut?, disabled? }` (`checked` makes it a ticked on/off item, `keep` keeps the menu open after it — several tags in a row —, `mark` puts a glyph in the icon's place), `'sep'` for a line, `{ heading }` for a quiet word over the items after it (shown only when one follows: a card's *Move to*), `{ choice: { label, value, options, onChange } }` for a one-of-many group that keeps the menu open (the theme: `useThemeChoice()`), falsy entries skipped. On a touch screen an item takes a click only when the press began on the menu (the tap that opened a sheet can't pick what slides in under the finger). Wire both to the same list so they never drift. Text fields, links and media inside a `ContextMenu` keep the browser's menu. The focus goes back to the trigger on close unless an item moved it somewhere (a field it opened). |

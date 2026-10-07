@@ -44,11 +44,12 @@ player.
 
 | Group | What it is | It leaves when |
 |---|---|---|
-| Questions from agents | an agent's open question about a frame | you answer it, or close it with *Done* |
-| Waiting for your OK | an agent's work stopped short of a permission its settings don't give it (a run Lampo started on your machine): what it needs, and the exact rule to add — *Copy*, then *Send again* | it goes on, you stop it (*Stop*), or you send it again |
-| Agents that stopped | an agent's work failed (a render that failed, an error, the time limit): why, with the last lines the tool printed, and *Try again* (*Log* opens the whole output of a run on this machine) | you try again, or once you opened it |
+| Questions from agents | an agent's open question about a frame, or on a folder before any version exists (options to pick from) | you answer it, or close it with *Done* |
+| Waiting for your OK | an agent's work stopped short of a permission its settings don't give it (a run Lampo started on your machine): what it needs, and the exact rule to add — *Copy*, then *Send again* (the last 7 days) | it goes on, you stop it (*Stop*), or you send it again |
+| Agents that stopped | an agent's work failed (a render that failed, an error, the time limit): why, with the last lines the tool printed, and *Try again* (*Log* opens the whole output of a run on this machine; the last 7 days) | you try again, or once you opened it |
 | Fixes to check | a note an agent marked fixed | *Looks right*, or *Still wrong* with what is still wrong |
 | To review | a version nobody has decided on yet: a new video's V1 or any new version (from the last 30 days; a partial render reads "New version V8 · part") | someone approves it, requests changes or leaves notes that need fixing |
+| Posts that failed | a post of a final version that failed or was sent and not confirmed, for whoever may publish: the reason, and *Try again* (or *Check again*) | it goes out, is changed or is cancelled |
 | From review links | an open note from a review link | the note is dealt with, or you wave it through (*Seen*, *Got it*) |
 | Playbook suggestions | an agent's suggested change to a playbook | someone accepts or rejects it |
 | Approvals | someone approved a version through a review link (the last 14 days) | *Got it* |
@@ -57,15 +58,17 @@ player.
 | Stalled | a video that waits too long: fixes keep coming back, four full renders and still no approval, or nothing happened for two days. It offers *Nudge agent* (a request to the video's agent) or *Review link* | its video moves on, or *Got it* (it comes back if it stalls again) |
 | Stalled (an agent) | no word from an agent at work for a while, or notes sent that no agent picked up in 10 minutes: *Nudge* and *Stop* (*Cancel*) | the agent is heard from again, or you stop it |
 
-**Work leaves when it is done.** Questions, fixes, versions to review and playbook suggestions have no *Got it*: they
-leave when they are answered, checked or decided. Only what informs can be waved through, and it also leaves by itself
-once you have read it in the preview (it stayed open for a moment, and you moved on).
+**Work leaves when it is done.** Questions, an agent's work that needs you, fixes, versions to review, failed posts
+and playbook suggestions have no *Got it*: they leave when they are answered, checked or decided. Only what informs
+can be waved through, and it also leaves by itself once you have read it in the preview (it stayed open for a moment,
+and you moved on).
 
 *Got it* changes nothing in the review; it only takes the item off your own list. Each person sees what their role
 allows: questions need the right to write notes, fixes the right to check them, versions to review and stalled videos
-the right to approve, playbook suggestions the right to edit playbooks, and an agent's work (waiting for your OK,
-stopped, gone quiet) the right to work with agents — never a reviewer. Stalled videos come last and aren't counted in
-the bell's number. Notes someone saved but hasn't sent never show up in anyone's inbox.
+the right to approve, playbook suggestions the right to edit playbooks, failed posts the right to publish, and an
+agent's work (waiting for your OK, stopped, gone quiet) the right to work with agents — never a reviewer. Stalled
+videos come last and aren't counted in the bell's number. Notes someone saved but hasn't sent never show up in
+anyone's inbox.
 
 **By video or by kind.** *By video* (the default) groups everything per video, the most urgent video first: its name,
 what it holds ("3 questions · 2 fixes · V4 to review") and a ⋯ for the whole video. *By kind* groups the list as in the

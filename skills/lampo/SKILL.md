@@ -50,8 +50,8 @@ MCP tools (the `lampo` server; `video-review` in older setups) or the `vr` CLI (
 - **Working in a project** (After Effects, Premiere, Resolve): `set_render_source` / `vr source` once, then per note
   export a still (After Effects: `comp.saveFrameToPng`) or a clip ≤ 10 s and
   `attach_preview({id, path, fixed: true, note})` (`path` only where the server runs; otherwise `data`, base64
-  ≤ 8 MB) / `vr preview <id> <file> --fixed --note "…"`. Render once per batch: a note whose preview the render
-  doesn't match comes back as `CHECK AGAIN`.
+  ≤ 8 MB, over HTTP ≤ 700 KB) / `vr preview <id> <file> --fixed --note "…"`. Render once per batch: a note whose
+  preview the render doesn't match comes back as `CHECK AGAIN`.
 
 ## Rules
 

@@ -229,9 +229,9 @@ its ⋯ menu has *Copy the player’s address* for a site that embeds from an ad
 The frame is as wide as the place you paste it and keeps the video's shape (its `aspect-ratio`). The player plays the
 newest version: play and pause, the timecode with frames as the app shows it, a frame back and on, sound, full screen,
 and on its timeline the video's chapters and, when the version has been heard, captions. Keys as in the app's player:
-Space or K plays and pauses, J K L play backwards, stop and forwards (L again: faster), ← → step a frame (⇧ ten), M
-mutes, F goes full screen, C turns captions on. A small Lampo mark sits at the bar's end; where a workspace hides the
-badge ([For the visitor](#for-the-visitor)), the player hides it too.
+Space plays and pauses, J K L play backwards, stop and forwards (J or L again: faster), ← → step a frame (⇧ ten), Home
+and End go to the first and last frame, M mutes, F goes full screen, C turns captions on and off. A small Lampo mark
+sits at the bar's end; where a workspace hides the badge ([For the visitor](#for-the-visitor)), the player hides it too.
 
 - **Chapters** are the render's own chapter markers, as Premiere, Resolve or Final Cut export them: a keyframe glyph
   on the timeline for each, its name in the bar while it plays and under the pointer. A render without markers has
@@ -239,8 +239,8 @@ badge ([For the visitor](#for-the-visitor)), the player hides it too.
 - **Captions** are what the version's transcript heard (the player draws them above its bar). The player never starts
   hearing a version: one that hasn't been heard has no captions button.
 - **Options** go in the player's address: `?autoplay=1` starts it by itself, muted (browsers only let a silent video
-  start on its own), `loop=1` plays it on a loop, `controls=0` shows the picture alone (a page's background film: a
-  click or Space still pauses it), `lang=de` speaks German. A hero film:
+  start on its own), `muted=1` starts it without sound, `loop=1` plays it on a loop, `controls=0` shows the picture
+  alone (a page's background film: a click or Space still pauses it), `lang=de` speaks German. A hero film:
   `https://app.example.com/e/1rT9cQ…?autoplay=1&loop=1&controls=0`.
 - **It shows the video and nothing else**: no notes, no names, no other versions, no downloads. Its title is the
   video's file name, as a *Watch only* visitor reads it.
@@ -257,10 +257,10 @@ badge ([For the visitor](#for-the-visitor)), the player hides it too.
 
 **oEmbed.** Sites and tools that embed from an address (WordPress, Notion and others) find the player through
 [oEmbed](https://oembed.com): both the player's address and the link's watch page name it in their head, and
-`GET /oembed?url=<address>&format=json` answers with the player's `<iframe>`, its size (scaled down to `maxwidth` and
-`maxheight` when given), the video's title and its poster, which other sites may show as a picture. On your own
-machine it answers at the tunnel's address too, the one the pages name. Any other link, address or format is a 404
-(501 for XML).
+`GET /oembed?url=<address>&format=json` answers with the player's `<iframe>`, its size (the video's own, at most 1280
+pixels a side, or scaled down to `maxwidth` and `maxheight` when given), the video's title and its poster, which other
+sites may show as a picture. On your own machine it answers at the tunnel's address too, the one the pages name. Any
+other link or address is a 404; a format other than JSON, such as XML, is a 501.
 
 ## Downloads
 
@@ -435,12 +435,12 @@ Checking a guess runs in a thread pool, so guesses never stall the server.
 address counts as its /64), 500 a day per visitor, and 2,000 a day per link whoever the visitors are. Only writes that
 landed count for the day (a reference's one-time upload URL when its file arrives), so refused or invalid requests and
 unused URLs spend nobody's share; a visitor holds at most 50 such URLs open at once, a link's visitors 500 together. A
-video takes at most 2,000 client notes through each of its links (one link at its limit closes no other), and none
-while the server's disk is down to its reserve (`VR_MIN_FREE`; the page is told to try again later). Approvals: 20 a
-minute per link; visits: 60 a minute per link and address. Through the local tunnel every visitor arrives from this
-machine, so there a visitor's address is the one Cloudflare names (`CF-Connecting-IP`); a hosted server goes by
-`VR_TRUST_PROXY`. A preview copy that is still being made answers `425` with `Retry-After`, and the page looks again
-every few seconds.
+video takes at most 2,000 client notes through each of its links (one link at its limit closes no other), and none while
+the server's disk is down to its reserve (`VR_MIN_FREE`; the page is told to try again later). Approvals and requests
+for changes: 20 a minute and 50 a day per visitor (they count in the day's writes too); visits: 60 a minute per link and
+address. Through the local tunnel every visitor arrives from this machine, so there a visitor's address is the one
+Cloudflare names (`CF-Connecting-IP`); a hosted server goes by `VR_TRUST_PROXY`. A preview copy that is still being made
+answers `425` with `Retry-After`, and the page looks again every few seconds.
 
 **Archives.** Video is compressed already, so the zip stores the files as they are: it starts at once and its exact
 size is known up front. Archives over 4 GB use ZIP64 (only where a size or an offset needs it); tested with macOS

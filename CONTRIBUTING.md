@@ -218,8 +218,15 @@ re-runs.
 ## Contributor License Agreement
 
 Contributions are accepted under the [Contributor License Agreement](CLA.md). It lets the maintainers also offer
-Lampo under a commercial license; your contribution always stays available under the AGPL too. The CLA
-Assistant check asks you to agree once, with a comment on your first pull request.
+Lampo under a commercial license; your contribution always stays available under the AGPL too. You sign it once: the
+**CLA signed** check on your first pull request asks you to comment
+
+```
+I have read the CLA Document and I hereby sign the CLA
+```
+
+and turns green; it stays green on every later pull request. A comment saying `recheck` runs it again
+(`.github/workflows/cla.yml`).
 
 ### Code you didn't write
 

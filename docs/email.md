@@ -31,11 +31,14 @@ says so in its log at start.
 | Welcome | the person who signed up | the moment their address is confirmed | — |
 | You already have an account | an existing account's address | someone tried to sign up with it | sign in, or *Forgot password?* |
 | A new sign-in to your account | the account's address | a sign-in from a browser (or `vr login`) the account hasn't used before — **only when the person turned sign-in alerts on** (Settings → Notifications) | a link to *Forgot password?* |
-| Your account was disabled / removed | the account's address | an admin disabled or removed it | — |
+| Your account was disabled / removed | the account's address | an admin disabled or removed it, or `vr admin delete-account --yes` deleted it | — |
+| Your account is deleted | the account's address | the person deleted their own account (*Settings → Profile*) | — |
+| Your workspace is suspended / works again | every member of the workspace not suspended there | the server's operator suspended the workspace, or lifted the suspension ([server-mode.md](server-mode.md#the-operators-pages)) | — |
+| A workspace of yours was deleted | everyone who was in it, each told whether their account went with it | its owner (*Settings → Workspace*), the server's operator, or `vr admin delete-workspace --yes` deleted it | — |
 | Email works | whoever you name | `vr admin mail-test` | — |
 | A message about the workspace (a plan, a trial) | the workspace's owners and admins (or the roles asked for) | a billing provider asks ([server-mode.md](server-mode.md#a-billing-provider)) | a screen of the app, e.g. Settings → Billing |
 
-Notices (changed, welcome, sign-in, disabled, removed) only go to an address that was confirmed: someone who typed a
+Notices (changed, welcome, sign-in, disabled, removed, deleted, suspended) only go to an address that was confirmed: someone who typed a
 wrong address never sends someone else their account's news. Accounts from before email count as confirmed, and so do
 addresses an admin vouched for (the owner from setup, `vr admin create-user`, and on the machine *Add a user* and an
 invite made out to that address; on a hosted server an invite vouches for nothing,

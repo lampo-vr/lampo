@@ -48,7 +48,8 @@ too) and *History*. On a narrow screen *What agents read* and the history open a
 The brief and the rules are markdown (`- ` for a list, `**bold**`, links); the editor has a *Preview*. A skill is a
 `SKILL.md`: a `name` (lowercase letters, digits and hyphens, like `export-reels`) and a `description` (when to use it)
 at the top, then the steps, written in a dialog made for it (twelve lines to start, growing with the text; the whole
-screen on a phone). *SKILL.md → Import* takes one you already have, *Copy* takes this one elsewhere.
+screen on a phone). Under *SKILL.md*, *Import SKILL.md…* takes one you already have and *Copy SKILL.md* takes this
+one elsewhere.
 
 ## Revisions and render stamps
 

@@ -1,7 +1,7 @@
 # Token bench: what talking to Lampo costs an agent
 
-_Measured 2026-10-01 on macOS, Node 24. Before = the code at 18c0d30, after = the token-efficiency change; the same
-bench for both._
+_Measured 2026-10-01 on macOS, Node 24. Before = the code just before the token-efficiency change (from before the
+repository's public history), after = that change; the same bench for both._
 
 Every token an agent spends on Lampo is a cost the person pays: the tool list rides along on every turn of the agent's
 conversation, every answer stays in its context. This bench measures it on a realistic review, and
@@ -165,8 +165,8 @@ the measured value + about 10 %; raise one only on purpose, with the bench run t
 
 | | Measured | Budget |
 |---|---:|---:|
-| Tool list | 4770 | 5250 |
-| Tool list, lean set | 2909 | 3200 |
+| Tool list | 4770 (5718 since publishing, footage search and the rest) | 5850 |
+| Tool list, lean set | 2909 (2932 since) | 3200 |
 | `get_open_notes`, 12 notes | 2704 | 3000 |
 | `wait_for_feedback`, 1 note | 430 | 480 |
 | `wait_for_feedback`, nothing new | 53 | 58 |

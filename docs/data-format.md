@@ -66,6 +66,8 @@ data/
   funnel.json                 where a billing provider runs: the operator's counts of first
                               steps per workspace, never who (server-mode.md)
   backups/                    copies made before a hosted store moved to workspaces
+  erasures.jsonl              the ids of deleted accounts and workspaces, to delete them
+                              again after a backup is restored (server-mode.md)
   w/<workspace id>/           every workspace but #1: the same layout as data/ itself
 versions/<slug>/vN.<ext>      the bytes of every version; can't be rebuilt
 versions/w/<workspace id>/    every workspace but #1: its versions, the same way
@@ -86,8 +88,8 @@ cache/agent-activity.jsonl    what agents on this machine did through vr and
 ```
 
 - **Only the app's user reads them** (mode 0600): accounts, invites, the keys, `oauth/`, `push/`, `workspaces.json`,
-  `links.json`, `account-links.json`, `mail/`, `backups/`, `publish/connections.json`, `funnel.json`, `moments.json`,
-  `cache/agent-activity.jsonl` and the logs in `cache/agent-runs/`.
+  `links.json`, `account-links.json`, `mail/`, `backups/`, `erasures.jsonl`, `publish/connections.json`,
+  `funnel.json`, `moments.json`, `cache/agent-activity.jsonl` and the logs in `cache/agent-runs/`.
 - **Locks.** Folders whose names start with a dot (`.lock`, `.inbox`, `.uploads`, …) are held while something writes:
   leave them alone.
 - **`cache/` is rebuilt on demand** and safe to delete while the app is stopped, except `cache/uploads/` (uploads in
@@ -357,6 +359,7 @@ Every event has `at`, `type`, `by`, `video`, `slug` and `session` (the assigned 
 | `preview` | by `system`: a newer render matched the fix preview a note was checked on. A mismatch is a `status` event by `system` that sets the note back to `fixed` |
 | `ref` | a reference was added to a note; the event carries it as `ref` |
 | `agent_run` | your machine started the assigned agent for a request, or that run ended: `run` names it, `phase` is `started` (by whoever asked), `finished`, `failed`, `stopped` (by whoever stopped it) or `timeout`, and `exit` is the process's exit code (`null` when it was killed) |
+| `run` | an agent's run on the video ([Agent runs](#agent-runs)) opened, began, waits for the person or ended: `run` names it, `phase` is `opened`, `started`, `needs_you` or `ended`, and `text` says how it was opened (`send`, `request`, `nudge`, `answer`, `retry`, `agent`), what it needs (`question`, `options`, `permission`, `sign_in`) or how it ended (`done`, `failed`, `stopped`, or `needs_you`: it handed back waiting for the person). Not feedback: INBOX.md and `wait_for_feedback` leave it out, `vr watch --all` prints it as `AGENT RUN OPENED`, `WORKING`, `NEEDS YOU` or `ENDED <state>` |
 | `post` | a post of a final video was drafted, published, scheduled, posted, failed or taken back; it carries `post` ([Publishing](#publishing-publishpostsjson-publishconnectionsjson)). Not feedback: INBOX.md and `wait_for_feedback` leave it out |
 
 What else an event carries:
@@ -647,12 +650,12 @@ One JSON object per line, one line per run, oldest first: the run as `GET /api/r
 ([api.md](api.md#agent-runs)), plus `steps` (what it did, oldest first) and `clock` (the server's own counters). The
 app rewrites the file under the video's lock (`.lock`), atomically, about a second after a change; nothing else
 writes it, and `vr` only reads it to name a version's run. It is compacted as it is written: at most 200 steps per
-run (a stretch of render progress keeps its first and last line; the first step, questions and errors stay), and a
-run that ended more than 90 days ago keeps no steps. Lines it can't read are kept as they are. A store without the
-file has no runs; nothing else changes.
+run (a stretch of render progress keeps its first and last line; the first step, questions and errors stay), a run
+that ended more than 90 days ago keeps no steps, and past 1,000 runs on a video the oldest ended ones go. Lines it
+can't read are kept as they are. A store without the file has no runs; nothing else changes.
 
 Runs on a question asked on a folder before any render (`asks.json`) live in the workspace's own `runs.jsonl`, with
-`slug: null` and `folder`.
+`slug: null` and `folder` (at most 200 of them).
 
 ## Live agent activity
 
@@ -722,7 +725,7 @@ review links, playbooks, events and people. The app on a person's own machine is
   lower-case letters and digits.
 - **What belongs to no workspace** stays in `data/` itself: accounts (`users.json`, `invites.json`), sessions, OAuth
   clients and connections (`oauth/`), devices for notifications (`push/`), the keys, `workspaces.json`, `links.json`,
-  `account-links.json`, `mail/` and `backups/`. Profile pictures belong to no workspace either.
+  `account-links.json`, `mail/`, `backups/` and `erasures.jsonl`. Profile pictures belong to no workspace either.
 - **`workspaces.json`** (hosted servers: each workspace and its members, written at a hosted server's first start;
   0600) lists each workspace (`id`, `name`, `created`) with its `members`: `{user, role, since, suspended?}`, the
   account id and its role there (`owner`, `admin`, `member`, `reviewer`); `suspended` is when an admin of that
@@ -731,8 +734,12 @@ review links, playbooks, events and people. The app on a person's own machine is
   name was theirs, a placeholder); `named` is when a person chose its name (made in the app or with `vr admin`, or
   renamed); `by` is the account it was made by or for (what `VR_WORKSPACE_CREATE_LIMIT` counts); `personas` is who
   its videos are for, as its owner picked in the setup (`agency`, `inhouse`, `creator`, `other`; absent: never asked
-  or skipped), with `personaOther`, "something else" in a few words. API tokens, invites and app connections name
-  the workspace they act in (`workspace`; absent means `w1`, as everything written before workspaces does).
+  or skipped), with `personaOther`, "something else" in a few words. `suspended` (`{at, by, reason}`) is set while
+  the server's operator holds the workspace read-only ([server-mode.md](server-mode.md#the-operators-pages)): `by`
+  is the operator's account, and `reason` is shown to the operator only. `badge: "hidden"` says its owners or admins
+  hid *Powered by Lampo* on its review links ([sharing.md](sharing.md#for-the-visitor)); it shows again whenever the
+  plan may not hide it. API tokens, invites and app connections name the workspace they act in (`workspace`; absent
+  means `w1`, as everything written before workspaces does).
 - **A store without `workspaces.json`** is workspace #1 alone, and its members are every account with the account's
   own `role`, exactly how stores always worked (an account that signed up on its own without an invite, `signup` set,
   is never one of them: it gets a workspace of its own). A hosted server moves its store to workspaces once, at start

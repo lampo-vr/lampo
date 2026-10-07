@@ -38,10 +38,11 @@ A config.json for your own machine might be:
 Folders in it may start with `~`, and a relative folder counts from the file's own folder. A file that isn't valid
 JSON is ignored as a whole: the app then starts with the defaults.
 
-The app's Settings page holds what people change while it runs: their profile, theme, language and API tokens, and
-for admins the users, invites, webhooks and, on a hosted server, the workspace's name. It also shows what the
+The app's Settings page holds what people change while it runs: their profile, theme, language and API tokens, the
+export of their own data (and on a hosted server, deleting their account), and for admins the users, invites,
+webhooks and, on a hosted server, the workspace's name (its owners also delete it there). It also shows what the
 settings on this page add up to (the speech engine, Auto-check's dictionary, ready-to-copy agent configs, the
-version), but it doesn't change them.
+version, the legal pages), but it doesn't change them.
 
 ## Where data lives
 
@@ -117,6 +118,8 @@ These matter on a server other people reach. Setting one up: [server-mode.md](se
 | `VR_ORG_NAME` | `org_name` | none | Your team's name (an agency, a studio), shown on review links next to the person who shared them: "Alex · Northwind Studio shared …". On a hosted server with several workspaces it is the first workspace's: the links of every other workspace show that workspace's own name, and no team name while a sign-up's workspace still has the name it started with. It also names the team in the subject of invite emails, and is the first workspace's name until someone renames it. |
 | `VR_WORKSPACE_CREATE` | `workspace_create` | `owners` | Who may make a [workspace](server-mode.md#workspaces) in the app on a hosted server: `owners` (whoever runs the server: `LAMPO_OPERATOR`, else the first workspace's owners), or `anyone` signed in, each account up to `VR_WORKSPACE_CREATE_LIMIT`. Sign-up (`VR_SIGNUP=open`) gives each person a workspace of their own either way. |
 | `VR_WORKSPACE_CREATE_LIMIT` | `workspace_create_limit` | 3 | With `VR_WORKSPACE_CREATE=anyone`: how many workspaces one account may make, the one its sign-up gave it included. Whoever runs the server has no limit. |
+| `LAMPO_OPERATOR` | | the owners of the first workspace | Who runs this server: accounts by email address (once confirmed) or account id, separated by commas or spaces, at most 20. They see the [operator's pages](server-mode.md#the-operators-pages) (every workspace and account; suspending or deleting a workspace), the server's setup and health check, and make workspaces without a limit. An entry that matches no account is named in the log at start. Hosted servers only. |
+| `VR_CLOUD_MODULE` | | none | The file of a module that adds plans and billing to a hosted server, loaded at start ([server-mode.md → A billing provider](server-mode.md#a-billing-provider)). Lampo Cloud's is one, kept outside this repository. Leave it unset: a self-hosted server is complete without it. A module that can't be loaded stops the start. |
 | `VR_DOMAIN` | | none | Docker compose only: the domain Caddy gets a certificate for. |
 
 ### Uploads and disk
@@ -164,20 +167,22 @@ bucket instead; the steps are in [server-mode.md](server-mode.md#storage). In co
 | `VR_SESSION_DAYS` | | 30 | A sign-in lasts at most this many days. |
 | `VR_SESSION_IDLE_DAYS` | | 14 | A sign-in ends after this many days without use. |
 | `VR_SIGNUP` | `signup` | off | Who may sign up on their own: `off`, `invite` (an address a pending invite names gets the invite again, and its link makes the account) or `open` (anyone, each into a workspace of their own; a hosted server only). Anything but `off` needs `VR_PUBLIC_URL` ([email.md](email.md#sign-up-vr_signup)). |
-| `VR_TERMS_URL`, `VR_PRIVACY_URL` | `terms_url`, `privacy_url` | none | Your terms and privacy policy, linked from the sign-up screen, the sign-in screen's foot, the checkout (terms) and a review link's foot (privacy). `VR_SIGNUP=open` refuses to start without both ([legal pages](#legal-pages)). |
+| `VR_TERMS_URL`, `VR_PRIVACY_URL` | `terms_url`, `privacy_url` | none | Your terms and privacy policy, linked from the sign-up screen, the sign-in screen's foot, *Settings → About*, the checkout of a billing provider, and a review link's foot (privacy). `VR_SIGNUP=open` refuses to start without both ([legal pages](#legal-pages)). |
 | `VR_ONBOARDING` | `onboarding` | on | New accounts start with the first-run checklist ([onboarding.md](onboarding.md)); `off` for an instance whose people know Lampo already. Accounts from before never get one. |
 | `VR_ONBOARDING_SAMPLE` | `onboarding_sample` | on | With `onboarding`: an account that starts in a workspace of its own (an open sign-up, the server's setup, the machine's first start) finds the sample in its library, made in the background ([onboarding.md](onboarding.md#the-sample)); `off`: only when someone asks for it. |
 
 ### Legal pages
 
-Lampo links your own pages; it never writes them. Each must be an http(s) URL, or the server refuses to start.
+Lampo links your own pages; it never writes them. Each must be an http(s) URL, or the server refuses to start. None is
+required, except the terms and the privacy policy for an open sign-up. The withdrawal and cancellation pages matter
+only where a billing provider sells plans ([server-mode.md](server-mode.md#a-billing-provider)).
 
 | Variable | config.json | Default | What it does |
 |---|---|---|---|
 | `VR_IMPRINT_URL` | `imprint_url` | none | Who runs this server (an imprint, § 5 DDG in Germany): at the foot of the sign-in screens and of every review link's page, and in *Settings → About*. |
 | `VR_TERMS_URL`, `VR_PRIVACY_URL` | `terms_url`, `privacy_url` | none | As above; open sign-up needs both. |
 | `VR_WITHDRAWAL_URL` | `withdrawal_url` | none | The withdrawal information for consumers, linked above the checkout's order button and in *Settings → About*. |
-| `VR_CANCEL_URL` | `cancel_url` | none | A page where anyone cancels a contract without signing in (*Cancel contracts here*, § 312k BGB), linked where a billing provider runs. Without it the link opens *Settings → Billing*'s own cancellation, after signing in. |
+| `VR_CANCEL_URL` | `cancel_url` | none | A page where anyone cancels a contract without signing in (*Cancel contracts here*, § 312k BGB), linked at the foot of the sign-in screens and in *Settings → About*. Without it, where a billing provider runs, the same link opens *Settings → Billing*'s own cancellation, after signing in. |
 
 ### Email
 
@@ -333,7 +338,9 @@ What's in each: [data-format.md](data-format.md).
 - `publish/`: posts of final videos and the publishing connections, their keys and tokens sealed
   ([publishing.md](publishing.md)).
 - On a hosted server: `workspaces.json` (each workspace and its members), `links.json` (which workspace a review link
-  belongs to), `w/<id>/` (every workspace but the first) and `backups/` (copies made before the move to workspaces).
+  belongs to), `w/<id>/` (every workspace but the first), `backups/` (copies made before the move to workspaces) and
+  `erasures.jsonl` (the accounts and workspaces deleted, by id: what to delete again after restoring a backup,
+  [server-mode.md](server-mode.md#deleting-and-exporting)).
 
 ## Details
 

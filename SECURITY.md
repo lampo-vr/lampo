@@ -17,19 +17,21 @@ the problem publicly.
 
 ## Supported versions
 
-Lampo has no stable release yet. Security fixes go into the `main` branch and the next release. Once there are
-releases, the latest minor version will receive security fixes.
+Lampo is before 1.0; its first public release is 0.1.0. Security fixes go into the `main` branch and the next
+release, not into older releases: run the latest release or `main`.
 
 ## Scope
 
 In scope:
 
 - **Server mode:** authentication, sessions and API tokens, access control between users, roles and workspaces,
-  sign-up and the emailed links, uploads, the storage adapters and signed URLs, and anything that lets a client read
-  or write the server's disk.
+  sign-up and the emailed links, uploads, the storage adapters and signed URLs, a person's data export and the
+  deletion of accounts and workspaces, the operator's pages, and anything that lets a client read or write the
+  server's disk.
 - **Local mode:** anything that lets another machine, a website open in your browser (CSRF, DNS rebinding), or a
   review link reach more than it should. That includes reaching through `npm run lan` or the Cloudflare tunnel.
-- **Review links:** anything that lets a link reach another video, internal notes, or the rest of the API.
+- **Review links and embeds:** anything that lets a link, or a video embedded with one, reach another video,
+  internal notes, people's names, or the rest of the API.
 - **The agent interfaces:** anything that makes `vr` or the MCP server write outside the store or run commands.
 - **Media handling:** anything that makes ffmpeg or ffprobe read or fetch something other than the file it was given.
 

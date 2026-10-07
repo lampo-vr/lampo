@@ -437,6 +437,18 @@ The person writes notes as drafts and sends them in one batch (on a video with a
 the composer keeps each note, and "Send 3 to <agent>" sends them), so the agent gets them in one answer and starts
 once. While it waits, the player says so beside Send: "<agent> is waiting · gets your notes when you send".
 
+### Two lines an answer may end with
+
+What an agent does on a video is one piece of work for the person, a run
+([agents.md](agents.md#your-work-as-the-person-sees-it-runs)). Two things about it reach the agent as one line at the
+end of its next answer from any tool, once:
+
+- **Notes sent while it works** join the same run: `2 new notes on launch.mp4 since you started: get_open_notes since
+  "<time>".` Read them and fold them into the same version.
+- **The person stopped the work**: `The person stopped this work on launch.mp4: stop now, render nothing, mark
+  nothing, and say you stopped.` Stop then. A wait (`wait_for_feedback`) never carries it: an agent that went back to
+  waiting is done with the work anyway.
+
 ## The review card (MCP App)
 
 `show_review` shows the person you work with a video's review. Hosts that show MCP Apps (Claude, ChatGPT, VS Code,
@@ -545,13 +557,14 @@ the coordinates are not). Read tools are marked read-only, so clients can allow 
   `ANSWERED … PICKED voice=v3 music=m1 · note: "…"`.
 - **`attach_preview({id, path | data, kind?, frame | timecode | seconds?, fixed?, note?, app?, project?, comp?, time?})`.**
   A still (PNG, JPEG, WebP) or a clip (`kind: "clip"`, 10 s at most). `path` only where the server runs (stdio, the app
-  on this machine); `data` is base64, 8 MB at most; on a hosted server without either, the answer is a one-time upload
-  URL for `curl -fT`. `fixed: true` marks the note fixed with it. The next render is compared with it automatically.
+  on this machine); `data` is base64, 8 MB at most over stdio and about 700 KB over HTTP (where `/mcp` takes 1 MB a
+  request); over HTTP without either, the answer is a one-time upload URL for `curl -fT`, the way for anything larger.
+  `fixed: true` marks the note fixed with it. The next render is compared with it automatically.
 - **`attach_reference({id, url | video + frame | path | data, caption?, note?})`.** A link (`url`); a moment of a
   video in the library (`video` with `frame`, `timecode` or `seconds`, and `v`; `to_frame` ends a stretch of 60 s at
-  most); or an image or a clip of 60 s at most (`path` only where the server runs; `data` base64, 8 MB at most;
-  neither on a hosted server: an upload URL). At most 8 per note. On someone else's note, `note` says why, and it comes
-  as a reply. `add_note` and `reply` take `references: [...]` of the same shape.
+  most); or an image or a clip of 60 s at most (`path` only where the server runs; `data` base64, 8 MB at most over
+  stdio and about 700 KB over HTTP; neither over HTTP: an upload URL). At most 8 per note. On someone else's note,
+  `note` says why, and it comes as a reply. `add_note` and `reply` take `references: [...]` of the same shape.
 - **`set_render_source({video, v?, app, project?, comp?, start_frame?, fps?, clear?})`.** Only the project's file name
   is kept. `clear: true` removes it.
 - **`track_video({path, folder?, session?})`.** `session: "me"`: this Claude Code session (over stdio). After

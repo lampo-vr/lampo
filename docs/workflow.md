@@ -48,9 +48,16 @@ with Undo. It leaves the sidebar, All videos, the board, Recent, the Inbox and I
 ⌘K lists it apart, under *Archived*. The sidebar's *Archived* row (with how many) opens a page of the archived
 projects; each opens as before, and so do its videos, with *Archived · Restore* where the project's *Share* or the
 player's next step stands. Everything in it is read only until it is restored: you can watch, read and download, but
-nothing new goes in (no version, note, reply, sign-off, move into it or review link). Owners and admins can still move
-a video out. *Restore* (on its page, in the player or on the Archived page) brings it back as it was. Its review links
-play watch only meanwhile and take notes and decisions again once it is restored.
+nothing new goes in (no version, note, reply, decision, playbook change, post, move into it or review link). Owners
+and admins can still move a video out. *Restore* (on its page, in the player or on the Archived page) brings it back
+as it was. Its review links play watch only meanwhile and take notes and decisions again once it is restored; its
+embeds keep playing. Agents are refused any write into it with one sentence
+([agents.md](agents.md#where-a-video-stands)).
+
+**What an agent is doing** shows on the card itself, in the same words as the player: "fixing 3 of 6", "rendering V4 ·
+42 %" with a thin edge along the poster's foot, "needs you" with *Answer*, a failure in its own words. The sidebar's
+*Agents* say where each one stands, and *Being fixed* counts the agents at work
+([agents.md](agents.md#your-work-as-the-person-sees-it-runs)).
 
 ## In the player
 
@@ -162,6 +169,16 @@ same row in the agent menu for the frame on screen. It is never the default.
 
 On your own machine you are the owner and can do everything. On a hosted server these are the *approve* and
 *finalize* rights of the role table ([`lib/permissions.ts`](../lib/permissions.ts)).
+
+Two more rights of that table touch where a video stands:
+
+- **Downloading a version**: *Download V3* in a video's ⋯ menu saves that version as it was rendered, named
+  `spot V3.mp4` (in the player, the version on screen; on its card in the library, the newest); *Download another
+  version* lists the others. Owners, admins and members may, as for whole folders; reviewers watch and leave notes.
+  Visitors download only what their review link allows ([sharing.md](sharing.md)).
+- **Archiving a project** and restoring it: owners and admins, in the app. Taking a video out of an archived one is
+  theirs too; no API token or connected app does it (on your own machine, `vr move` and the machine's own agent may,
+  as the owner).
 
 ## How the stage is decided
 
