@@ -257,12 +257,13 @@ try {
     assert((await text('[data-testid=agent-step]')).includes(`Reading the note at ${note.timecode}`), 'unchanged');
   });
 
-  await check('the sidebar’s Agents rows say what each agent is doing now', async () => {
+  await check('the sidebar’s Agents rows say what each agent is doing now (its step, or where its work on a video stands)', async () => {
     await page.goto(`${BASE}/#/`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('[data-testid=agent-now-row]', { timeout: 20000 });
     const rows = await page.$$eval('[data-testid=agent-now-row]', (r) => r.map((e) => e.closest('.nav-item')?.textContent || ''));
     assert(
-      rows.some((r) => r.includes('promo-cut') && r.includes('Reading a note') && !r.includes(note.id)),
+      // with the server's own work on the video (a write opened it): where it stands, in a word or two
+      rows.some((r) => r.includes('promo-cut') && /Reading a note|fixing \d+ of \d+|working/.test(r) && !r.includes(note.id)),
       rows.join(' | '),
     );
     const one = await page.$$eval('[data-testid=agent-now-row]', (r) => r.every((e) => (e.closest('.nav-item')?.getBoundingClientRect().height ?? 99) < 40));
@@ -272,8 +273,8 @@ try {
 
   await check('a board card says which agent works on its video and what it is doing now', async () => {
     await page.goto(`${BASE}/#/status`, { waitUntil: 'domcontentloaded' });
-    const card = `.bcard[data-slug="${promo}"] [data-testid=bcard-agent]`;
-    // first "promo-cut is working on it" (before the monitor's module arrives), then its live step
+    // the card's line: the agent's work on the video (RunLine), or before there is any, who works and its live step
+    const card = `.bcard[data-slug="${promo}"] :is([data-testid=bcard-agent], [data-testid=run-line])`;
     await until(async () => /promo-cut/.test((await page.$(card)) ? await text(card) : ''), 'the agent on the card');
     await until(async () => /Reading a note|Waiting|Fixed/.test(await text(card)), 'what it is doing, live');
     const said = await text(card);

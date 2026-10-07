@@ -15,6 +15,7 @@ import { copyText, toast, toastError } from '../lib/toast.ts';
 import type { NoteAt } from '../sessions/activityWords.ts';
 import { LiveSection, stepLine, useAgentNow } from '../sessions/Live.tsx';
 import { listenLine, StartListening, useListening, waitsForStart } from '../sessions/listening.tsx';
+import { LOOK, phaseOf, type RunLike, shortLine } from '../sessions/runState.ts';
 import { SessionPicker } from '../sessions/Sessions.tsx';
 import { useAgentRuns, useWakeChoice, WakeAsk } from '../sessions/Wake.tsx';
 import { AgentMark, I } from '../ui/icons.tsx';
@@ -65,6 +66,8 @@ interface AgentMenuProps {
   fps?: number;
   /** A note's moment by its id: what the agent did is said without the agent's note ids. */
   noteAt?: NoteAt;
+  /** What the run strip speaks of (RunStrip.tsx): the button's glyph and words follow it. */
+  run?: RunLike | null;
 }
 
 /** What a request says to the agent; a partial render's opt-in rides along (the server adds its PART RENDER OK line). */
@@ -88,6 +91,7 @@ export function AgentMenu({
   frameNow,
   fps = 25,
   noteAt,
+  run: work = null,
 }: AgentMenuProps) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<'menu' | 'assign'>('menu');
@@ -155,31 +159,41 @@ export function AgentMenu({
     }
   };
 
+  // the strip's state, in a word or two, where the button would say the agent's step
+  // the strip's state in its glyph; its words a word or two — while it works, the step it is on, when there is one
+  const look = work ? LOOK[phaseOf(work)] : null;
+  const short = work && !(phaseOf(work) === 'working' && now) ? shortLine(work) : null;
   const label = session
-    ? now
-      ? t('Agent {name}: {step}', { name: session.name, step: stepLine(now, noteAt) })
-      : listen
-        ? waitsForStart(listen)
-          ? t('Agent {name}, not listening', { name: session.name })
-          : t('Agent {name}, listening', { name: session.name })
-        : active
-          ? t('Agent {name}, running', { name: session.name })
-          : t('Agent {name}, not running', { name: session.name })
+    ? short
+      ? t('Agent {name}: {step}', { name: session.name, step: short })
+      : now
+        ? t('Agent {name}: {step}', { name: session.name, step: stepLine(now, noteAt) })
+        : listen
+          ? waitsForStart(listen)
+            ? t('Agent {name}, not listening', { name: session.name })
+            : t('Agent {name}, listening', { name: session.name })
+          : active
+            ? t('Agent {name}, running', { name: session.name })
+            : t('Agent {name}, not running', { name: session.name })
     : t('Agent');
   const trigger = (
     <button
       type="button"
-      className={`btn sm ghost agent-btn${session ? '' : ' none'}${now && !compact ? ' now' : ''}`}
+      className={`btn sm ghost agent-btn${session ? '' : ' none'}${(short || now) && !compact ? ' now' : ''}`}
       aria-label={label}
       data-testid="agent-button"
     >
       {session ? (
         <>
-          <AgentState active={working} />
+          {look ? <KeyGlyph shape={look.shape} className={`nav-kg run-kg ${look.tone}`} /> : <AgentState active={working} />}
           <AgentMark kind={agentKindOfRef(session)} size={14} />
           {/* While it works, the step it is on stands where its name does (the name is in the popover and the label). */}
           {!compact &&
-            (now ? (
+            (short ? (
+              <span className="agent-name agent-step ellipsis" data-testid="agent-step">
+                {short}
+              </span>
+            ) : now ? (
               <span className="agent-name agent-step ellipsis" data-testid="agent-step">
                 {stepLine(now, noteAt)}
               </span>

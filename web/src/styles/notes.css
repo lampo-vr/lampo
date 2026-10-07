@@ -237,6 +237,39 @@
 .nr-kind.nr-info {
   color: var(--muted);
 }
+.nr.planned {
+  grid-template-rows: auto auto;
+  row-gap: 0;
+  padding-bottom: var(--sp-1);
+}
+/* A sent note's line in the agent's plan, under its words: quiet, one line, its room kept from the start (empty until
+   the agent reaches it) so the row never grows twice. */
+.nr-plan {
+  grid-row: 2;
+  grid-column: 3 / -1;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  height: calc(var(--fs-xs) * var(--lh-ui));
+  font: var(--fw-text) var(--fs-xs) / var(--lh-ui) var(--ui);
+  color: var(--muted);
+}
+.nr-plan .kg {
+  --kg-size: 8px;
+}
+.nr-plan-words {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.nr-plan[data-state='asked'] {
+  color: var(--claude-2);
+}
+.nr-plan[data-state='fixed'] {
+  color: var(--fg-2);
+}
 .nr-text {
   min-width: 0;
   overflow: hidden;
@@ -572,6 +605,45 @@ button.c-tc:hover {
 }
 .side-views button.on {
   color: var(--fg);
+}
+/* Notes · Transcript · Agent: three views keep the one row the head has. They say less as the panel narrows, never
+   wrap or push + Note away: the views a step smaller and Auto-check its glyph and number (its words are in its label),
+   then the tools closer together and + Note its plus alone (named by its label). */
+.side-views.three {
+  gap: var(--sp-2);
+}
+@container notes-head (max-width: 400px) {
+  .side-views.three button {
+    font-size: var(--fs-md);
+  }
+  .side-title:has(.side-views.three) :is(.ac-chip-name, .ac-chip-sep, .ac-chip-n) {
+    display: none;
+  }
+  .side-title:has(.side-views.three) .ac-chip-num {
+    display: inline;
+  }
+}
+@container notes-head (max-width: 340px) {
+  .side-title:has(.side-views.three) {
+    gap: var(--sp-1);
+  }
+  .side-title:has(.side-views.three) > .grow {
+    margin-left: 0;
+  }
+  .side-title:has(.side-views.three) .new-note-word {
+    display: none;
+  }
+}
+.side-views button .side-view-kg {
+  margin-left: var(--sp-1);
+  vertical-align: 1px;
+}
+/* The Agent view's place in the panel (player/AgentView.tsx fills it: its list scrolls, "Tell it…" stays at the foot) */
+.av-host {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .side-views button:focus-visible {
   outline: none;

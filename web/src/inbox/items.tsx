@@ -383,7 +383,7 @@ export function useInboxActions() {
       act(
         i,
         async () => {
-          await api(`/api/review/${enc(i.slug)}/request`, { method: 'POST', body: { text: nudgeText(i), ...(start ? { start: true } : {}) } });
+          await api(`/api/review/${enc(i.slug)}/request`, { method: 'POST', body: { text: nudgeText(i), nudge: true, ...(start ? { start: true } : {}) } });
           await dismiss(i);
         },
         start ? t('Nudged and started {name}', { name: who(i.agent) }) : t('Nudged {name}', { name: who(i.agent) }),
