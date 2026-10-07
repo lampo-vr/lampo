@@ -7,9 +7,9 @@ import path from 'node:path';
 import { readCredentials } from './backend/credentials.ts';
 import { createApi } from './backend/remote.ts';
 import { cleanAgentName } from './names.ts';
-import { oneLine } from './time.ts';
 import { CACHE, isoLocal } from './paths.ts';
 import { currentSession } from './sessions.ts';
+import { oneLine } from './time.ts';
 import type { AgentActivity } from './types.ts';
 
 /** The rolling file the app tails. */
@@ -54,7 +54,12 @@ export function fileSink(file = ACTIVITY_FILE): ActivitySink {
 /** What a hosted server answers a batch with: the lines for its agent (server/routes/sessions.ts), a few short ones. */
 const linesOf = (answer: unknown): string[] => {
   const lines = (answer as { lines?: unknown } | null)?.lines;
-  return Array.isArray(lines) ? lines.filter((l): l is string => typeof l === 'string').map((l) => oneLine(l).slice(0, 500)).slice(0, 2) : [];
+  return Array.isArray(lines)
+    ? lines
+        .filter((l): l is string => typeof l === 'string')
+        .map((l) => oneLine(l).slice(0, 500))
+        .slice(0, 2)
+    : [];
 };
 
 /** Batches activity to a hosted server (one POST at most every 2 s, at most 20 entries). */

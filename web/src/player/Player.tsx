@@ -1202,9 +1202,12 @@ function PlayerView({
   // the Agent view's writes, here so its own chunk carries none of their code
   const runActs = useRunActions(slug);
   const tellRequest = useRequest(slug);
+  // Try again (Send again) of work Lampo started on this machine starts it again here, unless the person only sends
+  const again = (id: string) =>
+    runActs.retry.mutateAsync({ id, start: wake.here && wake.pref !== 'send' && runs?.find((r) => r.id === id)?.delivery === 'machine' });
   const stripActs = {
     stop: (id: string) => runActs.stop.mutateAsync(id),
-    retry: (id: string) => runActs.retry.mutateAsync(id),
+    retry: again,
     nudge: (id: string) => runActs.nudge.mutateAsync(id),
     busy: runActs.stop.isPending || runActs.retry.isPending || runActs.nudge.isPending,
   };
@@ -1213,7 +1216,7 @@ function PlayerView({
   const detail = useRunDetail(shownId, view === 'agent');
   const agentActs = {
     stop: (id: string) => runActs.stop.mutateAsync(id),
-    retry: (id: string) => runActs.retry.mutateAsync(id),
+    retry: again,
     tell: async (text: string) => {
       await tellRequest.mutateAsync(text);
       toast(t('Sent to {name}', { name: stripRun?.agent.name ?? review.session?.name ?? t('the agent') }), 'ok');

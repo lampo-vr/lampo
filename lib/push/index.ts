@@ -282,7 +282,11 @@ export function runMessage(list: RunNotice[]): PushMessage {
             : `${who} stopped — an error on ${file}`;
     const body =
       quoted ||
-      (w?.key === 'The render failed (exit {code})' ? `Exit ${w.vars?.code ?? '?'}. Try again from the inbox.` : w?.key ? 'Try again from the inbox.' : quote(w?.text) || 'Try again from the inbox.');
+      (w?.key === 'The render failed (exit {code})'
+        ? `Exit ${w.vars?.code ?? '?'}. Try again from the inbox.`
+        : w?.key
+          ? 'Try again from the inbox.'
+          : quote(w?.text) || 'Try again from the inbox.');
     return { ...base, title, body, tag: `run:${n.slug}`, category: 'agents' };
   }
   return {

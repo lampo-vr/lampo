@@ -1,19 +1,23 @@
 // What waits for you, shared by the full "For you" page and the inbox popover: the groups, the words for each item,
-// and the actions (answer, verify, still wrong, got it, nudge an agent) with the optimistic removal from the list.
+// and the actions (answer, verify, still wrong, got it, nudge an agent; an agent's work: try again, send again, stop,
+// nudge) with the optimistic removal from the list.
 import { useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, useState } from 'react';
-import { useCan } from '../api/auth.ts';
+import { useAuthStatus, useCan } from '../api/auth.ts';
 import { api, enc } from '../api/client.ts';
 import { playbookHref } from '../api/playbooks.ts';
 import { keys, useInfo, useLibrary } from '../api/queries.ts';
 import type { ForYouItem, ForYouKind, ForYouResponse } from '../api/types.ts';
 import { locale, perLang, t } from '../i18n/index.ts';
-import { hoursWords } from '../lib/format.ts';
+import { hoursWords, secsWords } from '../lib/format.ts';
 import { later as afterUndo, toast, toastError, toastUndo } from '../lib/toast.ts';
 import { OptionsAsk } from '../options/OptionsAsk.tsx';
 import { sectionWords } from '../playbook/PlaybookShell.tsx';
 import { PLATFORM_LABEL } from '../publish/words.ts';
+import { phrase } from '../sessions/activityWords.ts';
+import { lastPrinted, PrintedLines } from '../sessions/RunNeeds.tsx';
 import { useWakeChoice, WakeAsk } from '../sessions/Wake.tsx';
+import { Code } from '../settings/parts.tsx';
 import { LazyShareModal } from '../share/LazyShareModal.tsx';
 import { Choices } from '../ui/Choices.tsx';
 import { I } from '../ui/icons.tsx';
@@ -23,6 +27,9 @@ import { hide, unhide } from './hidden.ts';
 
 export const GROUPS = perLang((): { kind: ForYouKind; title: string }[] => [
   { kind: 'question', title: t('Questions from agents') },
+  // an agent's work that needs you, ahead of fixes to check: a permission it lacks, work that failed
+  { kind: 'blocked', title: t('Waiting for your OK') },
+  { kind: 'failed', title: t('Agents that stopped') },
   { kind: 'verify', title: t('Fixes to check') },
   { kind: 'review', title: t('To review') },
   { kind: 'post', title: t('Posts that failed') },
@@ -44,7 +51,8 @@ export const who = (by: string | null | undefined) => (by ? by.replace(/^agent:/
 
 /** Kinds that are a conversation — a question, an answer to your note, a client's note: the preview puts what was said
  * first and where you answer right under it, the picture beside it (Preview.tsx). */
-export const isTalk = (i: Pick<ForYouItem, 'kind'>): boolean => i.kind === 'question' || i.kind === 'answer' || i.kind === 'client';
+export const isTalk = (i: Pick<ForYouItem, 'kind'>): boolean =>
+  i.kind === 'question' || i.kind === 'answer' || i.kind === 'client' || i.kind === 'blocked' || i.kind === 'failed';
 
 export const when = (iso: string) => {
   const m = Math.round((Date.now() - Date.parse(iso)) / 60000);
@@ -70,6 +78,9 @@ export function openHref(i: ForYouItem, at?: { v: number; f: number; newest: boo
   const s = q.toString();
   return `#/v/${enc(i.slug)}${s ? `?${s}` : ''}`;
 }
+
+/** Minutes since an ISO time, as words ("40 min", "2 h"). */
+const sinceWords = (iso: string | null | undefined) => secsWords(Math.max(60, iso ? (Date.now() - Date.parse(iso)) / 1000 : 60));
 
 /** Whom a stalled video waits on. */
 const waitingOn = (i: ForYouItem): string =>
@@ -104,7 +115,14 @@ export function whatLine(i: ForYouItem): { text: string; at?: string } {
       return { text: i.part ? t('New version V{v} · part', { v: i.v ?? '' }) : t('New version V{v}', { v: i.v ?? '' }) };
     case 'playbook':
       return { text: t('{name} suggests a change to {what}', { name: who(i.by), what: sectionWords(i.section || '') }) };
+    case 'blocked':
+      return { text: t('{name} needs your OK', { name: who(i.run?.agent ?? i.by) }) };
+    case 'failed':
+      return { text: t('{name} stopped', { name: who(i.run?.agent ?? i.by) }) };
     case 'stalled':
+      // an agent at work that went quiet, or work sent that nobody picked up
+      if (i.run && i.reason === 'lost') return { text: t('No word from {name} for {time}', { name: who(i.run.agent), time: sinceWords(i.run.seen) }) };
+      if (i.run && i.reason === 'queued') return { text: t('{name} hasn’t picked it up', { name: who(i.run.agent) }) };
       return { text: waitingOn(i) };
     case 'post':
       return {
@@ -181,9 +199,25 @@ export const stalledWhy = (i: ForYouItem): string =>
       ? t('V{n} and not approved yet', { n: i.count ?? 0 })
       : t('Quiet for {d}', { d: hoursWords(i.waitingHours) });
 
+/** An agent's work in a line under what happened: what it needs, why it stopped (with the tool's last words), what it
+ * did last, or since when it waits to be picked up. */
+function runText(i: ForYouItem): string | undefined {
+  const r = i.run;
+  if (!r) return undefined;
+  if (i.kind === 'blocked') return r.needs?.text ? phrase(r.needs.text) : t('Needs a permission it doesn’t have');
+  if (i.kind === 'failed') {
+    const why = r.error ? phrase(r.error) : t('It stopped with an error');
+    const last = lastPrinted(r.error);
+    return last ? `${why}: ${last}` : why;
+  }
+  if (i.reason === 'queued') return t('Sent {time} ago', { time: sinceWords(r.started) });
+  return r.now ? t('Last: {step}', { step: phrase(r.now) }) : t('Nothing heard since it began');
+}
+
 /** The line under what happened: what was said, or why a stalled video is listed. A render to review has none: the
  * line above says it, the preview shows what it brings. */
-export const itemText = (i: ForYouItem): string | undefined => (i.kind === 'stalled' ? stalledWhy(i) : i.kind === 'review' ? undefined : i.text);
+export const itemText = (i: ForYouItem): string | undefined =>
+  i.run ? runText(i) : i.kind === 'stalled' ? stalledWhy(i) : i.kind === 'review' ? undefined : i.text;
 
 /** What the agent reads when you nudge it (agent-facing text stays English, like everything agents parse). */
 export const nudgeText = (i: ForYouItem) =>
@@ -223,6 +257,10 @@ export function tallyParts(items: ForYouItem[]): string[] {
           return t('stalled');
         case 'post':
           return t('{n} post failed|{n} posts failed', { n });
+        case 'blocked':
+          return t('needs your OK');
+        case 'failed':
+          return t('an agent stopped');
         default:
           return '';
       }
@@ -245,6 +283,14 @@ export function whenWords(iso: string, now = new Date()): string {
 export function useInboxActions() {
   const qc = useQueryClient();
   const can = useCan();
+  // Try again (Send again) of work Lampo started on this machine starts it again here — unless the person only sends
+  const status = useAuthStatus().data;
+  const info = useInfo();
+  const startsHere = (i: ForYouItem) =>
+    i.run?.delivery === 'machine' && status?.via === 'local' && !!info?.capabilities?.wakeAgents && status?.user?.prefs?.wake !== 'send';
+  const runWrite = (i: ForYouItem, what: 'stop' | 'retry' | 'nudge', body?: object) =>
+    api(`/api/runs/${enc(i.run?.id ?? '')}/${what}`, { method: 'POST', ...(body ? { body } : {}) });
+  const agentOf = (i: ForYouItem) => who(i.run?.agent ?? i.agent ?? i.by);
   const drop = (key: string) =>
     qc.setQueryData<ForYouResponse>(keys.forYou, (d) => {
       if (!d) return d;
@@ -388,6 +434,25 @@ export function useInboxActions() {
         },
         start ? t('Nudged and started {name}', { name: who(i.agent) }) : t('Nudged {name}', { name: who(i.agent) }),
       ),
+    /** Whether this person may steer agents (Try again, Send again, Stop, Nudge): the agents right. */
+    canSteer: can('agents'),
+    /** Try again (a failure) or Send again (a permission now allowed): the follow-up on the notes still open. */
+    retryRun: (i: ForYouItem) =>
+      act(
+        i,
+        () => runWrite(i, 'retry', startsHere(i) ? { start: true } : undefined),
+        i.kind === 'blocked' ? t('Sent to {name} again', { name: agentOf(i) }) : t('{name} tries again', { name: agentOf(i) }),
+      ),
+    /** Stop (a permission it lacks, an agent gone quiet) or Cancel (sent, never picked up). */
+    stopRun: (i: ForYouItem) => act(i, () => runWrite(i, 'stop'), i.reason === 'queued' ? t('Called off') : t('Stopped {name}', { name: agentOf(i) })),
+    /** Nudge an agent gone quiet (or one that hasn't picked it up): a request on the same work; it stays listed until
+     * the agent is heard from. */
+    nudgeRun: (i: ForYouItem) =>
+      runWrite(i, 'nudge').then(
+        () => toast(t('Nudged {name}', { name: agentOf(i) }), 'ok'),
+        (e) => toastError(e),
+      ),
+    /** A failure seen without an action leaves the list quietly (inbox/seen.ts), as an update does. */
     verify: (i: ForYouItem) => act(i, () => patch(i, { status: 'verified' }), t('Looks right — {name} hears about it', { name: who(i.by) })),
     answer: (i: ForYouItem, text: string) => act(i, () => patch(i, { status: 'verified', note: text }), t('Answered — {name} gets it', { name: who(i.by) })),
     stillWrong: (i: ForYouItem, text: string) =>
@@ -406,6 +471,11 @@ export type InboxActions = ReturnType<typeof useInboxActions>;
  * the link to send again), else the player; and "Got it". `done`: the item left the list (the list moves on).
  */
 export function StalledActions({ item: i, actions, done }: { item: ForYouItem; actions: InboxActions; done?: (p: Promise<boolean>) => void }) {
+  if (i.run) return <RunActs item={i} actions={actions} done={done} />;
+  return <VideoStalledActions item={i} actions={actions} done={done} />;
+}
+
+function VideoStalledActions({ item: i, actions, done }: { item: ForYouItem; actions: InboxActions; done?: (p: Promise<boolean>) => void }) {
   const can = useCan();
   const [link, setLink] = useState(false);
   // "Send and start" or "Only send", when the agent isn't running and the person asked to be asked.
@@ -445,6 +515,68 @@ export function StalledActions({ item: i, actions, done }: { item: ForYouItem; a
       </button>
       {main}
       {link && <LazyShareModal slug={i.slug} name={i.video} onClose={() => setLink(false)} />}
+    </>
+  );
+}
+
+/**
+ * What an agent's work offers where it is listed (the preview's foot, a card): a failure Log (where this machine keeps
+ * one) and Try again; a permission it lacks Stop while it is still at it, Send again once it ended; one gone quiet Nudge
+ * and Stop, one never picked up Nudge and Cancel. Only for who may steer agents; the rest open the video. Never "Got it".
+ */
+export function RunActs({
+  item: i,
+  actions,
+  done,
+  log,
+}: {
+  item: ForYouItem;
+  actions: InboxActions;
+  done?: (p: Promise<boolean>) => void;
+  /** The raw log can be opened here (a run this machine started, seen from the machine itself). */
+  log?: boolean;
+}) {
+  const run = (p: Promise<boolean>) => (done ? done(p) : void p);
+  const r = i.run;
+  if (!r) return null;
+  if (!actions.canSteer)
+    return (
+      <a className="btn primary sm" href={openHref(i)}>
+        {t('Open')}
+      </a>
+    );
+  const logButton = log && r.log && (
+    <a className="btn ghost sm" href={`/api/runs/${enc(r.id)}/log`} target="_blank" rel="noopener" data-testid="inbox-run-log">
+      {t('Log')}
+    </a>
+  );
+  if (i.kind === 'failed')
+    return (
+      <>
+        {logButton}
+        <button type="button" className="btn primary sm" onClick={() => run(actions.retryRun(i))} data-testid="inbox-run-retry">
+          <I name="refresh" size={14} /> {t('Try again')}
+        </button>
+      </>
+    );
+  if (i.kind === 'blocked')
+    return r.ended === null ? (
+      <button type="button" className="btn sm" onClick={() => run(actions.stopRun(i))} data-testid="inbox-run-stop">
+        <I name="stop" size={14} /> {t('Stop')}
+      </button>
+    ) : (
+      <button type="button" className="btn primary sm" onClick={() => run(actions.retryRun(i))} data-testid="inbox-run-again">
+        <I name="send" size={14} /> {t('Send again')}
+      </button>
+    );
+  return (
+    <>
+      <button type="button" className="btn ghost sm" onClick={() => run(actions.stopRun(i))} data-testid="inbox-run-stop">
+        {i.reason === 'queued' ? t('Cancel') : t('Stop')}
+      </button>
+      <button type="button" className="btn primary sm" onClick={() => void actions.nudgeRun(i)} data-testid="inbox-run-nudge">
+        <I name="send" size={14} /> {t('Nudge')}
+      </button>
     </>
   );
 }
@@ -491,6 +623,17 @@ export const When = ({ at }: { at: string }) => (
     {when(at)}
   </time>
 );
+
+/** A permission's rule to copy, on a card (the preview says where it goes, at length). */
+function PermissionRule({ item: i }: { item: ForYouItem }) {
+  const allow = i.run?.needs?.allow;
+  if (!allow) return null;
+  return (
+    <Code label={t('Permission rule')} testid="run-allow">
+      {allow}
+    </Code>
+  );
+}
 
 /** "Later" on a card: back tomorrow at 9:00, or once the video moves. */
 const LaterButton = ({ item: i, actions }: { item: ForYouItem; actions: InboxActions }) => (
@@ -589,6 +732,26 @@ export function ItemCard({ item: i, actions, inVideo = false }: { item: ForYouIt
             <LaterButton item={i} actions={actions} />
             <StalledActions item={i} actions={actions} />
           </div>
+        ) : i.kind === 'blocked' || i.kind === 'failed' ? (
+          <>
+            {/* what it lacks (the rule to copy) or why it stopped (the tool's last lines): the card is all there is here */}
+            {i.kind === 'blocked' ? (
+              <div className="fy-run">
+                <PermissionRule item={i} />
+              </div>
+            ) : (
+              <div className="fy-run">
+                <PrintedLines words={i.run?.error} />
+              </div>
+            )}
+            <div className="fy-actions">
+              <LaterButton item={i} actions={actions} />
+              <a className="btn ghost sm" href={href}>
+                {t('Open')}
+              </a>
+              <RunActs item={i} actions={actions} />
+            </div>
+          </>
         ) : i.kind === 'post' ? (
           <div className="fy-actions">
             <LaterButton item={i} actions={actions} />

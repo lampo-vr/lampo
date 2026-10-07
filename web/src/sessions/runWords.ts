@@ -179,7 +179,8 @@ export function runSaid(r: RunLike, o: SayOptions = {}): RunSaid {
     case 'stopped':
       return line({
         name: null,
-        words: t('Stopped after {time}', { time: secsWords(Math.max(1, r.worked_s)) }),
+        // an agent that listens hears it with its next call to Lampo, not before: said so until then
+        words: r.stop_pending ? t('Stopped · it will notice at its next step') : t('Stopped after {time}', { time: secsWords(Math.max(1, r.worked_s)) }),
         actions: ['again'],
       });
     case 'lost':

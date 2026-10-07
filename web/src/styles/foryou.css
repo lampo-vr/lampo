@@ -283,6 +283,12 @@
   display: grid;
   gap: var(--sp-2);
 }
+/* an agent's work on a card: the rule to copy, or the last lines it printed (sessions/RunNeeds.tsx) */
+.fy-run {
+  display: grid;
+  min-width: 0;
+  margin: var(--sp-1) 0;
+}
 .fy-answer textarea {
   width: 100%;
   min-height: 64px;

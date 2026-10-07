@@ -8,7 +8,8 @@
 //   reading width, the choices and the answer right under them, the picture beside at a calmer size, on the moment the
 //   words are about (their note's frame; a note about the whole video: the first timecode it names, else the poster's
 //   frame). Timecodes in the words are links that seek the picture. No stage chip: it would describe the video, not
-//   the item.
+//   the item. An agent's work that needs you reads the same way: a permission it lacks with the exact rule to copy, a
+//   failure with its error and the last lines it printed (sessions/RunNeeds.tsx).
 // "Open in player" (O, a double-click on the picture, or ↵ on the open item in the list) takes the frame on screen to
 // the full player.
 // Keys while the preview is there: Space plays/pauses, ←/→ a frame, ⇧←/→ a second, O opens — never while typing.
@@ -19,8 +20,10 @@ import { partWhere } from '../../../lib/part.ts';
 import { renderKey } from '../../../lib/renderKey.ts';
 import { posterFrame, timecode, timecodesIn, timeToFrame } from '../../../lib/time.ts';
 import type { StageInfo } from '../../../lib/types.ts';
+import { useAuthStatus } from '../api/auth.ts';
 import { useWakeAgent } from '../api/mutations.ts';
 import { useInfo, useQaQuery, useReview } from '../api/queries.ts';
+import { useRunDetail } from '../api/runQueries.ts';
 import { spriteUrl, useSprite } from '../api/sprite.ts';
 import type { Comment, ForYouItem, Review, ReviewResponse, Version, VideoSummary } from '../api/types.ts';
 import { t } from '../i18n/index.ts';
@@ -28,6 +31,7 @@ import { ago, bytes } from '../lib/format.ts';
 import { toast, toastError } from '../lib/toast.ts';
 import { OptionsAsk } from '../options/OptionsAsk.tsx';
 import { fullSaid, seamSaid } from '../player/partWords.ts';
+import { FailureLines, LastSteps, PermissionNeeds } from '../sessions/RunNeeds.tsx';
 import { useWakeChoice, WakeAsk, type WakeChoice } from '../sessions/Wake.tsx';
 import { useStageActions } from '../status/api.ts';
 import { StatusPill } from '../status/StatusPill.tsx';
@@ -39,7 +43,20 @@ import { EmptyState } from '../ui/system.tsx';
 import { TimecodeText } from '../ui/TimecodeText.tsx';
 import { SayButton, withSaid } from '../ui/VoiceButton.tsx';
 import { laterUntil } from './group.ts';
-import { ChangedLabel, type InboxActions, isTalk, itemText, OPEN_PLAYER, openHref, PostRetry, StalledActions, What, whenWords, who } from './items.tsx';
+import {
+  ChangedLabel,
+  type InboxActions,
+  isTalk,
+  itemText,
+  OPEN_PLAYER,
+  openHref,
+  PostRetry,
+  RunActs,
+  StalledActions,
+  What,
+  whenWords,
+  who,
+} from './items.tsx';
 import { PlaybookPreview } from './PlaybookPreview.tsx';
 import { PreviewLoading as Loading } from './PreviewPending.tsx';
 import { Scrubber } from './Scrubber.tsx';
@@ -247,9 +264,10 @@ function Loaded(props: PreviewProps & { review: Review; media: ReviewResponse['m
     location.hash = openHref(item, { v: ver.v, f: pv.current(), newest });
   };
   usePreviewKeys(root, pv, ver.fps, open);
-  // A stalled video or a render to review isn't about one moment, nor is a note about the whole video: no mark.
+  // A stalled video or a render to review isn't about one moment, nor is a note about the whole video, nor an agent's
+  // work: no mark.
   const moment =
-    item.kind === 'stalled' || item.kind === 'review' || item.kind === 'post' || note?.scope === 'video'
+    item.kind === 'stalled' || item.kind === 'review' || item.kind === 'post' || item.run || note?.scope === 'video'
       ? null
       : { frame: start, range: own ? note?.range : null, kind: item.kind };
   const text = itemText(item);
@@ -370,6 +388,8 @@ function Loaded(props: PreviewProps & { review: Review; media: ReviewResponse['m
             {item.kind === 'answer' && item.question && <p className="inbox-pv-quote">{t('on “{question}”', { question: item.question })}</p>}
             {item.kind === 'review' ? (
               <RenderFacts item={item} review={review} ver={ver} />
+            ) : item.run ? (
+              <RunFacts item={item} />
             ) : (
               <>
                 {said && <p className="inbox-pv-text">{said}</p>}
@@ -387,6 +407,24 @@ function Loaded(props: PreviewProps & { review: Review; media: ReviewResponse['m
         </div>
       </div>
     </PreviewShell>
+  );
+}
+
+/**
+ * An agent's work that needs you, in the preview: a permission it lacks (what for, the rule to copy, where it goes), a
+ * failure (its error, the tool's last lines, the steps before), or one gone quiet (what it did last).
+ */
+function RunFacts({ item }: { item: ForYouItem }) {
+  const r = item.run;
+  const detail = useRunDetail(r?.id ?? null, !!r && item.kind !== 'blocked');
+  if (!r) return null;
+  if (item.kind === 'blocked') return <PermissionNeeds run={r} />;
+  if (item.kind === 'failed') return <FailureLines run={r} steps={detail?.steps} />;
+  return (
+    <>
+      <p className="inbox-pv-text">{itemText(item)}</p>
+      <LastSteps steps={detail?.steps} />
+    </>
   );
 }
 
@@ -492,6 +530,10 @@ function Act({ item, actions, onDone, choices, agent, wake }: PreviewProps & { c
   const [pending, setPending] = useState<string | null>(null);
   const stage = useStageActions(item.slug);
   const wakeAgent = useWakeAgent(item.slug);
+  // the raw log of work this machine started is read on the machine itself
+  const via = useAuthStatus().data?.via;
+  const canWake = !!useInfo()?.capabilities?.wakeAgents;
+  const machine = via === 'local' && canWake;
   const done = async (p: Promise<boolean>) => {
     if (await p) onDone(item.key);
   };
@@ -664,6 +706,13 @@ function Act({ item, actions, onDone, choices, agent, wake }: PreviewProps & { c
       <div className="inbox-act-row">
         {later}
         <StalledActions item={item} actions={actions} done={done} />
+      </div>
+    );
+  if (item.run)
+    return (
+      <div className="inbox-act-row">
+        {later}
+        <RunActs item={item} actions={actions} done={done} log={machine} />
       </div>
     );
   if (item.kind === 'post')

@@ -62,6 +62,7 @@ export interface ReviewServerOptions {
    * Each tool call an agent makes, as live activity for the UI (lib/activity.ts): no extra tokens, the call itself.
    * What it returns is a line the answer ends with: the person stopped this agent's work (lib/runs.ts stopLine), once.
    */
+  // biome-ignore lint/suspicious/noConfusingVoidType: a callback that only records (tests, older callers) says nothing back
   activity?: (a: ActivityRecord) => string | null | undefined | void;
   /** The caller's new frames, counted per account (`get_frame`, like `GET /api/review/:slug/frame`); absent: not counted. */
   frameGrabs?: GrabCount;

@@ -1112,7 +1112,10 @@ export interface RunStepLine extends ActivityWords {
 
 /** What the library's cards, the sidebar and the board need of a video's run: the open one, else the last that ended
  * in the past 24 hours. */
-export type RunBrief = Pick<Run, 'id' | 'agent' | 'state' | 'started' | 'ended' | 'worked_s' | 'now' | 'progress' | 'result' | 'error' | 'needs' | 'stop_pending'> & {
+export type RunBrief = Pick<
+  Run,
+  'id' | 'agent' | 'state' | 'started' | 'ended' | 'worked_s' | 'now' | 'progress' | 'result' | 'error' | 'needs' | 'stop_pending'
+> & {
   /** Plan counts: notes in the plan, and how many are fixed, asked, left or answered. */
   planned: number;
   answered: number;

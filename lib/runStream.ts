@@ -134,7 +134,8 @@ export function permissionFor(name: string, input: Record<string, unknown>): { w
       ? { words: words('Needs permission to run {command}', { command: prefix }), allow: clean(`Bash(${prefix}:*)`) }
       : { words: words('Needs permission to use {tool}', { tool: 'Bash' }), allow: 'Bash' };
   }
-  if (name === 'Edit' || name === 'MultiEdit' || name === 'Write' || name === 'NotebookEdit') return { words: words('Needs permission to edit files'), allow: 'Edit' };
+  if (name === 'Edit' || name === 'MultiEdit' || name === 'Write' || name === 'NotebookEdit')
+    return { words: words('Needs permission to edit files'), allow: 'Edit' };
   const mcp = /^mcp__(.+?)__(.+)$/.exec(name);
   if (mcp) {
     // Lampo's own tools, under whatever key the session gave the server: all of them at once

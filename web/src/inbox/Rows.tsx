@@ -15,7 +15,7 @@ import { enc } from '../api/client.ts';
 import type { ForYouItem } from '../api/types.ts';
 import { perLang, t } from '../i18n/index.ts';
 import { useMedia } from '../lib/media.ts';
-import { toast } from '../lib/toast.ts';
+import { copyText, toast } from '../lib/toast.ts';
 import { useMeasuredWindow, WINDOW_FROM } from '../lib/windowing.ts';
 import { I } from '../ui/icons.tsx';
 import { IconButton, Kbd, Menu, type MenuEntry, Modal, Tip } from '../ui/primitives.tsx';
@@ -336,11 +336,56 @@ type Run = {
   verifyMany: (list: ForYouItem[]) => void;
 };
 
+/** A permission's rule on the clipboard (the preview has it whole, with where it goes). */
+const copyRule = (i: ForYouItem) => {
+  const allow = i.run?.needs?.allow;
+  if (allow) void copyText(allow).then((ok) => toast(ok ? t('Copied: {rule}', { rule: allow }) : t('Could not copy'), ok ? 'ok' : 'error'));
+};
+
+/** An agent's work, from its row: Try again (failed), the rule and Send again or Stop (a permission), Nudge (quiet). */
+function runRowActs(i: ForYouItem, actions: InboxActions) {
+  const r = i.run;
+  if (!r) return [];
+  const out: { key: string; label: string; tip: string; icon: 'refresh' | 'copy' | 'send' | 'stop'; onClick: () => void }[] = [];
+  if (i.kind === 'blocked' && r.needs?.allow)
+    out.push({ key: 'copy', label: t('Copy the rule: {video}', { video: i.video }), tip: t('Copy the rule'), icon: 'copy', onClick: () => copyRule(i) });
+  if (!actions.canSteer) return out;
+  if (i.kind === 'failed')
+    out.push({
+      key: 'retry',
+      label: t('Try again: {video}', { video: i.video }),
+      tip: t('Try again'),
+      icon: 'refresh',
+      onClick: () => void actions.retryRun(i),
+    });
+  else if (i.kind === 'blocked')
+    out.push(
+      r.ended === null
+        ? { key: 'stop', label: t('Stop: {video}', { video: i.video }), tip: t('Stop'), icon: 'stop', onClick: () => void actions.stopRun(i) }
+        : { key: 'again', label: t('Send again: {video}', { video: i.video }), tip: t('Send again'), icon: 'send', onClick: () => void actions.retryRun(i) },
+    );
+  else if (i.kind === 'stalled')
+    out.push({ key: 'nudge', label: t('Nudge: {video}', { video: i.video }), tip: t('Nudge'), icon: 'send', onClick: () => void actions.nudgeRun(i) });
+  return out;
+}
+
 /** A row's own actions, in the time's place while the pointer or the keys are on it (nothing moves). */
 function RowActs({ i, actions, run, onAsk, laterTip }: { i: ForYouItem; actions: InboxActions; run: Run; onAsk: (key: string) => void; laterTip: string }) {
   const how = doneOf(i);
   return (
     <span className="inbox-row-acts">
+      {runRowActs(i, actions).map((a) => (
+        <IconButton
+          key={a.key}
+          className="btn ghost sm icon-only"
+          label={a.label}
+          tip={a.tip}
+          icon={a.icon}
+          size={14}
+          onClick={stop(a.onClick)}
+          data-testid={`inbox-row-run-${a.key}`}
+        />
+      ))}
       {i.kind === 'verify' && (
         <>
           <IconButton
@@ -404,6 +449,10 @@ function RowActs({ i, actions, run, onAsk, laterTip }: { i: ForYouItem; actions:
 function RowMenu({ i, actions, run, sel, onAsk }: { i: ForYouItem; actions: InboxActions; run: Run; sel: Selection; onAsk: (key: string) => void }) {
   const how = doneOf(i);
   const items: MenuEntry[] = [
+    ...runRowActs(i, actions).map((a) => ({ label: a.tip, icon: a.icon, onClick: a.onClick })),
+    i.kind === 'stalled' &&
+      !!i.run &&
+      actions.canSteer && { label: i.reason === 'queued' ? t('Cancel') : t('Stop'), icon: 'stop', onClick: () => void actions.stopRun(i) },
     i.kind === 'verify' && { label: t('Looks right'), icon: 'check', onClick: () => actions.verifyUndo(i) },
     i.kind === 'verify' && { label: t('Still wrong…'), icon: 'reopen', onClick: () => onAsk(i.key) },
     i.kind === 'post' && actions.canRetry && postRetry(i) && { label: postRetry(i)?.label ?? '', icon: 'refresh', onClick: () => void actions.retryPost(i) },

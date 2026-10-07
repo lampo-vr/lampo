@@ -71,7 +71,9 @@ serveStdio(
       // from this machine's runs, or what the hosted server answered an earlier batch with.
       activity: (a) => {
         activity.record(a);
-        return remote ? activity.heard().join('\n') || null : localStopLine(a.agent, { kind: a.kind, slug: a.slug ?? null, video: a.video ?? null, target: a.target ?? null });
+        return remote
+          ? activity.heard().join('\n') || null
+          : localStopLine(a.agent, { kind: a.kind, slug: a.slug ?? null, video: a.video ?? null, target: a.target ?? null });
       },
       sourceUrl: cfg.source_url,
       told,

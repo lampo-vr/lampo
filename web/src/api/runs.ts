@@ -26,6 +26,7 @@ export function briefOf(r: Run): RunBrief {
     result: r.result,
     error: r.error,
     needs: r.needs,
+    ...(r.stop_pending ? { stop_pending: true } : {}),
     planned: r.plan.length,
     answered,
   };
@@ -57,14 +58,21 @@ function settleRun(qc: QueryClient, slug: string, run: Run) {
   qc.setQueryData<ReviewResponse>(keys.review(slug), (old) => (old ? { ...old, summary: { ...old.summary, run: b } } : old));
 }
 
+/** A write on one run; `start`: Try again starts the agent on this machine as well (a run Lampo started here). */
+export type RunWrite = string | { id: string; start?: boolean };
+
 /** Stop, Try again (a failed or stopped run: the follow-up on the notes still open) and Nudge (one gone quiet). */
 export function useRunActions(slug: string) {
   const qc = useQueryClient();
-  const write = (what: 'stop' | 'retry' | 'nudge') => (id: string) => api<RunWriteResponse>(`/api/runs/${enc(id)}/${what}`, { method: 'POST' });
+  const write = (what: 'stop' | 'retry' | 'nudge') => (w: RunWrite) =>
+    api<RunWriteResponse>(`/api/runs/${enc(typeof w === 'string' ? w : w.id)}/${what}`, {
+      method: 'POST',
+      ...(typeof w !== 'string' && w.start ? { body: { start: true } } : {}),
+    });
   const stop = useMutation({
     mutationFn: write('stop'),
     // stopped at once: the strip, the card and the Agent view say so before the server answers
-    onMutate: (id: string) => guessRun(qc, slug, id, { state: 'stopped', ended: new Date().toISOString(), progress: null }),
+    onMutate: (w: RunWrite) => guessRun(qc, slug, typeof w === 'string' ? w : w.id, { state: 'stopped', ended: new Date().toISOString(), progress: null }),
     onError: (_e, _id, undo) => {
       for (const u of undo || []) u();
     },

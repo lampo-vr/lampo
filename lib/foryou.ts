@@ -29,7 +29,7 @@ import { dataDir, isoLocal, slugify } from './paths.ts';
 import { can } from './permissions.ts';
 import { pendingProposals, scopeLabel } from './playbooks.ts';
 import { failedPosts } from './publish/posts.ts';
-import { due, isAnswered, readRuns, settle, type StoredRun } from './runs.ts';
+import { due, isAnswered, readRuns, type StoredRun, settle } from './runs.ts';
 import { stageOf } from './stage.ts';
 import { listReviews, readHistory, withLock, writeAtomic } from './store.ts';
 import { compareTime, isAgent, isQuestion, isRequired } from './time.ts';
@@ -393,7 +393,16 @@ function runOf(r: StoredRun): ForYouRun {
     seen: r.seen,
     ...(r.error ? { error: r.error } : {}),
     ...(r.needs ? { needs: r.needs } : {}),
-    ...(r.now ? { now: { text: r.now.text, ...(r.now.key ? { key: r.now.key } : {}), ...(r.now.vars ? { vars: r.now.vars } : {}), ...(r.now.quote ? { quote: r.now.quote } : {}) } } : {}),
+    ...(r.now
+      ? {
+          now: {
+            text: r.now.text,
+            ...(r.now.key ? { key: r.now.key } : {}),
+            ...(r.now.vars ? { vars: r.now.vars } : {}),
+            ...(r.now.quote ? { quote: r.now.quote } : {}),
+          },
+        }
+      : {}),
     ...(r.log ? { log: true } : {}),
     planned: r.plan.length,
     answered: r.plan.filter(isAnswered).length,
@@ -430,7 +439,16 @@ function runItems(reviews: Review[], now: number): ForYouItem[] {
       }
       const since = (iso: string | null) => (iso ? now - Date.parse(iso) : 0);
       if (run.state === 'needs_you' && run.needs?.kind === 'permission' && since(run.ended ?? run.seen) < (WINDOW.blocked ?? 0))
-        out.push({ key: `blocked:${run.id}`, kind: 'blocked', at: run.seen, ...common, text: run.needs.text?.text ?? '', by: `agent:${run.agent.name}`, run: runOf(run), dismissible: false });
+        out.push({
+          key: `blocked:${run.id}`,
+          kind: 'blocked',
+          at: run.seen,
+          ...common,
+          text: run.needs.text?.text ?? '',
+          by: `agent:${run.agent.name}`,
+          run: runOf(run),
+          dismissible: false,
+        });
       else if (run.state === 'failed' && since(run.ended) < (WINDOW.failed ?? 0))
         out.push({
           key: `failed:${run.id}`,

@@ -793,7 +793,10 @@ export function claimStop(id: string, now = Date.now()): boolean {
  * yet. The app hears the same call a moment later (the activity file) and clears `stop_pending`; `claimStop` keeps it to
  * one telling. A wait tells nothing (it went back to waiting: the work is over either way). Read only.
  */
-export function localStopLine(agent: string | null, about: { kind: AgentActivityKind; slug?: string | null; video?: string | null; target?: string | null }): string | null {
+export function localStopLine(
+  agent: string | null,
+  about: { kind: AgentActivityKind; slug?: string | null; video?: string | null; target?: string | null },
+): string | null {
   if (!agent || about.kind === 'wait') return null;
   try {
     let slug = about.slug ?? null;

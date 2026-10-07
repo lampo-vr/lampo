@@ -10,6 +10,7 @@ import type { Request } from 'express';
 import { agentName, words } from '../lib/activityText.ts';
 import { agentKindOfRef } from '../lib/agentKind.ts';
 import { can } from '../lib/permissions.ts';
+import type { RunNotice } from '../lib/push/index.ts';
 import * as lib from '../lib/runs.ts';
 import { boundToWorkspace, currentWorkspace, inWorkspace, wsKey } from '../lib/scope.ts';
 import * as store from '../lib/store.ts';
@@ -27,7 +28,6 @@ import type {
   RunPhase,
   RunProgress,
 } from '../lib/types.ts';
-import type { RunNotice } from '../lib/push/index.ts';
 import type { Broadcast } from './events.ts';
 import { fail } from './http.ts';
 
