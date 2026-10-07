@@ -1073,6 +1073,15 @@ export interface Run {
   request?: string;
   /** The run this one continues (an answer, Try again). */
   follows?: string;
+  /** A raw log exists (a run Lampo started: this machine or a runner), served at GET /api/runs/:id/log to whoever may
+   * read it there. */
+  log?: boolean;
+}
+
+/** POST /api/runs/:id/stop, /retry and /nudge (a person with the agents right; never an API token). Retry opens the
+ * follow-up run (`follows`) on the notes still open, and answers with it. */
+export interface RunWriteResponse {
+  run: Run;
 }
 
 /** One kept step of a run (at most 200 per run; progress keeps only its first and last line). */
