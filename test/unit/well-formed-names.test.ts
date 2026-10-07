@@ -13,7 +13,7 @@ isolatedEnv();
 const { uploadName, uploadFolder } = await import('../../lib/store.ts');
 const { safeSegment } = await import('../../lib/archive.ts');
 const { normFolder, folderName } = await import('../../lib/folders.ts');
-const { parseFolders, cleanArchived, foldersFile, archivedProjectOf, checkNotArchived } = await import('../../lib/folderIds.ts');
+const { parseFolders, cleanArchived, folderRecord, foldersFile, archivedProjectOf, checkNotArchived } = await import('../../lib/folderIds.ts');
 const { repairFolders } = await import('../../lib/folders.ts');
 const { cutChars, wellFormed, cleanDisplayName, cleanAgentName, shownName } = await import('../../lib/names.ts');
 const { guestName } = await import('../../lib/shares.ts');
@@ -87,8 +87,10 @@ test('folders.json as an older version kept it reads well-formed', () => {
 
 test('an archived project’s record reads well-formed too, from a whole file or a damaged one, and still locks its project', () => {
   const stored = { folders: ['Old\ud800', 'Old\ud800/Reels'], archived: { 'Old\ud800': { at: '2026-10-07T10:00:00', by: 'Olivia\udfff' } } };
-  assert.deepEqual(cleanArchived(parseFolders(JSON.stringify(stored)).archived), { 'Old\ufffd': { at: '2026-10-07T10:00:00', by: 'Olivia\ufffd' } });
-  assert.deepEqual(cleanArchived(stored.archived), { 'Old\ufffd': { at: '2026-10-07T10:00:00', by: 'Olivia\ufffd' } });
+  // well-formed, and still a record without a prototype (folderRecord: any name a project can have reads as itself)
+  const read = folderRecord(Object.entries({ 'Old\ufffd': { at: '2026-10-07T10:00:00', by: 'Olivia\ufffd' } }));
+  assert.deepEqual(cleanArchived(parseFolders(JSON.stringify(stored)).archived), read);
+  assert.deepEqual(cleanArchived(stored.archived), read);
   // the videos inside read their folder well-formed (lib/store.ts shownNames): the lock still holds for them
   fs.mkdirSync(path.dirname(foldersFile()), { recursive: true });
   fs.writeFileSync(foldersFile(), JSON.stringify(stored));

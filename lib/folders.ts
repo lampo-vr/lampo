@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { projectOfFolder } from './archived.ts';
 import { moveAskFolders } from './asks.ts';
-import { checkNotArchived, cleanArchived, FoldersUnreadableError, foldersFile, newFolderId, parseFolders, readFoldersText } from './folderIds.ts';
+import { checkNotArchived, cleanArchived, FoldersUnreadableError, folderRecord, foldersFile, newFolderId, parseFolders, readFoldersText } from './folderIds.ts';
 import { cutChars } from './names.ts';
 import { dataDir, isoLocal, projectOf, slugify, USER } from './paths.ts';
 import { movePlaybooks, playbookRoot } from './playbookFiles.ts';
@@ -91,9 +91,10 @@ const parentOf = (p: string) => p.split('/').slice(0, -1).join('/') || null;
  */
 function loadFile(): { folders: string[]; ids: Record<string, string>; archived: Record<string, ArchivedProject> } {
   const text = readFoldersText(FILE());
-  if (text === null) return { folders: [], ids: {}, archived: {} };
+  if (text === null) return { folders: [], ids: folderRecord(), archived: folderRecord() };
   const f = parseFolders(text, FILE());
-  return { folders: f.folders || [], ids: f.ids || {}, archived: cleanArchived(f.archived) };
+  // by name without a prototype (folderRecord): `constructor` or `__proto__` is a folder like any other
+  return { folders: f.folders || [], ids: folderRecord(Object.entries(f.ids ?? {})), archived: cleanArchived(f.archived) };
 }
 
 export function loadFolders(): string[] {
@@ -116,7 +117,7 @@ function save(list: Iterable<string>, ids: Record<string, string>, archived: Rec
 
 /** Ids moved with their folders: `map` gives a folder's new path, or null for one whose id ends. */
 function moveIds(ids: Record<string, string>, map: (f: string) => string | null): Record<string, string> {
-  const out: Record<string, string> = {};
+  const out = folderRecord<string>();
   for (const [f, id] of Object.entries(ids)) {
     const to = map(f);
     if (to) out[to] = id;
@@ -187,7 +188,8 @@ export function createFolder(p: unknown): string {
 export function folderIdFor(p: string): string {
   return withLock(LOCK_DIR(), () => {
     const { folders, ids, archived } = loadFile();
-    if (ids[p] && folders.includes(p)) return ids[p];
+    const had = Object.hasOwn(ids, p) ? ids[p] : undefined;
+    if (had && folders.includes(p)) return had;
     const id = newFolderId();
     save([...folders, ...ancestors(p)], { ...ids, [p]: id }, archived);
     return id;
@@ -318,7 +320,7 @@ export function archiveProject(p: unknown, by: { name: string; id?: string }): {
   const name = projectNamed(p);
   return withLock(LOCK_DIR(), () => {
     const { folders, ids, archived } = loadFile();
-    const was = archived[name];
+    const was = Object.hasOwn(archived, name) ? archived[name] : undefined;
     if (was) return { project: name, archived: was };
     const record: ArchivedProject = { at: isoLocal(), by: by.name, ...(by.id ? { by_id: by.id } : {}) };
     // listed in the file (a project only its videos made is kept there from now on, so its mark has a place)
@@ -332,8 +334,8 @@ export function restoreProject(p: unknown): { project: string; restored: boolean
   const name = projectNamed(p);
   return withLock(LOCK_DIR(), () => {
     const { folders, ids, archived } = loadFile();
-    if (!archived[name]) return { project: name, restored: false };
-    const { [name]: _restored, ...rest } = archived;
+    if (!Object.hasOwn(archived, name)) return { project: name, restored: false };
+    const rest = folderRecord(Object.entries(archived).filter(([project]) => project !== name));
     save(folders, ids, rest);
     return { project: name, restored: true };
   });
@@ -429,7 +431,7 @@ function recover(text: string): { folders: string[]; ids: [string, string][]; ar
     }
   }
   // the archived projects, each entry as far as its text reads whole (a name, then an object without nesting)
-  const archived: Record<string, ArchivedProject> = {};
+  const archived = folderRecord<ArchivedProject>();
   const shut = /"archived"\s*:\s*\{/g.exec(text);
   if (shut) {
     const entry = new RegExp(`\\s*${STRING}\\s*:\\s*(\\{[^{}]*\\})\\s*([,}])`, 'y');

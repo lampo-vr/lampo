@@ -16,6 +16,22 @@ export function archivedIn(folder: string | null | undefined, archived: Readonly
 }
 
 /**
+ * The archived projects by name with `held` laid over them: projects archived (their record) or restored (null) a
+ * moment ago, whose change waits behind its Undo (web/src/library/archiving.ts). A record without a prototype, so any
+ * name a project can have holds, `constructor` and `__proto__` among them (lib/folderIds.ts folderRecord).
+ */
+export function archivedWithHeld<T extends Pick<ArchivedProject, 'at'>>(
+  archived: Readonly<Record<string, T>> | null | undefined,
+  held: ReadonlyMap<string, T | null> = new Map(),
+): Record<string, T> {
+  const out: Record<string, T> = Object.assign(Object.create(null), archived);
+  for (const [p, s] of held)
+    if (s) out[p] = s;
+    else delete out[p];
+  return out;
+}
+
+/**
  * The one sentence every refusal says, to people and agents alike (the API, `vr`, MCP): what is archived and who can
  * change that. The name is a person's: one line, whatever it holds.
  */

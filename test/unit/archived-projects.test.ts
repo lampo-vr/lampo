@@ -25,6 +25,7 @@ const folders = await import('../../lib/folders.ts');
 const { slugify, dataDir, reviewDir, reviewFile } = await import('../../lib/paths.ts');
 const { createLocalBackend } = await import('../../lib/backend/local.ts');
 const { createReviewServer } = await import('../../mcp/core.ts');
+const { archivedIn, archivedWithHeld } = await import('../../lib/archived.ts');
 type User = import('../../lib/auth.ts').User;
 
 // Fresh connections: refusals answer before reading the body, which can end a kept-alive socket mid-test.
@@ -454,6 +455,43 @@ test('a render is never tracked into an archived project: refused before it is a
   }
   assert.equal(store.loadReview(slugify(late)), null, 'nothing tracked');
   json(await restore());
+});
+
+test('a project called constructor, __proto__ or toString is archived and restored like any other', async () => {
+  await restore();
+  const guest = { ...origin, Host: 'review.test' };
+  for (const [i, name] of ['constructor', '__proto__', 'toString'].entries()) {
+    json(await request('POST', '/api/folders', { body: { path: name }, headers: as.member }));
+    const slug = filed(`names/clip-${i}.mp4`, name);
+    const link = json(await request('POST', '/api/folder-shares', { body: { folder: name, comment: true }, headers: as.owner })).token;
+    const page = () => request('GET', `/api/g/${link}`, { headers: guest });
+    assert.equal(json(await page()).videos.length, 1, `${name}: its review link shows its video`);
+    assert.equal(json(await restore(as.admin, name)).restored, false, `${name}: not archived, nothing to restore`);
+
+    const done = json(await archive(as.admin, name));
+    assert.equal(done.archived.by, 'Ada', name);
+    assert.ok(Object.hasOwn(done.archived_projects ?? {}, name), `${name} is archived`);
+    assert.ok(Object.hasOwn(foldersFile().archived ?? {}, name), `${name}: kept in folders.json`);
+    const note = await request('POST', `/api/review/${enc(slug)}/comments`, { body: { frame: 1, text: 'In?' }, headers: as.memberToken });
+    assert.equal(note.status, 423, `${name}: ${note.text}`);
+    assert.deepEqual(note.json(), { archived: name, error: `the project "${name}" is archived: it is read-only until a person restores it` });
+    const shut = json(await page());
+    assert.deepEqual([shut.videos.length, shut.perms.comment], [1, false], `${name}: its link plays, watch only`);
+
+    assert.equal(json(await restore(as.admin, name)).restored, true, name);
+    assert.ok(!Object.hasOwn(foldersFile().archived ?? {}, name), `${name}: restored`);
+    json(await request('POST', `/api/review/${enc(slug)}/comments`, { body: { frame: 1, text: 'In again' }, headers: as.memberToken }));
+    assert.equal(json(await page()).perms.comment, true, `${name}: its link takes notes again`);
+  }
+  // the app's own view while an archive or a restore waits behind its Undo (web/src/library/archiving.ts) holds them too
+  for (const name of ['constructor', '__proto__', 'toString']) {
+    const record = { at: '2026-10-07T10:00:00+02:00', by: 'Ada' };
+    const shown = archivedWithHeld({}, new Map([[name, record]]));
+    assert.equal(archivedIn(`${name}/Cuts`, shown), name, `${name}: shown archived at once`);
+    assert.deepEqual(shown[name], record);
+    const back = archivedWithHeld({ [name]: record }, new Map([[name, null]]));
+    assert.equal(archivedIn(name, back), null, `${name}: shown restored at once`);
+  }
 });
 
 test('a project archived in one workspace is that workspace’s: the other’s project of the same name stays open', async () => {
