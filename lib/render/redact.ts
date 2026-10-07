@@ -25,6 +25,14 @@ const RULES: [RegExp, (...m: string[]) => string][] = [
   [new RegExp(String.raw`(--?${SECRET_NAME}\s+)(?!-)\S+`, 'gi'), (_m, head) => `${head}${CUT}`],
   // a name ending in "key" after a separator — OPENAI_KEY=…, stripe.key: …, x-signing-key=… (never keyint= or colorkey=)
   [/(["']?\b(?:[A-Za-z0-9]+[_.-])+key\b["']?\s*[:=]\s*)(?!\[redacted\])(?:"[^"]*"|'[^']*'|[^\s,;&"'})\]]+)/gi, (_m, head) => `${head}${CUT}`],
+  // a name with a secret's word glued on (PGPASSWORD=, DBSECRET=) or ending in "pass" after a separator (SMTP_PASS=)
+  [
+    /(["']?\b[A-Za-z0-9]+(?:password|passwd|passphrase|secret|token)\b["']?\s*[:=]\s*)(?!\[redacted\])(?:"[^"]*"|'[^']*'|[^\s,;&"'})\]]+)/gi,
+    (_m, head) => `${head}${CUT}`,
+  ],
+  [/(["']?\b(?:[A-Za-z0-9]+[_.-])+pass\b["']?\s*[:=]\s*)(?!\[redacted\])(?:"[^"]*"|'[^']*'|[^\s,;&"'})\]]+)/gi, (_m, head) => `${head}${CUT}`],
+  // a MySQL or MariaDB client's password glued to -p (mysql -uroot -psecret)
+  [/(\b(?:mysql|mysqldump|mysqladmin|mariadb|mariadb-dump)\b[^\n]*?\s-p)(?!\[redacted\])\S+/gi, (_m, head) => `${head}${CUT}`],
   // a user and password given to a command: curl -u user:password, --user user:password, --proxy-user …
   [/((?:^|\s)(?:-u|--user|--proxy-user|-U)(?:\s+|=))([^\s:@]+):(?!\/\/)\S+/g, (_m, head, user) => `${head}${user}:${CUT}`],
   // webhook addresses are their own credential (Slack, Discord)

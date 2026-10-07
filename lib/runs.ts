@@ -391,30 +391,29 @@ export function fitRuns(h: Pick<Held, 'runs' | 'raw'>, max: number, now = Date.n
     measure(r);
     total += size.get(r) ?? 0;
   };
+  // Every pass makes it smaller, or the loop ends: whatever the file held (one written before these bounds too), a write
+  // always returns. What can't go — open runs' heads — is written as it is.
   while (total > RUN_LIMITS.fileBytes) {
+    const before = total;
     const oldestWithSteps = runs.filter((r) => r.ended !== null && r.steps.length).sort((a, b) => compareTime(a.ended ?? '', b.ended ?? ''))[0];
-    if (oldestWithSteps) {
-      shrink(oldestWithSteps, []);
-      continue;
-    }
-    const lost = runs.filter((r) => r.ended === null && r.state === 'lost').sort((a, b) => compareTime(a.seen, b.seen))[0];
-    if (lost) {
-      drop(lost);
-      continue;
-    }
-    const oldEnded = runs.filter((r) => r.ended !== null).sort((a, b) => compareTime(a.ended ?? '', b.ended ?? ''))[0];
-    if (oldEnded) {
-      drop(oldEnded);
-      continue;
-    }
-    const long = [...runs].sort((a, b) => b.steps.length - a.steps.length)[0];
-    if (long && long.steps.length > 1) {
-      shrink(long, [long.steps[0] as RunStepLine, ...long.steps.slice(1).slice(-Math.floor(long.steps.length / 2))]);
-      continue;
-    }
-    break;
+    const lost = oldestWithSteps ? undefined : runs.filter((r) => r.ended === null && r.state === 'lost').sort((a, b) => compareTime(a.seen, b.seen))[0];
+    const oldEnded = oldestWithSteps || lost ? undefined : runs.filter((r) => r.ended !== null).sort((a, b) => compareTime(a.ended ?? '', b.ended ?? ''))[0];
+    const long = oldestWithSteps || lost || oldEnded ? undefined : runs.filter((r) => r.steps.length).sort((a, b) => b.steps.length - a.steps.length)[0];
+    if (oldestWithSteps) shrink(oldestWithSteps, []);
+    else if (lost) drop(lost);
+    else if (oldEnded) drop(oldEnded);
+    else if (long) shrink(long, halved(long.steps));
+    if (total >= before) break;
   }
   return [...h.raw, ...runs.map((r) => JSON.stringify(r))];
+}
+
+/** Half of a run's steps, fewer every time: the first and the newest of the rest (ceil(n/2) in all); none of two or one. */
+export function halved(steps: readonly RunStepLine[]): RunStepLine[] {
+  const n = steps.length;
+  if (n <= 2) return [];
+  const keep = Math.ceil(n / 2);
+  return [steps[0] as RunStepLine, ...steps.slice(n - (keep - 1))];
 }
 
 /** Every place (workspace, video) with runs that haven't ended, or that wait to be written. */

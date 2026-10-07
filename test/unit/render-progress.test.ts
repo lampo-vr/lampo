@@ -350,6 +350,9 @@ test('redaction: keys named *_KEY, a user’s password given to a command, webho
     [joined('S', 'G.', 'abcdefghijklmnopqrstuv', '.', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_abcde'), ['abcdefghijklmnop', 'ABCDEFGHIJKLMNOP'], []],
     [`error: ${joined('h', 'f_', 'abcdefghijklmnopqrstuvwxyzABCDEFGH')} invalid`, ['abcdefghijklmnop'], ['error:', 'invalid']],
     [`npm token ${joined('np', 'm_', 'abcdefghijklmnopqrstuvwxyz0123456789')} is invalid`, ['abcdefghijklmnop'], ['npm token', 'is invalid']],
+    ['PGPASSWORD=hunter2 psql -h db', ['hunter2'], ['PGPASSWORD=', 'psql -h db']],
+    ['SMTP_PASS=hunter2 send failed', ['hunter2'], ['SMTP_PASS=', 'send failed']],
+    ['mysql -uroot -phunter2 -h db failed', ['hunter2'], ['mysql -uroot -p', '-h db failed']],
   ];
   for (const [text, gone, kept] of cases) {
     const out = redact(text);
@@ -367,6 +370,7 @@ test('redaction: keys named *_KEY, a user’s password given to a command, webho
     "Error: ENOENT: no such file or directory, open '/Users/you/Projects/Acme2026/LaunchFilm/export/Main_V12.mp4'",
     'Could not resolve src/components/Logo/AnimatedEntryFrames.tsx',
     'git -u origin main',
+    'ffmpeg -i in.mov -pix_fmt yuv420p -pass 1 -passlogfile ff out.mp4',
   ])
     assert.equal(redact(text), text);
 });

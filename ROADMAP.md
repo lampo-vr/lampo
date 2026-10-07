@@ -223,6 +223,12 @@ Findings of audit A13 (2026-10-05, `AUDITS.md`) and its verification rounds that
 - **A13 VERIFY-4b** (low): while one address's reset or confirmation waits in the mail queue, another person asking
   from the same address (one office network) gets theirs only on a later try. Key the one-at-a-time rule by recipient
   too (`askerWaits` in `lib/mail/index.ts`).
+- **A13 RENDER-1, the rest** (low): a failed render's last lines still keep a password said in prose ("password
+  hunter2"), and the rule for a bare AWS secret key also takes a relative path of exactly 40 characters that has digits,
+  both cases and a "/" (it says less, never more). Prose needs a different approach than shapes; the path is a cosmetic
+  loss.
+- **A13 RUN-2, look-alikes** (info): an account's name may hold a character that looks like "·" but isn't one of the
+  six refused (`checkName`); it can't pass for another's agent (runs go by account id), it only reads alike.
 - **A13 VERIFY-5** (low): pending OAuth sign-ins are kept in a bounded store that makes room by dropping the oldest;
   when it is full it should refuse new ones (or bound them per network) instead.
 - **A13 VERIFY-6** (info): a version diff cut short by its time limit is cached as if it were complete; mark it partial
