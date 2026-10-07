@@ -226,13 +226,16 @@ const noteUrl = (e: ReviewEvent) =>
   e.slug ? `#/v/${encodeURIComponent(e.slug)}${e.id ? `?c=${e.id}` : ''}` : `#/folder/${encodeURIComponent(e.folder || '')}`;
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
-/** The last line of what a tool printed (oneLine joins its lines with ↵): where it says what went wrong. */
-const lastLine = (s: string | undefined) =>
-  (s || '')
+/** Where what a tool printed (oneLine joins its lines with ↵) says what went wrong: the last line that names an error,
+ * else its last line (a stack's frame says less than the message above it). */
+function lastLine(s: string | undefined): string {
+  const lines = (s || '')
     .split(' ↵ ')
     .map((l) => l.trim())
-    .filter(Boolean)
-    .at(-1) ?? '';
+    .filter(Boolean);
+  return [...lines].reverse().find((l) => SAYS_ERROR.test(l)) ?? lines.at(-1) ?? '';
+}
+const SAYS_ERROR = /\b(error|failed|fatal|cannot|can[’']t|could not|couldn[’']t|not found|missing|denied|invalid|exception)\b/i;
 const RENDER_TOOL = /\b(remotion|ffmpeg|aerender|blender)\b|^vr render\b/;
 
 /** What a run waits for the person's OK to do, in a few words: "render promo.mp4", "run npm test on promo.mp4". */

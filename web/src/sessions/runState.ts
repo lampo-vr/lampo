@@ -50,12 +50,12 @@ export const LOOK: Record<Phase, { shape: Shape; tone: Tone }> = {
 /** Still going (the server ends it: done, failed, stopped). */
 export const isOpen = (r: RunLike): boolean => r.ended == null && r.state !== 'done' && r.state !== 'failed' && r.state !== 'stopped';
 
-/** The run a card speaks of: one going on, one that ended badly (failed, stopped), or one done while its fixes wait to be
- * checked. Older servers send no `run` (undefined): their cards keep today's line. */
+/** The run a card speaks of: one going on, one that ended badly (failed, stopped) or waiting for the person (needs you),
+ * or one done while its fixes wait to be checked. Older servers send no `run` (undefined): their cards keep today's line. */
 export function cardRun(v: Pick<VideoSummary, 'run' | 'stage'>): RunLike | null {
   const r = v.run;
   if (!r) return null;
-  if (isOpen(r) || r.state === 'failed' || r.state === 'stopped') return r;
+  if (isOpen(r) || r.state === 'failed' || r.state === 'stopped' || r.state === 'needs_you') return r;
   return r.state === 'done' && v.stage.stage === 'check_fixes' ? r : null;
 }
 

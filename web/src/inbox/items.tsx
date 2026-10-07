@@ -119,8 +119,9 @@ export function whatLine(i: ForYouItem): { text: string; at?: string } {
       return { text: t('{name} stopped', { name: who(i.run?.agent ?? i.by) }) };
     case 'stalled':
       // an agent at work that went quiet, or work sent that nobody picked up
-      if (i.run && i.reason === 'lost') return { text: t('No word from {name} for {time}', { name: who(i.run.agent), time: sinceWords(i.run.seen) }) };
-      if (i.run && i.reason === 'queued') return { text: t('{name} hasn’t picked it up', { name: who(i.run.agent) }) };
+      // how long: the time beside it says (since its last word, since it was sent)
+      if (i.run && i.reason === 'lost') return { text: t('No word from {name}', { name: who(i.run.agent) }) };
+      if (i.run && i.reason === 'queued') return { text: t('{name} hasn’t started', { name: who(i.run.agent) }) };
       return { text: waitingOn(i) };
     case 'post':
       return {
@@ -213,13 +214,16 @@ function failureText(w: ActivityWords | undefined): string {
   if (w?.key === 'Stopped with an error' || !w) return t('It stopped with an error');
   return w.text;
 }
-/** The last line a tool printed (one line kept by the server, its breaks as ↵): where it says what went wrong. */
-const lastPrinted = (w: ActivityWords | undefined): string =>
-  (w?.quote ?? '')
+/** Where what a tool printed (one line kept by the server, its breaks as ↵) says what went wrong: the last line that
+ * names an error, else its last line (a stack's frame says less than the message above it). */
+function lastPrinted(w: ActivityWords | undefined): string {
+  const lines = (w?.quote ?? '')
     .split(' ↵ ')
     .map((l) => l.trim())
-    .filter(Boolean)
-    .at(-1) ?? '';
+    .filter(Boolean);
+  return [...lines].reverse().find((l) => SAYS_ERROR.test(l)) ?? lines.at(-1) ?? '';
+}
+const SAYS_ERROR = /\b(error|failed|fatal|cannot|can[’']t|could not|couldn[’']t|not found|missing|denied|invalid|exception)\b/i;
 
 /** An agent's work in a line under what happened: what it needs, why it stopped (with the tool's last words), how far
  * it got before it went quiet, or since when it waits to be picked up. */
@@ -695,7 +699,8 @@ export function ItemCard({ item: i, actions, inVideo = false }: { item: ForYouIt
           </div>
         )}
         {i.kind === 'answer' && i.question && <p className="fy-quote">{t('on “{question}”', { question: i.question })}</p>}
-        {itemText(i) && <p className="fy-text">{itemText(i)}</p>}
+        {/* a failure's card says why in words; the lines it printed follow in their own box */}
+        {itemText(i) && <p className="fy-text">{i.kind === 'failed' ? failureText(i.run?.error) : itemText(i)}</p>}
         {i.kind === 'verify' && i.note && (
           <p className="fy-note">
             <ChangedLabel note={i.note} className="fy-changed" />

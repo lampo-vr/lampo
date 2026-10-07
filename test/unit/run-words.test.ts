@@ -99,3 +99,21 @@ test('a note’s plan line: nothing before the agent reaches it, then on it, fix
 test('who made a version: the agent, in how long, what it fixed', () => {
   assert.equal(madeBy(f.done.run), 'Claude Code · 12 min · 5 fixed · 1 asked');
 });
+
+test('a permission as the server says it: what it needs to run, once; a stopped agent that listens notices at its next step', () => {
+  const needs = {
+    kind: 'permission' as const,
+    text: { text: 'Needs permission to run npx remotion render', key: 'Needs permission to run {command}', vars: { command: 'npx remotion render' } },
+    allow: 'Bash(npx remotion render:*)',
+  };
+  const p = runSaid({ ...f.permission.run, needs }, { now: NOW, asOf: NOW, say });
+  assert.equal(
+    [p.name, p.words].join(' · '),
+    'Claude Code · needs permission to run npx remotion render',
+    'said once, never “needs permission · Needs permission”',
+  );
+  assert.deepEqual(p.actions, ['allow']);
+  const s = runSaid({ ...f.stopped.run, stop_pending: true }, { now: NOW, asOf: NOW, say });
+  assert.equal(s.words, 'Stopped · it will notice at its next step');
+  assert.equal(runSaid(f.stopped.run, { now: NOW, asOf: NOW, say }).words, 'Stopped after 4 min', 'heard, or one Lampo ran: as before');
+});

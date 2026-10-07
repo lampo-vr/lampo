@@ -216,7 +216,7 @@ function Shown({
       <section className="av-head" aria-label={run.agent.name}>
         <p className="av-meta">{[startedLine(whole ?? run, p.me), clock(worked), where].filter(Boolean).join(' · ')}</p>
         {/* the strip above says Stop while it works; while it asks you, Answer is the strip's and Stop is here */}
-        {run.state === 'needs_you' && p.canSteer && (
+        {run.state === 'needs_you' && run.ended == null && p.canSteer && (
           <button type="button" className="btn sm" onClick={onStop} disabled={busy} data-testid="agent-stop">
             <I name="stop" size={14} /> {t('Stop')}
           </button>
@@ -289,7 +289,7 @@ function Shown({
             </q>
           )}
           {/* a permission it was refused: the exact rule to copy and where it goes ("How to allow it" opens this) */}
-          {run.needs?.kind === 'permission' && <PermissionNeeds run={run} />}
+          {run.needs?.kind === 'permission' && <PermissionNeeds run={run} bare={!!action} />}
         </section>
       ) : (
         <Ended run={run} props={p} onRetry={onRetry} busy={busy} />

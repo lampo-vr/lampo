@@ -19,7 +19,7 @@ import '../styles/foryou.css';
 
 const LABELS = perLang((): [keyof PushPrefs, string, string][] => [
   ['questions', t('Questions from agents'), t('an agent needs a decision from you')],
-  ['agents', t('Agents that stop'), t('an agent’s work failed, or waits for your OK')],
+  ['agents', t('Agents that stop or wait'), t('its work failed, or it waits for your OK')],
   ['quiet', t('Agents gone quiet'), t('no word from an agent at work for 30 min')],
   ['fixes', t('Fixes to check'), t('a new version with fixes, once per version')],
   ['clients', t('Review links'), t('notes and approvals that come through them')],

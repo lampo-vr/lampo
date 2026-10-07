@@ -24,12 +24,13 @@ export function RuleToCopy({ allow }: { allow: string }) {
   );
 }
 
-/** A permission it lacks: what for, and the rule that allows it, with where it goes. */
-export function PermissionNeeds({ run }: { run: { needs?: Run['needs'] } }) {
+/** A permission it lacks: what for (unless the line above says it: `bare`), and the rule that allows it, with where
+ * it goes. */
+export function PermissionNeeds({ run, bare = false }: { run: { needs?: Run['needs'] }; bare?: boolean }) {
   const needs = run.needs;
   return (
     <div className="rn-perm" data-testid="run-permission">
-      <p className="rn-what">{needs?.text ? phrase(needs.text) : t('Needs a permission it doesn’t have')}</p>
+      {!bare && <p className="rn-what">{needs?.text ? phrase(needs.text) : t('Needs a permission it doesn’t have')}</p>}
       {needs?.allow ? (
         <>
           <p className="rn-how">
