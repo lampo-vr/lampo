@@ -230,6 +230,9 @@ try {
 
   await check('one approval: the headline says what it was and after how many the figure settles', async () => {
     await open();
+    // The visit before kept what Insights said then, before the approval (api/persist.ts): a later visit paints that at
+    // once, ready, and the server's answer replaces it a moment later. Wait for the answer, not for the first paint.
+    await until(async () => /approved so far/.test(await text('[data-testid=ins-headline]')), 'the headline after the approval');
     assert(
       (await text('[data-testid=ins-headline]')) === '1 video approved so far, at V1. The figure settles after 3 approvals.',
       await text('[data-testid=ins-headline]'),
