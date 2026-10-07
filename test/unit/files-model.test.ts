@@ -3,6 +3,7 @@
 // what is left out and why, names that differ only in case), what the plan holds after it, the commands an agent gets,
 // who made a version, the list's order, the address — and the browser's SHA-256, a piece at a time, against Node's.
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import { test } from 'node:test';
 import type { Existing } from '../../web/src/files/model.ts';
@@ -115,12 +116,17 @@ test('what the plan comes to once hashes are known: the same bytes need nothing,
 test('what an agent gets: one pull with exactly these, the MCP call under it, the push for a big folder', () => {
   assert.equal(
     pullCommand('Acme/Spring sale', ['Footage/Day 1/A001C003.mov'], ['Music']),
-    'lampo files pull "Acme/Spring sale" --to public/ --only "Music/**" --only "Footage/Day 1/A001C003.mov"',
+    "lampo files pull 'Acme/Spring sale' --to public/ --only 'Music/**' --only 'Footage/Day 1/A001C003.mov'",
   );
   assert.equal(pullCommand('', ['Fonts/Inter.ttf']), 'lampo files pull House --to public/ --only Fonts/Inter.ttf');
   assert.equal(mcpCall('Acme', 'Brand'), 'list_files({folder: "Acme", path: "Brand"})');
-  assert.equal(pushCommand('Acme/Spring sale', 'Footage', './Shoot'), 'lampo files push ./Shoot --to "Acme/Spring sale" --path Footage/');
-  assert.equal(shellWord('a "b" $c'), '"a \\"b\\" \\$c"');
+  assert.equal(pushCommand('Acme/Spring sale', 'Footage', './Shoot'), "lampo files push ./Shoot --to 'Acme/Spring sale' --path Footage/");
+  // single quotes: nothing inside is special — `$`, a backtick, `!` (history in an interactive zsh or bash)
+  assert.equal(shellWord('a "b" $c `d` Hi!'), `'a "b" $c \`d\` Hi!'`);
+  assert.equal(shellWord("Mia's cut"), `'Mia'\\''s cut'`);
+  // and a shell gives back exactly the word
+  for (const w of ["Mia's cut", 'a "b" $c `d` Hi!', 'Day 1/*.mov', 'x\\y', 'it\'s 100% "done"!'])
+    assert.equal(execFileSync('sh', ['-c', `printf %s ${shellWord(w)}`], { encoding: 'utf8' }), w);
 });
 
 test('who made a version: the agent with its kind, the CLI glyph for lampo, else the person', () => {

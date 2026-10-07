@@ -14,6 +14,7 @@ import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { KindIcon } from '../ui/kindIcons.tsx';
 import { IconButton, Menu, type MenuEntry, Modal } from '../ui/primitives.tsx';
 import { SkLine } from '../ui/Skeleton.tsx';
+import { Button, EmptyState } from '../ui/system.tsx';
 import { download, fileKeys, inlineUrl, refreshArea, restoreFile, useFileHistory } from './api.ts';
 import { againAt, type FileRow, nameOf, size, spaced, typeLabel, type VersionRow, whoOf } from './model.ts';
 import { WhoTag } from './Rows.tsx';
@@ -91,7 +92,20 @@ function Preview({ f }: { f: FileRow }) {
           </audio>
         </div>
       ) : look === 'pdf' ? (
-        <iframe src={url} key={url} title={nameOf(f.path)} />
+        // never framed (no answer of this server may be): Chrome's viewer in a tab of its own. The link is the app's
+        // route, which hands out a fresh sealed URL on each click; a sealed URL never sits in the page
+        <div className="pf-pv-none pf-pv-pdf">
+          <KindIcon kind={f.kind} size={32} />
+          <span>{typeLabel(f.path, f.kind)}</span>
+          <span className="pf-pv-acts">
+            <a className="btn sm" href={url} target="_blank" rel="noopener noreferrer" data-testid="file-pdf-open">
+              <I name="external" size={14} /> {t('Open')}
+            </a>
+            <button type="button" className="btn sm" onClick={() => download(f.id, f.v)} data-testid="file-pdf-download">
+              <I name="download" size={14} /> {t('Download')}
+            </button>
+          </span>
+        </div>
       ) : look === 'text' ? (
         <TextLook url={url} />
       ) : (
@@ -303,6 +317,8 @@ export function FileSheet({
 }) {
   const h = useFileHistory(id);
   const f: FileRow | null = row ?? (h.data?.file as FileRow | undefined) ?? null;
+  // an address naming a file that isn't here (moved, trashed, another workspace's): said, with the way back
+  const missing = !f && h.error ? <Missing error={h.error} onClose={onClose} onRetry={() => void h.refetch()} /> : null;
   const title = useId();
   const box = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -328,7 +344,7 @@ export function FileSheet({
     return (
       <Modal title={f ? nameOf(f.path) : t('File')} onClose={onClose} foot={foot}>
         <div className="pf-sh-body" data-testid="file-sheet">
-          {f ? <Body f={f} area={area} write={write} history={h.data} /> : <VersionsPending />}
+          {f ? <Body f={f} area={area} write={write} history={h.data} /> : (missing ?? <VersionsPending />)}
         </div>
       </Modal>
     );
@@ -351,12 +367,39 @@ export function FileSheet({
       <header className="pf-sh-head">
         <span className="pf-sh-glyph">{f ? <KindIcon kind={f.kind} size={18} /> : <KeyGlyph shape="outline" size={10} />}</span>
         <h2 id={title} className="pf-sh-title" title={f?.path}>
-          {f ? nameOf(f.path) : <SkLine w="10em" />}
+          {f ? nameOf(f.path) : missing ? t('File') : <SkLine w="10em" />}
         </h2>
         <IconButton className="btn ghost icon-only" label={t('Close')} shortcut="Esc" icon="x" size={16} onClick={onClose} data-testid="file-sheet-close" />
       </header>
-      <div className="pf-sh-body">{f ? <Body f={f} area={area} write={write} history={h.data} /> : <VersionsPending />}</div>
+      <div className="pf-sh-body">{f ? <Body f={f} area={area} write={write} history={h.data} /> : (missing ?? <VersionsPending />)}</div>
       {foot && <footer className="pf-sh-foot">{foot}</footer>}
     </aside>
+  );
+}
+
+/** The file an address names isn't here (404), or didn't load: said in the sheet's place, with the way back. */
+function Missing({ error, onClose, onRetry }: { error: Error; onClose: () => void; onRetry: () => void }) {
+  const gone = error instanceof ApiError && error.status === 404;
+  return (
+    <EmptyState
+      art={gone ? 'filter' : 'error'}
+      size="sm"
+      title={gone ? t('This file isn’t here') : t('The file didn’t load')}
+      testId="file-sheet-missing"
+      action={
+        <Button onClick={onClose} data-testid="file-sheet-back">
+          {t('Back to the files')}
+        </Button>
+      }
+      secondary={
+        gone ? undefined : (
+          <Button variant="ghost" icon="refresh" onClick={onRetry}>
+            {t('Try again')}
+          </Button>
+        )
+      }
+    >
+      {gone ? t('It may have been moved, renamed or put in the trash, or it belongs to another workspace.') : error.message}
+    </EmptyState>
   );
 }

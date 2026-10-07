@@ -57,7 +57,7 @@ export const SHOWN = {
 const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
 
 /** Bytes for a path: a real picture, clip, PDF or text where the browser shows one, else a few made-up kilobytes. */
-function bytesFor(dir, p, i) {
+export function bytesFor(dir, p, i) {
   const ext = p.split('.').pop().toLowerCase();
   if (ext === 'png') {
     const out = path.join(dir, `still-${i}.png`);
@@ -95,11 +95,11 @@ trailer<</Root 1 0 R>>
 `;
 
 /** Puts `files` ({path: bytes}) into `area` through the API, as `who` (agent fields: an agent writing with the account). */
-export async function push(base, area, files, { agent, agent_kind, base: bases = {} } = {}) {
+export async function push(base, area, files, { agent, agent_kind, base: bases = {}, headers = {} } = {}) {
   const items = Object.entries(files).map(([p, b]) => ({ path: p, size: b.length, sha256: sha(b), base: bases[p] ?? null }));
   const r = await fetch(`${base}/api/files/uploads`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify({ folder: area, files: items, ...(agent ? { agent, agent_kind, via: 'mcp' } : {}) }),
   });
   const answer = await r.json();
@@ -117,7 +117,7 @@ export async function push(base, area, files, { agent, agent_kind, base: bases =
   if (stored.length) {
     const c = await fetch(`${base}/api/files/commit`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify({ folder: area, add: stored, ...(agent ? { agent, agent_kind, via: 'mcp' } : {}) }),
     });
     if (!c.ok) throw new Error(`commit: ${c.status} ${await c.text()}`);
@@ -157,4 +157,27 @@ export async function seedProject(base, dir) {
   const ids = Object.fromEntries(listing.files.map((f) => [f.path, f.id]));
   await api(`/api/files/${ids['Footage/Day 1/A001C003_old.mov']}`, 'DELETE');
   return ids;
+}
+
+/**
+ * Whether Chrome shows the PDF at `url` (an app route that redirects to the bytes) in a tab of its own: a whole Chrome
+ * (chrome-headless-shell has no PDF viewer), signed in with `cookie` when the server wants one. `viewer`: Chrome's PDF
+ * viewer loaded (its extension frame), not a blank page or a download.
+ */
+export async function pdfShown(url, { cookie = null } = {}) {
+  const { launch } = await import('./browser.mjs');
+  const browser = await launch({ notifications: true });
+  try {
+    const tab = await browser.newPage();
+    if (cookie) await tab.setCookie({ name: cookie.name, value: cookie.value, url });
+    const res = await tab.goto(url, { waitUntil: 'load' });
+    const viewer = await tab
+      .waitForFrame((f) => f.url().startsWith('chrome-extension://') && f.url().endsWith('/index.html'), { timeout: 15_000 })
+      .then(() => true)
+      .catch(() => false);
+    const contentType = await tab.evaluate(() => document.contentType).catch(() => null);
+    return { status: res?.status() ?? 0, contentType, viewer, at: new URL(tab.url()).origin };
+  } finally {
+    await browser.close();
+  }
 }

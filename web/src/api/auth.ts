@@ -8,7 +8,7 @@ import { type Action, can } from '../../../lib/permissions.ts';
 import { currentLang } from '../i18n/index.ts';
 import { chromeRole } from '../lib/chromeHint.ts';
 import { forgetRecent } from '../lib/recent.ts';
-import { forgetAccountStorage } from '../lib/signedOut.ts';
+import { forgetAccountStorage, forgetInMemory } from '../lib/signedOut.ts';
 import { isAccountData } from './accountData.ts';
 import { api } from './client.ts';
 import { reconnectEvents } from './events.ts';
@@ -124,6 +124,8 @@ export function afterSignOut(qc: QueryClient, tell = true) {
   forgetRecent();
   forgetAccountStorage(localStorage);
   forgetAccountStorage(sessionStorage);
+  // the upload stores: what is on its way stops, the tray empties (no Try again into the next account's workspace)
+  forgetInMemory();
   if (tell) channel?.postMessage('signed-out');
 }
 

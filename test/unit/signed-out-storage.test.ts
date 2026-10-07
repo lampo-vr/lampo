@@ -47,6 +47,18 @@ test('sign-out removes every vr. key but the device’s own and the review-link 
   assert.deepEqual([...DEVICE_KEYS].sort(), ['vr.g.visitor', 'vr.guestName', 'vr.lang', 'vr.theme']);
 });
 
+test('sign-out removes the uploads the account left unfinished (tus’s resume entries: where they went, their names)', () => {
+  const local = storage({
+    'tus::lampo-file:fd_0123456789ab:Footage/Day 1/A001C003.mov:4200:1700000000000:0:refuse::1':
+      '{"uploadUrl":"https://media.test/api/uploads/u_1","metadata":{"filename":"A001C003.mov"}}',
+    'tus::tus-br-spot.mp4-video/mp4-1234-1700000000000-https://app.test/api/uploads::2': '{"uploadUrl":"https://media.test/api/uploads/u_2"}',
+    'vr.theme': 'dark',
+    'other-site-key': 'kept',
+  });
+  forgetAccountStorage(local);
+  assert.deepEqual([...local.map.keys()].sort(), ['other-site-key', 'vr.theme']);
+});
+
 test('a storage that throws (private mode, blocked site data) changes nothing and throws nothing', () => {
   const broken = {
     get length(): number {

@@ -57,6 +57,8 @@ const SECONDS = {
   transcript: 27,
   monitor: 26,
   'media-host': 25,
+  // the Files tab with its own media host: a picture, a text and a PDF in Chrome's viewer (a whole Chrome)
+  'files-media': 20,
   ui: 24,
   billing: 45,
   limits: 30,

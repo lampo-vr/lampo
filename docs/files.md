@@ -161,15 +161,18 @@ are in Settings → Files. Reviewers have neither.
 - **Adding**: drop files and folders anywhere on the tab, or *Add files* (a folder, or a new empty folder, from its
   menu). Before a byte moves, one sheet says what will happen: what is already in Lampo (the browser hashes files up
   to 256 MB and asks), which files become a new version, what is left out (junk), and whether it fits the plan. The
-  uploads run in the upload tray over tus: they resume after a dropped connection, and dropping the same folder again
-  after a reload continues where each file stopped. A file someone changed while yours was on its way is never
+  uploads run in the upload tray over tus, three at a time, each file's one-time upload URL asked for a few files ahead
+  (a URL lives 15 minutes; one that ran out before its file started is asked for again by itself): they resume after a
+  dropped connection, and dropping the same folder again after a reload continues where each file stopped. Signing out
+  stops them and forgets them, and what the browser kept to resume them. A file someone changed while yours was on its way is never
   overwritten: the tray names who changed it, with *Keep both* (yours lands beside it) or *Replace*. A file you made
   the day's versions of already (each person's own, with their agents) waits there with the time it takes your next,
   and *Save as a copy* lands yours beside it now; *Restore* in a file says the same.
 - **A file, opened**: beside the list on a wide screen, over it on a narrower one, a sheet from the bottom on a phone.
-  Pictures, video, sound, PDF and plain text show in the browser; anything else downloads. Every version kept, who
-  made it and whether an agent did, *Restore* and *Download* per version; rename, move (also into another project's
-  files), trash, and *Copy for an agent*: the `lampo files pull` line that fetches exactly the files picked.
+  Pictures, video, sound and plain text show in the sheet; a PDF opens in a tab of its own (*Open*); anything else
+  downloads. Every version kept, who made it and whether an agent did, *Restore* and *Download* per version; rename,
+  move (also into another project's files), trash, and *Copy for an agent*: the `lampo files pull` line that fetches
+  exactly the files picked. An address naming a file that isn't there any more says so, with the way back.
 - **The trash**: at the foot of the area's top, *Restore*. Each file says when it goes (`purge_at`: up to 30 days), an
   older version until when it is kept (`kept_until`). A member trashes what they added; owners and admins anyone's.
 - **The plan**: where a billing provider runs, the foot says what files and videos take of the plan's storage, the head

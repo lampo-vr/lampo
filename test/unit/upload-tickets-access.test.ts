@@ -224,13 +224,19 @@ test('an account holds at most OPEN_PER_OWNER upload URLs open at once', async (
   const sam = await auth.createUser({ email: 'sam@example.com', name: 'Sam', password: 'a long password', role: 'member' });
   const headers = { Authorization: `Bearer ${auth.createToken(sam.id, 'agent').token}` };
   const codes: number[] = [];
-  for (let i = 0; i <= OPEN_PER_OWNER; i++)
-    codes.push((await request('POST', '/api/uploads/tickets', { body: { filename: `Sam-${i}.mp4`, folder: 'Reels' }, headers })).status);
+  let last: Awaited<ReturnType<typeof request>> | null = null;
+  for (let i = 0; i <= OPEN_PER_OWNER; i++) {
+    last = await request('POST', '/api/uploads/tickets', { body: { filename: `Sam-${i}.mp4`, folder: 'Reels' }, headers });
+    codes.push(last.status);
+  }
   assert.ok(
     codes.slice(0, OPEN_PER_OWNER).every((c) => c === 200),
     codes.join(','),
   );
   assert.equal(codes.at(-1), 429, 'one more is refused until some are used or expire');
+  // it says why, so a client waits and asks again instead of taking it for a file's day of versions
+  assert.equal(last?.json().reason, 'tickets', last?.text);
+  assert.equal(last?.json().retry_after, 60);
 });
 
 test('a workspace’s team holds at most OPEN_PER_POOL open together, and one review link’s visitors together', () => {

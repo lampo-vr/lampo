@@ -100,6 +100,15 @@ format stays backwards compatible throughout.
   command runs on the agent's own machine, never on a server ([docs/agents.md](docs/agents.md)).
 
 ### Fixed
+- Pictures show in a file's preview on servers with their own media host, and a PDF opens in a tab of its own (with
+  Download beside it) instead of a frame that stayed blank.
+- A big drop of files no longer fails part way: their uploads are prepared a few at a time as the files go, one that
+  waited too long is prepared again by itself, and a busy server makes them wait and go on instead of saying "no more
+  versions today".
+- Signing out stops the uploads under way and forgets them, and what the browser kept to resume them; the next person in
+  that browser starts with an empty tray.
+- A file name with `!` or a quote in it no longer breaks the line Copy for an agent hands out.
+- A link to a file that isn't there any more says so in the file's place, with the way back to the files.
 - `lampo login <server>` signs in with a token from the environment only when no other server is named beside it
   (`LAMPO_SERVER` with `LAMPO_TOKEN`): a token one server issued is never sent to another.
 - Settings → Users names the server's own command for a lost password only to whoever runs the server (on the machine

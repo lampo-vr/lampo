@@ -485,13 +485,24 @@ test('downloads: a short-lived URL on the media host, an inert attachment that a
   assert.equal(head.headers['content-length'], String(logo.length));
   // never on the app's own host
   assert.ok([401, 404].includes((await raw('GET', url.pathname)).status));
-  // a preview: a picture as itself, inline — an SVG never
-  const inline = await api('GET', `/api/files/${f.id}/download?inline=1`, asOlivia);
+  // a preview: a picture as itself, inline, from the app host as posters are (the page's img-src is the app's own;
+  // the media host keeps video off the app host's front) — an SVG never
+  const picture = await raw('GET', `/api/files/${f.id}/download?inline=1`, { headers: asOlivia });
+  assert.equal(picture.status, 200, 'not sent to the media host');
+  assert.equal(picture.headers.location, undefined);
+  assert.equal(picture.headers['content-type'], 'image/png');
+  assert.match(String(picture.headers['content-disposition']), /^inline/);
+  assert.equal(picture.headers['x-content-type-options'], 'nosniff');
+  assert.match(String(picture.headers['content-security-policy']), /sandbox/);
+  assert.equal(sha(picture.body), sha(logo));
+  // a text preview's first 32 KB, from the media host: the page asks with a Range, so the browser asks first
+  await push(asOlivia, '', [{ path: 'Brief/notes.txt', data: Buffer.from('Spring is here\n') }]);
+  const notes = await fileAt('', 'Brief/notes.txt');
+  const inline = await api('GET', `/api/files/${notes.id}/download?inline=1`, asOlivia);
   const shown = await raw('GET', new URL(String(inline.headers.location)).pathname, { host: MEDIA, headers: { Origin: `http://${APP}` } });
-  assert.equal(shown.headers['content-type'], 'image/png');
+  assert.equal(shown.headers['content-type'], 'text/plain; charset=utf-8');
   assert.match(String(shown.headers['content-disposition']), /^inline/);
   assert.equal(shown.headers['access-control-allow-origin'], `http://${APP}`);
-  // a text preview's first 32 KB: the page asks with a Range, so the browser asks first
   const pre = await raw('OPTIONS', new URL(String(inline.headers.location)).pathname, {
     host: MEDIA,
     headers: { Origin: `http://${APP}`, 'Access-Control-Request-Method': 'GET', 'Access-Control-Request-Headers': 'range' },

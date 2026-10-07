@@ -406,6 +406,7 @@ test('each account’s new versions of a file a day are bounded — its own, nev
   assert.match(refused.json().error, /versions of spot\.txt today.*as a copy/);
   assert.ok(Number(refused.headers['retry-after']) > 0, 'when the next may come');
   assert.ok(refused.json().retry_after > 0);
+  assert.equal(refused.json().reason, 'versions', 'told apart from any other 429');
   // a save as a copy is never refused for it: it lands beside the file
   const data = Buffer.from('member, as a copy');
   const asCopy = await api('POST', '/api/files/uploads', asMember, {

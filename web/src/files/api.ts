@@ -5,7 +5,7 @@
 import { type InfiniteData, type QueryClient, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { FILE_LIMITS } from '../../../lib/fileText.ts';
 import type { FileDirInfo, FileHistory, FileKind, FilesListing, FilesSummary, FilesTrash, TrashedFileInfo } from '../../../lib/types.ts';
-import { api, enc } from '../api/client.ts';
+import { ApiError, api, enc } from '../api/client.ts';
 import type { FileRow, TrashRow } from './model.ts';
 
 export interface ListArgs {
@@ -70,7 +70,13 @@ export const useFilesTrash = (area: string, enabled = true) =>
   });
 
 export const useFileHistory = (id: string | null) =>
-  useQuery({ queryKey: fileKeys.history(id ?? ''), queryFn: () => api<FileHistory>(`/api/files/${enc(id ?? '')}/history`), enabled: !!id });
+  useQuery({
+    queryKey: fileKeys.history(id ?? ''),
+    queryFn: () => api<FileHistory>(`/api/files/${enc(id ?? '')}/history`),
+    enabled: !!id,
+    // a file that isn't here stays not here: said at once, not after a retry
+    retry: (n, e) => !(e instanceof ApiError && e.status === 404) && n < 1,
+  });
 
 // ---------------------------------------------------------------- where bytes come from
 

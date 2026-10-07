@@ -244,6 +244,9 @@ export function fileRoutes(ctx: ServerContext): Router {
   function urlFor(req: Request, version: FileVersion, name: string, type: string, seconds: number, inline: boolean): string | null {
     const key = blobKey(version.hash);
     const s = filesStorage();
+    // A picture's preview comes from this app, as posters do: pictures stay on the app host (the page's img-src), and
+    // the media host is there to keep video off the app host's front, not pictures
+    if (inline && shownAs(type)?.startsWith('image/')) return null;
     if (s.kind !== 'local' && !inline) {
       const u = s.url(key, seconds, name);
       if (u && !(mediaOrigin && u.startsWith(`${mediaOrigin}/`))) return u;

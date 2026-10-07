@@ -260,10 +260,13 @@ export function between(ids: string[], from: string, to: string): string[] {
 
 // ---------------------------------------------------------------- what agents get
 
-/** A word for a shell, quoted when it needs to be ("Acme/Spring sale", "Footage/**"). */
+/**
+ * A word for a shell, quoted when it needs to be ('Acme/Spring sale', 'Footage/**'): in single quotes, where nothing is
+ * special (`$`, a backtick, and `!` in an interactive zsh or bash), a quote itself as `'\''`.
+ */
 export function shellWord(s: string): string {
   if (/^[\w./@:+-]+$/.test(s)) return s;
-  return `"${s.replace(/(["\\$`])/g, '\\$1')}"`;
+  return `'${s.replaceAll("'", "'\\''")}'`;
 }
 
 /** The area's name for `lampo files`: the folder's path, or "House" for the House's. */

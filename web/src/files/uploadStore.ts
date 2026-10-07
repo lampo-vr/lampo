@@ -1,6 +1,7 @@
-// Files on their way into an area: asked for together (one check of the plan's room for all of them, one way in per
-// file), then sent over tus, three at a time, resumable (a dropped connection goes on; the same folder dropped again
-// after a reload continues where each file stopped), each committed as it arrives. A file the workspace holds already is
+// Files on their way into an area: a way in asked for a few files ahead of what is being sent (a way in lives 15
+// minutes: asked for a whole big drop at once, the last would run out before their turn), then sent over tus, three at
+// a time, resumable (a dropped connection goes on; the same folder dropped again after a reload continues where each
+// file stopped), each committed as it arrives. A file the workspace holds already is
 // committed without a byte sent. A replace names the version it was based on: if someone changed the file meanwhile the
 // server refuses it (409) and the tray asks — keep both, or replace theirs. The upload tray (uploads/UploadTray.tsx)
 // shows the batches, grouped by their top folders; the Files tab shows the rows still on their way.
@@ -21,6 +22,7 @@ import type {
 import { ApiError, api, UNAUTHORIZED } from '../api/client.ts';
 import { t } from '../i18n/index.ts';
 import { refusalText } from '../lib/refusal.ts';
+import { onSignOut } from '../lib/signedOut.ts';
 import { type LimitAsk, openLimit, toastError } from '../lib/toast.ts';
 import { fileKeys } from './api.ts';
 import { trayGroup } from './model.ts';
@@ -56,6 +58,10 @@ export interface FileUpload {
   offline?: boolean;
   /** When it arrived (the list shows it as on its way until its answer has it). */
   doneAt?: number;
+  /** How it is asked for: as a version (`refuse` a changed file), or beside it as a copy. */
+  mode?: FileConflictMode;
+  /** Its way in ran out before it started (410) and was asked for again once. */
+  reasked?: boolean;
 }
 
 export interface FileBatch {
@@ -72,9 +78,10 @@ export interface FileUploads {
   uploads: FileUpload[];
 }
 
-/** One request's files at most, and uploads at once. */
+/** One request's files at most, uploads at once, and ways in asked for ahead of them. */
 const PER_REQUEST = FILE_LIMITS.batch;
 const AT_ONCE = 3;
+export const AHEAD = 3;
 // Pieces stay below what reverse proxies take per request (Cloudflare: 100 MB).
 const CHUNK = 48 * 1024 * 1024;
 
@@ -85,6 +92,13 @@ const running = new Map<string, Upload>();
 const queue: string[] = [];
 const subs = new Set<() => void>();
 let qc: QueryClient | null = null;
+/** A way-in request in flight (one at a time), and no new one before `heldUntil` (a 429 that isn't a file's day). */
+let asking = false;
+let heldUntil = 0;
+let holdTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** What the store talks to: the API and tus (a unit test stands in for both). */
+export const fileIo = { api, Upload };
 
 const emit = () => {
   for (const f of subs) f();
@@ -100,6 +114,9 @@ const patch = (keys: Iterable<string>, p: Partial<FileUpload> | ((u: FileUpload)
 };
 const one = (key: string) => state.uploads.find((u) => u.key === key);
 const batchOf = (id: string) => state.batches.find((b) => b.id === id);
+
+/** The store as it is now (outside React: a test, a tally). */
+export const fileUploadsNow = (): FileUploads => state;
 
 export const useFileUploads = () =>
   useSyncExternalStore(
@@ -158,10 +175,7 @@ export function sendFiles(area: string, dir: string, items: Outgoing[]): string 
     };
   });
   set({ batches: [...state.batches, { id, area, dir }], uploads: [...state.uploads, ...uploads] });
-  void ask(
-    id,
-    uploads.map((u) => u.key),
-  );
+  pump();
   return id;
 }
 
@@ -194,8 +208,27 @@ function noRoom(id: string, keys: string[], error: string, details: Record<strin
   openLimit(ask);
 }
 
-/** Asks the server for a way in for `keys` (all of one batch), in requests of up to a thousand. */
-async function ask(id: string, keys: string[], conflict: FileConflictMode = 'refuse'): Promise<void> {
+/** A 429 that is a file's day of versions (the tray's 'later'); any other only means: not now. */
+const isDay = (json: Record<string, unknown> | null | undefined) => json?.reason === 'versions';
+
+/** A 429 that isn't a file's day (too many ways in open, a rate limit): no new asking until it says, then again. */
+function holdAsking(wait: number) {
+  heldUntil = Date.now() + Math.max(1, wait) * 1000;
+  if (holdTimer) clearTimeout(holdTimer);
+  holdTimer = setTimeout(() => {
+    holdTimer = null;
+    pump();
+  }, heldUntil - Date.now());
+}
+
+/** Ways in of a batch not asked for yet: all of them wait for room when the plan has none. */
+const unasked = (id: string) => state.uploads.filter((u) => u.batch === id && u.state === 'waiting' && !slots.has(u.key)).map((u) => u.key);
+
+/**
+ * Asks the server for a way in for `keys` (all of one batch), in requests of up to a thousand; `front`: they go next
+ * (one asked for again because its way in ran out as it started).
+ */
+async function ask(id: string, keys: string[], conflict: FileConflictMode = 'refuse', front = false): Promise<void> {
   const b = batchOf(id);
   if (!b) return;
   for (let i = 0; i < keys.length; i += PER_REQUEST) {
@@ -203,7 +236,7 @@ async function ask(id: string, keys: string[], conflict: FileConflictMode = 'ref
     if (!part.length) continue;
     const ups = part.map((k) => one(k) as FileUpload);
     try {
-      const answer = await api<FileUploadAnswer>('/api/files/uploads', {
+      const answer = await fileIo.api<FileUploadAnswer>('/api/files/uploads', {
         method: 'POST',
         body: {
           folder: b.area,
@@ -212,16 +245,25 @@ async function ask(id: string, keys: string[], conflict: FileConflictMode = 'ref
         },
       });
       const stored: string[] = [];
+      const ways: string[] = [];
       for (const slot of answer.uploads) {
         const key = `${id}:${slot.path}`;
         if (!one(key)) continue;
         if (slot.stored) stored.push(key);
         else {
           slots.set(key, { slot, tus: answer.tus, mode: conflict });
-          queue.push(key);
+          ways.push(key);
         }
       }
+      if (front) queue.unshift(...ways);
+      else queue.push(...ways);
+      // on their way while their commit runs: not asked for again meanwhile
+      patch(stored, { state: 'uploading' });
       if (stored.length) void commit(id, stored, conflict);
+      // a file the answer didn't name would be asked for forever
+      const named = new Set([...ways, ...stored]);
+      const left = part.filter((k) => !named.has(k));
+      if (left.length) patch(left, { state: 'failed', error: t('no way in came for it: try again') });
       pump();
     } catch (e) {
       const conflicts = conflictsOf(e);
@@ -239,12 +281,14 @@ async function ask(id: string, keys: string[], conflict: FileConflictMode = 'ref
         continue;
       }
       if (e instanceof ApiError && e.status === 402) {
-        noRoom(id, keys.slice(i), e.message, e.details);
+        noRoom(id, unasked(id), e.message, e.details);
         return;
       }
       if (e instanceof ApiError && e.status === 429) {
-        await pastTheDay(part, waitOf(e.retryAfter, e.details), e.message, (ks) => ask(id, ks, conflict));
-        continue;
+        if (isDay(e.details)) await pastTheDay(part, waitOf(e.retryAfter, e.details), e.message, (ks) => ask(id, ks, conflict));
+        // not now (too many ways in open, a rate limit): they stay waiting, and are asked for once it says
+        else holdAsking(waitOf(e.retryAfter, e.details) || 30);
+        return;
       }
       patch(part, { state: 'failed', error: (e as Error).message });
     }
@@ -270,7 +314,7 @@ async function commit(id: string, keys: string[], conflict: FileConflictMode) {
   if (!b) return;
   const ups = keys.map((k) => one(k)).filter((u): u is FileUpload => !!u?.sha256);
   try {
-    const answer = await api<FileCommitAnswer>('/api/files/commit', {
+    const answer = await fileIo.api<FileCommitAnswer>('/api/files/commit', {
       method: 'POST',
       body: { folder: b.area, conflict, add: ups.map((u) => ({ path: u.path, sha256: u.sha256, size: u.size, base: u.base })) },
     });
@@ -279,14 +323,21 @@ async function commit(id: string, keys: string[], conflict: FileConflictMode) {
   } catch (e) {
     const conflicts = conflictsOf(e);
     if (conflicts) for (const c of conflicts) patch([`${id}:${c.path}`], { state: 'conflict', conflict: c });
-    else if (e instanceof ApiError && e.status === 429)
+    else if (e instanceof ApiError && e.status === 429 && isDay(e.details))
       await pastTheDay(
         ups.map((u) => u.key),
         waitOf(e.retryAfter, e.details),
         e.message,
         (ks) => commit(id, ks, conflict),
       );
-    else
+    else if (e instanceof ApiError && e.status === 429) {
+      // not now: asked for again (its bytes are there: the next answer says so) once it says
+      patch(
+        ups.map((u) => u.key),
+        { state: 'waiting' },
+      );
+      holdAsking(waitOf(e.retryAfter, e.details) || 30);
+    } else
       patch(
         ups.map((u) => u.key),
         { state: 'failed', error: (e as Error).message },
@@ -312,6 +363,45 @@ function pump() {
     const key = queue.shift() as string;
     if (one(key)?.state === 'waiting') void start(key);
   }
+  void topUp();
+}
+
+/** Ways in for the next files, so AHEAD of them wait ready beside the ones being sent (one request at a time). */
+async function topUp() {
+  if (asking || Date.now() < heldUntil) return;
+  const room = AT_ONCE + AHEAD - running.size - queue.length;
+  if (room <= 0) return;
+  const first = state.uploads.find((u) => u.state === 'waiting' && !slots.has(u.key) && files.has(u.key));
+  if (!first) return;
+  const mode = first.mode ?? 'refuse';
+  const keys = state.uploads
+    .filter((u) => u.batch === first.batch && u.state === 'waiting' && !slots.has(u.key) && files.has(u.key) && (u.mode ?? 'refuse') === mode)
+    .slice(0, room)
+    .map((u) => u.key);
+  asking = true;
+  try {
+    await ask(first.batch, keys, mode);
+  } finally {
+    asking = false;
+  }
+  pump();
+}
+
+/** A way in that ran out as its file started (410: it waited behind long uploads): asked for once more, to go next. */
+function reask(key: string): boolean {
+  const u = one(key);
+  if (!u || u.reasked) return false;
+  slots.delete(key);
+  patch([key], { state: 'waiting', reasked: true, sent: 0, rate: 0 });
+  void ask(u.batch, [key], u.mode ?? 'refuse', true).catch(toastError);
+  return true;
+}
+
+/** A 429 as a file went that isn't its day of versions: asked for again once the server says. */
+function notNow(key: string, wait: number) {
+  slots.delete(key);
+  patch([key], { state: 'waiting', sent: 0, rate: 0 });
+  holdAsking(wait || 30);
 }
 
 /** The body of a tus answer that failed, as JSON (409: the conflict; 402: the plan's refusal). */
@@ -334,7 +424,7 @@ async function start(key: string) {
   if (!way.slot.ticket && way.slot.url) return put(key, file, way.slot.url);
   patch([key], { state: 'uploading' });
   let last = { t: performance.now(), sent: 0 };
-  const upload = new Upload(file, {
+  const upload = new fileIo.Upload(file, {
     endpoint: way.tus,
     chunkSize: CHUNK,
     // about four minutes of retries: long enough for the server's restart during a deploy
@@ -390,9 +480,12 @@ async function start(key: string) {
         const c = (json as unknown as FileConflictAnswer).conflicts.find((x) => x.path === u.path) ?? (json as unknown as FileConflictAnswer).conflicts[0];
         patch([key], { state: 'conflict', conflict: c, rate: 0 });
       } else if (status === 402 && json) noRoom(u.batch, [key], String(json.error ?? ''), json);
-      else if (status === 429)
-        later([key], waitOf(err instanceof DetailedError ? err.originalResponse?.getHeader('Retry-After') : null, json), String(json?.error ?? ''));
-      else patch([key], { state: 'failed', rate: 0, error: typeof json?.error === 'string' ? json.error : messageOf(status) });
+      else if (status === 410 && reask(key)) return;
+      else if (status === 429) {
+        const wait = waitOf(err instanceof DetailedError ? err.originalResponse?.getHeader('Retry-After') : null, json);
+        if (isDay(json)) later([key], wait, String(json?.error ?? ''));
+        else notNow(key, wait);
+      } else patch([key], { state: 'failed', rate: 0, error: typeof json?.error === 'string' ? json.error : messageOf(status) });
       pump();
     },
   });
@@ -435,7 +528,9 @@ function put(key: string, file: File, url: string) {
     } else if (xhr.status === 409 && json && Array.isArray(json.conflicts))
       patch([key], { state: 'conflict', conflict: (json.conflicts as FileConflict[])[0] });
     else if (xhr.status === 402 && json) noRoom(u.batch, [key], String(json.error ?? ''), json);
-    else if (xhr.status === 429) later([key], waitOf(xhr.getResponseHeader('Retry-After'), json), String(json?.error ?? ''));
+    else if (xhr.status === 410 && reask(key)) return;
+    else if (xhr.status === 429 && isDay(json)) later([key], waitOf(xhr.getResponseHeader('Retry-After'), json), String(json?.error ?? ''));
+    else if (xhr.status === 429) notNow(key, waitOf(xhr.getResponseHeader('Retry-After'), json));
     else if (one(key)?.state !== 'canceled') patch([key], { state: 'failed', error: typeof json?.error === 'string' ? json.error : messageOf(xhr.status) });
     pump();
   };
@@ -450,8 +545,14 @@ function put(key: string, file: File, url: string) {
  */
 export function resolveConflicts(id: string, how: 'copy' | 'replace') {
   const keys = state.uploads.filter((u) => u.batch === id && u.state === 'conflict').map((u) => u.key);
-  patch(keys, (u) => ({ state: 'waiting', conflict: undefined, ...(how === 'replace' && u.conflict ? { base: u.conflict.v } : {}) }));
-  void ask(id, keys, how === 'copy' ? 'copy' : 'refuse').catch(toastError);
+  for (const k of keys) slots.delete(k);
+  patch(keys, (u) => ({
+    state: 'waiting',
+    conflict: undefined,
+    mode: how === 'copy' ? 'copy' : 'refuse',
+    ...(how === 'replace' && u.conflict ? { base: u.conflict.v } : {}),
+  }));
+  pump();
 }
 
 /**
@@ -460,8 +561,9 @@ export function resolveConflicts(id: string, how: 'copy' | 'replace') {
  */
 export function resolveLater(id: string, how: 'copy' | 'again') {
   const keys = state.uploads.filter((u) => u.batch === id && u.state === 'later').map((u) => u.key);
-  patch(keys, { state: 'waiting', retryAt: undefined, error: undefined });
-  void ask(id, keys, how === 'copy' ? 'copy' : 'refuse').catch(toastError);
+  for (const k of keys) slots.delete(k);
+  patch(keys, { state: 'waiting', retryAt: undefined, error: undefined, mode: how === 'copy' ? 'copy' : 'refuse' });
+  pump();
 }
 
 /** A batch that waited for room is asked for again (its sheet comes back if there is still none). */
@@ -469,7 +571,7 @@ export function retryRoom(id: string) {
   const keys = state.uploads.filter((u) => u.batch === id && u.state === 'room').map((u) => u.key);
   set({ batches: state.batches.map((b) => (b.id === id ? { ...b, ask: undefined } : b)) });
   patch(keys, { state: 'waiting' });
-  void ask(id, keys);
+  pump();
 }
 
 export function showRoom(id: string) {
@@ -480,8 +582,9 @@ export function showRoom(id: string) {
 /** Failed files of a batch, once more. */
 export function retryFailed(id: string) {
   const keys = state.uploads.filter((u) => u.batch === id && u.state === 'failed' && files.has(u.key)).map((u) => u.key);
+  for (const k of keys) slots.delete(k);
   patch(keys, { state: 'waiting', error: undefined, sent: 0 });
-  void ask(id, keys);
+  pump();
 }
 
 /** Stops a batch (or one file of it): what is on its way is dropped on the server too; what arrived stays. */
@@ -511,3 +614,24 @@ export function clearFileUploads() {
   for (const u of state.uploads) if (!live.has(u.batch)) files.delete(u.key);
   set({ batches: state.batches.filter((b) => live.has(b.id)), uploads: state.uploads.filter((u) => live.has(u.batch)) });
 }
+
+/**
+ * Signed out: nothing of the account's uploads stays in this tab — what is on its way stops (the server ends its
+ * half-sent uploads by itself), the tray empties, and no Try again can send its files into the next account's
+ * workspace. Its resume entries (`tus::` keys) go with the account's storage (lib/signedOut.ts).
+ */
+export function resetFileUploads() {
+  for (const up of running.values()) void up.abort(false).catch(() => {});
+  running.clear();
+  queue.length = 0;
+  files.clear();
+  slots.clear();
+  stalled.clear();
+  dirty.clear();
+  asking = false;
+  heldUntil = 0;
+  if (holdTimer) clearTimeout(holdTimer);
+  holdTimer = null;
+  set({ batches: [], uploads: [] });
+}
+onSignOut(resetFileUploads);

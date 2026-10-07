@@ -19,13 +19,16 @@ import type { RefAttached, RefTarget } from '../lib/refs.ts';
 import { currentWorkspace } from '../lib/scope.ts';
 import { scopeAllows } from '../lib/scopes.ts';
 import * as store from '../lib/store.ts';
-import type { FileUploadResult, GuestRef, OptionGroup, UploadResult } from '../lib/types.ts';
+import type { FileUploadResult, GuestRef, OptionGroup, TooManyAnswerFields, UploadResult } from '../lib/types.ts';
 import { roleIn } from '../lib/workspaces.ts';
 import { sessionOf } from './auth.ts';
 import { fail } from './http.ts';
 
 const TICKET = /^vrup_[\w-]{32}$/;
 const TICKET_MS = 15 * 60_000;
+/** A 429 for open URLs says so (`reason`), so a client tells it from a file's day of versions (lib/files.ts): it waits
+ * `retry_after` and asks again. */
+const OPEN_REFUSAL: TooManyAnswerFields = { reason: 'tickets', retry_after: 60 };
 
 export const TicketInput = z.object({
   filename: fileName,
@@ -256,8 +259,9 @@ export function createUploadTickets({ origin = null }: { origin?: string | null 
       }
       const max = guard.limits ?? { owner: OPEN_PER_OWNER, pool: OPEN_PER_POOL };
       if (mine >= max.owner)
-        throw Object.assign(fail(429, `${max.owner} upload URLs are open already: use them, or wait until they expire`), { retryAfter: 60 });
-      if (pooled >= max.pool) throw Object.assign(fail(429, 'too many upload URLs are open here right now: try again in a minute'), { retryAfter: 60 });
+        throw Object.assign(fail(429, `${max.owner} upload URLs are open already: use them, or wait until they expire`, OPEN_REFUSAL), { retryAfter: 60 });
+      if (pooled >= max.pool)
+        throw Object.assign(fail(429, 'too many upload URLs are open here right now: try again in a minute', OPEN_REFUSAL), { retryAfter: 60 });
     }
     const token = `vrup_${crypto.randomBytes(24).toString('base64url')}`;
     const expires = Date.now() + TICKET_MS;

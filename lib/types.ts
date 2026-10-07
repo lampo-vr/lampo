@@ -2392,6 +2392,17 @@ export interface FileUploadAnswer {
   tus: string;
 }
 
+/**
+ * What a 429 for uploads says beside `error` (and `Retry-After`): `versions` — the account made the day's versions of a
+ * file already (FILE_LIMITS.versionsPerDay; a save as a copy is never refused for it); `tickets` — too many upload URLs
+ * are open (wait `retry_after` and ask again). A 429 without a reason is any other limit: wait, and ask again.
+ */
+export type TooManyAnswerFields = {
+  reason?: 'versions' | 'tickets';
+  /** Seconds until the next try may pass. */
+  retry_after?: number;
+};
+
 /** What one file of a commit became. */
 export interface FileCommitItem {
   /** Where it is now (a copy: its own path). */

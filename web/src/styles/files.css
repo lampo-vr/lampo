@@ -911,15 +911,6 @@ a.pf-crumb:focus-visible {
 .pf-pv video {
   width: 100%;
 }
-.pf-pv.pdf {
-  aspect-ratio: 3 / 4;
-  background: var(--ink-2);
-}
-.pf-pv iframe {
-  width: 100%;
-  height: 100%;
-  border: 0;
-}
 .pf-pv.text {
   place-items: stretch;
   background: var(--ink-2);
@@ -973,6 +964,14 @@ a.pf-crumb:focus-visible {
 .pf-pv-why {
   font-size: var(--fs-sm);
   color: var(--muted);
+}
+/* a PDF opens in a tab of its own (Chrome's viewer), never in a frame here */
+.pf-pv-acts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
 }
 .pf-sh-facts {
   display: grid;

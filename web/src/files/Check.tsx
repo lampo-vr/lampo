@@ -5,7 +5,7 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import type { BillingInfo, FilesMissing } from '../../../lib/types.ts';
 import { api } from '../api/client.ts';
-import { t } from '../i18n/index.ts';
+import { locale, t } from '../i18n/index.ts';
 import { openLimit, toastError } from '../lib/toast.ts';
 import { Code } from '../settings/parts.tsx';
 import { I } from '../ui/icons.tsx';
@@ -22,7 +22,7 @@ import { sendFiles } from './uploadStore.ts';
 const BIG_BYTES = 20e9;
 const BIG_COUNT = 1000;
 
-/** A few names, then how many more: ".DS_Store, ._A001C003.mov, Thumbs.db +2". */
+/** A few names, then how many more: ".DS_Store, ._A001C003.mov, Thumbs.db +2" (junk in one order: the disk's differs). */
 const some = (names: string[], n = 3) => `${names.slice(0, n).join(', ')}${names.length > n ? ` +${names.length - n}` : ''}`;
 
 function Line({ glyph, children, value, testid }: { glyph: ReactNode; children: ReactNode; value?: ReactNode; testid?: string }) {
@@ -183,7 +183,7 @@ export function CheckSheet({
         )}
         {gathered.junk.length > 0 && (
           <Line glyph={<KeyGlyph shape="outline" size={10} />} testid="files-check-junk">
-            {t('{n} left out: {names}', { n: gathered.junk.length, names: some(gathered.junk) })}
+            {t('{n} left out: {names}', { n: gathered.junk.length, names: some([...gathered.junk].sort(new Intl.Collator(locale()).compare)) })}
           </Line>
         )}
         {plan && plan.bad.length + plan.clash.length > 0 && (

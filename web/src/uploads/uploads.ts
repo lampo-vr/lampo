@@ -9,6 +9,7 @@ import { keys } from '../api/queries.ts';
 import type { UploadResult } from '../api/types.ts';
 import { t } from '../i18n/index.ts';
 import { refusalText } from '../lib/refusal.ts';
+import { onSignOut } from '../lib/signedOut.ts';
 import { type LimitAsk, openLimit } from '../lib/toast.ts';
 
 /** `room`: the plan has no room for it now; it waits (the file kept in this page) until there is, then starts again. */
@@ -303,3 +304,17 @@ export async function forget(x: Interrupted) {
   await defaultOptions.urlStorage.removeUpload(x.key).catch(() => {});
   if (x.url) await Upload.terminate(x.url).catch(() => {});
 }
+
+/**
+ * Signed out: the account's renders on their way stop (the server ends their half-sent uploads by itself), the tray
+ * forgets them and what an earlier page left unfinished; their resume entries go with the account's storage.
+ */
+export function resetUploads() {
+  for (const up of running.values()) void up.abort(false).catch(() => {});
+  running.clear();
+  roomless.clear();
+  items = [];
+  interrupted = [];
+  emit();
+}
+onSignOut(resetUploads);

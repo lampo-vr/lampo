@@ -62,6 +62,7 @@ import type {
   FileUploadResult,
   FileVersion,
   FileVersionInfo,
+  TooManyAnswerFields,
   TrashedDir,
   TrashedDirInfo,
   TrashedFile,
@@ -564,7 +565,7 @@ function checkVersionRoom(e: FileEntry, who: { by: string; by_id?: string }, now
     new FileError(
       429,
       `you made ${FILE_LIMITS.versionsPerDay} versions of ${e.path} today: each is kept at least a day, so your next can come once the first of them is a day old — or save it beside it as a copy (conflict: "copy") or under another name`,
-      { retry_after: wait },
+      { retry_after: wait, reason: 'versions' } satisfies TooManyAnswerFields,
     ),
     { retryAfter: wait },
   );

@@ -4665,6 +4665,11 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'All files of {area}': 'Alle Dateien von {area}',
   'Nothing to skip: all of it needs uploading': 'Nichts zu überspringen: alles muss hochgeladen werden',
   'No more versions today': 'Heute keine Versionen mehr',
+  'This file isn’t here': 'Diese Datei ist nicht hier',
+  'no way in came for it: try again': 'kein Weg hinein kam dafür: versuch es noch einmal',
+  'The file didn’t load': 'Die Datei hat nicht geladen',
+  'It may have been moved, renamed or put in the trash, or it belongs to another workspace.':
+    'Vielleicht wurde sie verschoben, umbenannt oder in den Papierkorb gelegt, oder sie gehört zu einem anderen Workspace.',
   '{n} file can’t take another version from you today|{n} files can’t take another version from you today':
     '{n} Datei nimmt heute keine weitere Version von dir an|{n} Dateien nehmen heute keine weitere Version von dir an',
   'a new version {when}': 'neue Version {when}',

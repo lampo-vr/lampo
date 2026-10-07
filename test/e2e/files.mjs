@@ -18,7 +18,7 @@ import { until } from '../lib/helpers.ts';
 import { dataTheme, layoutMatrix, settle } from './layout.mjs';
 import { launch, requireChrome, requireDist, shotsDir, signedIn } from './lib/browser.mjs';
 import { assert, check, crashed, finish, screenshotFailures } from './lib/checks.mjs';
-import { CAMPAIGN, PROJECT, push, SHOWN, seedProject } from './lib/filesStore.mjs';
+import { CAMPAIGN, PROJECT, pdfShown, push, SHOWN, seedProject } from './lib/filesStore.mjs';
 import { startServer } from './lib/server.mjs';
 
 const LABEL = 'files e2e';
@@ -109,6 +109,8 @@ let role = null;
 let hosted = false;
 // the next upload request is refused for room (the plan's sheet)
 let refuseNext = false;
+/** A file id no store has (an address that outlived its file). */
+const NO_SUCH_FILE = 'fl_000000000000';
 let dayFull = false;
 /** The `conflict` of every POST /api/files/uploads, in order. */
 const asked = [];
@@ -127,7 +129,7 @@ async function intercept(p) {
             status: 429,
             headers: { 'Retry-After': '7200' },
             contentType: 'application/json',
-            body: JSON.stringify({ error: 'you made 24 versions of Graphics/Spring_Teal.cube today', retry_after: 7200 }),
+            body: JSON.stringify({ error: 'you made 24 versions of Graphics/Spring_Teal.cube today', retry_after: 7200, reason: 'versions' }),
           });
         }
         if (refuseNext && at === '/api/files/uploads' && req.method() === 'POST') {
@@ -197,9 +199,11 @@ try {
   browser = await launch();
   page = await browser.newPage();
   page.on('pageerror', (x) => errors.push(x.message));
-  // the files' API answering an error the page didn't mean to cause (a 409, 402 or 429 is a check's own)
+  // the files' API answering an error the page didn't mean to cause (a 409, 402 or 429 is a check's own, and so is
+  // the 404 for a file no one has)
   page.on('response', (r) => {
     const u = new URL(r.url());
+    if (u.pathname.includes(NO_SUCH_FILE)) return;
     if (u.pathname.startsWith('/api/files') && r.status() >= 400 && ![402, 409, 429].includes(r.status()))
       errors.push(`${r.request().method()} ${u.pathname}${u.search}: ${r.status()}`);
   });
@@ -301,7 +305,10 @@ try {
     assert(known === 'Nothing to skip: all of it needs uploading', `what is in Lampo already: ${known}`);
     const text = await page.$eval('[data-testid=files-check]', (x) => x.textContent);
     assert(/Day 3/.test(text ?? ''), `the top folder: ${text}`);
-    assert(/2 left out: \.DS_Store, \._C001C001\.mov/.test(text ?? ''), `junk said once: ${text}`);
+    // what is left out, each said once (in the language's order: a disk lists them in its own)
+    const left = await page.$eval('[data-testid=files-check-junk]', (x) => x.textContent);
+    const junk = /^2 left out: (.+)$/.exec(left ?? '')?.[1]?.split(', ') ?? [];
+    assert(junk.sort().join() === '.DS_Store,._C001C001.mov', `junk said once: ${left}`);
     assert(requests === 0, 'nothing asked for before Add');
     const title = await page.$eval('.modal-head h3', (x) => x.textContent);
     assert(title === 'Add 3 files to Spring sale · Footage', `title: ${title}`);
@@ -417,6 +424,14 @@ try {
     await until(async () => (await listing(CAMPAIGN, 'Project')).files.find((f) => f.path === 'Project/endcard.c4d')?.v === before.v + 2, 'mine after theirs');
   });
 
+  await check('an address naming a file that isn’t here: the sheet says so, and leads back to the files', async () => {
+    await open(campaign(`?open=${NO_SUCH_FILE}`), { wait: '[data-testid=file-sheet-missing]' });
+    const said = await page.$eval('[data-testid=file-sheet-missing]', (x) => x.textContent);
+    assert(/This file isn’t here/.test(said ?? ''), said ?? '');
+    await page.click('[data-testid=file-sheet-back]');
+    await page.waitForFunction(() => !document.querySelector('[data-testid=file-sheet]') && !location.hash.includes('open='));
+  });
+
   await check('a file opened beside the list: a look at it, its versions with who and an agent’s marked; one restored', async () => {
     await open(campaign(`?path=${e('Project')}`));
     await page.$$eval('[data-testid=file-row]', (rows) => rows.find((r) => r.querySelector('.pf-name')?.textContent === 'spot.aep')?.click());
@@ -443,27 +458,51 @@ try {
       });
   });
 
-  await check('a picture, a PDF and a text file are shown in the sheet; a project file says it has no preview', async () => {
-    for (const [p, look] of [
-      ['Graphics', 'image'],
-      ['Brief', 'pdf'],
-      ['Brief', 'text'],
-      ['Project', 'none'],
-    ]) {
-      await open(campaign(`?path=${e(p)}`));
-      const name = { image: 'still_hero.png', pdf: 'Brief v3.pdf', text: 'voiceover script.txt', none: 'Spring sale key visual.psd' }[look];
-      await page.$$eval('[data-testid=file-row]', (rows, n) => rows.find((r) => r.querySelector('.pf-name')?.textContent === n)?.click(), name);
-      await page.waitForSelector(`[data-testid=file-preview][data-look=${look}]`);
-      if (look === 'image')
-        await page.waitForFunction(() => document.querySelector('[data-testid=file-preview] img')?.naturalWidth === 640, { timeout: 10_000 });
-      if (look === 'text')
-        await page.waitForFunction(() => /Spring is here/.test(document.querySelector('[data-testid=file-preview-text]')?.textContent ?? ''), {
-          timeout: 10_000,
-        });
-      if (look === 'image') await shot('files-sheet-image-1440');
-    }
-    await page.keyboard.press('Escape');
-  });
+  await check(
+    'a picture and a text file are shown in the sheet, a PDF opens in a tab of its own (Chrome shows it); a project file has no preview',
+    async () => {
+      for (const [p, look] of [
+        ['Graphics', 'image'],
+        ['Brief', 'pdf'],
+        ['Brief', 'text'],
+        ['Project', 'none'],
+      ]) {
+        await open(campaign(`?path=${e(p)}`));
+        const name = { image: 'still_hero.png', pdf: 'Brief v3.pdf', text: 'voiceover script.txt', none: 'Spring sale key visual.psd' }[look];
+        await page.$$eval('[data-testid=file-row]', (rows, n) => rows.find((r) => r.querySelector('.pf-name')?.textContent === n)?.click(), name);
+        await page.waitForSelector(`[data-testid=file-preview][data-look=${look}]`);
+        if (look === 'image')
+          await page.waitForFunction(() => document.querySelector('[data-testid=file-preview] img')?.naturalWidth === 640, { timeout: 10_000 });
+        if (look === 'pdf') {
+          // never framed (no answer of this server may be): Open in a tab of its own, on the app's route — a sealed URL
+          // never sits in the page — and Download
+          const pdf = await page.$eval('[data-testid=file-preview]', (x) => {
+            const a = x.querySelector('[data-testid=file-pdf-open]');
+            return {
+              frame: !!x.querySelector('iframe, embed, object'),
+              href: a?.getAttribute('href'),
+              target: a?.getAttribute('target'),
+              rel: a?.getAttribute('rel'),
+              download: !!x.querySelector('[data-testid=file-pdf-download]'),
+            };
+          });
+          assert(!pdf.frame && pdf.download, JSON.stringify(pdf));
+          assert(/^\/api\/files\/fl_[0-9a-f]{12}\/download\?v=\d+&inline=1$/.test(pdf.href ?? ''), `Open: ${pdf.href}`);
+          assert(pdf.target === '_blank' && pdf.rel === 'noopener noreferrer', JSON.stringify(pdf));
+          // and Chrome's viewer shows it there, under the bytes' own policy (sandbox)
+          const shown = await pdfShown(`${BASE}${pdf.href}`);
+          assert(shown.viewer && shown.contentType === 'application/pdf', `the PDF in its tab: ${JSON.stringify(shown)}`);
+          await shot('files-sheet-pdf-1440');
+        }
+        if (look === 'text')
+          await page.waitForFunction(() => /Spring is here/.test(document.querySelector('[data-testid=file-preview-text]')?.textContent ?? ''), {
+            timeout: 10_000,
+          });
+        if (look === 'image') await shot('files-sheet-image-1440');
+      }
+      await page.keyboard.press('Escape');
+    },
+  );
 
   await check('the keys: ↓ moves, ↵ opens a folder, ⌘↑ goes back up, Space looks, ⌫ trashes with Undo', async () => {
     await open(campaign());
@@ -674,8 +713,32 @@ try {
         );
         assert(picked, 'no Select in the row’s ⋯');
         await page.waitForSelector('[data-testid=files-selbar]');
-        // the rest are ticked by their boxes; the last one tapped keeps its tick in view
-        for (const i of [1, 2]) await (await page.$$('[data-testid=file-row] .pf-tick'))[i].tap();
+        // the menu's sheet goes with an animation, its scrim over the list until then (on CI's slower compositor,
+        // long enough to take the next taps): each box is tapped once nothing lies over it, and holds before the next
+        const over = (i) =>
+          page.evaluate((i) => {
+            const t = document.querySelectorAll('[data-testid=file-row] .pf-tick')[i];
+            const r = t.getBoundingClientRect();
+            const el = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+            return !el || t.contains(el)
+              ? null
+              : `${el.tagName.toLowerCase()}.${String(el.className?.baseVal ?? el.className)
+                  .trim()
+                  .split(/\s+/)
+                  .join('.')}`;
+          }, i);
+        await page.waitForFunction(() => !document.querySelector('[role=menu]'));
+        for (const i of [1, 2]) {
+          await until(
+            async () => (await over(i)) === null,
+            async () => `row ${i + 1}'s box is under ${await over(i)}`,
+          );
+          await (await page.$$('[data-testid=file-row] .pf-tick'))[i].tap();
+          await until(
+            async () => (await boxes())[i] === 'on:1',
+            async () => `row ${i + 1}'s box after its tap: ${(await boxes()).join()}`,
+          );
+        }
         const ticked = (x) => x.slice(0, 3).every((y) => y === 'on:1') && x.slice(3).every((y) => y === 'off:1');
         await until(async () => ticked(await boxes()), 'three ticked, every box shown').catch(async () => {
           throw new Error(`ticked rows: ${await boxes()}`);
