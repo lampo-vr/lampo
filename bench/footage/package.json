@@ -9,5 +9,8 @@
     "@lancedb/lancedb": "0.39.0",
     "onnxruntime-node": "1.30.0",
     "sqlite-vec": "0.1.9"
+  },
+  "overrides": {
+    "sharp": "^0.35.5"
   }
 }
