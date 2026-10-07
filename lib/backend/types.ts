@@ -213,8 +213,12 @@ export interface Backend {
   setSource(slug: string, v: number | undefined, source: RenderSource | null, by: string): Promise<Version>;
   /** Put a render under review: a path on this machine (local) or an upload of that file (remote). */
   track(videoPath: string, o: { by: string; byId?: string; session?: SessionInput | null; folder?: string }): Promise<{ review: Review; created: boolean }>;
-  /** Upload a render as a new review or the next version of one (`to`: its slug). */
-  push(file: string, o: { by: string; folder?: string | null; name?: string; to?: string | null; part?: PartPushInput }): Promise<PushResult>;
+  /** Upload a render as a new review or the next version of one (`to`: its slug); `onProgress`: bytes sent so far (an
+   * upload to a server; the store on this machine takes the file in one go). */
+  push(
+    file: string,
+    o: { by: string; folder?: string | null; name?: string; to?: string | null; part?: PartPushInput; onProgress?: (sent: number, total: number) => void },
+  ): Promise<PushResult>;
   /** Attaches an elements map (parsed JSON, checked whole where it is stored) to version `v`, the newest when absent. */
   putElements(slug: string, v: number | undefined, map: unknown): Promise<ElementsAttached>;
   /** What these notes point at in their versions' elements maps, and those elements' names (empty without maps). */

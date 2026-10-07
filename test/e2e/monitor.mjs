@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // covers: web/src/sessions/ web/src/player/ClaudeMenu.tsx server/routes/sessions.ts server/routes/mcp.ts
 // covers: server/activity.ts server/agentRuns.ts server/sessionCache.ts server/watch.ts lib/runStream.ts
-// covers: lib/activity.ts lib/activityText.ts lib/agentStatus.ts
+// covers: lib/activity.ts lib/activityText.ts lib/agentStatus.ts lib/runs.ts server/runs.ts server/routes/runs.ts
 // Browser end-to-end test of the live agent monitor: what an agent does shows while it does it, built only from what
 // Lampo sees anyway — the agent spends no tokens on it. A run Lampo started (the harness's stand-in prints Claude
 // Code's stream-json a line at a time) shows its step, a timeline and its tokens in the agent menu's Live section and

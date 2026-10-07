@@ -10,6 +10,7 @@ import { ACTIVITY_FILE, type ActivityRecord } from '../lib/activity.ts';
 import { agentName, isActivityKey } from '../lib/activityText.ts';
 import { cutChars } from '../lib/names.ts';
 import { currentWorkspace, isoLocal, slugify } from '../lib/paths.ts';
+import { ERROR_MAX } from '../lib/render/redact.ts';
 import { cleanProgress, RUN_ID } from '../lib/runs.ts';
 import * as store from '../lib/store.ts';
 import { compareTime, oneLine } from '../lib/time.ts';
@@ -99,18 +100,19 @@ function cleanVars(v: unknown): Record<string, string | number> | undefined {
 }
 
 /** A clean activity from what a caller sent: known kind and template, one-line words, sane sizes. Null when it is
- * unusable. */
+ * unusable. A failure (`error`) keeps up to ERROR_MAX characters of the tool's words; every other line much less. */
 export function cleanActivity(a: ActivityRecord): (AgentActivity & { video?: string | null }) | null {
   const agent = agentName(a.agent);
   if (!agent || !KINDS.has(a.kind)) return null;
-  const text = line(a.text, 160);
+  const failure = a.kind === 'error';
+  const text = line(a.text, failure ? ERROR_MAX : 160);
   if (!text) return null;
   const target = typeof a.target === 'string' ? cutChars(a.target, 40) : null;
   const at = typeof a.at === 'string' && !Number.isNaN(Date.parse(a.at)) ? a.at : isoLocal();
   const pct = typeof a.pct === 'number' && Number.isFinite(a.pct) ? Math.max(0, Math.min(100, Math.round(a.pct))) : undefined;
   const key = isActivityKey(a.key) ? a.key : undefined;
   const vars = key ? cleanVars(a.vars) : undefined;
-  const quote = key && typeof a.quote === 'string' ? line(a.quote, 60) : '';
+  const quote = key && typeof a.quote === 'string' ? line(a.quote, failure ? ERROR_MAX : 60) : '';
   const progress = cleanProgress(a.progress);
   return {
     at,
@@ -181,7 +183,8 @@ export function createActivityStore(broadcast: Broadcast, { onRecord }: Activity
     // A wait that keeps being asked for is one wait, a render still growing or an upload going on is one line that
     // moves; the same action again soon is the same line, newer — also when a run's output and the call it made both
     // tell it (the call's kind says more than the run's "tool").
-    const progress = entry.kind === 'render' || (entry.kind === 'upload' && entry.pct !== undefined && last?.pct !== undefined);
+    const progress =
+      entry.kind === 'render' || (entry.kind === 'upload' && ((entry.pct !== undefined && last?.pct !== undefined) || (!!entry.progress && !!last?.progress)));
     const same = !!last && last.text === entry.text && now - (Date.parse(last.at) || 0) < MERGE_MS;
     if (last && ((last.kind === entry.kind && (entry.kind === 'wait' || progress)) || same)) {
       p.recent[0] = { ...entry, kind: entry.kind === 'tool' ? last.kind : entry.kind };
