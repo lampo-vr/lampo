@@ -25,6 +25,7 @@ import { forgetGone, RECENT_SHOWN, useRecent } from '../lib/recent.ts';
 import { toast, toastError, toastUndo } from '../lib/toast.ts';
 import type { GetStartedProps } from '../onboarding/GetStarted.tsx';
 import { StartRow } from '../onboarding/Row.tsx';
+import { cardRun, LOOK, mostUrgent, phaseOf, type RunLike, shortLine } from '../sessions/runState.ts';
 import { SessionHover } from '../sessions/Sessions.tsx';
 import { LazyShareModal } from '../share/LazyShareModal.tsx';
 import { stageLabel } from '../status/stageText.ts';
@@ -340,15 +341,18 @@ export function Sidebar({ videos: loaded, folders: all = NONE, archived = NO_ARC
     return m;
   }, [folders, live]);
   const sessions = useMemo(() => {
-    const m = new Map<string, { n: number; active: boolean; ref: NonNullable<VideoSummary['session']> }>();
+    const m = new Map<string, { n: number; active: boolean; ref: NonNullable<VideoSummary['session']>; runs: RunLike[] }>();
     for (const v of live) {
       if (!v.session) continue;
-      const s = m.get(v.session.name) || { n: 0, active: false, ref: v.session };
+      const s = m.get(v.session.name) || { n: 0, active: false, ref: v.session, runs: [] };
       s.n++;
       s.active ||= !!v.sessionActive;
+      // its work on its videos: the row says the one that matters most (needs you, failed … before working)
+      const r = cardRun(v);
+      if (r) s.runs.push(r);
       m.set(v.session.name, s);
     }
-    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    return [...m.entries()].map(([name, s]) => [name, { ...s, run: mostUrgent(s.runs) }] as const).sort((a, b) => a[0].localeCompare(b[0]));
   }, [live]);
   // What each agent is doing now, in its row: its code and data come after the first paint (the start's budget), and
   // nothing shows until an agent does something.
@@ -584,6 +588,8 @@ export function Sidebar({ videos: loaded, folders: all = NONE, archived = NO_ARC
             <div className="nav-section">
               <div className="nav-head">{t('Agents')}</div>
               {sessions.map(([name, s]) => {
+                // with work going on (or ended badly), its state in a word or two and its glyph; else what it does now
+                const look = s.run ? LOOK[phaseOf(s.run)] : null;
                 return (
                   <NavItem
                     key={name}
@@ -591,13 +597,21 @@ export function Sidebar({ videos: loaded, folders: all = NONE, archived = NO_ARC
                     label={
                       <>
                         {name}
-                        {Now && <Now.AgentNowText agent={name} />}
+                        {s.run ? (
+                          <span className="nav-now" data-testid="agent-now-row" data-phase={phaseOf(s.run)}>
+                            {shortLine(s.run)}
+                          </span>
+                        ) : (
+                          Now && <Now.AgentNowText agent={name} idle={s.active ? t('ready') : null} />
+                        )}
                       </>
                     }
                     count={s.n}
                     countOf={t('video|videos', { n: s.n })}
                     dot={
-                      Now ? (
+                      look ? (
+                        <KeyGlyph shape={look.shape} className={`nav-kg run-kg ${look.tone}`} />
+                      ) : Now ? (
                         <Now.AgentNowDot agent={name} active={s.active} />
                       ) : (
                         <KeyGlyph shape={s.active ? 'ease' : 'outline'} className={`nav-kg ${s.active ? 'live' : ''}`} />

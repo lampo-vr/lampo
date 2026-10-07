@@ -153,6 +153,8 @@ interface TimelineProps {
   peaks?: number[];
   rms?: number[];
   comments?: TimelineComment[];
+  /** The note an agent has in hand (its plan, AgentView.tsx): its keyframe is the hourglass while it does. */
+  inHand?: string | null;
   /** Holds (frames that look the same); `quiet`: Auto-check doesn't think it a problem (an end card, a pause). */
   freezes?: (FreezeRange & { quiet?: boolean })[];
   words?: TimelineWord[] | null;
@@ -230,6 +232,7 @@ export default function Timeline({
   peaks,
   rms,
   comments,
+  inHand = null,
   freezes,
   words,
   segments,
@@ -768,7 +771,7 @@ export default function Timeline({
       // should half, nice hollow, an idea a circle; a question an hourglass, an info note a square. A closed note fades.
       const cy = yMarks + 10;
       const look = noteKind(c);
-      const shape: Shape = look === 'feedback' ? SEVERITY_SHAPE[c.severity] || 'half' : KIND_SHAPE[look];
+      const shape: Shape = c.id === inHand ? 'ease' : look === 'feedback' ? SEVERITY_SHAPE[c.severity] || 'half' : KIND_SHAPE[look];
       const k = 11 / 12;
       const glyph = glyphPath(shape);
       g.save();
@@ -851,6 +854,7 @@ export default function Timeline({
     peaks,
     rms,
     comments,
+    inHand,
     freezes,
     words,
     segments,
@@ -1263,6 +1267,8 @@ export default function Timeline({
         data-view={zoomed ? `${Math.round(v0 * 100) / 100}-${Math.round(v1 * 100) / 100}` : undefined}
         data-cells={cells || undefined}
         data-writing={(writing && !!section) || undefined}
+        // the note an agent has in hand (its keyframe is the hourglass)
+        data-in-hand={inHand ?? undefined}
       >
         <canvas ref={cv} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} style={{ cursor }} />
         <Playhead

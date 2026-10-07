@@ -148,28 +148,6 @@
   border-left: 0;
   width: 24px;
 }
-.agent-status {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  height: 24px;
-  padding: 0 var(--sp-2);
-  border-radius: var(--r-full);
-  background: var(--claude-bg);
-  color: var(--claude-3);
-  font: var(--fw-ui) var(--fs-xs) var(--ui);
-  font-stretch: 87.5%;
-  max-width: 260px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.agent-status .spinner {
-  width: 11px;
-  height: 11px;
-  border-color: color-mix(in srgb, var(--claude) 25%, transparent);
-  border-top-color: var(--claude);
-}
 .claude-pop {
   min-width: 360px;
   gap: var(--sp-1);

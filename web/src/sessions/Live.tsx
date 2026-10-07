@@ -13,6 +13,9 @@ import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { type NoteAt, phrase, say } from './activityWords.ts';
 import { RunLine } from './Wake.tsx';
 
+/** An agent's own words in the UI's language, for the cards' run lines once this module is here (RunLine.tsx). */
+export const sayWords = (w: ActivityWords): string => say(w);
+
 /** How long the latest action counts as "now". A wait is re-asked every few minutes while it lasts. */
 const FRESH_MS = 90_000;
 const WAIT_FRESH_MS = 15 * 60_000;
@@ -116,10 +119,15 @@ export function AgentOnIt({ agent, step }: { agent: string | null; step: string 
 }
 
 /** An Agents row's words while the agent works (the sidebar): what it is doing, after its name; the full line in its
- * title. */
-export function AgentNowText({ agent }: { agent: string }) {
+ * title. `idle`: what it says while the agent does nothing ("ready"). */
+export function AgentNowText({ agent, idle = null }: { agent: string; idle?: string | null }) {
   const now = useAgentsNow(true).get(agent);
-  if (!now) return null;
+  if (!now)
+    return idle ? (
+      <span className="nav-now" data-testid="agent-now-row" data-phase="ready">
+        {idle}
+      </span>
+    ) : null;
   return (
     <span className="nav-now" data-testid="agent-now-row" title={`${agent} · ${stepLine(now)}`}>
       {stepLine(now)}
@@ -137,16 +145,25 @@ export function AgentNowDot({ agent, active }: { agent: string; active: boolean 
 const clock = (iso: string) => new Date(iso).toLocaleTimeString(locale(), { hour: 'numeric', minute: '2-digit' });
 
 /** An action's words with what moves on it: how far an upload is, since when a wait lasts. */
+/** How far a render or an upload is (`vr render`'s progress, else an upload's percentage), while it goes on. */
+const howFar = (a: { kind?: string; pct?: number; progress?: AgentActivity['progress'] }): number | null => {
+  const p = a.progress?.pct ?? (a.kind === 'upload' ? a.pct : undefined);
+  return p != null && p < 100 && (a.kind === 'upload' || a.kind === 'render') ? p : null;
+};
+
 export function activityLine(a: AgentActivity, noteAt?: NoteAt): string {
   const words = say(a, noteAt);
-  if (a.kind === 'upload' && a.pct !== undefined && a.pct < 100) return `${words} · ${pct(a.pct / 100)}`;
+  const far = howFar(a);
+  if (far !== null) return `${words} · ${pct(far / 100)}`;
   if (a.kind === 'wait' && a.since) return `${words} · ${t('since {time}', { time: clock(a.since) })}`;
   return words;
 }
 
 /** One line for small places (the agent button, the sidebar): the words without a quote. */
-export const stepLine = (a: ActivityWords & { kind?: string; pct?: number }, noteAt?: NoteAt): string =>
-  a.kind === 'upload' && a.pct !== undefined && a.pct < 100 ? `${phrase(a, noteAt)} · ${pct(a.pct / 100)}` : phrase(a, noteAt);
+export const stepLine = (a: ActivityWords & { kind?: string; pct?: number; progress?: AgentActivity['progress'] }, noteAt?: NoteAt): string => {
+  const far = howFar(a);
+  return far !== null ? `${phrase(a, noteAt)} · ${pct(far / 100)}` : phrase(a, noteAt);
+};
 
 const compact = (n: number) => new Intl.NumberFormat(locale(), { notation: 'compact', maximumFractionDigits: 1 }).format(n);
 const usd = (n: number) => new Intl.NumberFormat(locale(), { style: 'currency', currency: 'USD', maximumFractionDigits: n < 1 ? 3 : 2 }).format(n);

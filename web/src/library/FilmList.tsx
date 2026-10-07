@@ -12,6 +12,8 @@ import { useLang } from '../i18n/T.tsx';
 import { cardClick } from '../lib/a11y.ts';
 import { ago } from '../lib/format.ts';
 import { useWindowed, WINDOW_FROM } from '../lib/windowing.ts';
+import { RunEdge, RunLine } from '../sessions/RunLine.tsx';
+import { cardRun } from '../sessions/runState.ts';
 import { StatusPill } from '../status/StatusPill.tsx';
 import { I, type IconName } from '../ui/icons.tsx';
 import { ContextMenu, IconButton, Menu } from '../ui/primitives.tsx';
@@ -37,6 +39,7 @@ const Row = memo(function Row({ v, where, home, folders }: RowProps) {
   const qc = useQueryClient();
   const { items, dialogs, organize } = useVideoMenu(v, { home, folders });
   const n = v.counts;
+  const run = cardRun(v);
   return (
     <ContextMenu items={items} onOpenChange={setMenuOpen}>
       <tr
@@ -62,7 +65,9 @@ const Row = memo(function Row({ v, where, home, folders }: RowProps) {
             height={v.height}
             frame={16 / 9}
             className="lthumb"
-          />
+          >
+            <RunEdge run={run} />
+          </Poster>
           <span className="lname">
             <a href={`#/v/${enc(v.slug)}`} className="ellipsis" draggable={false} data-nav>
               {v.name}
@@ -70,7 +75,16 @@ const Row = memo(function Row({ v, where, home, folders }: RowProps) {
             <span className="lwhere ellipsis">
               {where ? `${where} · ` : ''}V{v.v}
               {v.sample && ` · ${t('Sample')}`}
-              {v.agent_status ? ` · ${v.agent_status.text}` : ''}
+              {run ? (
+                <>
+                  {' · '}
+                  <RunLine run={run} />
+                </>
+              ) : v.run === undefined && v.agent_status ? (
+                ` · ${v.agent_status.text}`
+              ) : (
+                ''
+              )}
               <UnsentMark slug={v.slug} />
             </span>
           </span>

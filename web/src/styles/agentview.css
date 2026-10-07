@@ -1,0 +1,264 @@
+/* The side panel's Agent view (player/AgentView.tsx), loaded with its code: the plan as the person's notes, now, the
+   steps, how it ended, earlier work, and "Tell it…" pinned at the foot. Rows of one height; the steps' box keeps its
+   height when it shows them all (the rest scroll inside it). */
+.av {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.av-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--sp-4);
+  padding: var(--sp-3);
+}
+.av-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--h-sm);
+}
+.av-meta {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font: var(--fw-text) var(--fs-xs) / var(--lh-ui) var(--ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* what the person asked for in their own words, when they did */
+.av-request {
+  display: block;
+  margin: calc(-1 * var(--sp-2)) 0 0;
+  font: var(--fw-text) var(--fs-sm) / var(--lh-body) var(--ui);
+  color: var(--fg-2);
+}
+.av-sec {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-1);
+}
+.av-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-2);
+  font: var(--fw-strong) var(--fs-xs) / var(--lh-tight) var(--ui);
+  letter-spacing: var(--track-eyebrow);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.av-count {
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  font-stretch: 87.5%;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.av-plan,
+.av-steps,
+.av-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+/* a plan note or an earlier piece of work: one row, one height */
+.av-row,
+.av-hrow {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  height: var(--h);
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--fg);
+  font: var(--fw-text) var(--fs-sm) / var(--lh-ui) var(--ui);
+  text-align: left;
+  cursor: pointer;
+}
+.av-row:hover,
+.av-hrow:hover {
+  background: var(--sel);
+}
+.av-row:focus-visible,
+.av-hrow:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.av-hrow {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+.av-tc,
+.av-hv {
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  font-stretch: 87.5%;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.av-tc {
+  width: calc(var(--sp-16) + var(--sp-1));
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.av-text,
+.av-htext {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.av-htext {
+  color: var(--fg-2);
+}
+.av-word {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-0_5);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.av-word.live {
+  color: var(--fg-2);
+}
+.av-word.ok {
+  color: var(--ok);
+}
+.av-word.ask {
+  color: var(--claude-2);
+}
+.av-go {
+  color: var(--faint);
+}
+.av-plan li[data-state='fixed'] .av-text,
+.av-plan li[data-state='wontfix'] .av-text,
+.av-plan li[data-state='replied'] .av-text {
+  color: var(--fg-2);
+}
+/* now: the step it is on, and what it said after it, quoted and quiet */
+.av-line {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: 0 var(--sp-2);
+  font: var(--fw-ui) var(--fs-sm) / var(--lh-ui) var(--ui);
+  color: var(--fg);
+}
+.av-line .kg {
+  --kg-size: 10px;
+}
+.av-line.quiet {
+  color: var(--muted);
+}
+.av-line.err {
+  color: var(--must-2);
+}
+.av-thought {
+  display: block;
+  margin: 0;
+  padding: 0 var(--sp-2) 0 calc(var(--sp-6) + var(--sp-0_5));
+  font: var(--fw-text) var(--fs-sm) / var(--lh-body) var(--ui);
+  color: var(--muted);
+}
+.av-needs {
+  margin: 0;
+  padding: 0 var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--claude-2);
+}
+.av-use {
+  margin: 0;
+  padding: 0 var(--sp-2);
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  color: var(--muted);
+}
+.av-acts {
+  display: flex;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-2) 0;
+}
+/* the steps: five rows of one height; "Show all" keeps the box and lets the rest scroll inside it */
+.av-steps {
+  align-content: start;
+}
+.av-steps.all {
+  height: calc(5 * var(--h-sm));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.av-step {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--sp-3);
+  height: var(--h-sm);
+  padding: 0 var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.av-step time {
+  min-width: 4.8em;
+  white-space: nowrap;
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  font-stretch: 87.5%;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.av-step-text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.av-step.thought .av-step-text {
+  color: var(--muted);
+}
+.av-step.err .av-step-text {
+  color: var(--must-2);
+}
+.av-more {
+  justify-self: start;
+}
+/* "Tell it…": at the panel's foot, whatever is scrolled */
+.av-tell {
+  flex: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-2);
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  border-top: 1px solid var(--line);
+}
+.av-tell-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.av-empty {
+  margin-top: var(--sp-2);
+}
+.av-pending {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+}

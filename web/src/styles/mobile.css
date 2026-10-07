@@ -87,6 +87,8 @@
     .nav-act,
     .playbtn,
     .p-strip .btn,
+    .run-act,
+    .run-main,
     .side-views button,
     button.tr-tc,
     .crumb button,
@@ -115,6 +117,8 @@
     .nav-act,
     .playbtn,
     .p-strip .btn,
+    .run-act,
+    .run-main,
     .side-views button,
     button.tr-tc,
     .crumb button,
@@ -564,9 +568,30 @@
     height: 100dvh;
     min-height: 0;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
-    grid-template-areas: 'top' 'strip' 'stage' 'dock' 'side';
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
+    grid-template-areas: 'top' 'strip' 'stage' 'run' 'dock' 'side';
     overflow: hidden;
+  }
+  /* the run strip above the dock (RunStrip.tsx): a thumb's height, the edge on its foot; tapping it opens the Agent
+     view in the sheet */
+  .run-slot {
+    grid-area: run;
+    min-width: 0;
+  }
+  /* the sheet's head with the Agent view open (three views): + Note says its plus alone (named by its label) */
+  .nsheet .side-title:has(.side-views.three) .new-note-word {
+    display: none;
+  }
+  /* its buttons a step smaller than the band, their tap areas a finger's size (the ::after above) */
+  .run-strip.phone .run-act {
+    height: var(--h);
+    min-height: 0;
+  }
+  .run-strip.phone {
+    height: var(--h-touch);
+    margin: 0;
+    padding: 0 max(var(--sp-2), env(safe-area-inset-right)) 0 max(var(--sp-3), env(safe-area-inset-left));
+    border-bottom: 0;
   }
   .p-bar {
     gap: var(--sp-1);

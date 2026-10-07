@@ -91,7 +91,8 @@ try {
     await openMenu();
     await page.waitForSelector('[data-testid=agent-run][data-state=running]');
     const label = await page.$eval('[data-testid=agent-button]', (e) => e.getAttribute('aria-label'));
-    assert(/running/.test(label) && !/not running/.test(label), `running at once: ${label}`);
+    // its work on the video, as the server keeps it, or (an older server) that it runs
+    assert(/running|: (starting|working)/.test(label) && !/not running/.test(label), `running at once: ${label}`);
     assert((await page.$eval('[data-testid=agent-run]', (e) => e.textContent)).includes('Working · started by Lampo'), 'says it works');
     await shot('wake-working');
   });

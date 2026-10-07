@@ -91,6 +91,17 @@ export type {
   RecordingsResponse,
   Retime,
   Role,
+  Run,
+  RunBrief,
+  RunDetail,
+  RunPlanItem,
+  RunPlanState,
+  RunProgress,
+  RunState,
+  RunStepLine,
+  RunStepType,
+  RunsResponse,
+  RunWriteResponse,
   Severity,
   Shape,
   ShareActivityInfo,
@@ -152,6 +163,7 @@ import type {
   PartSuggestion,
   QaWhy,
   Retime,
+  RunBrief,
   AssignedSession as SessionRef,
   Severity,
   Shape,
@@ -265,6 +277,8 @@ export interface Version {
   playbook?: { scope: string; rev: number }[];
   /** A partial render spliced into version `of` (lib/part.ts): its stretch, seams and what the next full render said. */
   part?: VersionPart;
+  /** The agent's work that made it (lib/types.ts Run): who, in how long, what it fixed. */
+  run?: string;
 }
 
 export interface Review {
@@ -311,6 +325,8 @@ export interface VideoSummary {
   approval: Approval | null;
   stage: StageInfo;
   agent_status: AgentStatus | null;
+  /** The video's agent work: the open one, else the last that ended in the past 24 hours. Absent from older servers. */
+  run?: RunBrief | null;
   sessionActive: boolean | null;
   /** Whether the assigned agent hears new notes by itself (lib/types.ts); absent from older servers. */
   sessionListening?: boolean | null;
