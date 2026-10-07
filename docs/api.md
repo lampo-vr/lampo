@@ -903,7 +903,7 @@ Details:
 |---|---|
 | `GET /api/sessions?video=` | the agents you can assign, ranked for a video (below) |
 | `PUT /api/review/:slug/session` | assign `{name, sessionId?, cwd?, agent?}` (`agent`: the kind, as `/api/sessions` lists it), or `{}` to unassign. The name is kept as one line of printable text, 80 characters at most (`400` when nothing printable is left); the session id and folder lose line breaks and control characters |
-| `POST /api/review/:slug/request` | ask the assigned agent: `{text?, start?, part?}` (it arrives as a `REQUEST` in `vr watch`) → `{ok, run}` |
+| `POST /api/review/:slug/request` | ask the assigned agent: `{text?, start?, part?, nudge?}` (it arrives as a `REQUEST` in `vr watch`) → `{ok, run}` |
 | `POST /api/review/:slug/wake` | start the assigned agent without a request of its own (its question was answered): `{text?}` → `{run}` |
 | `GET /api/agent-runs?slug=` | runs Lampo started on this machine, newest first: `{runs}` (below) |
 | `POST /api/agent-runs/:id/stop` | end a run and everything it started (SIGTERM, then SIGKILL after 5 s) |
@@ -953,10 +953,62 @@ Details:
   2 s. `progress` takes only the stages and tools `vr render` knows and bounded numbers, `run` only a run id's shape.
   Each line is listed as `<agent> · <account>` (unless the name already ends with the sending account), and its `at`
   is held to the last 5 minutes.
+- **Reporting activity** may name `run` (`run_…`, from `LAMPO_RUN`): a hint, taken only when that run is the same
+  agent's (as listed, with its account), on the same video, in the same workspace; otherwise the line joins the open
+  run of its agent and video like any other ([below](#agent-runs)).
 - **The inbox** lists 50 events unless `limit` says otherwise (5,000 at most); `all` adds agents' events and every
   event type. Screenshots are paths on the server's disk only for the machine itself, here, in `/api/inbox.md` and
   over MCP; anyone else (the LAN link, a token, every caller of a hosted server) reads them as `/data/<slug>/<file>`
   URLs, and so does everyone on the live stream.
+
+## Agent runs
+
+A run is one stretch of an agent's work on one video: opened when a team member sends the video's agent notes, asks,
+nudges, answers its question or tries again (or by the agent's own first write), ended when it hands back
+([agents.md](agents.md#your-work-as-the-person-sees-it-runs)). Its plan is the notes sent, its result a version.
+
+| Route | What it does |
+|---|---|
+| `GET /api/runs?slug=` · `?folder=` | a video's runs, newest first: `{runs: Run[]}`; `folder` for runs on a folder's question before any render |
+| `GET /api/runs/:id` | one run and its kept steps, newest first: `{run, steps: RunStepLine[]}` |
+| `POST /api/runs/:id/stop` | stops it at once: `stopped`; a run this machine started ends its process too → `{run}` |
+| `POST /api/runs/:id/retry` | Try again: `{start?}` opens the follow-up run on the notes still open (`follows`, `opened_by.how: "retry"`), told to the agent as a `REQUEST` → `{run}` |
+| `POST /api/runs/:id/nudge` | `{text?, start?}`: a `REQUEST` to the same agent about the same run (a run not heard from works again at its next sign) → `{run}` |
+| `GET /api/runs/:id/log` | the end of the raw log of a run this machine started (256 KB at most, text) |
+
+Details:
+
+- **Who.** Reading needs the view action (reviewers too); nothing of a run is reachable through a review link. Which
+  session and computer an agent runs in (`agent.session_id`, `agent.runner`) shows only to roles with the agents
+  action. Stop, retry and nudge need the agents action and a person: an API token gets `403`. The log answers only on
+  a person's own machine, from the machine itself (like `/api/agent-runs/:id/log`), and names no path.
+- **Opening.** Send (`POST …/drafts/send`, a recording's send), a request (`nudge: true` for a nudge), an answer to
+  the agent's question (`PATCH /api/comments/:id` to `verified` with words, `POST /api/asks/:id/answer`) and retry
+  open a run for the video's assigned agent, or add their notes to the one it has open (`added: true` once it began):
+  only for a person whose role has the agents action, never a reviewer, a review link visitor or an API token. Their
+  notes and requests go out all the same. An agent's own write (a note, a fix, a reply, a question, an upload, a
+  status) with no run open opens one (`opened_by.how: "agent"`, working); reads and waits never do.
+- **A `Run`** (`lib/types.ts`): `id`, `slug` (or `null` and `folder`), `agent {name, kind, session_id?, runner?}`,
+  `opened_by {who, id?, how}`, `delivery` (`listening`, or `machine` for one this machine started), `state`
+  (`queued` → `starting` → `working` ⇄ `needs_you` → `done` · `failed` · `stopped` · `lost`), `started`, `ended`,
+  `seen` (its last sign), `worked_s` (as of the answer; never the time it waited for a person), `plan` (`[{id, state:
+  todo | doing | fixed | asked | wontfix | replied, at, v?, added?}]`), `now` (the newest step or what the agent said,
+  with its `type` and `at`), `progress` (a render or upload under way), `result {v?, fixed, asked, wontfix, summary?,
+  tokens?, cost_usd?}`, `error`, `needs`, `request`, `follows`, `log`.
+- **States.** A run begins at its agent's first sign (a wait that hands the notes over included). `needs_you` comes
+  with the agent's question or options and goes with the answer. `failed` with an error (`vr render`) or a non-zero
+  exit. No sign for 20 minutes (5 for a run this machine started, 10 more while a render reports) reads as `lost`; any
+  sign revives it; an hour later it is closed as `stopped`, without an error. It is `done` by the first of: its process
+  exits 0 with no question open (else it ends `needs_you`), the agent waits again after handing back (a version, or
+  every planned note answered), or a version arrived with every planned note answered.
+- **Steps** are kept with the video, 200 at most per run (render progress keeps its first and last line), for 90 days
+  after it ended; what an agent said comes only from its own words to the person, never its hidden reasoning.
+- **The library** (`GET /api/library`, `?slug=`) carries each video's `run` (`RunBrief`): the open run, else the last
+  that ended in the past 24 hours, with `planned` and `answered` counts.
+- **Events.** SSE `run` `{slug, id}` (at most once per run every 0.3 s) says which to fetch again. The event log gets
+  `run` events (`phase`: `opened`, `started`, `needs_you`, `ended`; `text`: how it was opened or how it ended), which
+  `vr watch --all` prints as `AGENT RUN OPENED`, `AGENT RUN WORKING`, `AGENT RUN NEEDS YOU` and `AGENT RUN ENDED
+  <STATE>`; INBOX.md, `vr inbox`, `wait_for_feedback` and `vr watch` without `--all` leave them out.
 
 ## Uploads (tus)
 
@@ -1047,6 +1099,7 @@ answers `429` with `Retry-After`. The events:
 | `playbook` | `{scope}` | a playbook changed |
 | `for-you` | | someone's inbox changed: items dismissed, put aside or brought back, a playbook suggestion made or decided |
 | `agent-runs` | `{slug}` | a run Lampo started began, moved on or ended |
+| `run` | `{slug, id}` | an agent's run opened, moved or ended (at most once per run every 0.3 s; `GET /api/runs/:id` says what) |
 | `agent-activity` | `{agent, slug}` | an agent did something (at most once per agent and video every 0.3 s; `GET /api/agent-activity` says what) |
 | `drafts` | `{slug}` | your drafts on a video changed: sent only to your own streams in the app, never to others or to an API token |
 | `asks` | | a question on a folder was asked, answered, closed or given a file (a video's questions come as `review`) |

@@ -27,6 +27,8 @@ const BUDGET = {
   waitNone: 58,
   /** The line a hand-off ends with (track_video; mark_fixed and wont_fix once nothing is left open): lib/handoff.ts. */
   handOff: 45,
+  /** The line an agent's next answer ends with when the person sent notes while it worked, once (lib/runs.ts). */
+  newNotes: 48,
   /** skills/lampo/SKILL.md, read into context when the skill applies (1350 until the options bullet, 1450 until
    * `vr render`: bench/tokens/README.md). */
   skill: 1550,
@@ -124,6 +126,16 @@ test('a wait that ends with nothing new, and the line a hand-off ends with', asy
   const { waitNowLine } = await import('../../lib/handoff.ts');
   const line = approxTokens(waitNowLine((/cursor: (\S+)/.exec(textOf(none)) || [])[1] as string));
   assert.ok(line <= BUDGET.handOff, `the hand-off line: ${line} tokens > ${BUDGET.handOff}`);
+});
+
+test('the new-notes line, appended once when the person sent notes while the agent works', async () => {
+  const { newNotesLine } = await import('../../lib/runs.ts');
+  // one note names its moment (the dearest form); several are counted
+  const one = approxTokens(newNotesLine({ video: 'spring-launch.mp4', timecodes: ['00:00:12:03'], since: '2026-10-07T10:00:00Z' }));
+  const many = approxTokens(
+    newNotesLine({ video: 'spring-launch.mp4', timecodes: ['00:00:12:03', '00:00:21:04', '00:00:30:00'], since: '2026-10-07T10:00:00Z' }),
+  );
+  assert.ok(Math.max(one, many) <= BUDGET.newNotes, `the new-notes line: ${one} / ${many} tokens > ${BUDGET.newNotes}`);
 });
 
 test('vr render: two lines for a render put up, one for a wait while it goes on', async () => {

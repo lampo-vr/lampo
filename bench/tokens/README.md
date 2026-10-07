@@ -171,6 +171,7 @@ the measured value + about 10 %; raise one only on purpose, with the bench run t
 | `wait_for_feedback`, 1 note | 430 | 480 |
 | `wait_for_feedback`, nothing new | 53 | 58 |
 | The hand-off line | 41 | 45 |
+| The new-notes line (one note; several: 35) | 43 | 48 |
 | SKILL.md | 1220 (1385 with the options bullet, 1490 with `vr render`) | 1550 |
 | `vr render`, a render put up (its two lines) | 45 | 50 |
 | `vr render wait`, still rendering | 32 | 36 |

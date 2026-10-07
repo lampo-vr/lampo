@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import express, { type Request, type Router } from 'express';
 import { z } from 'zod';
+import { checkReviewOpen } from '../../lib/folderIds.ts';
 import { RUN_ID } from '../../lib/runs.ts';
 import * as store from '../../lib/store.ts';
 import type { Run, RunDetail, RunsResponse, RunWriteResponse } from '../../lib/types.ts';
@@ -98,7 +99,8 @@ export function runRoutes(ctx: ServerContext): Router {
     const b = body(RetryBody, req);
     const { slug } = ofVideo(id);
     const review = getReview(slug);
-    // checked first: a start that can't happen opens nothing
+    // checked first: nothing new goes into an archived project, and a start that can't happen opens nothing
+    checkReviewOpen(review);
     if (b.start) checkWake(req, ctx, review);
     const run = ctx.runs.retry(req, id);
     // a listening agent hears it as a request (what wait_for_feedback and `vr watch` hand over)
@@ -116,6 +118,7 @@ export function runRoutes(ctx: ServerContext): Router {
     const { slug, run } = ofVideo(id);
     if (run.ended !== null) throw fail(409, 'that run has ended: try again instead');
     const review = getReview(slug);
+    checkReviewOpen(review);
     if (b.start) checkWake(req, ctx, review);
     // the same run: a lost one waits for the agent's next sign to work again
     const words = store.addRequest(

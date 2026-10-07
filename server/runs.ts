@@ -339,8 +339,14 @@ export function createRuns({ broadcast, actor }: RunsOptions): Runs {
           run = q;
         }
       }
+      if (!run && !name.includes(' · ')) {
+        // Named by a person's account (an upload with their API token): the run of that account's agent on the video.
+        const theirs = runs.filter((r) => r.ended === null && r.state !== 'queued' && ownerOfName(r.agent.name) === name);
+        if (theirs.length === 1) run = theirs[0];
+      }
       if (run) return applyTo(slug, run.id, s, name);
-      if (!WRITES.has(a.kind)) return;
+      // a write opens a run; how far an upload got (Lampo's own observation) doesn't
+      if (!WRITES.has(a.kind) || (a.kind === 'upload' && (a.pct !== undefined || a.progress))) return;
       const review = store.loadReview(slug);
       if (!review || review.onboarding_sample) return;
       // The agent's own write with no run open: an implicit run (an agent that puts up V1 on its own, fixes unasked).
@@ -381,7 +387,7 @@ export function createRuns({ broadcast, actor }: RunsOptions): Runs {
       change(slug, run.id, (r) => {
         if (r.agent.name !== agent) r.agent = lib.runAgent(agent);
         // what it was handed was told of too: no new-notes line for it
-        r.clock.told = new Date(now).toISOString();
+        r.clock.told = r.plan.length;
         return lib.applySign(r, { at: now, kind: 'wait', words: words('Waiting for your answer'), handed: true, quiet: true });
       });
     }
@@ -426,6 +432,19 @@ export function createRuns({ broadcast, actor }: RunsOptions): Runs {
               return lib.checkDone(x, now) ? ['ended'] : moved;
             });
       if (e.status === 'verified' && e.kind === 'question' && !isAgent(e.by)) resolve(slug, e.id);
+      return;
+    }
+    // a note deleted leaves the plans it was in (nobody can answer it any more)
+    if (e.type === 'delete' && e.id && !e.reply) {
+      for (const r of runs)
+        if (r.ended === null && r.plan.some((p) => p.id === e.id))
+          change(slug, r.id, (x) => {
+            const at = x.plan.findIndex((p) => p.id === e.id);
+            x.plan.splice(at, 1);
+            // what it was told of counts by place: one place fewer before it
+            if (x.clock.told && at < x.clock.told) x.clock.told--;
+            return lib.checkDone(x, now) ? ['ended'] : true;
+          });
       return;
     }
     if (e.type === 'reply' && e.id && isAgent(e.by)) {
@@ -545,7 +564,7 @@ export function createRuns({ broadcast, actor }: RunsOptions): Runs {
       if (!u) continue;
       const told = () =>
         change(s, run.id, (r) => {
-          r.clock.told = new Date().toISOString();
+          r.clock.told = r.plan.length;
           return false;
         });
       // it just read the video's open notes: the new ones among them
@@ -696,8 +715,8 @@ export function createRuns({ broadcast, actor }: RunsOptions): Runs {
   };
 }
 
+/** Whose agent a listed name is (`claude-code · Mia` → `Mia`); '' for an agent of this machine. */
+const ownerOfName = (n: string) => / · ([^·]*)$/.exec(n)?.[1]?.trim() ?? '';
+
 /** Two agents of the same person (or of this machine): one may take a run sent to the other. */
-function sameOwner(a: string, b: string): boolean {
-  const owner = (n: string) => / · ([^·]*)$/.exec(n)?.[1]?.trim() ?? '';
-  return owner(a) === owner(b);
-}
+const sameOwner = (a: string, b: string): boolean => ownerOfName(a) === ownerOfName(b);

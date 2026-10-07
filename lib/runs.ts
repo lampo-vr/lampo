@@ -82,8 +82,8 @@ export interface RunClock {
   lost?: string;
   /** When it first began working (its `started` event). */
   began?: string;
-  /** Notes added while it worked, told to the agent up to here (the new-notes line). */
-  told?: string;
+  /** How many of its plan's notes its agent was told of (handed over, or the new-notes line): the rest are new to it. */
+  told?: number;
   /** The agent's questions during the run, by note id. */
   qs?: string[];
   /** Questions asked without an id Lampo heard. */
@@ -308,7 +308,8 @@ export function flushRuns(slug: string | null, now = Date.now()): boolean {
   const key = wsKey(slug ?? '');
   const h = held.get(key);
   if (!h?.dirty) return true;
-  if (slug !== null && !fs.existsSync(reviewFile(slug))) {
+  // a video removed (or a workspace deleted) takes its runs with it: never a folder made again for them
+  if (slug !== null ? !fs.existsSync(reviewFile(slug)) : !fs.existsSync(dataDir())) {
     held.delete(key);
     open.delete(key);
     return false;
@@ -810,36 +811,39 @@ export const runAgent = (name: string, kind?: AgentKind | null, sessionId?: stri
 
 /**
  * The line a listening agent's next Lampo answer ends with when notes were added to its run while it worked (§4.6):
- * how many, where, and how to read only them. One line, appended; the video's name is someone's, so oneLine'd.
+ * how many (one by its moment), where, and how to read only them. One line, appended; the video's name is someone's,
+ * so oneLine'd. Its cost fits test/unit/token-budget.test.ts.
  */
 export function newNotesLine(o: { video: string; timecodes: readonly string[]; since: string }): string {
   const n = o.timecodes.length;
-  const tc = o.timecodes.slice(0, 3).join(', ') + (n > 3 ? ', …' : '');
-  return oneLine(
-    `${n} new note${n === 1 ? '' : 's'} on ${path.basename(o.video)} since you started (${tc}): read ${n === 1 ? 'it' : 'them'} with get_open_notes since "${o.since}".`,
-  );
+  const at = n === 1 ? ` (${o.timecodes[0]})` : '';
+  return oneLine(`${n} new note${n === 1 ? '' : 's'} on ${path.basename(o.video)} since you started${at}: get_open_notes since "${o.since}".`);
 }
 
-/** Notes added to a run that its agent wasn't told of yet: their ids and when the first came. */
+/** Notes added to a run that its agent wasn't told of yet: their ids and when the first came (whole seconds). */
 export function untold(r: Run & { clock?: RunClock }): { ids: string[]; since: string } | null {
-  const after = ms(r.clock?.told);
-  const fresh = r.plan.filter((p) => p.added && p.state === 'todo' && ms(p.at) > after);
+  const fresh = r.plan.slice(r.clock?.told ?? 0).filter((p) => p.added && p.state === 'todo');
   if (!fresh.length) return null;
   const first = Math.min(...fresh.map((p) => ms(p.at)));
-  return { ids: fresh.map((p) => p.id), since: new Date(Math.floor(first / 1000) * 1000).toISOString() };
+  return { ids: fresh.map((p) => p.id), since: new Date(Math.floor(first / 1000) * 1000).toISOString().replace('.000Z', 'Z') };
 }
 
 /**
- * The run a version registered now belongs to (registerVersion, under the video's lock): the open run an agent is at
- * on this video — the one whose agent wrote it when several are, else the one heard from last. A run nobody began
- * (queued) makes no version. Read only: it never writes.
+ * The run a version registered now belongs to (registerVersion, under the video's lock): the open run of the agent
+ * that registered it (`agent:<name>`, or the account its API token is: `<name> · <account>`'s account), or — for a
+ * re-render the file watcher found (`system`) — the run of the agent at the video, the one heard from last. A person
+ * putting up a version makes none an agent's, nor does a run nobody began (queued). Read only: it never writes.
  */
 export function versionRunOf(slug: string, by: string): string | undefined {
   try {
     const going = readRuns(slug).filter((r) => r.ended === null && r.state !== 'queued');
     if (!going.length) return undefined;
-    const own = going.find((r) => sameAgent(r.agent.name, by));
-    return (own ?? [...going].sort((a, b) => compareTime(b.seen, a.seen))[0])?.id;
+    const latest = (list: StoredRun[]) => [...list].sort((a, b) => compareTime(b.seen, a.seen))[0]?.id;
+    const own = going.filter((r) => sameAgent(r.agent.name, by));
+    if (own.length) return latest(own);
+    const account = going.filter((r) => !!by && ownerOf(r.agent.name) === by);
+    if (account.length) return latest(account);
+    return by === 'system' ? latest(going) : undefined;
   } catch {
     return undefined;
   }
