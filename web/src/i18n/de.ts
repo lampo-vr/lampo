@@ -4,7 +4,9 @@
 // Review-Link, In Abstimmung (out for review) / per Link freigegeben (approved via link) — wer über einen Link schaut,
 // ist nie „Kunde“: „über den Review-Link“, „Besucher“ oder der Name —, Auslieferung (the delivery link), Projekt /
 // Ordner, Frame, Timecode, Vergleich (nebeneinander · Wischblende · Überlagerung), Auto-Check, Posteingang, Agent
-// (zuweisen). Severities: Muss · Sollte · Kann · Idee.
+// (zuweisen; „er“). Die Arbeit eines Agenten an einem Video hat kein Nomen: gesagt wird, was geschieht („behebt 3 von 6“,
+// „rendert V4“), Früheres nach seiner Version („V4 · Claude Code · 12 Min.“); Korrekturen prüfen. Severities: Muss ·
+// Sollte · Kann · Idee.
 import { type ClientKey, client } from './de.client.ts';
 import type { Key } from './en.ts';
 
