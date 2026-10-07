@@ -1,8 +1,9 @@
 // A throwaway server for one browser suite: its own store in a temp dir, a free port on 127.0.0.1, speech off, and a
 // stand-in for the `claude` CLI, so a suite never lists the machine's real Claude Code sessions (their names would
 // end up in screenshots). Settings from the shell that change what a server is (mode, storage, URLs, tokens,
-// proxies, tunnels) are dropped; a suite states the ones it needs. The server is stopped when the suite exits, however
-// it exits, so no test server outlives its run.
+// proxies, tunnels) are dropped; a suite states the ones it needs. Its environment (srv.env) never sees the machine's
+// `vr login`, so a `vr` run with it stays on the suite's store. The server is stopped when the suite exits, however it
+// exits, so no test server outlives its run.
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -99,6 +100,12 @@ export async function startServer({ prefix, mode = 'local', user, publicUrl, con
       ? { VR_MODE: 'server', ...(publicUrl ? { VR_PUBLIC_URL: publicUrl === true ? base : publicUrl } : { VR_ALLOW_NO_PUBLIC_URL: '1' }) }
       : {}),
     ...(typeof extra === 'function' ? extra({ port, base }) : extra),
+    // A `vr` a suite runs with this environment works on the suite's store, never on a server this machine is signed
+    // in to (`vr login`'s credentials.json and its download cache: lib/backend/credentials.ts). Last, so no suite's
+    // settings undo it; a suite that wants a remote `vr` sets VR_REMOTE and the rest on that one command.
+    VR_REMOTE: '0',
+    XDG_CONFIG_HOME: path.join(dir, 'xdg-config'),
+    XDG_CACHE_HOME: path.join(dir, 'xdg-cache'),
   });
   const cfg = typeof config === 'function' ? config(dir) : (config ?? (mode === 'server' ? {} : { browse_root: dir }));
   fs.writeFileSync(env.VR_CONFIG, JSON.stringify(cfg));
