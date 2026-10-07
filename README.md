@@ -245,7 +245,8 @@ Everything an agent needs is plain files and one CLI; the UI and the server don'
 5. Optional, for a long step: `vr status <video> "rendering v4" [--eta 90]` shows on the card. It clears when the
    render lands.
 6. Re-render **to the same path** (or `vr push` it). It becomes the next version, and open notes carry forward with
-   `check_again: true`. Render only a stretch when a note says `PART RENDER OK` (`vr push --part-at`; see
+   `check_again: true`. Through `vr render --to <video> --out <file> -- <your render command>` the person watches the
+   render's progress in Lampo and you read two lines ([docs/agents.md](docs/agents.md#rendering-through-vr-render-the-person-sees-the-progress)). Render only a stretch when a note says `PART RENDER OK` (`vr push --part-at`; see
    [docs/agents.md](docs/agents.md#partial-renders-only-when-a-note-says-part-render-ok)), never otherwise.
 7. `vr diff <video>` shows what actually changed on screen and whether cuts moved; compare it with what you intended.
    `vr qa <video>` runs the same Auto-check the reviewer sees.

@@ -11,10 +11,12 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { RUN_ID } from './activity.ts';
 import { words } from './activityText.ts';
 import { agentKindOf } from './agentKind.ts';
 import { cleanAgentName, cutChars } from './names.ts';
 import { dataDir, isoLocal, reviewDir, reviewFile } from './paths.ts';
+import { RENDER_STAGES, RENDER_TOOLS } from './render/tools.ts';
 import { currentWorkspace, wsKey } from './scope.ts';
 import { listSlugs, setVersionRunProvider, withLock, writeAtomic } from './store.ts';
 import { compareTime, oneLine } from './time.ts';
@@ -68,7 +70,8 @@ export const RUN_TIMES = {
   late: 2 * 60_000,
 };
 
-export const RUN_ID = /^run_[0-9a-f]{12}$/;
+// A run's id: `run_` and 12 hex digits (lib/activity.ts holds the one pattern: `vr` checks LAMPO_RUN by it).
+export { RUN_ID };
 export const newRunId = (): string => `run_${crypto.randomBytes(6).toString('hex')}`;
 
 /** What only the server keeps of a run (never in the API): the clock it counts by. */
@@ -120,26 +123,29 @@ export function stepTypeOf(kind: AgentActivityKind): RunStepType {
 }
 
 const PROGRESS_WHAT = new Set<RunProgress['what']>(['render', 'upload', 'check']);
-const num = (x: unknown, lo: number, hi: number): number | null => (typeof x === 'number' && Number.isFinite(x) && x >= lo && x <= hi ? x : null);
+const PROGRESS_STAGES = new Set<string>(RENDER_STAGES);
+const PROGRESS_TOOLS = new Set<string>(RENDER_TOOLS);
+/** The longest time left a progress line may claim (a week). */
+export const PROGRESS_ETA_MAX = 7 * 24 * 3600;
+const finite = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
+const frameCount = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 0 && n <= 1e8;
 
-/** A render's or upload's progress as a caller sent it, bounded: a known `what`, a short stage word, sane numbers. */
+/**
+ * A render's or upload's progress as a caller sent it (`vr render`, an upload), bounded: a known `what`, a stage and a
+ * tool from `vr render`'s lists (lib/render/tools.ts), the percent clamped to 0–100, whole frames (done ≤ total), the
+ * time left at most a week, a whole version number. Anything else in it is dropped; no known stage, no progress at all.
+ * One rule for every way in: the activity file, the hosted batches (whose schema says the same), what runs keep.
+ */
 export function cleanProgress(p: unknown): RunProgress | undefined {
   if (!p || typeof p !== 'object' || Array.isArray(p)) return undefined;
   const x = p as Record<string, unknown>;
-  if (!PROGRESS_WHAT.has(x.what as RunProgress['what'])) return undefined;
-  const stage = typeof x.stage === 'string' ? cutChars(oneLine(x.stage).trim(), 24) : '';
-  if (!stage) return undefined;
-  const pct = num(x.pct, 0, 100);
-  const out: RunProgress = { what: x.what as RunProgress['what'], stage, pct: pct === null ? null : Math.round(pct * 10) / 10 };
-  const f = Array.isArray(x.frames) ? x.frames : null;
-  const done = num(f?.[0], 0, 1e9);
-  const total = num(f?.[1], 1, 1e9);
-  if (done !== null && total !== null && done <= total) out.frames = [Math.round(done), Math.round(total)];
-  const eta = num(x.eta_s, 0, 7 * 86_400);
-  if (eta !== null) out.eta_s = Math.round(eta);
-  if (typeof x.tool === 'string' && /^[a-z0-9-]{1,24}$/.test(x.tool)) out.tool = x.tool;
-  const v = num(x.v, 1, 1e6);
-  if (v !== null) out.v = Math.round(v);
+  if (!PROGRESS_WHAT.has(x.what as RunProgress['what']) || typeof x.stage !== 'string' || !PROGRESS_STAGES.has(x.stage)) return undefined;
+  const out: RunProgress = { what: x.what as RunProgress['what'], stage: x.stage, pct: finite(x.pct) ? Math.max(0, Math.min(100, Math.round(x.pct))) : null };
+  const f = Array.isArray(x.frames) && x.frames.length === 2 && frameCount(x.frames[0]) && frameCount(x.frames[1]) && x.frames[1] >= 1 ? x.frames : null;
+  if (f) out.frames = [Math.min(f[0], f[1]), f[1]];
+  if (finite(x.eta_s) && x.eta_s >= 0) out.eta_s = Math.min(Math.round(x.eta_s), PROGRESS_ETA_MAX);
+  if (typeof x.tool === 'string' && PROGRESS_TOOLS.has(x.tool)) out.tool = x.tool;
+  if (typeof x.v === 'number' && Number.isInteger(x.v) && x.v >= 1 && x.v <= 1e6) out.v = x.v;
   return out;
 }
 

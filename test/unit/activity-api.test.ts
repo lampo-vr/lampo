@@ -145,6 +145,57 @@ test('AGENT-10: a posted line is its poster’s: another member’s agent name g
   }
 });
 
+test('hosted: vr render posts its progress, its failure and its run; bounded by the schema, a stranger’s shapes refused', async () => {
+  const owner = await auth.createUser({ email: 'render@example.test', name: 'Rhea', password: 'a-long-password-4', role: 'owner' });
+  const token = { authorization: `Bearer ${auth.createToken(owner.id, 'agent').token}` };
+  const at = new Date().toISOString();
+  const progress = { what: 'render', stage: 'rendering', pct: 42, frames: [378, 900], eta_s: 61, tool: 'remotion', v: 4 };
+  const quote = `Error: ${'x'.repeat(280)}`;
+  const entries: ActivityRecord[] = [
+    {
+      at,
+      agent: 'render-cut',
+      kind: 'render',
+      text: 'Rendering a new version',
+      key: 'Rendering a new version',
+      pct: 42,
+      progress: progress as never,
+      run: 'run_0123456789ab',
+    },
+    {
+      at,
+      agent: 'render-cut',
+      kind: 'error',
+      text: 'The render failed (exit 1)',
+      key: 'The render failed (exit {code})',
+      vars: { code: 1 },
+      quote,
+      progress: progress as never,
+      run: 'run_0123456789ab',
+    },
+  ];
+  await call('POST', '/api/agents/activity', { entries }, { to: hostedBase, headers: token });
+  const got = await until(async () => {
+    const r = await call<AgentActivityResponse>('GET', '/api/agent-activity', undefined, { to: hostedBase, headers: token });
+    return r.agents.find((a) => a.agent === 'render-cut · Rhea' && a.current?.kind === 'error');
+  }, 'the render’s lines');
+  assert.equal(got.current?.quote, quote, 'a failure keeps its words (≤ 300)');
+  assert.deepEqual(got.current?.progress, progress);
+  assert.equal(got.current?.run, 'run_0123456789ab');
+  const refused = async (patch: Record<string, unknown>) =>
+    statusOf(call('POST', '/api/agents/activity', { entries: [{ ...entries[0], ...patch }] }, { to: hostedBase, headers: token }));
+  // only the contract's words, sane numbers, a run id's shape and no fields of its own
+  assert.equal(await refused({ progress: { ...progress, stage: 'hacking' } }), 400);
+  assert.equal(await refused({ progress: { ...progress, tool: 'sh' } }), 400);
+  assert.equal(await refused({ progress: { ...progress, pct: 101 } }), 400);
+  assert.equal(await refused({ progress: { ...progress, eta_s: 8 * 24 * 3600 } }), 400);
+  assert.equal(await refused({ progress: { ...progress, frames: [1.5, 2] } }), 400);
+  assert.equal(await refused({ progress: { ...progress, path: '/etc/passwd' } }), 400);
+  assert.equal(await refused({ run: '../../x' }), 400);
+  assert.equal(await refused({ quote: 'q'.repeat(301) }), 400);
+  assert.equal(await refused({ kind: 'run' }), 400, 'what Lampo sees itself still can’t be posted');
+});
+
 test('a run Lampo started: its stream-json becomes the live step, tokens and the cost it states; each step is activity', async () => {
   const bin = path.join(dir, 'bin', 'claude-stream');
   fs.mkdirSync(path.dirname(bin), { recursive: true });

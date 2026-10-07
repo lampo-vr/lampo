@@ -54,6 +54,9 @@ export const ACTIVITY_KEYS = [
   'Looking for footage',
   'Rendering… {mb} MB, still growing',
   'Rendering a new version',
+  // how a render through `vr render` ended (lib/render/job.ts)
+  'Rendered in {time}',
+  'The render failed (exit {code})',
   // what a run Lampo started printed (lib/runStream.ts) and how it went (server/agentRuns.ts)
   'Editing {file}',
   'Writing {file}',
