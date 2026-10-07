@@ -25,15 +25,17 @@ import type { ServerContext } from '../context.ts';
 import { countStep } from '../funnel.ts';
 import { body, fail, router } from '../http.ts';
 
-// Put away / brought back, the setup over (finished or skipped), the agent picked in it: at least one of them.
+// The card put away / brought back, everything hidden for good / brought back, the setup over (finished or skipped), the
+// agent picked in it: at least one of them.
 const Update = z
   .object({
     hidden: z.boolean().optional(),
+    dismissed: z.boolean().optional(),
     setup: z.literal('done').optional(),
     agent: z.enum(SETUP_AGENTS as [SetupAgent, ...SetupAgent[]]).optional(),
   })
   .strict()
-  .refine((b) => b.hidden !== undefined || b.setup !== undefined || b.agent !== undefined, 'nothing to change');
+  .refine((b) => b.hidden !== undefined || b.dismissed !== undefined || b.setup !== undefined || b.agent !== undefined, 'nothing to change');
 const NewSample = z.object({ lang: z.enum(['en', 'de']).optional() }).strict();
 
 type Person = { id: string; name: string };
@@ -152,19 +154,24 @@ export function onboardingRoutes(ctx: ServerContext): Router {
     res.json(answer(req, o));
   });
 
-  // Put away ("Hide") or brought back (the account menu's "Get started"); the setup over (Welcome and its steps, finished
-  // or skipped: it doesn't show again); the agent picked in it (Get started and the sample name it). Accounts from before
-  // the first run have none.
+  // The card put away (its ×) or brought back (the account menu's "Get started"); hidden for good, the sidebar's row too
+  // ("Hide for good"), or brought back; the setup over (Welcome and its steps, finished or skipped: it doesn't show
+  // again); the agent picked in it (Get started and the sample name it). Accounts from before the first run have none.
   r.put('/api/onboarding', express.json(), (req, res) => {
     const user = req.auth?.user;
     if (!user) throw fail(401, 'please sign in');
-    const { hidden, setup, agent } = body(Update, req);
+    const { hidden, dismissed, setup, agent } = body(Update, req);
     const now = isoLocal();
     const u = auth.updateOnboarding(user.id, (o) => {
       let next = o;
       if (hidden === true && !next.hidden) next = { ...next, hidden: now };
       if (hidden === false && next.hidden) {
         const { hidden: _, ...rest } = next;
+        next = rest;
+      }
+      if (dismissed === true && !next.dismissed) next = { ...next, dismissed: now };
+      if (dismissed === false && next.dismissed) {
+        const { dismissed: _, ...rest } = next;
         next = rest;
       }
       if (setup === 'done' && !next.setup_done) next = { ...next, setup_done: now };

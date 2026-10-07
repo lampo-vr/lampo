@@ -165,6 +165,16 @@ test('put away and brought back; only the account’s own, never through the pro
   assert.equal((await request('PUT', '/api/onboarding', { body: {}, ...as(owner) })).status, 400, 'something to change');
   const back = await request('PUT', '/api/onboarding', { body: { hidden: false }, ...as(owner) });
   assert.equal(back.json().onboarding.hidden, undefined);
+  // hidden for good (the card and the sidebar's row), on its own field: the card's × is another choice
+  const gone = await request('PUT', '/api/onboarding', { body: { dismissed: true }, ...as(owner) });
+  assert.equal(gone.status, 200, gone.text);
+  assert.match(gone.json().onboarding.dismissed, /^\d{4}-/);
+  assert.equal(gone.json().onboarding.hidden, undefined, 'the card’s own choice is left as it was');
+  const again = await request('PUT', '/api/onboarding', { body: { dismissed: true }, ...as(owner) });
+  assert.equal(again.json().onboarding.dismissed, gone.json().onboarding.dismissed, 'the first time is kept');
+  assert.equal((await request('PUT', '/api/onboarding', { body: { dismissed: 1 }, ...as(owner) })).status, 400);
+  const backAll = await request('PUT', '/api/onboarding', { body: { dismissed: false, hidden: false }, ...as(owner) });
+  assert.equal(backAll.json().onboarding.dismissed, undefined);
   // a step can't be ticked from the outside: prefs are strict and have no way to write it
   assert.equal((await request('PATCH', '/api/auth/me', { body: { prefs: { onboarding: { since: 'x', done: { video: 'x' } } } }, ...as(owner) })).status, 400);
 });
