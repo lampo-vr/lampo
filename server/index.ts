@@ -303,6 +303,8 @@ async function stop(sig: NodeJS.Signals) {
   }
   ctx.tunnel.stop();
   ctx.agentRuns.stopAll();
+  // agents' runs not written yet (their steps go out together, about a second after they happen)
+  ctx.runs.flushAll();
   stopStt();
   // a job still running is interrupted, not crashed: the next start runs it again (lib/crashGuard.ts counts only ends
   // without a signal like this one, an out-of-memory kill or a crash)

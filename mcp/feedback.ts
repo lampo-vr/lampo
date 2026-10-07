@@ -122,6 +122,8 @@ export interface FeedbackOptions {
   quiet?: Quiet;
   /** One line when a wait starts and one when it ends: how long, how it ended (never what it handed out). */
   log?: (line: string) => void;
+  /** The wait handed over work on these videos (new feedback, what waited for it): the agent's runs there begin. */
+  handed?: (slugs: string[], ctx: ServerContext) => void;
 }
 
 const GONE = 'your access ended (the token was revoked, or the account left this workspace or was disabled)';
@@ -258,6 +260,7 @@ export function registerFeedback(server: McpServer, o: FeedbackOptions): void {
             listening?.({ handed: true });
             listening = null;
             o.quiet?.something();
+            o.handed?.(backlog.slugs, ctx);
             return backlog.result;
           }
         }
@@ -282,6 +285,7 @@ export function registerFeedback(server: McpServer, o: FeedbackOptions): void {
             listening = null;
             for (const e of fresh) if (e.slug) o.told?.mark(e.slug, Date.parse(e.at));
             o.quiet?.something();
+            o.handed?.([...new Set(fresh.map((e) => e.slug).filter(Boolean))], ctx);
             return await result(fresh, next, more, images);
           }
           const left = deadline - Date.now();
@@ -322,7 +326,7 @@ export function registerFeedback(server: McpServer, o: FeedbackOptions): void {
    * of (`told`: by a wait, or by reading the notes) — one line each, and the cursor from now. Null when there is none,
    * or when nobody can tell who this agent is.
    */
-  async function waitingFor(slug: string | null, cursorNow: () => Promise<string>): Promise<{ count: number; result: CallToolResult } | null> {
+  async function waitingFor(slug: string | null, cursorNow: () => Promise<string>): Promise<{ count: number; slugs: string[]; result: CallToolResult } | null> {
     const me = o.me?.();
     if (!me || (!me.name && !me.sessionId)) return null;
     const mine = forAgents(await b.listReviews()).filter(
@@ -333,6 +337,7 @@ export function registerFeedback(server: McpServer, o: FeedbackOptions): void {
     const asked = (await b.events(500)).filter((e) => e.type === 'request' && isFeedback(e) && e.slug);
     const lines: string[] = [];
     const waiting: { video: string; open: number; requests: number }[] = [];
+    const slugs: string[] = [];
     let count = 0;
     for (const r of mine) {
       const s = slugify(r.video);
@@ -349,6 +354,7 @@ export function registerFeedback(server: McpServer, o: FeedbackOptions): void {
         ...requests.slice(-3).map(shortEventLine),
       );
       waiting.push({ video: r.video, open: open.length, requests: requests.length });
+      slugs.push(s);
       count += open.length + requests.length;
       o.told?.mark(s, Date.now());
     }
@@ -356,6 +362,7 @@ export function registerFeedback(server: McpServer, o: FeedbackOptions): void {
     const at = await cursorNow();
     return {
       count,
+      slugs,
       result: {
         content: [
           {

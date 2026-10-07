@@ -253,11 +253,14 @@ export function draftRoutes(ctx: ServerContext): Router {
     }
     shotsToFollow(ctx, slug, notes);
     tell(who, slug);
+    // Sent to the video's agent: its run opens, or the one it has open takes them (a person with the agents right only:
+    // server/runs.ts — a reviewer's notes go out all the same, and the agent's own work opens its run then).
+    const opened = notes.length ? ctx.runs.fromPerson(req, slug, { how: 'send', notes: notes.map((c) => c.id) }) : null;
     let run: AgentRunInfo | null | undefined;
     if (b.start && notes.length) {
       const text = `${notes.length === 1 ? '1 new note' : `${notes.length} new notes`}: ${notes.map((c) => c.id).join(', ')}`;
       try {
-        run = await startAgent(req, ctx, slug, review, text);
+        run = await startAgent(req, ctx, slug, review, text, opened?.id);
       } catch (e) {
         error ??= refusal({ id: '-' }, e).error;
       }

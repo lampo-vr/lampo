@@ -82,6 +82,13 @@ export interface ReviewServerOptions {
   quiet?: Quiet;
   /** One line per tool call: the tool, how long it took, how it ended — never what it was given or said. */
   log?: (line: string) => void;
+  /** A wait of this agent (by its activity name) handed over work on these videos: its runs there begin (server/runs.ts). */
+  handed?: (agent: string, slugs: string[]) => void;
+  /**
+   * The line an agent's next answer ends with when notes were added to its run while it worked (lib/runs.ts
+   * newNotesLine), or null: told once per batch. `video` / `note`: what the call was about, when it said.
+   */
+  news?: (agent: string, about: { video: string | null; note: string | null; read: boolean }) => string | null;
   /**
    * Why nothing may be written now (the workspace is suspended by the server's operator: server/permissions.ts), or
    * null: a tool that writes answers with it; reading goes on. Asked at every call.
@@ -112,6 +119,10 @@ export interface ToolKit {
   activity(name: string, args: Record<string, unknown>, ctx: ServerContext): void;
   /** The agent this connection is (`session: "me"`): null when the server can't tell (a client nobody assigns to). */
   me(): { name: string | null; sessionId: string | null } | null;
+  /** The agent a call comes from, by its activity name (null: a person's client, or no name). */
+  agentName(ctx: ServerContext): string | null;
+  /** A wait handed over work on these videos (the `handed` option, by this connection's agent). */
+  handed(slugs: string[], ctx: ServerContext): void;
 }
 
 export function createToolKit(server: McpServer, o: ReviewServerOptions): ToolKit {
@@ -142,8 +153,11 @@ export function createToolKit(server: McpServer, o: ReviewServerOptions): ToolKi
         // as the HTTP API's bodies (server/http.ts parse): no lone surrogate goes into a name, a label or a note
         const given = wellFormed(args);
         const out = await fn(given, ctx);
-        if (!out.isError) noteActivity(name, given as Record<string, unknown>, ctx);
-        return out;
+        if (out.isError) return out;
+        noteActivity(name, given as Record<string, unknown>, ctx);
+        // notes the person added to its run while it worked: one line at the end of its next answer, once
+        const line = newsFor(name, given as Record<string, unknown>, ctx);
+        return line ? { ...out, content: [...out.content, { type: 'text', text: line }] } : out;
       } catch (e) {
         return fail(publicMessage(e, audienceOf(o.principal), { status: 400, where: `mcp ${name}` }));
       }
@@ -190,18 +204,32 @@ export function createToolKit(server: McpServer, o: ReviewServerOptions): ToolKi
     return o.principal.via !== 'local' && o.principal.name ? ownedAgentName(app, o.principal.name) : agentName(app);
   }
 
+  /** The agent a call comes from, for what it did: only agents' calls (a person's MCP client reading notes is not). */
+  const agentOf = (ctx: ServerContext): string | null => (allowed(o.principal, 'agents') || o.principal.via === 'local' ? activityName(ctx) : null);
+
   // What the agent just did, in plain words, for the UI's live view. Only agents' calls (a person's MCP client reading
   // notes is not agent activity), and never a failure of its own to break the tool.
   function noteActivity(name: string, args: Record<string, unknown>, ctx: ServerContext) {
     if (!o.activity) return;
     try {
-      if (!allowed(o.principal, 'agents') && o.principal.via !== 'local') return;
       const guess = toolActivity(name, args);
       if (!guess) return;
-      const agent = activityName(ctx);
+      const agent = agentOf(ctx);
       if (!agent) return;
       o.activity?.({ ...guess, at: isoLocal(), agent, target: guess.target ?? null, video: guess.video ?? null });
     } catch {}
+  }
+
+  function newsFor(name: string, args: Record<string, unknown>, ctx: ServerContext): string | null {
+    if (!o.news) return null;
+    try {
+      const agent = agentOf(ctx);
+      if (!agent) return null;
+      const guess = toolActivity(name, args);
+      return o.news(agent, { video: guess?.video ?? null, note: guess?.target ?? null, read: name === 'get_open_notes' });
+    } catch {
+      return null;
+    }
   }
 
   async function openReview(video: string): Promise<{ slug: string; review: Review }> {
@@ -223,6 +251,14 @@ export function createToolKit(server: McpServer, o: ReviewServerOptions): ToolKi
     byArg: byName.optional().meta({ hidden: true }),
     activity: noteActivity,
     me: () => meOf(o),
+    agentName: agentOf,
+    handed(slugs, ctx) {
+      if (!o.handed || !slugs.length) return;
+      try {
+        const agent = agentOf(ctx);
+        if (agent) o.handed(agent, slugs);
+      } catch {}
+    },
   };
 }
 

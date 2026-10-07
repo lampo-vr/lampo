@@ -56,6 +56,7 @@ import type {
   Reply,
   Review,
   ReviewEvent,
+  RunPhase,
   SampleMark,
   Severity,
   Shape,
@@ -455,9 +456,20 @@ interface NewVersion {
   part?: VersionPart;
 }
 
+/**
+ * Which agent run a version registered now comes from (lib/runs.ts sets it wherever it is loaded: the app, `vr`, the
+ * stdio MCP server): read only, it never writes. None without it.
+ */
+let versionRun: ((slug: string, by: string) => string | undefined) | null = null;
+export const setVersionRunProvider = (fn: (slug: string, by: string) => string | undefined): void => {
+  versionRun = fn;
+};
+
 // Appends the next version and carries open comments forward to it ("check again").
 function registerVersion(review: Review, n: NewVersion): { version: Version; carried: number } {
   const v = (review.versions.at(-1)?.v || 0) + 1;
+  // the run an agent is at on this video made it ("V4 by Claude Code · 12 min · 5 fixed"), never a guess from names alone
+  const run = review.onboarding_sample ? undefined : versionRun?.(slugify(review.video), n.by);
   const { meta } = n;
   // A part is the whole video on the screen: the frames, rate and size of the version it patches, whose file and
   // colours the review keeps describing (its own bytes are only a stretch).
@@ -478,6 +490,7 @@ function registerVersion(review: Review, n: NewVersion): { version: Version; car
     ...(n.stored ? { stored: n.stored } : {}),
     ...(n.uploadedBy ? { by: n.uploadedBy } : {}),
     ...(n.part ? { part: n.part } : {}),
+    ...(run ? { run } : {}),
   };
   // What the render was made with: the playbooks of its folder, as they stand now (docs/playbooks.md).
   const stamp = stampFor(review.folder);
@@ -1805,9 +1818,9 @@ interface EventInput {
   party?: ApprovalParty;
   /** ref events: the reference added. */
   ref?: NoteRef;
-  /** agent_run events: which run, what happened, how it ended. */
+  /** agent_run and run events: which run, what happened, how it ended. */
   run?: string;
-  phase?: AgentRunPhase;
+  phase?: AgentRunPhase | RunPhase;
   exit?: number | null;
   /** request events: the partial render the person allows with it. */
   part?: PartRequest;

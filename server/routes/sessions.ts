@@ -7,13 +7,14 @@ import { ownedAgentName } from '../../lib/activityText.ts';
 import { AGENT_KINDS } from '../../lib/agentKind.ts';
 import { isInboxEvent } from '../../lib/eventLine.ts';
 import { isoLocal } from '../../lib/paths.ts';
+import { RUN_ID } from '../../lib/runs.ts';
 import { rankSessions } from '../../lib/sessions.ts';
 import * as store from '../../lib/store.ts';
 import type { AgentActivityResponse, AgentKind, SessionsResponse } from '../../lib/types.ts';
 import type { ServerContext } from '../context.ts';
 import { agentView, getReview } from '../helpers.ts';
 import { body, fail, query, router } from '../http.ts';
-import { requireMachine, startAgent } from '../wake.ts';
+import { checkWake, requireMachine, startAgent } from '../wake.ts';
 
 const SessionsQuery = z.object({ fresh: z.string().optional(), video: z.string().optional() });
 // `{}` (or no name) unassigns; extra fields the UI sends along (pid, kind, score …) are ignored.
@@ -50,6 +51,8 @@ const ActivityBatch = z.object({
         target: z.string().max(80).nullish(),
         video: z.string().max(1000).nullish(),
         pct: z.number().min(0).max(100).optional(),
+        // the run Lampo started it for (LAMPO_RUN): a hint, bound only to the poster's own agent's run (server/runs.ts)
+        run: z.string().regex(RUN_ID).optional(),
       }),
     )
     .max(20),
@@ -172,7 +175,11 @@ export function sessionRoutes(ctx: ServerContext): Router {
   r.post('/api/review/:slug/wake', express.json(), async (req, res) => {
     const review = getReview(req.params.slug);
     const text = (body(WakeBody, req).text || '').trim() || 'Your question was answered; read the answer and go on.';
-    res.json({ run: await startAgent(req, ctx, req.params.slug, review, text) });
+    // checked first: a start that can't happen opens nothing
+    checkWake(req, ctx, review);
+    // the run it starts for: the agent's open one (an answer opened it), else a nudge's
+    const opened = ctx.runs.fromPerson(req, req.params.slug, { how: 'nudge' });
+    res.json({ run: await startAgent(req, ctx, req.params.slug, review, text, opened?.id) });
   });
 
   r.get('/api/agents', (req, res) => {

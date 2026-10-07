@@ -1,8 +1,10 @@
 // Runs Lampo starts on the person's own machine: the assigned Claude Code session resumed with a request, because it
-// wasn't running (lib/agentRun.ts decides the arguments and the prompt). One run per session at a time, a hard
-// timeout, the output in cache/agent-runs/<id>.log, an `agent_run` event when it starts and when it ends, and Stop ends
-// the whole process group. Runs belong to this process: when the app stops, its runs stop with it (nobody would be
-// left to time them out).
+// wasn't running (lib/agentRun.ts decides the arguments and the prompt). One run per session at a time, stopped after
+// 30 minutes without a sign of it (its output, or a call it makes through Lampo) and after 3 hours in all, the output
+// in cache/agent-runs/<id>.log, an `agent_run` event when it starts and when it ends, and Stop ends the whole process
+// group. Each is an agent run (server/runs.ts) with delivery `machine`: its process carries the run's id in LAMPO_RUN,
+// so what it does through `vr` and the stdio MCP server joins that run. Runs belong to this process: when the app
+// stops, its runs stop with it (nobody would be left to time them out).
 import { type ChildProcess, spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -14,6 +16,8 @@ import { claudeRunArgs, RUN_RATE_MAX, RUN_RATE_WINDOW_MS, RUN_TIMEOUT_MS } from 
 import { CACHE, isoLocal } from '../lib/paths.ts';
 import { RateLimit } from '../lib/rateLimit.ts';
 import { createRunReader } from '../lib/runStream.ts';
+import { type Exit, RUN_ID, RUN_TIMES } from '../lib/runs.ts';
+import { boundToWorkspace } from '../lib/scope.ts';
 import { findClaude } from '../lib/sessions.ts';
 import * as store from '../lib/store.ts';
 import { compareTime } from '../lib/time.ts';
@@ -28,7 +32,7 @@ export function runEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return Object.fromEntries(Object.entries(env).filter(([k]) => !DROPPED_ENV.test(k)));
 }
 
-/** The run's timeout: VR_AGENT_RUN_TIMEOUT in seconds (1 s – 24 h), else RUN_TIMEOUT_MS. */
+/** How long a run may go without a sign of it: VR_AGENT_RUN_TIMEOUT in seconds (1 s – 24 h), else RUN_TIMEOUT_MS. */
 export function runTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
   const s = Number(env.VR_AGENT_RUN_TIMEOUT);
   return Number.isFinite(s) && s >= 1 && s <= 86_400 ? Math.round(s * 1000) : RUN_TIMEOUT_MS;
@@ -47,6 +51,10 @@ const took = (ms: number) => (ms < 60_000 ? `${Math.max(1, Math.round(ms / 1000)
 
 interface Run {
   info: AgentRunInfo;
+  /** The agent run it is (server/runs.ts): LAMPO_RUN in its environment. */
+  run: string;
+  /** When its output last grew. */
+  heard: number;
   proc: ChildProcess | null;
   timer: NodeJS.Timeout | null;
   /** Why it was ended, when Lampo ended it (stop, timeout, the app stopping), and who stopped it. */
@@ -64,6 +72,17 @@ export interface StartRun {
   /** Who asked (the event's author). */
   by: string;
   prompt: string;
+  /** The agent run it starts for (server/runs.ts); without one, a run is opened for it. */
+  run?: string;
+}
+
+/** The agent runs these processes are (server/runs.ts). */
+export interface MachineRuns {
+  /** A process started for run `run` (or for none): the run's id. */
+  started(info: AgentRunInfo, run: string | undefined): string;
+  ended(info: AgentRunInfo, run: string, exit: Exit): void;
+  /** When the run was last heard from (its calls through Lampo), in ms. */
+  seen(run: string): number | null;
 }
 
 export interface AgentRuns {
@@ -85,18 +104,25 @@ export interface AgentRunOptions {
   broadcast: Broadcast;
   /** The binary (VR_CLAUDE_BIN or the one found; tests point it at a stand-in). */
   bin?: () => string;
+  /** Stopped after this long without a sign (its output, its calls). */
   timeoutMs?: number;
+  /** … and after this long in all. */
+  capMs?: number;
   dir?: string;
   /** Where a run's steps go as live activity (server/activity.ts). */
   activity?: (a: ActivityRecord) => void;
+  /** The agent runs (server/runs.ts). */
+  runs?: MachineRuns;
 }
 
 export function createAgentRuns({
   broadcast,
   bin = findClaude,
   timeoutMs = runTimeoutMs(),
+  capMs = RUN_TIMES.cap,
   dir = path.join(CACHE, 'agent-runs'),
   activity,
+  runs: agentRunsOf,
 }: AgentRunOptions): AgentRuns {
   const runs = new Map<string, Run>();
   const starts = new RateLimit(RUN_RATE_MAX, RUN_RATE_WINDOW_MS, { maxKeys: 1000 });
@@ -161,6 +187,7 @@ export function createAgentRuns({
       return;
     }
     if (size <= l.offset) return;
+    r.heard = Date.now();
     const len = Math.min(size - l.offset, 512 * 1024);
     const buf = Buffer.alloc(len);
     const fd = fs.openSync(logPath(r.info.id), 'r');
@@ -171,7 +198,7 @@ export function createAgentRuns({
     }
     l.offset += len;
     for (const { kind, ...step } of l.reader.feed(l.text.write(buf)))
-      if (kind !== 'run') activity?.({ at: isoLocal(), agent: r.info.name, slug: r.info.slug, kind, ...step });
+      if (kind !== 'run') activity?.({ at: isoLocal(), agent: r.info.name, slug: r.info.slug, kind, ...step, run: r.run });
     const st = l.reader.state();
     r.info.live = { step: st.step, tokens: st.tokens, cost_usd: st.cost_usd, turns: st.turns, updated: isoLocal() };
     const sig = JSON.stringify([st.step, st.tokens, st.cost_usd]);
@@ -190,7 +217,7 @@ export function createAgentRuns({
       if (r.live.timer) clearInterval(r.live.timer);
       r.live.timer = null;
     }
-    if (r.timer) clearTimeout(r.timer);
+    if (r.timer) clearInterval(r.timer);
     r.timer = null;
     r.info.exit = code;
     r.info.ended = isoLocal();
@@ -209,7 +236,15 @@ export function createAgentRuns({
           : r.info.state === 'failed'
             ? words('Couldn’t start')
             : words('Stopped after {time}', { time });
-    activity?.({ at: isoLocal(), agent: r.info.name, slug: r.info.slug, kind: 'run', ...how });
+    activity?.({ at: isoLocal(), agent: r.info.name, slug: r.info.slug, kind: 'run', ...how, run: r.run });
+    const st = r.live?.reader.state();
+    const phase = r.info.state;
+    agentRunsOf?.ended({ ...r.info }, r.run, {
+      phase: phase === 'started' ? 'finished' : phase,
+      code,
+      summary: st?.summary ?? null,
+      ...(st ? { tokens: st.tokens, cost_usd: st.cost_usd } : {}),
+    });
     changed(r);
     prune();
   };
@@ -230,10 +265,26 @@ export function createAgentRuns({
       // A log is the agent's whole transcript (what it read, what commands printed): its owner's alone (A12 AGENT-13).
       fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
       fs.chmodSync(dir, 0o700);
-      const id = `run_${crypto.randomBytes(6).toString('hex')}`;
+      // the agent run's own id when it is free (one process per run), so its log and its run read the same
+      const id = o.run && RUN_ID.test(o.run) && !runs.has(o.run) ? o.run : `run_${crypto.randomBytes(6).toString('hex')}`;
+      const info: AgentRunInfo = {
+        id,
+        slug: o.slug,
+        name: o.name,
+        session_id: o.sessionId,
+        cwd: o.cwd,
+        by: o.by,
+        started: isoLocal(),
+        ended: null,
+        state: 'running',
+        exit: null,
+      };
+      const run = agentRunsOf ? agentRunsOf.started({ ...info }, o.run ?? id) : (o.run ?? id);
       const out = fs.openSync(logPath(id), 'a', 0o600);
       const r: Run = {
-        info: { id, slug: o.slug, name: o.name, session_id: o.sessionId, cwd: o.cwd, by: o.by, started: isoLocal(), ended: null, state: 'running', exit: null },
+        info,
+        run,
+        heard: Date.now(),
         proc: null,
         timer: null,
         ending: null,
@@ -243,7 +294,8 @@ export function createAgentRuns({
       runs.set(id, r);
       try {
         // An argument list, never a shell; its own process group, so Stop reaches whatever it starts.
-        r.proc = spawn(bin(), args, { cwd: o.cwd, env: runEnv(process.env), detached: true, stdio: ['ignore', out, out] });
+        // what it does through `vr` and the stdio MCP server names its run (a hint the server checks: server/runs.ts)
+        r.proc = spawn(bin(), args, { cwd: o.cwd, env: { ...runEnv(process.env), LAMPO_RUN: run }, detached: true, stdio: ['ignore', out, out] });
       } catch (e) {
         fs.closeSync(out);
         finished(r, null, null, e as Error);
@@ -252,7 +304,17 @@ export function createAgentRuns({
       fs.closeSync(out);
       r.proc.on('error', (e) => finished(r, null, null, e));
       r.proc.on('exit', (code, signal) => finished(r, code, signal));
-      r.timer = setTimeout(() => end(r, 'timeout'), timeoutMs);
+      // Stopped after timeoutMs without a sign — its output growing, or a call it made through Lampo — and at capMs in all.
+      const began = Date.now();
+      r.timer = setInterval(
+        boundToWorkspace(() => {
+          if (r.info.state !== 'running') return;
+          const now = Date.now();
+          const heard = Math.max(r.heard, agentRunsOf?.seen(r.run) ?? 0);
+          if (now - heard >= timeoutMs || now - began >= capMs) end(r, 'timeout');
+        }),
+        Math.max(50, Math.min(Math.round(timeoutMs / 3), 30_000)),
+      );
       r.timer.unref();
       if (r.live) {
         r.live.timer = setInterval(() => {
@@ -262,7 +324,7 @@ export function createAgentRuns({
         }, LIVE_MS);
         r.live.timer.unref();
       }
-      activity?.({ at: isoLocal(), agent: o.name, slug: o.slug, kind: 'run', ...words('Started by Lampo') });
+      activity?.({ at: isoLocal(), agent: o.name, slug: o.slug, kind: 'run', ...words('Started by Lampo'), run });
       event(r, 'started', o.by);
       changed(r);
       return { ...r.info };

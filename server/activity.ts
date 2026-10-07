@@ -10,6 +10,7 @@ import { ACTIVITY_FILE, type ActivityRecord } from '../lib/activity.ts';
 import { agentName, isActivityKey } from '../lib/activityText.ts';
 import { cutChars } from '../lib/names.ts';
 import { currentWorkspace, isoLocal, slugify } from '../lib/paths.ts';
+import { cleanProgress, RUN_ID } from '../lib/runs.ts';
 import * as store from '../lib/store.ts';
 import { compareTime, oneLine } from '../lib/time.ts';
 import type { AgentActivity, AgentActivityKind, AgentLive } from '../lib/types.ts';
@@ -26,7 +27,22 @@ const EVENT_MS = 300;
 /** How often the rolling file is looked at (fs.watch wakes it sooner where it works). */
 const POLL_MS = 1000;
 
-const KINDS = new Set<AgentActivityKind>(['read', 'note', 'fix', 'reply', 'ask', 'upload', 'render', 'wait', 'playbook', 'status', 'tool', 'say', 'run']);
+const KINDS = new Set<AgentActivityKind>([
+  'read',
+  'note',
+  'fix',
+  'reply',
+  'ask',
+  'upload',
+  'render',
+  'wait',
+  'playbook',
+  'status',
+  'tool',
+  'say',
+  'run',
+  'error',
+]);
 
 interface Pair {
   agent: string;
@@ -35,6 +51,11 @@ interface Pair {
   updated: number;
   /** The workspace the activity happened in: it is shown there only. */
   ws: string;
+}
+
+export interface ActivityOptions {
+  /** Each activity as recorded, its video found: the runs it joins (server/runs.ts). */
+  onRecord?: (a: AgentActivity) => void;
 }
 
 export interface ActivityStore {
@@ -90,6 +111,7 @@ export function cleanActivity(a: ActivityRecord): (AgentActivity & { video?: str
   const key = isActivityKey(a.key) ? a.key : undefined;
   const vars = key ? cleanVars(a.vars) : undefined;
   const quote = key && typeof a.quote === 'string' ? line(a.quote, 60) : '';
+  const progress = cleanProgress(a.progress);
   return {
     at,
     agent,
@@ -101,11 +123,14 @@ export function cleanActivity(a: ActivityRecord): (AgentActivity & { video?: str
     ...(quote ? { quote } : {}),
     target,
     ...(pct !== undefined ? { pct } : {}),
+    ...(progress ? { progress } : {}),
+    // which run it says it is from: a hint the runs check (server/runs.ts), never trusted as it is
+    ...(typeof a.run === 'string' && RUN_ID.test(a.run) ? { run: a.run } : {}),
     ...(typeof a.video === 'string' ? { video: a.video.slice(0, 1024) } : {}),
   };
 }
 
-export function createActivityStore(broadcast: Broadcast): ActivityStore {
+export function createActivityStore(broadcast: Broadcast, { onRecord }: ActivityOptions = {}): ActivityStore {
   const pairs = new Map<string, Pair>();
   const pending = new Map<string, NodeJS.Timeout>();
   // Per workspace: two teams' agents may share a name and their videos a slug.
@@ -167,6 +192,7 @@ export function createActivityStore(broadcast: Broadcast): ActivityStore {
     }
     p.updated = now;
     announce(p);
+    onRecord?.(entry);
   }
 
   function live(slug?: string | null, agents: string[] = []): AgentLive[] {
