@@ -680,8 +680,10 @@ One line, spread out here:
 
 `agent` is the Claude Code session's name, or the one in `VR_BY` (a person running `vr` by hand writes nothing).
 `video` names the video as the agent did (a path, a name or a slug), and `target` a note id the app finds the video
-by. `kind`, `text`, `key`, `vars`, `quote` and `pct` are as in `GET /api/agent-activity`
-([api.md](api.md#sessions-agents-and-the-inbox)).
+by. `kind`, `text`, `key`, `vars`, `quote`, `pct`, `progress` (a render through `vr render`: its stage, percent,
+frames and time left) and `run` (the run Lampo started the agent for, from `LAMPO_RUN`) are as in
+`GET /api/agent-activity` ([api.md](api.md#sessions-agents-and-the-inbox)). A process with `LAMPO_RUN` and no name of
+its own writes as `agent`.
 
 ## Accounts
 

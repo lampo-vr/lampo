@@ -20,10 +20,10 @@ test('vr help and unknown commands', () => {
   // 7200 until `vr ask` (options before a render) took its two lines, 7450 until `vr post` (publishing) took two more,
   // 7700 until `vr export` / `vr admin import` (moving to a server) took one, 7820 until `vr footage` took two, 8050
   // until elements maps took two (`vr push … --elements`, `vr elements`) and `vr admin`'s deletion and export (A13
-  // PEOPLE-1) one
+  // PEOPLE-1) one, 8360 until `vr render` and `vr render wait` took three
   // measured with the data folder's path as a placeholder: the temp folder's length differs by machine
   const sized = help.replace(/\(data: [^)\n]*\)/, '(data: <data>)').length;
-  assert.ok(sized < 8360, `help is ${sized} characters`);
+  assert.ok(sized < 8660, `help is ${sized} characters`);
   assert.ok(help.includes('vr footage find "<request>"'), 'help names vr footage');
   assert.ok(help.includes('vr post draft <video> --platform yt|ig|fb'), 'help names vr post');
   const bad = vr(['frobnicate'], env);

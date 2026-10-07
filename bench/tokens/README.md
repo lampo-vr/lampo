@@ -94,6 +94,15 @@ Archived projects (2026-10-07): the tool list unchanged (5718, lean 2932: `list_
 sentence of about 17 tokens; `list_videos` and `list_folders` asked for archived ones add ` · archived` (2) per
 archived video or project; nothing else changed.
 
+Renders through `vr render` (2026-10-07): the tool list unchanged (no MCP tool: an agent without a shell can't render).
+A render the agent runs in its shell prints its own output into the agent's context: 2248 tokens for a 6 s ffmpeg
+encode at 1080×1920 (its banner, stream maps and stats lines), more for longer renders and chattier tools. The same
+command through `vr render --to … --out … -- <command>` prints two lines, 45 tokens: `V2 rendered in 1s and put up for
+review (180 frames).` and the hand-off line (with notes open, `Now mark each note fixed.` and `n notes still open`
+instead); a failure one line with the tool's last words (≤ 200 characters). One `vr render wait` while a detached
+render goes on: 32. `SKILL.md` 1449 → 1490 (+41: step 3 says to render through `vr render`, and how to wait for a long
+one; budget 1450 → 1550). New budgets: `vr render`'s two lines 50, a still-rendering wait 36.
+
 The largest tools before: `add_note` 1605, `attach_preview` 657, `attach_reference` 598, `reply` 529,
 `propose_playbook_change` 484. After: `add_note` 796, `attach_preview` 431, `propose_playbook_change` 309,
 `attach_reference` 296, `set_render_source` 288.
@@ -163,4 +172,6 @@ the measured value + about 10 %; raise one only on purpose, with the bench run t
 | `wait_for_feedback`, nothing new | 53 | 58 |
 | The hand-off line | 41 | 45 |
 | The new-notes line (one note; several: 35) | 43 | 48 |
-| SKILL.md | 1220 (1385 with the options bullet) | 1450 |
+| SKILL.md | 1220 (1385 with the options bullet, 1490 with `vr render`) | 1550 |
+| `vr render`, a render put up (its two lines) | 45 | 50 |
+| `vr render wait`, still rendering | 32 | 36 |

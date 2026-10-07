@@ -298,22 +298,35 @@ test('failed from an error; stopped by the person; nothing moves a run that ende
 });
 
 test('a progress object as callers send it is bounded', () => {
-  assert.deepEqual(runs.cleanProgress({ what: 'render', stage: 'rendering', pct: 42.345, frames: [377, 900], eta_s: 61.4, tool: 'remotion', v: 4 }), {
-    what: 'render',
-    stage: 'rendering',
-    pct: 42.3,
-    frames: [377, 900],
-    eta_s: 61,
-    tool: 'remotion',
-    v: 4,
-  });
-  assert.deepEqual(runs.cleanProgress({ what: 'upload', stage: 'a\nvery long stage word indeed, longer', pct: 900, frames: [9, 3], tool: 'rm -rf /' }), {
+  assert.deepEqual(
+    runs.cleanProgress({ what: 'render', stage: 'rendering', pct: 42.345, frames: [377, 900], eta_s: 61.4, tool: 'remotion', v: 4, more: 'x' }),
+    {
+      what: 'render',
+      stage: 'rendering',
+      pct: 42,
+      frames: [377, 900],
+      eta_s: 61,
+      tool: 'remotion',
+      v: 4,
+    },
+  );
+  // the percent clamped, frames done never past the total, the time left at most a week; what isn't one of its own goes
+  assert.deepEqual(runs.cleanProgress({ what: 'upload', stage: 'uploading', pct: 900, frames: [9, 3], eta_s: 30 * 86_400, tool: 'rm -rf /', v: 2.5 }), {
     what: 'upload',
-    stage: 'a ↵ very long stage word',
+    stage: 'uploading',
+    pct: 100,
+    frames: [3, 3],
+    eta_s: 7 * 86_400,
+  });
+  assert.deepEqual(runs.cleanProgress({ what: 'check', stage: 'checking', pct: 'soon', frames: [1, 0], eta_s: -1, v: 0 }), {
+    what: 'check',
+    stage: 'checking',
     pct: null,
   });
-  assert.equal(runs.cleanProgress({ what: 'mine', stage: 'x' }), undefined);
+  assert.equal(runs.cleanProgress({ what: 'render', stage: 'a\nvery long stage word' }), undefined, 'no known stage, no progress');
+  assert.equal(runs.cleanProgress({ what: 'mine', stage: 'rendering' }), undefined);
   assert.equal(runs.cleanProgress('render'), undefined);
+  assert.equal(runs.cleanProgress([{ what: 'render', stage: 'rendering' }]), undefined);
 });
 
 test('a version registered while an agent is at the video names its run (and none when nobody began one)', () => {

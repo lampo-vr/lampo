@@ -41,6 +41,14 @@ format stays backwards compatible throughout.
   Sites that embed from an address find it through oEmbed (on your own machine through its public tunnel too), with
   the poster as a thumbnail they may show. A link is an embed from when it is made: an existing link doesn't become
   one, nor an embed another kind of link.
+- **See a render's progress while an agent renders.** An agent that renders through
+  `vr render --to <video> --out <file> -- <its render command>` shows the person how far it is, as it goes: the stage
+  (bundling, rendering, encoding, uploading, checking), the percent and frames, and the time left once it can be
+  estimated honestly. Remotion, ffmpeg, After Effects (aerender) and Blender are read; any other command by its output
+  growing. When it is done, the file becomes the next version, and the agent reads two lines instead of the render's
+  output. A failed render reaches Lampo with the tool's last words, anything that looks like a secret taken out. Long
+  renders run detached (`--detach`, then `vr render wait`), so an agent's shell time limit doesn't end them. The
+  command runs on the agent's own machine, never on a server ([docs/agents.md](docs/agents.md)).
 
 ### Fixed
 - Checking a video or a download without fetching it (what browsers and download managers ask before they start) no

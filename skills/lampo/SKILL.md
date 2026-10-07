@@ -20,8 +20,9 @@ MCP tools (the `lampo` server; `video-review` in older setups) or the `vr` CLI (
    cropped to it; `get_note({id})` / `vr show <id>` shows one note in full (replies, the whole frame, a range's
    frames, references). Frames are 0-based, timecodes `mm:ss:ff`, drawings in video pixels. Fix a `range` note's
    whole stretch.
-3. **Fix and re-render to the same path** (hosted: `vr push <file> --to <video>`, or over MCP
-   `request_upload({filename, video})` and the one `curl` it prints); `vr diff` / `vr qa` check it.
+3. **Fix and re-render** through `vr render --to <video> --out <file> -- <your command>`, so the person sees the
+   progress; it puts the file up as the next version (past ~8 min: `--detach`, then `vr render wait <id>`). Without a
+   shell: `request_upload({filename, video})` and its `curl`. `vr diff` / `vr qa` check it.
 4. **Mark each note fixed with what you changed and where**: `mark_fixed({id, note: "caption moved to y 1392"})` /
    `vr fix <id> --note "…"`. On a `CLIENT` note the client reads it as written: no paths or team remarks.
 5. **Wait, don't poll**: `wait_for_feedback({video, since})` blocks until something new arrives and returns only

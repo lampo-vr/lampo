@@ -3,7 +3,7 @@
 // (text and images), the `vr` CLI's outputs, and one full loop. On a throwaway store built by fixture.ts, through the
 // real stdio server (bin/vr-mcp) and the real CLI (bin/vr). Counting: count.ts (a heuristic, ±15 %).
 //   node bench/tokens/measure.ts [--json out.json]
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -11,7 +11,7 @@ import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { isolatedEnv, makeVideo, ROOT, VR } from '../../test/lib/helpers.ts';
+import { FFMPEG, isolatedEnv, makeVideo, ROOT, VR } from '../../test/lib/helpers.ts';
 import { approxTokens, type ResultCost, resultCost, toolListCost } from './count.ts';
 import { buildFixture } from './fixture.ts';
 
@@ -151,6 +151,21 @@ try {
   cli.push({ item: `INBOX.md per note (avg of ${inboxNotes})`, tokens: Math.round(approxTokens(inbox) / Math.max(1, inboxNotes)) });
   const skill = fs.readFileSync(path.join(ROOT, 'skills/lampo/SKILL.md'), 'utf8');
   cli.push({ item: 'skills/lampo/SKILL.md (read into context)', tokens: approxTokens(skill) });
+  // A render as the agent's shell shows it, against the same command through `vr render` (its two lines), and one
+  // `vr render wait` while a detached render goes on. The render becomes the new reel's V2.
+  if (help.includes('vr render')) {
+    const ff = ['-y', '-i', fx.video, '-vf', 'hue=s=0', '-c:v', 'libx264', '-pix_fmt', 'yuv420p'];
+    const raw = spawnSync(FFMPEG, [...ff, path.join(dir, 'raw.mp4')], { encoding: 'utf8' });
+    cli.push({ item: 'a render, as its own output (ffmpeg, 6 s at 1080×1920)', tokens: approxTokens(raw.stdout + raw.stderr) });
+    const agent = { ...env, VR_BY: 'agent:bench' };
+    const two = execFileSync(process.execPath, [VR, 'render', '--to', fresh, '--out', fresh, '--', FFMPEG, ...ff, fresh], { env: agent, encoding: 'utf8' });
+    cli.push({ item: 'the same through vr render (two lines)', tokens: approxTokens(two) });
+    const { stillLine } = await import('../../lib/render/detach.ts');
+    const at = new Date().toISOString();
+    const progress = { what: 'render' as const, stage: 'rendering', pct: 62, eta_s: 230, tool: 'remotion', v: 4 };
+    const still = stillLine({ id: 'r_0a1b2c3d4e', state: 'running', started: at, updated: at, label: 'V4', progress });
+    cli.push({ item: 'vr render wait, still rendering', tokens: approxTokens(still) });
+  }
 
   // ---------------------------------------------------------------- one loop
   // connect → read the playbook and the new notes → look at one closely → fix 3 → (re-render) → wait → answer once.

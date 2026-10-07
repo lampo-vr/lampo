@@ -79,12 +79,10 @@ website's clips.
   5. Later: audio tags per shot, subject motion, near-duplicate grouping. Open: a multilingual model for German
      search; a separate *Footage* library (files that aren't videos under review).
 
-- **Render progress, live** (small, visible every day). The monitor already shows a render file growing ("Rendering…
-  340 MB"), but no percentage. `vr render -- <the render command>` runs the agent's own render (`npx remotion render …`,
-  `ffmpeg …`), reads its progress lines (Remotion's "Rendered 240/900", ffmpeg's `frame=`) and reports them as
-  activity: "Rendering V29 · 27 % · 1 min left" on the board card, the agent button and the inbox, and the finished
-  file registered as the new version. Zero tokens: it is one command the agent runs instead of the raw render, with no
-  output for the model to read. MCP gets no new tool; SKILL.md names the wrapper as optional.
+- **Render progress, next** (done: `vr render -- <cmd>` with Remotion, ffmpeg, aerender and Blender, `--detach` and
+  `vr render wait`; CHANGELOG): DaVinci Resolve (`GetRenderJobStatus`) and Remotion Lambda (`getRenderProgress`); an
+  image sequence counted by its frames rather than its size; `vr render stop <id>` for a detached render (today its
+  supervisor stops on SIGTERM); the run strip and cards showing `progress` (Phase 1c).
 
 - Options before a render, next (done: an agent asks, the person auditions and picks, the answer is one PICKED line;
   CHANGELOG): **options through a review link** — a client picks the narrator or the look on the link (a question

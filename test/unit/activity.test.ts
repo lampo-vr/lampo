@@ -236,3 +236,91 @@ test('who records: an agent by its session or VR_BY name; a person running vr by
   assert.equal(processAgent({ VR_BY: 'sam' }), null);
   assert.equal(processAgent({ VR_BY: 'agent:reel-cut' }), 'reel-cut');
 });
+
+test('a render’s progress (vr render) is kept to the contract: stages and tools it knows, numbers bounded; else none', () => {
+  const p = { what: 'render', stage: 'encoding', pct: 41.6, frames: [374, 900], eta_s: 70.4, tool: 'remotion', v: 4 };
+  assert.deepEqual(cleanActivity(rec({ s: 0, kind: 'render', text: 'Rendering a new version', progress: p as never }))?.progress, {
+    what: 'render',
+    stage: 'encoding',
+    pct: 42,
+    frames: [374, 900],
+    eta_s: 70,
+    tool: 'remotion',
+    v: 4,
+  });
+  const odd = { what: 'render', stage: 'rendering', pct: 900, frames: [950, 900], eta_s: 1e12, tool: 'rm -rf', v: -1, path: '/etc' };
+  assert.deepEqual(cleanActivity(rec({ s: 0, kind: 'render', text: 'x', progress: odd as never }))?.progress, {
+    what: 'render',
+    stage: 'rendering',
+    pct: 100,
+    frames: [900, 900],
+    eta_s: 7 * 24 * 3600,
+  });
+  for (const bad of [{ what: 'render', stage: 'hacking', pct: 1 }, { what: 'exfiltrate', stage: 'rendering', pct: 1 }, 'rendering', [1, 2], null])
+    assert.equal(cleanActivity(rec({ s: 0, kind: 'render', text: 'x', progress: bad as never }))?.progress, undefined, JSON.stringify(bad));
+  const upload = { what: 'upload', stage: 'uploading', pct: null };
+  assert.equal(cleanActivity(rec({ s: 0, kind: 'upload', text: 'x', progress: upload as never }))?.progress?.pct, null);
+});
+
+test('a failure keeps up to 300 characters of the tool’s words; any other line much less; the run is a run id or nothing', () => {
+  const said = `Error: ${'x'.repeat(320)}`;
+  const failed = cleanActivity(
+    rec({ s: 0, kind: 'error', text: `The render failed (exit 1) “${said}”`, key: 'The render failed (exit {code})', vars: { code: 1 }, quote: said }),
+  );
+  assert.equal(failed?.kind, 'error');
+  assert.equal(failed?.quote?.length, 300);
+  assert.equal(failed?.text.length, 300);
+  const fix = cleanActivity(rec({ s: 0, kind: 'fix', text: 'x'.repeat(400), key: 'Fixed {id}', vars: { id: 'c_1' }, quote: 'y'.repeat(400) }));
+  assert.equal(fix?.quote?.length, 60);
+  assert.equal(fix?.text.length, 160);
+  assert.equal(cleanActivity(rec({ s: 0, run: 'run_0123456789ab' }))?.run, 'run_0123456789ab');
+  for (const run of ['../etc', 'run_', `run_${'a'.repeat(65)}`, 'job_1', 42]) assert.equal(cleanActivity(rec({ s: 0, run: run as never }))?.run, undefined);
+});
+
+test('a render’s progress moves one line per kind; its end and a failure are lines of their own', () => {
+  const { store } = quietStore();
+  const progress = (stage: string, pct: number | null) =>
+    ({ what: stage === 'uploading' ? 'upload' : stage === 'checking' ? 'check' : 'render', stage, pct }) as never;
+  store.record(rec({ s: 1, kind: 'render', text: 'Rendering a new version', progress: progress('rendering', 10) }));
+  store.record(rec({ s: 2, kind: 'render', text: 'Rendering a new version', progress: progress('encoding', 50) }));
+  store.record(rec({ s: 3, kind: 'upload', text: 'Uploading v4.mp4', progress: progress('uploading', 40), pct: 40 }));
+  store.record(rec({ s: 4, kind: 'upload', text: 'Registering the new version', progress: progress('checking', null) }));
+  store.record(rec({ s: 5, kind: 'upload', text: 'Put a new version up for review', target: 'v4' }));
+  store.record(rec({ s: 6, kind: 'error', text: 'The render failed (exit 1)', key: 'The render failed (exit {code})', vars: { code: 1 } }));
+  assert.deepEqual(
+    store.live('spot')[0].recent.map((a) => [a.kind, a.text, a.progress?.stage ?? null]),
+    [
+      ['error', 'The render failed (exit 1)', null],
+      ['upload', 'Put a new version up for review', null],
+      ['upload', 'Registering the new version', 'checking'],
+      ['render', 'Rendering a new version', 'encoding'],
+    ],
+  );
+});
+
+test('every line of a process Lampo started for a run names the run (LAMPO_RUN), and only a run id', async () => {
+  const { openActivitySink, lampoRun, cliAgent } = await import('../../lib/activity.ts');
+  assert.equal(lampoRun({ LAMPO_RUN: 'run_0123456789ab' }), 'run_0123456789ab');
+  assert.equal(lampoRun({ LAMPO_RUN: 'run_../x' }), undefined);
+  assert.equal(lampoRun({}), undefined);
+  assert.equal(cliAgent({}), null, 'a person’s vr');
+  assert.equal(cliAgent({ LAMPO_RUN: 'run_0123456789ab' }), 'agent', 'a run Lampo started is an agent, named or not');
+  assert.equal(cliAgent({ LAMPO_RUN: 'run_0123456789ab', VR_BY: 'agent:reel-cut' }), 'reel-cut');
+  const file = path.join(dir, 'cache', 'agent-activity.jsonl');
+  const count = () => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).length : 0);
+  const before = count();
+  const sink = openActivitySink({ LAMPO_RUN: 'run_0123456789ab' });
+  sink.record(rec({ s: 0, kind: 'read', text: 'Reading the open notes' }));
+  sink.record(rec({ s: 1, kind: 'read', text: 'Reading the open notes', run: 'run_fedcba987654' }));
+  const lines = fs
+    .readFileSync(file, 'utf8')
+    .split('\n')
+    .filter(Boolean)
+    .slice(before)
+    .map((l) => JSON.parse(l) as ActivityRecord);
+  assert.deepEqual(
+    lines.map((l) => l.run),
+    ['run_0123456789ab', 'run_fedcba987654'],
+    'its own run when it names one',
+  );
+});
