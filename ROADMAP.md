@@ -230,6 +230,16 @@ Findings of audit A13 (2026-10-05, `AUDITS.md`) and its verification rounds that
   cover) don't go through the on-demand gate yet, and footage jobs have no crash-guard key.
 - **A13 DL** (low): files streamed by `streamFile` (server/playback.ts) ignore `If-Range`.
 - **A13 EMBED** (info): an embed's media and poster `Last-Modified` equals the version's registration time.
+- **A13 NAME** (low): a store from before well-formed names reads `shares.json`, `asks.json` and `playbooks/*.json` as
+  they are, so a link or playbook of a folder or video whose name holds half a character breaks after the upgrade.
+  Read those files well-formed too.
+- **A13 KIT** (low): `kitBase` (lib/publish/kit.ts) cuts a kit file name at 80 UTF-16 units, which can split a
+  character; cut with `cutChars`.
+- **A13 HEAD** (low): a HEAD on a review link's version download counts as a download (event, stats); return before
+  counting.
+- **A13 SSE** (info): SSE writes don't wait for the connection to drain (team members only, bounded per person).
+- **A13 TEST** (info): the export HEAD test checks the bytes sent, not the files read, so it can't catch a HEAD that
+  reads the file.
 
 ## Open decisions
 
