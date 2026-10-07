@@ -4,7 +4,7 @@ import path from 'node:path';
 import express, { type Router } from 'express';
 import { z } from 'zod';
 import { AGENT_KINDS } from '../../lib/agentKind.ts';
-import { archivedNow } from '../../lib/folderIds.ts';
+import { archivedNow, archivedProjectOf, checkNotArchived } from '../../lib/folderIds.ts';
 import {
   allFolders,
   archiveProject,
@@ -28,6 +28,7 @@ import type { ServerContext } from '../context.ts';
 import { countStep } from '../funnel.ts';
 import { accountOf, agentView, getReview, isOwn, summary } from '../helpers.ts';
 import { body, fail, query, router } from '../http.ts';
+import { PERSON_ONLY_ERROR } from '../permissions.ts';
 
 const ALL_EXT = [...VIDEO_EXT, '.webm', '.mkv'];
 
@@ -123,8 +124,8 @@ export function libraryRoutes(ctx: ServerContext): Router {
     if (!fs.existsSync(p) || !fs.statSync(p).isFile()) throw fail(404, `file not found: ${p}`);
     if (!ALL_EXT.includes(path.extname(p).toLowerCase())) throw fail(400, `not a video file (${ALL_EXT.join(', ')})`);
     if (p.startsWith(`${ROOT}/`)) throw fail(400, 'that file lives inside video-review itself');
-    // A folder that can't be made is refused before the video is added, not after.
-    if (b.folder) normFolder(b.folder);
+    // A folder that can't be made, or one in an archived project, is refused before the video is added, not after.
+    if (b.folder) checkNotArchived(normFolder(b.folder));
     const who = ctx.actor(req);
     const { review, created } = store.createOrGetReview(p, { by: who, byId: accountOf(req, who), session: b.session });
     if (created && !review.onboarding_sample) countStep(ctx, 'video_first');
@@ -272,9 +273,13 @@ export function libraryRoutes(ctx: ServerContext): Router {
   });
 
   r.put('/api/review/:slug/folder', express.json(), (req, res) => {
-    getReview(req.params.slug);
-    // out of an archived project: its owners' and admins' (the role in this workspace), never into one
-    const moved = moveVideo(req.params.slug, body(MoveVideo, req).folder ?? null, ctx.actor(req), { out: can(req.auth?.role, 'archive') });
+    const review = getReview(req.params.slug);
+    const folder = body(MoveVideo, req).folder ?? null;
+    // Out of an archived project: its owners' and admins' (the role in this workspace), and a person's, as restoring it
+    // is: an API token can't empty what only a person may bring back. Never into one.
+    const out = can(req.auth?.role, 'archive');
+    if (out && req.auth?.via === 'token' && archivedProjectOf(review.folder)) throw fail(403, PERSON_ONLY_ERROR, { person: true });
+    const moved = moveVideo(req.params.slug, folder, ctx.actor(req), { out });
     broadcast('review', { slug: req.params.slug });
     foldersChanged(res, { folder: moved.folder }, req.params.slug);
   });

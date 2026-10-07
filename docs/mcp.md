@@ -562,7 +562,8 @@ the coordinates are not). Read tools are marked read-only, so clients can allow 
   the video's page), for when the agent's own network refuses the `PUT`
   ([uploads from a chat app's sandbox](#claude-and-chatgpt)).
 - **`move_video({video, folder})`** and **`set_status({video, text, eta_seconds?})`.** An empty `text` clears the
-  status; so does the next version.
+  status; so does the next version. Out of an archived project only the machine's own agent moves a video, as
+  `vr move` there does; over HTTP that is a person's, in the app.
 - **Partial renders**, only where a note says PART RENDER OK: `track_video` also takes `part_of` (the video),
   `part_at` (the frame the stretch starts at) and `handles`, and `request_upload` takes `part_at` and `handles` with
   `video`. They are accepted but not listed with the tools

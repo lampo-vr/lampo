@@ -1,10 +1,12 @@
 // Archived projects (lib/archived.ts) on a hosted server. Owners and admins archive a project and restore it, in the app
 // (people only). While it is archived nothing new goes into it — notes, replies, statuses, drafts, stage changes,
-// versions and uploads, moves into it, review links, questions, agent status — each refused with one sentence (423,
-// `archived`), over HTTP and to agents (MCP, `vr`) alike; owners and admins still take a video out. Its review links
-// play watch only and get their rights back once it is restored; embeds keep playing. The lists leave it out unless
-// asked: search keeps its matches apart, the inbox, Insights' "now" lists and the status page drop it, `list_videos`,
-// `list_folders`, `vr ls` and `vr folders` show it with their `archived` flag.
+// versions and uploads, moves into it, review links, questions, agent status, playbook changes, posts — each refused
+// with one sentence (423, `archived`), over HTTP and to agents (MCP, `vr`) alike, before anything is begun (no
+// screenshot left behind, nothing tracked); owners and admins still take a video out, in the app (never with a token).
+// Its review links play watch only and get their rights back once it is restored; embeds keep playing. The lists leave
+// it out unless asked: search keeps its matches apart, the inbox, Insights' "now" lists and the status page drop it,
+// `list_videos`, `list_folders`, `vr ls` and `vr folders` show it with their `archived` flag. Any name a project can
+// have works, `constructor` and `__proto__` among them.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -21,9 +23,11 @@ const { dir } = isolatedEnv({ vars: { VR_MODE: 'server', VR_PUBLIC_URL: PUBLIC }
 const auth = await import('../../lib/auth.ts');
 const store = await import('../../lib/store.ts');
 const folders = await import('../../lib/folders.ts');
-const { slugify, dataDir, reviewFile } = await import('../../lib/paths.ts');
+const posts = await import('../../lib/publish/posts.ts');
+const { slugify, dataDir, reviewDir, reviewFile } = await import('../../lib/paths.ts');
 const { createLocalBackend } = await import('../../lib/backend/local.ts');
 const { createReviewServer } = await import('../../mcp/core.ts');
+const { archivedIn, archivedWithHeld } = await import('../../lib/archived.ts');
 type User = import('../../lib/auth.ts').User;
 
 // Fresh connections: refusals answer before reading the body, which can end a kept-alive socket mid-test.
@@ -191,13 +195,18 @@ test('nothing new in an archived project: every kind of write is refused with on
   store.deleteComment(note.id);
 });
 
-test('owners and admins take a video out of an archived project; nobody puts one in, and members take none out', async () => {
+test('owners and admins take a video out of an archived project, in the app; nobody puts one in, and members take none out', async () => {
   await restore();
   json(await archive());
   const move = (slug: string, folder: string | null, who: Record<string, string>) =>
     request('PUT', `/api/review/${enc(slug)}/folder`, { body: { folder }, headers: who });
   refused(await move(teaser, null, as.member), 'a member takes one out');
   refused(await move(teaser, 'ACME/Reels', as.owner), 'moved within it');
+  // an owner's API token neither: restoring is a person's, so is emptying the project (an agent can't take all out)
+  const token = await move(teaser, 'Globex', as.ownerToken);
+  assert.equal(token.status, 403, token.text);
+  assert.equal(token.json().person, true);
+  assert.equal(must(store.loadReview(teaser)).folder, 'ACME', 'still in it');
   json(await move(teaser, 'Globex', as.admin));
   assert.equal(must(store.loadReview(teaser)).folder, 'Globex', 'out, where it can be worked on');
   refused(await move(teaser, 'ACME', as.owner), 'and not back in');
@@ -205,9 +214,12 @@ test('owners and admins take a video out of an archived project; nobody puts one
   json(await move(teaser, 'ACME', as.member));
 });
 
-/** An MCP client on the local backend: what an agent on the server reaches over /mcp, refused by the store itself. */
-async function mcp(role: string) {
-  const server = createReviewServer({ backend: createLocalBackend(), principal: { via: 'token', name: 'Max', id: member.id, role } });
+/**
+ * An MCP client on the local backend: what an agent on the server reaches over /mcp (`token`), refused by the store
+ * itself; `local`: the server machine's own (stdio), which names files on its disk.
+ */
+async function mcp(role: string, via: 'token' | 'local' = 'token') {
+  const server = createReviewServer({ backend: createLocalBackend(), principal: { via, name: 'Max', id: member.id, role } });
   const [a, b] = InMemoryTransport.createLinkedPair();
   await server.connect(b);
   const c = new Client({ name: 'agent', version: '1' });
@@ -276,15 +288,18 @@ test('agents get the same sentence (MCP, vr), and their lists leave an archived 
   } finally {
     await agent.close();
   }
-  // the owner's agent takes a video out (move_video), as the owner does in the app
+  // the owner's agent takes no video out (move_video): that is a person's, in the app, as restoring is
   const owners = await mcp('owner');
   try {
     const out = await owners.call('move_video', { video: teaser, folder: '' });
-    assert.ok(!out.error, out.text);
-    assert.equal(must(store.loadReview(teaser)).folder, null);
+    assert.ok(out.error, out.text);
+    assert.equal(out.text, `Error: ${SENTENCE}`);
+    assert.equal(must(store.loadReview(teaser)).folder, 'ACME');
   } finally {
     await owners.close();
   }
+  json(await request('PUT', `/api/review/${enc(teaser)}/folder`, { body: { folder: null }, headers: as.owner }));
+  assert.equal(must(store.loadReview(teaser)).folder, null);
 
   const ls = await vr(['ls']);
   assert.equal(ls.code, 0, ls.err);
@@ -385,6 +400,158 @@ test('the lists leave an archived project out: search keeps it apart, the inbox,
   assert.ok((await forYou()).includes(spot), 'restored: back in the inbox');
   assert.ok((await status()).includes(spot));
   assert.equal(json(await request('GET', '/api/search?q=spot', { headers: as.owner })).videos[0]?.slug, spot);
+});
+
+/** The screenshot files in a video's folder (`c_<id>_clean.png`, `_marked.png`, `_range.jpg`). */
+const shotsOf = (slug: string) =>
+  fs
+    .readdirSync(reviewDir(slug))
+    .filter((f) => /^c_.*\.(png|jpg)$/.test(f))
+    .sort();
+/** A note as `vr add` (and MCP's add_note) hands it to the backend. */
+const noteAt = (frame: number, text: string) => ({ v: 1, frame, range: null, text, tags: [], severity: 'should' as const, drawing: [], author: 'tester' });
+
+test('a note or reference refused in an archived project leaves nothing behind: no screenshot, no frame grabbed', async () => {
+  await restore();
+  json(await archive());
+  const had = shotsOf(spot);
+  const notes = must(store.loadReview(spot)).comments.length;
+  const agent = await mcp('member');
+  try {
+    for (const args of [
+      { video: spot, frame: 2, text: 'Is the logo late?' },
+      { video: spot, frame: 1, to_frame: 6, text: 'This whole stretch' },
+    ]) {
+      const r = await agent.call('add_note', args);
+      assert.equal(r.text, `Error: ${SENTENCE}`, JSON.stringify(args));
+    }
+    // refused before its frame is grabbed: the archive answers, not the frame past the end
+    const ref = await agent.call('attach_reference', { id: open.id, video: spot, frame: 9999, caption: 'like this' });
+    assert.equal(ref.text, `Error: ${SENTENCE}`);
+  } finally {
+    await agent.close();
+  }
+  // `vr add` on the machine: the same backend
+  await assert.rejects(createLocalBackend().addNote(spot, noteAt(2, 'Late?')), { message: SENTENCE });
+  assert.deepEqual(shotsOf(spot), had, 'no screenshot left in the video’s folder');
+  assert.equal(must(store.loadReview(spot)).comments.length, notes, 'no note either');
+  json(await restore());
+});
+
+test('a note refused once its screenshots are made (archived meanwhile) takes them with it', async () => {
+  await restore();
+  const had = shotsOf(spot);
+  const adding = createLocalBackend().addNote(spot, noteAt(2, 'Late?'));
+  // archived while the screenshots are being made: the store refuses the note as it writes
+  folders.archiveProject('ACME', { name: 'Ada' });
+  await assert.rejects(adding, { message: SENTENCE });
+  assert.deepEqual(shotsOf(spot), had);
+  folders.restoreProject('ACME');
+});
+
+test('a render is never tracked into an archived project: refused before it is added', async () => {
+  await restore();
+  json(await archive());
+  const late = clip('acme/late.mp4');
+  await assert.rejects(createLocalBackend().track(late, { by: 'tester', folder: 'ACME/Reels' }), { message: SENTENCE });
+  assert.equal(store.loadReview(slugify(late)), null, 'nothing tracked');
+  // track_video, the server machine's own agent
+  const machine = await mcp('owner', 'local');
+  try {
+    const r = await machine.call('track_video', { path: late, folder: 'ACME' });
+    assert.equal(r.text, `Error: ${SENTENCE}`);
+  } finally {
+    await machine.close();
+  }
+  assert.equal(store.loadReview(slugify(late)), null, 'nothing tracked');
+  json(await restore());
+});
+
+test('an archived project’s playbooks and posts take nothing new either, and what waits in it leaves the inbox', async () => {
+  await restore();
+  // from before it was archived: a final video in it with a post that failed, a suggestion for its playbook, a question
+  const fin = filed('acme/final.mp4', 'ACME');
+  store.setFinal(fin, {}, 'tester');
+  const post = posts.draftPost({ slug: fin, platform: 'youtube', fields: { title: 'Before' }, by: 'tester' }).post;
+  posts.changePost(post.id, (p) => Object.assign(p, { state: 'failed', error: 'The platform said no.' }));
+  const suggestion = { folder: 'ACME', section: 'rules', content: 'The logo is in by 1 s', reason: 'asked on three videos' };
+  const waiting = json(await request('POST', '/api/playbook/proposals', { body: suggestion, headers: as.memberToken }), 201);
+  const question = { folder: 'ACME', text: 'Which music?', options: [{ id: 'm', items: [{ id: 'a' }, { id: 'b' }] }] };
+  const asked = json(await request('POST', '/api/asks', { body: question, headers: as.memberToken }));
+  type Item = { proposal?: string; id?: string; post?: { id: string } };
+  const inbox = async () => {
+    const items: Item[] = json(await request('GET', '/api/for-you', { headers: as.owner })).items;
+    return [items.some((i) => i.proposal === waiting.id), items.some((i) => i.id === asked.id), items.some((i) => i.post?.id === post.id)];
+  };
+  assert.deepEqual(await inbox(), [true, true, true], 'the inbox lists the suggestion, the question and the failed post while it is open');
+
+  json(await archive());
+  const text = (folder: string) => ({ folder, section: 'rules', content: 'Written while archived' });
+  refused(await request('PUT', '/api/playbook/text', { body: text('ACME'), headers: as.admin }), 'the project’s playbook edited');
+  refused(await request('PUT', '/api/playbook/text', { body: text('ACME/Reels'), headers: as.owner }), 'a folder’s in it');
+  refused(
+    await request('POST', '/api/playbook/refs', { body: { folder: 'ACME', kind: 'link', url: 'https://example.com/look' }, headers: as.admin }),
+    'a reference',
+  );
+  refused(await request('POST', '/api/playbook/proposals', { body: { ...suggestion, folder: 'ACME/Reels' }, headers: as.memberToken }), 'a suggestion');
+  refused(await request('POST', `/api/playbook/proposals/${waiting.id}/accept`, { body: {}, headers: as.admin }), 'a suggestion accepted');
+  assert.deepEqual(await inbox(), [false, false, false], 'they leave the inbox with the rest of its work');
+  const agent = await mcp('member');
+  try {
+    const r = await agent.call('propose_playbook_change', { folder: 'ACME/Reels', section: 'brief', content: 'A new brief', reason: 'test' });
+    assert.equal(r.text, `Error: ${SENTENCE}`);
+  } finally {
+    await agent.close();
+  }
+  refused(await request('PATCH', `/api/posts/${post.id}`, { body: { title: 'Changed while archived' }, headers: as.owner }), 'a post changed');
+  const confirm = { confirm: { platform: 'youtube', account: post.account ?? null, digest: posts.digestOf(post) } };
+  refused(await request('POST', `/api/posts/${post.id}/publish`, { body: confirm, headers: as.owner }), 'a post published');
+  refused(await request('POST', `/api/posts/${post.id}/retry`, { body: {}, headers: as.owner }), 'a post tried again');
+  assert.equal(posts.findPost(post.id)?.title, 'Before');
+  assert.equal(json(await request('GET', '/api/playbook?folder=ACME', { headers: as.member })).playbook.rules, '', 'the playbook as it was');
+
+  json(await restore());
+  assert.equal(json(await request('PUT', '/api/playbook/text', { body: text('ACME'), headers: as.admin })).rev.after, 'Written while archived');
+  assert.deepEqual(await inbox(), [true, true, true], 'restored: back in the inbox');
+  assert.equal(json(await request('PATCH', `/api/posts/${post.id}`, { body: { title: 'After' }, headers: as.owner })).title, 'After');
+  json(await request('POST', `/api/playbook/proposals/${waiting.id}/reject`, { body: {}, headers: as.admin }));
+});
+
+test('a project called constructor, __proto__ or toString is archived and restored like any other', async () => {
+  await restore();
+  const guest = { ...origin, Host: 'review.test' };
+  for (const [i, name] of ['constructor', '__proto__', 'toString'].entries()) {
+    json(await request('POST', '/api/folders', { body: { path: name }, headers: as.member }));
+    const slug = filed(`names/clip-${i}.mp4`, name);
+    const link = json(await request('POST', '/api/folder-shares', { body: { folder: name, comment: true }, headers: as.owner })).token;
+    const page = () => request('GET', `/api/g/${link}`, { headers: guest });
+    assert.equal(json(await page()).videos.length, 1, `${name}: its review link shows its video`);
+    assert.equal(json(await restore(as.admin, name)).restored, false, `${name}: not archived, nothing to restore`);
+
+    const done = json(await archive(as.admin, name));
+    assert.equal(done.archived.by, 'Ada', name);
+    assert.ok(Object.hasOwn(done.archived_projects ?? {}, name), `${name} is archived`);
+    assert.ok(Object.hasOwn(foldersFile().archived ?? {}, name), `${name}: kept in folders.json`);
+    const note = await request('POST', `/api/review/${enc(slug)}/comments`, { body: { frame: 1, text: 'In?' }, headers: as.memberToken });
+    assert.equal(note.status, 423, `${name}: ${note.text}`);
+    assert.deepEqual(note.json(), { archived: name, error: `the project "${name}" is archived: it is read-only until a person restores it` });
+    const shut = json(await page());
+    assert.deepEqual([shut.videos.length, shut.perms.comment], [1, false], `${name}: its link plays, watch only`);
+
+    assert.equal(json(await restore(as.admin, name)).restored, true, name);
+    assert.ok(!Object.hasOwn(foldersFile().archived ?? {}, name), `${name}: restored`);
+    json(await request('POST', `/api/review/${enc(slug)}/comments`, { body: { frame: 1, text: 'In again' }, headers: as.memberToken }));
+    assert.equal(json(await page()).perms.comment, true, `${name}: its link takes notes again`);
+  }
+  // the app's own view while an archive or a restore waits behind its Undo (web/src/library/archiving.ts) holds them too
+  for (const name of ['constructor', '__proto__', 'toString']) {
+    const record = { at: '2026-10-07T10:00:00+02:00', by: 'Ada' };
+    const shown = archivedWithHeld({}, new Map([[name, record]]));
+    assert.equal(archivedIn(`${name}/Cuts`, shown), name, `${name}: shown archived at once`);
+    assert.deepEqual(shown[name], record);
+    const back = archivedWithHeld({ [name]: record }, new Map([[name, null]]));
+    assert.equal(archivedIn(name, back), null, `${name}: shown restored at once`);
+  }
 });
 
 test('a project archived in one workspace is that workspace’s: the other’s project of the same name stays open', async () => {

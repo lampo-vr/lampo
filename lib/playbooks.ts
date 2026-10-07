@@ -7,6 +7,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { checkNotArchived } from './folderIds.ts';
 import { cutChars } from './names.ts';
 import { isoLocal } from './paths.ts';
 import { chainOf, HOUSE, listPlaybooks, playbookFile, playbookRoot, readPlaybook, stampFor } from './playbookFiles.ts';
@@ -82,8 +83,13 @@ function empty(scope: PlaybookScope): Playbook {
 /** The playbook of a scope; an empty one when it has none yet (nothing is written until someone edits it). */
 export const loadPlaybook = (scope: PlaybookScope): Playbook => readPlaybook(scope) || empty(scope);
 
-/** Reads, changes and writes one playbook under the playbooks' lock; `fn`'s result is returned. */
+/**
+ * Reads, changes and writes one playbook under the playbooks' lock; `fn`'s result is returned. Never one of an archived
+ * project's folders (lib/archived.ts): its playbooks take nothing new — no edit, suggestion or decision on one — until
+ * it is restored (423, the one sentence).
+ */
 function update<T>(scope: PlaybookScope, fn: (p: Playbook) => T): T {
+  checkNotArchived(scope);
   return store.withLock(playbookRoot(), () => {
     const p = loadPlaybook(scope);
     const out = fn(p);
@@ -261,6 +267,8 @@ export const skillFileKey = (p: Pick<Playbook, 'id'>, s: Pick<PlaybookSkill, 'id
 
 /** Adds (or replaces) a small file of a skill. `file` is a path on this machine the caller received the bytes in. */
 export async function addSkillFile(scope: PlaybookScope, skill: string, name: string, file: string, by: string): Promise<PlaybookRevision> {
+  // before the file is stored: an archived project's playbook takes none (update asks again)
+  checkNotArchived(scope);
   if (!SKILL_FILE.test(name)) throw bad('a file name is letters, digits, dots, dashes and underscores (e.g. reels-export.aep, look.cube)');
   const size = fs.statSync(file).size;
   if (!size) throw bad('the file is empty');
@@ -330,6 +338,8 @@ export type PlaybookRefInput =
   | { kind: 'image'; file: string; caption?: string };
 
 export async function addRef(scope: PlaybookScope, input: PlaybookRefInput, by: string): Promise<{ ref: NoteRef; rev: PlaybookRevision }> {
+  // before a frame is grabbed or an image stored: an archived project's playbook takes none (update asks again)
+  checkNotArchived(scope);
   const p = loadPlaybook(scope);
   if (p.refs.length >= PLAYBOOK_LIMITS.refs) throw bad(`a playbook holds at most ${PLAYBOOK_LIMITS.refs} references`);
   // A new playbook's id must be the one written, so its files land where it will look for them.

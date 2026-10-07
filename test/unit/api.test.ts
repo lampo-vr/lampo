@@ -264,3 +264,19 @@ test('machine endpoints never fall back to the web page', async () => {
     fs.rmSync(dist, { recursive: true, force: true });
   }
 });
+
+test('library: a video is never added into an archived project, refused before it is tracked', async () => {
+  assert.equal((await request('POST', '/api/folders', { body: { path: 'Shelf' } })).status, 200);
+  assert.equal((await request('POST', '/api/folders/archive', { body: { path: 'Shelf' } })).status, 200);
+  const late = makeVideo(path.join(dir, 'shelf/export/late.mp4'), { w: 64, h: 36, dur: 0.4 });
+  age(late);
+  const into = await request('POST', '/api/library', { body: { path: late, folder: 'Shelf/Cuts' } });
+  assert.equal(into.status, 423, into.text);
+  assert.equal(into.json().archived, 'Shelf');
+  const lib: LibraryResponse = (await request('GET', '/api/library')).json();
+  assert.ok(!lib.videos.some((v) => v.name === 'late.mp4'), 'nothing tracked');
+  assert.equal((await request('POST', '/api/folders/restore', { body: { path: 'Shelf' } })).status, 200);
+  const added = await request('POST', '/api/library', { body: { path: late, folder: 'Shelf/Cuts' } });
+  assert.equal(added.status, 200, added.text);
+  assert.equal(added.json().video.folder, 'Shelf/Cuts');
+});

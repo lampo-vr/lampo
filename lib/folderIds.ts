@@ -53,11 +53,22 @@ export function parseFolders(text: string, file = foldersFile()): Partial<Folder
 }
 
 /**
+ * A record keyed by folder names, without a prototype: a name is whatever a person typed, `constructor`, `toString` and
+ * `__proto__` included, and on a plain object those read as something every object has, or set its prototype instead
+ * of a key. Every name-keyed record of folders.json is one (lib/folders.ts too).
+ */
+export function folderRecord<T>(entries: Iterable<readonly [string, T]> = []): Record<string, T> {
+  const out = Object.create(null) as Record<string, T>;
+  for (const [name, v] of entries) out[name] = v;
+  return out;
+}
+
+/**
  * The archived projects a file holds, as far as they are well formed: a name without "/" (a project), with when. A
  * file edited by hand never makes a folder inside a project count as one, nor anything else.
  */
 export function cleanArchived(raw: unknown): Record<string, ArchivedProject> {
-  const out: Record<string, ArchivedProject> = {};
+  const out = folderRecord<ArchivedProject>();
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
   for (const [name, v] of Object.entries(raw as Record<string, unknown>)) {
     const x = v as Partial<ArchivedProject> | null;
@@ -71,7 +82,7 @@ export function cleanArchived(raw: unknown): Record<string, ArchivedProject> {
 // Asked on every request through a folder link and before every write into a project: parsed again only when the file
 // changed (by path: one per workspace). A failure is never kept: the next request reads again.
 const read = new Map<string, { key: string; ids: Record<string, string>; archived: Record<string, ArchivedProject> }>();
-const NONE = { ids: {}, archived: {} } as const;
+const NONE = { ids: folderRecord<string>(), archived: folderRecord<ArchivedProject>() } as const;
 
 function current(): { ids: Record<string, string>; archived: Record<string, ArchivedProject> } {
   const file = foldersFile();
@@ -87,7 +98,7 @@ function current(): { ids: Record<string, string>; archived: Record<string, Arch
   if (hit?.key === key) return hit;
   const text = readFoldersText(file);
   const f = text === null ? {} : parseFolders(text, file);
-  const got = { key, ids: f.ids || {}, archived: cleanArchived(f.archived) };
+  const got = { key, ids: folderRecord(Object.entries(f.ids ?? {})), archived: cleanArchived(f.archived) };
   read.set(file, got);
   return got;
 }
@@ -95,7 +106,10 @@ function current(): { ids: Record<string, string>; archived: Record<string, Arch
 /** The ids of the folders review links are on, by folder path; none without a file. Throws FoldersUnreadableError. */
 export const folderIds = (): Record<string, string> => current().ids;
 
-export const folderIdOf = (folder: string): string | null => folderIds()[folder] ?? null;
+export const folderIdOf = (folder: string): string | null => {
+  const ids = folderIds();
+  return Object.hasOwn(ids, folder) ? (ids[folder] as string) : null;
+};
 
 /** The archived projects by name (never change what it returns); none without a file. Throws FoldersUnreadableError. */
 export const archivedProjects = (): Readonly<Record<string, ArchivedProject>> => current().archived;

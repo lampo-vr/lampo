@@ -2,7 +2,7 @@
 // is gone): the library shows them so at once, and keeps showing them so whatever its next answer says until the change
 // has reached the server. Light: the sidebar and the library read it in the first paint.
 import { useMemo, useSyncExternalStore } from 'react';
-import { projectOfFolder } from '../../../lib/archived.ts';
+import { archivedWithHeld, projectOfFolder } from '../../../lib/archived.ts';
 import type { ArchivedProjectInfo, LibraryResponse, VideoSummary } from '../api/types.ts';
 import { loader } from '../lib/lazy.ts';
 
@@ -41,14 +41,10 @@ export function useHeldArchive(project: string | null): ArchivedProjectInfo | nu
 export function useArchived(data: LibraryResponse | null | undefined): { archived: Record<string, ArchivedProjectInfo>; videos: VideoSummary[] | null } {
   const now = useSyncExternalStore(subscribe, () => turn);
   return useMemo(() => {
-    const archived = { ...(data?.archived_projects ?? {}) };
     const videos = data?.videos ?? null;
-    if (!now || !waiting.size) return { archived, videos };
-    for (const [p, s] of waiting)
-      if (s) archived[p] = s;
-      else delete archived[p];
+    if (!now || !waiting.size) return { archived: archivedWithHeld(data?.archived_projects), videos };
     return {
-      archived,
+      archived: archivedWithHeld(data?.archived_projects, waiting),
       videos:
         videos?.map((v) => {
           const p = projectOfFolder(v.folder);

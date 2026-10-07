@@ -78,6 +78,12 @@ export function allowed(p: Principal, access: Access): boolean {
   return can(p.role as Role, access) && (!p.scopes || scopeAllows(p.scopes, access));
 }
 
+/**
+ * Whether the caller counts as a person for what only people do (the API's PERSON_ONLY): an API token or an OAuth app
+ * never does; the machine itself does, where a person and their agent can't be told apart (docs/playbooks.md, "Trust").
+ */
+export const byPerson = (p: Pick<Principal, 'via'>): boolean => p.via !== 'token' && p.via !== 'oauth';
+
 /** Who an error's text is for (lib/publicError.ts): the machine's own agent sees it as it is, anyone else a sentence. */
 export const audienceOf = (p: Pick<Principal, 'via'>): Audience => (p.via === 'local' ? 'owner' : 'other');
 
