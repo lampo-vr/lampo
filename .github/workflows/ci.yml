@@ -38,7 +38,7 @@ jobs:
     runs-on: ${{ github.event.repository.private && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.head.repo.fork && github.event.pull_request.user.login != 'dependabot[bot]')) && fromJSON('["self-hosted","linux","x64","lampo-ci"]') || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Temp files and caches in the runner's work dir
@@ -68,7 +68,7 @@ jobs:
       # Node's own default.
       LAMPO_TEST_JOBS: ${{ github.event.repository.private && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.head.repo.fork && github.event.pull_request.user.login != 'dependabot[bot]')) && '8' || '' }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Temp files and caches in the runner's work dir
@@ -123,7 +123,7 @@ jobs:
       # a missing Linux baseline fails the run (test/e2e/lib/baseline.mjs).
       LAMPO_BASELINE_MISSING: skip
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Temp files and caches in the runner's work dir
@@ -179,7 +179,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Build (no push)
         run: docker build --build-arg REVISION=${{ github.sha }} --tag lampo:ci .
       - name: The container answers /healthz
