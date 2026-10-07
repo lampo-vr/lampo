@@ -14,9 +14,9 @@ import { isAgent, isQuestion, isRequired, timecode, timeToFrame } from '../../..
 import { ReadOnlyScope, useAuthStatus, useCan } from '../api/auth.ts';
 import { api, enc } from '../api/client.ts';
 import { useSSE } from '../api/events.ts';
-import { type NewComment, useCommentActions } from '../api/mutations.ts';
+import { type NewComment, useCommentActions, useRequest } from '../api/mutations.ts';
 import { keys, useAnalysis, useAudience, useInfo, useLibrary, useReview, useTracks, useWaveform } from '../api/queries.ts';
-import { useRuns } from '../api/runs.ts';
+import { useRunActions, useRunDetail, useRuns } from '../api/runs.ts';
 import { spriteUrl, useSprite } from '../api/sprite.ts';
 import type { ActivityWords, DraftsSent, FrameRange, LibraryResponse, PlacedComment, QaItem, ReviewResponse, Shape, Tool } from '../api/types.ts';
 import { billingCode } from '../billing/code.ts';
@@ -1195,6 +1195,28 @@ function PlayerView({
     if (phone) setSheet((x) => (x === 'peek' ? 'half' : x));
   });
   const warmAgent = useCallback(() => setWarm(true), []);
+  // the Agent view's writes, here so its own chunk carries none of their code
+  const runActs = useRunActions(slug);
+  const tellRequest = useRequest(slug);
+  const stripActs = {
+    stop: (id: string) => runActs.stop.mutateAsync(id),
+    retry: (id: string) => runActs.retry.mutateAsync(id),
+    nudge: (id: string) => runActs.nudge.mutateAsync(id),
+    busy: runActs.stop.isPending || runActs.retry.isPending || runActs.nudge.isPending,
+  };
+  // the Agent view's run (one picked in the version picker, else the strip's, else the newest) and its kept steps
+  const shownId = (pickRun && runs?.some((r) => r.id === pickRun) ? pickRun : null) ?? stripRun?.id ?? runs?.[0]?.id ?? null;
+  const detail = useRunDetail(shownId, view === 'agent');
+  const agentActs = {
+    stop: (id: string) => runActs.stop.mutateAsync(id),
+    retry: (id: string) => runActs.retry.mutateAsync(id),
+    tell: async (text: string) => {
+      await tellRequest.mutateAsync(text);
+      toast(t('Sent to {name}', { name: stripRun?.agent.name ?? review.session?.name ?? t('the agent') }), 'ok');
+    },
+    busy: runActs.stop.isPending || runActs.retry.isPending,
+    telling: tellRequest.isPending,
+  };
   // a final video ships: its agent's idle line goes with the agent button (work still going on stays)
   const final = data.summary.stage.stage === 'final';
   const showStrip = hasAgent && (!final || !!stripRun);
@@ -1222,6 +1244,7 @@ function PlayerView({
       phone={phone}
       open={view === 'agent'}
       onWarm={warmAgent}
+      act={stripActs}
     />
   ) : null;
   const agentView =
@@ -1242,6 +1265,8 @@ function PlayerView({
         say={sayRun}
         onNote={showNote}
         onAnswer={answer}
+        act={agentActs}
+        detail={detail}
       />
     ) : null;
 

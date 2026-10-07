@@ -5,12 +5,10 @@
 // (the data has none), never the noun for it. Loaded when it is first opened (Player.tsx); its styles come with it.
 import { useState } from 'react';
 import { compareTime } from '../../../lib/time.ts';
-import { useRequest } from '../api/mutations.ts';
-import { useRunActions, useRunDetail } from '../api/runs.ts';
-import type { PlacedComment, Run, RunPlanItem, RunStepLine, SessionRef } from '../api/types.ts';
+import type { PlacedComment, Run, RunDetail, RunPlanItem, RunStepLine, SessionRef } from '../api/types.ts';
 import { locale, t } from '../i18n/index.ts';
 import { pct, secsWords } from '../lib/format.ts';
-import { toast, toastError } from '../lib/toast.ts';
+import { toastError } from '../lib/toast.ts';
 import { clock, isOpen, madeBy, phaseOf, planCounts, type RunLike, type Say, workedNow } from '../sessions/runWords.ts';
 import { I } from '../ui/icons.tsx';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
@@ -32,6 +30,8 @@ export interface AgentViewProps {
   current: RunLike | null;
   /** A run asked for by name elsewhere (the version picker's "Steps"). */
   pick: string | null;
+  /** The shown run's kept steps (Player.tsx asks for them: this chunk carries no query code). */
+  detail: RunDetail | undefined;
   onPick: (id: string | null) => void;
   asOf: number;
   session: SessionRef | null;
@@ -46,6 +46,17 @@ export interface AgentViewProps {
   say: Say;
   onNote: (id: string) => void;
   onAnswer: (note: string | null) => void;
+  /** The person's writes (Player.tsx: api/runs.ts and the request), passed in so this chunk carries none of them. */
+  act: AgentActs;
+}
+
+/** Stop, Try again (Send again) and Tell it…, with whether one is on its way. */
+export interface AgentActs {
+  stop: (id: string) => Promise<unknown>;
+  retry: (id: string) => Promise<unknown>;
+  tell: (text: string) => Promise<unknown>;
+  busy: boolean;
+  telling: boolean;
 }
 
 /** A plan note's glyph and its word. */
@@ -77,12 +88,10 @@ function startedLine(r: RunLike & Partial<Pick<Run, 'opened_by'>>, me: string | 
 }
 
 export function AgentView(p: AgentViewProps) {
-  const { stop, retry } = useRunActions(p.slug);
-  const request = useRequest(p.slug);
   const [text, setText] = useState('');
   const shown: RunLike | null = (p.pick && p.runs?.find((r) => r.id === p.pick)) || p.current || p.runs?.[0] || null;
   const whole = shown && 'plan' in shown ? shown : (p.runs?.find((r) => r.id === shown?.id) ?? null);
-  const detail = useRunDetail(shown?.id ?? null, !!shown);
+  const detail = p.detail?.run.id === shown?.id ? p.detail : undefined;
   const run = detail?.run ?? whole ?? shown;
   const name = run?.agent.name ?? p.session?.name ?? t('the agent');
   const others = (p.runs ?? []).filter((r) => r.id !== run?.id);
@@ -90,9 +99,8 @@ export function AgentView(p: AgentViewProps) {
     const words = text.trim();
     if (!words) return;
     try {
-      await request.mutateAsync(words);
+      await p.act.tell(words);
       setText('');
-      toast(t('Sent to {name}', { name }), 'ok');
     } catch (e) {
       toastError(e);
     }
@@ -114,9 +122,9 @@ export function AgentView(p: AgentViewProps) {
             whole={whole ?? (detail?.run as Run | undefined) ?? null}
             steps={detail?.steps}
             props={p}
-            onStop={() => stop.mutateAsync(run.id).catch(toastError)}
-            onRetry={() => retry.mutateAsync(run.id).catch(toastError)}
-            busy={stop.isPending || retry.isPending}
+            onStop={() => p.act.stop(run.id).catch(toastError)}
+            onRetry={() => p.act.retry(run.id).catch(toastError)}
+            busy={p.act.busy}
           />
         )}
         {others.length > 0 && (
@@ -152,7 +160,7 @@ export function AgentView(p: AgentViewProps) {
             aria-label={t('Tell {name}…', { name })}
             data-testid="agent-tell"
           />
-          <button type="submit" className="btn sm" disabled={!text.trim() || request.isPending} aria-label={t('Send')}>
+          <button type="submit" className="btn sm" disabled={!text.trim() || p.act.telling} aria-label={t('Send')}>
             <I name="send" size={14} />
           </button>
           {!p.reachable && <p className="av-tell-note">{t('It reads this when it next checks in.')}</p>}

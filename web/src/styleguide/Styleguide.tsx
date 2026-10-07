@@ -64,6 +64,7 @@ const SIZES = [
 const SPACE = ['0_5', '1', '2', '3', '4', '6', '8', '12'] as const;
 
 const noop = () => {};
+const still = { stop: async () => {}, retry: async () => {}, nudge: async () => {}, busy: false };
 const SESSION = { name: 'Claude Code', id: 'mcp-sg', cwd: null, assigned: '2026-10-07T09:00:00.000Z', by: 'Sam', agent: 'claude-code' as const };
 const PLAN: RunPlanItem[] = [
   { id: 'a', state: 'doing' },
@@ -98,6 +99,7 @@ function AgentAtWork() {
           onAnswer={noop}
           onCheck={noop}
           still={now}
+          act={still}
         />
       </div>
     </div>

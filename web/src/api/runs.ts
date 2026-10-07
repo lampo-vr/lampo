@@ -2,37 +2,14 @@
 // note rows, timeline and version picker, one run's kept steps for the Agent view, and the person's three writes —
 // Stop (at once, put back if the server says no), Try again and Nudge. SSE `run` refetches only that video's runs and
 // that run's steps where they are shown (api/live.ts); the library's cards read the brief on their entry.
-import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type QueryClient, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, enc } from './client.ts';
 import { guess, withEntry } from './mutations.ts';
 import { keys } from './queries.ts';
+import { runKeys } from './runQueries.ts';
 import type { LibraryResponse, ReviewResponse, Run, RunBrief, RunDetail, RunsResponse, RunWriteResponse } from './types.ts';
 
-export const runKeys = {
-  of: (slug: string) => ['runs', slug] as const,
-  one: (id: string) => ['run', id] as const,
-};
-
-/** The video's runs, newest first (asked for only where shown). `at`: when the answer came (the strip counts on). */
-export function useRuns(slug: string, enabled: boolean): { runs: Run[] | undefined; at: number } {
-  const q = useQuery({
-    queryKey: runKeys.of(slug),
-    queryFn: () => api<RunsResponse>(`/api/runs?slug=${enc(slug)}`),
-    enabled,
-    staleTime: 5_000,
-  });
-  return { runs: q.data?.runs, at: q.dataUpdatedAt };
-}
-
-/** One run with its kept steps (the Agent view). */
-export function useRunDetail(id: string | null, enabled: boolean): RunDetail | undefined {
-  return useQuery({
-    queryKey: runKeys.one(id ?? ''),
-    queryFn: () => api<RunDetail>(`/api/runs/${enc(id ?? '')}`),
-    enabled: enabled && !!id,
-    staleTime: 5_000,
-  }).data;
-}
+export { runKeys, useRunDetail, useRuns } from './runQueries.ts';
 
 /** What the cards need of a run (lib/types.ts RunBrief), from the whole run. */
 export function briefOf(r: Run): RunBrief {

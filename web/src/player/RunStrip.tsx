@@ -7,7 +7,6 @@
 import { type CSSProperties, memo, useEffect, useState } from 'react';
 import { agentKindOfRef } from '../../../lib/agentKind.ts';
 import { enc } from '../api/client.ts';
-import { useRunActions } from '../api/runs.ts';
 import type { SessionRef } from '../api/types.ts';
 import { t } from '../i18n/index.ts';
 import { useLang } from '../i18n/T.tsx';
@@ -60,6 +59,15 @@ export interface RunStripProps {
   onWarm?: () => void;
   /** A still picture (the styleguide): this moment, and no clock that counts. */
   still?: number;
+  /** Stop, Try again and Nudge (api/runs.ts useRunActions, in Player.tsx), and whether one is on its way. */
+  act: StripActs;
+}
+
+export interface StripActs {
+  stop: (id: string) => Promise<unknown>;
+  retry: (id: string) => Promise<unknown>;
+  nudge: (id: string) => Promise<unknown>;
+  busy: boolean;
 }
 
 /** What one action is called (literal keys for the translations). */
@@ -93,7 +101,6 @@ const allowedFor = (a: RunAction, steer: boolean, check: boolean) => (a === 'che
 
 export const RunStrip = memo(function RunStrip(p: RunStripProps) {
   useLang(); // memo'd: renders again on a language switch by itself
-  const { stop, retry, nudge } = useRunActions(p.slug);
   const run = p.run;
   const counting = !!run && (run.state === 'queued' || run.state === 'starting' || (run.state === 'working' && !run.progress?.pct));
   const ticked = useTick(counting && p.still === undefined);
@@ -106,7 +113,7 @@ export const RunStrip = memo(function RunStrip(p: RunStripProps) {
   if (!said) return null;
   const kind = run ? run.agent.kind : p.session ? agentKindOfRef(p.session) : null;
   const actions = said.actions.filter((a) => allowedFor(a, p.canSteer, p.canCheck));
-  const busy = stop.isPending || retry.isPending || nudge.isPending;
+  const busy = p.act.busy;
   const full = [said.name, said.words, said.figure].filter(Boolean).join(' · ');
   const act = (a: RunAction) => {
     if (a === 'answer') return p.onAnswer(run?.needs?.note ?? null);
@@ -118,8 +125,8 @@ export const RunStrip = memo(function RunStrip(p: RunStripProps) {
       return void copyText(how.text).then((ok) => ok && toast(t('Copied: paste it into {name}', { name: p.session?.name ?? '' }), 'ok'));
     }
     if (!run) return;
-    const m = a === 'stop' || a === 'cancel' ? stop : a === 'nudge' ? nudge : retry;
-    m.mutateAsync(run.id).then(() => a === 'nudge' && toast(t('Nudged {name}', { name: run.agent.name }), 'ok'), toastError);
+    const write = a === 'stop' || a === 'cancel' ? p.act.stop : a === 'nudge' ? p.act.nudge : p.act.retry;
+    write(run.id).then(() => a === 'nudge' && toast(t('Nudged {name}', { name: run.agent.name }), 'ok'), toastError);
   };
   const primary = (a: RunAction) => a === 'answer' || a === 'check';
   return (
