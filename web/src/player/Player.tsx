@@ -943,6 +943,10 @@ function PlayerView({
   const [warm, setWarm] = useState(false);
   const AgentUI = useLoaded(agentViewCode, view === 'agent' || warm);
   const [pickRun, setPickRun] = useState<string | null>(null);
+  // new work on the video: the Agent view shows it, not the earlier work picked before
+  const stripId = stripRun?.id ?? null;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: when the strip's work changes, not on every render
+  useEffect(() => setPickRun(null), [stripId]);
   const draftsSent = useStableCallback((out: DraftsSent) => {
     setDraftFocus(null);
     setFilter((f) => (f === 'active' || f === 'mine' || f === 'all' ? f : 'active'));

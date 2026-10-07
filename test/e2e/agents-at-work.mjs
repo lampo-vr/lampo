@@ -232,6 +232,14 @@ try {
     await p.goto(`${BASE}/#/`, { waitUntil: 'domcontentloaded' });
     await p.waitForSelector(`[data-testid=library-content][data-layout=${layout}]`, { timeout: 20000 });
   };
+  /** What sticks out of the window's sides in the panel's head and the strip (sideways() lets a page that scrolls pass). */
+  const outside = (p) =>
+    p.$$eval('.side-title > *, .side-title button, [data-testid=run-strip] button', (els) =>
+      els.flatMap((e) => {
+        const r = e.getBoundingClientRect();
+        return r.width && (r.right > innerWidth + 1 || r.left < -1) ? [`${e.className || e.tagName} at ${Math.round(r.left)}–${Math.round(r.right)}`] : [];
+      }),
+    );
   const text = (p, sel) => p.$eval(sel, (e) => e.textContent || '').catch(() => '');
   const rects = (p) =>
     p.evaluate(() => {
@@ -479,6 +487,7 @@ try {
     await shot(p, '05-phone-rendering');
     await p.tap('[data-testid=run-open]');
     await p.waitForSelector('.nsheet [data-testid=agent-view]', { timeout: 15000 });
+    assert(!(await outside(p)).length, `the sheet's head fits with the Agent view open: ${await outside(p)}`);
     const z = await p.$eval('.nsheet', (e) => getComputedStyle(e).zIndex);
     assert(!(await p.$('.nsheet-peek')), 'the sheet opened');
     await settle(p);
@@ -519,7 +528,8 @@ try {
           for (const st of states) {
             await go(p, st);
             await settle(p);
-            for (const b of [...(await sideways(p)), ...(await clippedText(p)), ...(await cutLabels(p))]) out.push(`${st} @${width} ${theme} ${lang}: ${b}`);
+            for (const b of [...(await sideways(p)), ...(await outside(p)), ...(await clippedText(p)), ...(await cutLabels(p))])
+              out.push(`${st} @${width} ${theme} ${lang}: ${b}`);
             // the percentage is never cut, the words are cut with an ellipsis
             const fig = await p.$eval('[data-testid=run-fig]', (e) => e.scrollWidth <= e.clientWidth + 1).catch(() => true);
             if (!fig) out.push(`${st} @${width} ${theme} ${lang}: the figure is cut`);

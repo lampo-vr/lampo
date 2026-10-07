@@ -315,6 +315,9 @@ export function NotesPanel(p: NotesPanelProps) {
   const style: CSSProperties | undefined = sheet && live !== null ? { height: live, transition: 'none' } : undefined;
   const words = p.view === 'transcript';
   const agent = p.view === 'agent';
+  // the Agent tab, where the video has an agent; a phone's sheet shows it only while it is open (the strip above the dock
+  // is the way in there, and the sheet's head has no room for a third view beside its thumb-sized tools)
+  const agentTab = !!p.agentTab && (!sheet || agent);
   // The transcript's search and comparison stay while you switch back and forth; a first version has nothing to compare.
   const [find, setFind] = useState<TranscriptFind>(NO_FIND);
   const base = p.transcript.base;
@@ -341,9 +344,9 @@ export function NotesPanel(p: NotesPanelProps) {
         )}
         <div className="side-head">
           <div className="side-title">
-            <div className={`side-views${p.agentTab ? ' three' : ''}`} role="tablist" aria-label={t('Notes or transcript')}>
+            <div className={`side-views${agentTab ? ' three' : ''}`} role="tablist" aria-label={t('Notes or transcript')}>
               {VIEWS()
-                .filter((x) => x.id !== 'agent' || p.agentTab)
+                .filter((x) => x.id !== 'agent' || agentTab)
                 .map((x) => (
                   <button
                     key={x.id}

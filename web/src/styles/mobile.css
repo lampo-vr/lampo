@@ -578,6 +578,10 @@
     grid-area: run;
     min-width: 0;
   }
+  /* the sheet's head with the Agent view open (three views): + Note says its plus alone (named by its label) */
+  .nsheet .side-title:has(.side-views.three) .new-note-word {
+    display: none;
+  }
   /* its buttons a step smaller than the band, their tap areas a finger's size (the ::after above) */
   .run-strip.phone .run-act {
     height: var(--h);
