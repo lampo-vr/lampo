@@ -81,7 +81,8 @@ const Row = memo(function Row({ v, where, home, folders }: RowProps) {
                   <RunLine run={run} />
                 </>
               ) : v.run === undefined && v.agent_status ? (
-                ` · ${v.agent_status.text}`
+                // an older server's free-text status: the state in a word, the agent's sentence whole in the title
+                <span title={`${v.agent_status.by} · ${v.agent_status.text}`}> · {t('working')}</span>
               ) : (
                 ''
               )}

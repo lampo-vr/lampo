@@ -84,6 +84,13 @@ format stays backwards compatible throughout.
   command runs on the agent's own machine, never on a server ([docs/agents.md](docs/agents.md)).
 
 ### Fixed
+- **What an agent says in its own words no longer gets cut off where there is no room for it.** A status like
+  "rendering v2 (notes and b-roll from the content folder, then the end card)" used to stand, cut short, in the player's
+  agent button. The button, a poster's chip in the grid and the sidebar's Agents rows now say where the agent stands in
+  a word or two, with how far beside it: "fixing 3 of 6", "rendering V2 · 42%", "needs you". The run strip and the
+  board's card line still show the agent's words after that, cut with an ellipsis; hovering shows them whole, and a
+  click opens the Agent view, whose Now shows them whole and wrapped (up to the 200 characters a status keeps, where
+  before it stopped at 80), under "working" rather than "nothing yet" when they are all the agent has done so far.
 - The sample video takes no versions but its own: "Upload new version…" is gone from it, an upload aimed at it is
   refused, and a file named like it becomes a video of its own. Your renders always count as your workspace's, and
   "Remove the sample" can't take one of them with it: a sample that holds one stays.

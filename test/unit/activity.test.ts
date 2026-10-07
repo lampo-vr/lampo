@@ -277,6 +277,18 @@ test('a failure keeps up to 300 characters of the tool’s words; any other line
   for (const run of ['../etc', 'run_', `run_${'a'.repeat(65)}`, 'job_1', 42]) assert.equal(cleanActivity(rec({ s: 0, run: run as never }))?.run, undefined);
 });
 
+test('an agent’s status keeps its whole sentence as it is kept (the Agent view shows it whole); beyond that it is cut', () => {
+  // longer than the 160 of any other line, within the 200 a status is kept to (lib/inputs.ts)
+  const said = `rendering v2 (notes and b-roll from the content folder, then the end card) ${'and more of it '.repeat(7)}done`;
+  assert.ok(said.length > 160 && said.length <= 200, `${said.length}`);
+  assert.equal(toolActivity('set_status', { text: said })?.text, said, 'set_status over MCP');
+  assert.equal(cliActivity('status', ['spot', ...said.split(' ')])?.text, said, '`vr status`');
+  const kept = cleanActivity(rec({ s: 0, kind: 'status', text: said }));
+  assert.equal(kept?.text, said, 'kept as the agent wrote it, its lowercase “v2” too');
+  assert.equal(cleanActivity(rec({ s: 0, kind: 'status', text: 'x'.repeat(400) }))?.text.length, 200);
+  assert.equal(cleanActivity(rec({ s: 0, kind: 'read', text: 'x'.repeat(400) }))?.text.length, 160);
+});
+
 test('a render’s progress moves one line per kind; its end and a failure are lines of their own', () => {
   const { store } = quietStore();
   const progress = (stage: string, pct: number | null) =>

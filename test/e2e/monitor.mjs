@@ -150,18 +150,30 @@ try {
     await shot('monitor-popover', '.claude-pop');
   });
 
-  await check('the agent button says the step it is on, in one line, with the live glyph', async () => {
+  await check('the agent button says where it stands in a word or two, in one line, with the live glyph; the step in its title', async () => {
     await page.keyboard.press('Escape');
     await page.waitForSelector('[data-testid=agent-menu]', { hidden: true });
-    await until(async () => (await text('[data-testid=agent-step]')).includes('Running npm run render'), 'the step in the button');
+    const label = () => page.$eval('[data-testid=agent-button]', (e) => e.getAttribute('aria-label') || '');
+    // the step it is on is the strip's and the button's title (a tight place says the state, never the step)
+    await until(
+      async () => (await label()).includes('Running npm run render'),
+      async () => `the step in the button's name: ${await label()}`,
+    );
     const box = await page.$eval('[data-testid=agent-button]', (e) => {
       const r = e.getBoundingClientRect();
       const s = e.querySelector('[data-testid=agent-step]');
-      return { h: r.height, w: r.width, one: s ? s.scrollHeight <= s.clientHeight + 1 : false, live: !!e.querySelector('.kg.live') };
+      return {
+        h: r.height,
+        w: r.width,
+        words: s?.textContent ?? '',
+        one: s ? s.scrollHeight <= s.clientHeight + 1 && s.scrollWidth <= s.clientWidth + 1 : false,
+        live: !!e.querySelector('.kg.live'),
+        title: e.title,
+      };
     });
-    assert(box.one && box.live && box.w <= 201, JSON.stringify(box));
-    const label = await page.$eval('[data-testid=agent-button]', (e) => e.getAttribute('aria-label'));
-    assert(/spot-edit: Running npm run render/.test(label), label);
+    assert(/^(working|fixing \d+ of \d+)$/.test(box.words) && box.one && box.live && box.w <= 201, JSON.stringify(box));
+    assert(/^Agent spot-edit: (?:(?:working|fixing \d+ of \d+) · )?Running npm run render/.test(await label()), await label());
+    assert(box.title === (await label()), `its title says it all: ${box.title}`);
     // The button as it sits in the bar (not the focus ring Escape hands back to it).
     await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
     await shot('monitor-chip', '.p-top');
@@ -250,11 +262,14 @@ try {
     // This store, never a `vr login` of the shell's.
     const vrEnv = { VR_REMOTE: '0', XDG_CONFIG_HOME: path.join(dir, 'xdg-config'), XDG_CACHE_HOME: path.join(dir, 'xdg-cache') };
     execFileSync(process.execPath, [path.join(ROOT, 'bin/vr'), 'show', note.id], { env: { ...srv.env, ...vrEnv, VR_BY: 'agent:promo-cut' }, encoding: 'utf8' });
-    await until(async () => (await text('[data-testid=agent-step]')).includes(`Reading the note at ${note.timecode}`), 'the CLI call in the button');
+    // the button's name and title say the step (its words say the state: a tight place)
+    const said = () => page.$eval('[data-testid=agent-button]', (e) => `${e.getAttribute('aria-label')} | ${e.title}`);
+    await until(async () => (await said()).split(' | ').every((s) => s.includes(`Reading the note at ${note.timecode}`)), 'the CLI call in the button');
     // …and a person running vr by hand is no agent activity.
     execFileSync(process.execPath, [path.join(ROOT, 'bin/vr'), 'ls'], { env: { ...srv.env, ...vrEnv, VR_BY: 'Sam' }, encoding: 'utf8' });
     await sleep(1500);
-    assert((await text('[data-testid=agent-step]')).includes(`Reading the note at ${note.timecode}`), 'unchanged');
+    assert((await said()).includes(`Reading the note at ${note.timecode}`), 'unchanged');
+    assert(!(await text('[data-testid=agent-step]')).includes('Reading'), `the button's words: ${await text('[data-testid=agent-step]')}`);
   });
 
   await check('the sidebar’s Agents rows say what each agent is doing now (its step, or where its work on a video stands)', async () => {

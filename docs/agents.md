@@ -106,8 +106,8 @@ For a script or an agent that has a shell but no MCP connection. An agent connec
    verified: checking a fix is the reviewer's call. When only the reviewer can decide something, ask on the frame:
    `vr add <video> --frame 363 --text "Keep this cut?"` ([Asking the reviewer](#asking-the-reviewer)).
 
-A long step can show on the video's card with `vr status <video> "rendering v4" --eta 90`; it clears itself when the new
-version arrives. Most loops don't need it: people see your notes, fixes and renders as they happen
+A long step can show in your own words with `vr status <video> "rendering v4" --eta 90` (in the player's agent line, on
+the board's card, whole in the Agent view); it clears itself when the new version arrives. Most loops don't need it: people see your notes, fixes and renders as they happen
 ([Lampo sees what you do](#lampo-sees-what-you-do-status-calls-are-optional)).
 
 ### Playbook and taste
@@ -734,7 +734,10 @@ builds it from what it sees anyway:
 None of it costs you a token or asks anything of you, and none of it is written into the review: it lives in the app's
 memory and a small rolling file in the cache, and the spine of it is kept with the video as a run (below). So `vr status` and `set_status` are optional: use them for what Lampo
 can't see ("waiting for the client's logo file", an estimate for a long render), not to narrate your steps; what you
-say there shows as your own words, quoted, until your next step.
+say there shows as your own words, quoted, until your next step: whole in the Agent view (up to 200 characters), cut to
+fit in the run strip and on the board's card. The places with room for only a word or two (the agent button, a
+poster, the sidebar) say where your work stands instead ("fixing 3 of 6", "rendering V4 · 42%"), with your words in
+their tooltip.
 
 How you're named there: by your Claude Code session, else by `VR_BY=agent:<name>`; an MCP client over HTTP by its name,
 as it is listed under connected agents. Every such name is kept as one line of printable text, at most 80 characters:

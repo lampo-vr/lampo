@@ -216,7 +216,7 @@ function Signed({ route, fallback }: { route: Route; fallback: ReactNode }) {
       ) : route.name === 'print' ? (
         <PrintView slug={route.slug} />
       ) : route.name === 'player' ? (
-        <Player key={route.slug} slug={route.slug} focus={route.c} startFrame={route.f} startV={route.v} verifyAt={route.verify} />
+        <Player key={route.slug} slug={route.slug} focus={route.c} startFrame={route.f} startV={route.v} verifyAt={route.verify} atAgent={route.agent} />
       ) : route.name === 'settings' ? (
         <Settings section={route.section} />
       ) : route.name === 'library' ? (

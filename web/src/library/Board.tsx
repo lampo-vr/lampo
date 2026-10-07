@@ -169,7 +169,11 @@ const BoardCard = memo(function BoardCard({ v, where, home, folders, lifted, lan
         data-slug={v.slug}
         data-stage={v.stage.stage}
         data-nav
-        onClick={cardClick((e) => openVideo(v.slug, e), '.bcard-menu, .bcard-next, .bcard-ask')}
+        // its line about the agent's work (cut where it is long, whole in its title) opens the video at the Agent view
+        onClick={cardClick(
+          (e) => openVideo(v.slug, e, run && (e.target as Element).closest('.bcard-line .run-line') ? 'agent=1' : undefined),
+          '.bcard-menu, .bcard-next, .bcard-ask',
+        )}
         onKeyDown={onActivate(() => openVideo(v.slug))}
         onPointerEnter={() => prefetchVideo(qc, v.slug)}
         onPointerLeave={cancelPrefetch}

@@ -89,14 +89,15 @@ export const Film = memo(function Film({ v, home, folders, where, compact, prior
           </div>
           {!compact && (
             <div className="film-over bottom">
-              {/* the agent's work on it; an older server's free-text status (no runs there) in the same keyframe language */}
+              {/* the agent's work on it; an older server's free-text status (no runs there) in the same keyframe language,
+                  as the chip says any state: in a word, the agent's own sentence whole in its title */}
               {run ? (
                 <RunLine run={run} chip />
               ) : (
                 v.run === undefined &&
                 v.agent_status && (
                   <span className="vchip agent ellipsis" title={`${v.agent_status.by} · ${v.agent_status.text}`}>
-                    <KeyGlyph shape="ease" className="nav-kg live" /> {v.agent_status.text}
+                    <KeyGlyph shape="ease" className="nav-kg live" /> {t('working')}
                   </span>
                 )
               )}

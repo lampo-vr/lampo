@@ -48,7 +48,8 @@ export type Route =
    * (`#/operator/…`, which page is web/src/operator/Operator.tsx's to read), asked for from Settings' chunk. */
   | { name: 'settings'; section: SettingsSection | 'operator' | null }
   | { name: 'print'; slug: string }
-  | { name: 'player'; slug: string; c: string | null; f: string | null; v: string | null; verify: string | null }
+  /** `agent`: open with the Agent view (`?agent=1`, a board card's line about the agent's work). */
+  | { name: 'player'; slug: string; c: string | null; f: string | null; v: string | null; verify: string | null; agent: boolean }
   | { name: 'status' }
   /** A new account's setup (onboarding/Setup.tsx): Welcome, or one of its steps. */
   | { name: 'welcome'; step: string | null }
@@ -108,7 +109,7 @@ export function parseRoute(hash: string, pathname: string): Route {
   const m = /^#\/v\/([^?]+)(?:\?(.*))?$/.exec(hash);
   if (m) {
     const q = new URLSearchParams(m[2] || '');
-    return { name: 'player', slug: decoded(m[1]), c: q.get('c'), f: q.get('f'), v: q.get('v'), verify: q.get('verify') };
+    return { name: 'player', slug: decoded(m[1]), c: q.get('c'), f: q.get('f'), v: q.get('v'), verify: q.get('verify'), agent: q.get('agent') === '1' };
   }
   const f = /^#\/folder\/(.+)$/.exec(hash);
   if (f) return { name: 'library', view: { kind: 'folder', id: decoded(f[1]) } };

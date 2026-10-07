@@ -96,6 +96,10 @@ export interface ActivityGuess extends ActivityWords {
   target?: string | null;
 }
 
+/** An agent's status (`set_status`, `vr status`) as long as it is kept (lib/inputs.ts INPUT_LIMITS.status): its own
+ * sentence, shown whole where there is room (the Agent view) and cut only by the places that have none. */
+export const STATUS_CHARS = 200;
+
 /** A short, single-line excerpt of what someone wrote (never the whole text). */
 export const excerpt = (s: string | null | undefined, max = 48): string => {
   const t = oneLine(s || '').trim();
@@ -200,8 +204,8 @@ export function toolActivity(tool: string, args: Args = {}): ActivityGuess | nul
     case 'get_posts':
       return guess('read', words('Reading the posts'), { video });
     case 'set_status': {
-      // The agent's own words: shown as they are.
-      const t = excerpt(str(args, 'text'), 80);
+      // The agent's own words: shown as they are, whole.
+      const t = excerpt(str(args, 'text'), STATUS_CHARS);
       return t ? { kind: 'status', text: t, video } : null;
     }
     default:
@@ -276,7 +280,7 @@ export function cliActivity(cmd: string, positional: string[] = [], flags: Args 
     case 'source':
       return guess('upload', words('Noted where the version came from'), { video: first });
     case 'status': {
-      const t = excerpt(positional.slice(1).join(' '), 80);
+      const t = excerpt(positional.slice(1).join(' '), STATUS_CHARS);
       return t ? { kind: 'status', text: t, video: first } : null;
     }
     default:

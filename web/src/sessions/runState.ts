@@ -2,7 +2,7 @@
 // or two ("rendering · 42 %", "needs you"), and how far a render is. Light, for the library's first paint (the cards'
 // line, the sidebar's Agents rows); the player's strip says it in full (runWords.ts). One value from the server
 // (lib/types.ts Run, or the cards' RunBrief) — never an id, and no noun for the work itself.
-import type { Run, RunBrief, RunProgress, VideoSummary } from '../api/types.ts';
+import type { ActivityWords, Run, RunBrief, RunProgress, VideoSummary } from '../api/types.ts';
 import { t } from '../i18n/index.ts';
 import { pct } from '../lib/format.ts';
 import type { Shape } from '../ui/glyphs.ts';
@@ -97,8 +97,8 @@ export function fixing(r: RunLike): string {
   return t('fixing {n} of {total}', { n: Math.min(total, answered + Math.max(1, doing)), total });
 }
 
-/** A word or two for where it stands: the sidebar's Agents rows, the agent button, a card's line ("rendering", "needs
- * you", "V4 is ready"). The percentage goes beside it (pctOf), never inside, so it is never cut. */
+/** A word or two for where it stands ("rendering", "needs you", "V4 is ready"); `stateWords` adds the version a render
+ * is of where nothing beside it says so. The percentage goes beside it (pctOf), never inside, so it is never cut. */
 export function runShort(r: RunLike): string {
   switch (phaseOf(r)) {
     case 'queued':
@@ -128,6 +128,44 @@ export function runShort(r: RunLike): string {
 
 /** The word or two and how far it is, for one line that has no room for more: "rendering 42 %". */
 export const shortLine = (r: RunLike): string => [runShort(r), pctOf(r)].filter(Boolean).join(' ');
+
+/** The word or two with the version a render, an upload or a check is of, where its progress says which: "rendering
+ * V4". In Lampo's words whatever the agent wrote: its "rendering v4 (…)" is its own sentence, never the state. */
+export function stateWords(r: RunLike): string {
+  const v = progressOf(r)?.v;
+  if (v) {
+    const phase = phaseOf(r);
+    if (phase === 'rendering') return t('rendering {v}', { v: `V${v}` });
+    if (phase === 'uploading') return t('uploading {v}', { v: `V${v}` });
+    if (phase === 'checking') return t('checking {v}', { v: `V${v}` });
+  }
+  return runShort(r);
+}
+
+/**
+ * What it did in its own words: its step while it works (what it said, quoted), why it failed. `say` puts a step in the
+ * UI's language; without it (its words not loaded yet) only what the agent wrote itself, which needs none of ours.
+ */
+export function ownWords(r: RunLike, say?: (w: ActivityWords) => string): string | null {
+  const phase = phaseOf(r);
+  const n = r.now;
+  if (phase === 'working' && n && n.type !== 'progress') {
+    if (n.type === 'thought') return t('“{quote}”', { quote: say ? say(n) : n.text });
+    return say ? say(n) : null;
+  }
+  if (phase === 'failed' && r.error) return say ? say(r.error) : r.error.key ? null : r.error.text;
+  return null;
+}
+
+/**
+ * A tight place's words — the agent button, a poster's chip, the sidebar's rows: the state in a word or two and the
+ * figure beside it, never cut ("rendering V4" · "42%"). Never a step or the agent's own sentence: those are the strip's
+ * and the board's, and whole in the place's title (`fullWords`).
+ */
+export const tightOf = (r: RunLike): { words: string; figure: string | null } => ({ words: stateWords(r), figure: pctOf(r) });
+
+/** Everything a line about it says, for a title or an accessible name: the state, its own words, how far. */
+export const fullWords = (r: RunLike, say?: (w: ActivityWords) => string): string => [stateWords(r), ownWords(r, say), pctOf(r)].filter(Boolean).join(' · ');
 
 /** Which of an agent's runs speaks for it in one place (the sidebar): what needs the person first, then work going on. */
 const URGENCY: Record<Phase, number> = {

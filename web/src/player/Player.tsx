@@ -96,6 +96,8 @@ interface PlayerProps {
   startV?: string | null;
   /** Open verify mode at this note (?verify=<id>). */
   verifyAt?: string | null;
+  /** Open with the Agent view (?agent=1: a board card's line about the agent's work). */
+  atAgent?: boolean;
   /** Drawn before the server has said who you are (App's loading state): the player's loading layout, nothing asked. */
   pending?: boolean;
 }
@@ -103,7 +105,7 @@ interface PlayerProps {
 /** The sample's "That's the loop" (onboarding/LoopDone.tsx): loaded only while the sample is open. */
 const loopDoneCode = loader(() => import('../onboarding/LoopDone.tsx'));
 
-export default function Player({ slug, focus, startFrame, startV = null, verifyAt = null, pending = false }: PlayerProps) {
+export default function Player({ slug, focus, startFrame, startV = null, verifyAt = null, atAgent = false, pending = false }: PlayerProps) {
   const { data, error } = useReview(pending ? null : slug);
   const phone = usePhone();
   // The library already knows the video's shape: tablets size the stage by it while the review loads.
@@ -136,7 +138,7 @@ export default function Player({ slug, focus, startFrame, startV = null, verifyA
     return (
       <PlayerLoading slug={slug} phone={phone} ar={known?.width ? known.height / known.width : undefined} agent={!!known && (!!known.session || !!known.run)} />
     );
-  return <PlayerView data={data} slug={slug} focus={focus} startFrame={startFrame} startV={startV} verifyAt={verifyAt} />;
+  return <PlayerView data={data} slug={slug} focus={focus} startFrame={startFrame} startV={startV} verifyAt={verifyAt} atAgent={atAgent} />;
 }
 
 /**
@@ -214,6 +216,7 @@ function PlayerView({
   startFrame,
   startV,
   verifyAt,
+  atAgent,
 }: {
   data: ReviewResponse;
   slug: string;
@@ -221,6 +224,7 @@ function PlayerView({
   startFrame: string | null;
   startV: string | null;
   verifyAt: string | null;
+  atAgent: boolean;
 }) {
   const { review, media } = data;
   const info = useInfo();
@@ -313,7 +317,8 @@ function PlayerView({
   const queryClient = useQueryClient();
   // Phones: notes in a bottom sheet, A/B and before/after stacked with a swipe between them.
   const phone = usePhone();
-  const [sheet, setSheet] = useState<SheetState>('peek');
+  // opened for the agent's work (a board card's line): the Agent view, in a sheet that shows it
+  const [sheet, setSheet] = useState<SheetState>(atAgent && phone ? 'half' : 'peek');
   // where the timeline's zoom goes: the transport row's slot (a phone: the timeline's own row above the ruler)
   const [zoomSlot, setZoomSlot] = useState<HTMLDivElement | null>(null);
   const [showB, setShowB] = useState(false);
@@ -321,7 +326,7 @@ function PlayerView({
   // runs, and never over open notes: a remembered tab must not hide another video's notes behind an empty panel.
   const speech = info ? (info.stt ? info.stt.backend !== 'off' && info.stt.available : info.whisper) : false;
   const [view, setViewState] = useState<PanelView>(() =>
-    prefs.panel === slug && speech && !review.comments.some((c) => c.status === 'open' || c.status === 'fixed') ? 'transcript' : 'notes',
+    atAgent ? 'agent' : prefs.panel === slug && speech && !review.comments.some((c) => c.status === 'open' || c.status === 'fixed') ? 'transcript' : 'notes',
   );
   const setView = useCallback(
     (x: PanelView) => {
@@ -838,12 +843,16 @@ function PlayerView({
 
   // A link to this video while it is open (⌘K, the inbox's "Open in player", a notification) keeps the player and does
   // what the link says, as it does when a link opens the player: the version, the frame, the note, verify mode.
-  const linked = useRef({ focus, startFrame, startV, verifyAt });
+  const linked = useRef({ focus, startFrame, startV, verifyAt, atAgent });
   // biome-ignore lint/correctness/useExhaustiveDependencies: when the link changes, not when the review does
   useEffect(() => {
     const was = linked.current;
-    if (was.focus === focus && was.startFrame === startFrame && was.startV === startV && was.verifyAt === verifyAt) return;
-    linked.current = { focus, startFrame, startV, verifyAt };
+    if (was.focus === focus && was.startFrame === startFrame && was.startV === startV && was.verifyAt === verifyAt && was.atAgent === atAgent) return;
+    linked.current = { focus, startFrame, startV, verifyAt, atAgent };
+    if (atAgent && !was.atAgent) {
+      setView('agent');
+      if (phone) setSheet((x) => (x === 'peek' ? 'half' : x));
+    }
     const to = review.versions.find((x) => String(x.v) === startV);
     if (to) setV(to.v);
     const c = focus ? placed.find((x) => x.id === focus) : null;
@@ -856,7 +865,7 @@ function PlayerView({
       seek(at);
       if (c) setSelected(c.id);
     } else if (c) selectComment(c);
-  }, [focus, startFrame, startV, verifyAt]);
+  }, [focus, startFrame, startV, verifyAt, atAgent]);
 
   // ---------------------------------------------------------------- walkie-talkie (hold T)
   const walkieContext = useCallback(

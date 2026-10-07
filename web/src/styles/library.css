@@ -146,12 +146,42 @@
 .nav-label .mono {
   font-size: var(--fs-xs);
 }
-/* An agent's row while it works: what it is doing now, after its name and quieter; the row's ellipsis cuts it. */
+/* An agent's row (sessions/SidebarAgents.tsx): its name, then where it stands in a word or two, quieter. When the row
+   is short of room the state's words give way first, then the name, each with an ellipsis; a percentage never does. */
+.nav-agent {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+}
+.nav-agent-name {
+  flex: 0 1 auto;
+  min-width: 2.5em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .nav-now {
   margin-left: var(--sp-2);
   font-size: var(--fs-sm);
   font-weight: var(--fw-text);
   color: var(--muted);
+}
+.nav-agent > .nav-now {
+  flex: 0 3 auto;
+  display: inline-grid;
+  grid-template-columns: minmax(0, auto);
+  grid-auto-columns: auto;
+  grid-auto-flow: column;
+  column-gap: var(--sp-1);
+  white-space: nowrap;
+}
+.nav-now-words {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nav-now-fig {
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  font-variant-numeric: tabular-nums;
 }
 /* The count never goes away and nothing moves on hover: the row's actions float in over the end of the label, just
    before the count (the label fades out beneath them). */

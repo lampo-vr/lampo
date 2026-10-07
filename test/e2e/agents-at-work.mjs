@@ -1,14 +1,16 @@
 #!/usr/bin/env node
 // covers: web/src/player/RunStrip.tsx web/src/player/AgentView.tsx web/src/sessions/runState.ts web/src/sessions/runWords.ts web/src/sessions/RunLine.tsx
 // covers: web/src/api/runs.ts web/src/styles/runs.css web/src/styles/agentview.css web/src/styleguide/runStates.ts
+// covers: web/src/player/ClaudeMenu.tsx web/src/sessions/SidebarAgents.tsx web/src/library/Board.tsx
 // Browser end-to-end test of what a person sees while an agent works on a video (an agent's "run": never a word in
 // the UI). The runs API answers with real-shaped work in every state (web/src/styleguide/runStates.ts) and the review,
 // library and agents answers carry it, so every state can be shown without an agent; SSE `run` reaches the page the
 // way another tab relays it. Checks: the strip's fixed slot (nothing moves from ready to working, rendering, needs you
 // and done), its words per state, the Agent view's plan and steps, Stop at once and back when refused, a reviewer
 // seeing the work without its controls, the board card's hairline and action slot, the cards without a spinner, the
-// version picker's ghost and who made a version, the phone's strip and sheet, and every state at 390–1920 in both
-// themes and German. Screenshots land in VR_SHOTS.
+// version picker's ghost and who made a version, the phone's strip and sheet, the agent's own long sentence (the state
+// in the tight places, cut with its whole title where there is room, whole in the Agent view), and every state at
+// 390–1920 in both themes and German. Screenshots land in VR_SHOTS.
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { RUN_STATES, runFixtures } from '../../web/src/styleguide/runStates.ts';
@@ -84,6 +86,13 @@ try {
   // What the server says, with the agent's work in it. `state[slug]`: the state its work is in (null: none going on).
   const now = Date.now();
   const fixtures = runFixtures(slug, notes, 2, now);
+  // What an agent says in its own words with set_status / `vr status` (the run's `now`, a thought): a version and a stage
+  // in a sentence far longer than a tight place has room for, its lowercase "v2" its own.
+  const LONG = 'rendering v2 (notes and b-roll from the content folder, then the end card, and the logo sting moved to frame 300 as asked)';
+  fixtures.long = {
+    run: { ...fixtures.thinking.run, id: 'run_long', now: { text: LONG, type: 'thought', at: new Date(now).toISOString() } },
+    steps: [{ text: LONG, type: 'thought', at: new Date(now).toISOString() }, ...fixtures.thinking.steps.slice(1)],
+  };
   // the earlier work that made V2
   const made = {
     ...fixtures.done.run,
@@ -137,6 +146,11 @@ try {
           if (stopAnswer === 'hold') await until(() => stopAnswer !== 'hold', 'the held answer', 30_000);
           if (stopAnswer === 'fail') return json(req, { error: 'The agent could not be reached' }, 409);
           return json(req, { run: { ...run, state: 'stopped', ended: new Date().toISOString(), progress: null } });
+        }
+        // the agent's newest call is that status: what the agent button knows it is doing now
+        if (at === '/api/agent-activity' && req.method() === 'GET' && state[slug] === 'long') {
+          const a = { at: new Date().toISOString(), agent: 'Claude Code', slug, kind: 'status', text: LONG, target: null };
+          return json(req, { agents: [{ agent: 'Claude Code', slug, current: a, recent: [a], updated: a.at }] });
         }
         if (at === '/api/agents' && req.method() === 'GET') {
           const live = listening
@@ -192,8 +206,10 @@ try {
     p.evaluate((data) => new BroadcastChannel('vr-events').postMessage({ type: 'run', data }), { slug: s, id: runOf(s)?.id ?? 'none' });
   const go = async (p, st) => {
     state[slug] = st;
+    // said just now (a thought older than a minute and a half reads "last: … · 3 min ago")
+    if (st === 'long') fixtures.long.run.now = { ...fixtures.long.run.now, at: new Date().toISOString() };
     await moved(p);
-    const phase = st === 'thinking' || st === 'quiet' ? 'working' : st === 'permission' ? 'needs_you' : st;
+    const phase = st === 'thinking' || st === 'quiet' || st === 'long' ? 'working' : st === 'permission' ? 'needs_you' : st;
     // the strip says the state, of this very work (two states can share a phase)
     await p.waitForFunction(
       (ph, id) => {
@@ -412,6 +428,103 @@ try {
     role = null;
   });
 
+  await check(
+    'an agent’s long sentence: the state in tight places, cut with a whole title in the strip and on the board, whole in the Agent view',
+    async () => {
+      const said = (p, sel) =>
+        p.$eval(sel, (e) => {
+          const w = e.querySelector('[data-testid=agent-step], [data-testid=run-words], .run-words') ?? e;
+          return {
+            text: w.textContent,
+            cut: w.scrollWidth > w.clientWidth + 1,
+            ellipsis: getComputedStyle(w).textOverflow === 'ellipsis',
+            over: e.scrollWidth > e.clientWidth + 1,
+            label: e.getAttribute('aria-label'),
+            title: e.title,
+          };
+        });
+      state[slug] = 'long';
+      await openPlayer(page);
+      await go(page, 'long');
+      // the top bar's agent button: the state in a word or two, never "rendering v2 (…", which is its title, whole
+      await page.waitForFunction((s) => document.querySelector('[data-testid=agent-button]')?.title.includes(s), { timeout: 15000 }, LONG);
+      const button = await said(page, '[data-testid=agent-button]');
+      assert(button.text === 'fixing 3 of 7', `the button says the state: "${button.text}"`);
+      assert(!button.cut && !button.over, `nothing overflows the button: ${JSON.stringify(button)}`);
+      assert(button.label === `Agent Claude Code: fixing 3 of 7 · “${LONG}”` && button.title === button.label, `its name and title: ${button.label}`);
+      // the strip has room for the agent's words after the state: cut with an ellipsis, whole on hover, all on a press
+      const strip = await said(page, '[data-testid=run-open]');
+      assert(strip.text.startsWith('Claude Code · fixing 3 of 7 · “rendering v2 ('), `the strip: ${strip.text}`);
+      assert(strip.cut && strip.ellipsis, `the strip cuts it with an ellipsis: ${JSON.stringify(strip)}`);
+      assert(strip.title.startsWith(`Claude Code · fixing 3 of 7 · “${LONG}”`), `the strip's title: ${strip.title}`);
+      await page.click('[data-testid=run-open]');
+      await page.waitForSelector('[data-testid=agent-thought]', { timeout: 15000 });
+      const view = await page.$eval('[data-testid=agent-thought]', (q) => ({
+        text: q.textContent,
+        lines: Math.round(q.getBoundingClientRect().height / Number.parseFloat(getComputedStyle(q).lineHeight)),
+        cut: q.scrollWidth > q.clientWidth + 1 || q.scrollHeight > q.clientHeight + 1,
+      }));
+      assert(view.text === LONG, `the Agent view's Now says it whole: ${view.text}`);
+      assert(view.lines >= 2 && !view.cut, `wrapped, never cut: ${JSON.stringify(view)}`);
+      await shot(page, '08-long-agent-view');
+      // all it has done so far is say it: Now says it works, never "nothing yet" above its words
+      const steps = fixtures.long.steps;
+      fixtures.long.steps = steps.slice(0, 1);
+      await moved(page);
+      await until(
+        async () => (await text(page, '[data-testid=agent-now-block] .av-line')) === 'working',
+        async () => `Now with only its words: ${await text(page, '[data-testid=agent-now-block]')}`,
+      );
+      assert((await text(page, '[data-testid=agent-thought]')) === LONG, 'its words still follow, whole');
+      fixtures.long.steps = steps;
+      await page.click('[data-testid=panel-notes]');
+      // a render that says how far: "rendering V3" in Lampo's words, and the percentage beside the words, never cut —
+      // where the bar gives the button less room too
+      for (const width of [1440, 1024]) {
+        await page.setViewport({ width, height: 900 });
+        await go(page, 'rendering');
+        await page.waitForFunction(() => document.querySelector('[data-testid=agent-fig]')?.textContent === '42%', { timeout: 15000 });
+        const r = await page.$eval('[data-testid=agent-button]', (b) => {
+          const f = b.querySelector('[data-testid=agent-fig]');
+          return {
+            words: b.querySelector('[data-testid=agent-step]').textContent,
+            fig: f.scrollWidth > f.clientWidth + 1,
+            over: b.scrollWidth > b.clientWidth + 1,
+          };
+        });
+        assert(r.words === 'rendering V3' && !r.fig && !r.over, `@${width}: ${JSON.stringify(r)}`);
+      }
+      await page.setViewport({ width: 1440, height: 900 });
+      // the grid's poster chip: the state alone, whole; the sentence in its title
+      state[slug] = 'long';
+      fixtures.long.run.now = { ...fixtures.long.run.now, at: new Date().toISOString() };
+      await layoutTo(page, 'grid');
+      const card = `.film[data-slug="${slug}"] [data-testid=run-line]`;
+      await page.waitForSelector(card, { timeout: 20000 });
+      const chip = await said(page, card);
+      assert(chip.text === 'fixing 3 of 7' && !chip.cut && !chip.over, `the poster's chip: ${JSON.stringify(chip)}`);
+      assert(chip.title === `Claude Code · fixing 3 of 7 · “${LONG}”`, `its title: ${chip.title}`);
+      // the board's line: the state, then the agent's words cut with an ellipsis; a click on it opens the Agent view
+      await page.goto('about:blank');
+      await page.goto(`${BASE}/#/status`, { waitUntil: 'domcontentloaded' });
+      const line = `.bcard[data-slug="${slug}"] [data-testid=run-line]`;
+      await page.waitForFunction((sel) => document.querySelector(sel)?.textContent.includes('rendering v2 ('), { timeout: 20000 }, line);
+      await settle(page);
+      const board = await said(page, line);
+      assert(
+        board.text.startsWith('Claude Code · fixing 3 of 7 · “rendering v2 (') && board.cut && board.ellipsis,
+        `the board's line: ${JSON.stringify(board)}`,
+      );
+      assert(board.title === `Claude Code · fixing 3 of 7 · “${LONG}”`, `its title: ${board.title}`);
+      await shot(page, '08-long-board');
+      await page.click(line);
+      await page.waitForSelector('[data-testid=agent-view]', { timeout: 20000 });
+      assert(page.url().includes('agent=1'), page.url());
+      assert(await page.$eval('[data-testid=panel-agent]', (e) => e.getAttribute('aria-selected') === 'true'), 'the Agent tab is on');
+      assert(/rendering v2 \(/.test(await text(page, '[data-testid=agent-thought]')), 'and says what the agent said');
+    },
+  );
+
   await check('the board: the card says the work, a hairline on the poster while rendering, Answer in the action slot, no spinner', async () => {
     state[slug] = 'working';
     await page.goto('about:blank');
@@ -420,7 +533,7 @@ try {
     await settle(page);
     const card = (s) => `.bcard[data-slug="${s}"]`;
     const line = (s) => text(page, `${card(s)} [data-testid=run-line]`);
-    assert(/Claude Code · rendering\s*42%/.test(await line(others.promo)), `rendering: ${await line(others.promo)}`);
+    assert(/Claude Code · rendering V2\s*42%/.test(await line(others.promo)), `rendering: ${await line(others.promo)}`);
     const edge = await page.$eval(
       `${card(others.promo)} .bthumb [data-testid=run-edge]`,
       (e) => e.getBoundingClientRect().width / e.parentElement.getBoundingClientRect().width,
@@ -500,12 +613,13 @@ try {
 
   await check('every state fits at 390, 768, 1024, 1280, 1440 and 1920, in both themes and in German', async () => {
     const out = [];
-    // every state in English and the dark theme; the longest words (rendering, needs you, failed) in light and German
+    // every state in English and the dark theme; the longest words (rendering, needs you, failed) and the agent's own
+    // long sentence in light and German
     const runs = [
-      ['en', 'dark', ['working', 'rendering', 'needs_you', 'done', 'failed', 'lost']],
-      ['en', 'light', ['rendering', 'needs_you', 'failed']],
-      ['de', 'dark', ['rendering', 'needs_you', 'failed']],
-      ['de', 'light', ['rendering', 'needs_you', 'failed']],
+      ['en', 'dark', ['working', 'rendering', 'needs_you', 'done', 'failed', 'lost', 'long']],
+      ['en', 'light', ['rendering', 'needs_you', 'failed', 'long']],
+      ['de', 'dark', ['rendering', 'needs_you', 'failed', 'long']],
+      ['de', 'light', ['rendering', 'needs_you', 'failed', 'long']],
     ];
     for (const lang of ['en', 'de']) {
       const p = await browser.newPage();
@@ -535,7 +649,22 @@ try {
             // the percentage is never cut, the words are cut with an ellipsis
             const fig = await p.$eval('[data-testid=run-fig]', (e) => e.scrollWidth <= e.clientWidth + 1).catch(() => true);
             if (!fig) out.push(`${st} @${width} ${theme} ${lang}: the figure is cut`);
-            if (SHOTS && (st === 'rendering' || st === 'needs_you') && [390, 768, 1440].includes(width)) await shot(p, `06-${st}-${width}-${theme}-${lang}`);
+            // the agent button (words only on a desk): the state in a word or two, never the agent's sentence, nothing
+            // overflowing it, its figure whole
+            const btn = await p
+              .$eval('[data-testid=agent-button]', (b) => {
+                const f = b.querySelector('[data-testid=agent-fig]');
+                return {
+                  words: b.querySelector('[data-testid=agent-step]')?.textContent ?? '',
+                  over: b.scrollWidth > b.clientWidth + 1,
+                  fig: !!f && f.scrollWidth > f.clientWidth + 1,
+                };
+              })
+              .catch(() => null);
+            if (btn && (btn.over || btn.fig || btn.words.includes('rendering v2')))
+              out.push(`${st} @${width} ${theme} ${lang}: the agent button ${JSON.stringify(btn)}`);
+            if (SHOTS && ['rendering', 'needs_you', 'long'].includes(st) && [390, 768, 1440].includes(width))
+              await shot(p, `06-${st}-${width}-${theme}-${lang}`);
           }
         }
       }

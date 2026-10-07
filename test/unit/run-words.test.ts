@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { RunPlanItem } from '../../lib/types.ts';
-import { cardRun, edgeOf, isOpen, mostUrgent, phaseOf, shortLine } from '../../web/src/sessions/runState.ts';
+import { cardRun, edgeOf, fullWords, isOpen, mostUrgent, ownWords, phaseOf, shortLine, stateWords, tightOf } from '../../web/src/sessions/runState.ts';
 import { clock, idleSaid, madeBy, planSaid, runSaid, workedNow } from '../../web/src/sessions/runWords.ts';
 import { RUN_STATES, runFixtures } from '../../web/src/styleguide/runStates.ts';
 
@@ -116,4 +116,25 @@ test('a permission as the server says it: what it needs to run, once; a stopped 
   const s = runSaid({ ...f.stopped.run, stop_pending: true }, { now: NOW, asOf: NOW, say });
   assert.equal(s.words, 'Stopped · it will notice at its next step');
   assert.equal(runSaid(f.stopped.run, { now: NOW, asOf: NOW, say }).words, 'Stopped after 4 min', 'heard, or one Lampo ran: as before');
+});
+
+test('tight places say the state in a word or two and the figure, never the agent’s own sentence; the title says it whole', () => {
+  // what an agent says with set_status / `vr status`: a version and a stage in its own words, longer than a tight place
+  const long = 'rendering v2 (notes and b-roll from the content folder, then the end card)';
+  const thought = { ...f.thinking.run, now: { text: long, type: 'thought' as const, at: new Date(NOW - 6000).toISOString() } };
+  assert.deepEqual(tightOf(thought), { words: 'fixing 3 of 7', figure: null }, 'the state, never “rendering v2 (…”');
+  // a render that says how far: its version in Lampo’s words, the figure beside the words (never inside, never cut)
+  assert.deepEqual(tightOf(f.rendering.run), { words: 'rendering V4', figure: '42%' });
+  assert.deepEqual(tightOf(f.uploading.run), { words: 'uploading V4', figure: '80%' });
+  const unknown = { ...f.rendering.run, progress: { what: 'render' as const, stage: 'rendering', pct: 42 } };
+  assert.equal(stateWords(unknown), 'rendering', 'no version known: none said');
+  assert.equal(tightOf(f.needs_you.run).words, 'needs you');
+  // the agent's own words, for the lines that have room and for titles: what it said quoted, as it wrote it ("v2")
+  assert.equal(ownWords(thought), `“${long}”`, 'a thought needs none of the UI’s words');
+  assert.equal(ownWords(f.working.run), null, 'a step needs them: left out until they are here');
+  assert.equal(ownWords(f.working.run, say), 'Editing src/Logo.tsx');
+  assert.equal(ownWords(f.failed.run), 'the render failed at frame 312: the font “Inter Display” is missing');
+  assert.equal(ownWords(f.rendering.run, say), null, 'a render says how far it is, not the step before it');
+  assert.equal(fullWords(thought), `fixing 3 of 7 · “${long}”`);
+  assert.equal(fullWords(f.rendering.run, say), 'rendering V4 · 42%');
 });

@@ -121,8 +121,8 @@ export function AgentOnIt({ agent, step }: { agent: string | null; step: string 
   );
 }
 
-/** An Agents row's words while the agent works (the sidebar): what it is doing, after its name; the full line in its
- * title. `idle`: what it says while the agent does nothing ("ready"). */
+/** An Agents row's words while the agent does something with no work open on a video (the sidebar): the state in a
+ * word or two and how far, its step whole in the title. `idle`: what it says while the agent does nothing ("ready"). */
 export function AgentNowText({ agent, idle = null }: { agent: string; idle?: string | null }) {
   const now = useAgentsNow(true).get(agent);
   if (!now)
@@ -131,11 +131,39 @@ export function AgentNowText({ agent, idle = null }: { agent: string; idle?: str
         {idle}
       </span>
     ) : null;
+  const tight = activityShort(now);
+  return <NavNow agent={agent} words={tight.words} figure={tight.figure} full={stepLine(now)} />;
+}
+
+/** An Agents row's state after the agent's name (the sidebar): its words give way with an ellipsis, the figure never.
+ * `full` says it all — in the title after the agent's name, and to screen readers in place of the short words. */
+export function NavNow({ agent, words, figure, full, phase }: { agent: string; words: string; figure?: string | null; full: string; phase?: string }) {
   return (
-    <span className="nav-now" data-testid="agent-now-row" title={`${agent} · ${stepLine(now)}`}>
-      {stepLine(now)}
+    <span className="nav-now" data-testid="agent-now-row" data-phase={phase} title={`${agent} · ${full}`}>
+      <span className="nav-now-words" aria-hidden="true">
+        {words}
+      </span>
+      {figure && (
+        <span className="nav-now-fig" aria-hidden="true">
+          {figure}
+        </span>
+      )}
+      <span className="sr-only">{full}</span>
     </span>
   );
+}
+
+/**
+ * What an agent is doing where nothing of its work is open (the sidebar's rows, the agent button), as a tight place says
+ * it: a word for the state — ready while it only waits for notes, working else, rendering or uploading while one says
+ * how far — and that figure. Never its step or its own sentence: those go whole into the place's title (`stepLine`).
+ */
+export function activityShort(a: AgentActivity): { words: string; figure: string | null } {
+  const far = howFar(a);
+  if (a.kind === 'wait') return { words: t('ready'), figure: null };
+  if (far !== null && a.kind === 'upload') return { words: t('uploading'), figure: pct(far / 100) };
+  if (far !== null) return { words: t('rendering'), figure: pct(far / 100) };
+  return { words: t('working'), figure: null };
 }
 
 /** An Agents row's keyframe: turning while the agent runs or did something a moment ago. */

@@ -163,8 +163,9 @@
 .agent-btn.none .spark {
   color: var(--claude-2);
 }
-/* While the agent works the button says the step it is on, in the name's place: one width for any step, so the bar
- * doesn't shift with every new one (the bar's 150/200 px cap still holds). */
+/* While the agent works the button says where it stands in a word or two, in the name's place, never the agent's own
+ * sentence: one width for any state, so the bar doesn't shift with each (the bar's 150/200 px cap still holds). The
+ * words give way with an ellipsis, a percentage beside them never does. */
 .agent-btn.now {
   width: 200px;
 }
@@ -173,6 +174,13 @@
   text-align: left;
   font-weight: var(--fw-text);
   color: var(--fg-2);
+}
+.agent-btn .agent-fig {
+  flex: none;
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  font-stretch: 87.5%;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
 }
 /* its popover: where the agent stands, then what you can ask, copy or change */
 .am {

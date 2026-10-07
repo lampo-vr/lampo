@@ -114,6 +114,7 @@ export const RunStrip = memo(function RunStrip(p: RunStripProps) {
   const kind = run ? run.agent.kind : p.session ? agentKindOfRef(p.session) : null;
   const actions = said.actions.filter((a) => allowedFor(a, p.canSteer, p.canCheck));
   const busy = p.act.busy;
+  // the line as it is cut with an ellipsis where it doesn't fit: whole in its title, and pressing opens all of it
   const full = [said.name, said.words, said.figure].filter(Boolean).join(' · ');
   const act = (a: RunAction) => {
     if (a === 'answer') return p.onAnswer(run?.needs?.note ?? null);
@@ -136,6 +137,7 @@ export const RunStrip = memo(function RunStrip(p: RunStripProps) {
         className="run-main"
         onClick={p.onOpen}
         aria-label={p.open ? full : t('{line} · show what the agent is doing', { line: full })}
+        title={full}
         aria-expanded={p.phone ? undefined : p.open}
         data-testid="run-open"
         onPointerEnter={p.onWarm}

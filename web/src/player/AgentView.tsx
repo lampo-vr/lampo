@@ -277,6 +277,12 @@ function Shown({
               <KeyGlyph shape={phase === 'needs_you' ? 'diamond' : 'ease'} className={`nav-kg run-kg ${phase === 'needs_you' ? 'ask' : 'live'}`} />
               <span>{p.say(action)}</span>
             </div>
+          ) : thought ? (
+            // it has only said something so far (its status): it works, and its words follow whole, never "nothing yet"
+            <div className="av-line">
+              <KeyGlyph shape="ease" className="nav-kg run-kg live" />
+              <span>{t('working')}</span>
+            </div>
           ) : (
             <div className="av-line quiet">
               <KeyGlyph shape="outline" className="nav-kg run-kg quiet" />

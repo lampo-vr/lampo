@@ -12,10 +12,10 @@ import type { PartRequest, SessionPick, SessionRef } from '../api/types.ts';
 import { t } from '../i18n/index.ts';
 import { usePainted } from '../lib/lazy.ts';
 import { copyText, toast, toastError } from '../lib/toast.ts';
-import type { NoteAt } from '../sessions/activityWords.ts';
-import { LiveSection, stepLine, useAgentNow } from '../sessions/Live.tsx';
+import { type NoteAt, say } from '../sessions/activityWords.ts';
+import { activityShort, LiveSection, stepLine, useAgentNow } from '../sessions/Live.tsx';
 import { listenLine, StartListening, useListening, waitsForStart } from '../sessions/listening.tsx';
-import { LOOK, phaseOf, type RunLike, shortLine } from '../sessions/runState.ts';
+import { fullWords, LOOK, phaseOf, type RunLike, tightOf } from '../sessions/runState.ts';
 import { SessionPicker } from '../sessions/Sessions.tsx';
 import { useAgentRuns, useWakeChoice, WakeAsk } from '../sessions/Wake.tsx';
 import { AgentMark, I } from '../ui/icons.tsx';
@@ -152,44 +152,49 @@ export function AgentMenu({
     }
   };
 
-  // the strip's state, in a word or two, where the button would say the agent's step
-  // the strip's state in its glyph; its words a word or two — while it works, the step it is on, when there is one
+  // The strip's state in its glyph, and in a word or two where the name stands, with how far ("fixing 3 of 6",
+  // "rendering V4" · "42%"): a tight place, so never the step it is on or its own sentence ("rendering v4 (…)") — the
+  // strip right below says those, and the button's title and accessible name say it all. With no work open on the
+  // video, what it does now in a word ("working"); while it only waits for notes, its name.
   const look = work ? LOOK[phaseOf(work)] : null;
-  const short = work && !(phaseOf(work) === 'working' && now) ? shortLine(work) : null;
+  const tight = work ? tightOf(work) : now && now.kind !== 'wait' ? activityShort(now) : null;
+  const full = work ? fullWords(work, (w) => say(w, noteAt)) : now ? stepLine(now, noteAt) : null;
   const label = session
-    ? short
-      ? t('Agent {name}: {step}', { name: session.name, step: short })
-      : now
-        ? t('Agent {name}: {step}', { name: session.name, step: stepLine(now, noteAt) })
-        : listen
-          ? waitsForStart(listen)
-            ? t('Agent {name}, not listening', { name: session.name })
-            : t('Agent {name}, listening', { name: session.name })
-          : active
-            ? t('Agent {name}, running', { name: session.name })
-            : t('Agent {name}, not running', { name: session.name })
+    ? full
+      ? t('Agent {name}: {step}', { name: session.name, step: full })
+      : listen
+        ? waitsForStart(listen)
+          ? t('Agent {name}, not listening', { name: session.name })
+          : t('Agent {name}, listening', { name: session.name })
+        : active
+          ? t('Agent {name}, running', { name: session.name })
+          : t('Agent {name}, not running', { name: session.name })
     : t('Agent');
   const trigger = (
     <button
       type="button"
-      className={`btn sm ghost agent-btn${session ? '' : ' none'}${(short || now) && !compact ? ' now' : ''}`}
+      className={`btn sm ghost agent-btn${session ? '' : ' none'}${tight && !compact ? ' now' : ''}`}
       aria-label={label}
+      title={session && full ? label : undefined}
       data-testid="agent-button"
     >
       {session ? (
         <>
           {look ? <KeyGlyph shape={look.shape} className={`nav-kg run-kg ${look.tone}`} /> : <AgentState active={working} />}
           <AgentMark kind={agentKindOfRef(session)} size={14} />
-          {/* While it works, the step it is on stands where its name does (the name is in the popover and the label). */}
+          {/* While it works, where it stands takes the name's place (the name is in the popover and the label). */}
           {!compact &&
-            (short ? (
-              <span className="agent-name agent-step ellipsis" data-testid="agent-step">
-                {short}
-              </span>
-            ) : now ? (
-              <span className="agent-name agent-step ellipsis" data-testid="agent-step">
-                {stepLine(now, noteAt)}
-              </span>
+            (tight ? (
+              <>
+                <span className="agent-name agent-step ellipsis" data-testid="agent-step">
+                  {tight.words}
+                </span>
+                {tight.figure && (
+                  <span className="agent-fig" data-testid="agent-fig">
+                    {tight.figure}
+                  </span>
+                )}
+              </>
             ) : (
               <span className="agent-name ellipsis">{session.name}</span>
             ))}

@@ -48,9 +48,9 @@ export const videoLink = (slug: string) => `${location.origin}${location.pathnam
 
 /** Opens the player; with ⌘ or Ctrl held (like a link), in a new tab. A move still waiting for its toast goes first, so
  * the player shows where the video stands. */
-export const openVideo = (slug: string, e?: { metaKey: boolean; ctrlKey: boolean }) => {
+export const openVideo = (slug: string, e?: { metaKey: boolean; ctrlKey: boolean }, query?: string) => {
   moveCode.ready?.sendMoveNow(slug);
-  return e && (e.metaKey || e.ctrlKey) ? window.open(videoLink(slug), '_blank', 'noopener') : go(slug);
+  return e && (e.metaKey || e.ctrlKey) ? window.open(videoLink(slug), '_blank', 'noopener') : go(slug, query);
 };
 
 // A video with notes is archived (its review stays, Undo brings it back); one without is removed for good, so that

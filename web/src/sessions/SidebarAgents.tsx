@@ -13,8 +13,9 @@ import { t } from '../i18n/index.ts';
 import { goView, type LibraryView } from '../lib/nav.ts';
 import { AgentMark } from '../ui/icons.tsx';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
-import { AgentNowDot, AgentNowText } from './Live.tsx';
-import { cardRun, LOOK, mostUrgent, phaseOf, type RunLike, shortLine } from './runState.ts';
+import { say } from './activityWords.ts';
+import { AgentNowDot, AgentNowText, NavNow } from './Live.tsx';
+import { cardRun, fullWords, LOOK, mostUrgent, phaseOf, type RunLike, tightOf } from './runState.ts';
 import { SessionHover } from './Sessions.tsx';
 
 /** What the sidebar's row takes (library/Sidebar.tsx NavItem). */
@@ -91,21 +92,21 @@ export function SidebarAgents({ videos, view, Item }: { videos: readonly VideoSu
       {sessions.map(([name, s]) => {
         // with work going on (or ended badly), its state in a word or two and its glyph; else what it does now
         const look = s.run ? LOOK[phaseOf(s.run)] : null;
+        const tight = s.run ? tightOf(s.run) : null;
         return (
           <Item
             key={name}
             lead={<AgentMark kind={agentKindOfRef(s.ref)} size={15} />}
             label={
-              <>
-                {shownAgent(name, agentKindOfRef(s.ref), me)}
-                {s.run ? (
-                  <span className="nav-now" data-testid="agent-now-row" data-phase={phaseOf(s.run)}>
-                    {shortLine(s.run)}
-                  </span>
+              <span className="nav-agent">
+                <span className="nav-agent-name">{shownAgent(name, agentKindOfRef(s.ref), me)}</span>
+                {s.run && tight ? (
+                  // the state in a word or two and how far, never its step or its own sentence (whole in the title)
+                  <NavNow agent={name} words={tight.words} figure={tight.figure} full={fullWords(s.run, say)} phase={phaseOf(s.run)} />
                 ) : (
                   agents && <AgentNowText agent={name} idle={s.active ? t('ready') : null} />
                 )}
-              </>
+              </span>
             }
             count={s.n}
             countOf={t('video|videos', { n: s.n })}
@@ -137,12 +138,12 @@ export function SidebarAgents({ videos, view, Item }: { videos: readonly VideoSu
             key={a.session_id}
             lead={<AgentMark kind={a.kind ?? 'mcp'} size={15} />}
             label={
-              <>
-                {shownAgent(a.name, a.kind, me)}
+              <span className="nav-agent">
+                <span className="nav-agent-name">{shownAgent(a.name, a.kind, me)}</span>
                 <span className="nav-now" data-testid="agent-now-row" data-phase={state} title={`${a.name} · ${STATE_LINES[state]()}`}>
                   {STATE_WORDS[state]()}
                 </span>
-              </>
+              </span>
             }
             dot={<KeyGlyph shape={on ? 'ease' : 'outline'} className={`nav-kg ${on ? 'live' : ''}`} />}
             active={here(a.name)}

@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
 import { ACTIVITY_FILE, type ActivityRecord } from '../lib/activity.ts';
-import { agentName, isActivityKey } from '../lib/activityText.ts';
+import { agentName, isActivityKey, STATUS_CHARS } from '../lib/activityText.ts';
 import { cutChars } from '../lib/names.ts';
 import { currentWorkspace, isoLocal, slugify } from '../lib/paths.ts';
 import { ERROR_MAX, redact } from '../lib/render/redact.ts';
@@ -110,14 +110,15 @@ function cleanVars(v: unknown): Record<string, string | number> | undefined {
 }
 
 /** A clean activity from what a caller sent: known kind and template, one-line words, sane sizes. Null when it is
- * unusable. A failure (`error`) keeps up to ERROR_MAX characters of the tool's words; every other line much less. */
+ * unusable. A failure (`error`) keeps up to ERROR_MAX characters of the tool's words, an agent's status its whole
+ * sentence as kept (STATUS_CHARS: the Agent view shows it whole); every other line less. */
 export function cleanActivity(a: ActivityRecord): (AgentActivity & { video?: string | null }) | null {
   const agent = agentName(a.agent);
   if (!agent || !KINDS.has(a.kind)) return null;
   const failure = a.kind === 'error';
   // a failure's words are a tool's last lines: what looks like a secret goes here too, whatever sent them
   const scrub = (x: unknown) => (failure && typeof x === 'string' ? redact(x) : x);
-  const text = line(scrub(a.text), failure ? ERROR_MAX : 160);
+  const text = line(scrub(a.text), failure ? ERROR_MAX : a.kind === 'status' ? STATUS_CHARS : 160);
   if (!text) return null;
   const target = typeof a.target === 'string' ? cutChars(a.target, 40) : null;
   const at = typeof a.at === 'string' && !Number.isNaN(Date.parse(a.at)) ? a.at : isoLocal();
