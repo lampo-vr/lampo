@@ -37,6 +37,8 @@ const EVENT_MS = 300;
 const FLUSH_MS = 1000;
 /** How often the clock looks at open runs. */
 const SWEEP_MS = 30_000;
+/** Stops not heard yet kept in memory for calls that name no video (the oldest go first). */
+const UNHEARD_MAX = 10_000;
 
 /** What an agent's own write is: these open a run when none is open (reads and waits never do). */
 const WRITES = new Set<AgentActivityKind>(['note', 'fix', 'reply', 'ask', 'upload', 'render', 'error', 'status']);
@@ -849,7 +851,11 @@ export function createRuns({ broadcast, actor, notify }: RunsOptions): Runs {
         who,
       );
       if (!r) return null;
-      if (r.stop_pending && hit.slug !== null) unheard.set(wsKey(r.id), { ws: currentWorkspace(), slug: hit.slug, agent: r.agent.name, id: r.id });
+      if (r.stop_pending && hit.slug !== null) {
+        // bounded: an agent that never calls again leaves its entry (the runs file still says it)
+        if (unheard.size >= UNHEARD_MAX) unheard.delete(unheard.keys().next().value as string);
+        unheard.set(wsKey(r.id), { ws: currentWorkspace(), slug: hit.slug, agent: r.agent.name, id: r.id });
+      }
       const proc = r.delivery === 'machine' ? (r.clock.proc ?? r.id) : null;
       return { run: lib.shownRun(r), proc };
     },
