@@ -85,9 +85,8 @@ format stays backwards compatible throughout.
 - An account deleted, disabled or given a new password while someone signs in to it gets no session and sends no
   sign-in email: the answer is the same as for any wrong sign-in. The same holds while someone takes an invite with
   it: it joins no workspace, and nobody is signed in.
-- Save and Send in the note composer stay where they are when the video's agent is assigned, starts waiting or is
-  unassigned while you write: only which of the two is the main action changes, so a click meant for Save never lands
-  on Send.
+- Save and Send in the note composer keep their size when the video's agent is assigned, starts waiting or is
+  unassigned while you write: the pair never grows, shrinks or shifts beside the rest of the toolbar.
 - On a phone, a long note keeps the line you are typing above the pinned Save and Send, and that bar sits flush with
   the bottom of the notes sheet instead of letting the note show beneath it.
 - Auto-check works again on videos longer than about 50 seconds with current FFmpeg releases (5.1.9, 7.1.4, 8.0.2
@@ -111,6 +110,8 @@ format stays backwards compatible throughout.
   dialog is full, then scroll inside while the name, the files and the actions stay put; Write and Preview are one box,
   so switching moves nothing; on a phone the dialog takes the whole screen. Import and Copy sit together under
   *SKILL.md*. An open brief or rules editor starts with room for a paragraph.
+- **The main button in the note composer is always the one on the right.** On a video with an agent, Save sits on the
+  right as the main action (⌘↵) and Send on its left (⇧⌘↵); without an agent it stays Save, then Send.
 
 ## [0.1.0] - 2026-10-06
 
