@@ -261,3 +261,34 @@ test('the agent’s upload with its person’s token: its progress joins the run
   assert.equal(after.progress, null, 'its upload is done');
   assert.ok(!(await runs()).some((x) => x.agent.name === 'Mia'), 'an upload under the account’s name opened no run of its own');
 });
+
+test('Stop reaches the agent at its next call, once, in the answer its vr reads: never another account’s agent, never another workspace’s', async () => {
+  const ws = await import('../../lib/workspaces.ts');
+  const run = (await runs()).find((x) => x.ended === null && x.agent.name === AGENT) as Run;
+  assert.equal(run.state, 'working');
+  const stopped = await request('POST', `/api/runs/${run.id}/stop`, { body: {}, headers: as.mia });
+  assert.equal(stopped.status, 200, stopped.text);
+  assert.equal(stopped.json().run.stop_pending, true, 'it listens: told at its next call');
+  const eve = await auth.createUser({ email: 'eve@example.com', name: 'Eve', password: 'eves password 1', role: 'member' });
+  const carl = await auth.createUser({ email: 'carl@example.com', name: 'Carl', password: 'carls password 1', role: 'member' });
+  if (!ws.roleIn('w1', eve.id)) ws.addMember('w1', eve.id, 'member');
+  const C = ws.createWorkspace({ name: 'Charlie', ownerId: carl.id }).id;
+  // only there (an account made now may not be a member here at all)
+  if (ws.roleIn('w1', carl.id)) ws.removeMember('w1', carl.id);
+  const heard = async (headers: Record<string, string>) => {
+    const entries = [
+      { at: new Date().toISOString(), agent: 'cloud-cut', kind: 'read', text: 'Reading the open notes', key: 'Reading the open notes', video: slug },
+    ];
+    const r = await request('POST', '/api/agents/activity', { body: { entries }, headers });
+    assert.equal(r.status, 200, r.text);
+    return (r.json() as { lines?: string[] }).lines;
+  };
+  // another member's agent of the same name, and a member of another workspace: nothing
+  assert.equal(await heard({ Authorization: `Bearer ${auth.createToken(eve.id, 'agent').token}` }), undefined);
+  assert.equal(await heard({ Authorization: `Bearer ${auth.createToken(carl.id, 'agent', { workspace: C }).token}` }), undefined);
+  assert.equal((await runs()).find((x) => x.id === run.id)?.stop_pending, true, 'still waiting for its own agent');
+  // Mia's agent: the line, once
+  assert.deepEqual(await heard(as.miaToken), ['The person stopped this work on spot.mp4: stop now, render nothing, mark nothing, and say you stopped.']);
+  assert.equal(await heard(as.miaToken), undefined, 'told once');
+  assert.equal((await runs()).find((x) => x.id === run.id)?.stop_pending, undefined);
+});

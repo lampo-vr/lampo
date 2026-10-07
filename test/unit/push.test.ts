@@ -270,6 +270,75 @@ test('locally, the owner hears about what others did, not about their own fixes'
   push.unsubscribe(b.endpoint, null);
 });
 
+test('agents: a failure and a permission it waits for ping (on by default), one gone quiet only when asked; bundled per video', async () => {
+  reset();
+  const b = browser('https://fcm.googleapis.com/fcm/send/device-agents');
+  push.subscribe({ endpoint: b.endpoint, keys: b.keys, user: null });
+  assert.equal(push.DEFAULT_PREFS.agents, true);
+  assert.equal(push.DEFAULT_PREFS.quiet, false);
+  const svc = service();
+  const p = push.createPush({ subject: 'mailto:ops@example.com', fetchImpl: svc.fetchImpl, resolve: PUBLIC });
+  const base = { slug: 'promo', video: 'promo.mp4', agent: 'Claude Code', run: 'run_0123456789ab' };
+  p.run({
+    ...base,
+    kind: 'failed',
+    words: {
+      text: 'The render failed (exit 1)',
+      key: 'The render failed (exit {code})',
+      vars: { code: 1 },
+      quote: 'frame 312 ↵ Error: font Inter Display not found',
+    },
+  });
+  p.run({
+    ...base,
+    slug: 'teaser',
+    video: 'teaser.mp4',
+    kind: 'permission',
+    words: { text: 'Needs permission to run npx remotion render', key: 'Needs permission to run {command}', vars: { command: 'npx remotion render' } },
+    allow: 'Bash(npx remotion render:*)',
+  });
+  p.run({ ...base, slug: 'spring', video: 'spring.mp4', kind: 'quiet', minutes: 30 });
+  p.flush();
+  await p.idle();
+  const got = Object.fromEntries(svc.got.map((g) => [b.read(g.body).title, { msg: b.read(g.body), urgency: g.headers.get('urgency') }]));
+  assert.deepEqual(Object.keys(got).sort(), [
+    'Claude Code is waiting for your OK to render teaser.mp4',
+    'Claude Code stopped — the render of promo.mp4 failed',
+  ]);
+  assert.equal(got['Claude Code stopped — the render of promo.mp4 failed'].msg.body, '“Error: font Inter Display not found”', 'the tool’s last line');
+  assert.equal(
+    got['Claude Code is waiting for your OK to render teaser.mp4'].msg.body,
+    'Allow Bash(npx remotion render:*) in its settings, then send it again.',
+  );
+  assert.equal(got['Claude Code is waiting for your OK to render teaser.mp4'].urgency, 'high', 'it waits for you');
+  assert.equal(got['Claude Code stopped — the render of promo.mp4 failed'].msg.url, '#/inbox');
+  // quiet only when asked for; agents off: none of these
+  svc.got.length = 0;
+  push.updatePrefs(b.endpoint, null, { quiet: true, agents: false });
+  p.run({ ...base, kind: 'failed', words: { text: 'Stopped with an error', key: 'Stopped with an error' } });
+  p.run({ ...base, slug: 'spring', video: 'spring.mp4', kind: 'quiet', minutes: 31 });
+  p.flush();
+  await p.idle();
+  assert.deepEqual(
+    svc.got.map((g) => b.read(g.body).title),
+    ['No word from Claude Code on spring.mp4 for 31 min'],
+  );
+  // never for started, rendering or progress: there is no such notice at all
+  assert.equal(
+    push.runMessage([
+      { ...base, kind: 'permission', words: { text: 'x', key: 'Needs permission to use {tool}', vars: { tool: 'Lampo' } }, allow: 'mcp__lampo' },
+    ]).title,
+    'Claude Code is waiting for your OK to use Lampo on promo.mp4',
+  );
+  push.unsubscribe(b.endpoint, null);
+});
+
+test('agents’ pings go to people with the agents right in the workspace (never a reviewer)', () => {
+  const msg = push.runMessage([{ kind: 'failed', slug: 's', video: 's.mp4', agent: 'cut', run: 'run_0123456789ab' }]);
+  assert.equal(msg.category, 'agents');
+  assert.deepEqual(msg.authors, ['agent:cut'], 'nobody is left out as its author');
+});
+
 test('dead subscriptions are dropped; a busy push service gets one retry', async () => {
   reset();
   const gone = browser('https://fcm.googleapis.com/fcm/send/gone');
@@ -422,6 +491,12 @@ test('API: key, subscribe, preferences, a test notification, unsubscribe', async
   assert.equal(sub.devices, 1);
   const prefs = (await (await api('PATCH', '/api/push/prefs', { endpoint: b.endpoint, prefs: { versions: true } })).json()) as PushState;
   assert.equal(prefs.subscription?.prefs.versions, true);
+  // the agents' switches: a failure or a permission (on), an agent gone quiet (off until asked for)
+  assert.equal(prefs.subscription?.prefs.agents, true);
+  assert.equal(prefs.subscription?.prefs.quiet, false);
+  const quiet = (await (await api('PATCH', '/api/push/prefs', { endpoint: b.endpoint, prefs: { quiet: true, agents: false } })).json()) as PushState;
+  assert.equal(quiet.subscription?.prefs.quiet, true);
+  assert.equal(quiet.subscription?.prefs.agents, false);
   assert.equal((await api('POST', '/api/push/test', { endpoint: b.endpoint })).status, 200);
   assert.equal(b.read(svc.got.at(-1)?.body as Buffer).title, 'Notifications are on');
   assert.equal(((await (await api('POST', '/api/push/unsubscribe', { endpoint: b.endpoint })).json()) as PushState).devices, 0);

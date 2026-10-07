@@ -149,6 +149,9 @@ try {
   const inbox = fs.readFileSync(path.join(env.VR_DATA as string, 'INBOX.md'), 'utf8');
   const inboxNotes = (inbox.match(/^### /gm) || []).length || events.length;
   cli.push({ item: `INBOX.md per note (avg of ${inboxNotes})`, tokens: Math.round(approxTokens(inbox) / Math.max(1, inboxNotes)) });
+  // what an agent's next answer ends with, once, after a person stopped its work (lib/runs.ts)
+  const { stopLine } = await import('../../lib/runs.ts');
+  cli.push({ item: 'the stop line, appended once', tokens: approxTokens(stopLine(fx.video)) });
   const skill = fs.readFileSync(path.join(ROOT, 'skills/lampo/SKILL.md'), 'utf8');
   cli.push({ item: 'skills/lampo/SKILL.md (read into context)', tokens: approxTokens(skill) });
   // A render as the agent's shell shows it, against the same command through `vr render` (its two lines), and one

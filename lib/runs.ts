@@ -875,6 +875,7 @@ export function briefOf(r: StoredRun, now = Date.now()): RunBrief {
     ...(s.result ? { result: s.result } : {}),
     ...(s.error ? { error: s.error } : {}),
     ...(s.needs ? { needs: s.needs } : {}),
+    ...(s.stop_pending ? { stop_pending: true } : {}),
     planned: s.plan.length,
     answered: s.plan.filter(isAnswered).length,
   };
