@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { execFileSync } from 'node:child_process';
 // covers: web/src/inbox/ web/src/sessions/RunNeeds.tsx web/src/styles/runneeds.css web/src/foryou/ lib/foryou.ts lib/pushPrefs.ts
 // covers: server/runs.ts server/routes/runs.ts server/routes/phone.ts
 // Browser end-to-end test of an agent's work that needs the person, in the inbox: a permission it was refused (the
@@ -8,6 +7,7 @@ import { execFileSync } from 'node:child_process';
 // quiet ones folded into Stalled. A reviewer of a hosted team sees none of it; Settings → Notifications has the agents
 // and quiet switches. Every screen at 390–1920, both themes and German, with real-shaped work written as the server
 // keeps it (data/<slug>/runs.jsonl). Screenshots land in VR_SHOTS.
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { age, makeVideo, sleep, until, VR } from '../lib/helpers.ts';
