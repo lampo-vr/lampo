@@ -132,3 +132,27 @@ test('WS-11: an agent’s “open in the player” link (show_review) names the 
     server.close();
   }
 });
+
+test('a workspace’s notice mail (billing’s trial, grace, read-only) opens that workspace’s screen', async () => {
+  const fs = await import('node:fs');
+  const { readOutbox } = await import('../../lib/mail/index.ts');
+  const ctx = createContext({ cfg: loadConfig(), token: 'unused' });
+  try {
+    const words = { subject: 'Your trial ends soon', title: 'Your trial ends soon', body: ['Choose a plan.'], button: 'Choose a plan' };
+    assert.equal(ctx.accountMail.workspaceNotice({ workspace: B, text: { en: words }, link: '#/settings/billing' }), 1);
+    await ctx.mail.flush();
+    const outbox = path.join(dir, 'cache', 'outbox');
+    const mail = fs.existsSync(outbox) ? readOutbox(outbox).find((m) => m.to === 'bo@example.com' && m.kind === 'notice') : undefined;
+    assert.ok(mail, 'Bo, B’s owner, is told');
+    assert.ok(mail.text.includes(`${PUBLIC}/#/settings/billing?w=${B}`), mail.text);
+  } finally {
+    ctx.mail.stop();
+  }
+});
+
+test('an agent’s line about a post (draft_post, get_posts) opens it in its workspace', async () => {
+  const { postLines } = await import('../../lib/publish/posts.ts');
+  const post = { id: 'po_000000000001', slug: 'spot.mp4', platform: 'youtube', state: 'draft', v: 1, problems: [], video: 'spot.mp4' };
+  const line = scope.inWorkspace(B, () => postLines(post as never, PUBLIC));
+  assert.ok(line.endsWith(`${PUBLIC}/#/v/spot.mp4?publish=po_000000000001&w=${B}`), line);
+});

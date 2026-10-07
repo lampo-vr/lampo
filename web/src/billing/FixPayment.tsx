@@ -7,14 +7,13 @@ import { useEffect, useState } from 'react';
 import type { BillingInfo, BillingSecret } from '../../../lib/types.ts';
 import { locale, t } from '../i18n/index.ts';
 import { useLoaded } from '../lib/lazy.ts';
-import { errorMessage, toastError } from '../lib/toast.ts';
 import { methodLabel, payForms } from '../settings/BillingAccount.tsx';
 import { Spinner } from '../ui/feedback.tsx';
 import { I } from '../ui/icons.tsx';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { Modal } from '../ui/primitives.tsx';
-import { useBillingAccount, useDefaultMethod, usePayInvoice } from './api.ts';
-import { dayOf, money, whyFailed } from './words.ts';
+import { toastRefusal, useBillingAccount, useDefaultMethod, usePayInvoice } from './api.ts';
+import { billingSaid, dayOf, money, whyFailed } from './words.ts';
 
 const DAY = 86_400_000;
 
@@ -30,7 +29,7 @@ export function FixPayment({ b, onClose }: { b: BillingInfo; onClose: () => void
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, when the sheet opens
   useEffect(() => {
     payForms.load().catch(() => {});
-    ask().then(setSecret, (e) => setFailed(errorMessage(e)));
+    ask().then(setSecret, (e) => setFailed(billingSaid(e)));
   }, []);
 
   const f = b.failure;
@@ -180,7 +179,7 @@ export function FixPayment({ b, onClose }: { b: BillingInfo; onClose: () => void
                   title={t('A new card')}
                   action={total ? t('Pay {amount}', { amount: total }) : t('Pay')}
                   onDone={async (method) => {
-                    if (method) await def.mutateAsync(method).catch(toastError);
+                    if (method) await def.mutateAsync(method).catch(toastRefusal);
                     setPaid({ method });
                   }}
                   onCancel={onClose}

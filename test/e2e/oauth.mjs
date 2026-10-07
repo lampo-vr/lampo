@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// covers: web/src/auth/AuthScreens.tsx web/src/settings/Tokens.tsx server/routes/oauth.ts server/routes/mcp.ts
+// covers: web/src/auth/AuthScreens.tsx web/src/settings/Tokens.tsx server/routes/oauth.ts server/routes/mcp.ts web/src/main.tsx
 // covers: lib/oauth/ lib/scopes.ts lib/browserLogin.ts lib/cliAccount.ts
 // Browser end-to-end test of the OAuth sign-in for MCP clients (server mode): an app registers and sends the person to
 // /oauth/authorize while signed out → the app's sign-in screen → the consent screen (who asks, where the answer goes,
@@ -309,6 +309,33 @@ try {
       assert(/^vra_/.test(answer.get('code') || ''), 'with a code');
     } finally {
       await app.close();
+    }
+  });
+
+  await check('the consent page’s open opener policy stays with the consent screen: /?consent#/ loads the app without it', async () => {
+    const coop = new Map();
+    const heard = (r) => r.request().resourceType() === 'document' && coop.set(new URL(r.url()).search, r.headers()['cross-origin-opener-policy']);
+    page.on('response', heard);
+    try {
+      // a fresh page at the address, as a link or a reload opens it
+      await page.goto('about:blank');
+      await page.goto(`${BASE}/?consent#/`, { waitUntil: 'domcontentloaded' });
+      await page.waitForFunction(() => location.search === '' && location.pathname === '/', { timeout: 10000 });
+      assert(coop.get('?consent') === 'unsafe-none', `the consent address itself: ${coop.get('?consent')}`);
+      assert(coop.get('') === 'same-origin', `then the app as usual: ${JSON.stringify([...coop])}`);
+      // and from the consent screen, a hash that leads anywhere else loads the app again too
+      coop.clear();
+      await page.goto('about:blank');
+      await page.goto(`${BASE}/?consent#/oauth/error?error=invalid_request`, { waitUntil: 'domcontentloaded' });
+      await page.waitForFunction(() => document.readyState === 'complete');
+      assert(new URL(page.url()).search === '?consent', `the consent screen stays where it is: ${page.url()}`);
+      await page.evaluate(() => {
+        location.hash = '#/';
+      });
+      await page.waitForFunction(() => location.search === '', { timeout: 10000 });
+      assert(coop.get('') === 'same-origin', `loaded again without it: ${JSON.stringify([...coop])}`);
+    } finally {
+      page.off('response', heard);
     }
   });
 

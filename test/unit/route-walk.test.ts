@@ -2,9 +2,10 @@
 // encoded prefix — anonymously, as a reviewer (API token and browser session) and as the owner. Only the canonical
 // path may reach a handler; everything else is refused or not found, and the app shell is the most a variant may get.
 // (A route matched case-insensitively once skipped sign-in and the role table: /API/status served every video.)
-// An extension module's routes are walked too (a stand-in like Lampo Cloud's: a signed-in read, a signed-in write and a
-// public webhook): signed out only its public one answers, no spelling of any of them reaches its handler, and the role
-// table holds each to the role it declares (BILL-10: a module that forgets its own check is still covered).
+// An extension module's routes are walked too (a stand-in like Lampo Cloud's: a signed-in read, a person's read, a
+// signed-in write and a public webhook): signed out only its public one answers, no spelling of any of them reaches its
+// handler, and the role table holds each to the role it declares, a HEAD to its GET's (a module that forgets its own
+// check is still covered).
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -44,6 +45,13 @@ ctx.extension = ext.createExtension(
         path: '/api/billing',
         role: 'reviewer',
         handle: async (req) => (host.who(req) ? { status: 200, json: { plan: 'team' } } : { status: 401, json: {} }),
+      },
+      {
+        method: 'GET',
+        path: '/api/billing/account',
+        role: 'admin',
+        person: true,
+        handle: async (req) => (host.who(req) ? { status: 200, json: { card: 'on file' } } : { status: 401, json: {} }),
       },
       {
         method: 'POST',
@@ -228,10 +236,13 @@ test('the canonical path: signed out, only the public routes answer; reviewers g
       const declared = moduleRoute(method, pattern);
       if (declared) {
         if (declared.public) continue;
-        const r = await ask(method, url, callers['reviewer (token)'], body);
-        const allowed = declared.role === 'reviewer' && !declared.person;
-        if (allowed ? r.status === 403 : r.status !== 403)
-          problems.push(`reviewer token ${method} ${url} (module: ${declared.role}${declared.person ? ', a person' : ''}) → ${r.status}`);
+        // a HEAD runs the GET's handler: it is held to the same declaration
+        for (const asked of method === 'GET' ? ['GET', 'HEAD'] : [method]) {
+          const r = await ask(asked, url, callers['reviewer (token)'], body);
+          const allowed = declared.role === 'reviewer' && !declared.person;
+          if (allowed ? r.status === 403 : r.status !== 403)
+            problems.push(`reviewer token ${asked} ${url} (module: ${declared.role}${declared.person ? ', a person' : ''}) → ${r.status}`);
+        }
         continue;
       }
       if (isPublic(pattern) || rule === 'self' || rule === 'public' || (rule !== 'none' && can(reviewerRole, rule))) continue;
@@ -255,10 +266,24 @@ test('what only a person does: every PERSON_ONLY route is a registered one, and 
     if (r.status !== 403 || !r.text.includes(PERSON_ONLY_ERROR)) problems.push(`owner token ${method} ${pattern} → ${r.status} ${r.text.slice(0, 80)}`);
   }
   // a module's routes that are a person's alone: the owner's own token is refused there too
-  for (const route of ctx.extension.routes.filter((x) => x.person)) {
-    const r = await ask(route.method, route.path, callers.owner as Record<string, string>, WRITES.has(route.method) ? '{}' : undefined);
-    if (r.status !== 403 || !r.text.includes(PERSON_ONLY_ERROR))
-      problems.push(`owner token ${route.method} ${route.path} (module) → ${r.status} ${r.text.slice(0, 80)}`);
-  }
+  for (const route of ctx.extension.routes.filter((x) => x.person))
+    for (const asked of route.method === 'GET' ? ['GET', 'HEAD'] : [route.method]) {
+      const r = await ask(asked, route.path, callers.owner as Record<string, string>, WRITES.has(asked) ? '{}' : undefined);
+      // a HEAD's answer has no body to read the sentence from
+      if (r.status !== 403 || (asked !== 'HEAD' && !r.text.includes(PERSON_ONLY_ERROR)))
+        problems.push(`owner token ${asked} ${route.path} (module) → ${r.status} ${r.text.slice(0, 80)}`);
+    }
+  // every write on credentials, members, webhooks, workspaces and links is a person's, but what is listed here
+  const NOT_ONLY_A_PERSON = new Set([
+    // ending a credential is never a way in: an agent may revoke its own token or an app
+    'DELETE /api/auth/tokens/:id',
+    'DELETE /api/auth/apps/:id',
+    // a session's own workspace; a token works in the one it was made in
+    'POST /api/workspaces/switch',
+  ]);
+  const only = new Set(PERSON_ONLY.map(([m, p]) => `${m} ${p}`));
+  for (const [m, p] of routes)
+    if (WRITES.has(m) && /^\/api\/(admin|workspaces|auth\/(tokens|apps)|shares|folder-shares|publish\/connections)(\/|$)|\/shares$/.test(p))
+      if (!only.has(`${m} ${p}`) && !NOT_ONLY_A_PERSON.has(`${m} ${p}`)) problems.push(`${m} ${p} is no person's alone (PERSON_ONLY)`);
   assert.deepEqual(problems, [], problems.join('\n'));
 });

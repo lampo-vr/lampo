@@ -415,6 +415,27 @@ try {
     assert(!stripeRequests.length, 'still nothing from Stripe');
   });
 
+  await check('back from paying: Billing says so only in the tab that paid, never from an address alone', async () => {
+    for (const q of ['paid=done', 'method=done', 'checkout=done']) {
+      await fresh(`#/settings/billing?${q}`);
+      await page.waitForSelector('[data-testid=billing-plan][data-kind]');
+      assert(!(await page.$('[data-testid=billing-return]')), `${q}: said from the address alone`);
+      assert((await page.evaluate(() => location.hash)) === '#/settings/billing', `${q}: the address is cleaned`);
+    }
+    // this tab started a payment (as the payment sheet and the checkout mark it right before they confirm)
+    // and a bank's page that answers within the tab comes back through the address
+    await page.evaluate(() => {
+      sessionStorage.setItem('vr.billing.paying', String(Date.now()));
+      location.hash = '#/settings/billing?paid=done';
+    });
+    await page.waitForSelector('[data-testid=billing-return]');
+    assert(/the invoice is paid/.test(await text('[data-testid=billing-return]')));
+    // said once: the same address again is a link's
+    await fresh('#/settings/billing?paid=done');
+    await page.waitForSelector('[data-testid=billing-plan][data-kind]');
+    assert(!(await page.$('[data-testid=billing-return]')), 'said once');
+  });
+
   await check('choosing a plan opens the checkout step at its own address; paid there, and Billing shows the plan', async () => {
     // the sweep above reloaded the page at phone sizes: monthly in USD again (the checkout itself: test/e2e/checkout.mjs)
     await openBilling();

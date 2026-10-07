@@ -192,7 +192,8 @@ test('vr watch follows the server live and heartbeats its session', async () => 
     const sessions = await listed();
     assert.deepEqual(
       sessions.map((s: { name: string; sessionId: string; cwd: string }) => [s.name, s.sessionId, s.cwd]),
-      [['remote-agent', 'sess-remote-1', '/work/acme']],
+      // (named with whose it is, as every agent a heartbeat lists from another computer)
+      [['remote-agent · Olivia', 'sess-remote-1', '/work/acme']],
       'the watching agent can be assigned videos',
     );
   } finally {

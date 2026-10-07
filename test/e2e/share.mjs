@@ -1179,12 +1179,14 @@ try {
     // made room only once the picture landed moved the buttons under a visitor's tap.
     const reel = await add('Upright/export/reel.mp4', 'Upright', { w: 180, h: 320, pattern: 'smptebars' });
     const share = (body) => api(`/api/review/${encodeURIComponent(reel.slug)}/shares`, 'POST', { notes: 'all', ...body });
-    // the note's own version is listed where the link shows every version; a newest-only link lists V2 alone
+    // the note's frame is V1's: a link that shows every version shows it (on a desk and on a phone); a newest-only link
+    // lists V2 alone, and so shows the note without V1's picture
     const links = [
       { label: 'Reel', versions: 'all', viewport: { width: 1440, height: 900 } },
-      { label: 'Reel newest', viewport: { width: 390, height: 844, isMobile: true, hasTouch: true } },
+      { label: 'Reel phone', versions: 'all', viewport: { width: 390, height: 844, isMobile: true, hasTouch: true } },
     ];
     for (const l of links) l.token = (await share({ label: l.label, ...(l.versions ? { versions: l.versions } : {}) })).token;
+    const newest = (await share({ label: 'Reel newest' })).token;
     const gid = (await api(`/api/g/${links[0].token}`)).videos[0].slug;
     const note = await api(`/api/g/${links[0].token}/comments`, 'POST', { name: 'Mia', slug: gid, v: 1, frame: 12, text: 'Kürzer' });
     makeVideo(reel.file, { w: 180, h: 320, fps: 30, dur: 3, pattern: 'smptebars', freq: 880 });
@@ -1233,6 +1235,19 @@ try {
       }
     }
     assert(!problems.length, `the card keeps its picture's room, and nothing moves when it arrives: ${problems.join(' | ')}`);
+    // the newest-only link: the fixed note and its check, no frame of the version it doesn't show
+    const p = await browser.newPage();
+    p.on('pageerror', (e) => errors.push(e.message));
+    try {
+      const asked = [];
+      p.on('request', (r) => r.url().includes('/data/g/') && asked.push(r.url()));
+      await p.goto(`${BASE}/g/${newest}`, { waitUntil: 'domcontentloaded' });
+      await p.waitForSelector('.g-note .g-check .btn.ok');
+      assert(!(await p.$('.g-note .c-thumb')), 'no V1 frame on a newest-only link');
+      assert(!asked.length, `nothing asked for it: ${asked.join(', ')}`);
+    } finally {
+      await p.close();
+    }
   });
 
   await check('no page errors along the way', async () => {

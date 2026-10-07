@@ -29,12 +29,22 @@ const isHosted = (): boolean => {
   return hosted;
 };
 
-export function readSetting(): FootageSetting | null {
+/**
+ * What the workspace said: null when it said nothing (no file), `unreadable` when its file is there and can't be read —
+ * never taken for nothing said, which on a person's machine means on: someone may have turned it off.
+ */
+export function readSetting(): FootageSetting | null | 'unreadable' {
+  let text: string;
   try {
-    const s = JSON.parse(fs.readFileSync(file(), 'utf8')) as FootageSetting;
-    return typeof s.on === 'boolean' ? s : null;
+    text = fs.readFileSync(file(), 'utf8');
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === 'ENOENT' ? null : 'unreadable';
+  }
+  try {
+    const s = JSON.parse(text) as FootageSetting;
+    return s && typeof s.on === 'boolean' ? s : 'unreadable';
   } catch {
-    return null;
+    return 'unreadable';
   }
 }
 
@@ -42,6 +52,7 @@ export function readSetting(): FootageSetting | null {
 export function footageState(): { on: boolean; why?: string } {
   if (footageOffEverywhere()) return { on: false, why: 'footage search is off on this machine or server (footage: "off" / VR_FOOTAGE=off)' };
   const s = readSetting();
+  if (s === 'unreadable') return { on: false, why: 'footage search is off: its setting (footage.json) can’t be read — vr footage on or off writes it again' };
   if (s) return s.on ? { on: true } : { on: false, why: 'footage search is off for this workspace (vr footage on turns it on)' };
   if (isHosted()) return { on: false, why: 'footage search is off for this workspace: an owner or admin turns it on (vr footage on)' };
   return { on: true };

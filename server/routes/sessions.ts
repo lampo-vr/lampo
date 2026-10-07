@@ -118,18 +118,24 @@ export function sessionRoutes(ctx: ServerContext): Router {
   // listens for as long as it is listed (only `vr watch` sends this: lib/backend/remote.ts watchEvents).
   r.post('/api/agents/heartbeat', express.json(), (req, res) => {
     const b = body(Heartbeat, req);
-    ctx.agents.heartbeat(
+    // the ids MCP gives the agents it lists are its own: a heartbeat never speaks for one
+    if (b.session_id.startsWith('mcp-')) throw fail(400, 'session ids starting with "mcp-" are the MCP server’s own: send your session’s id');
+    const machine = req.auth?.via === 'local';
+    const account = machine ? null : (req.auth?.user ?? null);
+    const told = ctx.agents.heartbeat(
       {
         session_id: b.session_id,
-        name: b.name,
+        // what it calls itself, with whose it is: never listed under another person's name alone
+        name: account ? (ownedAgentName(b.name, account.name) ?? b.name) : b.name,
         cwd: b.cwd || null,
         host: b.host || null,
         // Whose agent it is, unless it runs on the machine itself (the machine owner's, like every local agent).
-        user: req.auth?.via === 'local' ? null : req.auth?.user?.name || null,
+        user: account?.name || null,
         kind: b.kind ?? 'cli',
       },
-      { listens: true, ...(req.auth?.via !== 'local' && req.auth?.user?.id ? { account: req.auth.user.id } : {}) },
+      { listens: true, ...(account ? { account: account.id } : {}) },
     );
+    if (!told) throw fail(409, 'another account’s agent is listed under this session id');
     res.json({ ok: true });
   });
 

@@ -41,16 +41,28 @@ export function endpointsFrom(env: NodeJS.ProcessEnv = process.env): { endpoints
   } catch {
     throw new Error('VR_PUBLISH_ENDPOINTS is not JSON');
   }
+  if (!given || typeof given !== 'object' || Array.isArray(given)) throw new Error('VR_PUBLISH_ENDPOINTS must be a JSON object of endpoint URLs');
   const endpoints = { ...DEFAULT_ENDPOINTS };
   const named = new Set<string>();
   for (const k of Object.keys(DEFAULT_ENDPOINTS) as (keyof Endpoints)[]) {
     const v = given[k];
     if (typeof v !== 'string') continue;
-    const u = new URL(v);
+    const u = URL.canParse(v) ? new URL(v) : null;
+    if (!u || (u.protocol !== 'https:' && u.protocol !== 'http:')) throw new Error(`VR_PUBLISH_ENDPOINTS: ${k} must be an http(s) URL`);
     endpoints[k] = v.replace(/\/+$/, '');
     named.add(u.host);
   }
   return { endpoints, named };
+}
+
+/** What is wrong with VR_PUBLISH_ENDPOINTS, as start-up refusals (lib/config.ts startupProblems): one line each. */
+export function endpointsProblems(env: NodeJS.ProcessEnv = process.env): string[] {
+  try {
+    endpointsFrom(env);
+    return [];
+  } catch (e) {
+    return [`${(e as Error).message} (docs/publishing.md).`];
+  }
 }
 
 /** A failure on the way: `transient` ones (the network, a timeout, a 5xx, a rate limit) are tried again later. */

@@ -387,8 +387,8 @@ Where a billing module runs, the server counts how sign-ups become paying worksp
 404, as if there were no such page). It is first-party and small:
 
 - **Eight steps, once per workspace, the first time each happens**: signed up, setup done (finished or skipped), the
-  first video of its own (not the sample), the first review link, a link's first opening by a visitor (never the team's
-  own preview), the first fix checked, active at the trial's end and the first payment. The last two are the module's to
+  first video of its own (not the sample), the first review link and a link's first opening by a visitor (never the
+  team's own preview, never a link on the sample), the first fix checked, active at the trial's end and the first payment. The last two are the module's to
   tell (`host.funnel(workspace, 'trial_end' | 'plan_paid', { plan, active })`); a trial's end counts when anything
   happened in the workspace in its last three days (the module's `active`, or when it leaves that out, the workspace's
   own log). The server records the rest where they happen. Each is a workspace id, the day (UTC) and the plan, in `data/funnel.json` (0600, next to `workspaces.json`).
@@ -559,10 +559,10 @@ a hosted server only). An open sign-up can do nothing until its address is confi
 meanwhile.
 
 **Browser sign-ins** are signed `HttpOnly; SameSite=Lax` cookies, over https named `__Host-vr_session` (this host
-only, `Secure`, the whole site: a sibling subdomain can't set or overwrite it; a browser holding the older `vr_session`
-is moved to it on its next request, still signed in). They last at most 30 days and end after 14 days
+only, `Secure`, the whole site: a sibling subdomain can't set or overwrite it; a `vr_session` is never read over https,
+and an answer expires it, so a browser that still holds one signs in once more). They last at most 30 days and end after 14 days
 without use (`VR_SESSION_DAYS`, `VR_SESSION_IDLE_DAYS`). Signing out ends that session on the server too, so a copy of
-its cookie stops working; changing the password, disabling the account or *sign out everywhere* ends all of them.
+its cookie stops working, and tells the browser to drop its cached renders and pictures; changing the password, disabling the account or *sign out everywhere* ends all of them.
 *Sign out everywhere* and any new password (in Profile, set by an admin, or from a reset link) also end the account's
 notifications on every device (its push subscriptions); a new password also ends its apps connected through sign-in,
 and a reset its API tokens. A browser told its session is gone (a `401`, or a status that names nobody) deletes the

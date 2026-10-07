@@ -64,8 +64,10 @@ On a machine without the app running, `vr footage index` indexes in its own proc
 
 **The model** is [SigLIP B/16-224](https://huggingface.co/Xenova/siglip-base-patch16-224), int8 (Google, Apache-2.0):
 213 MB, downloaded once on first use into `<cache>/models/siglip-base-patch16-224/` (`VR_FOOTAGE_MODELS` moves it),
-from one pinned revision, every file checked by size and SHA-256 before it is used. Nothing downloads at install
-time. It runs in a process of its own through ONNX Runtime (`onnxruntime-node`, an optional dependency: without it,
+from one pinned revision, every file checked by size and SHA-256 before it is used: the model never comes at install
+time. On Linux x64, onnxruntime-node's own install fetches about 500 MB of CUDA libraries the model doesn't use, unless
+`ONNXRUNTIME_NODE_INSTALL=skip` is set (the Docker image and CI set it; an npm setting for it would make npm warn on
+every command). It runs in a process of its own through ONNX Runtime (`onnxruntime-node`, an optional dependency: without it,
 footage search answers by filters and words only), one picture at a time with half the cores (at most four;
 `VR_FOOTAGE_THREADS`), and stops after ten idle minutes (`VR_FOOTAGE_IDLE_MINUTES`). A copy of the files put in that
 folder by hand is checked and used. On a Mac footage is decoded with VideoToolbox (`VR_FOOTAGE_HWACCEL=off` decodes

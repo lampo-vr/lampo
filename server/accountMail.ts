@@ -12,7 +12,7 @@ import type { Config } from '../lib/config.ts';
 import type { Mailer } from '../lib/mail/index.ts';
 import { type MailParams, type MailSite, mailLinks, renderMail, siteOf } from '../lib/mail/templates.ts';
 import { type MailLang, mailLang } from '../lib/mail/words.ts';
-import { DEFAULT_WORKSPACE } from '../lib/scope.ts';
+import { DEFAULT_WORKSPACE, routeIn } from '../lib/scope.ts';
 import type { PublicInvite, PublicUser, Role } from '../lib/types.ts';
 import { getWorkspace, listWorkspaces, membersOf, workspaceNamed } from '../lib/workspaces.ts';
 
@@ -215,7 +215,8 @@ export function createAccountMail(cfg: Config, mailer: Mailer): AccountMail {
       const roles = new Set<Role>(m.roles ?? ['owner', 'admin']);
       // named once someone chose a name: a sign-up's workspace is called after its owner until then
       const name = workspaceNamed(m.workspace) ? getWorkspace(m.workspace)?.name : undefined;
-      const url = m.link ? `${site.url}/${m.link}` : undefined;
+      // the screen of this workspace, not of whichever one the reader's browser last worked in
+      const url = m.link ? `${site.url}/${routeIn(m.link, m.workspace)}` : undefined;
       let queued = 0;
       for (const member of membersOf(m.workspace)) {
         if (!roles.has(member.role) || member.suspended) continue;

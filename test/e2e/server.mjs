@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// covers: web/src/auth/ web/src/uploads/ web/src/settings/Tokens.tsx web/src/settings/Users.tsx
+// covers: web/src/auth/ web/src/uploads/ web/src/settings/Tokens.tsx web/src/settings/Users.tsx web/src/pwa/push.ts
 // covers: server/routes/uploads.ts server/routes/account.ts server/auth.ts server/uploadTickets.ts
 // covers: server/permissions.ts lib/auth.ts lib/rateLimit.ts lib/storage/
 // Browser end-to-end test of server mode: a real server (VR_MODE=server, temp store, free port) + headless Chrome.
@@ -124,6 +124,36 @@ try {
     await fillSignIn(OWNER.email, OWNER.password);
     await page.waitForSelector('.user-chip:enabled', { timeout: WAIT });
     assert((await inPage('/api/library')).status === 200, 'signed in: the API answers');
+  });
+
+  await check('a session that ends elsewhere ends this device’s notifications too', async () => {
+    await page.evaluate(() => {
+      window.__unsubscribed = 0;
+      const sub = { endpoint: 'https://push.example.test/e2e-device-2', unsubscribe: async () => ++window.__unsubscribed };
+      const reg = { pushManager: { getSubscription: async () => sub } };
+      const real = navigator.serviceWorker;
+      const stand = new Proxy(real, {
+        get: (t, k) => (k === 'getRegistration' ? async () => reg : typeof t[k] === 'function' ? t[k].bind(t) : t[k]),
+      });
+      Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: stand });
+    });
+    try {
+      // the session ends on the server (here: its own sign-out, sent past the app), and the app's next call hears a 401
+      assert((await page.evaluate(async () => (await fetch('/api/auth/logout', { method: 'POST' })).status)) === 200);
+      await page.evaluate(() => {
+        location.hash = '#/settings/links';
+      });
+      await page.waitForSelector('input[name=email]', { timeout: WAIT });
+      await page.waitForFunction(() => window.__unsubscribed === 1, { timeout: WAIT });
+    } finally {
+      // signed in again for what follows, whatever happened above
+      if (!(await page.$('.user-chip:enabled'))) {
+        await page.goto(`${BASE}/#/`, { waitUntil: 'domcontentloaded' });
+        await page.waitForSelector('input[name=email], .user-chip:enabled', { timeout: WAIT });
+        if (await page.$('input[name=email]')) await fillSignIn(OWNER.email, OWNER.password);
+        await page.waitForSelector('.user-chip:enabled', { timeout: WAIT });
+      }
+    }
   });
 
   await check('upload a render through the UI (tus): it becomes a review, the tray says so', async () => {

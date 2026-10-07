@@ -19,6 +19,7 @@ const auth = await import('../../lib/auth.ts');
 const oauth = await import('../../lib/oauth/store.ts');
 const store = await import('../../lib/store.ts');
 const { LISTEN_TIMES } = await import('../../server/agents.ts');
+const { inWorkspace } = await import('../../lib/scope.ts');
 
 const { base, request } = await startApp({ feed: 50, headers: { Host: 'review.test' } });
 const PASSWORD = 'a long password';
@@ -196,6 +197,26 @@ test('notes written while the agent wasn’t listening reach it when it starts t
   await note(slug, 5, 'Four');
   await c.callTool({ name: 'get_open_notes', arguments: { video: 'reel-c.mp4' } });
   assert.match(textOf((await c.callTool({ name: 'wait_for_feedback', arguments: { timeout_s: 1 } })) as Result), /No new feedback/);
+});
+
+test('a request made in the second the video was assigned reaches the agent’s first wait', async () => {
+  const slug = await upload('reel-r.mp4');
+  const c = await agent('agent-r');
+  await assign(slug, 'agent-r');
+  const asked = await request('POST', `/api/review/${encodeURIComponent(slug)}/request`, { body: { text: 'Check the logo first' }, headers: person });
+  assert.equal(asked.status, 200, asked.text);
+  // events have whole seconds: the request is logged in the second the assignment was made
+  const assigned = inWorkspace('w1', () => store.loadReview(slug)?.session?.assigned) as string;
+  const file = inWorkspace('w1', () => store.eventsFile());
+  const lines = fs.readFileSync(file, 'utf8').split('\n');
+  const i = lines.findLastIndex((l) => l.includes('"type":"request"') && l.includes('Check the logo first'));
+  assert.ok(i >= 0 && assigned, 'the request and the assignment');
+  lines[i] = JSON.stringify({ ...JSON.parse(lines[i] as string), at: new Date(Math.floor(Date.parse(assigned) / 1000) * 1000).toISOString() });
+  fs.writeFileSync(file, lines.join('\n'));
+  const first = (await c.callTool({ name: 'wait_for_feedback', arguments: { timeout_s: 5 } })) as Result;
+  assert.match(textOf(first), /^Waiting for you/, textOf(first));
+  assert.match(textOf(first), /1 request/, textOf(first));
+  assert.match(textOf(first), /Check the logo first/);
 });
 
 test('the app shows whether the assigned agent listens: from its open waits, not from being connected', async () => {

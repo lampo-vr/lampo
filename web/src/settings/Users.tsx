@@ -528,9 +528,12 @@ export function Users() {
             ))}
           </div>
         )}
-        <div className="set-sub">
-          <T k={'Locked out yourself? On the server: <0>vr admin reset-password --email you@example.com</0>'} tags={[(c) => <code>{c}</code>]} />
-        </div>
+        {/* a command on the server's own machine: only for whoever runs it (the machine's owner, a hosted server's operator) */}
+        {(!here || status?.operator) && (
+          <div className="set-sub" data-testid="locked-out">
+            <T k={'Locked out yourself? On the server: <0>vr admin reset-password --email you@example.com</0>'} tags={[(c) => <code>{c}</code>]} />
+          </div>
+        )}
       </Card>
 
       {withPassword ? (

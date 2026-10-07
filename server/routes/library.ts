@@ -102,11 +102,12 @@ export function libraryRoutes(ctx: ServerContext): Router {
     const shown = shownFolders(reviews);
     const archived = archivedNow();
     const projects = archivedList(archived);
+    const degraded = [...(shown.degraded ? (['folders'] as const) : []), ...(store.unreadableReviews().length ? (['videos'] as const) : [])];
     const out: LibraryResponse = {
       videos: listed.map((rv) => agentView.summary(req, summary(rv, sessions, archived))),
       folders: shown.folders,
       ...(projects ? { archived_projects: projects } : {}),
-      ...(shown.degraded ? { degraded: ['folders' as const] } : {}),
+      ...(degraded.length ? { degraded } : {}),
     };
     res.json(out);
   });

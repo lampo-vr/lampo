@@ -288,9 +288,13 @@ export function uploadRoutes(ctx: ServerContext): Router {
             if (meta) await plan(ws, meta, size + declaredIn(open, ws));
             else await ctx.extension.check(ws, 'upload', size + declaredIn(open, ws));
           } catch (e) {
-            const { status = 402, details } = e as { status?: number; details?: Record<string, unknown> };
+            // A refusal keeps its own status and words; anything else (a plan check that failed inside) is the server's
+            // fault, answered by audience: a sentence and a ref, never an errno or a file path.
+            const status = statusOf(e);
+            const words = publicMessage(e, who?.via === 'local' ? 'owner' : 'other', { status, where: 'upload' });
+            const { details } = e as { details?: Record<string, unknown> };
             // A person's browser reads the refusal's reason and numbers (the limit's sheet); an agent and `vr` keep the sentence.
-            const said = who?.via !== 'token' && status === 402 && details ? JSON.stringify({ error: (e as Error).message, ...details }) : (e as Error).message;
+            const said = who?.via !== 'token' && status === 402 && details ? JSON.stringify({ error: words, ...details }) : words;
             throw reject(status, said);
           }
           held.set(upload.id, { id: upload.id, kind: 'tus', ws, by, size, offset: 0, moved: Date.now(), at: Date.now() });

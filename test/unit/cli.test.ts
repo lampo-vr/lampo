@@ -26,6 +26,11 @@ test('vr help and unknown commands', () => {
   assert.ok(sized < 8660, `help is ${sized} characters`);
   assert.ok(help.includes('vr footage find "<request>"'), 'help names vr footage');
   assert.ok(help.includes('vr post draft <video> --platform yt|ig|fb'), 'help names vr post');
+  // what each takes, as it is: repair-folders works in a workspace too; sessions lists a server's agents after vr login
+  assert.ok(help.includes('list-users/repair-folders, else VR_WORKSPACE'), 'repair-folders takes --workspace');
+  assert.doesNotMatch(help, /vr sessions .*the agents running on this machine/);
+  const mcp = vr(['mcp', 'config'], env);
+  assert.match(`${mcp.out}${mcp.err}`, /\[--json\]/, 'vr mcp config names --json');
   const bad = vr(['frobnicate'], env);
   assert.equal(bad.code, 2);
   assert.match(bad.err, /unknown command/);

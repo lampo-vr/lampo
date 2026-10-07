@@ -119,8 +119,8 @@ Nothing is ever written over. A video id the workspace holds already is skipped 
 gets a new one (its screenshots and history follow). A playbook comes in with ids of the server (its own, its skills'
 and its suggestions'), so its files land in a place of their own, after the videos are in; a playbook for a folder that
 has one already is skipped and said. An import that stops halfway takes back what it placed, and a video's history goes in
-only with the video; one that was killed is carried on by the next run of the same bundle, and nothing is imported
-twice (what a killed run of another bundle left is taken back by the next import). One import runs in a workspace at a
+only with the video; one that was killed is carried on by the next run of the same bundle — a video it had put in
+without its history yet gets that history then — and nothing is imported twice (what a killed run of another bundle left is taken back by the next import). One import runs in a workspace at a
 time, and it never writes into a video id an upload is filling at that moment: it stops before writing anything, and
 the next run goes on.
 

@@ -20,7 +20,6 @@ import type { BillingInfo, BillingOffer } from '../../../lib/types.ts';
 import { keys, useBilling, useInfo } from '../api/queries.ts';
 import { locale, t } from '../i18n/index.ts';
 import { T } from '../i18n/T.tsx';
-import { errorMessage } from '../lib/toast.ts';
 import { methodLabel, vatProblem } from '../settings/BillingAccount.tsx';
 import { Spinner } from '../ui/feedback.tsx';
 import { I } from '../ui/icons.tsx';
@@ -31,6 +30,7 @@ import { Panel } from '../ui/system.tsx';
 import { useBillingAccount, useCheckout, useOrderConsent, useSaveDetails } from './api.ts';
 import { PaymentsConsent, usePaymentsChoice } from './PaymentsConsent.tsx';
 import { Ruler } from './parts.tsx';
+import { payingHere } from './returning.ts';
 import { ADDRESS, CARD, Element, TAX_ID } from './Slots.tsx';
 import {
   appearance,
@@ -43,7 +43,7 @@ import {
   type StripeElement,
   stripeFor,
 } from './stripe.ts';
-import { day, dayOf, money } from './words.ts';
+import { billingSaid, day, dayOf, money } from './words.ts';
 import '../styles/checkout.css';
 
 export interface CheckoutChoice {
@@ -222,7 +222,7 @@ function Step({ b, choice, workspace, layout = 'page', onBack, onPaid, onRetry }
     setStartError('');
     mutateAsync({ plan: choice.plan, interval: choice.interval, currency: choice.currency, form })
       .then((r) => live && setSecret(r.clientSecret))
-      .catch((e: Error) => live && setStartError(e.message));
+      .catch((e: Error) => live && setStartError(billingSaid(e)));
     return () => {
       live = false;
     };
@@ -345,9 +345,11 @@ function Step({ b, choice, workspace, layout = 'page', onBack, onPaid, onRetry }
       });
     } catch (e) {
       setBusy(false);
-      return setError(errorMessage(e));
+      return setError(billingSaid(e));
     }
     // Stripe answers a declined card with an error result; a lost connection throws: both leave the form as it was
+    // a bank's page may take this tab away and bring it back: Billing then says it is done (returning.ts)
+    payingHere();
     const r = await actions.confirm({ redirect: 'if_required' }).catch(() => ({ type: 'error' as const, error: {} }));
     if (r.type === 'error') {
       setBusy(false);

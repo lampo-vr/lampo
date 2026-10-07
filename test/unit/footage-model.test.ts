@@ -62,6 +62,45 @@ test('a file that doesn’t match its checksum is refused and leaves nothing beh
   assert.ok(!fs.existsSync(path.join(modelDir(model, root), 'onnx/text.onnx.part')));
 });
 
+test('a download that sends more than the file’s bytes, or drips past its time, stops and leaves nothing behind', async () => {
+  // more than declared: a stream far longer than the file, stopped at the file's size. (It ends by itself after 1 MB, so
+  // a download that didn't stop reads as a wrong file here, never as a full disk.)
+  const root = tmpdir();
+  const long = (async (_url: string | URL, init?: RequestInit) => {
+    const zeros = new Uint8Array(64 * 1024);
+    let sent = 0;
+    return new Response(
+      new ReadableStream({
+        pull: (c) => {
+          if (init?.signal?.aborted) return c.error(init.signal.reason);
+          if (sent++ >= 16) return c.close();
+          c.enqueue(zeros);
+        },
+      }),
+    );
+  }) as typeof fetch;
+  await assert.rejects(ensureModel(model, { root, fetchImpl: long, log: () => {} }), /more than its \d+ bytes/);
+  assert.equal(modelReady(model, root), false);
+  assert.deepEqual(
+    fs.readdirSync(path.join(modelDir(model, root), 'onnx')).filter((f) => f.endsWith('.part')),
+    [],
+  );
+  // a stall: the answer starts and no byte follows; the file's time runs out (the stand-in gives up after 10 s itself,
+  // so a download without a deadline fails here instead of hanging)
+  const stalled = (async (_url: string | URL, init?: RequestInit) =>
+    new Response(
+      new ReadableStream({
+        start(c) {
+          init?.signal?.addEventListener('abort', () => c.error(init.signal?.reason));
+          setTimeout(() => c.error(new Error('the stand-in stopped waiting')), 10_000).unref();
+        },
+      }),
+    )) as typeof fetch;
+  const other = tmpdir();
+  await assert.rejects(ensureModel(model, { root: other, fetchImpl: stalled, log: () => {}, fileMs: () => 300 }), /abort|timeout/i);
+  assert.equal(modelReady(model, other), false);
+});
+
 test('downloaded once, from the pinned revision; checked files are not fetched or hashed again', async () => {
   const root = tmpdir();
   const first = fakeFetch();

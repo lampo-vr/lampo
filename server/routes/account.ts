@@ -8,6 +8,7 @@ import { LINK_TOKEN, peekLink, useLink, voidLinks } from '../../lib/accountLinks
 import * as auth from '../../lib/auth.ts';
 import { afterNewPassword } from '../../lib/newPassword.ts';
 import { revokeAppsOf } from '../../lib/oauth/store.ts';
+import { isInternal } from '../../lib/publicError.ts';
 import { addressKey, RateLimit } from '../../lib/rateLimit.ts';
 import { isSignupPlan } from '../../lib/setupFlow.ts';
 import * as workspaces from '../../lib/workspaces.ts';
@@ -15,7 +16,7 @@ import { WorkspaceError } from '../../lib/workspaces.ts';
 import { CLEAR_SITE_DATA, sessionCookies, sha256 } from '../auth.ts';
 import type { ServerContext } from '../context.ts';
 import { sampleForFirstRun } from '../firstSample.ts';
-import { body, fail, router } from '../http.ts';
+import { body, fail, failFrom, router } from '../http.ts';
 
 const Email = z.string().max(254);
 const Lang = z.enum(['en', 'de']).optional();
@@ -99,7 +100,7 @@ export function accountRoutes(ctx: ServerContext): Router {
     try {
       return await fn();
     } catch (e) {
-      throw fail(400, (e as Error).message);
+      throw failFrom(isInternal(e) ? 500 : 400, e);
     }
   };
   const mailOn = () => {

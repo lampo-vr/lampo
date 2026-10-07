@@ -94,6 +94,24 @@ test('only sensible dates, only known moments, people only', async () => {
 });
 
 let slug = '';
+test('a link on the sample, and a visitor opening it, are no first link and no moment', async () => {
+  const made = await request('POST', '/api/onboarding/sample', { body: {}, headers: laptop });
+  assert.equal(made.status, 200, made.text);
+  const sample = ws.inWorkspace('w1', () => store.listReviews().find((r) => r.onboarding_sample));
+  assert.ok(sample?.folder, 'the sample, in its project');
+  const video = (await request('POST', `/api/review/${encodeURIComponent(made.json().slug)}/shares`, { body: { label: 'Try it' }, headers: laptop })).json();
+  const folder = (await request('POST', '/api/folder-shares', { body: { folder: sample.folder, label: 'Its project' }, headers: laptop })).json();
+  for (const link of [video, folder]) {
+    assert.ok(link.token, JSON.stringify(link));
+    assert.equal((await request('POST', `/api/g/${link.token}/visit`, { body: { name: 'Sam' }, headers: origin })).status, 200);
+  }
+  assert.equal(steps().link_first, undefined, 'no first link');
+  assert.equal(steps().link_opened_first, undefined, 'no first link opened');
+  assert.deepEqual((await request('GET', '/api/moments', { headers: laptop })).json().pending, [], 'nothing waits for its maker');
+  // the sample goes again: the tests below start where a workspace without one does
+  assert.equal((await request('DELETE', '/api/onboarding/sample', { headers: laptop })).status, 200);
+});
+
 test('the first video, link and fix: the funnel’s steps, once per workspace', async () => {
   const clip = makeVideo(path.join(dir, 'in/spot.mp4'), { dur: 1 });
   age(clip);

@@ -295,6 +295,32 @@ test('a module route that doesn’t say who may call it stops the server at star
   }
 });
 
+test('a module route named by a pattern stops the server at start: the role table looks its routes up by their exact path', async () => {
+  const { createApp } = await import('../../server/app.ts');
+  const allow = async () => ({ ok: true as const });
+  for (const p of ['/api/billing/:id', '/api/billing/{*rest}', '/api/billing/*', '/api/billing/a(b)?']) {
+    const c = createContext({ cfg: loadConfig(), token: 'unused' });
+    c.extension = ext.createExtension(
+      {
+        name: 'patterns',
+        entitlements: { get: async () => null, canUpload: allow, canAddMember: allow, canAddVideo: allow, canShare: allow },
+        routes: [{ method: 'GET', path: p, role: 'admin', handle: async () => ({ status: 200, json: {} }) }],
+        workspaces: {},
+      },
+      ext.hostContext({ publicUrl: PUBLIC, who: () => null, sameOrigin: () => false }),
+    );
+    try {
+      assert.throws(
+        () => createApp(c),
+        (e: Error) => e instanceof ext.ModuleRouteError && e.message.includes(`GET ${p}`) && /a pattern/.test(e.message),
+        p,
+      );
+    } finally {
+      c.extension.stop();
+    }
+  }
+});
+
 test('every router is mounted at the root: one under a path is refused, its routes would hide from the module check and the route walk', async () => {
   // Express keeps a router's routes without the path it is mounted under, so `app.use('/x', router)` would list
   // '/y' for what answers '/x/y': a module route there would slip past the check above, and the walk would ask

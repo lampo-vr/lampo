@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // covers: web/src/operator/ web/src/styles/operator.css server/routes/operator.ts lib/operator.ts web/src/auth/UserMenu.tsx
-// covers: test/e2e/lib/operatorStore.ts test/e2e/lib/billingModule.ts web/src/settings/parts.tsx
+// covers: test/e2e/lib/operatorStore.ts test/e2e/lib/billingModule.ts web/src/settings/parts.tsx web/src/settings/Users.tsx
 // The operator's admin (#/operator/workspaces, #/operator/accounts) on a hosted server with a billing module (the
 // stand-in, test/e2e/lib/billingModule.ts) and a dozen workspaces in every state a plan can be in, with long names
 // (test/e2e/lib/operatorStore.ts). LAMPO_OPERATOR names Noor, an admin of the first workspace: the account menu offers
@@ -157,6 +157,21 @@ try {
     }
     // and the server says the same to them
     for (const c of [olivia, max]) assert((await request('GET', '/api/operator/workspaces', { headers: { Cookie: c } })).status === 404);
+  });
+
+  await check('Settings → Users names the server’s own command for a lost password only to the operator', async () => {
+    for (const [who, cookie, shown] of [
+      ['owner of #1', olivia, false],
+      ['the operator', noor, true],
+    ]) {
+      await signIn(cookie);
+      await fresh('#/settings/users');
+      // the rows need the role from the status, which says who runs the server too
+      await page.waitForSelector('.set-rows .set-row', { timeout: 15000 });
+      const hint = await page.$('[data-testid=locked-out]');
+      assert(!!hint === shown, `${who}: ${hint ? 'shown' : 'not shown'}`);
+      if (shown) assert((await text('[data-testid=locked-out]')).includes('vr admin reset-password'), who);
+    }
   });
 
   await signIn(noor);

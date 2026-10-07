@@ -255,9 +255,9 @@ export function createLocalBackend(): Backend {
     // Footage search (lib/footage/), loaded only when used: the index is read here, the query embedded by the model's
     // own process. Shots carry the render's path on this machine; callers that aren't the machine get it removed
     // (mcp/access.ts backendFor, server/routes/footage.ts).
-    async findFootage(req) {
+    async findFootage(req, o) {
       const f = await import('../footage/service.ts');
-      return f.find(req, { local: true });
+      return f.find(req, { local: o?.files !== false });
     },
     async footageSheet(ids, out) {
       const f = await import('../footage/service.ts');

@@ -9,6 +9,7 @@ import path from 'node:path';
 import { checkReviewOpen } from '../folderIds.ts';
 import { dataDir, isoLocal, slugify } from '../paths.ts';
 import { renderKey } from '../renderKey.ts';
+import { routeIn } from '../scope.ts';
 import { stageOf } from '../stage.ts';
 import { listReviews, loadReview, logEvent, withLock, writeAtomic } from '../store.ts';
 import { compareTime, oneLine } from '../time.ts';
@@ -725,7 +726,7 @@ export function postLine(p: Pick<Post, 'platform' | 'state' | 'url' | 'schedule_
 export function postLines(p: PostView, appUrl?: string | null): string {
   const head = `${p.id} ${postLine(p, p.account_name)}`;
   const needs = p.state === 'draft' || p.state === 'failed' || p.state === 'cancelled' ? problemsLine(p.problems) : '';
-  const link = appUrl ? ` · ${appUrl}/#/v/${encodeURIComponent(p.slug)}?publish=${p.id}` : '';
+  const link = appUrl ? ` · ${appUrl}/${routeIn(`#/v/${encodeURIComponent(p.slug)}?publish=${p.id}`)}` : '';
   return oneLine(`${head}${needs ? ` · ${needs}` : p.state === 'draft' ? ' · ready for a person to publish' : ''}${link}`);
 }
 

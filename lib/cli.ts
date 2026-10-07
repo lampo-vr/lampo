@@ -136,7 +136,7 @@ Acting
   vr footage find "<request>" [--aspect 9:16] [--min 2] [--motion push-in] [--no-text] [--sheet]   B-roll: shots with
                                         exact in–out frames · vr footage sheet <id…> | status | on | off | index
   vr status <video> "rendering v4" [--eta 90] | --clear   show what you are doing on the video's card
-  vr sessions [--for <video>]           the agents running on this machine (ranked for a video)
+  vr sessions [--for <video>]           the agents you can assign (ranked for a video)
 
 Hosted server
   vr login <url> [--expires 90d] [--insecure]   use a Lampo server from now on: you allow it in the browser (over SSH:
@@ -147,7 +147,7 @@ Hosted server
   vr whoami                             which store or server this vr uses, and as whom
   vr admin invite [--role member|reviewer|admin|owner] [--email e] [--name n] [--days 7]   a one-time sign-up link
   vr admin invites · revoke-invite <id> · create-user --email e --name n [--role r] · reset-password --email e · list-users
-  vr admin workspaces [list] · workspaces create --name n --owner e · workspaces migrate   (--workspace <id> on invite/invites/revoke-invite/create-user/list-users, else VR_WORKSPACE; invites --all)
+  vr admin workspaces [list] · workspaces create --name n --owner e · workspaces migrate   (--workspace <id> on invite/invites/revoke-invite/create-user/list-users/repair-folders, else VR_WORKSPACE; invites --all)
                                         accounts, run on the server with its data directory
   vr admin repair-folders [--write] [--take-back <link id,…>]
                                         rebuild a damaged folders.json from what it still says, the videos and the
@@ -349,7 +349,7 @@ function commentLines(b: Backend, review: Review, c: Comment, { full = false, br
   if (c.check_again) flags.push(`CHECK AGAIN in v${c.carried_to}`);
   if (c.status === 'fixed') flags.push(`fixed in v${c.fixed_in_v}`);
   if (c.verified_on) flags.push(`verified on preview ${c.verified_on.preview}: the next render must contain it`);
-  if (c.scope === 'video') flags.push('OVERALL: about the whole video');
+  if (c.scope === 'video') flags.push('OVERALL: about the whole video, not frame 0');
   if (isAgent(c.author)) flags.push(`by ${c.author}`);
   if (isClient(c.author)) flags.push(CLIENT_NOTE_FLAG);
   if (c.status !== 'open' && picksToRender(c, review.versions.at(-1)?.registered)) flags.push('PICKED: render with these');

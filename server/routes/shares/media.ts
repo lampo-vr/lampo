@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { poster, waveform } from '../../../lib/media.ts';
 import { reviewDir, slugify } from '../../../lib/paths.ts';
 import { Recent } from '../../../lib/rateLimit.ts';
-import { guestName, recordDownload, settingsOf, shareId, visibleNotes } from '../../../lib/shares.ts';
+import { guestName, noteShotShown, recordDownload, settingsOf, shareId, visibleNotes } from '../../../lib/shares.ts';
 import { SIGNED_URL_SECONDS } from '../../../lib/storage/index.ts';
 import * as store from '../../../lib/store.ts';
 import type { Version } from '../../../lib/types.ts';
@@ -72,11 +72,16 @@ export function guestMediaRoutes(ctx: ServerContext): Router {
     sendSprite(res, ctx.background.startSprite(target(share, req.params.slug)));
   });
 
-  // Screenshots of the notes the link shows, nothing else from the review's folder.
+  // Screenshots of the notes the link shows, nothing else from the review's folder: the marked one, of a version the
+  // link shows (noteShotShown).
   function shot(req: Request<{ token: string }>, res: Response, id: string | undefined, file: string) {
     const share = open(req);
     const review = target(share, id);
-    const allowed = new Set(visibleNotes(share, review).flatMap((c) => [c.shots?.clean, c.shots?.marked].filter(Boolean)));
+    const allowed = new Set(
+      visibleNotes(share, review)
+        .filter((c) => noteShotShown(share, review, c))
+        .flatMap((c) => (c.shots?.marked ? [c.shots.marked] : [])),
+    );
     if (!allowed.has(file)) throw fail(404, 'not found');
     sendInternal(res, path.join(reviewDir(slugify(review.video)), file));
   }

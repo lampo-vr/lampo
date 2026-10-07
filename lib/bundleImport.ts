@@ -530,6 +530,9 @@ async function run(o: ImportOptions, read: Read, owner: User, log: (line: string
   const ids = new Set([...here.flatMap((r) => r.comments.map((c) => c.id)), ...listAsks().map((a) => a.id)]);
   const plans: ReviewPlan[] = [];
   const stored = new Map<string, Review>();
+  // A video this bundle put in before: its notes' ids as they were stored (an id taken in the workspace got a new one),
+  // matched by place and text, for history a run that was killed before writing it still owes (below).
+  const putInBefore = new Map<string, Record<string, string>>();
   for (const [key, b] of [...read.reviews].sort(([a], [b2]) => a.localeCompare(b2))) {
     const slug = uploadShape(b) as string;
     const files = [...read.files].filter(([, f]) => 'key' in f.part && f.part.key === key && f.part.kind !== 'skillFile' && f.part.kind !== 'playbookRef');
@@ -553,6 +556,14 @@ async function run(o: ImportOptions, read: Read, owner: User, log: (line: string
     if (has) {
       plan.action = 'skip';
       plan.why = has.id && has.id === b.id ? 'this workspace has it already (imported before)' : 'this workspace has another video with this id';
+      if (has.id && has.id === b.id) {
+        const renamed: Record<string, string> = {};
+        b.comments.forEach((c, i) => {
+          const now = has.comments[i];
+          if (now && now.id !== c.id && now.text === c.text) renamed[c.id] = now.id;
+        });
+        putInBefore.set(slug, renamed);
+      }
     } else if (mark === bundle) plan.action = 'resume';
     else if (!leftover.has(slug) && (fs.existsSync(reviewDir(slug)) || fs.existsSync(path.join(versionsDir(), slug)))) {
       plan.action = 'skip';
@@ -615,7 +626,11 @@ async function run(o: ImportOptions, read: Read, owner: User, log: (line: string
   const already = store.historyFrom(bundle);
   const slugOfKey = new Map(plans.map((p) => [p.key, p.slug]));
   const goingSlugs = new Set(going.map((p) => p.slug));
-  const events = read.events.filter((e) => goingSlugs.has(e.slug) && !already.has(e.slug));
+  // A video's history is appended once the video is in: a run killed in between left a video without it, and the next
+  // run (which skips the video) appends it. Never for a video any import brought history for already.
+  const anyHistory = store.historyFrom();
+  const owed = new Map([...putInBefore].filter(([slug]) => !anyHistory.has(slug)));
+  const events = read.events.filter((e) => (goingSlugs.has(e.slug) && !already.has(e.slug)) || owed.has(e.slug));
   const there = read.events.filter((e) => goingSlugs.has(e.slug) && already.has(e.slug)).length;
   // the files, and the records written as reviews, views, playbooks and history (SW-8: they were left out)
   const bytes =
@@ -722,7 +737,7 @@ async function run(o: ImportOptions, read: Read, owner: User, log: (line: string
       for (const [key, r] of stored) settle(r, probes.get(key) ?? new Map());
 
       // ---------------------------------------------------------------- the reviews, then their history
-      const renamedOf = new Map(going.map((p) => [p.slug, p.renamed]));
+      const renamedOf = new Map([...owed, ...going.map((p) => [p.slug, p.renamed] as const)]);
       const history: ReviewEvent[] = events
         .map((e) => {
           const x = structuredClone(e) as ReviewEvent;
@@ -745,7 +760,7 @@ async function run(o: ImportOptions, read: Read, owner: User, log: (line: string
         .sort((a, b) => compareTime(a.at, b.at));
       // A video's history goes into the log once the video is in, never before: a video that doesn't come in leaves
       // none behind for whatever takes its id later (SW-7).
-      const committed = new Set<string>();
+      const committed = new Set<string>(owed.keys());
       try {
         for (const p of going) {
           const r = stored.get(p.key) as Review;

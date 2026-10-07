@@ -172,6 +172,10 @@ The note was made on V1, fixed in V2 and checked; V3 is approved by the team and
 Times are ISO 8601, mostly with the writer's UTC offset (`2026-10-01T14:02:11+02:00`), some in UTC (`…Z`, such as a
 version's `mtime`). Compare them as times, not as text.
 
+A review.json that can't be read (cut short by a crash, edited by hand) takes only its own video away: the library,
+search, status, the inbox and `vr ls` leave it out, the server's log names it once, and `GET /api/library` says
+`degraded: ["videos"]` until it is restored from a backup. Opening that video fails.
+
 ### The video
 
 | Field | |
@@ -269,7 +273,7 @@ render is never final.
 | `author` | the reviewer's name, `agent:<session>`, or `guest:<name>` for a client |
 | `author_id` | the account that wrote it, when a signed-in person did, through the app or `/mcp` (optional; absent on older notes, agents', clients' and local `vr` writes). When present it decides who may edit or delete the note: a renamed account keeps its notes, and a new account with a deleted person's name gets none. Otherwise `author` decides |
 | `created`, `edited` | when it was written, and when it was last edited: its text, tags, severity, drawing or words, or a reference's caption or removal (optional) |
-| `replies` | `{by, text, status?, fixed_in_v?, preview?, refs?, at, by_id?, edited?}`. Every status change adds a reply with the new `status`. `preview` names the fix preview a fix or check refers to; `refs` the references that came with the reply (their ids; the references themselves are in the note's `refs`). `by_id`: the account of a signed-in person who wrote it; `edited`: when its author last changed its words (only plain replies change; `at` stays) |
+| `replies` | `{by, text, status?, fixed_in_v?, preview?, refs?, at, by_id?, edited?, share?}`. Every status change adds a reply with the new `status`. `preview` names the fix preview a fix or check refers to; `refs` the references that came with the reply (their ids; the references themselves are in the note's `refs`). `by_id`: the account of a signed-in person who wrote it; `edited`: when its author last changed its words (only plain replies change; `at` stays); `share`: the review link a visitor wrote it through (a link that shows only its own visitors' notes shows only their replies too) |
 | `check_again`, `carried_to` | an open note carried into a newer render that nobody has checked again yet |
 | `fixed_in_v` | the version a fix landed in |
 | `share` | client notes: the public id of the review link they came through (optional) |

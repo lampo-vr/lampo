@@ -274,7 +274,11 @@ export const PERSON_ONLY: [string, string][] = [
   ['DELETE', '/api/admin/apps/:id'],
   ['POST', '/api/admin/webhooks'],
   ['PATCH', '/api/admin/webhooks/:id'],
+  ['DELETE', '/api/admin/webhooks/:id'],
+  ['POST', '/api/admin/webhooks/:id/test'],
   ['POST', '/api/workspaces'],
+  // the name invite mails and the consent screen show
+  ['PATCH', '/api/workspaces/current'],
   ['PUT', '/api/workspaces/current/persona'],
   ['PUT', '/api/workspaces/current/badge'],
   // A person's own data (A13 PEOPLE-1): taking it home, deleting the account, deleting the workspace they own — and
@@ -463,7 +467,8 @@ export function authorize({ own }: { own?: (method: string, path: string) => Mod
       const method = req.method === 'HEAD' ? 'GET' : req.method;
       if (isGated(req.auth.user) && PRIVATE_PATH.test(req.path) && !HELD_MAY.has(`${method} ${req.path}`))
         throw fail(403, 'confirm your email address first: the link is in your inbox', { unconfirmed: true });
-      const module = own?.(req.method, req.path) ?? null;
+      // a HEAD runs a GET's handler: it is held to what that GET declares
+      const module = own?.(method, req.path) ?? null;
       if (module) {
         if (module !== 'public') {
           // the workspace's role from the request (req.auth.role), never the account's mirror (user.role)

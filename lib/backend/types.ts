@@ -254,8 +254,11 @@ export interface Backend {
   draftPost(input: PostDraftRequest): Promise<{ post: PostView; created: boolean }>;
   /** Posts and where they stand: a video's, or every one. */
   posts(slug?: string): Promise<PostView[]>;
-  /** Footage search (lib/footage/): the workspace's shots for a request, best first. Local: with the render's path. */
-  findFootage(req: FootageRequest): Promise<FootageAnswer>;
+  /**
+   * Footage search (lib/footage/): the workspace's shots for a request, best first. Local: with the render's path, unless
+   * `files: false` (a caller that isn't the machine: no render is fetched to name it).
+   */
+  findFootage(req: FootageRequest, o?: { files?: boolean }): Promise<FootageAnswer>;
   /** A labelled contact sheet of shots by id, as a JPEG on this machine (`out`, or the cache). */
   footageSheet(ids: string[], out?: string): Promise<{ file: string }>;
   /** How far the workspace's footage index is. */

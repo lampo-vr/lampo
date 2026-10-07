@@ -7,6 +7,7 @@ import { t } from '../i18n/index.ts';
 import { Spinner } from '../ui/feedback.tsx';
 import { I } from '../ui/icons.tsx';
 import { PaymentsConsent, usePaymentsChoice } from './PaymentsConsent.tsx';
+import { payingHere } from './returning.ts';
 import { CARD, Element } from './Slots.tsx';
 import {
   appearance,
@@ -84,6 +85,8 @@ export function IntentForm({ publishableKey, clientSecret, kind, title, action, 
     setBusy(true);
     setError('');
     const o = { elements: ctx.elements, redirect: 'if_required' as const, confirmParams: { return_url: back(kind === 'setup' ? 'method=done' : 'paid=done') } };
+    // a bank's page may take this tab away and bring it back: Billing then says it is done (returning.ts)
+    payingHere();
     const r = kind === 'setup' ? await ctx.stripe.confirmSetup(o) : await ctx.stripe.confirmPayment(o);
     if (r.error) {
       setBusy(false);

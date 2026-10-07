@@ -289,7 +289,8 @@ test("reviewers don't see where connected agents run (folders on people's machin
     assert.ok(!asReviewer.text.includes(cwd) && !asReviewer.text.includes('studio-mac'), `hidden from reviewers: ${url}`);
   }
   const agents = (await request('GET', '/api/agents', { headers: asRita })).json().agents;
-  assert.equal(agents[0].name, 'promo-edit', 'the agent itself is still listed');
+  // (named with whose it is: a heartbeat speaks for the account that posts it)
+  assert.equal(agents[0].name, 'promo-edit · Olivia', 'the agent itself is still listed');
 });
 
 test('/readyz: one boolean per check and no details (public), 503 while stopping', async () => {

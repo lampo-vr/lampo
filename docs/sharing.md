@@ -64,7 +64,7 @@ as its own page with the same rows (an *Embed* link keeps its kind: [below](#emb
 | Leave notes | a switch; off: the link only plays (watch only) |
 | Approve or request changes | a switch, with notes on |
 | See notes from other links | a switch, with notes on: off shows only what came in through this link |
-| All versions, to switch and compare | a switch; off: the newest version only (older ones are refused, their stills in frame references too, and there is no compare) |
+| All versions, to switch and compare | a switch; off: the newest version only (older ones are refused, their stills in frame references and the screenshots of notes made on them too, and there is no compare) |
 | Downloads | *Off* · *Preview* · *Original* (see [Downloads](#downloads)) |
 | Expiry date | a switch (a week out to start with); its button opens 1, 7 or 30 days and a calendar for any day |
 | Password | a switch; on, a password is made up in its field (*Generate* makes another, or type your own, at least 4 characters); anyone with the link needs it |

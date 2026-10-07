@@ -3,11 +3,14 @@
 // a second person or Insights — billed for at least two), its price as the picker says it, what changes now → then, the
 // head's sentence and the button's words, in English and German; and what a 402 carries beside its sentence.
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
 import type { BillingInfo, BillingOffer } from '../../lib/types.ts';
 import { refusalOf } from '../../web/src/conversion/facts.ts';
 import {
   changeRows,
+  contractMail,
   fitFor,
   keepOf,
   ledeOf,
@@ -185,4 +188,12 @@ test('a 402’s body: its numbers and plan id, nothing else; a first name read o
   assert.equal(refusalOf({ room: { videos: 'a' } }).room, undefined);
   assert.equal(nameFromAddress('ben.kruse@example.com'), 'Ben');
   assert.equal(nameFromAddress('x1@example.com'), null);
+});
+
+test('"Talk to us" names its address wherever it shows: one address, never a bare mailto:', () => {
+  assert.match(contractMail(), /^mailto:[^@?\s]+@[^?\s]+\?subject=/);
+  const root = path.join(import.meta.dirname, '../../web/src');
+  const files = (fs.readdirSync(root, { recursive: true }) as string[]).filter((f) => /\.tsx?$/.test(f));
+  const bare = files.filter((f) => /['"`]mailto:['"`?]/.test(fs.readFileSync(path.join(root, f), 'utf8')));
+  assert.deepEqual(bare, [], 'a mailto: link without an address');
 });

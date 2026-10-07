@@ -255,6 +255,24 @@ Findings of audit A13 (2026-10-05, `AUDITS.md`) and its verification rounds that
 - **A13 SSE** (info): SSE writes don't wait for the connection to drain (team members only, bounded per person).
 - **A13 TEST** (info): the export HEAD test checks the bytes sent, not the files read, so it can't catch a HEAD that
   reads the file.
+- **A13 WEB-1's rest** (low): a browser whose session ended stops its notifications the next time it opens the app;
+  until then the server still sends to it. Binding a device to its session needs a way back for people who stay signed
+  in (a new session after 30 days would silence them): keep the session's end with the device and refresh it when the
+  app asks for its push state or signs in with notifications allowed.
+- **A13 AGENT-3's rest** (low): over a remote backend, a wait without a cursor starts from the agent machine's clock;
+  one running ahead skips notes. Take "now" from the server (its events answer's time).
+- **A13 AUTH-3's rest** (low): confirmation mails sent for invite accepts are charged to no workspace's mail share.
+  Charge them to the invite's workspace and count accepts per invite too.
+- **A13 LINK-6** (info): a link's views are named by the visitor's address, so two visitors behind one address share a
+  name. Key names by the visitor's own key, or record views without one.
+- **A13 LINK-7** (info): a review link's media URLs carry part of the render's key. Neutral names with a keyed hash for
+  the cache instead.
+- **A13 INV-6** (info, tests): some unit files build their own server instead of `startApp()`, and some browser suites
+  wait a time instead of a state. Move them over and let the test-files check flag a new one.
+- **A13 LINK-8** (info, tests): the review-link privacy crawl doesn't reach the media host's routes, compare and a few
+  older routes. Extend it, hosted with a media origin.
+- **A13 WS-4** (info, tests): the workspace isolation walk doesn't cover the moments, the funnel and sprites. Run it with
+  a stand-in billing module and seed those in both workspaces.
 
 ## Open decisions
 

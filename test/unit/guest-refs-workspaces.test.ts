@@ -19,7 +19,8 @@ const { createApp } = await import('../../server/app.ts');
 const auth = await import('../../lib/auth.ts');
 const ws = await import('../../lib/workspaces.ts');
 const { inWorkspace } = await import('../../lib/paths.ts');
-const { revokeShare } = await import('../../lib/shares.ts');
+const { revokeShare, updateShare } = await import('../../lib/shares.ts');
+const store = await import('../../lib/store.ts');
 
 const PASSWORD = 'a long password';
 const origin = { Origin: PUBLIC };
@@ -118,4 +119,25 @@ test('a link revoked after the URL was handed out takes nothing: refused in its 
   const put = await request('PUT', new URL(ticket.upload.url, PUBLIC).pathname, { body, headers: { 'content-length': String(body.length) } });
   assert.equal(put.status, 410, put.text);
   assert.match(put.json().error, /not valid any more/);
+});
+
+test('a password set after the URL was handed out: the file isn’t taken, the visitor has to know it now', async () => {
+  const link = await linkIn('w1');
+  const guest = client(port, { Host: 'review.test', ...origin, 'x-forwarded-for': '203.0.113.9' });
+  const id = (await guest('GET', `/api/g/${link}`)).json().videos[0].slug;
+  const note = (await guest('POST', `/api/g/${link}/comments`, { body: { name: 'Mia', slug: id, frame: 3, text: 'one more' } })).json();
+  const ticket = (await guest('POST', `/api/g/${link}/comments/${note.id}/refs`, { body: { name: 'Mia', kind: 'image' } })).json();
+  inWorkspace('w1', () => updateShare(link, { password: 'now it is locked' }));
+  assert.equal((await guest('GET', `/api/g/${link}/review/${id}`)).status, 401, 'the link asks for it');
+  const body = fs.readFileSync(png);
+  const put = await request('PUT', new URL(ticket.upload.url, PUBLIC).pathname, { body, headers: { 'content-length': String(body.length) } });
+  assert.equal(put.status, 401, put.text);
+  const kept = inWorkspace('w1', () =>
+    store
+      .listReviews()
+      .flatMap((r) => r.comments)
+      .find((c) => c.id === note.id),
+  );
+  assert.ok(kept, 'the note is there');
+  assert.equal(kept.refs?.length ?? 0, 0, 'and carries no picture');
 });

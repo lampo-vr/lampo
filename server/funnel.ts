@@ -6,6 +6,7 @@
 import { counting, countWhen, notePlan, recordStep } from '../lib/funnel.ts';
 import { notice } from '../lib/moments.ts';
 import { currentWorkspace } from '../lib/scope.ts';
+import { listReviews, loadReview } from '../lib/store.ts';
 import type { FunnelStep, PendingMoment } from '../lib/types.ts';
 import type { ServerContext } from './context.ts';
 
@@ -21,6 +22,17 @@ function here(): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * A review link on the first run's sample, or on a folder that holds nothing else: the sample's playground, never the
+ * workspace's first link (Get started points there) nor its first link opened.
+ */
+export function onSample(link: { slug?: string | null; folder?: string | null }): boolean {
+  if (link.slug) return !!loadReview(link.slug)?.onboarding_sample;
+  if (!link.folder) return false;
+  const inside = listReviews().filter((r) => !r.archived && (r.folder === link.folder || r.folder?.startsWith(`${link.folder}/`)));
+  return inside.length > 0 && inside.every((r) => r.onboarding_sample);
 }
 
 /** Counts a step for the workspace the request works in (its first time only), then notes its plan. */

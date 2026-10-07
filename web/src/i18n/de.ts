@@ -4650,6 +4650,29 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'your agent puts it here': 'dein Agent stellt sie hier ein',
   'Your agent puts up V1': 'Dein Agent stellt V1 ein',
   'Your project': 'Dein Projekt',
+  // a billing provider's refusals, by their code (billing/words.ts billingSaid): its own English sentence otherwise
+  'Sign in first.': 'Melde dich zuerst an.',
+  'Only the workspace’s owners and admins manage billing.': 'Nur die Inhaber und Admins des Workspace verwalten die Abrechnung.',
+  'Too many attempts: wait a minute, then try again.': 'Zu viele Versuche: Warte eine Minute und versuch es dann noch einmal.',
+  'Paying isn’t set up on this server yet.': 'Bezahlen ist auf diesem Server noch nicht eingerichtet.',
+  'This workspace is complimentary: there is nothing to pay.': 'Dieser Workspace ist kostenlos gestellt: Es gibt nichts zu bezahlen.',
+  'That VAT ID doesn’t look right. Look at it again, or leave it out.':
+    'Diese USt-IdNr. sieht nicht richtig aus. Sieh sie dir noch einmal an, oder lass sie weg.',
+  'This workspace has no billing account yet: choose a plan first.': 'Dieser Workspace hat noch kein Abrechnungskonto: Wähl zuerst einen Plan.',
+  'This workspace already has a plan: change it in Billing instead.': 'Dieser Workspace hat schon einen Plan: Ändere ihn stattdessen unter Abrechnung.',
+  'More extra storage than that is a Business contract: talk to us.': 'Mehr Zusatzspeicher ist ein Business-Vertrag: Sprich mit uns.',
+  'This workspace has no running plan.': 'Dieser Workspace hat keinen laufenden Plan.',
+  'Renewals are charged to this payment method. Make another one the default first.':
+    'Verlängerungen werden über diese Zahlungsmethode abgerechnet. Mach zuerst eine andere zur Standardmethode.',
+  'There is no open invoice to pay.': 'Es gibt keine offene Rechnung zu bezahlen.',
+  'No payment is waiting.': 'Es steht keine Zahlung aus.',
+  'Solo is for one person. Choose Team to keep everyone in this workspace.': 'Solo ist für eine Person. Wähl Team, damit alle in diesem Workspace bleiben.',
+  'This workspace has more members than that plan has room for. Choose a bigger one.':
+    'Dieser Workspace hat mehr Mitglieder, als dieser Plan Platz bietet. Wähl einen größeren.',
+  'This workspace holds more than that would leave room for: archive or delete videos first, then reduce the extra storage.':
+    'Dieser Workspace belegt mehr, als danach Platz wäre: Archiviere oder lösche zuerst Videos, dann verringere den Zusatzspeicher.',
+  'This plan ends at the end of its period: one month’s notice is for a consumer’s yearly plan after its first year.':
+    'Dieser Plan endet zum Ende seines Zeitraums: Die Kündigung mit einer Frist von einem Monat gilt für den Jahresplan von Verbrauchern nach dem ersten Jahr.',
 };
 
 export const de: Record<Key, string> = { ...owner, ...client };

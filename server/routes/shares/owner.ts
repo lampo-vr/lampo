@@ -23,7 +23,7 @@ import { FOLDER_LIMITS } from '../../../lib/store.ts';
 import type { ShareInfo, SharesResponse } from '../../../lib/types.ts';
 import type { ServerContext } from '../../context.ts';
 import { gate } from '../../extension.ts';
-import { countStep } from '../../funnel.ts';
+import { countStep, onSample } from '../../funnel.ts';
 import { lanIps } from '../../guard.ts';
 import { getReview } from '../../helpers.ts';
 import { body, fail, failFrom, query, router } from '../../http.ts';
@@ -102,7 +102,7 @@ export function ownerShareRoutes(ctx: ServerContext): Router {
       // Made for this video, by its id (createShare): never for one added later under the same name.
       const s = refusable(() => createShare({ slug: req.params.slug }, { ...b, by: ctx.actor(req), byId: req.auth?.user?.id }));
       changed(ctx, req.params.slug);
-      countStep(ctx, 'link_first');
+      if (!onSample(s)) countStep(ctx, 'link_first');
       res.json(shareInfo(s));
     },
   );
@@ -139,7 +139,7 @@ export function ownerShareRoutes(ctx: ServerContext): Router {
       // The link is on this folder by its id: wherever it moves, and never on another folder made under its name later.
       const s = refusable(() => createShare({ folder, folder_id: folderIdFor(folder) }, { ...input, by: ctx.actor(req), byId: req.auth?.user?.id }));
       ctx.broadcast('library');
-      countStep(ctx, 'link_first');
+      if (!onSample(s)) countStep(ctx, 'link_first');
       res.json(shareInfo(s));
     },
   );

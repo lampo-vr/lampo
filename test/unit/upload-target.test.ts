@@ -10,7 +10,7 @@ import { age, isolatedEnv, makeVideo, must } from '../lib/helpers.ts';
 const { dir } = isolatedEnv();
 const store = await import('../../lib/store.ts');
 const folders = await import('../../lib/folders.ts');
-const { slugify, VERSIONS } = await import('../../lib/paths.ts');
+const { reviewDir, slugify, VERSIONS } = await import('../../lib/paths.ts');
 
 let n = 0;
 /** A render with its own picture (so every upload is new bytes). */
@@ -73,4 +73,26 @@ test('files on disk whose paths share an id are refused, not mixed up', () => {
   assert.equal(store.createOrGetReview(a).created, true);
   assert.throws(() => store.createOrGetReview(b), /share one id/);
   assert.equal(must(store.loadReview(slugify(a))).video, path.resolve(a));
+});
+
+test('a version’s bytes go into versions/ only under the video’s lock: never over one another writer registers meanwhile', async () => {
+  const first = await upload('race.mp4', 'Locks');
+  const slug = slugify(first.review.video);
+  const v2 = path.join(VERSIONS, slug, 'v2.mp4');
+  // another process holds the video's lock (the watcher registering a re-render as V2, say): it is alive and its lock is fresh
+  const lock = path.join(reviewDir(slug), '.lock');
+  fs.mkdirSync(lock);
+  fs.writeFileSync(path.join(lock, 'owner'), `${process.ppid}@${(await import('node:os')).hostname()}`);
+  try {
+    await assert.rejects(
+      async () => upload('race.mp4', 'Locks'),
+      (e: Error & { status?: number }) => e.status === 503,
+    );
+    assert.equal(fs.existsSync(v2), false, 'nothing written at V2 while the lock was someone else’s');
+  } finally {
+    fs.rmSync(lock, { recursive: true, force: true });
+  }
+  const second = await upload('race.mp4', 'Locks');
+  assert.equal(second.version.v, 2);
+  assert.ok(fs.existsSync(v2), 'stored once the lock was this upload’s');
 });

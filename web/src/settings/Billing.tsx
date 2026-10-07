@@ -16,6 +16,7 @@ import { CheckoutStep, choiceFromHash } from '../billing/Checkout.tsx';
 import { FixPayment } from '../billing/FixPayment.tsx';
 import { lastChoice, type Picked, Picker } from '../billing/Picker.tsx';
 import { kindOf, PlanPanel } from '../billing/Plan.tsx';
+import { askedReturn, returnedHere, returnOf, startedHere } from '../billing/returning.ts';
 import { t } from '../i18n/index.ts';
 import { errorMessage } from '../lib/toast.ts';
 import { Spinner } from '../ui/feedback.tsx';
@@ -23,15 +24,10 @@ import { I } from '../ui/icons.tsx';
 import { BillingAccountPanel } from './BillingAccount.tsx';
 import '../styles/billing.css';
 
-/** What the address says on arrival: back from a bank's approval page, or a plan picked on the website. */
+/** What the address says on arrival: back from a bank's approval page (said only in the tab that paid: returning.ts),
+ * or a plan picked on the website. */
 const params = () => new URLSearchParams(location.hash.split('?')[1] ?? '');
-const returned = (): string | null => {
-  const p = params();
-  if (p.get('checkout')) return p.get('checkout');
-  if (p.get('method') === 'done') return 'method';
-  if (p.get('paid') === 'done') return 'paid';
-  return null;
-};
+const returned = (): string | null => returnOf(location.hash, startedHere());
 /** The website's pricing buttons send `?plan=cloud-solo|cloud-team|cloud-business`, and may say the interval and the
  * currency they showed; anything else is ignored. */
 const PICKS: Record<string, string> = { 'cloud-solo': 'solo', 'cloud-team': 'team', 'cloud-business': 'business' };
@@ -104,13 +100,16 @@ function BillingPage({ ws }: { ws: string }) {
   const [change, setChange] = useState(!!picked);
   const [fixing, setFixing] = useState(false);
   useEffect(() => {
-    if (back || picked) history.replaceState(history.state, '', '#/settings/billing');
+    if (back) returnedHere();
+    // a return named by an address alone is said nowhere, and leaves the address too
+    if (back || picked || askedReturn(location.hash)) history.replaceState(history.state, '', '#/settings/billing');
   }, [back, picked]);
   // a bank's page that answers within the tab (no reload) comes back through the address as well
   useEffect(() => {
     const heard = () => {
       const r = returned();
       if (!r) return;
+      returnedHere();
       setBack(r);
       setWaiting(r === 'done');
       history.replaceState(history.state, '', '#/settings/billing');

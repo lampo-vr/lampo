@@ -25,8 +25,8 @@ import { currencyOf, periodTotal } from '../facts.ts';
 import { momentEvent } from '../moments.ts';
 import { PayInPlace, type PayWhat, previewMoney, previewSwitch } from '../pay.tsx';
 import {
-  CONTRACT_ADDRESS,
   changeRows,
+  contractMail,
   day,
   type Fit,
   fitFor,
@@ -286,7 +286,7 @@ function FitBlock({
       <div className="lim-contract">
         <h3>Business</h3>
         <p className="lim-line">{t('More than any plan holds: Business is a contract, made for the room you need.')}</p>
-        <a className="btn" href={`mailto:${CONTRACT_ADDRESS}?subject=${encodeURIComponent('Lampo Business')}`}>
+        <a className="btn" href={contractMail()}>
           {t('Talk to us')}
         </a>
       </div>

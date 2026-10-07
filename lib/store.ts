@@ -28,7 +28,7 @@ import { describeRange, frameInRange, normalizeRange, rangeOnGrid } from './rang
 import { describeRef } from './refLine.ts';
 import { currentWorkspace, inWorkspace, wsKey } from './scope.ts';
 import { approvalsOf, partyOf, STAGE_LABELS, type StageContext, stageOf, verdictOn } from './stage.ts';
-import { storage } from './storage/index.ts';
+import { moveFile, storage } from './storage/index.ts';
 import { compareTime, frameToTime, isAgent, isAnswer, isIdea, isQuestion, isRequired, noteLabel, noteRank, oneLine, timecode, timeToFrame } from './time.ts';
 import { TEXT_EDIT_MAX, textEditLine } from './transcript.ts';
 import type {
@@ -251,6 +251,17 @@ export function deepFreeze<T>(value: T): T {
   return value;
 }
 
+// A review.json that can't be read (cut short by a crash, edited by hand) is left out of listings, said once in the log
+// and named by unreadableReviews(): one damaged file never takes the library, search, status or `vr ls` down with it.
+// What opens that one video still fails, as it should. Keyed like `listed`: the file's path and what it was when said.
+const unreadable = new Map<string, string>();
+
+/** The videos of this workspace whose review.json the last listing couldn't read (their slugs). */
+export function unreadableReviews(): string[] {
+  const root = dataDir();
+  return [...unreadable.keys()].filter((file) => path.dirname(path.dirname(file)) === root).map((file) => path.basename(path.dirname(file)));
+}
+
 /** Every review in the store, read-only (see above). */
 export function listReviews(): Review[] {
   let names: fs.Dirent[] = [];
@@ -278,13 +289,23 @@ export function listReviews(): Review[] {
       out.push(hit.review);
       continue;
     }
-    const review = loadReview(d.name);
+    let review: Review | null;
+    try {
+      review = loadReview(d.name);
+    } catch (e) {
+      listed.delete(file);
+      if (unreadable.get(file) !== key) console.error(`left out of listings: ${d.name}/review.json can't be read (${(e as Error).message})`);
+      unreadable.set(file, key);
+      continue;
+    }
+    unreadable.delete(file);
     if (!review) continue;
     listed.set(file, { key, review: deepFreeze(review) });
     out.push(review);
   }
   // Forget this workspace's reviews that are gone (its own files only: one folder deep under its root).
   for (const file of listed.keys()) if (path.dirname(path.dirname(file)) === root && !seen.has(file)) listed.delete(file);
+  for (const file of unreadable.keys()) if (path.dirname(path.dirname(file)) === root && !seen.has(file)) unreadable.delete(file);
   return out;
 }
 
@@ -887,7 +908,12 @@ async function ingestReserved(
   const v = (last?.v || 0) + 1;
   const ext = path.extname(video);
   const store = storage();
-  await store.put(versionKey(slug, v, ext), file, { keep: o.keep, contentType: CONTENT_TYPE[ext.toLowerCase()] || 'video/mp4' });
+  const bytes = versionKey(slug, v, ext);
+  // On this disk the bytes go in under the video's lock, once its number is checked there: a re-render the watcher
+  // registers meanwhile (syncVersions, under the same lock) is never written over. A remote store's upload takes too
+  // long to hold the lock for; nothing else writes its version keys.
+  const here = store.kind === 'local';
+  if (!here) await store.put(bytes, file, { keep: o.keep, contentType: CONTENT_TYPE[ext.toLowerCase()] || 'video/mp4' });
   return withLock(reviewDir(slug), () => {
     let review = loadReview(slug);
     const created = !review;
@@ -917,6 +943,7 @@ async function ingestReserved(
     const stored = store.kind === 'local' ? undefined : store.kind;
     if (part && review.versions.at(-1)?.v !== part.of)
       throw Object.assign(new Error('another version arrived meanwhile: render the part against it'), { status: 409 });
+    if (here) moveFile(file, store.localPath(bytes), { keep: o.keep });
     const { version } = registerVersion(review, {
       hash,
       sample: key,
@@ -1213,6 +1240,8 @@ export interface CommentPatch {
   by?: string;
   /** The account of `by` when a signed-in person writes (the reply then stays theirs: Reply.by_id). */
   by_id?: string;
+  /** The review link a visitor writes through (Reply.share). */
+  share?: string;
 }
 
 /** Picks for a question with options, as kept (lib/options.ts checkPicks); throws on a note that offers none. */
@@ -1271,6 +1300,7 @@ export function updateComment(id: string, patch: CommentPatch): Comment {
     if (patch.status && patch.status !== c.status) {
       const reply: Reply = { by, text: (patch.note || '').trim(), status: patch.status, at: isoLocal() };
       if (patch.by_id) reply.by_id = patch.by_id;
+      if (patch.share) reply.share = patch.share;
       if (answer) reply.answer = answer;
       if (patch.preview) reply.preview = patch.preview;
       if (patch.status === 'fixed') {
@@ -1288,6 +1318,7 @@ export function updateComment(id: string, patch: CommentPatch): Comment {
     } else if (patch.note || patch.preview) {
       const reply: Reply = { by, text: (patch.note || '').trim(), at: isoLocal() };
       if (patch.by_id) reply.by_id = patch.by_id;
+      if (patch.share) reply.share = patch.share;
       // Picks again on a question already answered: a reply that says the new ones.
       if (answer) reply.answer = answer;
       if (patch.preview) reply.preview = patch.preview;
@@ -1334,6 +1365,9 @@ export function addRefs(id: string, refs: NoteRef[], o: { by: string; by_id?: st
     if (note) {
       const reply: Reply = { by: o.by, text: note, refs: refs.map((r) => r.id), at: isoLocal() };
       if (o.by_id) reply.by_id = o.by_id;
+      // the review link its references came through (refs.ts base): the reply's too
+      const via = refs.find((r) => r.share)?.share;
+      if (via) reply.share = via;
       c.replies.push(reply);
       logEvent({ type: 'reply', by: o.by, review, comment: c, reply });
     } else for (const ref of refs) logEvent({ type: 'ref', by: o.by, review, comment: c, ref });
@@ -1650,10 +1684,13 @@ export function appendHistory(events: ReviewEvent[], bundle: string): void {
  */
 export const historyFiles = (): string[] => [importedEventsFile(), eventsFile()];
 
-/** The video ids whose history a bundle's import appended already (a run that stopped, then ran again). */
-export function historyFrom(bundle: string): Set<string> {
+/**
+ * The video ids whose history a bundle's import appended already (a run that stopped, then ran again); without a bundle,
+ * those any import appended history for.
+ */
+export function historyFrom(bundle?: string): Set<string> {
   const out = new Set<string>();
-  const mark = `"imported":${JSON.stringify(bundle)}`;
+  const mark = bundle === undefined ? '"imported":"' : `"imported":${JSON.stringify(bundle)}`;
   for (const file of historyFiles()) {
     let log = '';
     try {
@@ -1665,7 +1702,7 @@ export function historyFrom(bundle: string): Set<string> {
       if (!line.includes(mark)) continue;
       try {
         const e = JSON.parse(line) as ReviewEvent;
-        if (e.imported === bundle && e.slug) out.add(e.slug);
+        if ((bundle === undefined ? typeof e.imported === 'string' : e.imported === bundle) && e.slug) out.add(e.slug);
       } catch {}
     }
   }
@@ -2179,6 +2216,7 @@ export function renderInbox(events: ReviewEvent[]): string {
         `- at: ${e.timecode} · frame ${e.frame}${e.range ? ` · range ${e.range.in}–${e.range.out}${e.range_at ? ` · ${e.range_at}` : ''}` : ''}${onWords(pointer)}${part}`,
       );
       if (pointer && points) out.push(`- ${legendLine([pointer], points.names)}`);
+      if (e.scope === 'video') out.push('- overall: about the whole video, not frame 0');
       out.push(`- text: ${e.text || '(no text)'}`);
       if (e.text_edit) out.push(`- CHANGE WORDS "${e.text_edit.from}" → "${e.text_edit.to}"`);
       if (e.part) out.push(`- ${partLine(e.part)}`);
@@ -2263,6 +2301,7 @@ export function commentBlock(review: Review, c: Comment, { heading = '###', file
   if (c.check_again) flags.push(`check again in v${c.carried_to || latest}`);
   if (c.status === 'fixed') flags.push(`fixed in v${c.fixed_in_v}, waiting for verification`);
   if (isAgent(c.author)) flags.push(isQuestion(c) ? `asked by ${c.author}` : `by ${c.author}`);
+  if (c.scope === 'video') flags.push('overall: about the whole video, not frame 0');
   lines.push(`${heading} ${c.id} · ${noteLabel(c)} · ${tagList(c.tags)} · ${where}${flags.length ? ` · ${flags.join(' · ')}` : ''}`);
   lines.push('');
   lines.push(c.text ? c.text : c.text_edit ? '_(a change to the words, below)_' : '_(no text, see drawing)_');

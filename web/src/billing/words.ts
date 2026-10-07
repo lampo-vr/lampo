@@ -2,7 +2,7 @@
 // one sentence per state, the numbers as people read them. The provider names its plans and prices; every other word is
 // ours, in English and German. Pure, so the page and the banner say the same and the unit test reads both languages.
 import type { BillingInfo, BillingOffer } from '../../../lib/types.ts';
-import { locale, t } from '../i18n/index.ts';
+import { currentLang, locale, t } from '../i18n/index.ts';
 import { bannerDue } from './due.ts';
 
 const DAY = 86_400_000;
@@ -181,5 +181,54 @@ export function whyFailed(code: string | undefined, label: string): string {
       return t('the bank declined {method}', { method });
     default:
       return t('{method} didn’t go through', { method });
+  }
+}
+
+/**
+ * What a billing provider's refusal says (its routes answer `{error, code}` in English), in the page's language: in
+ * English its own sentence, which may name numbers; in another, ours for a code we know, else its sentence as it is.
+ */
+export function billingSaid(e: unknown): string {
+  const said = e instanceof Error ? e.message : String(e);
+  if (currentLang() === 'en') return said;
+  const code = (e as { details?: { code?: unknown } } | null)?.details?.code;
+  switch (code) {
+    case 'signed-out':
+      return t('Sign in first.');
+    case 'not-allowed':
+      return t('Only the workspace’s owners and admins manage billing.');
+    case 'slow-down':
+      return t('Too many attempts: wait a minute, then try again.');
+    case 'unavailable':
+      return t('Paying isn’t set up on this server yet.');
+    case 'complimentary':
+      return t('This workspace is complimentary: there is nothing to pay.');
+    case 'tax-id-invalid':
+      return t('That VAT ID doesn’t look right. Look at it again, or leave it out.');
+    case 'no-billing-account':
+      return t('This workspace has no billing account yet: choose a plan first.');
+    case 'already-subscribed':
+      return t('This workspace already has a plan: change it in Billing instead.');
+    case 'addon-too-large':
+    case 'addon-range':
+      return t('More extra storage than that is a Business contract: talk to us.');
+    case 'no-subscription':
+      return t('This workspace has no running plan.');
+    case 'method-in-use':
+      return t('Renewals are charged to this payment method. Make another one the default first.');
+    case 'nothing-to-pay':
+      return t('There is no open invoice to pay.');
+    case 'nothing-to-tell':
+      return t('No payment is waiting.');
+    case 'solo-one-person':
+      return t('Solo is for one person. Choose Team to keep everyone in this workspace.');
+    case 'too-many-members':
+      return t('This workspace has more members than that plan has room for. Choose a bigger one.');
+    case 'storage-in-use':
+      return t('This workspace holds more than that would leave room for: archive or delete videos first, then reduce the extra storage.');
+    case 'no-notice':
+      return t('This plan ends at the end of its period: one month’s notice is for a consumer’s yearly plan after its first year.');
+    default:
+      return said;
   }
 }

@@ -8,7 +8,7 @@ import { ROOT } from './paths.ts';
 
 type Opts = Record<string, string | true | string[] | undefined>;
 
-const usage = `vr mcp config <client> [--stdio | --http] [--url <server>] [--token-env NAME] [--with-token] [--name ${MCP_NAME}]
+const usage = `vr mcp config <client> [--stdio | --http] [--url <server>] [--token-env NAME] [--with-token] [--name ${MCP_NAME}] [--json]
   clients: ${MCP_CLIENTS.join(', ')}
   --name: the server's key in the client's config (default ${MCP_NAME}; a setup under video-review keeps working).
   Local store: stdio by default (runs bin/vr-mcp); --http uses the running app at http://localhost:<port>/mcp.

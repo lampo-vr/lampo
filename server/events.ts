@@ -40,8 +40,10 @@ export interface EventHub {
   listen: (fn: (type: ServerEvent, data: object, ws: string) => void) => () => void;
   /** GET /api/events */
   handler: (req: Request, res: Response) => void;
-  /** Keep-alive comments so proxies don't drop idle streams. */
+  /** Keep-alive comments so proxies don't drop idle streams (and each stream asked again: recheck). */
   startPing: (ms?: number) => void;
+  /** Ends every stream whose caller wouldn't get it now: at once when access ended (lib/auth.ts onAccessEnded). */
+  recheck: () => void;
   clients: () => number;
   /** Ends every stream (shutdown): browsers and `vr watch` reconnect by themselves. */
   closeAll: () => void;
@@ -64,6 +66,22 @@ export function createEventHub({ stillAllowed }: { stillAllowed?: (req: Request)
         fn(type, data, ws);
       } catch {}
     }
+  };
+  // A stream whose caller can't be asked about right now (workspaces.json unreadable: lib/workspaces.ts) ends, as one
+  // that may no longer read would: it comes back through the sign-in check, never past it.
+  const allowed = (req: Request): boolean => {
+    try {
+      return !stillAllowed || stillAllowed(req);
+    } catch {
+      return false;
+    }
+  };
+  const recheck = () => {
+    for (const [res, req] of clients)
+      if (!allowed(req)) {
+        clients.delete(res);
+        res.end();
+      }
   };
   const broadcast: Broadcast = (type, data = {}, need) => {
     const ws = tellingWorkspace();
@@ -105,24 +123,12 @@ export function createEventHub({ stillAllowed }: { stillAllowed?: (req: Request)
       });
     },
     startPing(ms = 25000) {
-      // A stream whose caller can't be asked about right now (workspaces.json unreadable: lib/workspaces.ts) ends, as
-      // one that may no longer read would: it comes back through the sign-in check, never past it.
-      const allowed = (req: Request): boolean => {
-        try {
-          return !stillAllowed || stillAllowed(req);
-        } catch {
-          return false;
-        }
-      };
       setInterval(() => {
-        for (const [res, req] of clients) {
-          if (!allowed(req)) {
-            clients.delete(res);
-            res.end();
-          } else res.write(': ping\n\n');
-        }
+        recheck();
+        for (const res of clients.keys()) res.write(': ping\n\n');
       }, ms).unref();
     },
+    recheck,
     clients: () => clients.size,
     closeAll() {
       for (const res of clients.keys()) res.end();

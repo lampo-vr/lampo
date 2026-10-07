@@ -226,3 +226,25 @@ test('a store an earlier version imported into (the history inside events.jsonl)
   assert.ok(items.some((i) => i.kind === 'approval' && i.slug === slugify(video)));
   assert.ok(store.historyFrom(OLD).has(slugify(video)));
 });
+
+test('a run killed after a video went in, before its history did: the next run writes that history, once', async () => {
+  const video = '/@uploads/Moved/killed.mp4';
+  const history = historyOf(5, video);
+  const b = await bundleWith('killed.tar', video, history);
+  const first = await importBundle({ file: b.file, workspace: 'w1', owner: 'owner@example.com', derive: false });
+  assert.equal(first.events.append, history.length);
+  // what a kill between the video's commit and the history's write leaves: the video, none of its history
+  const file = path.join(dataDir(), 'events.imported.jsonl');
+  const kept = fs
+    .readFileSync(file, 'utf8')
+    .split('\n')
+    .filter((l) => l && !l.includes(b.id));
+  fs.writeFileSync(file, kept.map((l) => `${l}\n`).join(''));
+  assert.equal(store.historyFrom(b.id).has(slugify(video)), false);
+  const again = await importBundle({ file: b.file, workspace: 'w1', owner: 'owner@example.com', derive: false });
+  assert.equal(again.reviews[0]?.action, 'skip', 'the video is not brought in twice');
+  assert.equal(again.events.append, history.length, 'its history is');
+  assert.equal(linesOf(file).filter((e) => e.imported === b.id).length, history.length);
+  const third = await importBundle({ file: b.file, workspace: 'w1', owner: 'owner@example.com', derive: false });
+  assert.equal(third.events.append, 0, 'and never twice');
+});

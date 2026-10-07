@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { BillingInfo, BillingOffer } from '../../lib/types.ts';
-import { bannerOf, day, daysUntil, gross, money, monthly, ofLimit, size, stateLabel, stateLine, vatRate } from '../../web/src/billing/words.ts';
+import { bannerOf, billingSaid, day, daysUntil, gross, money, monthly, ofLimit, size, stateLabel, stateLine, vatRate } from '../../web/src/billing/words.ts';
 import { de } from '../../web/src/i18n/de.ts';
 import { setDictionary } from '../../web/src/i18n/index.ts';
 import { refusalText } from '../../web/src/lib/refusal.ts';
@@ -130,6 +130,30 @@ test('a plan’s refusal: the provider’s sentence in the page’s language, el
     assert.match(refusalText('x', { reason: 'payment' }), /Zahlung ist fehlgeschlagen/);
     assert.match(refusalText('x', { reason: 'read-only' }), /nur lesbar/);
     assert.match(refusalText('x', {}), /nur lesbar/, 'an unknown reason: read-only');
+  } finally {
+    setDictionary('en', null);
+  }
+});
+
+test('a billing provider’s refusal: its own sentence in English, ours in German for a code we know', () => {
+  // what the web's api() throws for a module's `{error, code}` (an ApiError: its message, status and details)
+  const refused = (code: string, error: string) => Object.assign(new Error(error), { status: 409, details: { code } });
+  const already = refused('already-subscribed', 'This workspace already has a subscription: change the plan in Billing instead.');
+  const team = refused('too-many-members', 'Team has room for 50 members; this workspace has 51. Choose Business.');
+  const odd = refused('something-new', 'A sentence only the provider has.');
+  setDictionary('en', null);
+  assert.equal(billingSaid(already), already.message, 'English: the provider’s words, numbers and all');
+  assert.equal(billingSaid(team), team.message);
+  setDictionary('de', de);
+  try {
+    assert.equal(billingSaid(already), 'Dieser Workspace hat schon einen Plan: Ändere ihn stattdessen unter Abrechnung.');
+    assert.match(billingSaid(team), /mehr Mitglieder/);
+    assert.equal(
+      billingSaid(refused('slow-down', 'Too many attempts: wait a minute.')),
+      'Zu viele Versuche: Warte eine Minute und versuch es dann noch einmal.',
+    );
+    assert.equal(billingSaid(odd), odd.message, 'a code we don’t know: the provider’s sentence as it is');
+    assert.equal(billingSaid(new Error('offline')), 'offline', 'no code at all');
   } finally {
     setDictionary('en', null);
   }

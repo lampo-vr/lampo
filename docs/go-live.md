@@ -70,6 +70,11 @@ With the app host behind a CDN proxy, the steps change in a few places; the back
   visitor's address from the CDN's header (Cloudflare: `CF-Connecting-IP`) only for requests from the CDN's published
   ranges, and refuses the app host to anyone else; `VR_TRUST_PROXY` names the proxy on the server, as before. Without
   this every visitor would look like a handful of CDN addresses, and sign-in limits would lock everyone out.
+- **The proxy's config.** [`deploy/Caddyfile.cdn`](../deploy/Caddyfile.cdn) does the above with Caddy for Cloudflare:
+  only the CDN's ranges reach the app host (authenticated origin pulls are there, commented, and recommended), the
+  visitor's address comes from `CF-Connecting-IP`, and the media host gets its own certificate. Mount it in place of
+  `deploy/Caddyfile` (the `caddy` service's volume in `docker-compose.yml`), give that service `VR_MEDIA_DOMAIN` beside
+  `VR_DOMAIN`, and the origin certificate and key in `/etc/caddy/certs/`.
 - **Caching.** Let the CDN cache `/assets/` (hashed names, a year) and bypass its cache for everything else: the app
   marks what may be kept, and pictures and screenshots are private (a CDN caches `.png` and `.jpg` by extension).
 - **Rewriting.** Turn off whatever rewrites pages or injects scripts (Rocket Loader, email obfuscation, automatic HTTPS

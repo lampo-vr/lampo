@@ -34,7 +34,7 @@ import {
   type YouTubeSecret,
   type ZernioSecret,
 } from '../../lib/publish/connections.ts';
-import { cachedCover, kitDir, kitInfo, kitPath, kitZip, makeKit } from '../../lib/publish/kit.ts';
+import { cachedCover, kitDir, kitInfo, kitPath, kitZip, makeKit, shownKit } from '../../lib/publish/kit.ts';
 import { platformOf } from '../../lib/publish/platforms.ts';
 import {
   deletePost,
@@ -58,7 +58,7 @@ import type { ConnectionsResponse, PostFields, PostsResponse, PostView } from '.
 import type { ServerContext } from '../context.ts';
 import { gate } from '../extension.ts';
 import { accountOf } from '../helpers.ts';
-import { body, fail, failFrom, parse, query, router, sendInternal, sendStreamed } from '../http.ts';
+import { audienceOf, body, fail, failFrom, parse, query, router, sendInternal, sendStreamed } from '../http.ts';
 
 const postId = z.string().regex(/^po_[0-9a-f]{12}$/, 'expected a post id like po_1a2b3c4d5e6f');
 const connId = z.string().regex(/^pc_[0-9a-f]{12}$/, 'expected a connection id like pc_1a2b3c4d5e6f');
@@ -409,13 +409,15 @@ export function publishRoutes(ctx: ServerContext): Router {
     // an encode is a job like any other: a workspace whose queue is full is told so (503), nothing queued past the cap
     needJobRoom();
     void makeKit(p, review).then(() => told(p.slug));
-    res.status(202).json(kitInfo(p.id) ?? { state: 'making', files: [] });
+    const info = kitInfo(p.id);
+    res.status(202).json(info ? shownKit(info, audienceOf(req)) : { state: 'making', files: [] });
   });
 
   r.get('/api/posts/:id/kit', (req, res) => {
     const p = postOf(req);
     videoOf(p);
-    res.json(kitInfo(p.id) ?? { state: 'none', files: [] });
+    const info = kitInfo(p.id);
+    res.json(info ? shownKit(info, audienceOf(req)) : { state: 'none', files: [] });
   });
 
   r.get('/api/posts/:id/kit/:file', async (req, res) => {

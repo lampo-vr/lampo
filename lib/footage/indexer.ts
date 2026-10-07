@@ -11,7 +11,7 @@ import { heavy, PRIORITY, QueueFullError } from '../jobs.ts';
 import { slugify } from '../paths.ts';
 import { FFMPEG, lower, selectFrames, spawnMedia } from '../probe.ts';
 import { renderKey } from '../renderKey.ts';
-import { wsKey } from '../scope.ts';
+import { boundToWorkspace, wsKey } from '../scope.ts';
 import { seekTime } from '../shots.ts';
 import * as store from '../store.ts';
 import { textTools } from '../text/index.ts';
@@ -290,6 +290,9 @@ async function step(t: Target, e: Embedder, readings: Map<string, Reading>): Pro
   return framesChunk(t, e);
 }
 
+/** A render the job queue had no room for comes back this much later, until it has its turn (tests shorten it). */
+export const QUEUE_RETRY = { ms: 60_000 };
+
 export interface IndexerOptions {
   embedder?: () => Embedder;
   log?: (msg: string) => void;
@@ -352,7 +355,14 @@ export function createIndexer(o: IndexerOptions = {}) {
       (err: Error) => {
         running.delete(k);
         readings.delete(k);
-        if (err instanceof QueueFullError) return;
+        // a full queue is no failure: its turn comes again later, never dropped (the status would wait for it for good)
+        if (err instanceof QueueFullError) {
+          setTimeout(
+            boundToWorkspace(() => run(t)),
+            QUEUE_RETRY.ms,
+          ).unref();
+          return;
+        }
         failedThisRun.set(k, (failedThisRun.get(k) ?? 0) + 1);
         markFailed(t.key, err.message);
         log(`footage: ${path.basename(t.review.video)} v${t.ver.v}: ${err.message}`);

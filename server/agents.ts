@@ -19,9 +19,12 @@ const TTL = 90_000;
 export const LISTEN_TIMES = { betweenMs: 20_000, workingMs: 10 * 60_000 };
 
 export interface AgentRegistry {
-  /** `listens`: it follows new notes by itself while it is listed (`vr watch`). `account`: whose agent it is, by the
-   * account's id (never listed; agents' runs know it by it: server/runs.ts). */
-  heartbeat(a: Omit<ConnectedAgent, 'last_seen' | 'state' | 'listened'>, o?: { listens?: boolean; account?: string }): void;
+  /**
+   * `listens`: it follows new notes by itself while it is listed (`vr watch`). `account`: whose agent it is, by the
+   * account's id (never listed; agents' runs know it by it: server/runs.ts; none: the machine itself). An agent listed
+   * under another account's session id is that account's: false, nothing changed.
+   */
+  heartbeat(a: Omit<ConnectedAgent, 'last_seen' | 'state' | 'listened'>, o?: { listens?: boolean; account?: string }): boolean;
   /** The account a connected agent of this workspace is (by its session id), while it is listed. */
   accountOf(sessionId: string): string | undefined;
   /**
@@ -92,12 +95,16 @@ export function createAgentRegistry(broadcast: Broadcast): AgentRegistry {
       };
       const ws = currentWorkspace();
       const key = `${ws}\u0000${a.session_id}`;
-      const known = agents.has(key);
-      agents.set(key, { ...a, last_seen: isoLocal(), at: Date.now(), ws, listens: listens || !!agents.get(key)?.listens });
+      const was = agents.get(key);
+      // one account's agent is never spoken for by another (its listening state, its name in the pickers), while listed
+      if (was && Date.now() - was.at <= TTL && accounts.get(key) !== account) return false;
+      const same = !!was && accounts.get(key) === account;
+      agents.set(key, { ...a, last_seen: isoLocal(), at: Date.now(), ws, listens: listens || (same && !!was?.listens) });
       if (account) accounts.set(key, account);
       else accounts.delete(key);
-      if (!known) broadcast('sessions');
+      if (!was) broadcast('sessions');
       tell(key);
+      return true;
     },
     accountOf(sessionId) {
       const key = `${currentWorkspace()}\u0000${cleanAgentName(sessionId, 200) || 'agent'}`;

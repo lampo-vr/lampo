@@ -65,6 +65,10 @@ export class Recent<V> {
   delete(key: string): void {
     this.map.delete(key);
   }
+
+  clear(): void {
+    this.map.clear();
+  }
 }
 
 export interface MemoOptions<V> {

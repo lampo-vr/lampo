@@ -128,6 +128,8 @@ export function createApp(ctx: ServerContext, { ui }: AppOptions = {}): Express 
   });
   // The machine's tunnel: review links tell its visitors apart by Cloudflare's header (ipOf, server/routes/shares).
   app.locals.tunnel = ctx.capabilities.tunnel;
+  // A site reached over https reads its session only under the name no other host can set (sessionOf, server/auth.ts).
+  app.locals.https = !!ctx.cfg.public_url?.startsWith('https:');
   // An Embed link's pages carry their oEmbed discovery tag (staticUi below; server/routes/shares/embed.ts).
   app.locals.discovery = ((req, token, kind) => discoveryTag(ctx, req, token, kind)) satisfies Discovery;
   // One guard for a hosted server and the person's own machine; the machine adds its host names and the LAN link.
@@ -218,6 +220,9 @@ export function createApp(ctx: ServerContext, { ui }: AppOptions = {}): Express 
  * one the app answers already (its method, and a path one of the app's patterns matches) would be the app's handler
  * behind the module's exemptions — public, no role check (sweep 2 SW-6) — so the module is refused (ModuleRouteError).
  */
+/** A path with nothing Express reads as a pattern: segments of letters, digits and `._~-`. */
+const LITERAL_PATH = /^(\/[A-Za-z0-9._~-]+)+$/;
+
 function mountExtension(app: Express, ctx: ServerContext): void {
   const own = registeredRoutes(app);
   for (const route of ctx.extension.routes) {
@@ -226,7 +231,13 @@ function mountExtension(app: Express, ctx: ServerContext): void {
       throw new ModuleRouteError(
         `the module ${ctx.extension.name ?? ''} names ${route.method} ${route.path}, which is the app’s own (${taken[0]} ${taken[1]}): give the module routes of its own, such as /api/billing/…`,
       );
-    // who may call it is the app's to hold it to: a signed-in route that says nothing is refused, not left open (BILL-10)
+    // the role table finds a module's route by its exact path: a pattern (`:id`, `*`, `{…}`) would answer paths it
+    // never looks up, held to nothing
+    if (!LITERAL_PATH.test(route.path))
+      throw new ModuleRouteError(
+        `the module ${ctx.extension.name ?? ''} names ${route.method} ${route.path}, a pattern: give the module literal paths, such as /api/billing/plan`,
+      );
+    // who may call it is the app's to hold it to: a signed-in route that says nothing is refused, not left open
     if (!route.public && !ROLES.includes(route.role as Role))
       throw new ModuleRouteError(
         `the module ${ctx.extension.name ?? ''} doesn’t say who may call ${route.method} ${route.path}: give the route a role (${ROLES.join(', ')}), and person: true for what only a person signed in may do`,

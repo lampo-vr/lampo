@@ -19,6 +19,7 @@ import { vrTokenName } from '../lib/oauth/clients.ts';
 import { GrantError, listApps, redeemVrCode } from '../lib/oauth/store.ts';
 import { isOperator } from '../lib/operator.ts';
 import { can } from '../lib/permissions.ts';
+import { isInternal } from '../lib/publicError.ts';
 import { forgetDevicesOf } from '../lib/push/index.ts';
 import { addressKey, RateLimit } from '../lib/rateLimit.ts';
 import { DEFAULT_WORKSPACE } from '../lib/scope.ts';
@@ -27,7 +28,7 @@ import type { AuthStatus, MemberView, MyWorkspace } from '../lib/types.ts';
 import * as workspaces from '../lib/workspaces.ts';
 import { type AccountMail, describeDevice } from './accountMail.ts';
 import { type Extension, gate, NO_EXTENSION } from './extension.ts';
-import { fail, LanQuery, queryOr, router, sendInternal } from './http.ts';
+import { fail, failFrom, LanQuery, queryOr, router, sendInternal } from './http.ts';
 
 export interface Auth {
   /** local: a request from the machine itself; lan: a phone with the LAN link's cookie; cookie / token: signed in. */
@@ -42,9 +43,9 @@ export interface Auth {
   workspace: string;
   /** The session cookie again with a fresh "last active" (idle timeout), for the guard to send back. */
   refresh?: { value: string; maxAge: number };
-  /** The request carries the session cookie under its old name (`vr_session`): `used` = its value when it is the
-   * session this request is signed in with. Over https the guard moves it to `__Host-vr_session` (sessionUpdates). */
-  oldName?: { used: string | null };
+  /** Over https the request carries a cookie under the session's plain-http name (`vr_session`), which is never read
+   * there: the guard expires it (sessionUpdates). */
+  oldName?: true;
   /** via token: which one — MCP counts its open waits and listens per token (server/routes/mcp.ts), and a one-time upload
    * URL checks it again when used (server/uploadTickets.ts). */
   tokenId?: string;
@@ -65,16 +66,13 @@ const expired = (name: string, secure: boolean): string =>
 
 /**
  * What the guard sends back about the session a request came with: the cookie again with a fresh "last active" (idle
- * timeout), and over https the move from `vr_session` to `__Host-vr_session` — the same session under the new name,
- * the old one expired — so a browser signed in before keeps its session (A12 WEB-9).
+ * timeout), and over https a `vr_session` beside it expired. That name is never read over https and never moved to
+ * `__Host-vr_session`: a sibling subdomain can set it, so a session it carries is no proof of who the browser is.
  */
 export function sessionUpdates(a: Auth | undefined, secure: boolean): string[] {
   if (a?.via !== 'cookie') return [];
-  const moving = secure && !!a.oldName;
-  const value = a.refresh?.value ?? (moving ? a.oldName?.used : null);
-  // a moved session keeps its own end inside its claims: the browser may hold it as long as any session lasts
-  const out = value ? [sessionCookie(value, a.refresh?.maxAge ?? auth.SESSION_DAYS * 86400, secure)] : [];
-  if (moving) out.push(expired(COOKIE, true));
+  const out = a.refresh ? [sessionCookie(a.refresh.value, a.refresh.maxAge, secure)] : [];
+  if (secure && a.oldName) out.push(expired(COOKIE, true));
   return out;
 }
 
@@ -105,8 +103,14 @@ export const cookieOf = (req: Request, name: string): string | null => {
   return null;
 };
 
-/** The session cookie a request carries, under either name (one signed in before this name came keeps `vr_session`). */
-export const sessionOf = (req: Request): string | null => cookieOf(req, HOST_COOKIE) ?? cookieOf(req, COOKIE);
+/** Whether a request reached the site over https: its own connection, or the server's public URL (server/app.ts). */
+export const overHttps = (req: Request): boolean => req.secure || req.app?.locals?.https === true;
+
+/**
+ * The session cookie a request carries: over https only `__Host-vr_session`, which no other host can set — a plain
+ * `vr_session` there may come from a sibling subdomain (session fixation) and is nobody's; over plain http `vr_session`.
+ */
+export const sessionOf = (req: Request): string | null => (overHttps(req) ? cookieOf(req, HOST_COOKIE) : (cookieOf(req, HOST_COOKIE) ?? cookieOf(req, COOKIE)));
 
 const bearer = (req: Request): string | null => /^Bearer\s+(\S+)$/i.exec(req.headers.authorization || '')?.[1] || null;
 
@@ -222,12 +226,10 @@ export function createIdentify({ machine, lanToken = null, peerUid = loopbackPee
         ? { via: 'token', name: hit.user.name, role, user: hit.user, workspace, tokenId: hit.token.id, ...(Number.isFinite(until) ? { until } : {}) }
         : null;
     }
-    const host = cookieOf(req, HOST_COOKIE);
-    const before = cookieOf(req, COOKIE);
-    const cookie = host ?? before;
+    const cookie = sessionOf(req);
     const s = cookie ? auth.checkSession(cookie) : null;
-    // a `vr_session` beside or instead of the new name: the guard moves or drops it over https (sessionUpdates)
-    const oldName = before !== null ? { oldName: { used: host === null ? before : null } } : {};
+    // a `vr_session` over https is never read: the guard drops it (sessionUpdates)
+    const oldName = overHttps(req) && cookieOf(req, COOKIE) !== null ? { oldName: true as const } : {};
     if (s) {
       // The workspace the session switched to while the person is still a member there, else where they work.
       const workspace = workspaces.sessionWorkspace(s.user.id, s.workspace);
@@ -398,19 +400,21 @@ const parse = <S extends z.ZodType>(schema: S, value: unknown): z.output<S> => {
 
 // Errors from lib/auth.ts and lib/workspaces.ts are the user's fault (taken name, short password, the last owner): a
 // 4xx with the message (workspaces say which).
-const statusOf = (e: unknown) => (e instanceof workspaces.WorkspaceError || e instanceof auth.TooManyInvitesError ? e.status : 400);
+// a failure of ours (an object store's refusal) is the server's fault: a 500, whatever the store answered
+const statusOf = (e: unknown) => (e instanceof workspaces.WorkspaceError || e instanceof auth.TooManyInvitesError ? e.status : isInternal(e) ? 500 : 400);
+// the failure stays the cause: one that is internal (an object store's refusal) is answered by audience, never as it is
 const userError = <T>(fn: () => T): T => {
   try {
     return fn();
   } catch (e) {
-    throw fail(statusOf(e), (e as Error).message);
+    throw failFrom(statusOf(e), e);
   }
 };
 const userErrorAsync = async <T>(fn: () => Promise<T>): Promise<T> => {
   try {
     return await fn();
   } catch (e) {
-    throw fail(statusOf(e), (e as Error).message);
+    throw failFrom(statusOf(e), e);
   }
 };
 
@@ -531,6 +535,11 @@ export function sessionCookies(cfg: Config) {
  * service workers — and with them a push subscription). Never its cookies: a reset signs the browser in.
  */
 export const CLEAR_SITE_DATA = '"cache", "storage"';
+/**
+ * What a plain sign-out tells the browser to drop: the HTTP cache, where the account's renders, frames and pictures sit
+ * as immutable for a year. Its storage the page clears itself, all but the device's own settings (web/src/lib/signedOut.ts).
+ */
+export const CLEAR_ON_SIGN_OUT = '"cache"';
 
 /** See sessionCookies().signup. */
 export const SIGNUP_COOKIE = 'vr_signup';
@@ -715,6 +724,7 @@ export function authRoutes({ cfg, setupToken, setupDone, extension = () => NO_EX
     // Ends the session on the server too: a copy of this cookie stops working, the person's other devices don't.
     for (const cookie of [cookieOf(req, HOST_COOKIE), cookieOf(req, COOKIE)]) if (cookie) auth.revokeSession(cookie);
     clearCookie(req, res);
+    res.setHeader('Clear-Site-Data', CLEAR_ON_SIGN_OUT);
     res.json({ ok: true });
   });
 
@@ -1208,7 +1218,7 @@ export function authRoutes({ cfg, setupToken, setupDone, extension = () => NO_EX
     if (guessWait) throw Object.assign(fail(429, `too many attempts, try again in ${Math.ceil(guessWait / 60)} min`), { retryAfter: guessWait });
     if (!auth.inviteFits(token, b.email)) {
       wrongAddresses.hit(guessed);
-      byIp.hit(req.ip || 'unknown');
+      byIp.hit(addressKey(req.ip || 'unknown'));
       throw fail(400, 'this invite is for another e-mail address');
     }
     const me = req.auth?.via === 'cookie' ? req.auth.user : null;
@@ -1218,7 +1228,7 @@ export function authRoutes({ cfg, setupToken, setupDone, extension = () => NO_EX
       throw fail(409, 'this server can’t email the link that confirms an address (it has no public URL), so an invite can’t be taken here');
     // Every try counts against the address and this caller like a failed sign-in, whatever the address: an invite link
     // is no way around the sign-in limits, and a limit reached says nothing about who has an account.
-    const ip = req.ip || 'unknown';
+    const ip = addressKey(req.ip || 'unknown');
     const account = auth.emailKey(b.email);
     const pair = `${account}\n${ip}`;
     const wait = Math.max(byIp.retryAfter(ip), byAccountAndIp.retryAfter(pair), byAccount.retryAfter(account));

@@ -1,7 +1,7 @@
 // On a server reached over https the session cookie is `__Host-vr_session`: the browser takes it only from this exact
 // host, Secure, for the whole site — a sibling subdomain (another tenant's site on a shared domain) can't set or
-// overwrite it, which a plain `vr_session` allowed (session fixation; A12 WEB-9). A browser signed in before keeps
-// its session: its `vr_session` is still read, and the first answer moves it to the new name and expires the old one.
+// overwrite it, which a plain `vr_session` allowed (session fixation). So over https a `vr_session` is never read,
+// never moved to the new name — a sibling could have set it to a session of its own — and the answer expires it.
 // Over plain http (the machine, a local test) the name stays `vr_session`: browsers refuse `__Host-` cookies there.
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -47,25 +47,30 @@ test('signing in over https sets __Host-vr_session: Secure, the whole site, no D
   assert.equal(named(me, '__Host-vr_session'), undefined, 'nothing to move');
 });
 
-test('a browser signed in under the old name stays signed in, and its cookie moves to the new name', async () => {
-  const old = auth.signSession(user);
-  const me = await request('GET', '/api/auth/me', { headers: { Cookie: `vr_session=${old}` } });
-  assert.equal(me.status, 200, 'still signed in');
-  assert.equal(me.json().user.id, user.id);
-  const moved = named(me, '__Host-vr_session');
-  assert.ok(moved, `moved to the new name: ${setCookies(me).join(' | ')}`);
-  assert.match(moved, /; Secure/);
-  assert.equal(auth.checkSession(cookieValue(moved))?.user.id, user.id, 'the same account’s session');
-  const gone = named(me, 'vr_session');
-  assert.ok(gone && /Max-Age=0/.test(gone), `the old one expired: ${gone}`);
-  // and from then on the new one is what the browser sends
-  assert.equal((await request('GET', '/api/auth/me', { headers: { Cookie: `__Host-vr_session=${cookieValue(moved)}` } })).status, 200);
+test('over https a session under the old name is nobody’s: never read, never moved, expired', async () => {
+  // what a sibling subdomain can set for the whole domain: a session of its own account under the plain name
+  const mallory = await auth.createUser({ email: 'mallory@example.com', name: 'Mallory', password: 'a long password', role: 'owner' });
+  const planted = auth.signSession(mallory);
+  const me = await request('GET', '/api/auth/me', { headers: { Cookie: `vr_session=${planted}` } });
+  assert.equal(me.status, 401, me.text);
+  assert.equal(named(me, '__Host-vr_session'), undefined, `never moved to the new name: ${setCookies(me).join(' | ')}`);
+  const write = await request('POST', '/api/folders', { body: { name: 'Planted' }, headers: { Cookie: `vr_session=${planted}` } });
+  assert.equal(write.status, 401, 'nothing lands as the planted account');
+  // beside the person's own session: theirs is the one read, and the planted one goes
+  const own = auth.signSession(user);
+  const both = await request('GET', '/api/auth/me', { headers: { Cookie: `vr_session=${planted}; __Host-vr_session=${own}` } });
+  assert.equal(both.status, 200, both.text);
+  assert.equal(both.json().user.id, user.id);
+  assert.match(named(both, 'vr_session') ?? '', /Max-Age=0/, 'the planted cookie expired');
+  assert.equal(named(both, '__Host-vr_session'), undefined, 'the own session stays as it is');
 });
 
 test('signing out ends the session under either name and clears both', async () => {
   const value = auth.signSession(user);
   const out = await request('POST', '/api/auth/logout', { headers: { Cookie: `__Host-vr_session=${value}` } });
   assert.equal(out.status, 200);
+  // the browser's HTTP cache goes too: the account's renders and pictures are kept there as immutable
+  assert.equal(out.headers['clear-site-data'], '"cache"');
   assert.match(named(out, '__Host-vr_session') ?? '', /Max-Age=0/);
   assert.match(named(out, 'vr_session') ?? '', /Max-Age=0/);
   assert.equal((await request('GET', '/api/auth/me', { headers: { Cookie: `__Host-vr_session=${value}` } })).status, 401, 'revoked');

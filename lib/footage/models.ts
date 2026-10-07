@@ -82,12 +82,15 @@ export const downloadProgress = (m: FootageModel, root = footageModelsDir()): nu
  * The model's folder, downloaded once (each file streamed to a .part file, size + SHA-256 checked, then renamed); a
  * file already there is checked once. Concurrent callers share one download.
  */
-export function ensureModel(m: FootageModel, { root = footageModelsDir(), log = console.log, fetchImpl = fetch }: EnsureOptions = {}): Promise<string> {
+export function ensureModel(
+  m: FootageModel,
+  { root = footageModelsDir(), log = console.log, fetchImpl = fetch, fileMs = MODEL_FETCH_MS }: EnsureOptions = {},
+): Promise<string> {
   const dir = modelDir(m, root);
   if (modelReady(m, root)) return Promise.resolve(dir);
   let p = downloads.get(dir);
   if (!p) {
-    p = fetchAll(m, dir, log, fetchImpl).finally(() => {
+    p = fetchAll(m, dir, log, fetchImpl, fileMs).finally(() => {
       downloads.delete(dir);
       progress.delete(dir);
     });
@@ -100,7 +103,15 @@ export interface EnsureOptions {
   root?: string;
   log?: (msg: string) => void;
   fetchImpl?: typeof fetch;
+  /** How long one file may take at most (tests shorten it): MODEL_FETCH_MS. */
+  fileMs?: (bytes: number) => number;
 }
+
+/**
+ * How long one file of the model may take: ten minutes, or its bytes at 50 KB/s if that is longer. A connection that
+ * drips (or stalls) ends there, and the model says it failed instead of preparing for good.
+ */
+export const MODEL_FETCH_MS = (bytes: number): number => Math.max(10 * 60_000, (bytes / 50_000) * 1000);
 
 const sha256Of = async (file: string): Promise<string> => {
   const h = crypto.createHash('sha256');
@@ -108,7 +119,7 @@ const sha256Of = async (file: string): Promise<string> => {
   return h.digest('hex');
 };
 
-async function fetchAll(m: FootageModel, dir: string, log: (msg: string) => void, fetchImpl: typeof fetch): Promise<string> {
+async function fetchAll(m: FootageModel, dir: string, log: (msg: string) => void, fetchImpl: typeof fetch, fileMs: (bytes: number) => number): Promise<string> {
   const total = modelBytes(m);
   let done = 0;
   const mb = (n: number) => `${Math.round(n / 1e6)} MB`;
@@ -131,19 +142,22 @@ async function fetchAll(m: FootageModel, dir: string, log: (msg: string) => void
     }
     fs.mkdirSync(path.dirname(file), { recursive: true });
     const url = `https://huggingface.co/${m.repo}/resolve/${m.revision}/${f.path}`;
-    const res = await fetchImpl(url, { redirect: 'follow' });
-    if (!res.ok || !res.body) throw new Error(`footage model download failed: HTTP ${res.status} for ${f.path}`);
     const part = `${file}.part`;
     const hash = crypto.createHash('sha256');
     let got = 0;
-    const body = Readable.fromWeb(res.body as import('node:stream/web').ReadableStream<Uint8Array>);
-    body.on('data', (chunk: Buffer) => {
-      hash.update(chunk);
-      got += chunk.length;
-      progress.set(dir, Math.min(1, (done + got) / total));
-    });
     try {
-      await pipeline(body, fs.createWriteStream(part));
+      // the whole file within its time, and never more than its bytes: the hash would refuse it anyway, at the end
+      const signal = AbortSignal.timeout(fileMs(f.bytes));
+      const res = await fetchImpl(url, { redirect: 'follow', signal });
+      if (!res.ok || !res.body) throw new Error(`footage model download failed: HTTP ${res.status} for ${f.path}`);
+      const body = Readable.fromWeb(res.body as import('node:stream/web').ReadableStream<Uint8Array>);
+      body.on('data', (chunk: Buffer) => {
+        hash.update(chunk);
+        got += chunk.length;
+        progress.set(dir, Math.min(1, (done + got) / total));
+        if (got > f.bytes) body.destroy(new Error(`footage model file ${f.path} is corrupt (more than its ${f.bytes} bytes)`));
+      });
+      await pipeline(body, fs.createWriteStream(part), { signal });
       const sum = hash.digest('hex');
       if (got !== f.bytes || sum !== f.sha256) throw new Error(`footage model file ${f.path} is corrupt (got ${got} bytes, sha256 ${sum.slice(0, 12)}…)`);
       fs.renameSync(part, file);

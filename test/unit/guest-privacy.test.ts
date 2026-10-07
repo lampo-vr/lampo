@@ -260,6 +260,63 @@ test('a newest-only link serves no still of a version it doesn’t show', async 
   assert.equal((await file(newest, gNewest, now)).status, 200);
 });
 
+// A note's screenshot is a frame of the version it was made on: a newest-only link shows none of an older version's,
+// by its address or by its name, and no link hands out a note's clean frame (the page shows the marked one).
+test('a newest-only link serves no screenshot of an older version’s note, and no link a clean frame', async () => {
+  const both = track('Clients/Acme/Shots/export/shots.mp4', 'Acme/Shots');
+  makeVideo(both.file, { w: 160, h: 90, dur: 1, freq: 660 });
+  age(both.file);
+  assert.equal(store.sync(both.slug)?.review.versions.length, 2, 'two versions');
+  const make = async (body: object) =>
+    JSON.parse((await request('POST', '/api/folder-shares', { folder: 'Acme/Shots', notes: 'all', ...body })).text).token as string;
+  const all = await make({ versions: 'all', label: 'All' });
+  const newest = await make({ label: 'Newest' });
+  const idIn = async (token: string) => JSON.parse((await guest('GET', `/api/g/${token}`)).text).videos[0].slug as string;
+  const [gAll, gNewest] = [await idIn(all), await idIn(newest)];
+  const noted = await guest('POST', `/api/g/${all}/comments`, { name: 'Mia', slug: gAll, v: 1, frame: 3, text: 'On V1: the logo' });
+  assert.equal(noted.status, 200, noted.text);
+  const id = JSON.parse(noted.text).id as string;
+  const shots = await until(() => store.loadReview(both.slug)?.comments.find((c) => c.id === id)?.shots, 'its screenshots');
+  assert.ok(shots.marked && shots.clean);
+  const noteOn = async (token: string, gid: string) =>
+    JSON.parse((await guest('GET', `/api/g/${token}/review/${gid}`)).text).notes.find((n: { id: string }) => n.id === id) as { marked: string | null };
+  const file = (token: string, gid: string, f: string) => guest('GET', `/data/g/${token}/${gid}/${f}`);
+  // where every version is shown: the marked frame, never the clean one
+  assert.ok((await noteOn(all, gAll)).marked, 'shown where V1 is');
+  assert.equal((await file(all, gAll, shots.marked as string)).status, 200);
+  assert.equal((await file(all, gAll, shots.clean as string)).status, 404, 'a clean frame is never a visitor’s');
+  // the newest-only link: the note, without V1's picture, by its address or by its name
+  assert.equal((await noteOn(newest, gNewest)).marked, null);
+  assert.equal((await file(newest, gNewest, shots.marked as string)).status, 404);
+  assert.equal((await file(newest, gNewest, shots.clean as string)).status, 404);
+});
+
+// A link that shows its own visitors' notes only shows its own visitors' replies only: what another link's visitor
+// answers on one of its notes (through a link that shows every note) stays with that other link. The team's replies
+// reach every link.
+test('a visitor’s reply through another link never reaches a link that shows only its own visitors', async () => {
+  track('Clients/Acme/Replies/export/reply.mp4', 'Acme/Replies');
+  const make = async (body: object) => JSON.parse((await request('POST', '/api/folder-shares', { folder: 'Acme/Replies', ...body })).text).token as string;
+  const own = await make({ label: 'Client A' });
+  const all = await make({ notes: 'all', label: 'Agency' });
+  const idIn = async (token: string) => JSON.parse((await guest('GET', `/api/g/${token}`)).text).videos[0].slug as string;
+  const [gOwn, gAll] = [await idIn(own), await idIn(all)];
+  const noted = await guest('POST', `/api/g/${own}/comments`, { name: 'Anna', slug: gOwn, frame: 3, text: 'A: the logo is too small' });
+  assert.equal(noted.status, 200, noted.text);
+  const id = JSON.parse(noted.text).id as string;
+  const other = await guest('POST', `/api/g/${all}/comments/${id}/replies`, { name: 'Ben', text: 'from the agency: leave it' });
+  assert.equal(other.status, 200, other.text);
+  const mine = await guest('POST', `/api/g/${own}/comments/${id}/replies`, { name: 'Anna', text: 'A again: still small' });
+  assert.equal(mine.status, 200, mine.text);
+  store.updateComment(id, { note: 'the team: on it', by: 'Olivia' });
+  const replies = async (token: string, gid: string) =>
+    (JSON.parse((await guest('GET', `/api/g/${token}/review/${gid}`)).text).notes.find((n: { id: string }) => n.id === id).replies as { text: string }[]).map(
+      (r) => r.text,
+    );
+  assert.deepEqual(await replies(own, gOwn), ['A again: still small', 'the team: on it'], 'its own visitor and the team');
+  assert.deepEqual(await replies(all, gAll), ['from the agency: leave it', 'A again: still small', 'the team: on it'], 'every one where every note shows');
+});
+
 /** Bytes to a one-time upload URL, as the review page sends a file: a fresh request, no cookie, no address of the visit. */
 function put(url: string, data: Buffer): Promise<Seen> {
   return new Promise((resolve, reject) => {

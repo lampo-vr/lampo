@@ -66,12 +66,22 @@ export function nowCursor(events: ReviewEvent[], now = Date.now()): Cursor {
 
 /**
  * Events after the cursor (oldest first, at most `limit`) and the cursor after the last of them: when more arrived
- * than one answer shows, the rest come with the next call instead of being skipped.
+ * than one answer shows, the rest come with the next call instead of being skipped. A cursor counts every video's
+ * events of its second (cursorAt): `events` are all of them, and `keep` picks what is handed out (one video's), so a
+ * note on another video in the same second never takes the place of one on this.
  */
-export function after(events: ReviewEvent[], c: Cursor, limit = Number.POSITIVE_INFINITY): { fresh: ReviewEvent[]; next: string; more: boolean } {
+export function after(
+  events: ReviewEvent[],
+  c: Cursor,
+  limit = Number.POSITIVE_INFINITY,
+  keep: (e: ReviewEvent) => boolean = () => true,
+): { fresh: ReviewEvent[]; next: string; more: boolean } {
   let skipped = 0;
   let more = false;
   const fresh: ReviewEvent[] = [];
+  // where the next call starts: past every event looked at, handed out or not
+  let at = c.at;
+  let seen = c.seen;
   for (const e of events) {
     const t = Date.parse(e.at);
     if (t < c.at) continue;
@@ -79,17 +89,20 @@ export function after(events: ReviewEvent[], c: Cursor, limit = Number.POSITIVE_
       skipped++;
       continue;
     }
-    if (fresh.length >= limit) {
-      more = true;
-      break;
+    if (keep(e)) {
+      if (fresh.length >= limit) {
+        more = true;
+        break;
+      }
+      fresh.push(e);
     }
-    fresh.push(e);
+    if (t === at) seen++;
+    else {
+      at = t;
+      seen = 1;
+    }
   }
-  const last = fresh.at(-1);
-  if (!last) return { fresh, next: `${new Date(c.at).toISOString()}#${c.seen}`, more };
-  const lastAt = Date.parse(last.at);
-  const sameSecond = fresh.filter((e) => Date.parse(e.at) === lastAt).length + (lastAt === c.at ? c.seen : 0);
-  return { fresh, next: `${new Date(lastAt).toISOString()}#${sameSecond}`, more };
+  return { fresh, next: `${new Date(at).toISOString()}#${seen}`, more };
 }
 
 export interface FeedbackOptions {
@@ -244,9 +257,10 @@ export function registerFeedback(server: McpServer, o: FeedbackOptions): void {
         o.activity?.({ video: slug }, ctx);
         o.log?.(`wait_for_feedback start timeout_s=${timeout_s}${since ? '' : ' first'}`);
         listening = o.onWait?.() ?? null;
-        // Only what is new since the cursor's second (a hosted server sends that much, not its whole recent log).
-        const feedback = async (from: Cursor) =>
-          (await b.events(2000, { since: new Date(from.at - 1000).toISOString() })).filter((e) => isFeedback(e) && (!slug || e.slug === slug));
+        // Only what is new since the cursor's second (a hosted server sends that much, not its whole recent log). Every
+        // video's: the cursor counts them all (after's `keep` picks this video's).
+        const feedback = async (from: Cursor) => (await b.events(2000, { since: new Date(from.at - 1000).toISOString() })).filter(isFeedback);
+        const ours = (e: ReviewEvent) => !slug || e.slug === slug;
         // Without a cursor the agent just started to listen: what was assigned to it and came in while it didn't (an MCP
         // client acts only when prompted) is handed over at once, each thing once (`told`), then it waits as usual.
         if (!since) {
@@ -277,7 +291,7 @@ export function registerFeedback(server: McpServer, o: FeedbackOptions): void {
             outcome = 'access ended';
             return { content: [{ type: 'text', text: `Error: ${GONE}` }], isError: true };
           }
-          const { fresh, next, more } = after(read ?? (await feedback(cursor)), cursor, MAX_EVENTS);
+          const { fresh, next, more } = after(read ?? (await feedback(cursor)), cursor, MAX_EVENTS, ours);
           read = null;
           if (fresh.length) {
             outcome = `${fresh.length} event${fresh.length === 1 ? '' : 's'}`;
@@ -341,11 +355,13 @@ export function registerFeedback(server: McpServer, o: FeedbackOptions): void {
     let count = 0;
     for (const r of mine) {
       const s = slugify(r.video);
-      const since = Math.max(told(s), Date.parse(r.session?.assigned || '') || 0);
+      // Requests since it was the agent's (events have whole seconds: one in the assignment's second counts) and since
+      // it was last told of this video.
+      const assigned = Math.floor((Date.parse(r.session?.assigned || '') || 0) / 1000) * 1000;
       const open = r.comments.filter((c) => c.status === 'open' && (isRequired(c) || isIdea(c)));
       // A person's last word on it (a reply of the agent's own is no news to it).
       const fresh = open.filter((c) => peopleChangedAt(c) > told(s));
-      const requests = asked.filter((e) => e.slug === s && Date.parse(e.at) > since);
+      const requests = asked.filter((e) => e.slug === s && Date.parse(e.at) >= assigned && Date.parse(e.at) > told(s));
       if (!fresh.length && !requests.length) continue;
       lines.push(
         oneLine(

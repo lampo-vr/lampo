@@ -2,6 +2,7 @@
 // keeps the screens' data in IndexedDB as it changes, and deletes an account's copy on sign-out or when another
 // account signs in here.
 import type { Query, QueryClient } from '@tanstack/react-query';
+import { keptData } from './keptData.ts';
 import { CORE, done, type Entry, guestPage, MAX_BYTES, open, openedDb, ownerOf, persistable, STORE, sizes, WHO, who } from './persist.ts';
 
 /**
@@ -36,7 +37,7 @@ export function persistQueries(qc: QueryClient): void {
     const puts: Entry[] = [];
     const dels: string[] = [];
     for (const [hash, q] of batch) {
-      const data = q?.state.data;
+      const data = q ? keptData(q.queryKey, q.state.data) : undefined;
       if (!q || data === undefined || q.state.status !== 'success') {
         dels.push(hash);
         continue;

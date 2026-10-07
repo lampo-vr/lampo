@@ -54,6 +54,22 @@ test('ports, storage kinds and a CDN without signed addresses', () => {
   assert.deepEqual(startupProblems(loadConfig({}), {}), [], 'the machine needs none of it');
 });
 
+test('publishing’s endpoints that can’t be read stop the start with one line, on the machine too', () => {
+  const ok = { VR_PUBLIC_URL: 'https://review.example.com', VR_TRUST_PROXY: 'loopback' };
+  for (const [given, says] of [
+    ['nope', /^VR_PUBLISH_ENDPOINTS is not JSON/],
+    ['["https://example.com"]', /^VR_PUBLISH_ENDPOINTS must be a JSON object/],
+    ['{"youtube":"not a url"}', /^VR_PUBLISH_ENDPOINTS: youtube must be an http\(s\) URL/],
+    ['{"zernio":"ftp://example.com/api"}', /^VR_PUBLISH_ENDPOINTS: zernio must be an http\(s\) URL/],
+  ] as const) {
+    const [line, ...more] = problems({ ...ok, VR_PUBLISH_ENDPOINTS: given });
+    assert.match(line ?? '', says, given);
+    assert.ok(!(line ?? '').includes('\n') && !more.length, `one line: ${line}`);
+    assert.match(startupProblems(loadConfig({}), { VR_PUBLISH_ENDPOINTS: given })[0] ?? '', says, `the machine: ${given}`);
+  }
+  assert.deepEqual(problems({ ...ok, VR_PUBLISH_ENDPOINTS: '{"youtube":"http://127.0.0.1:9000/youtube/v3"}' }), [], 'a test’s fake platform');
+});
+
 test('a key file that is cut short is refused, never used to sign', () => {
   assert.throws(
     () => checkKey(Buffer.alloc(0), 'data/secret.key', 'x'),

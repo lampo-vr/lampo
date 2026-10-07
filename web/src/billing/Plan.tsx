@@ -9,12 +9,12 @@ import { useState } from 'react';
 import type { BillingInfo, BillingOffer } from '../../../lib/types.ts';
 import { ApiError, api } from '../api/client.ts';
 import { t } from '../i18n/index.ts';
-import { toast, toastError } from '../lib/toast.ts';
+import { toast } from '../lib/toast.ts';
 import { Spinner } from '../ui/feedback.tsx';
 import { I } from '../ui/icons.tsx';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { SkLine } from '../ui/Skeleton.tsx';
-import { useCancel } from './api.ts';
+import { toastRefusal, useCancel } from './api.ts';
 import { FitGrid, Meter, Ruler, RulerTicks } from './parts.tsx';
 import { dayOf, daysUntil, money, ofLimit, size, stateLine, unitsFor, whyFailed } from './words.ts';
 
@@ -117,7 +117,7 @@ function Loaded({ b, ws, picker, onPicker, onFix }: { b: BillingInfo; ws: string
       await cancel.mutateAsync(false);
       toast(t('{plan} goes on.', { plan: b.planName }), 'ok');
     } catch (e) {
-      toastError(e);
+      toastRefusal(e);
     }
   };
 
@@ -386,7 +386,7 @@ function Nudge({ ws }: { ws: string }) {
     } catch (e) {
       // a provider without the route yet: say it plainly, nothing else went wrong
       if (e instanceof ApiError && e.status === 404) toast(t('Couldn’t tell them right now. Let the owner of {ws} know yourself.', { ws }), 'error');
-      else toastError(e);
+      else toastRefusal(e);
     }
   };
   return (

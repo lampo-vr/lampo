@@ -19,6 +19,7 @@ import {
   isExpired,
   isUnlocked,
   knowsVisitor,
+  noteShotShown,
   recordView,
   recordVisit,
   recordWatch,
@@ -32,6 +33,7 @@ import {
   unlockValue,
   visibleNotes,
   visitorKey,
+  visitorReplies,
 } from '../../../lib/shares.ts';
 import { shotsOrLater } from '../../../lib/shots.ts';
 import { SPRITE_VERSION } from '../../../lib/sprite.ts';
@@ -54,7 +56,7 @@ import type {
 import { MAX_PLAYS_PER_REPORT, PARTS, SEEN_PATTERN } from '../../../lib/watch.ts';
 import { getWorkspace, workspaceNamed } from '../../../lib/workspaces.ts';
 import type { ServerContext } from '../../context.ts';
-import { countStep, noticeMoment } from '../../funnel.ts';
+import { countStep, noticeMoment, onSample } from '../../funnel.ts';
 import { metaOf, sanitizeDrawing, versionBytes } from '../../helpers.ts';
 import { body, commentId, fail, failFrom, parse, query, router, VersionQuery } from '../../http.ts';
 import { freeBytes } from '../../ready.ts';
@@ -361,9 +363,9 @@ export function guestRoutes(ctx: ServerContext): Router {
     // A folder link's room is a visit of its own; on a video link the video's view says it (recordView).
     const act = fresh && share.folder ? { kind: 'open' as const, name } : undefined;
     if (fresh || name) recordVisit(share.token, { open: fresh, name, visitor, act });
-    // the workspace's first review link opened by a visitor (never the team's own preview): the funnel's step, and a
+    // the workspace's first review link opened by a visitor (never the team's own preview, nor one on the sample): the funnel's step, and a
     // moment for whoever made the link — named by the link's name alone, never by who opened it
-    if (fresh) {
+    if (fresh && !onSample(share)) {
       countStep(ctx, 'link_opened_first');
       noticeMoment(ctx, 'link_open', share.by_id, { link: share.label, slug: share.slug });
     }
@@ -499,6 +501,7 @@ export function guestRoutes(ctx: ServerContext): Router {
   function guestNote(share: ShareWithToken, review: Review, ver: Version, c: Comment) {
     const id = guestId(share, slugify(review.video));
     const refs = guestRefs(share, review, c);
+    const replyShown = visitorReplies(share, review);
     return {
       id: c.id,
       v: c.v,
@@ -513,11 +516,12 @@ export function guestRoutes(ctx: ServerContext): Router {
       fixed_in_v: c.fixed_in_v ?? null,
       created: c.created,
       drawing: c.drawing,
-      marked: c.shots?.marked ? `/data/g/${share.token}/${id}/${c.shots.marked}` : null,
+      marked: c.shots?.marked && noteShotShown(share, review, c) ? `/data/g/${share.token}/${id}/${c.shots.marked}` : null,
       mine: c.share === shareId(share),
-      // Agents answer as "the editor"; their questions stay internal, their status changes are shown.
+      // Agents answer as "the editor"; their questions stay internal, their status changes are shown. A visitor's reply
+      // is for the visitors of the link it came through, as their notes are (visitorReplies).
       replies: (c.replies || [])
-        .filter((rp) => !isAgent(rp.by) || rp.status)
+        .filter((rp) => (!isAgent(rp.by) || rp.status) && replyShown(rp))
         .map((rp) => ({
           by: isAgent(rp.by) ? 'editor' : rp.by.replace(/^guest:/, ''),
           text: rp.text,
@@ -710,7 +714,7 @@ export function guestRoutes(ctx: ServerContext): Router {
     const { review } = visibleNote(share, id);
     const b = body(GuestReply, req);
     const name = guestName(b.name);
-    store.updateComment(id, { note: b.text.trim().slice(0, 2000), by: `guest:${name}` });
+    store.updateComment(id, { note: b.text.trim().slice(0, 2000), by: `guest:${name}`, share: shareId(share) });
     landed();
     recordVisit(share.token, { name, act: { kind: 'reply', name, slug: slugify(review.video) } });
     remember(share, req, name);
@@ -750,6 +754,7 @@ export function guestRoutes(ctx: ServerContext): Router {
       const kind = b.kind === 'file' ? undefined : b.kind;
       if ((comment.refs?.length || 0) >= store.REFS_PER_NOTE) throw fail(422, `A note carries at most ${store.REFS_PER_NOTE} references.`);
       if (!b.data) {
+        const passwordAsked = share.password_v || 0;
         // Without a public URL, a path: the page resolves it on the host it came in on (the machine's tunnel is https
         // outside and plain http here, so an absolute URL built from this request would be wrong there).
         out = {
@@ -758,10 +763,12 @@ export function guestRoutes(ctx: ServerContext): Router {
             request.by,
             cfg.public_url || null,
             {
-              // The file arrives later: a link revoked, expired or made watch-only in between takes nothing.
+              // The file arrives later: a link revoked, expired or made watch-only in between takes nothing, nor one whose
+              // password was set or changed since (the visitor would have to know it now)
               check: () => {
                 const now = resolveShare(share.token);
                 if (!now || isExpired(now) || !perms(now).comment) throw fail(410, 'This review link is not valid any more.');
+                if ((now.password_v || 0) !== passwordAsked) throw fail(401, 'This review link asks for its password now: open it again.');
               },
               // a visitor holds only so many open at once, and the link's visitors together (server/uploadTickets.ts)
               owner: `guest:${share.token}|${ipOf(req)}`,
@@ -821,7 +828,12 @@ export function guestRoutes(ctx: ServerContext): Router {
     if (comment.status !== 'fixed') throw fail(409, 'This note is not waiting for a check.');
     const b = body(GuestCheck, req);
     const name = guestName(b.name);
-    store.updateComment(id, { status: b.verdict === 'confirm' ? 'verified' : 'open', note: (b.text || '').trim().slice(0, 2000), by: `guest:${name}` });
+    store.updateComment(id, {
+      status: b.verdict === 'confirm' ? 'verified' : 'open',
+      note: (b.text || '').trim().slice(0, 2000),
+      by: `guest:${name}`,
+      share: shareId(share),
+    });
     recordVisit(share.token, { name, act: { kind: 'check', name, slug: slugify(review.video), detail: b.verdict } });
     remember(share, req, name);
     changed(ctx, slugify(review.video));

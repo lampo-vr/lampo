@@ -128,9 +128,10 @@ export function backendFor(p: Principal, b: Backend): Backend {
     },
     // What it says: where files are fetched from, never where they lie on this server.
     reviewMarkdown: (slug, o) => b.reviewMarkdown(slug, { ...o, files: false }),
-    // Shots name the render's file on this disk for the machine itself only.
+    // Shots name the render's file on this disk for the machine itself only: no render is fetched (from a bucket, a
+    // part's splice) to be named, and a backend that names one anyway has it taken out.
     async findFootage(req) {
-      const a = await b.findFootage(req);
+      const a = await b.findFootage(req, { files: false });
       return { ...a, shots: a.shots.map(({ file: _file, ...s }) => s) };
     },
     refLocation: (review, file) => `/api/refs/${encodeURIComponent(slugify(review.video))}/${encodeURIComponent(file)}`,

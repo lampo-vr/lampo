@@ -17,7 +17,8 @@ curl -H "Authorization: Bearer $VR_TOKEN" https://review.example.com/api/library
 curl -N -H "Authorization: Bearer $VR_TOKEN" https://review.example.com/api/events
 ```
 
-The first call lists the videos; the second stays open and prints an event whenever something changes. On your own
+The first call lists the videos; the second stays open and prints an event whenever something changes, until the access
+it opened with ends (the token revoked, the member removed, the account disabled: at once). On your own
 machine the app trusts calls from the machine itself, so no token is needed: `curl http://localhost:4747/api/library`.
 
 The rules for every call:
@@ -45,7 +46,7 @@ A call is identified by the first of these that it carries:
 1. **An API token**: `Authorization: Bearer vr_…` (Settings → API tokens). A token that doesn't check out is nobody,
    even from the machine itself.
 2. **A session cookie**, set when a person signs in in the browser: `__Host-vr_session` over https (this host only,
-   `Secure`; a browser holding the older `vr_session` is moved to it on its next request, still signed in),
+   `Secure`; a `vr_session` is never read over https: a browser that still holds one signs in once more),
    `vr_session` over plain http.
 3. **On a person's own machine only:** a call from the machine itself (loopback, no proxy headers; on Linux only from
    the app's own OS account or root), or from a device that opened the LAN link (`--lan`; its key is kept as a cookie).
@@ -71,7 +72,7 @@ Then these rules apply:
   or the machine itself). With an API token it answers `403 {person: true}`, whatever the token's role (`PERSON_ONLY`
   in [`server/permissions.ts`](../server/permissions.ts)): making API tokens, signing out everywhere, adding, changing
   and removing members, making, emailing and revoking invites or getting their links again, revoking the workspace's
-  tokens, disconnecting its apps, adding and changing webhooks, making a workspace, subscribing a device to push
+  tokens, disconnecting its apps, adding, changing, testing and removing webhooks, making or renaming a workspace, subscribing a device to push
   notifications, and making, changing or revoking a review link (whoever holds a link can act as the client through it,
   a client's approval included, and sign-off is people's). `PATCH /api/auth/me` with a `password` or a new `email`
   answers a token `403` too; a token may still change a name or preferences. Other things are a person's in the app as
@@ -125,8 +126,8 @@ says what the next invoice will be, `/plan` switches a running plan, `/storage {
 plan carries (the terabytes in all, paid with the card on file), and `/cancel` and `/resume` end the plan at the
 period's end or keep it. `POST /api/billing/nudge` is for someone who can't pay (not an owner or admin) when a payment
 failed: it tells the workspace's owners and admins, once per failed payment. The module answers these routes; each
-declares the lowest role that may call it and whether only a person may, and the server's guard holds it to that (`403`,
-with `{person: true}` for an API token). An API token never changes what a workspace pays.
+declares the lowest role that may call it and whether only a person may, and the server's guard holds it to that, a
+`HEAD` as its `GET` (`403`, with `{person: true}` for an API token); a module's paths are literal, never patterns. An API token never changes what a workspace pays.
 
 Consumers may buy. `vat: {rate}` is the VAT a consumer pays on the offers' prices: Settings → Billing shows them with
 it. `reverseCharge: true` says the checkout offers reverse charge (the provider's seller has a VAT ID of its own): the
@@ -1020,7 +1021,9 @@ Details:
 - **A heartbeat**'s `kind` is an agent kind (the mark the app shows; `400` for an unknown one). `vr watch` sends one
   every 30 s from inside a Claude Code session, as `claude-code`; without `kind` an agent counts as `cli` (shown as
   "vr"); a script on the HTTP API sends `api`. Names are listed as one line of printable text, the name 80 characters
-  at most.
+  at most, and end in whose agent it is (`claude · Alex`) unless it runs on the machine itself. A heartbeat speaks
+  for its own account only: a `session_id` another account's agent is listed under answers `409`, and ids starting
+  with `mcp-` (the MCP server's own) `400`.
 - **Activity** (the agents action) answers `{agents: AgentLive[]}`. With `slug`: that video's agents (each
   `{agent, slug, current, recent}`, newest first, 12 lines at most, including what the agent did that named no video;
   `agent` adds the assigned one before it touched the video). Without: every agent's latest. A line is `{at, agent,

@@ -16,8 +16,10 @@ export type Fit =
   | { kind: 'addon'; tb: number; month: number | null; year: number | null; currency: string }
   | { kind: 'contract' };
 
-/** Where "Talk to us" about a contract goes. A placeholder until the maintainer names the address. */
+/** Where "Talk to us" about a contract goes: the one address, for the limit sheet and Settings → Billing alike. */
 export const CONTRACT_ADDRESS = 'hello@lampo.video';
+/** "Talk to us" about Business as a link: a message to CONTRACT_ADDRESS. */
+export const contractMail = (): string => `mailto:${CONTRACT_ADDRESS}?subject=${encodeURIComponent('Lampo Business')}`;
 
 /** The plan that brings a feature when the provider doesn't say (the website: roles, Insights and webhooks come with Team). */
 const FEATURE_PLAN: Record<Feature, string> = { insights: 'team', roles: 'team', webhooks: 'team' };

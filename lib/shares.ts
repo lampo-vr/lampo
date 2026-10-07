@@ -16,6 +16,8 @@ import { listReviews, loadReview, withLock, writeAtomic } from './store.ts';
 import { compareTime } from './time.ts';
 import type {
   ApprovalEntry,
+  Comment,
+  Reply,
   Review,
   Share,
   ShareActivity,
@@ -964,6 +966,26 @@ export function visibleNotes(s: ShareWithToken, review: Review) {
   const legacyIsOurs = onlyLinkEver(s, review);
   return review.comments.filter((c) => c.author?.startsWith('guest:') && (all || c.share === id || (!c.share && legacyIsOurs())));
 }
+
+/**
+ * Which replies on a note a link shows: the team's and agents' to everyone, a visitor's like their notes (visibleNotes):
+ * those that came through this link (or every visitor's with notes: 'all'), and older ones without a link only where
+ * this was the video's only link ever.
+ */
+export function visitorReplies(s: ShareWithToken, review: Review): (r: Pick<Reply, 'by' | 'share'>) => boolean {
+  const id = shareId(s);
+  const all = settingsOf(s).notes === 'all';
+  const legacyIsOurs = onlyLinkEver(s, review);
+  return (r) => !r.by.startsWith('guest:') || all || r.share === id || (!r.share && legacyIsOurs());
+}
+
+/**
+ * Whether a visible note's marked screenshot is for a link's visitors: it is a frame of the version the note was made
+ * on, so a link that shows only the newest version shows only the newest version's (its clean frame never: the marked
+ * one is what the page shows).
+ */
+export const noteShotShown = (s: ShareWithToken, review: Pick<Review, 'versions'>, c: Pick<Comment, 'v'>): boolean =>
+  settingsOf(s).versions === 'all' || c.v === undefined || c.v === review.versions.at(-1)?.v;
 
 /**
  * The clients' verdicts a link shows (lib/stage.ts approvalsOf, the team's left in): with notes: 'own', only the ones

@@ -45,6 +45,7 @@ export function claudePrompt(review: Review, { includeFixed = true, shot, dataFi
       c.check_again ? `carried from v${c.v}, check again` : null,
       c.v !== latest?.v && !c.check_again ? `made on v${c.v}` : null,
       isQuestion(c) ? `asked by ${c.author}` : null,
+      c.scope === 'video' ? 'overall: about the whole video, not frame 0' : null,
     ].filter(Boolean);
     L.push(
       `${i + 1}. ${c.id} · ${noteLabel(c)} · ${c.tags.join(', ') || '–'} · ${c.timecode} f${c.frame}${range}${flags.length ? ` · ${flags.join(', ')}` : ''}`,
@@ -55,10 +56,12 @@ export function claudePrompt(review: Review, { includeFixed = true, shot, dataFi
     for (const s of c.drawing || []) L.push(`   drawing: ${describeShape(s)}`);
     const last = c.replies?.at(-1);
     if (last) L.push(`   last reply (${last.by}): ${last.text || last.status}`);
-    if (hosted) L.push(`   frames: vr show ${c.id} (downloads the marked and the clean frame)`);
-    else {
-      L.push(`   marked: ${abs(c.shots?.marked)}`);
-      L.push(`   clean:  ${abs(c.shots?.clean)}`);
+    // a note about the whole video has no frame of its own to show
+    if (hosted) {
+      if (c.scope !== 'video') L.push(`   frames: vr show ${c.id} (downloads the marked and the clean frame)`);
+    } else if (c.shots) {
+      L.push(`   marked: ${abs(c.shots.marked)}`);
+      L.push(`   clean:  ${abs(c.shots.clean)}`);
     }
   };
   L.push(`Open (${n.open}${n.must ? `, ${n.must} must` : ''}):`);

@@ -4,24 +4,22 @@
 // only inform (Your trial, Current, Your pick). One bar under the tiles, sticky while the plans are in view, says what
 // the selection costs this workspace and holds the one orange action: on to the checkout step for a new plan, or a
 // switch (with what the next invoice will be) for a running one. The member stepper tries other team sizes and never
-// changes the bill. Free and the rest in one row and one line below. Consumers may buy (A13 CLOUD-2): where the provider
+// changes the bill. Free and the rest in one row and one line below. Consumers may buy: where the provider
 // names the VAT a consumer pays (BillingInfo.vat), every price here is shown with it (PAngV), and the foot says that the
 // checkout works the tax out for the billing address.
 import { useState } from 'react';
 import type { BillingInfo, BillingOffer } from '../../../lib/types.ts';
+import { contractMail } from '../conversion/limits/model.ts';
 import { currentLang, t } from '../i18n/index.ts';
 import { T } from '../i18n/T.tsx';
-import { toast, toastError } from '../lib/toast.ts';
+import { toast } from '../lib/toast.ts';
 import { Spinner } from '../ui/feedback.tsx';
 import { I } from '../ui/icons.tsx';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { useConfirm } from '../ui/primitives.tsx';
-import { type PlanChoice, useChangePlan, usePlanPreview } from './api.ts';
+import { type PlanChoice, toastRefusal, useChangePlan, usePlanPreview } from './api.ts';
 import { checkoutHash } from './Checkout.tsx';
 import { dayOf, daysUntil, gross, money, monthly, planLine, saving, size, unitsFor, vatRate } from './words.ts';
-
-/** "Business as a contract, on invoice: talk to us." — TODO: the address is the maintainer's to give (a placeholder). */
-export const TALK_TO_US = 'mailto:';
 
 /** What the address brought: a plan picked on the website, with its interval and currency when it said them. */
 export interface Picked {
@@ -99,7 +97,7 @@ export function Picker({
       toast(t('{plan} it is: the change shows here in a moment.', { plan: sel.name }), 'ok');
       onClose();
     } catch (e) {
-      toastError(e);
+      toastRefusal(e);
     } finally {
       setBusy(false);
     }
@@ -250,7 +248,7 @@ export function Picker({
               amount: money(gross(1000, b), currency),
             },
           )}{' '}
-          <a className="bill-u" href={TALK_TO_US}>
+          <a className="bill-u" href={contractMail()}>
             {t('talk to us')}
           </a>
           .

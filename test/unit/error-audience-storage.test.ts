@@ -253,6 +253,19 @@ test('a multipart upload the bucket fails late (a 200 with an error document): a
   }
 });
 
+test('a bucket that refuses a profile picture: the person gets a sentence and a 5xx, not the bucket’s answer', async () => {
+  const png = path.join(dir, 'me.png');
+  execFileSync(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=green:s=120x120', '-frames:v', '1', png]);
+  refuse.put = true;
+  try {
+    const r = await request('PUT', '/api/auth/me/avatar', { body: { data: fs.readFileSync(png).toString('base64') }, headers: olivia });
+    assert.ok(r.status >= 500, `the server's fault, not the picture's: ${r.status} ${r.text}`);
+    plain('a profile picture', r.text);
+  } finally {
+    refuse.put = false;
+  }
+});
+
 test('the rule itself: an object store’s refusal is internal, read as it is only by the owner at the machine', async () => {
   const { publicMessage, isInternal, statusOf } = await import('../../lib/publicError.ts');
   const { HttpStatusError } = await import('../../lib/storage/http.ts');

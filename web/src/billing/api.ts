@@ -4,8 +4,10 @@
 // The plan itself is `useBilling` (api/queries.ts): the banner reads it from there.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { BillingAccount, BillingAddress, BillingCancelled, BillingCancelOptions, BillingPreview, BillingSecret } from '../../../lib/types.ts';
-import { api } from '../api/client.ts';
+import { ApiError, api } from '../api/client.ts';
 import { keys } from '../api/queries.ts';
+import { toast, toastError } from '../lib/toast.ts';
+import { billingSaid } from './words.ts';
 
 export interface PlanChoice {
   plan: string;
@@ -13,6 +15,12 @@ export interface PlanChoice {
   currency?: string;
   /** `full`: Stripe's address form on the page (Settings → Billing); `card`: card and country only (a limit sheet). */
   form?: 'full' | 'card';
+}
+
+/** A billing refusal as a toast in the page's language (billingSaid); a plan's limit (402) still opens its sheet. */
+export function toastRefusal(e: unknown): void {
+  if (e instanceof ApiError && e.status === 402) toastError(e);
+  else toast(billingSaid(e), 'error');
 }
 
 /** Under the plan's key: whatever changes the plan refreshes the account too, and the other way round. */

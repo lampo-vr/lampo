@@ -1,5 +1,6 @@
 // A live event stream (/api/events) carries every note as it is written. Signing out, revoking a token or disabling
-// the account ends the streams it opened (on the next keep-alive), not only the requests that come after.
+// the account ends the streams it opened (at once in this process, events-access-ended.test.ts; a change another
+// process made, on the next keep-alive), not only the requests that come after.
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { after, before, test } from 'node:test';

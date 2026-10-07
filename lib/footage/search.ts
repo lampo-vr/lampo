@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { slugify } from '../paths.ts';
+import { Recent } from '../rateLimit.ts';
 import { renderKey } from '../renderKey.ts';
 import { wsKey } from '../scope.ts';
 import * as store from '../store.ts';
@@ -98,8 +99,9 @@ function load(model: string): Loaded | null {
   return l;
 }
 
-// What is said in a shot, from its render's transcript (read again only when the file changed).
-const saidCache = new Map<string, { mtime: number; words: { f0: number; text: string }[] }>();
+// What is said in a shot, from its render's transcript (read again only when the file changed): the renders asked
+// about most recently, bounded.
+const saidCache = new Recent<{ mtime: number; words: { f0: number; text: string }[] }>(2_000);
 function saidIn(ver: Version, f0: number, f1: number): string {
   const key = renderKey(ver);
   let mtime = 0;

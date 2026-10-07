@@ -5,6 +5,7 @@ import net from 'node:net';
 import { type LegalUrls, legalConfig, legalProblems } from './legal.ts';
 import { type MailConfig, mailConfig, mailProblems, type SignupMode, signupConfig } from './mail/config.ts';
 import { type ConfigFile, readConfigFile, type StorageConfig, type SttConfig, USER } from './paths.ts';
+import { endpointsProblems } from './publish/net.ts';
 
 export type Mode = 'local' | 'server';
 
@@ -201,6 +202,8 @@ export function startupProblems(cfg: Config, env: NodeJS.ProcessEnv = process.en
   // Email and sign-up, in either mode (docs/email.md).
   problems.push(...mailProblems(cfg, { signupSeam }));
   problems.push(...legalProblems(cfg));
+  // read by the publishing queue as the server starts: a stack trace then, after the store may have been moved
+  problems.push(...endpointsProblems(env));
   if (cfg.mode !== 'server') return problems;
   if (!cfg.public_url) {
     if (!flag(env.VR_ALLOW_NO_PUBLIC_URL || '0'))

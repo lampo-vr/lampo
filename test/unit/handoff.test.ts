@@ -4,6 +4,7 @@
 // with nothing new says why and to call again, and an agent that heard only that for 30 minutes in a row is told to
 // stop and say so (a clock of its own here: never a real half hour).
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import type { ReviewEvent } from '../../lib/types.ts';
@@ -81,6 +82,29 @@ test('track_video ends with "wait now" and a cursor from that moment: a note wri
     const got = said(await call(c, 'wait_for_feedback', { since: cursor, timeout_s: 5 }));
     assert.match(got, /^1 new:\n/, got);
     assert.ok(got.includes(meanwhile.id) && !got.includes(before.id), got);
+  });
+});
+
+test('a wait for one video hears a note made in the same second as one on another video the cursor counted', async () => {
+  const [fa, fb] = [film('same-a.mp4'), film('same-b.mp4')];
+  const [a, b] = [slugOf(fa), slugOf(fb)];
+  store.createOrGetReview(fa, { by: 'Sam Rivera' });
+  store.createOrGetReview(fb, { by: 'Sam Rivera' });
+  const onB = person(b, 'On B first');
+  const onA = person(a, 'On A, the same second');
+  // both notes in one second, B's first: the cursor a hand-off gave between them counted B's (cursorAt counts every video)
+  const T = Math.floor(Date.now() / 1000) * 1000 - 5000;
+  const file = store.eventsFile();
+  const lines = fs
+    .readFileSync(file, 'utf8')
+    .split('\n')
+    .map((l) => (l.includes(onA.id) || l.includes(onB.id) ? JSON.stringify({ ...JSON.parse(l), at: new Date(T).toISOString() }) : l));
+  fs.writeFileSync(file, lines.join('\n'));
+  const cursor = `${new Date(T).toISOString()}#1`;
+  await mcp(async (c) => {
+    const got = said(await call(c, 'wait_for_feedback', { video: fa, since: cursor, timeout_s: 1 }));
+    assert.ok(got.includes(onA.id), `A’s note is heard: ${got}`);
+    assert.ok(!got.includes(onB.id), 'B’s is not this wait’s');
   });
 });
 

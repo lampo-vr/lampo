@@ -84,6 +84,62 @@ format stays backwards compatible throughout.
   command runs on the agent's own machine, never on a server ([docs/agents.md](docs/agents.md)).
 
 ### Fixed
+- On a server reached over https, a browser is signed in only by the session cookie no other site can set: the older
+  cookie name is no longer read there, so a browser that still holds one signs in once more.
+- When a server's storage refuses a profile picture (or another account change fails on the server's side), the person
+  gets a sentence with a reference, never the storage's own answer.
+- Routes a server's billing module adds are held to the role they declare for every kind of request.
+- Settings → Billing's "talk to us" about a Business contract opens a message to Lampo's address, as the limit sheet's
+  does; before, it opened an empty one.
+- Settings → Users names the server's own command for a lost password only to whoever runs the server, not to every
+  workspace's owners and admins.
+- A publishing kit that couldn't be made tells the team so in a sentence: what went wrong inside (the encoder's own
+  output, file paths on the server) is kept for whoever runs the server.
+- Starting an upload when the plan can't be checked answers with a sentence and a reference, not the server's own
+  error.
+- A review link on the sample video no longer counts as the workspace's first link, and its opening no longer takes
+  the place of the first link a visitor opens.
+- On a server with several workspaces, a workspace's billing emails and an agent's link to a post open that workspace,
+  not whichever one the browser used last.
+- A picture or clip a visitor was about to add through a review link isn't taken once the link has a new password: they
+  open the link again with it.
+- Billing's refusals (a plan you can't switch to, a card that can't be removed, too many tries) read in German for
+  German users too, in the checkout, paying, cancelling and the plan picker.
+- Signing out tells the browser to drop its cached copies of the account's videos and pictures too, not only the
+  session.
+- Renaming a workspace and removing or testing a webhook are a person's, like adding one: an API token is refused.
+- One video whose saved state can't be read (cut short by a crash, edited by hand) no longer takes the whole library,
+  search, status and `vr ls` down with it: the others show, and the library says one is left out.
+- Moving a store: an import stopped the hard way right after a video went in no longer loses that video's history;
+  running the import again brings it.
+- Someone removed from a workspace, or whose token is revoked, stops receiving its live updates at once, not up to half
+  a minute later.
+- An agent's check-in speaks only for the account that sends it: nobody can make someone else's agent look like it is
+  listening, or list an agent under another person's name.
+- `vr help` names `repair-folders` among the admin commands that take `--workspace`, no longer says `vr sessions` lists
+  only this machine's agents, and `vr mcp config` names its `--json`.
+- Going live behind a CDN: `deploy/Caddyfile.cdn` is a working proxy config for it (only the CDN reaches the app, the
+  visitor's own address, a media host of its own), linked from the go-live guide.
+- The relaxed window policy an app's sign-in popup needs stays with the screen where you allow the app: any other
+  screen reached from there loads with the usual protection.
+- A review link that shows only the newest version no longer shows the screenshots of notes made on older versions,
+  and no review link hands out a note's unmarked frame.
+- A reply a visitor writes through one review link no longer shows on another link that shows only its own visitors'
+  notes: each link's visitors read their own replies and the team's.
+- When a session ends elsewhere (it ran out, a sign-out everywhere, a new password), the browser that held it stops
+  getting the account's notifications too, not only when you sign out there.
+- An agent waiting for one video's notes no longer misses a note written in the same second as one on another video,
+  nor a request made in the second the video was assigned to it.
+- A note about the whole video reads as one everywhere an agent reads notes ("Copy for an agent", INBOX.md, review.md,
+  `vr open`), not as a note on frame 0 with screenshots it doesn't have.
+- A server whose publishing endpoints setting can't be read says so in one line when it starts, before it changes
+  anything, instead of stopping with a stack trace.
+- Settings → Billing thanks you for a payment only in the browser tab that made it; a link that merely names a payment
+  shows nothing.
+- Footage search: its model's download can no longer hang or grow past its files, a damaged setting keeps it off
+  instead of turning it back on, and a video it couldn't take its turn for is indexed later instead of never.
+- The plan this browser keeps between visits holds no card details.
+- Taking an invite counts against the same per-network limits as signing in, for IPv6 networks too.
 - **A project file's recent versions stay restorable.** New versions, by anyone, never drop a version replaced the
   same day; a file's new versions per day are bounded and the next is refused with when it may come. A file deleted
   close to the plan's limit can be restored: what it already counted is no longer counted twice.

@@ -10,6 +10,7 @@ import path from 'node:path';
 import { heavy, PRIORITY } from '../jobs.ts';
 import { cacheDir } from '../paths.ts';
 import { FFMPEG, run } from '../probe.ts';
+import { type Audience, shownTo } from '../publicError.ts';
 import { renderKey } from '../renderKey.ts';
 import { wsKey } from '../scope.ts';
 import { grabFrame } from '../shots.ts';
@@ -36,6 +37,10 @@ export function kitInfo(postId: string): KitInfo | null {
     return null;
   }
 }
+
+/** A kit as `audience` may read it: a failure's own words (a tool's output, a path) are the machine's owner's alone. */
+export const shownKit = (info: KitInfo, audience: Audience): KitInfo =>
+  info.error === undefined ? info : { ...info, error: shownTo(audience, info.error, 'The kit couldn’t be made: try again, or ask whoever runs the server.') };
 
 /** A file name for people: the video's name and the platform, nothing a shell or an unzipper could trip on. */
 export function kitBase(review: Review, platform: PublishPlatform): string {
@@ -247,6 +252,8 @@ export function makeKit(post: Post, review: Review): Promise<KitInfo> {
       fs.writeFileSync(kitFile(post.id), JSON.stringify(info));
       return info;
     } catch (e) {
+      // kept for whoever asks later: as it is only for the machine's owner (shownKit), all of it in the log now
+      console.error(`[kit] ${post.id}:`, (e as Error)?.stack || e);
       const info: KitInfo = { state: 'failed', error: (e as Error).message.split('\n')[0]?.slice(0, 300), files: [] };
       fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(kitFile(post.id), JSON.stringify(info));

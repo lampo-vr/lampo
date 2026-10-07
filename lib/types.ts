@@ -246,6 +246,9 @@ export interface Reply {
   by_id?: string;
   /** When its author last changed its words. Only plain replies change (lib/ownership.ts changeableReply); `at` stays. */
   edited?: string;
+  /** A reply written through a review link: that link's id (Share.id), so a link showing only its own visitors' notes
+   * shows only its own visitors' replies too. Absent: the team's, an agent's, or from before. */
+  share?: string;
 }
 
 /** What a person picked from a question's options: item ids per group id (none = left open), and their own words. */
@@ -3039,9 +3042,10 @@ export interface LibraryResponse {
   /**
    * What is shown in part only: `folders` — the workspace's folders.json can't be read right now, so `folders` holds only
    * the folders videos are filed in (no empty ones) and folders can't be changed until it can (`vr admin
-   * repair-folders`). Absent: everything as it is.
+   * repair-folders`); `videos` — a video's review.json can't be read, so that video is left out (the server's log names
+   * it). Absent: everything as it is.
    */
-  degraded?: 'folders'[];
+  degraded?: ('folders' | 'videos')[];
 }
 
 /** GET /api/search?q=: the ⌘K palette. Best match first in each group, at most `limit` per group. */

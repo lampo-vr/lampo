@@ -10,8 +10,8 @@ import type { BillingInfo, BillingMethod, BillingPreview } from '../../../lib/ty
 import { api } from '../api/client.ts';
 import { useBillingAccount } from '../billing/api.ts';
 import { CheckoutStep } from '../billing/Checkout.tsx';
+import { billingSaid } from '../billing/words.ts';
 import { t } from '../i18n/index.ts';
-import { errorMessage } from '../lib/toast.ts';
 import { Spinner } from '../ui/feedback.tsx';
 import { I } from '../ui/icons.tsx';
 import { money } from './limits/model.ts';
@@ -133,7 +133,7 @@ function OnFile({ what, billing, label, order = [], total, onPaid }: PayProps) {
       onPaid();
     } catch (e) {
       setBusy(false);
-      setError(errorMessage(e));
+      setError(billingSaid(e));
     }
   };
   return (

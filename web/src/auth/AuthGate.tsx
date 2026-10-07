@@ -43,8 +43,10 @@ export function AuthGate({ children, loading = waiting }: { children: ReactNode;
       if (!s?.user || s.via === 'local') return;
       lost.current = true;
       // The session ended elsewhere (signed out everywhere, a new password, run out): nothing of the account stays in
-      // this browser either — its kept data, its Recent, the other tabs' screens.
+      // this browser either — its kept data, its Recent, the other tabs' screens, and its notifications (they carry the
+      // notes' text to the lock screen of what may be a shared computer; this browser stops them even unanswered).
       afterSignOut(qc);
+      void import('../pwa/push.ts').then((m) => m.disablePush()).catch(() => {});
     };
     window.addEventListener(UNAUTHORIZED, signedOut);
     return () => window.removeEventListener(UNAUTHORIZED, signedOut);

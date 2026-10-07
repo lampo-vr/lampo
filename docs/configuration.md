@@ -290,7 +290,7 @@ These are read on the machine where the agent works.
 | Variable | Default | What it does |
 |---|---|---|
 | `VR_FFMPEG`, `VR_FFPROBE` | the first found in `/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin`, else the PATH | The ffmpeg and ffprobe programs. |
-| `VR_PUBLISH_ENDPOINTS` | the real ones | Publishing's platform endpoints as JSON (`googleAuth`, `googleToken`, `googleRevoke`, `youtube`, `youtubeUpload`, `zernio`), for tests' fake platforms or a staging proxy; the hosts it names may be private and plain http ([publishing.md](publishing.md)). |
+| `VR_PUBLISH_ENDPOINTS` | the real ones | Publishing's platform endpoints as JSON (`googleAuth`, `googleToken`, `googleRevoke`, `youtube`, `youtubeUpload`, `zernio`), for tests' fake platforms or a staging proxy; the hosts it names may be private and plain http ([publishing.md](publishing.md)). A value that isn't a JSON object of http(s) URLs stops the start with one line. |
 
 ### For people working on Lampo
 

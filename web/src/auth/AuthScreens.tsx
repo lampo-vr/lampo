@@ -680,9 +680,12 @@ export function InviteScreen({ token }: { token: string }) {
 
 // ---------------------------------------------------------------- an app asking to connect (OAuth)
 
-/** The way back where there is nothing to fill in: the quiet button, as a link. */
+/**
+ * The way back where there is nothing to fill in: the quiet button, as a link. A page load of its own, not a hash change:
+ * the consent page's opener policy stays behind with it (main.tsx).
+ */
 const LibraryLink = () => (
-  <a className="gate-alt" href="#/">
+  <a className="gate-alt" href="/#/">
     {t('Open the library')}
   </a>
 );

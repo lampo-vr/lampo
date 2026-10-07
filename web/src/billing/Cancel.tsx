@@ -12,7 +12,6 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import type { BillingCancelOptions, BillingInfo } from '../../../lib/types.ts';
 import { useAuthStatus } from '../api/auth.ts';
 import { locale, t } from '../i18n/index.ts';
-import { errorMessage } from '../lib/toast.ts';
 import { Spinner } from '../ui/feedback.tsx';
 import { I } from '../ui/icons.tsx';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
@@ -20,7 +19,7 @@ import { Panel } from '../ui/system.tsx';
 import { useCancelContract } from './api.ts';
 import { kindOf, planPrice } from './Plan.tsx';
 import { FitGrid } from './parts.tsx';
-import { dayOf, money } from './words.ts';
+import { billingSaid, dayOf, money } from './words.ts';
 import '../styles/checkout.css';
 
 /** The step's own address. */
@@ -120,7 +119,7 @@ export function CancelStep({ b, ways, workspace, onBack }: { b: BillingInfo; way
       const r = await cancel.mutateAsync({ kind, ...(kind === 'extraordinary' ? { reason: reason.trim() } : {}) });
       setDone({ kind: r.kind, receivedAt: r.receivedAt, endsAt: r.endsAt, ...(r.refund ? { refund: r.refund } : {}) });
     } catch (e) {
-      setError(errorMessage(e));
+      setError(billingSaid(e));
     }
   };
 

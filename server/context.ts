@@ -147,6 +147,9 @@ export function createContext({ cfg, lan = false, dev = false, token, loadSessio
       return !!now && (now.user?.id ?? now.name) === (req.auth?.user?.id ?? req.auth?.name) && now.workspace === req.auth?.workspace;
     },
   });
+  // …asked again at once when access ends here (a member removed, a token revoked, an account disabled), not at the next
+  // keep-alive: an open stream carries every note as it is written
+  auth.onAccessEnded(() => hub.recheck());
   const broadcast = hub.broadcast;
   const playback = createPlayback(broadcast);
   const agents = createAgentRegistry(broadcast);
