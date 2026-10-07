@@ -13,11 +13,11 @@ export interface RunTokens {
   cache_write: number;
 }
 
-export interface RunStep extends ActivityWords {
+export interface StreamStep extends ActivityWords {
   kind: 'tool' | 'say' | 'run';
 }
 
-export interface RunState {
+export interface StreamState {
   step: ActivityWords | null;
   tokens: RunTokens;
   cost_usd: number | null;
@@ -100,7 +100,7 @@ export function createRunReader(cwd: string) {
   const perMessage = new Map<string, RunTokens>();
   let unnamed = 0;
   let final: RunTokens | null = null;
-  const state: RunState = {
+  const state: StreamState = {
     step: null,
     tokens: { input: 0, output: 0, cache_read: 0, cache_write: 0 },
     cost_usd: null,
@@ -121,7 +121,7 @@ export function createRunReader(cwd: string) {
     return t;
   };
 
-  function line(raw: string, out: RunStep[]) {
+  function line(raw: string, out: StreamStep[]) {
     const text = raw.trim();
     if (!text.startsWith('{')) return;
     let e: Record<string, unknown>;
@@ -130,7 +130,7 @@ export function createRunReader(cwd: string) {
     } catch {
       return;
     }
-    const push = (s: RunStep) => {
+    const push = (s: StreamStep) => {
       if (state.step?.text === s.text) return;
       const { kind: _, ...step } = s;
       state.step = step;
@@ -161,8 +161,8 @@ export function createRunReader(cwd: string) {
 
   return {
     /** New bytes of the log, as text. */
-    feed(chunk: string): RunStep[] {
-      const out: RunStep[] = [];
+    feed(chunk: string): StreamStep[] {
+      const out: StreamStep[] = [];
       const lines = (partial + chunk).split('\n');
       partial = lines.pop() ?? '';
       // A runaway line (no newline for a long time) is dropped rather than kept growing.
@@ -170,6 +170,6 @@ export function createRunReader(cwd: string) {
       for (const l of lines) line(l, out);
       return out;
     },
-    state: (): RunState => ({ ...state, step: state.step && { ...state.step }, tokens: { ...state.tokens } }),
+    state: (): StreamState => ({ ...state, step: state.step && { ...state.step }, tokens: { ...state.tokens } }),
   };
 }

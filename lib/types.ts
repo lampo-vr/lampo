@@ -124,6 +124,8 @@ export interface Version {
   stored?: 'bunny' | 's3';
   /** Who uploaded this render (uploads only). */
   by?: string;
+  /** The run that made this version (an agent's work, lib/runs.ts): who made it, in how long, what it fixed. */
+  run?: string;
   /** Where the render was made, as its agent reported it: maps render frame N to the project's time. */
   source?: RenderSource;
   /** The playbook revisions in force when the render arrived (House first, down to its folder); absent = none. */
@@ -949,6 +951,136 @@ export interface AgentLive {
 
 export interface AgentActivityResponse {
   agents: AgentLive[];
+}
+
+// ---------------------------------------------------------------- runs (one stretch of an agent's work on one video)
+
+/**
+ * Where a run stands. The server decides it; every view (card, player, sidebar, inbox, phone, push) shows this one
+ * value, never a guess from how fresh a call is. `lost`: no sign for a while (a run Lampo started and reads: 5 min; an
+ * agent heard only through its calls: 20 min; +10 min while a render reports); any sign revives it.
+ */
+export type RunState = 'queued' | 'starting' | 'working' | 'needs_you' | 'done' | 'failed' | 'stopped' | 'lost';
+/** What a person (or, for `agent`, the agent itself with a write) did that opened the run. */
+export type RunOpenedHow = 'send' | 'request' | 'nudge' | 'answer' | 'retry' | 'agent';
+/** How the work reached the agent: a wait it sat in, a runner, this machine's own start, a cloud agent, a chat, a webhook. */
+export type RunDelivery = 'listening' | 'runner' | 'machine' | 'cloud' | 'chat' | 'webhook';
+/** One sent note in a run's plan: not reached yet, in hand, fixed (in the project; the version may still come), asked
+ * the person, left as it is, or answered with a reply. */
+export type RunPlanState = 'todo' | 'doing' | 'fixed' | 'asked' | 'wontfix' | 'replied';
+/** Linear's five activity types plus progress. Today's kinds map onto them: read, playbook, tool, wait, note, fix,
+ * reply → action; ask → elicitation; upload, render → progress; status, say → thought; run → the run's own state. */
+export type RunStepType = 'thought' | 'action' | 'elicitation' | 'response' | 'error' | 'progress';
+
+/** A render, upload or Auto-check under way (`vr render`, tus uploads): replaces itself in place. */
+export interface RunProgress {
+  what: 'render' | 'upload' | 'check';
+  /** The stage in words' key terms: 'bundling', 'rendering', 'encoding', 'uploading', 'checking'. */
+  stage: string;
+  /** 0–100 within the stage, null when the tool can't say (a growing file). */
+  pct: number | null;
+  /** Frames done and in all, when the tool says. */
+  frames?: [done: number, total: number];
+  /** Seconds left, from a moving average; absent for the first 5 % and while the rate swings. */
+  eta_s?: number;
+  /** The tool as `vr render` knew it: 'remotion', 'ffmpeg', 'aerender', 'blender', or absent. */
+  tool?: string;
+  /** The version it will become. */
+  v?: number;
+}
+
+export interface RunPlanItem {
+  /** The note's id. */
+  id: string;
+  state: RunPlanState;
+  /** When it last changed. */
+  at?: string;
+  /** The version a fix landed in, once it did. */
+  v?: number;
+  /** Sent while the run was already going ("added while it works"). */
+  added?: boolean;
+}
+
+export interface RunResult {
+  /** The version the run handed back, if it made one. */
+  v?: number;
+  fixed: number;
+  asked: number;
+  wontfix: number;
+  /** The agent's own last words to the person, one line. */
+  summary?: string;
+  tokens?: { input: number; output: number; cache_read: number; cache_write: number };
+  /** Only when the agent's own output states it; never estimated. */
+  cost_usd?: number | null;
+}
+
+/**
+ * One stretch of an agent's work on one video, opened by something a person did and ended by handing something back
+ * (Linear's Agent Session, for video): its plan is the person's notes, its result a version. Kept per video in
+ * `data/<slug>/runs.jsonl`; one open run per agent × video (a second Send adds to its plan). Never shown by id.
+ */
+export interface Run {
+  /** run_…; never shown. */
+  id: string;
+  /** The video; null for a question on a folder before V1 (then `folder`). */
+  slug: string | null;
+  folder?: string;
+  agent: {
+    /** As the UI shows it (cleaned, like AgentActivity.agent). */
+    name: string;
+    kind: AgentKind;
+    session_id?: string;
+    /** The runner (a computer) that started it, by name. */
+    runner?: string;
+  };
+  opened_by: { who: string; id?: string; how: RunOpenedHow };
+  delivery: RunDelivery;
+  state: RunState;
+  started: string;
+  ended: string | null;
+  /** The last sign of the agent: `lost` and the run timeout (30 min of silence, 3 h at most) count from it. */
+  seen: string;
+  /** Seconds the agent worked: time in `needs_you` doesn't count ("worked 9 min"). Grows while the run is open. */
+  worked_s: number;
+  plan: RunPlanItem[];
+  /** The one line the strip shows: the newest step, or what the agent said (a thought), with its time. */
+  now: (ActivityWords & { type: RunStepType; at: string }) | null;
+  progress?: RunProgress | null;
+  result?: RunResult;
+  /** Why it failed, or what it needs (needs_you: a question, options, a permission). */
+  error?: ActivityWords;
+  needs?: { kind: 'question' | 'options' | 'permission' | 'sign_in'; note?: string; text?: ActivityWords };
+  /** The person's words that opened it (Ask, Tell it…), one line. */
+  request?: string;
+  /** The run this one continues (an answer, Try again). */
+  follows?: string;
+}
+
+/** One kept step of a run (at most 200 per run; progress keeps only its first and last line). */
+export interface RunStepLine extends ActivityWords {
+  at: string;
+  type: RunStepType;
+  /** A note id or version it was about. */
+  target?: string | null;
+}
+
+/** What the library's cards, the sidebar and the board need of a video's run: the open one, else the last that ended
+ * in the past 24 hours. */
+export type RunBrief = Pick<Run, 'id' | 'agent' | 'state' | 'started' | 'ended' | 'worked_s' | 'now' | 'progress' | 'result' | 'error' | 'needs'> & {
+  /** Plan counts: notes in the plan, and how many are fixed, asked, left or answered. */
+  planned: number;
+  answered: number;
+};
+
+/** GET /api/runs?slug=: a video's runs, newest first. */
+export interface RunsResponse {
+  runs: Run[];
+}
+
+/** GET /api/runs/:id: one run with its kept steps, newest first. */
+export interface RunDetail {
+  run: Run;
+  steps: RunStepLine[];
 }
 
 // ---------------------------------------------------------------- folders.json, shares.json
@@ -2369,6 +2501,8 @@ export interface VideoSummary {
   /** Where the video stands (lib/stage.ts). */
   stage: StageInfo;
   agent_status: AgentStatus | null;
+  /** The video's agent run: the open one, else the last that ended in the past 24 hours. Absent from older servers. */
+  run?: RunBrief | null;
   /** null = no session assigned; else whether that session is running (a connected agent: listening or working). */
   sessionActive: boolean | null;
   /**
@@ -3460,6 +3594,8 @@ export type ServerEvent =
   | 'recording'
   | 'agent-runs'
   | 'agent-activity'
+  /** A run opened, moved or ended (`{slug, id}`): its video's player and card refetch that run only. */
+  | 'run'
   /** Your drafts on a video changed: sent only to your own streams (EventHub.tell), never broadcast. */
   | 'drafts'
   /** A question asked on a folder before any render was asked, answered or removed (lib/asks.ts). */
