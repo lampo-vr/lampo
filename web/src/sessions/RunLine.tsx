@@ -3,19 +3,10 @@
 // every layout, light enough for the library's first paint (runState.ts): the state in a word or two, the agent's own
 // words (its step, why it failed) once the board has them (`say`), the percentage never cut. A card doesn't tick.
 import type { CSSProperties } from 'react';
-import type { ActivityWords, VideoSummary } from '../api/types.ts';
+import type { ActivityWords } from '../api/types.ts';
 import { t } from '../i18n/index.ts';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
-import { edgeOf, isOpen, LOOK, pctOf, phaseOf, type RunLike, runShort } from './runState.ts';
-
-/** The run a card speaks of: one going on, one that ended badly (failed, stopped), or one done while its fixes wait to be
- * checked. Older servers send no `run` (undefined): their cards keep today's line. */
-export function cardRun(v: VideoSummary): RunLike | null {
-  const r = v.run;
-  if (!r) return null;
-  if (isOpen(r) || r.state === 'failed' || r.state === 'stopped') return r;
-  return r.state === 'done' && v.stage.stage === 'check_fixes' ? r : null;
-}
+import { edgeOf, LOOK, pctOf, phaseOf, type RunLike, runShort } from './runState.ts';
 
 export function RunLine({ run, say, chip = false }: { run: RunLike; say?: (w: ActivityWords) => string; chip?: boolean }) {
   const phase = phaseOf(run);

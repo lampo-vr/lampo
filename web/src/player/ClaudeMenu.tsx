@@ -160,8 +160,9 @@ export function AgentMenu({
   };
 
   // the strip's state, in a word or two, where the button would say the agent's step
+  // the strip's state in its glyph; its words a word or two — while it works, the step it is on, when there is one
   const look = work ? LOOK[phaseOf(work)] : null;
-  const short = work ? shortLine(work) : null;
+  const short = work && !(phaseOf(work) === 'working' && now) ? shortLine(work) : null;
   const label = session
     ? short
       ? t('Agent {name}: {step}', { name: session.name, step: short })

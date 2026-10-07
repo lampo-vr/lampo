@@ -9,9 +9,10 @@
 // seeing the work without its controls, the board card's hairline and action slot, the cards without a spinner, the
 // version picker's ghost and who made a version, the phone's strip and sheet, and every state at 390–1920 in both
 // themes and German. Screenshots land in VR_SHOTS.
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { RUN_STATES, runFixtures } from '../../web/src/styleguide/runStates.ts';
-import { age, makeVideo, sleep, until } from '../lib/helpers.ts';
+import { age, makeVideo, ROOT, sleep, until } from '../lib/helpers.ts';
 import { clippedText, cutLabels, settle, sideways } from './layout.mjs';
 import { jsonApi } from './lib/api.mjs';
 import { launch, requireChrome, shotsDir } from './lib/browser.mjs';
@@ -518,6 +519,42 @@ try {
       await p.close();
     }
     assert(!out.length, out.join('\n        '));
+  });
+
+  await check('with the server’s own work: Send opens it, the agent’s first call starts it, Stop ends it', async () => {
+    // a video the fixtures leave alone, and a page that hears the server as it is
+    const real = await video('real.mp4', 'Real', 'testsrc2');
+    await api(`/api/review/${enc(real)}/session`, 'PUT', { name: 'Claude Code', sessionId: 'mcp-real', agent: 'claude-code' });
+    for (const [frame, text] of [
+      [10, 'Swoosh on the first title'],
+      [40, 'Logo a touch later'],
+    ])
+      await api(`/api/review/${enc(real)}/drafts`, 'POST', { frame, text, severity: 'should' });
+    const sent = await api(`/api/review/${enc(real)}/drafts/send`, 'POST', {});
+    const p = await browser.newPage();
+    p.on('pageerror', (e) => errors.push(e.message));
+    await p.setViewport({ width: 1440, height: 900 });
+    await openPlayer(p, real);
+    const phase = () => p.$eval('[data-testid=run-strip]', (e) => e.dataset.phase).catch(() => null);
+    await until(
+      async () => (await phase()) === 'queued',
+      async () => `the strip says ${await phase()} after Send`,
+    );
+    assert(/^Sent to Claude Code · waiting for it to start/.test(await text(p, '[data-testid=run-words]')), await text(p, '[data-testid=run-words]'));
+    // the agent's first call (here `vr` on this machine, as the agent): the work begins, and the page hears it
+    const vrEnv = { ...srv.env, VR_BY: 'agent:Claude Code' };
+    execFileSync(process.execPath, [path.join(ROOT, 'bin/vr'), 'show', sent.notes[0].id], { env: vrEnv, encoding: 'utf8' });
+    await until(
+      async () => !['queued', null].includes(await phase()),
+      async () => `the strip still says ${await phase()} after the agent's call`,
+    );
+    await shot(p, '07-real-working');
+    if ((await phase()) === 'working' || (await phase()) === 'starting') {
+      await p.click('[data-testid=run-stop]');
+      await until(async () => (await phase()) === 'stopped', 'stopped on the strip');
+      await until(async () => (await api(`/api/runs?slug=${enc(real)}`)).runs[0]?.state === 'stopped', 'stopped on the server');
+    }
+    await p.close();
   });
 
   await check('no page errors', async () => {

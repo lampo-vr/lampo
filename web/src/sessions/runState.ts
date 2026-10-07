@@ -2,7 +2,7 @@
 // or two ("rendering · 42 %", "needs you"), and how far a render is. Light, for the library's first paint (the cards'
 // line, the sidebar's Agents rows); the player's strip says it in full (runWords.ts). One value from the server
 // (lib/types.ts Run, or the cards' RunBrief) — never an id, and no noun for the work itself.
-import type { Run, RunBrief, RunProgress } from '../api/types.ts';
+import type { Run, RunBrief, RunProgress, VideoSummary } from '../api/types.ts';
 import { t } from '../i18n/index.ts';
 import { pct } from '../lib/format.ts';
 import type { Shape } from '../ui/glyphs.ts';
@@ -49,6 +49,15 @@ export const LOOK: Record<Phase, { shape: Shape; tone: Tone }> = {
 
 /** Still going (the server ends it: done, failed, stopped). */
 export const isOpen = (r: RunLike): boolean => r.ended == null && r.state !== 'done' && r.state !== 'failed' && r.state !== 'stopped';
+
+/** The run a card speaks of: one going on, one that ended badly (failed, stopped), or one done while its fixes wait to be
+ * checked. Older servers send no `run` (undefined): their cards keep today's line. */
+export function cardRun(v: Pick<VideoSummary, 'run' | 'stage'>): RunLike | null {
+  const r = v.run;
+  if (!r) return null;
+  if (isOpen(r) || r.state === 'failed' || r.state === 'stopped') return r;
+  return r.state === 'done' && v.stage.stage === 'check_fixes' ? r : null;
+}
 
 /** The progress shown: only while the agent works. */
 export const progressOf = (r: RunLike): RunProgress | null => (r.state === 'working' && r.progress ? r.progress : null);

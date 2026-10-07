@@ -86,7 +86,7 @@ function nowWords(r: RunLike, o: SayOptions, now: number): string | null {
   const n = r.now;
   if (!n || !o.say || n.type === 'progress') return null;
   const words = n.type === 'thought' ? t('“{quote}”', { quote: o.say(n) }) : o.say(n);
-  return since(n.at, now) > 90 ? t('last: {step} · {ago}', { step: words, ago: ago(n.at) }) : words;
+  return since(n.at, now) > 90 ? t('last: {step} · {ago}', { step: words, ago: ago(n.at, now) }) : words;
 }
 
 /** What one run says, for the strip and the cards. */
