@@ -24,6 +24,8 @@ export interface StreamState {
   turns: number | null;
   done: boolean;
   error: boolean;
+  /** Its last words to the person (the result's text, its first lines): the run's hand-back. */
+  summary: string | null;
 }
 
 interface Usage {
@@ -107,6 +109,7 @@ export function createRunReader(cwd: string) {
     turns: null,
     done: false,
     error: false,
+    summary: null,
   };
 
   const sum = (): RunTokens => {
@@ -155,6 +158,7 @@ export function createRunReader(cwd: string) {
       state.turns = typeof e.num_turns === 'number' ? e.num_turns : null;
       state.done = true;
       state.error = e.is_error === true || (typeof e.subtype === 'string' && e.subtype !== 'success');
+      if (typeof e.result === 'string' && e.result.trim()) state.summary = short(e.result, 300);
       push({ kind: 'run', ...words(state.error ? 'Stopped with an error' : 'Finished') });
     }
   }

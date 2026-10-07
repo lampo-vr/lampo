@@ -812,6 +812,8 @@ export type EventType =
   | 'preview'
   | 'ref'
   | 'agent_run'
+  /** An agent run opened, began, needs the person, or ended (`run`, `phase`; `text` = how it ended). Not feedback. */
+  | 'run'
   /** A post of a final video: drafted, published, scheduled, posted, failed or taken back (`post`). Not feedback. */
   | 'post';
 
@@ -860,9 +862,10 @@ export interface ReviewEvent {
   scope?: 'video';
   files?: number;
   bytes?: number;
-  /** agent_run events: which run, what happened to it, and how the process ended (null while it runs or when killed). */
+  /** agent_run events: which run, what happened to it, and how the process ended (null while it runs or when killed).
+   * run events: the run (lib/runs.ts) and its phase. */
   run?: string;
-  phase?: AgentRunPhase;
+  phase?: AgentRunPhase | RunPhase;
   exit?: number | null;
   /** post events: the post and where it stands. */
   post?: PostEventInfo;
@@ -878,6 +881,8 @@ export interface ReviewEvent {
 /** What to do when you send something to an agent that isn't running: ask each time, start it, or only send. */
 export type WakePref = 'ask' | 'start' | 'send';
 export type AgentRunPhase = 'started' | 'finished' | 'failed' | 'stopped' | 'timeout';
+/** What a `run` event says of a run (lib/runs.ts): opened, began working, needs the person, ended. */
+export type RunPhase = 'opened' | 'started' | 'needs_you' | 'ended';
 
 /** A run Lampo started on this machine (GET /api/agent-runs): a Claude Code session resumed with a request. */
 export interface AgentRunInfo {

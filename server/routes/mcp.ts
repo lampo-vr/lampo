@@ -239,6 +239,9 @@ export function mcpRoutes(ctx: ServerContext): Router {
           // Events with paths on this disk for the machine itself only; anyone else reads URLs (wait_for_feedback).
           publicEvent: ctx.eventFor(principal.via),
           activity: ctx.activity.record,
+          // agents' runs: a wait handing work over begins them; notes added meanwhile end the next answer (server/runs.ts)
+          handed: (name, slugs) => ctx.runs.handed(name, slugs),
+          news: (name, about) => ctx.runs.news(name, about),
           // New frames count per account, as `GET /api/review/:slug/frame` counts them (A13 VERIFY-2); not the machine's own.
           ...(principal.via === 'local'
             ? {}

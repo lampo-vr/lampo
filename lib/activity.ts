@@ -82,9 +82,18 @@ export function remoteSink(post: (entries: ActivityRecord[]) => Promise<unknown>
 /** The sink for this process: the hosted server it is logged in to, else the file on this machine. */
 export function openActivitySink(): ActivitySink {
   const c = readCredentials();
-  if (!c) return fileSink();
-  const api = createApi(c);
-  return remoteSink((entries) => api.call('POST', '/api/agents/activity', { entries }));
+  const sink = c ? remoteSink((entries) => createApi(c).call('POST', '/api/agents/activity', { entries })) : fileSink();
+  return taggedWithRun(sink);
+}
+
+/** The run Lampo started this process for (`LAMPO_RUN`), when it names one. */
+export const lampoRun = (env: NodeJS.ProcessEnv = process.env): string | undefined =>
+  /^run_[0-9a-f]{12}$/.test(env.LAMPO_RUN ?? '') ? env.LAMPO_RUN : undefined;
+
+/** Every activity of a process Lampo started for a run names that run: a hint the server checks (server/runs.ts). */
+export function taggedWithRun(sink: ActivitySink, run = lampoRun()): ActivitySink {
+  if (!run) return sink;
+  return { record: (a) => sink.record({ ...a, run: a.run ?? run }), flush: () => sink.flush() };
 }
 
 /** The agent this process works for, by the name the UI shows: the Claude Code session, else VR_BY's agent name.

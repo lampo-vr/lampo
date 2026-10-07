@@ -39,6 +39,7 @@ import { publishRoutes } from './routes/publish.ts';
 import { recordingRoutes } from './routes/recordings.ts';
 import { refRoutes } from './routes/refs.ts';
 import { reviewRoutes } from './routes/review.ts';
+import { runRoutes } from './routes/runs.ts';
 import { serverHealthRoutes } from './routes/serverHealth.ts';
 import { sessionRoutes } from './routes/sessions.ts';
 import { discoveryTag } from './routes/shares/embed.ts';
@@ -172,6 +173,7 @@ export function createApp(ctx: ServerContext, { ui }: AppOptions = {}): Express 
     libraryRoutes,
     reviewRoutes,
     sessionRoutes,
+    runRoutes,
     mediaRoutes,
     previewRoutes,
     elementRoutes,

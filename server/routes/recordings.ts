@@ -346,6 +346,8 @@ export function recordingRoutes(ctx: ServerContext): Router {
     if (notes.length) {
       ctx.broadcast('review', { slug });
       ctx.broadcast('library', { slug });
+      // sent to the video's agent: its run opens, or takes them (a person with the agents right only: server/runs.ts)
+      ctx.runs.fromPerson(req, slug, { how: 'send', notes: notes.map((c) => c.id) });
     }
     shotsToFollow(ctx, slug, notes);
     tell(slug, rec.id);
