@@ -15,7 +15,7 @@ import express, { type Response, type Router } from 'express';
 import { excerpt, words } from '../../lib/activityText.ts';
 import { attachOptionFile, type OptionAttached, type OptionTarget } from '../../lib/askOptions.ts';
 import { getUser } from '../../lib/auth.ts';
-import { type FileTarget, ingestFile } from '../../lib/files.ts';
+import { checkTargetRoom, FileError, type FileTarget, ingestFile } from '../../lib/files.ts';
 import { FILE_LIMITS, nameOf } from '../../lib/fileText.ts';
 import { checkNotArchived, checkReviewOpen } from '../../lib/folderIds.ts';
 import { cursorAt, waitNowLine } from '../../lib/handoff.ts';
@@ -272,6 +272,14 @@ export function uploadRoutes(ctx: ServerContext): Router {
         } catch (e) {
           throw reject(403, (e as Error).message);
         }
+        // the version it was for may be past its account's day by now: said before the bytes, not after
+        try {
+          const target = t.target.file;
+          inWorkspace(t.ws, () => checkTargetRoom(target));
+        } catch (e) {
+          if (e instanceof FileError) throw reject(e.status, JSON.stringify({ ...e.details, error: e.message }));
+          throw e;
+        }
         t.used = true;
       } else if (size > ctx.cfg.upload_max_bytes) throw reject(413, 'the file is larger than this server accepts');
       const file = ticket?.target.kind === 'file' ? ticket.target.file : null;
@@ -377,7 +385,7 @@ export function uploadRoutes(ctx: ServerContext): Router {
             // 409: a part that can't be one, or a project file changed since its base (with who changed it); ≥ 500: the
             // server's fault (its storage), never "your file"; a project file's other refusals keep their own status
             const code = status === 409 || status >= 500 || target ? status : undefined;
-            const details = target && status === 409 && e.details ? e.details : undefined;
+            const details = target && (status === 409 || status === 429) && e.details ? e.details : undefined;
             remember(upload.id, { status: 'failed', error, ...(code ? { code } : {}), ...(details ? { details } : {}) }, owner.ws, owner.by);
             throw Object.assign(e, { body: error, answer: details ? { ...details, error } : null });
           },
@@ -432,7 +440,10 @@ export function uploadRoutes(ctx: ServerContext): Router {
   };
   const answer = (res: Response, o: Outcome) => {
     if (o.status === 'done') return void res.json(o.result);
-    if (o.status === 'failed') return void res.status(o.code ?? 422).json({ ...o.details, error: o.error });
+    if (o.status === 'failed') {
+      if (o.retryAfter) res.setHeader('Retry-After', String(o.retryAfter));
+      return void res.status(o.code ?? 422).json({ ...o.details, error: o.error });
+    }
     res.status(202).json({ pending: true });
   };
 
@@ -512,6 +523,16 @@ export function uploadRoutes(ctx: ServerContext): Router {
             : ctx.cfg.upload_max_bytes;
     if (size > max) throw fail(413, 'the file is larger than this server accepts');
     if (t.target.kind === 'file' && size !== t.target.file.size) throw fail(400, `this URL is for ${t.target.file.size} bytes, not ${size}`);
+    if (t.target.kind === 'file') {
+      const target = t.target.file;
+      // the version it was for may be past its account's day by now: said before the bytes, not after
+      try {
+        inWorkspace(t.ws, () => checkTargetRoom(target));
+      } catch (e) {
+        if (e instanceof FileError) throw Object.assign(fail(e.status, e.message, e.details), { retryAfter: (e as { retryAfter?: number }).retryAfter });
+        throw e;
+      }
+    }
     // Taken before the first await (the plan's check may wait on a lookup): a second PUT sent at the same moment finds
     // it used. A refusal gives it back, as a broken stream does below (sweep 2 MH-3).
     t.used = true;
@@ -571,16 +592,18 @@ export function uploadRoutes(ctx: ServerContext): Router {
                 : result,
         };
       },
-      (e: Error & { status?: number; details?: Record<string, unknown> }) => {
+      (e: Error & { status?: number; details?: Record<string, unknown>; retryAfter?: number }) => {
         // Whoever holds a one-time URL (a review-link visitor, an agent elsewhere) is never identified: never the owner.
         const status = statusOf(e, 422);
-        // a project file's refusals keep their status, and a conflict its files (FileConflictAnswer)
+        // a project file's refusals keep their status, a conflict its files (FileConflictAnswer), a refusal for now
+        // when to come back (Retry-After, and `retry_after` in the body)
         const file = target.kind === 'file';
         t.outcome = {
           status: 'failed',
           error: publicMessage(e, 'other', { status, where: 'upload ticket' }),
           ...(status === 409 || status >= 500 || file ? { code: status } : {}),
-          ...(file && status === 409 && e.details ? { details: e.details } : {}),
+          ...(file && (status === 409 || status === 429) && e.details ? { details: e.details } : {}),
+          ...(file && e.retryAfter ? { retryAfter: e.retryAfter } : {}),
         };
       },
     );

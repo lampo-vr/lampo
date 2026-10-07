@@ -84,6 +84,9 @@ format stays backwards compatible throughout.
   command runs on the agent's own machine, never on a server ([docs/agents.md](docs/agents.md)).
 
 ### Fixed
+- **One person's many versions of a project file no longer hold up anyone else.** Each account has its own daily
+  share of new versions of a file, and saving as a copy always works. An upload that can't become a version any more
+  is refused before its bytes are sent, saying when to try again.
 - On a server reached over https, a browser is signed in only by the session cookie no other site can set: the older
   cookie name is no longer read there, so a browser that still holds one signs in once more.
 - When a server's storage refuses a profile picture (or another account change fails on the server's side), the person

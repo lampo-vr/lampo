@@ -411,7 +411,8 @@ export function fileRoutes(ctx: ServerContext): Router {
         const conflicts = pushConflicts(area.scope, items);
         if (conflicts.length) throw new FileConflictError(conflicts);
       }
-      checkVersionsRoom(area.scope, items);
+      // a push saving as a copy is never refused for the day's versions; any other, before any byte moves
+      if (conflict !== 'copy') checkVersionsRoom(area.scope, items, stampOf(req, b));
       // bytes the workspace holds already: nothing to send
       const held = heldBlobs(items.flatMap((i) => (i.sha256 ? [i.sha256] : [])));
       const stored = (i: (typeof items)[number]) => !!i.sha256 && held.get(i.sha256)?.size === i.size;

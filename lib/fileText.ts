@@ -39,9 +39,10 @@ export const FILE_LIMITS = {
    */
   versions: 10,
   /**
-   * New versions one file may take in a day (FILE_LIMITS.protectHours): a version replaced within the day is never
-   * dropped, so this is what bounds a file's catalog lines and the bytes it holds uncounted meanwhile — a new version
-   * every hour around the clock. The next is refused (429) until the oldest of them is a day old.
+   * New versions of one file one account may make in a day (FILE_LIMITS.protectHours) — each person, with their agents,
+   * their own: a version replaced within the day is never dropped, so this is what bounds a file's catalog lines per
+   * account — a new version every hour around the clock. Their next is refused (429) until the first of them is a day
+   * old; a save as a copy (`conflict: 'copy'`) is never refused for it, and lands beside the file.
    */
   versionsPerDay: 24,
   /** Hours bytes a file stopped naming (purged, its last version dropped) are kept when a push just asked for them. */

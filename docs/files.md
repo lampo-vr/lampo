@@ -51,8 +51,10 @@ account (and its kind), how it came (the app, the CLI, an agent's tool), when.
 - **Older versions** are kept 30 days after they were replaced, the ten newest of each file (versions kept on purpose
   besides) — and every version replaced within the last day, whoever replaced it. Any of them can be brought back as
   the newest version (V5 with V2's bytes; V4 stays one of its versions); bringing back the bytes the file has already
-  makes no new version. A file takes at most 24 new versions a day: the next is refused (429) until the first of them
-  is a day old — push it under another name meanwhile.
+  makes no new version. Each account (a person with their agents) makes at most 24 new versions of a file a day: its
+  next is refused (429, with when it may come) until the first of them is a day old, and nobody else's versions are
+  held up by it. A save as a copy (`conflict: "copy"`) is never refused for it: it lands beside the file. An upload URL
+  handed out while there was room is checked again when its bytes start to come.
 - **The trash** keeps a file 30 days. Restoring puts it back at its path, or beside it as `name (restored).ext` when
   something else is there now. Members trash what they added; owners and admins anything.
 - **Bytes are kept once per workspace** by their SHA-256: the same logo in fifty projects is stored and counted once.

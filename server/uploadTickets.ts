@@ -93,7 +93,7 @@ export type Outcome =
    * `code`: the status to answer with (409: a part that can't be one, a project file that changed since its base), else
    * 422. `details`: the answer's other fields (a file's conflicts).
    */
-  | { status: 'failed'; error: string; code?: number; details?: Record<string, unknown> };
+  | { status: 'failed'; error: string; code?: number; details?: Record<string, unknown>; retryAfter?: number };
 
 /**
  * What the PUT becomes: a render (the next version of a video, or a new one; `byId`: the account of the ticket's `by`),

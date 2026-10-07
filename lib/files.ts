@@ -540,19 +540,31 @@ function trimOlder(e: FileEntry, now = Date.now()): void {
   if (!e.older.length) delete e.older;
 }
 
+/** Whose a version is, for the day's count: the account (agents write with their person's), else the name. */
+const authorOf = (x: { by: string; by_id?: string }): string => x.by_id ?? `name:${x.by}`;
+
 /**
- * A new version of `e` (a push, a revert) once it took FILE_LIMITS.versionsPerDay within the day: refused (429), with
- * when the next may come — what a file held within the day can't go early, so the day's versions are bounded here.
+ * Seconds until `who` may make another version of `e` (null: now): an account makes at most FILE_LIMITS.versionsPerDay
+ * versions of one file a day — what a file took within the day can't go early, so each account's day is bounded here,
+ * and one account's versions never use up anyone else's.
  */
-function checkVersionRoom(e: FileEntry, now = Date.now()): void {
+function versionWait(e: FileEntry, who: { by: string; by_id?: string }, now = Date.now()): number | null {
   const day = FILE_LIMITS.protectHours * 3600_000;
-  const today = (e.older ?? []).filter((x) => !!x.replaced && now - Date.parse(x.replaced) < day).map((x) => Date.parse(x.replaced as string));
-  if (today.length < FILE_LIMITS.versionsPerDay) return;
-  const wait = Math.max(60, Math.ceil((Math.min(...today) + day - now) / 1000));
+  const mine = authorOf(who);
+  const today = [e, ...(e.older ?? [])].filter((x) => authorOf(x) === mine && now - Date.parse(x.at) < day).map((x) => Date.parse(x.at));
+  if (today.length < FILE_LIMITS.versionsPerDay) return null;
+  return Math.max(60, Math.ceil((Math.min(...today) + day - now) / 1000));
+}
+
+/** A new version of `e` by `who` past their day's versions: refused (429), saying when and how else. */
+function checkVersionRoom(e: FileEntry, who: { by: string; by_id?: string }, now = Date.now()): void {
+  const wait = versionWait(e, who, now);
+  if (wait === null) return;
   throw Object.assign(
     new FileError(
       429,
-      `${e.path} has had ${FILE_LIMITS.versionsPerDay} new versions today: each is kept at least a day, so the next can come once the first of them is a day old — or push it under another name`,
+      `you made ${FILE_LIMITS.versionsPerDay} versions of ${e.path} today: each is kept at least a day, so your next can come once the first of them is a day old — or save it beside it as a copy (conflict: "copy") or under another name`,
+      { retry_after: wait },
     ),
     { retryAfter: wait },
   );
@@ -670,7 +682,15 @@ export function commitFiles(areaId: string, items: CommitItem[], o: { conflict?:
       else conflicts.push(conflictOf(e, base));
     }
     if (conflicts.length) throw new FileConflictError(conflicts);
-    for (const p of plan) if (p.state === 'version' && p.e) checkVersionRoom(p.e);
+    for (const p of plan) {
+      if (p.state !== 'version' || !p.e) continue;
+      // a save as a copy is never refused for the day's versions: past them it lands beside the file, as a conflict would
+      if (o.conflict === 'copy' && versionWait(p.e, o.stamp) !== null) {
+        p.state = 'copy';
+        p.asked = p.it.path;
+        delete p.e;
+      } else checkVersionRoom(p.e, o.stamp);
+    }
     const adding = plan.filter((p) => p.state === 'added' || p.state === 'copy').length;
     if (a.files.length + adding > FILE_LIMITS.perArea) throw tooMany();
     if (adding && liveCount(listAreas().filter((x) => x.id !== a.id)) + a.files.length + adding > FILE_LIMITS.perWorkspace)
@@ -752,16 +772,30 @@ export function pushConflicts(folder: string, items: { path: string; sha256?: st
   return out;
 }
 
-/** A push's new versions checked against a file's versions for the day before any byte moves (429, as the commit's). */
-export function checkVersionsRoom(folder: string, items: { path: string; sha256?: string }[]): void {
+/**
+ * A push's new versions checked against what its account may still make today, before any byte moves (429, as the
+ * commit's). A push saving as a copy is never refused for it (its files land beside).
+ */
+export function checkVersionsRoom(folder: string, items: { path: string; sha256?: string }[], who: { by: string; by_id?: string }): void {
   const ref = areaRefOf(folder);
   const a = ref ? readArea(ref.id) : null;
   if (!a) return;
   const byPath = new Map(a.files.map((e) => [caseKey(e.path), e]));
   for (const it of items) {
     const e = byPath.get(caseKey(it.path));
-    if (e && !(it.sha256 && e.hash === it.sha256)) checkVersionRoom(e);
+    if (e && !(it.sha256 && e.hash === it.sha256)) checkVersionRoom(e, who);
   }
+}
+
+/**
+ * An upload's target checked again when its bytes start to come (a one-time PUT, a tus upload made with its ticket):
+ * the version the ticket was for may be past its account's day by now — refused before the bytes, not after.
+ */
+export function checkTargetRoom(t: FileTarget): void {
+  if (!t.commit || t.conflict === 'copy') return;
+  const a = AREA_ID.test(t.area) ? readArea(t.area) : null;
+  const e = a?.files.find((x) => caseKey(x.path) === caseKey(t.path));
+  if (e && !(t.sha256 && e.hash === t.sha256)) checkVersionRoom(e, t.stamp);
 }
 
 /**
@@ -1138,7 +1172,7 @@ export function restoreFile(id: string, v: number | undefined, stamp: FileStampI
     if (!old || !blob) throw new FileError(404, `V${v} of this file isn’t kept any more`);
     // its bytes are the file's now already: nothing to bring back, no version made
     if (old.hash === e.hash) return { file: fileInfo(e, scope), state: 'same' };
-    checkVersionRoom(e);
+    checkVersionRoom(e, stamp);
     e.older = [asOlder(e, at), ...(e.older ?? [])];
     trimOlder(e);
     setCurrent(e, { v: e.v + 1, hash: old.hash, size: old.size, ...stamped(stamp, at) }, blob.type);

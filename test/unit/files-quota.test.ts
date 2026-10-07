@@ -370,7 +370,7 @@ test('a file keeps a bounded number of older versions — never dropping one rep
   assert.equal(twice.json().v, once.json().v, 'its bytes are the file’s already: nothing new');
 });
 
-test('someone else’s new versions never take a version replaced within the day; a day’s new versions are bounded', async () => {
+test('someone else’s new versions never take a version replaced within the day', async () => {
   await clean();
   storage = 100 * PLAN;
   const v1 = Buffer.from('the owner’s first cut\n');
@@ -387,17 +387,65 @@ test('someone else’s new versions never take a version replaced within the day
   const back = await api('POST', `/api/files/${id}/restore`, asOwner, { v: 1 });
   assert.equal(back.status, 200, back.text);
   assert.equal(back.json().sha256, sha(v1));
-  // a day's new versions of one file are bounded: the next is refused before any byte, saying when it may come
-  let v = back.json().v as number;
+});
+
+test('each account’s new versions of a file a day are bounded — its own, never anyone else’s, and never a save as a copy', async () => {
+  await clean();
+  storage = 100 * PLAN;
+  const first = await push('spot.txt', Buffer.from('the owner’s cut\n'), {}, asOwner);
+  const id = first.put?.json().commit.files[0].id;
+  let v = 1;
+  // the member's day: their versions until the next is refused, saying when it may come and how else
   let status = 200;
-  while (status === 200 && v < 60) status = await newVersion('cut.txt', Buffer.from(`more ${v}`), v++);
+  while (status === 200 && v < 60) status = await newVersion('spot.txt', Buffer.from(`member ${v}`), v++);
+  v--;
   assert.equal(status, 429, `refused after ${FILE_LIMITS.versionsPerDay} in a day`);
-  const refused = await api('POST', '/api/files/uploads', asMember, { files: [{ path: 'cut.txt', size: 3, sha256: sha(Buffer.from('abc')), base: v - 1 }] });
+  assert.equal(v - 1, FILE_LIMITS.versionsPerDay, 'their own day’s worth');
+  const refused = await api('POST', '/api/files/uploads', asMember, { files: [{ path: 'spot.txt', size: 3, sha256: sha(Buffer.from('abc')), base: v }] });
   assert.equal(refused.status, 429);
-  assert.match(refused.json().error, /new versions today/);
+  assert.match(refused.json().error, /versions of spot\.txt today.*as a copy/);
   assert.ok(Number(refused.headers['retry-after']) > 0, 'when the next may come');
-  // a revert is a new version too
-  assert.equal((await api('POST', `/api/files/${id}/restore`, asOwner, { v: 1 })).status, 429);
+  assert.ok(refused.json().retry_after > 0);
+  // a save as a copy is never refused for it: it lands beside the file
+  const data = Buffer.from('member, as a copy');
+  const asCopy = await api('POST', '/api/files/uploads', asMember, {
+    files: [{ path: 'spot.txt', size: data.length, sha256: sha(data), base: v }],
+    conflict: 'copy',
+  });
+  assert.equal(asCopy.status, 200, asCopy.text);
+  const put = await raw('PUT', new URL(asCopy.json().uploads[0].url).pathname, { host: MEDIA, body: data });
+  assert.equal(put.status, 200, put.text);
+  assert.equal(put.json().commit.files[0].state, 'copy');
+  assert.notEqual(put.json().commit.files[0].path, 'spot.txt');
+  // the member's day is theirs alone: the owner pushes and reverts as ever
+  assert.equal(await newVersion('spot.txt', Buffer.from('the owner again'), v, asOwner), 200);
+  const revert = await api('POST', `/api/files/${id}/restore`, asOwner, { v: 1 });
+  assert.equal(revert.status, 200, revert.text);
+});
+
+test('an upload URL handed out before an account’s day was full is refused before its bytes, saying when', async () => {
+  await clean();
+  storage = 100 * PLAN;
+  await push('loop.txt', Buffer.from('v1'));
+  let v = 1;
+  // V1 and the versions after it are the member’s own: one short of their day
+  for (; v < FILE_LIMITS.versionsPerDay - 1; v++) assert.equal(await newVersion('loop.txt', Buffer.from(`v${v + 1}`), v), 200);
+  // one more may come: two URLs for it, the first used, the second then late
+  const a = Buffer.from('late a');
+  const b = Buffer.from('late b');
+  const askA = await api('POST', '/api/files/uploads', asMember, { files: [{ path: 'loop.txt', size: a.length, sha256: sha(a), base: v }] });
+  const askB = await api('POST', '/api/files/uploads', asMember, { files: [{ path: 'loop.txt', size: b.length, sha256: sha(b), base: v }] });
+  assert.equal(askA.status, 200, askA.text);
+  assert.equal(askB.status, 200, askB.text);
+  assert.equal((await raw('PUT', new URL(askA.json().uploads[0].url).pathname, { host: MEDIA, body: a })).status, 200);
+  const late = await raw('PUT', new URL(askB.json().uploads[0].url).pathname, { host: MEDIA, body: b });
+  assert.equal(late.status, 429, late.text);
+  assert.ok(Number(late.headers['retry-after']) > 0, 'when to come back');
+  assert.deepEqual(
+    inWorkspace('w1', () => files.missingBlobs([sha(b)])),
+    [sha(b)],
+    'refused before its bytes were kept',
+  );
 });
 
 test('a big file replaced by tiny versions again and again: what it holds counts, the disk stays bounded', async () => {
@@ -407,7 +455,9 @@ test('a big file replaced by tiny versions again and again: what it holds counts
     const b = await push(`stash${round}.bin`, big);
     if (b.answer.status === 402) break;
     assert.equal(b.put?.status, 200, b.put?.text);
-    for (let v = 2; v <= 12; v++) await newVersion(`stash${round}.bin`, Buffer.from(`t${v}`), v - 1);
+    // asked for again by a push that stores only (as a commit to come would): it never makes those bytes younger
+    await api('POST', '/api/files/uploads', asMember, { files: [{ path: `stash${round}-again.bin`, size: big.length, sha256: sha(big) }], commit: false });
+    for (let v = 2; v <= 12; v++) await newVersion(`stash${round}.bin`, Buffer.from(`${round}:${v}`), v - 1);
   }
   assert.ok(onDisk() <= PLAN + CAP, `${onDisk()} bytes on disk`);
   const u = await usage();
