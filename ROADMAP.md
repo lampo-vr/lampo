@@ -228,6 +228,8 @@ Findings of audit A13 (2026-10-05, `AUDITS.md`) and its verification rounds that
   so a later run finishes it.
 - **A13 VERIFY-7** (info): a few request-time ffmpeg runs (voice-note transcription, recording clips, the publishing
   cover) don't go through the on-demand gate yet, and footage jobs have no crash-guard key.
+- **A13 DL** (low): files streamed by `streamFile` (server/playback.ts) ignore `If-Range`.
+- **A13 EMBED** (info): an embed's media and poster `Last-Modified` equals the version's registration time.
 
 ## Open decisions
 

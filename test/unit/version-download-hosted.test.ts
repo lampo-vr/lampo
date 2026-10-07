@@ -162,6 +162,51 @@ test('a download that broke off picks up where it stopped on the media host: all
   assert.equal(Number(chunk.headers['content-length']), 8 * 1024 * 1024);
 });
 
+test('a HEAD on the media host answers the headers and reads nothing: a download, a review link’s, the player’s chunk', async () => {
+  const team = await raw(url(bigSlug), { headers: session(max) });
+  const link = shares.createShare(bigSlug, { label: 'Delivery', download: 'original' });
+  const guest = await raw(`/api/g/${link.token}/download/${shares.guestId(link, bigSlug)}/v1?kind=original`);
+  const played = await raw(`/media/${encodeURIComponent(bigSlug)}/v1`, { headers: session(max) });
+  // every read stream the server opens while it answers (Node drops a HEAD's body: one that streamed read it all)
+  const opened: string[] = [];
+  const real = fs.createReadStream;
+  const files = fs as { createReadStream: typeof fs.createReadStream };
+  files.createReadStream = ((...a: Parameters<typeof fs.createReadStream>) => {
+    if (String(a[0]).endsWith('.mp4')) opened.push(String(a[0]));
+    return real.apply(fs, a);
+  }) as typeof fs.createReadStream;
+  try {
+    for (const [who, r, headers] of [
+      ['the team', team, {}],
+      ['the team, picking up', team, { Range: 'bytes=1000-' }],
+      ['a review link', guest, {}],
+      ['the player', played, { Range: 'bytes=0-' }],
+    ] as const) {
+      const head = await new Promise<Raw>((resolve, reject) => {
+        const req = http.request(
+          { host: '127.0.0.1', port, method: 'HEAD', path: onMedia(r.headers.location), headers: { Host: MEDIA, ...headers }, agent: false },
+          (res) => {
+            res.resume();
+            res.on('end', () => resolve({ status: res.statusCode || 0, headers: res.headers, body: Buffer.alloc(0) }));
+          },
+        );
+        req.on('error', reject);
+        req.end();
+      });
+      assert.deepEqual(opened, [], `${who}: a HEAD opened no file`);
+      const ranged = 'Range' in headers;
+      assert.equal(head.status, ranged ? 206 : 200, who);
+      const length = !ranged ? bigBytes.length : who === 'the player' ? 8 * 1024 * 1024 : bigBytes.length - 1000;
+      assert.equal(Number(head.headers['content-length']), length, who);
+      assert.equal(head.headers['accept-ranges'], 'bytes', who);
+      assert.equal(head.headers['content-type'], 'video/mp4', who);
+      assert.ok(head.headers['last-modified'], who);
+    }
+  } finally {
+    files.createReadStream = real;
+  }
+});
+
 test('each workspace downloads its own bytes; another workspace’s video is nobody’s here', async () => {
   const bob = await make('b@example.com', 'Bob', 'reviewer');
   const B = ws.createWorkspace({ name: 'Bravo', ownerId: bob.id }).id;

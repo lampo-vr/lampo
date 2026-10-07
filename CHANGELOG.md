@@ -34,6 +34,9 @@ format stays backwards compatible throughout.
   one, nor an embed another kind of link.
 
 ### Fixed
+- Checking a video or a download without fetching it (what browsers and download managers ask before they start) no
+  longer makes the server read the whole file first: the player, downloads, review links, embeds, the publishing kit
+  and your data export answer with the details alone.
 - Video playback, downloads and review-link files that were cut short (a seek, a closed tab) no longer leave the file
   open on the server; and a version's file says when it was made, so a browser can resume a download.
 - A video whose file name held a broken character no longer breaks the library for the whole workspace: names are made

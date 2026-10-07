@@ -328,6 +328,8 @@ export async function sendDownload(req: Request, res: Response, src: Source, fil
 // pins one of the 6 HTTP/1.1 connections per host (the SSE stream already takes one per tab).
 // `cache`: the Cache-Control to send instead (a signed URL is good until it ends). `whole`: a download, which gets
 // every byte a range asks for (one that picks up where it broke off wants the rest, not a player's next chunk).
+// A HEAD gets the headers only: Express answers it with the GET route, and Node drops the body but would still read
+// every byte of the file to throw them away.
 export function streamFile(
   req: Request,
   res: Response,
@@ -341,9 +343,14 @@ export function streamFile(
   // a version's bytes never change under the same name: the date lets a browser resume a download it broke off
   res.setHeader('Last-Modified', st.mtime.toUTCString());
   res.setHeader('Cache-Control', cache ?? (immutable ? 'private, max-age=31536000, immutable' : 'no-cache'));
+  const headersOnly = req.method === 'HEAD';
   const range = req.headers.range && /bytes=(\d*)-(\d*)/.exec(req.headers.range);
   if (!range) {
     res.setHeader('Content-Length', st.size);
+    if (headersOnly) {
+      res.end();
+      return;
+    }
     // pipeline, not pipe: a viewer who aborts (a seek, a closed tab) closes the file too; pipe left it open for good
     pipeline(fs.createReadStream(file), res, () => {});
     return;
@@ -360,5 +367,9 @@ export function streamFile(
   res.status(206);
   res.setHeader('Content-Range', `bytes ${start}-${end}/${st.size}`);
   res.setHeader('Content-Length', end - start + 1);
+  if (headersOnly) {
+    res.end();
+    return;
+  }
   pipeline(fs.createReadStream(file, { start, end }), res, () => {});
 }

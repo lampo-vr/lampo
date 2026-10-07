@@ -109,6 +109,48 @@ test('each version downloads as it was rendered, as an attachment with its name'
   assert.equal(head.body.length, 0);
 });
 
+test('a HEAD answers what a GET would, and opens no file for it: ranged or not, a download or the player', async () => {
+  // every read stream the server opens on a video while the HEADs are answered (Node drops a HEAD's body, so one that
+  // streamed would read the whole file only to throw it away)
+  const opened: string[] = [];
+  const real = fs.createReadStream;
+  const files = fs as { createReadStream: typeof fs.createReadStream };
+  files.createReadStream = ((...a: Parameters<typeof fs.createReadStream>) => {
+    if (/\.(mp4|mov)$/.test(String(a[0]))) opened.push(String(a[0]));
+    return real.apply(fs, a);
+  }) as typeof fs.createReadStream;
+  const player = `/media/${encodeURIComponent(big)}/v1`;
+  try {
+    for (const [u, headers] of [
+      [url(big), {}],
+      [url(big), { Range: 'bytes=1000-' }],
+      [url(big), { Range: 'bytes=-10' }],
+      [player, {}],
+      [player, { Range: 'bytes=0-' }],
+    ] as const) {
+      const at = opened.length;
+      const got = await get(u, headers);
+      assert.equal(opened.length, at + 1, `${u} ${JSON.stringify(headers)}: a GET reads the file (the count works)`);
+      const head = await get(u, headers, 'HEAD');
+      assert.equal(opened.length, at + 1, `${u} ${JSON.stringify(headers)}: a HEAD opened ${opened.length - at - 1} read streams`);
+      assert.equal(head.status, got.status);
+      assert.equal(head.body.length, 0);
+      for (const h of ['content-length', 'content-range', 'accept-ranges', 'content-type', 'last-modified', 'cache-control', 'content-disposition'])
+        assert.equal(head.headers[h], got.headers[h], `${u} ${JSON.stringify(headers)}: ${h}`);
+    }
+  } finally {
+    files.createReadStream = real;
+  }
+  const whole = await get(url(big), {}, 'HEAD');
+  assert.equal(Number(whole.headers['content-length']), bigBytes.length);
+  assert.equal(whole.headers['accept-ranges'], 'bytes');
+  assert.equal(whole.headers['content-type'], 'video/mp4');
+  assert.ok(whole.headers['last-modified'], 'the date a browser resumes by');
+  const ranged = await get(url(big), { Range: 'bytes=1000-' }, 'HEAD');
+  assert.equal(ranged.status, 206);
+  assert.equal(ranged.headers['content-range'], `bytes 1000-${bigBytes.length - 1}/${bigBytes.length}`);
+});
+
 test('ranges: a part, and a download that picks up where it broke off gets all the rest (not a player’s 8 MB)', async () => {
   const part = await get(url(spot, '?v=1'), { Range: 'bytes=0-99' });
   assert.equal(part.status, 206);

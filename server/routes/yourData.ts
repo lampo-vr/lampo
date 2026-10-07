@@ -54,6 +54,10 @@ export function yourDataRoutes(ctx: ServerContext): Router {
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Length', String(plan.length));
     res.setHeader('Content-Disposition', `attachment; filename="lampo-data-${day}.zip"`);
+    if (req.method === 'HEAD') {
+      res.end();
+      return;
+    }
     for await (const chunk of plan.bytes()) if (!res.write(chunk)) await new Promise((ok) => res.once('drain', ok));
     res.end();
   });
