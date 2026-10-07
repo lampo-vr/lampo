@@ -129,10 +129,13 @@ function AgentAtWork() {
           {PLAN.map((p) => {
             const l = planSaid(p, 'Claude Code', 3);
             return (
-              <span key={p.id} className="nr-plan" data-state={p.state}>
-                {l && <KeyGlyph shape={l.shape} className={`nav-kg run-kg ${l.tone}`} />}
-                <span className="nr-plan-words">{l?.words ?? 'next (nothing to say yet)'}</span>
-              </span>
+              // a row of its own each (in a note's row the line takes the row's second line)
+              <div key={p.id}>
+                <span className="nr-plan" data-state={p.state}>
+                  {l && <KeyGlyph shape={l.shape} className={`nav-kg run-kg ${l.tone}`} />}
+                  <span className="nr-plan-words">{l?.words ?? 'not reached yet: its room is kept, empty'}</span>
+                </span>
+              </div>
             );
           })}
         </div>

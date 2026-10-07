@@ -23,15 +23,16 @@ export function RunLine({ run, say, chip = false }: { run: RunLike; say?: (w: Ac
         ? say(run.error)
         : null;
   const words = own ? `${runShort(run)} · ${own}` : runShort(run);
-  // "V4 is ready" stands by itself; everything else is the agent's
-  const name = phase === 'done' && run.result?.v ? null : run.agent.name;
+  // "V4 is ready" stands by itself; everything else is the agent's — but on a poster, where the card's agent chip under
+  // it names the agent, the state alone has the room
+  const name = chip || (phase === 'done' && run.result?.v) ? null : run.agent.name;
   const fig = pctOf(run);
   return (
     <span
       className={chip ? 'vchip run-line chip' : 'run-line'}
       data-testid="run-line"
       data-phase={phase}
-      title={[name, words, fig].filter(Boolean).join(' · ')}
+      title={[run.agent.name, words, fig].filter(Boolean).join(' · ')}
     >
       <KeyGlyph shape={look.shape} className={`nav-kg run-kg ${look.tone}`} />
       <span className="run-words">

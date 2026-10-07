@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// covers: web/src/styleguide/ web/src/styles/ test/e2e/baseline/
+// covers: web/src/styleguide/ web/src/styles/ test/e2e/baseline/ web/src/player/RunStrip.tsx web/src/sessions/RunLine.tsx
 // The design system's page (#/styleguide, in dev and test builds): every building block renders in both themes, every
 // selected or pressed state wears the raised material, nothing on it is cut or off the scales at a phone and a
 // desktop, and it looks the way it looked last time — a screenshot per theme compared with the baseline in
@@ -51,37 +51,46 @@ try {
     return page;
   };
 
-  await check('the styleguide shows every family: buttons, chips, badges, choosing, surfaces, floating, rows, empty states, scales', async () => {
-    const page = await open('dark', { width: 1440, height: 900 });
-    const blocks = await page.$$eval('.sg-block', (els) => els.map((e) => e.getAttribute('aria-label')));
-    assert(
-      JSON.stringify(blocks) ===
-        JSON.stringify([
-          'Brand',
-          'Agent marks',
-          'The raised material',
-          'Buttons',
-          'Chips and badges',
-          'Choosing',
-          'Surfaces',
-          'Floating',
-          'Rows',
-          'Empty states',
-          'Scales',
-        ]),
-      `blocks: ${blocks}`,
-    );
-    const counts = await page.evaluate(() => ({
-      buttons: document.querySelectorAll('.sg-block .btn').length,
-      empties: document.querySelectorAll('.sg-empties .empty-state').length,
-      stages: document.querySelectorAll('.sbadge[data-stage]').length,
-      logo: document.querySelectorAll('[data-testid=sg-brand] svg.brand-logo[aria-label=Lampo]').length,
-      marks: document.querySelectorAll('[data-testid=sg-marks] .agent-mark').length,
-    }));
-    // every scene in ui/emptyArt.tsx
-    assert(counts.buttons >= 30 && counts.empties === 17 && counts.stages >= 8 && counts.logo === 1 && counts.marks >= 12, JSON.stringify(counts));
-    await page.close();
-  });
+  await check(
+    'the styleguide shows every family: buttons, chips, badges, choosing, surfaces, floating, agents at work, rows, empty states, scales',
+    async () => {
+      const page = await open('dark', { width: 1440, height: 900 });
+      const blocks = await page.$$eval('.sg-block', (els) => els.map((e) => e.getAttribute('aria-label')));
+      assert(
+        JSON.stringify(blocks) ===
+          JSON.stringify([
+            'Brand',
+            'Agent marks',
+            'The raised material',
+            'Buttons',
+            'Chips and badges',
+            'Choosing',
+            'Surfaces',
+            'Floating',
+            'Agent at work',
+            'Rows',
+            'Empty states',
+            'Scales',
+          ]),
+        `blocks: ${blocks}`,
+      );
+      const counts = await page.evaluate(() => ({
+        buttons: document.querySelectorAll('.sg-block .btn').length,
+        empties: document.querySelectorAll('.sg-empties .empty-state').length,
+        stages: document.querySelectorAll('.sbadge[data-stage]').length,
+        logo: document.querySelectorAll('[data-testid=sg-brand] svg.brand-logo[aria-label=Lampo]').length,
+        marks: document.querySelectorAll('[data-testid=sg-marks] .agent-mark').length,
+        // an agent's work in every state of the design's table (ready and isn't running included)
+        strips: document.querySelectorAll('[data-testid=sg-strips] [data-testid=run-strip]').length,
+      }));
+      // every scene in ui/emptyArt.tsx
+      assert(
+        counts.buttons >= 30 && counts.empties === 17 && counts.stages >= 8 && counts.logo === 1 && counts.marks >= 12 && counts.strips === 15,
+        JSON.stringify(counts),
+      );
+      await page.close();
+    },
+  );
 
   await check('empty-state scenes: one lit element at most; every one moves, rests under reduced motion and pauses in a hidden tab', async () => {
     const page = await browser.newPage();
