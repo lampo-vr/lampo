@@ -123,6 +123,7 @@ version, the video, the agent it is assigned to (after `→`) and the text.
 | `APPROVED v3 (client: Mia)`, `CHANGES REQUESTED v3 (team)`, `FINAL v3`, `REOPENED v3 (was final)` | a decision about a version |
 | `PREVIEW CONFIRMED`, `CHECK AGAIN` | a new render matched, or didn't match, a fix preview ([below](#fixing-in-the-project-without-rendering-after-effects-premiere-resolve-)) |
 | `AGENT RUN` | a run Lampo started for you began or ended ([below](#when-youre-not-running-the-machine-can-start-you)) |
+| `AGENT RUN OPENED`, `WORKING`, `NEEDS YOU`, `ENDED` | with `--all` only: an agent's run on a video opened, began, waits for the person, or ended ([below](#your-work-as-the-person-sees-it-runs)) |
 
 Good to know:
 
@@ -688,7 +689,7 @@ in the sidebar's **Agents** list. Lampo builds it from what it sees anyway:
 ![The agent menu while the agent works: Live, with what it is doing now and its last actions with their times](assets/agent-menu-live.webp)
 
 None of it costs you a token or asks anything of you, and none of it is written into the review: it lives in the app's
-memory and a small rolling file in the cache. So `vr status` and `set_status` are optional: use them for what Lampo
+memory and a small rolling file in the cache, and the spine of it is kept with the video as a run (below). So `vr status` and `set_status` are optional: use them for what Lampo
 can't see ("waiting for the client's logo file", an estimate for a long render), not to narrate your steps.
 
 How you're named there: by your Claude Code session, else by `VR_BY=agent:<name>`; an MCP client over HTTP by its name,
@@ -701,6 +702,36 @@ Details: on the machine, `vr` and the stdio MCP server append a line per call to
 most every 2 s (`POST /api/agents/activity`). A hosted server shows what an account sends as that account's
 (`<name> · <account>`, like an MCP client connected with it) and at about the time it arrived, so nobody can make their
 agent's lines look like someone else's.
+
+## Your work as the person sees it: runs
+
+The person doesn't see calls, they see work: when a team member sends notes to the video's agent (Send, Ask, a nudge,
+an answer to your question, Try again), Lampo opens a **run** for that agent on that video, and everything you do there
+joins it. Its plan is the notes they sent; its result is the version you put up. The app shows it as one line ("fixing
+3 of 6 · editing Logo.tsx", "V4 is ready · 5 fixed · 1 asked · worked 9 min"). It asks nothing of you:
+
+- **It begins** with your first call about the video, or the wait that hands you the notes (`wait_for_feedback`;
+  with `vr watch`, your next command).
+- **The plan moves** with what you do anyway: reading a note or looking at its frame puts it "in hand"; `mark_fixed`
+  / `vr fix`, `wont_fix`, `reply` and a question (`add_note` kind question, `ask_options`) answer it. Nothing is
+  guessed from time.
+- **A question** (yours) makes it wait for the person; their answer sends it on. Time waiting for them isn't counted
+  as your work.
+- **It ends** when you hand back: you wait again after putting up the version or answering every note, or the version
+  arrives with every note answered. A run Lampo started for you ends with your process.
+- **If you go quiet** for 20 minutes (5 for a run Lampo started, 10 more while `vr render` reports), it shows as not
+  heard from; your next call picks it up again. After another hour it closes without blame.
+- **Your own write opens one** when none is open (an upload, a fix, a note): a person's reads and your reads never do.
+- **One run per agent and video**: notes sent while you work join it. Your next Lampo answer then ends with one line,
+  once: `2 new notes on launch.mp4 since you started: get_open_notes since "2026-10-07T10:00:00Z".` Read them
+  and fold them into the same version.
+- **The version you put up** while you're at the video names the run (`run` in review.json's versions).
+- `vr watch --all` prints the runs too (`AGENT RUN OPENED`, `WORKING`, `NEEDS YOU`, `ENDED <state>`), beside the
+  `AGENT RUN STARTED|FINISHED` lines of a run Lampo started; INBOX.md and `wait_for_feedback` never carry them.
+
+Only a team member with the agents right opens a run (owners, admins, members): never a reviewer, a review link or an
+API token. A run's history is kept in `data/<slug>/runs.jsonl` ([data-format.md](data-format.md#agent-runs)) and read
+through `GET /api/runs` ([api.md](api.md#agent-runs)).
 
 ## Working against a hosted server
 
@@ -749,8 +780,9 @@ The prompt is one line, for example:
   keep the tools the loop needs (`vr`, your render command) allowed for that project, and, if the session uses the
   MCP server, its tools: `mcp__lampo` allows them all, or name them (`mcp__lampo__get_open_notes`, …). A server
   added under the older key is `mcp__video-review__…`.
-- **Limits:** one run per session at a time, 30 minutes at most (`VR_AGENT_RUN_TIMEOUT`, in seconds), five starts per
-  ten minutes. The person sees the run working in the agent menu, with **Stop** (it ends the run and everything it
+- **Limits:** one run per session at a time, stopped after 30 minutes without a sign of it (no output, no call to Lampo:
+  `VR_AGENT_RUN_TIMEOUT`, in seconds) and after 3 hours in all; five starts per ten minutes. It carries
+  `LAMPO_RUN=<run id>` in its environment, and `vr` and the stdio MCP server name that run with what they report. The person sees the run working in the agent menu, with **Stop** (it ends the run and everything it
   started) and **Log** (`cache/agent-runs/<run>.log`: the run's whole transcript, so readable by you only). A run ends
   when the app quits.
 - **The request is still a `REQUEST` line**, as always: do the work the usual way and finish with the next render (or

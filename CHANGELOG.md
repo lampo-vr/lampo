@@ -8,6 +8,15 @@ format stays backwards compatible throughout.
 ## [Unreleased]
 
 ### Added
+- **An agent's work on a video is kept, from start to end.** When you send notes to the video's agent (Send, Ask,
+  a nudge, your answer to its question, Try again), Lampo keeps what it does with them as one piece of work: the notes
+  you sent as its plan (which it is on, which it fixed, asked about or left), what it is doing now, how long it worked
+  (not counting the time it waited for you), whether it needs you, and the version it handed back. It costs the agent
+  nothing: it comes from the calls it makes anyway. A version an agent made says so, notes you send while it works
+  join the same work (the agent hears of them with its next answer), and an agent that goes quiet shows as not heard
+  from instead of quietly reading as idle. Only team members who may work with agents start one; reviewers' notes and
+  review links never do. For tools: `GET /api/runs?slug=`, `GET /api/runs/:id`, each video's `run` in the library,
+  the live event `run`, and `AGENT RUN …` lines in `vr watch --all` (docs/api.md, docs/agents.md).
 - **Archive a project.** A project that is done can be put away from its ⋯ menu (owners and admins), with Undo: it
   leaves the sidebar, All videos, the board, Recent, the Inbox and Insights' lists of what waits now, and the
   sidebar's *Archived* row (with how many) opens the archived projects; ⌘K finds them under *Archived*. Opened, an
@@ -67,6 +76,9 @@ format stays backwards compatible throughout.
   good, and it is no longer started again every time someone opens the video.
 
 ### Changed
+- A Claude Code run Lampo starts on your machine now stops after 30 minutes without a sign of the agent (its output,
+  or a call to Lampo), and after 3 hours at most, instead of after 30 minutes whatever it was doing: a long render
+  no longer cuts it off.
 - **Several suggestions for the same part of a playbook** (the brief, the rules, one skill) stand together, the newest
   first and marked, with a line that says how they relate. Once one is accepted, or someone changed that part by hand,
   the others say so straight away and their diff shows what accepting them now would replace; *Accept anyway* does it

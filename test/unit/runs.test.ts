@@ -337,13 +337,13 @@ test('a version registered while an agent is at the video names its run (and non
 });
 
 test('the new-notes line: one line, the file’s name as one line, a cursor to read only them; small', () => {
-  const line = runs.newNotesLine({ video: 'launch.mp4', timecodes: ['00:00:12', '00:00:21'], since: '2026-10-07T10:00:00Z' });
-  assert.equal(line, '2 new notes on launch.mp4 since you started (00:00:12, 00:00:21): get_open_notes since "2026-10-07T10:00:00Z".');
+  const line = runs.newNotesLine({ video: 'launch.mp4', timecodes: ['00:00:12:03', '00:00:21:04'], since: '2026-10-07T10:00:00Z' });
+  assert.equal(line, '2 new notes on launch.mp4 since you started: get_open_notes since "2026-10-07T10:00:00Z".');
   assert.match(
     runs.newNotesLine({ video: 'Acme\nlaunch.mp4', timecodes: ['00:00:12'], since: 'x' }),
     /^1 new note on Acme ↵ launch\.mp4 since you started \(00:00:12\): get_open_notes/,
   );
-  assert.match(runs.newNotesLine({ video: 'launch.mp4', timecodes: ['a', 'b', 'c', 'd', 'e'], since: 'x' }), /\(a, b, c, …\)/);
+  assert.doesNotMatch(runs.newNotesLine({ video: 'launch.mp4', timecodes: ['a', 'b', 'c'], since: 'x' }), /\(/, 'several: no moments, the cursor reads them');
   assert.ok(approxTokens(line) <= 45, `${approxTokens(line)} tokens`);
   // told once: what it was told of isn't untold again
   const r = fresh();

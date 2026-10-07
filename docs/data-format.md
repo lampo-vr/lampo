@@ -32,6 +32,7 @@ data/
     drafts/                   notes people saved and haven't sent: <account id>.json and
                               their screenshots and voice notes (never read by agents)
     views.json                who on the team watched the video (never read by agents)
+    runs.jsonl                agents' runs on the video: one line each, its steps kept (below)
   events.jsonl                one line per change, appended
   events.imported.jsonl       another store's history, as `vr admin import` brought it in
   INBOX.md                    the newest human feedback across all videos (on your machine)
@@ -39,6 +40,7 @@ data/
   shares.json                 review links
   asks.json                   a folder's questions with options, before any render (below);
                               their files in asks/<id>/ (with Bunny or S3, in the bucket)
+  runs.jsonl                  agents' runs on those questions, before any render (below)
   publish/                    posts of final videos, the publishing connections with their
                               secrets sealed (below; publishing.md)
   footage.json                footage search on or off for this workspace, who said so and
@@ -203,6 +205,7 @@ Every render that lands at the same path, or is uploaded under the same name, is
 | `source` | where it was made, as the agent reported it (optional): `{app, project?, comp?, start_frame?, fps?}`. Render frame N is project time `N / fps + start_frame / (source.fps or fps)`. `project` is a file name, never a path |
 | `playbook` | the playbook revisions in force when it arrived (optional): `[{scope, rev}]`, the House (`""`) first, down to its folder; only playbooks with a revision |
 | `part` | a partial render (optional): `{of, at, frames, handles, seam?, confirmed?, mismatch?}` ([below](#partial-renders)) |
+| `run` | the agent run that made it (optional, `run_…`): the open run of an agent at the video when it was registered ([below](#agent-runs)) |
 
 A render on disk that is still being written (changed less than 3 seconds ago, or not readable by ffprobe yet) is
 picked up once it settles. The bytes of each version are kept as `versions/<slug>/vN.<ext>`; that is what makes
@@ -635,6 +638,21 @@ cleared cache only costs hearing it again. The shape is `Transcript` in `lib/typ
 | `lines` | reading lines: `{text, t0, t1, f0, f1, w0, n}`, words `w0` to `w0 + n − 1` |
 | `repairs` | stretches the first pass lost and that were heard again: `{t0, t1, engine}` (optional; [speech.md](speech.md)) |
 | `created` | when it was made |
+
+## Agent runs
+
+`<slug>/runs.jsonl` keeps the runs of agents on that video: one stretch of an agent's work, opened when a team member
+sends it notes (or by the agent's own first write), ended when it hands back ([agents.md](agents.md#your-work-as-the-person-sees-it-runs)).
+One JSON object per line, one line per run, oldest first: the run as `GET /api/runs/:id` shows it
+([api.md](api.md#agent-runs)), plus `steps` (what it did, oldest first) and `clock` (the server's own counters). The
+app rewrites the file under the video's lock (`.lock`), atomically, about a second after a change; nothing else
+writes it, and `vr` only reads it to name a version's run. It is compacted as it is written: at most 200 steps per
+run (a stretch of render progress keeps its first and last line; the first step, questions and errors stay), and a
+run that ended more than 90 days ago keeps no steps. Lines it can't read are kept as they are. A store without the
+file has no runs; nothing else changes.
+
+Runs on a question asked on a folder before any render (`asks.json`) live in the workspace's own `runs.jsonl`, with
+`slug: null` and `folder`.
 
 ## Live agent activity
 

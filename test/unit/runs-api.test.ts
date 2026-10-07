@@ -204,3 +204,35 @@ test('Ask opens the next run with the person’s words; Try again follows a run 
     'a listening agent hears it',
   );
 });
+
+test('a run id an agent posts is a hint: never another account’s run, never another workspace’s', async () => {
+  const ws = await import('../../lib/workspaces.ts');
+  // the run Try again opened for Mia's agent: queued, nobody at it yet
+  const run = (await runs()).find((x) => x.ended === null && x.agent.name === AGENT) as Run;
+  assert.equal(run.state, 'queued');
+  const mal = await auth.createUser({ email: 'mal@example.com', name: 'Mallory', password: 'mallorys password 1', role: 'member' });
+  const bob = await auth.createUser({ email: 'bob@example.com', name: 'Bob', password: 'bobs password 1', role: 'member' });
+  const B = ws.createWorkspace({ name: 'Bravo', ownerId: bob.id }).id;
+  ws.removeMember('w1', bob.id);
+  const tokens = {
+    // another member of the workspace, posting as Mia's agent's name and naming her run
+    mallory: { Authorization: `Bearer ${auth.createToken(mal.id, 'agent').token}` },
+    // a member of another workspace only: its token works there
+    bob: { Authorization: `Bearer ${auth.createToken(bob.id, 'agent', { workspace: B }).token}` },
+  };
+  for (const [who, headers] of Object.entries(tokens)) {
+    const entries = [
+      { at: new Date().toISOString(), agent: 'cloud-cut', kind: 'fix', text: 'Fixed everything', key: 'Fixed a note', video: slug, run: run.id },
+      { at: new Date().toISOString(), agent: 'cloud-cut · Mia', kind: 'read', text: 'Reading the open notes', key: 'Reading the open notes', run: run.id },
+    ];
+    const r = await request('POST', '/api/agents/activity', { body: { entries }, headers });
+    assert.equal(r.status, 200, `${who}: ${r.text}`);
+  }
+  const after = (await runs()).find((x) => x.id === run.id) as Run;
+  assert.equal(after.now, null, 'nothing joined Mia’s run');
+  assert.equal(after.state, 'queued');
+  assert.equal(after.agent.name, AGENT, 'nor did another account take it');
+  // Mallory's write opened her own agent's run (under her name), beside Mia's
+  assert.ok((await runs()).some((x) => x.agent.name === 'cloud-cut · Mallory' && x.opened_by.how === 'agent'));
+  assert.ok(!(await runs()).some((x) => x.agent.name.endsWith('· Bob')), 'nothing of B’s in this workspace');
+});

@@ -257,7 +257,7 @@ What it indexes and when: [footage.md](footage.md). A workspace's own switch is 
 
 | Variable | config.json | Default | What it does |
 |---|---|---|---|
-| `VR_AGENT_RUN_TIMEOUT` | | 1800 (30 minutes) | On your machine: how many seconds a Claude Code run that Lampo started may take before it is stopped (1 second to 24 hours; [agents.md](agents.md#when-youre-not-running-the-machine-can-start-you)). |
+| `VR_AGENT_RUN_TIMEOUT` | | 1800 (30 minutes) | On your machine: how many seconds a Claude Code run that Lampo started may go without a sign (output, or a call to Lampo) before it is stopped (1 second to 24 hours); 3 hours is the most any run takes ([agents.md](agents.md#when-youre-not-running-the-machine-can-start-you)). |
 | `VR_CLAUDE_BIN` | | the first `claude` found | The Claude Code program, used to list running sessions and to start a run. |
 | `VR_MCP_TOOLS` | | all | Which MCP tools are offered: `all`, `lean` (the review loop only) or tool names separated by commas. The stdio server reads it, and the app uses it for `/mcp` unless a client asks with `/mcp?tools=…`. |
 | `VR_MCP_LOG` | | on | `off`: the app logs no line per `/mcp` tool call. A line names the workspace, the agent's session id, the tool, how long it took and how it ended — never what it was given or answered ([mcp.md](mcp.md#what-the-server-logs)). |

@@ -24,7 +24,6 @@ process.env.VR_CLAUDE_BIN = stub;
 const hold = path.join(dir, 'bin', 'hold');
 
 const store = await import('../../lib/store.ts');
-const lib = await import('../../lib/runs.ts');
 const { slugify } = await import('../../lib/paths.ts');
 const { words } = await import('../../lib/activityText.ts');
 const { eventLine, isFeedback, isInboxEvent } = await import('../../lib/eventLine.ts');
@@ -264,4 +263,39 @@ test('over MCP: the wait that hands the work over begins it; notes sent meanwhil
   assert.match(got.at(-1) as string, /^1 new note on teaser\.mp4 since you started \(\d\d:\d\d:\d\d[^)]*\): get_open_notes since "[^"]+"\.$/);
   const again = await text('get_note', { id: d1.json.id });
   assert.doesNotMatch(again.join('\n'), /new note/, 'told once');
+});
+
+test('a question on a folder before V1: the asking agent’s run lives with the workspace’s folder runs; the picks send it on', async () => {
+  const asked = await call<{ id: string }>('POST', '/api/asks', {
+    folder: 'Launch',
+    text: 'Which voice?',
+    options: [
+      {
+        id: 'voice',
+        label: 'Voice',
+        items: [
+          { id: 'a', label: 'Warm' },
+          { id: 'b', label: 'Bright' },
+        ],
+      },
+    ],
+    by: 'agent:asker',
+  });
+  assert.equal(asked.status, 200, JSON.stringify(asked.json));
+  const run = await until(() => ctx.runs.list(null, 'Launch')[0], 'the folder run');
+  assert.equal(run.slug, null);
+  assert.equal(run.folder, 'Launch');
+  assert.equal(run.agent.name, 'asker');
+  assert.equal(run.state, 'needs_you');
+  assert.deepEqual(run.needs, { kind: 'options', note: asked.json.id });
+  await until(() => fs.existsSync(path.join(String(process.env.VR_DATA), 'runs.jsonl')), 'the workspace’s folder runs file');
+  const listed = await call<{ runs: Run[] }>('GET', '/api/runs?folder=Launch');
+  assert.deepEqual(
+    listed.json.runs.map((r) => r.id),
+    [run.id],
+  );
+  assert.deepEqual((await call<{ runs: Run[] }>('GET', '/api/runs?folder=Elsewhere')).json.runs, []);
+  const picked = await call('POST', `/api/asks/${asked.json.id}/answer`, { picks: { voice: ['b'] } });
+  assert.equal(picked.status, 200, JSON.stringify(picked.json));
+  assert.equal(ctx.runs.find(run.id)?.run.state, 'working');
 });

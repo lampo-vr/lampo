@@ -804,12 +804,13 @@ export const runAgent = (name: string, kind?: AgentKind | null, sessionId?: stri
 
 /**
  * The line a listening agent's next Lampo answer ends with when notes were added to its run while it worked (§4.6):
- * how many, where, and how to read only them. One line, appended; the video's name is someone's, so oneLine'd.
+ * how many (one by its moment), where, and how to read only them. One line, appended; the video's name is someone's,
+ * so oneLine'd. Its cost fits test/unit/token-budget.test.ts.
  */
 export function newNotesLine(o: { video: string; timecodes: readonly string[]; since: string }): string {
   const n = o.timecodes.length;
-  const tc = o.timecodes.slice(0, 3).join(', ') + (n > 3 ? ', …' : '');
-  return oneLine(`${n} new note${n === 1 ? '' : 's'} on ${path.basename(o.video)} since you started (${tc}): get_open_notes since "${o.since}".`);
+  const at = n === 1 ? ` (${o.timecodes[0]})` : '';
+  return oneLine(`${n} new note${n === 1 ? '' : 's'} on ${path.basename(o.video)} since you started${at}: get_open_notes since "${o.since}".`);
 }
 
 /** Notes added to a run that its agent wasn't told of yet: their ids and when the first came (whole seconds). */
