@@ -37,6 +37,7 @@ import { checkNotArchived, folderIdOf } from './folderIds.ts';
 import { allFolders, folderIdFor, folderName } from './folders.ts';
 import { isoLocal } from './paths.ts';
 import { chainOf } from './playbookFiles.ts';
+import { currentWorkspace } from './scope.ts';
 import { filesStorage } from './storage/index.ts';
 import type {
   FileArea,
@@ -117,7 +118,6 @@ const stamped = (s: FileStampIn, at: string): FileStamp => ({
 const newFileId = (): string => `fl_${crypto.randomBytes(6).toString('hex')}`;
 const DAY = 86_400_000;
 const keptMs = FILE_LIMITS.keptDays * DAY;
-const addDays = (iso: string, ms: number): string => new Date(Date.parse(iso) + ms).toISOString();
 
 // ---------------------------------------------------------------- areas
 
@@ -427,8 +427,9 @@ export async function storeBlob(file: string, expect: { size?: number; sha256?: 
       if (b?.gone) throw Object.assign(new FileError(503, 'the files are being tidied up right now: try again in a moment'), { retryAfter: 2 });
       const now = isoLocal();
       if (b?.stored) {
-        // bytes it holds already: a file's are asked for again (the commit follows); an upload's keeps its first day
-        if (b.named) {
+        // bytes it holds already: a file's are asked for again (the commit follows); an upload's keeps its first day,
+        // and so do bytes a file once named and none does now (they go at the next purge, uncounted meanwhile)
+        if (b.named && namedHashes(listAreas()).has(hash)) {
           b.touched = now;
           writeShard(hash, shard);
         }
@@ -938,8 +939,10 @@ function trashedGroup(a: FileArea, top: string): { dirs: TrashedDir[]; files: Tr
   };
 }
 
-function trashedDirInfo(a: FileArea, d: TrashedDir, scope: string): TrashedDirInfo {
+function trashedDirInfo(a: FileArea, d: TrashedDir, scope: string, early: Map<string, number> = earlyTimes()): TrashedDirInfo {
   const files = trashedGroup(a, d.with_dir ?? d.id).files;
+  // the folder's files may go apart: it says when the first of them may
+  const first = Math.min(Date.parse(d.trashed_at) + keptMs, ...files.map((t) => early.get(`t:${t.id}`) ?? Number.POSITIVE_INFINITY));
   return {
     id: d.id,
     area: scope,
@@ -950,7 +953,7 @@ function trashedDirInfo(a: FileArea, d: TrashedDir, scope: string): TrashedDirIn
     trashed_by: d.trashed_by,
     ...(d.trashed_agent ? { trashed_agent: d.trashed_agent } : {}),
     ...(d.why ? { why: d.why } : {}),
-    purge_at: addDays(d.trashed_at, keptMs),
+    purge_at: new Date(first).toISOString(),
   };
 }
 
@@ -1184,18 +1187,24 @@ export function fileInfo(e: FileEntry, area: string): FileInfo {
   };
 }
 
-export function trashedInfo(t: TrashedFile, area: string): TrashedFileInfo {
+/**
+ * A trashed file as the API answers it. `purge_at`: when it goes — 30 days after it was trashed, or earlier when the
+ * safety net holds more than its cap and it is among the oldest (never within its first day).
+ */
+export function trashedInfo(t: TrashedFile, area: string, early: Map<string, number> = earlyTimes()): TrashedFileInfo {
+  const goes = Math.min(Date.parse(t.trashed_at) + keptMs, early.get(`t:${t.id}`) ?? Number.POSITIVE_INFINITY);
   return {
     ...fileInfo(t, area),
     trashed_at: t.trashed_at,
     trashed_by: t.trashed_by,
     ...(t.trashed_agent ? { trashed_agent: t.trashed_agent } : {}),
     ...(t.why ? { why: t.why } : {}),
-    purge_at: addDays(t.trashed_at, keptMs),
+    purge_at: new Date(goes).toISOString(),
   };
 }
 
-function versionInfo(x: FileVersion, current: boolean): FileVersionInfo {
+function versionInfo(x: FileVersion, current: boolean, key = '', early: Map<string, number> = new Map()): FileVersionInfo {
+  const goes = x.replaced ? Math.min(Date.parse(x.replaced) + keptMs, early.get(key) ?? Number.POSITIVE_INFINITY) : 0;
   return {
     v: x.v,
     size: x.size,
@@ -1207,7 +1216,7 @@ function versionInfo(x: FileVersion, current: boolean): FileVersionInfo {
     via: x.via,
     at: x.at,
     ...(current ? { current: true as const } : {}),
-    ...(!current && !x.pinned?.length && x.replaced ? { kept_until: addDays(x.replaced, keptMs) } : {}),
+    ...(!current && !x.pinned?.length && x.replaced ? { kept_until: new Date(goes).toISOString() } : {}),
     ...(x.pinned?.length ? { pinned: x.pinned } : {}),
   };
 }
@@ -1345,8 +1354,9 @@ export function filesSummary(folder: string): FilesSummary {
 export function trashOf(folder: string): FilesTrash {
   const ref = areaRefOf(folder);
   const a = ref ? readArea(ref.id) : null;
-  const files = (a?.trash ?? []).map((t) => trashedInfo(t, folder)).sort((x, y) => Date.parse(y.trashed_at) - Date.parse(x.trashed_at));
-  const dirs = a ? (a.trash_dirs ?? []).filter((d) => !d.with_dir).map((d) => trashedDirInfo(a, d, folder)) : [];
+  const early = earlyTimes();
+  const files = (a?.trash ?? []).map((t) => trashedInfo(t, folder, early)).sort((x, y) => Date.parse(y.trashed_at) - Date.parse(x.trashed_at));
+  const dirs = a ? (a.trash_dirs ?? []).filter((d) => !d.with_dir).map((d) => trashedDirInfo(a, d, folder, early)) : [];
   return {
     folder,
     files,
@@ -1360,9 +1370,10 @@ export function historyOf(id: string): FileHistory {
   const found = findFile(id);
   if (!found) throw notFound();
   const { entry: e, area } = found;
+  const early = earlyTimes();
   return {
-    file: found.trashed ? trashedInfo(e as TrashedFile, scopeOf(area)) : fileInfo(e, scopeOf(area)),
-    versions: [versionInfo(e, true), ...(e.older ?? []).map((x) => versionInfo(x, false))],
+    file: found.trashed ? trashedInfo(e as TrashedFile, scopeOf(area), early) : fileInfo(e, scopeOf(area)),
+    versions: [versionInfo(e, true), ...(e.older ?? []).map((x) => versionInfo(x, false, `v:${e.id}:${x.v}`, early))],
     changes: journalOf(area.id, (c) => c.id === id, FILE_LIMITS.history),
   };
 }
@@ -1436,17 +1447,104 @@ function keptHashes(areas: FileArea[], counted: Map<string, number>): { kept: Ma
 
 const total = (m: Map<string, number>) => [...m.values()].reduce((n, x) => n + x, 0);
 
+// What each workspace's plan says its storage is (`storageBytes`, asked by the routes and the hourly purge before they
+// need it): what the safety net's cap is computed from wherever usage is counted, synchronously. Unknown: no plan says.
+const plans = new Map<string, number | null>();
+
+/** Remembers what a workspace's plan says its storage is (null: it doesn't say). */
+export function rememberPlan(ws: string, plan: number | null): void {
+  plans.set(ws, plan);
+}
+
+/** One thing the safety net keeps: a trashed file with its older versions (`t:<id>`), or a live file's older one (`v:<id>:<v>`). */
+interface NetItem {
+  key: string;
+  /** When it went into the net (ms). */
+  at: number;
+  bytes: { hash: string; size: number }[];
+}
+
+function netItems(areas: FileArea[]): NetItem[] {
+  const items: NetItem[] = [];
+  for (const a of areas) {
+    for (const e of a.files)
+      for (const x of e.older ?? [])
+        if (!x.pinned?.length) items.push({ key: `v:${e.id}:${x.v}`, at: Date.parse(x.replaced ?? x.at), bytes: [{ hash: x.hash, size: x.size }] });
+    for (const t of a.trash)
+      items.push({
+        key: `t:${t.id}`,
+        at: Date.parse(t.trashed_at),
+        bytes: [{ hash: t.hash, size: t.size }, ...(t.older ?? []).map((x) => ({ hash: x.hash, size: x.size }))],
+      });
+  }
+  return items.sort((x, y) => x.at - y.at || (x.key < y.key ? -1 : 1));
+}
+
 /**
- * What the workspace's files hold: counted (live files once per workspace, pinned versions, and uploads waiting for
- * their commit: `pending`) and kept (the trash and replaced versions, not counted). `cap`: the most the safety net may
- * hold (`keptCap`).
+ * What the safety net does past its cap: the oldest goes first, each once it has been in the net FILE_LIMITS.protectHours
+ * (never sooner), until the net holds no more than `cap`. `when`: the time each item that goes would go (now for those
+ * that may go already); `over`: what the net holds over its cap once those that may go now went — bytes that went in
+ * within the day, which count toward the plan until they may go.
  */
-export function filesUsage(cap: number | null = null): FilesUsage {
-  const areas = listAreas();
+function netPlan(items: NetItem[], counted: Map<string, number>, cap: number, now: number): { when: Map<string, number>; over: number } {
+  const refs = new Map<string, number>();
+  const sizes = new Map<string, number>();
+  for (const it of items)
+    for (const b of it.bytes)
+      if (!counted.has(b.hash)) {
+        refs.set(b.hash, (refs.get(b.hash) ?? 0) + 1);
+        sizes.set(b.hash, b.size);
+      }
+  let kept = total(sizes);
+  let keptNow: number | null = null;
+  const when = new Map<string, number>();
+  const protect = FILE_LIMITS.protectHours * 3600_000;
+  for (const it of items) {
+    if (kept <= cap) break;
+    const t = Math.max(now, it.at + protect);
+    if (t > now && keptNow === null) keptNow = kept;
+    when.set(it.key, t);
+    for (const b of it.bytes) {
+      if (counted.has(b.hash)) continue;
+      const left = (refs.get(b.hash) ?? 1) - 1;
+      refs.set(b.hash, left);
+      if (!left) kept -= b.size;
+    }
+  }
+  return { when, over: Math.max(0, (keptNow ?? kept) - cap) };
+}
+
+/** The workspace's files and its safety net as they stand: what counts, what waits, the cap, the plan past the cap. */
+function netState(areas: FileArea[], now = Date.now(), cap?: number | null) {
   const counted = countedHashes(areas);
   const pending = total(pendingBlobs(areas));
-  const { kept, items } = keptHashes(areas, counted);
-  return { files: liveCount(areas), bytes: total(counted) + pending, pending, kept: total(kept), kept_files: items, kept_cap: cap };
+  const limit = cap === undefined ? keptCap(plans.get(currentWorkspace()) ?? null, total(counted) + pending) : cap;
+  const items = netItems(areas);
+  const plan = limit === null ? { when: new Map<string, number>(), over: 0 } : netPlan(items, counted, limit, now);
+  return { counted, pending, cap: limit, items, ...plan };
+}
+
+/** When each thing the safety net keeps would go early (by `t:<id>` / `v:<id>:<v>`), with the cap as the plan says. */
+const earlyTimes = (): Map<string, number> => netState(listAreas()).when;
+
+/**
+ * What the workspace's files hold: counted (live files once per workspace, pinned versions, uploads waiting for their
+ * commit: `pending`, and what the safety net holds over its cap that may not go yet: `over`) and kept (the trash and
+ * replaced versions, not counted). `kept_cap`: the most the safety net may hold (`keptCap`, with the plan last asked).
+ */
+export function filesUsage(): FilesUsage {
+  const areas = listAreas();
+  const net = netState(areas);
+  const { kept, items } = keptHashes(areas, net.counted);
+  return {
+    files: liveCount(areas),
+    bytes: total(net.counted) + net.pending + net.over,
+    pending: net.pending,
+    over: net.over,
+    kept: total(kept),
+    kept_files: items,
+    kept_cap: net.cap,
+  };
 }
 
 /**
@@ -1459,11 +1557,10 @@ export function keptCap(plan: number | null, counted: number): number {
   return plan === null ? ceiling : Math.min(Math.floor(plan * FILE_LIMITS.keptShare), ceiling);
 }
 
-/** Whether a purge is due now: the safety net holds more than `cap`, or bytes nothing names may go. */
-export function safetyNetDue(cap: number, now = Date.now()): boolean {
+/** Whether a purge is due now: something the safety net keeps may go early now, or bytes nothing names may go. */
+export function safetyNetDue(now = Date.now()): boolean {
   const areas = listAreas();
-  const counted = countedHashes(areas);
-  if (total(keptHashes(areas, counted).kept) > cap) return true;
+  for (const t of netState(areas, now).when.values()) if (t <= now) return true;
   const named = namedHashes(areas);
   for (const [h, b] of allBlobs()) if (!named.has(h) && sweepable(b, now)) return true;
   return false;
@@ -1486,21 +1583,14 @@ export interface Purged {
   blobs: number;
 }
 
-/** A thing the safety net keeps, for the purge: when it went there, its bytes, and how to take it out. */
-interface KeptItem {
-  at: number;
-  hash: string;
-  size: number;
-  drop: () => void;
-}
-
 /**
  * The purge, in the workspace running now: what was trashed or replaced 30 days ago goes (pinned versions stay), then,
- * when the safety net still holds more than `cap` bytes, the oldest of it, early; then every blob nothing names any more
- * that may go (`sweepable`: what a file stopped naming, an upload past its day) is removed from the storage. A catalog
- * that can't be read stops it before anything is removed (FilesUnreadableError).
+ * when the safety net still holds more than its cap (`cap`, else the plan last asked; null: none), the oldest of it,
+ * early — never anything that went in within the last day (FILE_LIMITS.protectHours: that counts toward the plan
+ * instead); then every blob nothing names any more that may go (`sweepable`: what a file stopped naming, an upload past
+ * its day) is removed from the storage. A catalog that can't be read stops it before anything is removed.
  */
-export async function purgeFiles({ now = Date.now(), cap = null }: { now?: number; cap?: number | null } = {}): Promise<Purged> {
+export async function purgeFiles({ now = Date.now(), cap }: { now?: number; cap?: number | null } = {}): Promise<Purged> {
   const out: Purged = { trash: 0, versions: 0, blobs: 0 };
   const old = (iso: string | undefined) => !!iso && now - Date.parse(iso) > keptMs;
   const doomed = withFilesLock(() => {
@@ -1520,7 +1610,6 @@ export async function purgeFiles({ now = Date.now(), cap = null }: { now?: numbe
       by: 'purge',
       ...(dir ? { dir: true as const } : {}),
     });
-    const items: KeptItem[] = [];
     for (const a of areas) {
       for (const e of [...a.files, ...a.trash]) {
         const before = e.older?.length ?? 0;
@@ -1541,49 +1630,29 @@ export async function purgeFiles({ now = Date.now(), cap = null }: { now?: numbe
         out.trash += expired.length;
         changed(a).push(...expired.map((t) => purged(a, t)), ...expiredDirs.map((d) => purged(a, d, true)));
       }
-      // what stays in the safety net, for when it holds too much (the oldest go first)
-      for (const e of a.files)
-        for (const x of e.older ?? [])
-          if (!x.pinned?.length)
-            items.push({
-              at: Date.parse(x.replaced ?? x.at),
-              hash: x.hash,
-              size: x.size,
-              drop: () => {
-                e.older = (e.older ?? []).filter((y) => y !== x);
-                if (!e.older.length) delete e.older;
-                out.versions++;
-                changed(a);
-              },
-            });
-      for (const t of a.trash)
-        items.push({
-          at: Date.parse(t.trashed_at),
-          hash: t.hash,
-          size: t.size,
-          drop: () => {
-            if (!a.trash.includes(t)) return;
-            a.trash = a.trash.filter((y) => y !== t);
-            a.rev++;
-            out.trash++;
-            changed(a).push(purged(a, t));
-          },
-        });
     }
-    if (cap !== null && cap >= 0) {
-      const counted = countedHashes(areas);
-      const refs = new Map<string, number>();
-      for (const it of items) if (!counted.has(it.hash)) refs.set(it.hash, (refs.get(it.hash) ?? 0) + 1);
-      let kept = total(keptHashes(areas, counted).kept);
-      for (const it of items.sort((x, y) => x.at - y.at)) {
-        if (kept <= cap) break;
-        it.drop();
-        if (counted.has(it.hash)) continue;
-        const left = (refs.get(it.hash) ?? 1) - 1;
-        refs.set(it.hash, left);
-        if (!left) kept -= it.size;
+    // past the cap: what may go early now (the oldest, never what went in within the day), as the net's plan says
+    const due = new Set([...netState(areas, now, cap).when].filter(([, t]) => t <= now).map(([k]) => k));
+    if (due.size)
+      for (const a of areas) {
+        for (const e of a.files) {
+          const before = e.older?.length ?? 0;
+          if (!before) continue;
+          e.older = (e.older ?? []).filter((x) => !due.has(`v:${e.id}:${x.v}`));
+          if (e.older.length !== before) {
+            out.versions += before - e.older.length;
+            changed(a);
+          }
+          if (!e.older.length) delete e.older;
+        }
+        const gone = a.trash.filter((t) => due.has(`t:${t.id}`));
+        if (gone.length) {
+          a.rev++;
+          a.trash = a.trash.filter((t) => !due.has(`t:${t.id}`));
+          out.trash += gone.length;
+          changed(a).push(...gone.map((t) => purged(a, t)));
+        }
       }
-    }
     for (const [a, changes] of lines) saveArea(a, changes);
     // the sweep: blobs no catalog names (live, older, trashed) that may go (`sweepable`); marked gone before their bytes go
     const named = namedHashes(areas);

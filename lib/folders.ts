@@ -306,7 +306,8 @@ export function deleteFolder(p: unknown, by = USER): string | null {
       archived,
     );
   });
-  // Its project files (and those of a subfolder that merged into one already there) go to the trash whole, nothing lost:
+  // Its project files (and those of a subfolder that merged into one already there) go to the trash whole, nothing lost
+  // (lib/files.ts never takes from the trash early what went in within the day, whatever the cap):
   // into the parent's (or the House's), under the deleted folder's name; a merged one's into the folder it fell into.
   const parentOrHouse = parent ?? '';
   filesFollow(() =>

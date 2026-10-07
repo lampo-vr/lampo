@@ -2328,6 +2328,11 @@ export interface FilesUsage {
   bytes: number;
   /** Of `bytes`: uploads waiting for their commit (stored, no file names them yet), counted until committed or purged. */
   pending?: number;
+  /**
+   * Of `bytes`: what the safety net holds over its cap that may not go yet (it went in within the last day): counted
+   * until it may go early, or is restored or purged.
+   */
+  over?: number;
   kept: number;
   kept_files: number;
   /**

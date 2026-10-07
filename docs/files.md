@@ -65,8 +65,11 @@ Files and renders share the plan's storage.
   day the server keeps them.
 - **Not counted:** the trash and replaced versions (the safety net). Trashing a file gives its space back at once.
 - The safety net is kept 30 days, and holds at most a quarter of the plan's storage — and, plan or none, never more
-  than what the workspace's files count (or a floor of 5 GB). A trash, a new version or a deleted folder that takes
-  it past that lets the oldest of it go at once, with its bytes.
+  than what the workspace's files count (or a floor of 5 GB). Past that, the oldest of it goes early, with its bytes,
+  but **nothing that went in within the last day**: a file just trashed, a folder just deleted, a version just
+  replaced stays restorable. While such recent things hold the net over its cap, what it holds over counts toward the
+  plan (pushes, commits and restores get the plan's refusal) until it may go. Every trashed file says when it really
+  goes (`purge_at`), every older version too (`kept_until`).
 - **Uploads under way** count by their declared size from the start, as renders do.
 - **What comes back counts again:** restoring from the trash, a trashed folder or an older version is checked against
   the plan like a push.

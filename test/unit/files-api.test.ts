@@ -334,8 +334,11 @@ test('quota: live files count once, the trash and replaced versions don’t, the
   const after = (await api('GET', '/api/files/usage', asOlivia)).json();
   assert.equal(after.bytes, before.bytes - big.length, 'trashing gives the space back at once');
   assert.equal(after.kept, before.kept + big.length, 'kept, not counted');
-  // the safety net past its cap: the oldest goes first, early
-  const out = await inWorkspace('w1', () => files.purgeFiles({ cap: 0 }));
+  // the safety net past its cap: nothing that went in within the day goes early…
+  const soon = await inWorkspace('w1', () => files.purgeFiles({ cap: 0 }));
+  assert.equal(soon.trash, 0, JSON.stringify(soon));
+  // …a day on, the oldest goes first, early
+  const out = await inWorkspace('w1', () => files.purgeFiles({ cap: 0, now: Date.now() + 25 * 3600e3 }));
   assert.ok(out.trash >= 1 || out.versions >= 1, JSON.stringify(out));
   assert.equal((await api('GET', '/api/files/usage', asOlivia)).json().kept, 0);
 });

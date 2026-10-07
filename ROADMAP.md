@@ -216,6 +216,10 @@ Findings of audit A12 (2026-10-02, `AUDITS.md`) that are known and left for late
 
 Findings of audit A13 (2026-10-05, `AUDITS.md`) and its verification rounds that are known and left for later.
 
+- **A13 FILES-6** (low): a project file's older versions are capped per file, not per area, so an area of thousands of
+  files that each keep their versions holds a large catalog that every change reads and writes whole. Give each area a
+  budget of versions (the oldest unpinned go first), or split a big catalog by top-level path.
+
 - **A13 VERIFY-4b** (low): while one address's reset or confirmation waits in the mail queue, another person asking
   from the same address (one office network) gets theirs only on a later try. Key the one-at-a-time rule by recipient
   too (`askerWaits` in `lib/mail/index.ts`).

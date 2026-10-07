@@ -40,6 +40,11 @@ export const FILE_LIMITS = {
   versions: 10,
   /** Hours bytes a file stopped naming (purged, its last version dropped) are kept when a push just asked for them. */
   touchHours: 1,
+  /**
+   * Hours what went into the safety net (a file trashed, a version replaced) is never taken early, whatever the cap:
+   * while such things hold the net over its cap, the excess counts toward the plan instead.
+   */
+  protectHours: 24,
   /** Hours bytes nothing names yet are kept (an upload committing now is never swept). */
   graceHours: 24,
   /** Changes of a file's journal its history shows. */

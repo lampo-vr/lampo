@@ -33,7 +33,6 @@ import {
   heldBlob,
   heldBlobs,
   historyOf,
-  keptCap,
   listFiles,
   makeDir,
   missingBlobs,
@@ -43,6 +42,7 @@ import {
   purgeFiles,
   pushConflicts,
   readAreaRev,
+  rememberPlan,
   restoreDir,
   restoreFile,
   safetyNetDue,
@@ -157,6 +157,20 @@ function idOf(req: Request<{ id: string }>): string {
   const id = req.params.id;
   if (!ANY_ID.test(id)) throw fail(404, 'no such file');
   return id;
+}
+
+// The plan's check and the change it allows, one at a time per workspace (by its id: one queue each): an async module
+// answers each check on the usage as it was, so two at once could both pass where only one fits.
+const queues = new Map<string, Promise<unknown>>();
+function oneAtATime<T>(ws: string, fn: () => Promise<T>): Promise<T> {
+  const before = queues.get(ws) ?? Promise.resolve();
+  const p = before.then(fn, fn);
+  const settled = p.catch(() => {});
+  queues.set(ws, settled);
+  void settled.then(() => {
+    if (queues.get(ws) === settled) queues.delete(ws);
+  });
+  return p;
 }
 
 /** lib/files.ts's refusals as the API answers them: their status, their sentence, a conflict's files. */
@@ -289,9 +303,9 @@ export function fileRoutes(ctx: ServerContext): Router {
 
   r.get('/api/files/usage', (req, res) =>
     run(async () => {
-      const cap = await capFor(ctx, req.auth?.workspace ?? currentWorkspace());
+      await capFor(ctx, req.auth?.workspace ?? currentWorkspace());
       res.setHeader('Cache-Control', 'no-store');
-      res.json(filesUsage(cap));
+      res.json(filesUsage());
     }),
   );
 
@@ -403,8 +417,10 @@ export function fileRoutes(ctx: ServerContext): Router {
       const bytes = sending.reduce((n, i) => n + i.size, 0);
       const free = freeBytes(path.join(CACHE, 'uploads'));
       if (bytes && free !== null && bytes > free - (ctx.cfg.min_free_bytes ?? 0)) throw fail(507, 'not enough disk space on the server for these files');
+      const ws = req.auth?.workspace ?? currentWorkspace();
+      await capFor(ctx, ws);
       const counted = bytes + bytesToCount(items.filter(stored).map((i) => ({ sha256: i.sha256 as string, size: i.size })));
-      if (counted) await ctx.extension.check(req.auth?.workspace ?? currentWorkspace(), 'upload', counted);
+      if (counted) await oneAtATime(ws, () => ctx.extension.check(ws, 'upload', counted));
       // only a push the plan took: what a file names now is kept for its commit (an upload's bytes keep their first day)
       touchBlobs(items.filter(stored).map((i) => i.sha256 as string));
       const stamp = stampOf(req, b);
@@ -456,10 +472,15 @@ export function fileRoutes(ctx: ServerContext): Router {
     run(async () => {
       const b = body(CommitBody, req);
       const area = writeArea(b.folder);
-      const counted = bytesToCount(b.add);
-      if (counted) await ctx.extension.check(req.auth?.workspace ?? currentWorkspace(), 'upload', counted);
-      const out = commitFiles(area.id, b.add, { conflict: b.conflict ?? 'refuse', stamp: stampOf(req, b) });
-      await keepSafetyNet(ctx, req.auth?.workspace ?? currentWorkspace());
+      const ws = req.auth?.workspace ?? currentWorkspace();
+      // the plan's check and the change, one at a time per workspace: two at once can't both pass on the same usage
+      const out = await oneAtATime(ws, async () => {
+        await capFor(ctx, ws);
+        const counted = bytesToCount(b.add);
+        if (counted) await ctx.extension.check(ws, 'upload', counted);
+        return commitFiles(area.id, b.add, { conflict: b.conflict ?? 'refuse', stamp: stampOf(req, b) });
+      });
+      await keepSafetyNet(ctx, ws);
       told(out.folder);
       res.json(out);
     }),
@@ -497,10 +518,13 @@ export function fileRoutes(ctx: ServerContext): Router {
       const id = idOf(req);
       const stamp = stampOf(req, {});
       const mayAny = can(req.auth?.role, 'remove');
+      const ws = req.auth?.workspace ?? currentWorkspace();
       const out = DIR_ID.test(id) ? trashDir(id, stamp, { mayAny }) : trashFile(id, stamp, { mayAny });
-      await keepSafetyNet(ctx, req.auth?.workspace ?? currentWorkspace());
+      await keepSafetyNet(ctx, ws);
       told(out.area);
-      res.json(out);
+      // as it stands now, with the plan just asked: `purge_at` is when it really goes
+      const found = DIR_ID.test(id) ? null : findFile(id);
+      res.json(found?.trashed ? trashedInfo(found.entry as TrashedFile, scopeOf(found.area)) : DIR_ID.test(id) ? dirInfoOf(id) : out);
     }),
   );
 
@@ -510,10 +534,14 @@ export function fileRoutes(ctx: ServerContext): Router {
       const id = idOf(req);
       const b = body(RestoreBody, req);
       const stamp = stampOf(req, b);
-      const counted = bytesToRestore(id, b.v);
-      if (counted) await ctx.extension.check(req.auth?.workspace ?? currentWorkspace(), 'upload', counted);
-      const out = DIR_ID.test(id) ? restoreDir(id, stamp) : restoreFile(id, b.v, stamp).file;
-      await keepSafetyNet(ctx, req.auth?.workspace ?? currentWorkspace());
+      const ws = req.auth?.workspace ?? currentWorkspace();
+      const out = await oneAtATime(ws, async () => {
+        await capFor(ctx, ws);
+        const counted = bytesToRestore(id, b.v);
+        if (counted) await ctx.extension.check(ws, 'upload', counted);
+        return DIR_ID.test(id) ? restoreDir(id, stamp) : restoreFile(id, b.v, stamp).file;
+      });
+      await keepSafetyNet(ctx, ws);
       told(out.area ?? '');
       res.json(out);
     }),
@@ -571,7 +599,9 @@ export function fileRoutes(ctx: ServerContext): Router {
  */
 export async function capFor(ctx: ServerContext, ws: string): Promise<number> {
   const plan = await ctx.extension.storageBytes(ws);
-  return inWorkspace(ws, () => keptCap(plan, filesUsage().bytes));
+  // remembered for what counts usage synchronously (a module's plan check reads usageOf)
+  rememberPlan(ws, plan);
+  return inWorkspace(ws, () => filesUsage().kept_cap as number);
 }
 
 /**
@@ -581,8 +611,8 @@ export async function capFor(ctx: ServerContext, ws: string): Promise<number> {
  */
 export async function keepSafetyNet(ctx: ServerContext, ws: string): Promise<void> {
   try {
-    const cap = await capFor(ctx, ws);
-    if (inWorkspace(ws, () => safetyNetDue(cap))) await inWorkspace(ws, () => purgeFiles({ cap }));
+    await capFor(ctx, ws);
+    if (inWorkspace(ws, () => safetyNetDue())) await inWorkspace(ws, () => purgeFiles());
   } catch (e) {
     console.error(`files: the safety net of ${ws} wasn’t tidied (${(e as Error).message})`);
   }
@@ -602,8 +632,8 @@ export async function purgeEveryWorkspace(ctx: ServerContext): Promise<void> {
   }
   for (const ws of ids) {
     try {
-      const cap = await capFor(ctx, ws);
-      const out = await inWorkspace(ws, () => purgeFiles({ cap }));
+      await capFor(ctx, ws);
+      const out = await inWorkspace(ws, () => purgeFiles());
       if (out.trash || out.versions || out.blobs)
         console.log(`files: purged ${out.trash} trashed, ${out.versions} older versions, ${out.blobs} unused blobs in ${ws}`);
     } catch (e) {

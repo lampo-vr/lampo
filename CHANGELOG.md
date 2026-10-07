@@ -84,6 +84,9 @@ format stays backwards compatible throughout.
   command runs on the agent's own machine, never on a server ([docs/agents.md](docs/agents.md)).
 
 ### Fixed
+- **What you just trashed stays restorable.** A file just trashed, a folder just deleted or a version just replaced is
+  never taken early, even when the trash holds more than its share of the plan; meanwhile what is over counts toward
+  the plan, and each trashed file says when it really goes.
 - **What an agent says in its own words no longer gets cut off where there is no room for it.** A status like
   "rendering v2 (notes and b-roll from the content folder, then the end card)" used to stand, cut short, in the player's
   agent button. The button, a poster's chip in the grid and the sidebar's Agents rows now say where the agent stands in
