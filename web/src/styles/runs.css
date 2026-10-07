@@ -1,0 +1,180 @@
+/* An agent's work on a video (sessions/runWords.ts): the player's run strip, the library's run line and the 2 px edge
+   that fills while a render or an upload says how far it is. Calm until it needs you: working is a turning hourglass and
+   words, the edge is ink, never the brand's orange; only "needs you" earns a raised button (RunStrip.tsx). States swap
+   words, never heights. */
+
+/* The glyph's colour by what the line says (the shape says it too: ⧗ on it, ◇ waiting, ◈ fixed, ◆ decided, ▢ held). */
+.run-kg {
+  --kg-size: 9px;
+}
+.run-kg.ask {
+  color: var(--claude-2);
+}
+.run-kg.ok {
+  color: var(--ok);
+}
+.run-kg.err {
+  color: var(--must);
+}
+.run-kg.warn {
+  color: var(--should);
+}
+.run-kg.quiet {
+  color: var(--muted);
+}
+
+/* The progress along a foot: inside the box it belongs to (the strip, a poster), so nothing moves. */
+.run-edge {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: calc(var(--edge, 0) * 100%);
+  background: var(--fg-2);
+  border-radius: 0 1px 1px 0;
+  pointer-events: none;
+  transition: width var(--dur-slow) var(--ease-out);
+}
+/* on a poster: light on the picture in both themes (a dark island: its --fg is light) */
+.poster-frame .run-edge {
+  background: var(--fg);
+  box-shadow: 0 -1px 0 color-mix(in srgb, var(--ink-0) 60%, transparent);
+}
+
+/* ---------------------------------------------------------------- the strip (player) */
+
+/* Under the side panel's title, across its width: one line in a band of its own, the edge on its foot. */
+.run-strip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  height: var(--h-lg);
+  margin: 0 calc(-1 * var(--sp-3));
+  padding: 0 var(--sp-3);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--ink-1);
+}
+.run-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg-2);
+  font: var(--fw-ui) var(--fs-sm) / var(--lh-ui) var(--ui);
+  text-align: left;
+  cursor: pointer;
+}
+.run-main:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.run-strip:not(.pending):hover {
+  background: color-mix(in srgb, var(--fg) 4%, var(--ink-1));
+}
+.run-main > .icon {
+  flex: none;
+  color: var(--fg-2);
+}
+.run-main > .run-kg {
+  --kg-size: 10px;
+}
+.run-words {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.run-words b {
+  color: var(--fg);
+  font-weight: var(--fw-strong);
+}
+/* a percentage or a clock: never cut, in its own column at the line's end */
+.run-fig {
+  flex: none;
+  margin-left: auto;
+  padding-left: var(--sp-2);
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  font-stretch: 87.5%;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.run-go {
+  flex: none;
+  margin-left: auto;
+  color: var(--faint);
+}
+.run-fig + .run-go {
+  margin-left: 0;
+}
+.run-act {
+  flex: none;
+}
+.run-act.ghost {
+  color: var(--fg-2);
+}
+/* What needs you reads first: its words in the text colour. */
+.run-strip[data-phase='needs_you'] .run-words,
+.run-strip[data-phase='failed'] .run-words {
+  color: var(--fg);
+}
+.run-strip.pending .run-main {
+  cursor: default;
+}
+
+/* ---------------------------------------------------------------- the line (library cards, rows, posters) */
+
+.run-line {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  max-width: 100%;
+}
+.run-line b {
+  color: var(--fg);
+  font-weight: var(--fw-strong);
+}
+.run-line .run-fig {
+  margin-left: 0;
+  padding-left: 0;
+}
+/* on a grid card's poster, where the old status chip was: glass, the words in the UI face */
+.run-line.chip {
+  flex: 0 1 auto;
+  max-width: 76%;
+  gap: var(--sp-1);
+  font-family: var(--ui);
+  font-weight: var(--fw-ui);
+  letter-spacing: 0;
+}
+.run-line.chip b {
+  color: inherit;
+}
+.run-line.chip .run-fig {
+  color: inherit;
+}
+/* in a list row's second line: inline, so the row's own ellipsis cuts it */
+.lwhere .run-line {
+  display: inline;
+}
+.lwhere .run-line .kg {
+  margin-right: var(--sp-1);
+  vertical-align: -1px;
+}
+.lwhere .run-line .run-words {
+  overflow: visible;
+}
+.lwhere .run-line .run-fig {
+  margin-left: var(--sp-1);
+}

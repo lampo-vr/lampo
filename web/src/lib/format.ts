@@ -1,8 +1,9 @@
 import { locale, t } from '../i18n/index.ts';
 
-export function ago(iso: string | null | undefined) {
+/** How long ago, in words; `now` for a moment other than this one (a still picture, a test). */
+export function ago(iso: string | null | undefined, now = Date.now()) {
   if (!iso) return '';
-  const s = (Date.now() - new Date(iso).getTime()) / 1000;
+  const s = (now - new Date(iso).getTime()) / 1000;
   if (s < 45) return t('just now');
   if (s < 3600) return t('{n} min ago', { n: Math.round(s / 60) });
   if (s < 86400) return t('{n} h ago', { n: Math.round(s / 3600) });

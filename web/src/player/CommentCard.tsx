@@ -16,7 +16,7 @@ import { useAuthStatus, useCan, usePeople } from '../api/auth.ts';
 import { api, enc } from '../api/client.ts';
 import { type CommentPatch, useCommentActions } from '../api/mutations.ts';
 import { keys } from '../api/queries.ts';
-import type { FixPreview, OptionGroup, PlacedComment, Reply, TextEdit } from '../api/types.ts';
+import type { FixPreview, OptionGroup, PlacedComment, Reply, RunPlanItem, TextEdit } from '../api/types.ts';
 import { locale, perLang, t } from '../i18n/index.ts';
 import { useLang } from '../i18n/T.tsx';
 import { severityLabel, tagLabel } from '../i18n/terms.ts';
@@ -30,6 +30,7 @@ import { GOTO_FRAME, type GotoFrame, ownerRefs, splitRefs, type ViewRef } from '
 import { RefStrip } from '../refs/RefStrip.tsx';
 import { RefTools, usePendingRefs } from '../refs/RefTools.tsx';
 import { RefViewer } from '../refs/RefViewer.tsx';
+import { planSaid } from '../sessions/runWords.ts';
 import { Badge, type Tone } from '../ui/Badge.tsx';
 import { Choices } from '../ui/Choices.tsx';
 import { AutoTextarea, Avatar } from '../ui/controls.tsx';
@@ -386,6 +387,10 @@ interface CommentCardProps {
   /** Check mode is on: its card over the picture (VerifyPanel.tsx) is where a fix is decided, so this card says where
    * the note stands without asking the same question again. */
   checkMode?: boolean;
+  /** Its place in the agent's plan while work goes on (a line under the row; its room is kept from the start, empty
+   * until the agent reaches it), and the agent's name for it. */
+  plan?: RunPlanItem;
+  planName?: string;
 }
 
 // Memoised: the player re-renders on every frame during playback, the cards only when their own props change.
@@ -410,6 +415,8 @@ export const CommentCard = memo(function CommentCard({
   onPlayRange,
   looping,
   checkMode = false,
+  plan,
+  planName = '',
 }: CommentCardProps) {
   useLang(); // memo'd: renders again on a language switch by itself
   const [mode, setMode] = useState<Mode | null>(null);
@@ -643,6 +650,7 @@ export const CommentCard = memo(function CommentCard({
                 : null;
     const said = (c.replies || []).filter((r) => !r.status).length;
     const ghost = c.rangeHere && c.scope !== 'video' ? c.rangeHere : null;
+    const planLine = plan ? planSaid(plan, planName, latestV) : null;
     const show = () => {
       setPeek(true);
       if (ghost) setRangeHint({ ghost });
@@ -674,7 +682,7 @@ export const CommentCard = memo(function CommentCard({
           )}
           <button
             type="button"
-            className="nr"
+            className={plan ? 'nr planned' : 'nr'}
             onClick={() => onSelect(c)}
             onPointerEnter={show}
             onPointerLeave={hide}
@@ -705,6 +713,16 @@ export const CommentCard = memo(function CommentCard({
                   </span>
                 )}
                 {status && <span className={`nr-state nr-${c.status}${c.check_again && c.status === 'open' ? ' again' : ''}`}>{status}</span>}
+              </span>
+            )}
+            {plan && (
+              <span className="nr-plan" data-testid="note-plan" data-state={plan.state}>
+                {planLine && (
+                  <>
+                    <KeyGlyph shape={planLine.shape} className={`nav-kg run-kg ${planLine.tone}`} />
+                    <span className="nr-plan-words">{planLine.words}</span>
+                  </>
+                )}
               </span>
             )}
             {peek && marked && <img className="nr-thumb" src={shot(marked)} alt="" decoding="async" />}

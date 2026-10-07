@@ -2,7 +2,7 @@
 // over a blurred copy of itself (a 9:16 reel in a 16:10 card). With `scrub`, moving the pointer across it flips
 // through the render (the hover-scrub sprite, lib/sprite.ts), with a thin playhead along the bottom. Touch has no
 // hover: there the poster stays still.
-import { type CSSProperties, type PointerEvent, useState } from 'react';
+import { type CSSProperties, type PointerEvent, type ReactNode, useState } from 'react';
 import { spriteBackground, spriteTile } from '../../../lib/sprite.ts';
 import { useSprite } from '../api/sprite.ts';
 
@@ -33,9 +33,11 @@ interface PosterProps {
   className?: string;
   /** One of the first posters on screen: fetched at once and first, not when the browser gets round to it. */
   priority?: boolean;
+  /** Drawn over the picture, inside its frame (a render's progress along its foot). */
+  children?: ReactNode;
 }
 
-export function Poster({ src, sprite: spriteSrc = null, slug, width, height, frame, className = '', priority = false }: PosterProps) {
+export function Poster({ src, sprite: spriteSrc = null, slug, width, height, frame, className = '', priority = false, children }: PosterProps) {
   const scrub = !!spriteSrc;
   const a = width > 0 && height > 0 ? width / height : 16 / 9;
   // Within 15% of the frame's shape: fill it (a sliver cropped); a reel or a scope render: whole, over its blur.
@@ -79,6 +81,7 @@ export function Poster({ src, sprite: spriteSrc = null, slug, width, height, fra
         />
       )}
       {scrub && hover && <div className="scrub-head" style={{ '--at': at } as CSSProperties} aria-hidden="true" />}
+      {children}
     </div>
   );
 }

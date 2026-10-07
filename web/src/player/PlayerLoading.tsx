@@ -14,6 +14,7 @@ import { NotesPanel } from './NotesPanel.tsx';
 import { PhoneTools, PhoneTransport } from './PhoneDock.tsx';
 import { deviceById } from './phone/devices.ts';
 import type { PhoneView } from './phone/view.ts';
+import { RunStripPending } from './RunStrip.tsx';
 import Timeline from './Timeline.tsx';
 import { Transport } from './Transport.tsx';
 import type { Playback } from './usePlayback.ts';
@@ -59,9 +60,11 @@ interface Props {
   phone: boolean;
   /** Height / width of the video when the library already said (tablets size the stage by it). */
   ar?: number;
+  /** The library said the video has an agent: the run strip's slot is there already (RunStrip.tsx). */
+  agent?: boolean;
 }
 
-export function PlayerLoading({ slug, phone, ar }: Props) {
+export function PlayerLoading({ slug, phone, ar, agent = false }: Props) {
   const presets = presetsFor(1920, 1080);
   // the tab you worked in last, as the loaded player will show it
   const [prefs] = usePrefs('vr.player');
@@ -130,6 +133,11 @@ export function PlayerLoading({ slug, phone, ar }: Props) {
         </div>
       )}
       <div className="stage" />
+      {phone && agent && (
+        <div className="run-slot">
+          <RunStripPending phone />
+        </div>
+      )}
       <div className="dock grain" inert>
         {phone ? (
           <PhoneTransport pb={IDLE} fps={25} N={1} />
@@ -176,6 +184,8 @@ export function PlayerLoading({ slug, phone, ar }: Props) {
         sheet={phone ? { state: 'peek', setState: noop } : undefined}
         view={prefs.panel === slug ? 'transcript' : 'notes'}
         setView={noop}
+        strip={!phone && agent ? <RunStripPending /> : null}
+        agentTab={agent ? { live: false } : null}
         transcript={NO_TRANSCRIPT}
       />
     </main>

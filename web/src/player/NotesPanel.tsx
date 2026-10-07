@@ -7,7 +7,7 @@
 
 import { Tabs } from 'radix-ui';
 import { type CSSProperties, type ReactNode, type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import type { FrameRange, PlacedComment } from '../api/types.ts';
+import type { FrameRange, PlacedComment, RunPlanItem } from '../api/types.ts';
 import { perLang, t } from '../i18n/index.ts';
 import { T } from '../i18n/T.tsx';
 import { tagLabel } from '../i18n/terms.ts';
@@ -15,6 +15,7 @@ import { useScrollEdges } from '../lib/hooks.ts';
 import { useMeasuredWindow, WINDOW_FROM } from '../lib/windowing.ts';
 import type { EmptyArtName } from '../ui/emptyArt.tsx';
 import { I } from '../ui/icons.tsx';
+import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { IconButton, Kbd, Tip } from '../ui/primitives.tsx';
 import { Skeleton, SkeletonRegion, SkLine } from '../ui/Skeleton.tsx';
 import { EmptyState } from '../ui/system.tsx';
@@ -24,12 +25,15 @@ import { groupStarts, noteAt } from './noteRows.ts';
 import { NO_FIND, type TranscriptFind, TranscriptMeta, TranscriptTools, TranscriptView, type TranscriptViewProps } from './Transcript.tsx';
 
 export type Filter = 'active' | 'questions' | 'mine' | 'closed' | 'all';
-/** The panel shows the notes, or what is said in the render (Transcript.tsx). */
-export type PanelView = 'notes' | 'transcript';
+/** The panel shows the notes, what is said in the render (Transcript.tsx), or the agent's work (AgentView.tsx). */
+export type PanelView = 'notes' | 'transcript' | 'agent';
 const VIEWS = perLang((): { id: PanelView; label: string }[] => [
   { id: 'notes', label: t('Notes') },
   { id: 'transcript', label: t('Transcript') },
+  { id: 'agent', label: t('Agent') },
 ]);
+/** A note the plan holds a line for while the runs are on their way (the brief says work goes on). */
+export const PLAN_PENDING: RunPlanItem = { id: '', state: 'todo' };
 
 /** Phones: the notes live in a bottom sheet that peeks (header only), covers half the screen, or most of it. */
 export type SheetState = 'peek' | 'half' | 'full';
@@ -113,6 +117,20 @@ interface NotesPanelProps {
   top?: ReactNode;
   view: PanelView;
   setView: (v: PanelView) => void;
+  /** The run strip (RunStrip.tsx): under the panel's head, in a slot that is there from the first paint. Phones show it
+   * above the dock instead. */
+  strip?: ReactNode;
+  /** The Agent tab, where the video has an agent; `live` while it works (the tab's hourglass turns). */
+  agentTab?: { live: boolean } | null;
+  /** The Agent view, once its code is here. */
+  agentView?: ReactNode;
+  /** The work's plan by note (its line under each note row), the agent's name, and whether open notes keep a line's
+   * room while the runs arrive. */
+  plans?: Map<string, RunPlanItem>;
+  planName?: string;
+  planPending?: boolean;
+  /** The strip offers Check fixes: the list's own call to check steps back (one place to press). */
+  verifyInStrip?: boolean;
   /** What the transcript tab needs from the player. */
   transcript: Pick<TranscriptViewProps, 'base' | 'onSeek' | 'onPlay' | 'onChangeWords' | 'onRerun' | 'edits'>;
 }
@@ -296,6 +314,10 @@ export function NotesPanel(p: NotesPanelProps) {
   }, [selected]);
   const style: CSSProperties | undefined = sheet && live !== null ? { height: live, transition: 'none' } : undefined;
   const words = p.view === 'transcript';
+  const agent = p.view === 'agent';
+  // the Agent tab, where the video has an agent; a phone's sheet shows it only while it is open (the strip above the dock
+  // is the way in there, and the sheet's head has no room for a third view beside its thumb-sized tools)
+  const agentTab = !!p.agentTab && (!sheet || agent);
   // The transcript's search and comparison stay while you switch back and forth; a first version has nothing to compare.
   const [find, setFind] = useState<TranscriptFind>(NO_FIND);
   const base = p.transcript.base;
@@ -322,20 +344,23 @@ export function NotesPanel(p: NotesPanelProps) {
         )}
         <div className="side-head">
           <div className="side-title">
-            <div className="side-views" role="tablist" aria-label={t('Notes or transcript')}>
-              {VIEWS().map((x) => (
-                <button
-                  key={x.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={p.view === x.id}
-                  className={p.view === x.id ? 'on' : ''}
-                  onClick={() => pickView(x.id)}
-                  data-testid={`panel-${x.id}`}
-                >
-                  {x.label}
-                </button>
-              ))}
+            <div className={`side-views${agentTab ? ' three' : ''}`} role="tablist" aria-label={t('Notes or transcript')}>
+              {VIEWS()
+                .filter((x) => x.id !== 'agent' || agentTab)
+                .map((x) => (
+                  <button
+                    key={x.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={p.view === x.id}
+                    className={p.view === x.id ? 'on' : ''}
+                    onClick={() => pickView(x.id)}
+                    data-testid={`panel-${x.id}`}
+                  >
+                    {x.label}
+                    {x.id === 'agent' && p.agentTab?.live && <KeyGlyph shape="ease" className="nav-kg live side-view-kg" />}
+                  </button>
+                ))}
             </div>
             {/* the notes' numbers are on the tabs below; the transcript's head says which version it heard */}
             {words && (
@@ -344,8 +369,8 @@ export function NotesPanel(p: NotesPanelProps) {
               </span>
             )}
             <span className="grow" />
-            {!words && !sheet && p.autoCheck}
-            {!words && n && n.active > 1 && (
+            {!words && !agent && !sheet && p.autoCheck}
+            {!words && !agent && n && n.active > 1 && (
               <IconButton
                 className={`btn sm ghost icon-only ${p.reviewing ? 'on' : ''}`}
                 label={p.reviewing ? t('Leave review mode') : t('Go through the open notes')}
@@ -366,13 +391,15 @@ export function NotesPanel(p: NotesPanelProps) {
                   onClick={p.onCompose}
                   disabled={!p.canCompose}
                   data-testid="new-note"
+                  aria-label={t('Note')}
                 >
-                  <I name="plus" size={14} /> {t('Note')}
+                  <I name="plus" size={14} /> <span className="new-note-word">{t('Note')}</span>
                 </button>
               </Tip>
             )}
           </div>
-          {words ? (
+          {p.strip}
+          {agent ? null : words ? (
             <TranscriptTools find={find} setFind={setFind} v={p.v} base={base} />
           ) : (
             <div className="note-filters">
@@ -430,13 +457,18 @@ export function NotesPanel(p: NotesPanelProps) {
             scroller={scroller}
           />
         )}
-        {!words && (
+        {agent && (
+          <div className="av-host" data-testid="agent-panel">
+            {p.agentView ?? <NoteRowsPending />}
+          </div>
+        )}
+        {!words && !agent && (
           <Tabs.Content value={filter} asChild>
             <div className="side-scroll" ref={scroller}>
               {!n && <NoteRowsPending />}
               {p.top}
               {p.recording}
-              {p.verifyCount > 0 && filter !== 'closed' && !p.verifying && (
+              {p.verifyCount > 0 && filter !== 'closed' && !p.verifying && !p.verifyInStrip && (
                 <div className="verify-cta">
                   <I name="fixed" size={18} />
                   <span className="grow">
@@ -469,6 +501,11 @@ export function NotesPanel(p: NotesPanelProps) {
                     onPlayRange={p.onPlayRange}
                     looping={!!p.rangeLoop && !!c.rangeHere && p.rangeLoop.in === c.rangeHere.in && p.rangeLoop.out === c.rangeHere.out}
                     checkMode={!!p.verifying}
+                    plan={
+                      p.plans?.get(c.id) ??
+                      (p.planPending && (c.status === 'open' || c.status === 'fixed') && (!c.kind || c.kind === 'feedback') ? PLAN_PENDING : undefined)
+                    }
+                    planName={p.planName}
                   />
                 )}
               />

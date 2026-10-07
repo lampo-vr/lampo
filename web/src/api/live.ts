@@ -191,6 +191,27 @@ export function bindQueryClient(qc: QueryClient) {
     'agent-runs',
     coalesced(() => inv(['agent-runs']), 1000),
   );
+  // An agent's work on a video moved (opened, a step, a render's progress, ended): that video's runs and that run's
+  // steps where they are shown, and its library entry (the card's line) — at most once a second, never the review (a
+  // step is no change to the notes) and never the whole library.
+  const runSlugs = new Set<string>();
+  const runIds = new Set<string>();
+  const runMoved = coalesced(() => {
+    const slugs = [...runSlugs];
+    const ids = [...runIds];
+    runSlugs.clear();
+    runIds.clear();
+    for (const slug of slugs) if (qc.getQueryState(['runs', slug])) inv(['runs', slug]);
+    for (const id of ids) if (qc.getQueryState(['run', id])) inv(['run', id]);
+    patchLibrary(qc, slugs).catch(() => {});
+  }, 1000);
+  on('run', (d) => {
+    const slug = slugOf(d);
+    if (!slug) return;
+    runSlugs.add(slug);
+    if (typeof d.id === 'string') runIds.add(d.id);
+    runMoved();
+  });
   // What agents are doing (server/activity.ts): only the views that show it refetch, at most once a second — a video's
   // view when its agent did something there or nowhere in particular (a wait, the library), the all-agents view always.
   const moved = new Set<string>();

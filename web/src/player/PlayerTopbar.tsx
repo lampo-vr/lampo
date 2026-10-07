@@ -4,7 +4,7 @@
 import { memo, type ReactNode, useRef } from 'react';
 import { useCan } from '../api/auth.ts';
 import { enc } from '../api/client.ts';
-import type { ReviewResponse, Version } from '../api/types.ts';
+import type { ReviewResponse, Run, Version } from '../api/types.ts';
 import { t } from '../i18n/index.ts';
 import { useLang } from '../i18n/T.tsx';
 import { InboxBell } from '../inbox/InboxBell.tsx';
@@ -13,6 +13,7 @@ import { backToLibrary, crumbs } from '../lib/nav.ts';
 import { copyText, toast, toastError } from '../lib/toast.ts';
 import { ArchivedBanner } from '../library/ArchivedBanner.tsx';
 import { downloadVersion } from '../library/downloadVersion.ts';
+import type { RunLike } from '../sessions/runWords.ts';
 import { SessionChip } from '../sessions/Sessions.tsx';
 import { StageControl, StageLine } from '../status/StageControl.tsx';
 import { I } from '../ui/icons.tsx';
@@ -47,6 +48,12 @@ interface PlayerTopbarProps {
   frameNow?: () => number;
   /** Its project is archived (lib/archived.ts): the banner stands where the next step does; `onRestore` for who may. */
   archived?: { onRestore?: () => void } | null;
+  /** The video's agent work (the version picker says who made each version), and what the strip speaks of now (the
+   * agent button's words follow it). */
+  runs?: Run[];
+  run?: RunLike | null;
+  /** The version picker's "Steps": the Agent view on that work. */
+  onSteps?: (id: string) => void;
 }
 
 export const PlayerTopbar = memo(function PlayerTopbar({
@@ -66,6 +73,9 @@ export const PlayerTopbar = memo(function PlayerTopbar({
   strip = null,
   frameNow,
   archived = null,
+  runs,
+  run = null,
+  onSteps,
 }: PlayerTopbarProps) {
   useLang(); // memo'd: renders again on a language switch by itself
   const { review, summary, slug } = data;
@@ -83,7 +93,19 @@ export const PlayerTopbar = memo(function PlayerTopbar({
       <span className="ellipsis">{review.folder ? crumbs(review.folder) : review.project}</span>
     </div>
   );
-  const versions = <VersionPicker versions={review.versions} v={v} latestV={latestV} approved={approved} onVersion={onVersion} onCompare={onCompareWith} />;
+  const versions = (
+    <VersionPicker
+      versions={review.versions}
+      v={v}
+      latestV={latestV}
+      approved={approved}
+      onVersion={onVersion}
+      onCompare={onCompareWith}
+      runs={runs}
+      coming={run}
+      onSteps={onSteps}
+    />
+  );
   const compare = (
     <Tip content={t('Compare two versions')} shortcut="B" side="bottom">
       <button type="button" className={`btn sm ghost ${abOn ? 'on' : ''}`} onClick={onToggleAb} aria-pressed={abOn} aria-label={t('Compare')}>
@@ -118,16 +140,10 @@ export const PlayerTopbar = memo(function PlayerTopbar({
       frameNow={frameNow}
       fps={review.versions.at(-1)?.fps}
       noteAt={(id) => review.comments.find((c) => c.id === id)?.timecode ?? null}
+      run={run}
     />
   ) : (
     review.session && <SessionChip session={review.session} active={summary.sessionActive} listening={summary.sessionListening} disabled />
-  );
-  const agentStatus = review.agent_status && (
-    <Tip content={`${review.agent_status.by} · ${review.agent_status.at}`} side="bottom">
-      <span className={phone ? 'agent-status' : 'agent-status hide-sm'}>
-        <span className="spinner" /> {review.agent_status.text}
-      </span>
-    </Tip>
   );
   // where the video stands, and the next step as one button (the rest behind its chevron)
   const approval = archived ? (
@@ -212,7 +228,6 @@ export const PlayerTopbar = memo(function PlayerTopbar({
             {versions}
             {compare}
             {agent}
-            {agentStatus}
             <span className="grow" />
             {approval}
           </div>
@@ -226,7 +241,6 @@ export const PlayerTopbar = memo(function PlayerTopbar({
       {versions}
       {review.missing && <span className="badge danger">{t('file missing')}</span>}
       <span className="grow" />
-      {agentStatus}
       <div className="p-tools">
         {compare}
         {agent}
