@@ -3,7 +3,7 @@
 #   docker run -p 4747:4747 -v vr-data:/data -e LAMPO_PUBLIC_URL=http://localhost:4747 lampo
 # Store, renders, cache, the speech model and footage search's model live in the /data volume. See docs/docker.md.
 
-FROM node:24-slim AS build
+FROM node:25-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 # onnxruntime-node (footage search): its install script would fetch the CUDA providers on Linux x64 (~500 MB); the model
@@ -16,7 +16,7 @@ RUN LAMPO_STYLEGUIDE=0 npm run build && npm prune --omit=dev --no-audit --no-fun
   && if [ -d "$ort" ]; then rm -rf "$ort/darwin" "$ort/win32" \
        && find "$ort/linux" -mindepth 1 -maxdepth 1 ! -name "$(node -p process.arch)" -exec rm -rf {} +; fi
 
-FROM node:24-slim
+FROM node:25-slim
 # What the image is and where its source is (OCI labels; AGPL-3.0 §13 asks a modified copy run for others to offer its
 # source, so a fork builds with --build-arg SOURCE_URL=<its repository>). REVISION: the commit it was built from,
 #   docker build --build-arg REVISION=$(git rev-parse HEAD) -t lampo .
