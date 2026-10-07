@@ -84,6 +84,12 @@ format stays backwards compatible throughout.
   command runs on the agent's own machine, never on a server ([docs/agents.md](docs/agents.md)).
 
 ### Fixed
+- The sample video takes no versions but its own: "Upload new version…" is gone from it, an upload aimed at it is
+  refused, and a file named like it becomes a video of its own. Your renders always count as your workspace's, and
+  "Remove the sample" can't take one of them with it: a sample that holds one stays.
+- **Safe zones look the same for every app.** Instagram Reels drew its top bar, icons and caption as dashed boxes
+  while TikTok, Shorts and Stories used red stripes for the same thing; now every app's interface is red stripes
+  (keep text and logos out), and dashed lines are only margins such as title and action safe.
 - **Project files' trash and older versions are bounded on every server.** What the trash and replaced versions keep is
   held to its share of the plan, and to what the workspace's files count when no plan says; past it the oldest goes at
   once. Files uploaded and not yet committed count toward the plan until they are. Bringing a file back from the trash
