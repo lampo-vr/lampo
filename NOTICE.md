@@ -41,7 +41,7 @@ On macOS the text checks use the system's Vision framework and NSSpellChecker in
 Installed with `npm install` (and kept in the Docker image), each with its license file in `node_modules`:
 
 - **Express** (MIT), **zod** (MIT), **tus-node-server** and **tus-js-client** (MIT), **qrcode** (MIT), the
-  **Model Context Protocol SDK** and **MCP Apps** packages (MIT)
+  **Model Context Protocol SDK** packages (Apache-2.0, MIT for earlier contributions) and **MCP Apps** (MIT)
 - **resvg-js** (MPL-2.0) — https://github.com/yisibl/resvg-js. Used unmodified as a library; MPL-2.0 §3.3 allows
   distributing it as part of a larger work under the AGPL. Its source is available from the link above.
 
