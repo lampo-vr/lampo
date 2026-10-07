@@ -22,6 +22,7 @@ import { isOperator } from '../../lib/operator.ts';
 import { WORKSPACE_ID } from '../../lib/paths.ts';
 import { inWorkspace } from '../../lib/scope.ts';
 import * as store from '../../lib/store.ts';
+import { compareTime } from '../../lib/time.ts';
 import type {
   OperatorAccount,
   OperatorAccounts,
@@ -99,6 +100,15 @@ export function operatorOf(ctx: Pick<ServerContext, 'hosted' | 'cfg'>, req: Requ
 
 const ROLE_ORDER: Record<Role, number> = { owner: 0, admin: 1, member: 2, reviewer: 3 };
 const person = (u: auth.User): OperatorPerson => ({ id: u.id, name: u.name, email: u.email });
+
+/**
+ * Nothing recorded of an account made after the server began to keep when each was last active: it never signed in.
+ * One made before may have, unrecorded (its page says so).
+ */
+function neverSignedIn(u: auth.User): boolean {
+  const since = auth.seenSince();
+  return !u.seen && !u.signed_in && !!since && compareTime(u.created, since) >= 0;
+}
 
 /** A workspace's first owner who can still act (not disabled there or everywhere). */
 function ownerOf(w: StoredWorkspace): OperatorPerson | null {
@@ -190,6 +200,8 @@ export function operatorRoutes(ctx: ServerContext): Router {
     ...person(u),
     created: u.created,
     signedIn: u.signed_in ?? null,
+    lastActive: auth.lastActive(u),
+    ...(neverSignedIn(u) ? { neverSignedIn: true } : {}),
     disabled: u.disabled ?? null,
     ...(u.unverified ? { unverified: true } : {}),
     workspaces: workspaces.workspacesOf(u.id, { suspended: true }).map(({ workspace, role }) => {

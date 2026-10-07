@@ -1,7 +1,7 @@
 // Every account on the server (#/operator/accounts) and one opened (#/operator/accounts/<id>). The list: name and
-// email, the workspaces and roles, when it was made, its last sign-in and whether it is disabled — searched by name or
-// email. An account: its facts, its workspaces, and Disable (signed out everywhere, its tokens and apps stopped at once;
-// nothing deleted) or Enable. Never one's own, never a password, a token or anything the person made.
+// email, the workspaces and roles, when it was made, when it was last active and whether it is disabled — searched by
+// name or email. An account: its facts, its workspaces, and Disable (signed out everywhere, its tokens and apps stopped
+// at once; nothing deleted) or Enable. Never one's own, never a password, a token or anything the person made.
 import { useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import type { OperatorAccount, OperatorAccounts } from '../../../lib/types.ts';
@@ -21,13 +21,17 @@ import { Button, EmptyState } from '../ui/system.tsx';
 import { opKeys, refused, useAccess, useOpAccount, useOpAccounts } from './api.ts';
 import { Crumb, day, dayTime, Gone, SearchField, shortDay, since } from './parts.tsx';
 
-type Sort = 'signin' | 'created';
+type Sort = 'active' | 'created';
 type Group = 'all' | 'active' | 'disabled';
 
 /** What the list was showing, kept while an account is open: back is where you were. */
-const view: { q: string; group: Group; sort: Sort } = { q: '', group: 'all', sort: 'signin' };
+const view: { q: string; group: Group; sort: Sort } = { q: '', group: 'all', sort: 'active' };
 
 const time = (iso: string | null) => (iso ? Date.parse(iso) || 0 : 0);
+/** When it was last active, for the order: your own account now (you are using it). */
+const activeAt = (a: OperatorAccount) => (a.you ? Date.now() : time(a.lastActive));
+/** For nothing recorded: "never" for an account that never signed in, else "not recorded" (one from before it was kept). */
+const noActivity = (a: OperatorAccount): string => (a.neverSignedIn ? t('never') : t('not recorded'));
 
 function matches(a: OperatorAccount, q: string): boolean {
   if (!q) return true;
@@ -68,7 +72,7 @@ function Head() {
       <span className="op-c-main">{t('Account')}</span>
       <span className="op-c-spaces">{t('Workspaces')}</span>
       <span className="op-c-created op-num">{t('Created')}</span>
-      <span className="op-c-active op-num">{t('Last sign-in')}</span>
+      <span className="op-c-active op-num">{t('Last active')}</span>
     </div>
   );
 }
@@ -93,9 +97,9 @@ function Row({ a }: { a: OperatorAccount }) {
         <span className="sr-only">{t('Created')}: </span>
         {shortDay(a.created)}
       </span>
-      <span className="op-c-active op-num" title={a.signedIn ? dayTime(a.signedIn) : undefined}>
-        <span className="sr-only">{t('Last sign-in')}: </span>
-        {since(a.signedIn, t('not recorded'))}
+      <span className="op-c-active op-num" title={!a.you && a.lastActive ? dayTime(a.lastActive) : undefined} data-testid="op-acc-active">
+        <span className="sr-only">{t('Last active')}: </span>
+        {a.you ? t('now') : since(a.lastActive, noActivity(a))}
       </span>
     </a>
   );
@@ -155,7 +159,7 @@ export function AccountsPage() {
   const term = search.trim();
   const shown = all
     .filter((a) => matches(a, term) && (group === 'all' || (group === 'disabled') === !!a.disabled))
-    .sort((a, b) => (sort === 'signin' ? time(b.signedIn) - time(a.signedIn) : 0) || time(b.created) - time(a.created) || a.name.localeCompare(b.name));
+    .sort((a, b) => (sort === 'active' ? activeAt(b) - activeAt(a) : 0) || time(b.created) - time(a.created) || a.name.localeCompare(b.name));
   return (
     <>
       <header className="set-head">
@@ -191,7 +195,7 @@ export function AccountsPage() {
           value={sort}
           onChange={(s) => s && setSort(s as Sort)}
           options={[
-            { value: 'signin', label: t('Last sign-in') },
+            { value: 'active', label: t('Last active') },
             { value: 'created', label: t('Newest') },
           ]}
         />
@@ -262,6 +266,18 @@ export function AccountsPage() {
 }
 
 // ---------------------------------------------------------------- one account
+
+/** When it was last active, as its facts say it: "now" for your own, else how long ago and when. */
+function activeFact(a: OperatorAccount): string {
+  if (a.you) return t('now');
+  return a.lastActive ? `${since(a.lastActive)} · ${dayTime(a.lastActive)}` : noActivity(a);
+}
+
+/** Its last sign-in: how long ago and when; "never", or none recorded yet (an account from before it was kept). */
+function signInFact(a: OperatorAccount): string {
+  if (a.signedIn) return `${since(a.signedIn)} · ${dayTime(a.signedIn)}`;
+  return a.neverSignedIn ? t('never') : t('none recorded yet');
+}
 
 /** Disable or Enable: what each ends or gives back, said before it happens. */
 function AccessCard({ a }: { a: OperatorAccount }) {
@@ -390,10 +406,8 @@ export function AccountPage({ id }: { id: string }) {
                   value: a ? `${a.email} · ${a.unverified ? t('waiting for its confirmation link') : t('confirmed')}` : <SkLine w="14em" />,
                 },
                 { label: t('Created'), value: a ? dayTime(a.created) : <SkLine w="10em" /> },
-                {
-                  label: t('Last sign-in'),
-                  value: a ? a.signedIn ? `${since(a.signedIn)} · ${dayTime(a.signedIn)}` : t('none recorded yet') : <SkLine w="10em" />,
-                },
+                { label: t('Last active'), value: a ? activeFact(a) : <SkLine w="10em" /> },
+                { label: t('Last sign-in'), value: a ? signInFact(a) : <SkLine w="10em" /> },
                 { label: t('State'), value: a ? a.disabled ? t('disabled since {day}', { day: day(a.disabled) }) : t('active') : <SkLine w="5em" /> },
                 { label: t('Account id'), value: id, mono: true },
               ]}

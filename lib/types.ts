@@ -3611,8 +3611,15 @@ export interface OperatorWorkspaceDetail {
 /** One account in the operator's list. */
 export interface OperatorAccount extends OperatorPerson {
   created: string;
-  /** Its last sign-in (null: none recorded since the server began to keep it). */
+  /** Its last sign-in (null: none recorded since the server began to keep it). `lastActive` says more. */
   signedIn: string | null;
+  /**
+   * When it was last active: the later of its last sign-in and its last use of the app through a session (kept at most
+   * hourly). Null: neither recorded.
+   */
+  lastActive: string | null;
+  /** Neither recorded, and it was made after the server began to keep both: it never signed in. */
+  neverSignedIn?: true;
   /** When it was disabled (null: it is active). */
   disabled: string | null;
   /** A sign-up whose address isn't confirmed yet. */

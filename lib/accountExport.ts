@@ -56,7 +56,7 @@ function noteOf(c: Comment, mine: (byId?: string) => boolean) {
 
 const README = `Your data from Lampo
 
-profile.json         your account: name, address, when it was made, your settings
+profile.json         your account: name, address, when it was made and last used, your settings
 avatar.jpg           your profile picture (when you have one)
 workspaces.json      the workspaces you work in and your role in each
 access.json          your API tokens (names and dates, never the tokens), connected apps and devices
@@ -86,6 +86,7 @@ export async function accountExport(userId: string): Promise<ExportFile[]> {
       ...(u.pending_email ? { pending_email: u.pending_email } : {}),
       created: u.created,
       ...(u.signed_in ? { last_sign_in: u.signed_in } : {}),
+      ...(u.seen ? { last_active: u.seen } : {}),
       ...(u.unverified ? { unverified_since: u.unverified } : {}),
       ...(u.signup ? { signed_up: u.signup } : {}),
       ...(u.disabled ? { disabled: u.disabled } : {}),

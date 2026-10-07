@@ -1,13 +1,16 @@
 // The operator's admin (server/routes/operator.ts, lib/operator.ts): every workspace with its owner, members, videos,
 // storage and last activity, and its plan when a billing module runs (set by hand: complimentary, a trial's date, back
-// to normal — logged with who, when, what and why); every account with its workspaces and roles, its last sign-in, and
+// to normal — logged with who, when, what and why); every account with its workspaces and roles, when it was last active
+// (its last sign-in, or its session in use: stamped at most hourly, never by a review link or an API token), and
 // Disable / Enable, which end and give back access. Only the server's operator gets an answer: LAMPO_OPERATOR when set,
 // else the owners of the first workspace. An admin or member there, another workspace's owner, an API token, the app on
 // a person's own machine and a stranger are all answered as if there were no such page — the same for ids that exist
 // and ids that don't. No answer carries a password hash or a token.
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
+import type { User } from '../../lib/auth.ts';
 import type { OperatorAccount, OperatorAccounts, OperatorWorkspace, OperatorWorkspaceDetail, OperatorWorkspaces, PlanLogEntry } from '../../lib/types.ts';
 import type { CloudModule } from '../../server/extension.ts';
 import { startApp } from '../lib/app.ts';
@@ -23,6 +26,7 @@ const { operatorList, OPERATORS_MAX } = await import('../../lib/config.ts');
 const { isOperator, unknownOperators } = await import('../../lib/operator.ts');
 const { readEvents } = await import('../../lib/store.ts');
 const { inWorkspace } = await import('../../lib/scope.ts');
+const shares = await import('../../lib/shares.ts');
 
 const { ctx, request } = await startApp({ headers: { Host: 'review.test' } });
 const PASSWORD = 'a long password';
@@ -154,6 +158,75 @@ test('last sign-in: a new session, and `vr login` making a token', async () => {
   const me = await request('GET', '/api/auth/me', as(await signIn('mia@example.com')));
   assert.equal(me.status, 200, me.text);
   assert.doesNotMatch(me.text, /signed_in/);
+});
+
+test('last active: a request through the session stamps `seen`, once an hour; a review link and an API token never; only the operator reads it', async () => {
+  const fileKey = () => {
+    const st = fs.statSync(auth.USERS_FILE);
+    return `${st.ino}:${st.size}:${st.mtimeMs}`;
+  };
+  const listed = async (id: string) =>
+    ((await request('GET', '/api/operator/accounts', as(ops))).json() as OperatorAccounts).accounts.find((a) => a.id === id) as OperatorAccount;
+  // the operator's own requests began it (the first `seen`), so an account made after it that never signed in: "never"
+  assert.ok((await listed(olivia.id)).lastActive);
+  assert.ok(auth.seenSince());
+  const kim = await auth.createUser({ email: 'kim@example.com', name: 'Kim Reed', password: PASSWORD, role: 'member' });
+  ws.addMember(B, kim.id, 'member');
+  const fresh = await listed(kim.id);
+  assert.deepEqual([fresh.lastActive, fresh.signedIn, fresh.neverSignedIn], [null, null, true]);
+  // an account from before it was kept, with nothing recorded, is no "never": it may have signed in unrecorded
+  const old = await auth.createUser({ email: 'old@example.com', name: 'Old Timer', password: PASSWORD, role: 'member' });
+  const raw = JSON.parse(fs.readFileSync(auth.USERS_FILE, 'utf8'));
+  raw.users.find((u: { id: string }) => u.id === old.id).created = '2026-01-05T09:00:00+00:00';
+  fs.writeFileSync(auth.USERS_FILE, JSON.stringify(raw, null, 2));
+  const before = await listed(old.id);
+  assert.deepEqual([before.lastActive, before.neverSignedIn], [null, undefined]);
+
+  // an agent at work with the person's API token: no stamp
+  const token = { headers: { Authorization: `Bearer ${auth.createToken(kim.id, 'agent', { workspace: B }).token}` } };
+  assert.equal((await request('GET', '/api/library', token)).status, 200);
+  assert.equal(auth.getUser(kim.id)?.seen, undefined, 'an API token stamps nothing');
+  // signing in stamps signed_in (the request that signs in carries no session yet)
+  const kimC = await signIn('kim@example.com');
+  assert.equal(auth.getUser(kim.id)?.seen, undefined);
+  assert.ok(auth.getUser(kim.id)?.signed_in);
+  // the person opening a review link of their own workspace, session cookie and all: no stamp either
+  const link = inWorkspace(B, () => shares.createShare({ folder: 'Spots' }, { label: 'Client' }));
+  const guest = await request('GET', `/api/g/${link.token}`, as(kimC));
+  assert.equal(guest.status, 200, guest.text);
+  // a visit asks who is visiting (the team's own aren't counted): still no stamp
+  const visit = await request('POST', `/api/g/${link.token}/visit`, { body: { name: 'Kim' }, ...as(kimC) });
+  assert.equal(visit.status, 200, visit.text);
+  assert.equal(auth.getUser(kim.id)?.seen, undefined, 'a review link stamps nothing');
+
+  // the first request through the session stamps it; another within the hour writes nothing
+  assert.equal((await request('GET', '/api/auth/me', as(kimC))).status, 200);
+  const seen = auth.getUser(kim.id)?.seen;
+  assert.ok(seen && Math.abs(Date.parse(seen) - Date.now()) < 60_000, seen);
+  const written = fileKey();
+  const me = await request('GET', '/api/auth/me', as(kimC));
+  assert.equal(me.status, 200);
+  assert.equal(fileKey(), written, 'users.json not written again within the hour');
+  assert.equal(auth.getUser(kim.id)?.seen, seen);
+  // an hour on, the next one writes again
+  assert.equal(auth.noteSeen(kim.id, Date.now() + auth.SEEN_EVERY.ms + 1000), true);
+  assert.notEqual(auth.getUser(kim.id)?.seen, seen);
+
+  // the operator's answer: the later of the two, `signedIn` as before; nothing of it leaves anywhere else
+  const now = await listed(kim.id);
+  assert.equal(now.lastActive, auth.lastActive(auth.getUser(kim.id) as User));
+  assert.equal(now.lastActive, auth.getUser(kim.id)?.seen, 'the later one');
+  assert.equal(now.signedIn, auth.getUser(kim.id)?.signed_in);
+  assert.equal(now.neverSignedIn, undefined);
+  assert.equal(auth.lastActive({ seen: '2026-10-01T10:00:00+02:00', signed_in: '2026-10-01T09:30:00Z' }), '2026-10-01T09:30:00Z', 'times, not text');
+  assert.equal(auth.lastActive({}), null);
+  assert.equal('seen' in auth.publicUser(auth.getUser(kim.id) as User), false, 'publicUser leaves it out');
+  assert.equal('signed_in' in auth.publicUser(auth.getUser(kim.id) as User), false);
+  assert.equal(me.json().user?.seen, undefined, 'the account’s own answer leaves it out');
+  const members = await request('GET', '/api/admin/users', as(leeC));
+  assert.equal(members.status, 200, members.text);
+  assert.match(members.text, /kim@example\.com/);
+  assert.doesNotMatch(members.text, /"seen"|signed_in/, 'and the workspace’s people list');
 });
 
 test('nobody else: an admin and a member of #1, another workspace’s owner, a token, signed out — the same for ids that exist and those that don’t', async () => {

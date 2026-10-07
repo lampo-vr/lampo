@@ -2595,6 +2595,7 @@ export const EN = [
   'Notifications need a secure connection',
   'Notifications need the app on your Home Screen',
   'Notifications were not allowed on this device.',
+  'now',
   'Now',
   'Now · V{after}',
   'Now · V{v}',

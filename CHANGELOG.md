@@ -84,6 +84,8 @@ format stays backwards compatible throughout.
   command runs on the agent's own machine, never on a server ([docs/agents.md](docs/agents.md)).
 
 ### Fixed
+- The operator's Accounts page shows when each person was last active, not only their last sign-in, which accounts
+  signed in before it was recorded never had.
 - The app no longer opens on a blank page when the browser can't keep a copy of its code (its storage full or busy, a
   private window): what arrived from the server is used either way, and the copy is kept when it can be.
 - Setting up a server from a phone: the command that creates the owner (and the one that sets a new password) breaks

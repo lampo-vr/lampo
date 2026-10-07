@@ -425,8 +425,10 @@ Whoever runs a hosted server has three pages nobody else sees, behind **Operator
   change — who, when, what, why — and the page shows it. A workspace that pays keeps its subscription (end it first),
   and the server's own workspace, or one the module's own settings make complimentary (Lampo Cloud's:
   `LAMPO_COMPLIMENTARY`), is changed in those settings. Without a module the pages list the workspaces without plans.
-- **Accounts** (`#/operator/accounts`): every account with its workspaces and roles, when it was made, its last sign-in
-  and whether it is disabled; searched by name or email. **Disable** signs the account out everywhere and stops its API
+- **Accounts** (`#/operator/accounts`): every account with its workspaces and roles, when it was made, when it was last
+  active and whether it is disabled; searched by name or email. Last active is its last sign-in or its last use of the
+  app in a browser, whichever came later (kept at most once an hour; never by a review link or an API token): "now" for
+  your own, "never" for an account that never signed in, "not recorded" for one from before the server kept it. **Disable** signs the account out everywhere and stops its API
   tokens and connected apps at once, in every workspace; its notes and memberships stay. **Enable** lets it sign in
   again. Never one's own.
 - **Suspend or delete** (a workspace's page, never the server's own): **Suspend…** asks for a reason (kept on the page,

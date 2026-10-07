@@ -270,6 +270,22 @@ export function createIdentify({ machine, lanToken = null, peerUid = loopbackPee
   };
 }
 
+/**
+ * A person's session in use: when they were last active, for the operator's accounts page (lib/auth.ts noteSeen, at
+ * most once an hour). The guard calls it for a request it let in; it identifies nobody on a review link's paths, so a
+ * visitor (and a team member opening their own link) stamps nothing. An API token is an agent at work, and the machine's
+ * owner at the machine or by the LAN link has no session: none of them stamps it. A stamp that can't be written never
+ * fails the request.
+ */
+export function noteActive(a: Auth | undefined): void {
+  if (a?.via !== 'cookie' || !a.user) return;
+  try {
+    auth.noteSeen(a.user.id);
+  } catch (e) {
+    console.error(`accounts: when ${a.user.id} was last active wasn’t written (${(e as Error).message})`);
+  }
+}
+
 /** A hosted server's identify (tests and tools that only know tokens and cookies). */
 export const identify: Identify = createIdentify({ machine: false });
 

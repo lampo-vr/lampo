@@ -8,7 +8,7 @@ import os from 'node:os';
 import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
 import { THEME_BOOT } from '../lib/themeBoot.ts';
-import { type Identify, LAN_COOKIE, sameToken, sessionUpdates } from './auth.ts';
+import { type Identify, LAN_COOKIE, noteActive, sameToken, sessionUpdates } from './auth.ts';
 import type { ContentSources } from './extension.ts';
 import { EMBED_PAGE, GUEST_PATH, LanQuery, queryOr } from './http.ts';
 
@@ -310,6 +310,10 @@ export function createGuard(opts: GuardOptions) {
     if (SAME_ORIGIN_ONLY.test(req.path)) res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
     const why = refusal(req, res);
     if (why) res.status(why[0]).json({ error: why[1] });
-    else next();
+    else {
+      // a person's session let in: when they were last active (at most hourly; never on a review link's paths)
+      noteActive(req.auth);
+      next();
+    }
   };
 }

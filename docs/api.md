@@ -163,7 +163,7 @@ input is read, `403` for an API token. Every answer is `no-store`.
 | `POST /api/operator/workspaces/:id/suspend` · `…/unsuspend` | `{reason}` (one line of up to 300) to suspend, `{}` to lift it; answers the detail. A suspended workspace is read-only for its people (below), and they are emailed both times. The server's own workspace: `409` |
 | `GET /api/operator/workspaces/:id/deletion` | `WorkspaceDeletionPlan`: what deleting it would take (members and how many accounts go with it, videos, bytes, review links, invites, tokens, apps), or `refused` for the server's own workspace |
 | `POST /api/operator/workspaces/:id/delete` | `{name, reason}`: `name` typed as the workspace is called (else `400 {name: true}`); deletes it with everything it holds and emails its people → `{deleted: {id, name}, plan, accountsGone}`. The server's own workspace: `409` |
-| `GET /api/operator/accounts` | `OperatorAccounts`: every account's id, name, email, created, `signedIn`, `disabled`, `unverified`, workspaces and roles, `operator`, `you` |
+| `GET /api/operator/accounts` | `OperatorAccounts`: every account's id, name, email, created, `signedIn` (its last sign-in), `lastActive` (the later of that and its last request through a session, kept at most hourly; `null`: neither recorded), `neverSignedIn` (neither recorded, and made after the server began to keep them), `disabled`, `unverified`, workspaces and roles, `operator`, `you` |
 | `GET /api/operator/accounts/:id` | `{account}` |
 | `POST /api/operator/accounts/:id/disable`, `…/enable` | `{}`; disabling ends its sessions, tokens and apps at once (never one's own: `409`); answers `{account}` |
 

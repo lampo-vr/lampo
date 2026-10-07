@@ -696,7 +696,8 @@ its own writes as `agent`.
 ## Accounts
 
 `users.json` (0600) holds the accounts, the API tokens (`tokens`, each kept as its SHA-256) and the sessions signed
-out on one device, until they would have ended anyway (`revoked`). An account is `PublicUser` in `lib/types.ts`, plus
+out on one device, until they would have ended anyway (`revoked`), and since when accounts' `seen` is kept
+(`seen_since`, the first one written). An account is `PublicUser` in `lib/types.ts`, plus
 its password (an scrypt hash) and `epoch` (raised to end every session at once):
 
 | Field | |
@@ -711,6 +712,8 @@ its password (an scrypt hash) and `epoch` (raised to end every session at once):
 | `unverified` | since when its address waits to be confirmed by an emailed link (optional; absent: confirmed, or vouched for by whoever made the account) |
 | `signup` | when the person signed up on their own (optional); until the address is confirmed, such an account can do nothing |
 | `pending_email` | a new address waiting for its emailed link (optional); the account keeps signing in with `email` until then |
+| `signed_in` | when it last signed in: a new session, or `vr login` making a token (optional) |
+| `seen` | when the person last used the app through a session, written at most once an hour; never by a review link or an API token (optional). With `signed_in` it is the operator's "last active"; neither leaves the server but in the operator's pages and the person's own data export |
 
 - `account-links.json` (0600) keeps the emailed one-time links, `vt_…` to confirm an address (24 hours) and `rt_…`
   for a new password (60 minutes): each token's SHA-256, the account and the address it went to, never the token. A

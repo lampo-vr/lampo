@@ -3,8 +3,9 @@
 // failed payment and after a trial, read-only, complimentary by hand, a trial run to a day by hand, one where nothing
 // happened yet — with long names and long addresses where real ones get long, members, videos and storage of real size
 // (review.json records only: no footage is needed to count them) and their last activity; ~30 accounts with roles in
-// one or several, one disabled, one sign-up waiting for its link, one in no workspace; and the billing stand-in's
-// state for each (test/e2e/lib/billingModule.ts reads FAKE_BILLING_FILE). Everything here is invented.
+// one or several, one disabled, one sign-up waiting for its link, one in no workspace, and when each was last active (a
+// sign-in, a session in use, both, neither: from before they were kept, or never signed in); and the billing
+// stand-in's state for each (test/e2e/lib/billingModule.ts reads FAKE_BILLING_FILE). Everything here is invented.
 //
 //   VR_MODE=server VR_DATA=… VR_CACHE=… VR_CONFIG=… FAKE_BILLING_FILE=… node test/e2e/lib/operatorStore.ts
 //
@@ -289,7 +290,8 @@ await auth.signUp({ email: 'wren@pending-signup.test', name: 'Wren Calloway', pa
 const left = await person('Orla Byrne', 'orla@formerly.test');
 if (ws.roleIn(W1, left)) ws.removeMember(W1, left);
 
-// when things were made and last signed in to, spread over the weeks (the registry and the accounts file as written)
+// when things were made, last signed in to and last used, spread over the weeks (the registry and the accounts file as
+// written)
 const wsFile = path.join(DATA, 'workspaces.json');
 const reg = JSON.parse(fs.readFileSync(wsFile, 'utf8'));
 for (const w of reg.workspaces) {
@@ -299,14 +301,36 @@ for (const w of reg.workspaces) {
 fs.writeFileSync(wsFile, `${JSON.stringify(reg, null, 2)}\n`);
 const usersFile = auth.USERS_FILE;
 const users = JSON.parse(fs.readFileSync(usersFile, 'utf8'));
-users.users.forEach((u: { email: string; created: string; signed_in?: string }, i: number) => {
+interface Stamped {
+  email: string;
+  created: string;
+  signed_in?: string;
+  seen?: string;
+}
+users.users.forEach((u: Stamped, i: number) => {
   u.created = iso(NOW - Math.max(4, 300 - i * 7) * D);
   if (u.email === 'wren@pending-signup.test') {
     u.created = iso(NOW - 2 * H);
     return;
   }
   if (u.email === 'olivia@lampo.test' || u.email === 'noor@lampo.test' || i % 5 !== 4) u.signed_in = iso(NOW - ((i * 7) % 90) * H - 600_000);
+  // a session kept for weeks: in use minutes ago, signed in long before
+  if (u.signed_in && i % 3 === 0) u.seen = iso(NOW - (((i * 11) % 50) + 2) * 60_000);
 });
+// the server began to keep `seen` two months ago: an account made since with neither stamp never signed in
+users.seen_since = iso(NOW - 60 * D);
+const stamped = (email: string, set: Partial<Stamped>) => {
+  const u = users.users.find((x: Stamped) => x.email === email) as Stamped;
+  delete u.signed_in;
+  delete u.seen;
+  Object.assign(u, set);
+};
+// signed in before sign-ins were kept, and in the app three hours ago (the operator's page once read "not recorded")
+stamped('priya@kestrel.test', { seen: iso(NOW - 3 * H) });
+// from before anything was kept, and not back since
+stamped('kenji@brightwater-social.test', { created: iso(NOW - 200 * D) });
+// made since, never signed in
+stamped('orla@formerly.test', { created: iso(NOW - 10 * D) });
 fs.writeFileSync(usersFile, `${JSON.stringify(users, null, 2)}\n`);
 fs.chmodSync(usersFile, 0o600);
 

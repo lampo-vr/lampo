@@ -8,8 +8,9 @@
 // frame even for a moment; they read that there is no such page. The list searches by name or owner, filters by where a
 // plan stands, orders by last activity or by when it was made; a workspace opened shows its facts and members, and its
 // plan is set by hand (complimentary, the trial to a day, back to normal billing) with a reason that lands in its log.
-// The accounts list shows workspaces and roles, last sign-ins, the disabled; an account is disabled (its session ends at
-// once) and enabled again. Loading states hold the real layout. Every screen fits 390–1920 in both themes; German too.
+// The accounts list shows workspaces and roles, when each was last active (the operator's own row "now", a session in use
+// though no sign-in was recorded, "never" told from "not recorded"), the disabled; an account is disabled (its session
+// ends at once) and enabled again. Loading states hold the real layout. Every screen fits 390–1920 in both themes; German too.
 // Screenshots go to VR_SHOTS.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -74,6 +75,15 @@ try {
       location.hash = h;
     }, hash);
   };
+  /** Each account row's name and its "Last active" as shown (the screen reader's label left out). */
+  const activeColumn = () =>
+    page.$$eval('[data-testid=op-acc-row]', (els) =>
+      els.map((e) => {
+        const cell = e.querySelector('[data-testid=op-acc-active]').cloneNode(true);
+        cell.querySelector('.sr-only')?.remove();
+        return [e.querySelector('.op-c-main b').textContent.trim(), cell.textContent.trim()];
+      }),
+    );
   const rows = (kind = 'ws') => page.$$eval(`[data-testid=op-${kind}-row]`, (els) => els.map((e) => e.querySelector('.op-c-main b').textContent.trim()));
   const clickText = (sel, words) =>
     page.evaluate(
@@ -281,7 +291,7 @@ try {
   });
 
   let mia = '';
-  await check('accounts: workspaces and roles, last sign-in, disabled, waiting, in none — searched; one opened', async () => {
+  await check('accounts: workspaces and roles, last active, disabled, waiting, in none — searched; one opened', async () => {
     await go('#/operator/accounts');
     await page.waitForSelector('[data-testid=op-acc-row]', { timeout: 15000 });
     // each row as its name and what follows it (the avatar's initials left out)
@@ -302,6 +312,18 @@ try {
     assert(/UNCONFIRMED/.test(row('Wren Calloway')), row('Wren Calloway'));
     assert(/in no workspace/.test(row('Orla Byrne')), row('Orla Byrne'));
     assert(/Kestrel Motion ?· Member ?\+ 1 more/.test(row('Mia Stone')), row('Mia Stone'));
+    // when each was last active, newest first: the operator's own row now; a session in use counts though no sign-in was
+    // recorded; an account that never signed in is told from one from before anything was kept
+    assert((await text('.op-acc.op-head .op-c-active')) === 'Last active', await text('.op-acc.op-head .op-c-active'));
+    assert((await texts('.op-sort button')).join() === 'Last active,Newest', (await texts('.op-sort button')).join());
+    const active = await activeColumn();
+    const when = (name) => active.find(([n]) => n === name)?.[1];
+    assert(active[0]?.[0] === 'Noor Haddad' && when('Noor Haddad') === 'now', JSON.stringify(active.slice(0, 3)));
+    assert(when('Priya Raman') === '3 h ago', when('Priya Raman'));
+    assert(when('Kenji Sato') === 'not recorded', when('Kenji Sato'));
+    assert(when('Orla Byrne') === 'never' && when('Wren Calloway') === 'never', `${when('Orla Byrne')} · ${when('Wren Calloway')}`);
+    const times = active.map(([, w]) => w);
+    assert(times.filter((w) => /min ago|just now/.test(w)).length >= 3, times.join(' | '));
     await clickText('.op-chips .seg button', 'Disabled');
     await page.waitForFunction(() => document.querySelectorAll('[data-testid=op-acc-row]').length === 1);
     await clickText('.op-chips .seg button', 'All');
@@ -311,6 +333,8 @@ try {
     await page.waitForSelector('[data-testid=op-account]');
     await page.waitForSelector('[data-testid=op-acc-ws]');
     assert((await text('[data-testid=op-account] h1')).endsWith('Mia Stone'));
+    const facts = await text('[data-testid=op-facts]');
+    assert(/Last active ?not recorded/.test(facts) && /Last sign-in ?none recorded yet/.test(facts), facts);
     const spaces = await texts('[data-testid=op-acc-ws]');
     assert(spaces.length === 2 && spaces.some((s) => /Ferngrove.*REVIEWER/.test(s)), spaces.join(' | '));
     mia = await page.evaluate(() => location.hash.split('/').pop());
@@ -338,6 +362,8 @@ try {
     await page.waitForSelector('[data-testid=op-access]');
     assert(!(await page.$('[data-testid=op-disable]')), 'no Disable on one’s own account');
     assert(/your own account/.test(await text('[data-testid=op-access]')));
+    const own = await text('[data-testid=op-facts]');
+    assert(/Last active ?now/.test(own) && /Last sign-in ?(just now|\d+ min ago)/.test(own), own);
   });
 
   await check('loading states hold the real layout: the toolbar, the columns and rows in place before the list arrives', async () => {
@@ -418,6 +444,11 @@ try {
     assert(/Jeder Workspace auf diesem Server/.test(await text('.set-head p')), await text('.set-head p'));
     assert((await texts('[data-testid^=op-tab-]')).join() === 'Funnel,Workspaces,Konten');
     assert((await texts('.op-chips .seg button')).some((c) => c.startsWith('Kostenlos gestellt')));
+    await fresh('#/operator/accounts');
+    await page.waitForSelector('[data-testid=op-acc-row]');
+    assert((await text('.op-acc.op-head .op-c-active')) === 'Zuletzt aktiv', await text('.op-acc.op-head .op-c-active'));
+    const de = await activeColumn();
+    assert(de[0]?.[1] === 'jetzt' && de.some(([n, w]) => n === 'Orla Byrne' && w === 'nie'), JSON.stringify(de.slice(0, 2)));
     await page.evaluate(() => localStorage.removeItem('vr.lang'));
   });
 

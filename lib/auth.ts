@@ -15,6 +15,7 @@ import { cleanDisplayName, cutChars, looksReserved, nameSkeleton } from './names
 import { startOnboarding } from './onboarding.ts';
 import { DATA, isoLocal } from './paths.ts';
 import { can } from './permissions.ts';
+import { Recent } from './rateLimit.ts';
 import { isSignupPlan } from './setupFlow.ts';
 import { deepFreeze, withLock, writeAtomic } from './store.ts';
 import { compareTime } from './time.ts';
@@ -47,6 +48,12 @@ export interface User extends PublicUser {
   outside_w1?: true;
   /** When the account last signed in (a new session, or `vr login` making a token): the server's operator reads it. */
   signed_in?: string;
+  /**
+   * When the person last used the app through their session (a request with its cookie; written at most once an hour,
+   * noteSeen). With `signed_in` it is the operator's "last active": a session made before `signed_in` was kept, or one
+   * kept for weeks, never signs in again. Only the operator's answers and the person's own export carry it.
+   */
+  seen?: string;
 }
 
 /**
@@ -71,6 +78,11 @@ interface UsersFile {
   tokens: ApiToken[];
   /** Sessions signed out on one device (the cookie is stateless, so the server remembers which ones ended). */
   revoked?: RevokedSession[];
+  /**
+   * When the server began to keep `seen` (its first one): an account made since then with neither stamp never signed
+   * in, while one made before may have, unrecorded.
+   */
+  seen_since?: string;
 }
 
 export const USERS_FILE = path.join(DATA, 'users.json');
@@ -84,7 +96,7 @@ const b64 = (b: Buffer) => b.toString('base64url');
 const sha256 = (s: string) => crypto.createHash('sha256').update(s).digest('hex');
 
 export function publicUser(u: User): PublicUser {
-  const { password: _p, epoch: _e, signup_browser: _b, proven: _v, outside_w1: _o, signed_in: _i, ...rest } = u;
+  const { password: _p, epoch: _e, signup_browser: _b, proven: _v, outside_w1: _o, signed_in: _i, seen: _s, ...rest } = u;
   return { ...rest, has_password: !!u.password };
 }
 /** A token as the API shows it: no hash; `workspace` only when it isn't #1 (absent means #1, as before workspaces). */
@@ -96,7 +108,12 @@ export function publicToken(t: ApiToken): PublicToken {
 function load(): UsersFile {
   try {
     const f = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8')) as Partial<UsersFile>;
-    return { users: f.users || [], tokens: f.tokens || [], ...(f.revoked?.length ? { revoked: f.revoked } : {}) };
+    return {
+      users: f.users || [],
+      tokens: f.tokens || [],
+      ...(f.revoked?.length ? { revoked: f.revoked } : {}),
+      ...(f.seen_since ? { seen_since: f.seen_since } : {}),
+    };
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return { users: [], tokens: [] };
     throw e;
@@ -189,6 +206,48 @@ export function noteSignIn(id: string): void {
     const u = f.users.find((x) => x.id === id);
     if (u) u.signed_in = isoLocal();
   });
+}
+
+/** How often an account's `seen` is written at most (tests lower it). */
+export const SEEN_EVERY = { ms: 3_600_000 };
+// When this process last wrote (or found) each account's `seen`: one entry per account in use, so as many as there are
+// accounts at most, and bounded all the same.
+const seenWritten = new Recent<number>(50_000);
+
+/**
+ * A person used the app through their session (server/auth.ts noteActive, from the guard): when, for the operator's
+ * accounts page — written at most once an hour per account, since every request reads this file and every write makes
+ * it parsed again. A `seen` written within the hour by another process, or before a restart, counts as written. Says
+ * whether it wrote.
+ */
+export function noteSeen(id: string, now = Date.now()): boolean {
+  const last = seenWritten.get(id);
+  if (last !== undefined && now - last >= 0 && now - last < SEEN_EVERY.ms) return false;
+  const u = getUser(id);
+  if (!u) return false;
+  const stored = u.seen ? Date.parse(u.seen) : Number.NaN;
+  if (now - stored >= 0 && now - stored < SEEN_EVERY.ms) {
+    seenWritten.set(id, stored);
+    return false;
+  }
+  seenWritten.set(id, now);
+  const at = isoLocal(new Date(now));
+  change((f) => {
+    const x = f.users.find((y) => y.id === id);
+    if (!x) return;
+    x.seen = at;
+    f.seen_since ??= at;
+  });
+  return true;
+}
+
+/** When the server began to keep `seen` (null: not yet). */
+export const seenSince = (): string | null => read().seen_since ?? null;
+
+/** When the account was last active: the later of its `seen` and its `signed_in` (null: neither recorded). */
+export function lastActive(u: Pick<User, 'seen' | 'signed_in'>): string | null {
+  if (!u.seen || !u.signed_in) return u.seen || u.signed_in || null;
+  return compareTime(u.seen, u.signed_in) >= 0 ? u.seen : u.signed_in;
 }
 
 /** Every account (read-only: shared and frozen, see current()). */

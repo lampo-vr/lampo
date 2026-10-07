@@ -4026,6 +4026,7 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Normal billing': 'Normale Abrechnung',
   'not recorded': 'nicht erfasst',
   'not yet': 'noch nicht',
+  now: 'jetzt',
   'nothing has happened yet': 'noch nichts passiert',
   'Nothing was set by hand here: it is billed as usual already.': 'Hier wurde nichts von Hand gesetzt: Er wird schon normal abgerechnet.',
   'On which plan': 'Mit welchem Plan',

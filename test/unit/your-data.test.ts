@@ -118,6 +118,10 @@ test('Export my data: my profile, my notes and replies, my drafts — never anyo
   const profile = jsonIn(files, 'profile.json');
   assert.equal(profile.email, 'bob@example.com');
   assert.equal(profile.password, undefined);
+  // when he last signed in and was last active (his session in use: what the server's operator sees too)
+  assert.equal(profile.last_sign_in, auth.getUser(bob.id)?.signed_in);
+  assert.ok(profile.last_active, 'last active');
+  assert.equal(profile.last_active, auth.getUser(bob.id)?.seen);
   const notes = jsonIn(files, `workspaces/${B}/notes.json`);
   assert.deepEqual(
     notes.map((n: { text: string }) => n.text),
