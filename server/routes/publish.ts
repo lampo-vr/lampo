@@ -159,16 +159,17 @@ export function publishRoutes(ctx: ServerContext): Router {
     }
   };
   const toldConnections = () => ctx.broadcast('connections', {});
-  const viewAll = (posts: StoredPost[]): PostView[] => {
+  // what a post's kit says when it failed goes by who asks (lib/publish/kit.ts shownKit)
+  const viewAll = (posts: StoredPost[], req: Request): PostView[] => {
     const connections = safe(listConnections, []);
-    return posts.map((p) => viewOf(p, { connections, hosted: ctx.hosted }));
+    return posts.map((p) => viewOf(p, { connections, hosted: ctx.hosted, audience: audienceOf(req) }));
   };
   const postOf = (req: Request): StoredPost => {
     const p = findPost(parse(postId, req.params.id, 'post id'));
     if (!p) throw fail(404, 'no such post');
     return p;
   };
-  const view = (p: StoredPost): PostView => viewOf(p, { hosted: ctx.hosted });
+  const view = (p: StoredPost, req: Request): PostView => viewOf(p, { hosted: ctx.hosted, audience: audienceOf(req) });
   /** The video a post is of, for what is made from its file (the kit, the cover): 404 once that video is gone, and
    * what was made of it goes too — never served for a later video of the same name (A12 PUB-7). */
   const videoOf = (p: StoredPost) => {
@@ -315,14 +316,14 @@ export function publishRoutes(ctx: ServerContext): Router {
   r.get('/api/posts', (req, res) => {
     const q = query(z.object({ slug: z.string().max(600).optional() }).strict(), req);
     const posts = q.slug ? postsOf(q.slug) : shownPosts();
-    const out: PostsResponse = { posts: viewAll(posts) };
+    const out: PostsResponse = { posts: viewAll(posts, req) };
     res.json(out);
   });
 
   r.get('/api/review/:slug/posts', (req, res) => {
     const slug = String(req.params.slug);
     if (!store.loadReview(slug)) throw fail(404, 'unknown video');
-    const out: PostsResponse = { posts: viewAll(postsOf(slug)) };
+    const out: PostsResponse = { posts: viewAll(postsOf(slug), req) };
     res.json(out);
   });
 
@@ -336,7 +337,7 @@ export function publishRoutes(ctx: ServerContext): Router {
       draftPost({ slug, platform, fields: fields as PostFields, by: who, by_id: accountOf(req, who), person: req.auth?.via !== 'token' }),
     );
     told(slug);
-    res.status(created ? 201 : 200).json(view(post));
+    res.status(created ? 201 : 200).json(view(post, req));
   });
 
   r.patch('/api/posts/:id', express.json({ limit: '256kb' }), (req, res) => {
@@ -344,7 +345,7 @@ export function publishRoutes(ctx: ServerContext): Router {
     const { by: asBy, ...fields } = body(Change, req);
     const out = run(() => updatePost(p.id, fields as PostFields, ctx.actor(req, asBy), { person: req.auth?.via !== 'token' }));
     told(out.slug);
-    res.json(view(out));
+    res.json(view(out, req));
   });
 
   r.delete('/api/posts/:id', (req, res) => {
@@ -366,7 +367,7 @@ export function publishRoutes(ctx: ServerContext): Router {
       const out = run(() => publishPost(p.id, { confirm, by: who, by_id: accountOf(req, who), hosted: ctx.hosted, again }));
       ctx.publisher.poke();
       told(out.slug);
-      res.json(view(out));
+      res.json(view(out, req));
     },
   );
 
@@ -376,7 +377,7 @@ export function publishRoutes(ctx: ServerContext): Router {
       throw asHttp(e);
     });
     told(out.slug);
-    res.json(view(out));
+    res.json(view(out, req));
   });
 
   r.post(
@@ -389,7 +390,7 @@ export function publishRoutes(ctx: ServerContext): Router {
       const out = run(() => retryPost(p.id, ctx.actor(req), { again }));
       ctx.publisher.poke();
       told(out.slug);
-      res.json(view(out));
+      res.json(view(out, req));
     },
   );
 

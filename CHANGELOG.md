@@ -84,6 +84,14 @@ format stays backwards compatible throughout.
   command runs on the agent's own machine, never on a server ([docs/agents.md](docs/agents.md)).
 
 ### Fixed
+- A failed publishing kit says why in a sentence in every list of posts too, not only on its own page.
+- A reference a visitor adds with words through one review link no longer shows on another link that shows only its own
+  visitors' notes.
+- An agent connected over MCP can't be spoken for by anyone else's check-in, however its id is spelled and however long
+  it has been quiet.
+- An agent that waited for one video's notes and then waits for all of them, or another video's, misses none that came
+  meanwhile.
+- Sent notes leave the "Not sent yet" area in one motion: the area no longer blinks out and back while they go.
 - **One person's many versions of a project file no longer hold up anyone else.** Each account has its own daily
   share of new versions of a file, and saving as a copy always works. An upload that can't become a version any more
   is refused before its bytes are sent, saying when to try again.

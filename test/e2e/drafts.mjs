@@ -559,6 +559,15 @@ try {
 
   await check('Send all still sends the rest in one batch, every card leaving the same way, and the area with them', async () => {
     await watchGoing();
+    // the holding area leaves once: never taken off with its cards a moment before they are put back leaving
+    await page.evaluate(() => {
+      window.__areaGone = 0;
+      new MutationObserver((ms) => {
+        for (const m of ms)
+          for (const n of m.removedNodes)
+            if (n.nodeType === 1 && (n.matches('[data-testid=unsent]') || n.querySelector('[data-testid=unsent]'))) window.__areaGone++;
+      }).observe(document.body, { childList: true, subtree: true });
+    });
     const ids = await page.$$eval('[data-testid=note-draft]', (cs) => cs.map((c) => c.dataset.id));
     assert(ids.length === 15, `15 cards: ${ids.length}`);
     const waiting = tool('wait_for_feedback', { video: slug2, since: await cursor2(), timeout_s: 60 });
@@ -576,6 +585,7 @@ try {
       ids.every((id) => went[id]?.includes('leaving')),
       `every card left with the motion: ${JSON.stringify(went)}`,
     );
+    assert((await page.evaluate(() => window.__areaGone)) === 1, `the area left once: ${await page.evaluate(() => window.__areaGone)}`);
   });
 
   // ---------------------------------------------------------------- an agent's video: notes go to it together

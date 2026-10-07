@@ -68,7 +68,9 @@ export function nowCursor(events: ReviewEvent[], now = Date.now()): Cursor {
  * Events after the cursor (oldest first, at most `limit`) and the cursor after the last of them: when more arrived
  * than one answer shows, the rest come with the next call instead of being skipped. A cursor counts every video's
  * events of its second (cursorAt): `events` are all of them, and `keep` picks what is handed out (one video's), so a
- * note on another video in the same second never takes the place of one on this.
+ * note on another video in the same second never takes the place of one on this. The next cursor stands right after
+ * the last event handed out (nothing handed out: where it was), never past what was only looked at: a cursor from one
+ * video's wait, used for every video's or another's, skips none of theirs that came later.
  */
 export function after(
   events: ReviewEvent[],
@@ -79,9 +81,10 @@ export function after(
   let skipped = 0;
   let more = false;
   const fresh: ReviewEvent[] = [];
-  // where the next call starts: past every event looked at, handed out or not
+  // where the scan stands (every video's events of a second counted), and where the last kept one stood
   let at = c.at;
   let seen = c.seen;
+  let next = { at: c.at, seen: c.seen };
   for (const e of events) {
     const t = Date.parse(e.at);
     if (t < c.at) continue;
@@ -89,20 +92,20 @@ export function after(
       skipped++;
       continue;
     }
-    if (keep(e)) {
-      if (fresh.length >= limit) {
-        more = true;
-        break;
-      }
-      fresh.push(e);
-    }
     if (t === at) seen++;
     else {
       at = t;
       seen = 1;
     }
+    if (!keep(e)) continue;
+    if (fresh.length >= limit) {
+      more = true;
+      break;
+    }
+    fresh.push(e);
+    next = { at, seen };
   }
-  return { fresh, next: `${new Date(at).toISOString()}#${seen}`, more };
+  return { fresh, next: `${new Date(next.at).toISOString()}#${next.seen}`, more };
 }
 
 export interface FeedbackOptions {

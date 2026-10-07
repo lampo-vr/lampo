@@ -13,6 +13,7 @@ import { PROGRESS_ETA_MAX, RUN_ID } from '../../lib/runs.ts';
 import { rankSessions } from '../../lib/sessions.ts';
 import * as store from '../../lib/store.ts';
 import type { AgentActivityResponse, AgentKind, SessionsResponse } from '../../lib/types.ts';
+import { isMcpId } from '../agents.ts';
 import type { ServerContext } from '../context.ts';
 import { agentView, getReview } from '../helpers.ts';
 import { body, fail, query, router } from '../http.ts';
@@ -119,7 +120,8 @@ export function sessionRoutes(ctx: ServerContext): Router {
   r.post('/api/agents/heartbeat', express.json(), (req, res) => {
     const b = body(Heartbeat, req);
     // the ids MCP gives the agents it lists are its own: a heartbeat never speaks for one
-    if (b.session_id.startsWith('mcp-')) throw fail(400, 'session ids starting with "mcp-" are the MCP server’s own: send your session’s id');
+    // (as the registry reads the id: cleaned, any case)
+    if (isMcpId(b.session_id)) throw fail(400, 'session ids starting with "mcp-" are the MCP server’s own: send your session’s id');
     const machine = req.auth?.via === 'local';
     const account = machine ? null : (req.auth?.user ?? null);
     const told = ctx.agents.heartbeat(

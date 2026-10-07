@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { checkReviewOpen } from '../folderIds.ts';
 import { dataDir, isoLocal, slugify } from '../paths.ts';
+import type { Audience } from '../publicError.ts';
 import { renderKey } from '../renderKey.ts';
 import { routeIn } from '../scope.ts';
 import { stageOf } from '../stage.ts';
@@ -27,7 +28,7 @@ import type {
   Version,
 } from '../types.ts';
 import { connectionInfo, findConnection, holdsSchedule, listConnections, platformsOf, type StoredConnection } from './connections.ts';
-import { kitInfo } from './kit.ts';
+import { kitInfo, shownKit } from './kit.ts';
 import {
   DEFAULT_YOUTUBE_CATEGORY,
   PLATFORM_LIMITS,
@@ -465,7 +466,14 @@ export function deletePost(id: string, o: { person?: boolean } = {}): StoredPost
 // ---------------------------------------------------------------- what a post looks like to people and agents
 
 /** A post as the API shows it: what it breaks, the connection's and account's names, the kit; never the upload session. */
-export function viewOf(p: StoredPost, o: { review?: Review | null; connections?: StoredConnection[]; hosted?: boolean; now?: number } = {}): PostView {
+/**
+ * A post as `audience` may read it (lib/publicError.ts): its kit's failure is the machine's owner's to read as it is
+ * (shownKit), a sentence for anyone else — what doesn't say whom it is for gets the sentence.
+ */
+export function viewOf(
+  p: StoredPost,
+  o: { review?: Review | null; connections?: StoredConnection[]; hosted?: boolean; now?: number; audience?: Audience } = {},
+): PostView {
   const found = o.review === undefined ? loadReview(p.slug) : o.review;
   // an orphan (its video deleted, maybe another of the same name since) knows no video
   const review = found && ofVideo(p, found) ? found : null;
@@ -488,9 +496,14 @@ export function viewOf(p: StoredPost, o: { review?: Review | null; connections?:
     holds_schedule: conn ? holdsSchedule(conn.kind) : PLATFORM_LIMITS[p.platform].holdsSchedule,
     digest: digestOf(p),
     ...(p.platform === 'youtube' && p.remote_id ? { studio_url: youtubeStudioUrl(p.remote_id) } : {}),
-    kit: kitInfo(p.id),
+    kit: kitOf(p.id, o.audience ?? 'other'),
   };
 }
+
+const kitOf = (postId: string, audience: Audience) => {
+  const info = kitInfo(postId);
+  return info ? shownKit(info, audience) : info;
+};
 
 function safeConnections(): StoredConnection[] {
   try {

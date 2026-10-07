@@ -85,14 +85,19 @@ test('a download that sends more than the file’s bytes, or drips past its time
     fs.readdirSync(path.join(modelDir(model, root), 'onnx')).filter((f) => f.endsWith('.part')),
     [],
   );
-  // a stall: the answer starts and no byte follows; the file's time runs out (the stand-in gives up after 10 s itself,
-  // so a download without a deadline fails here instead of hanging)
+  // a stall: the answer starts and no byte follows; the file's time runs out. A real stalled download holds its socket
+  // open; this stand-in holds a timer instead, ref'd (Node's AbortSignal.timeout is not: with nothing else alive, Node
+  // 22's test runner would end the file with the download still pending). It gives up after 10 s itself, so a download
+  // without a deadline fails here instead of hanging, and lets go of its timer once the deadline aborts it.
   const stalled = (async (_url: string | URL, init?: RequestInit) =>
     new Response(
       new ReadableStream({
         start(c) {
-          init?.signal?.addEventListener('abort', () => c.error(init.signal?.reason));
-          setTimeout(() => c.error(new Error('the stand-in stopped waiting')), 10_000).unref();
+          const giveUp = setTimeout(() => c.error(new Error('the stand-in stopped waiting')), 10_000);
+          init?.signal?.addEventListener('abort', () => {
+            clearTimeout(giveUp);
+            c.error(init.signal?.reason);
+          });
         },
       }),
     )) as typeof fetch;

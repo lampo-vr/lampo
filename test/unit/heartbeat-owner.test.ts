@@ -33,6 +33,23 @@ test('another member’s heartbeat under someone’s agent is refused, and that 
   assert.equal(theirs.state, 'idle', 'it never waited');
   const hb = await request('POST', '/api/agents/heartbeat', { body: { session_id: theirs.session_id, name: 'claude-code · Alex' }, headers: asMallory });
   assert.equal(hb.status, 400, `an MCP agent’s id is the MCP server’s own: ${hb.text}`);
+  // spelled so the registry reads the same id (a leading space, a zero-width character, another case): refused too
+  for (const spelled of [` ${theirs.session_id}`, `\u200b${theirs.session_id}`, theirs.session_id.toUpperCase()]) {
+    const r = await request('POST', '/api/agents/heartbeat', { body: { session_id: spelled, name: 'claude-code' }, headers: asMallory });
+    assert.equal(r.status, 400, `${JSON.stringify(spelled)}: ${r.text}`);
+  }
+  // and after the agent was quiet for longer than a heartbeat lives: still never anyone else's
+  const real = Date.now;
+  Date.now = () => real() + 100_000;
+  try {
+    const later = await request('POST', '/api/agents/heartbeat', { body: { session_id: ` ${theirs.session_id}`, name: 'claude-code' }, headers: asMallory });
+    assert.equal(later.status, 400, later.text);
+    await c.callTool({ name: 'list_videos', arguments: {} });
+    const back = await until(async () => (await agents()).find((a) => a.session_id === theirs.session_id), 'Alex’s agent is listed again');
+    assert.equal(back.user, 'Alex', 'its own calls list it as Alex’s');
+  } finally {
+    Date.now = real;
+  }
   const now = (await agents()).find((a) => a.session_id === theirs.session_id);
   assert.equal(now?.state, 'idle', 'not listening');
   assert.equal(now?.user, 'Alex');

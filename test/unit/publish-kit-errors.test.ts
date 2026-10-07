@@ -47,4 +47,20 @@ test('a failed kit names no tool, exit code or path to a member', async () => {
   // the person in the browser reads the same sentence
   const seen = (await request('GET', `/api/posts/${id}/kit`, { headers: asOwner })).json() as { error?: string };
   assert.equal(seen.error, kit.error);
+  // and every list that carries a post's kit says the same: the composer's, a video's, an agent's (get_posts)
+  type Listed = { posts: { id: string; kit?: { error?: string } | null }[] };
+  const kitIn = (r: Listed) => r.posts.find((x) => x.id === id)?.kit?.error ?? '';
+  const { createLocalBackend } = await import('../../lib/backend/local.ts');
+  const { backendFor } = await import('../../mcp/access.ts');
+  const { inWorkspace } = await import('../../lib/scope.ts');
+  const agentPosts = await inWorkspace('w1', () => backendFor({ via: 'token', name: 'Max', role: 'member' }, createLocalBackend()).posts());
+  for (const [where, error] of [
+    ['GET /api/posts', kitIn((await request('GET', '/api/posts', { headers: asMember })).json() as Listed)],
+    ['GET /api/review/:slug/posts', kitIn((await request('GET', `/api/review/${enc}/posts`, { headers: asMember })).json() as Listed)],
+    ['an agent’s get_posts', kitIn({ posts: agentPosts })],
+  ] as const) {
+    assert.ok(error, `${where}: the kit says it failed`);
+    for (const secret of [dir, 'ffmpeg', 'exited', 'versions/', 'moov'])
+      assert.ok(!error.includes(secret), `${where} names ${JSON.stringify(secret)}: ${error}`);
+  }
 });

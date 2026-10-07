@@ -39,3 +39,19 @@ test('vr open names it overall', () => {
   assert.equal(r.code, 0, r.err);
   assert.match(r.out.split('\n').find((l) => l.includes(note.id)) ?? '', /OVERALL: about the whole video, not frame 0/);
 });
+
+test('on a hosted server too: "Copy for an agent" says it is overall and sends nobody for frames it has none of', async () => {
+  const { claudePrompt } = await import('../../lib/prompt.ts');
+  store.addComment(slug, { frame: 12, text: 'The logo is cut off', author: 'Mia Hartmann', severity: 'must' });
+  const out = claudePrompt(store.loadReview(slug) as NonNullable<ReturnType<typeof store.loadReview>>, { hosted: 'https://review.example.test' });
+  const block = (id: string) => {
+    const from = out.indexOf(id);
+    const next = out.slice(from + id.length).search(/\n\d+\. c_/);
+    return out.slice(from, next < 0 ? undefined : from + id.length + next);
+  };
+  const framed = (store.loadReview(slug)?.comments ?? []).find((c) => c.text === 'The logo is cut off');
+  assert.ok(framed);
+  assert.match(block(note.id).split('\n')[0] as string, SAID);
+  assert.doesNotMatch(block(note.id), /frames: /, 'no frames to download for the whole video');
+  assert.match(block(framed.id), new RegExp(`frames: \\S+ show ${framed.id}`), 'a note on a frame still names its frames');
+});

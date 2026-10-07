@@ -559,8 +559,9 @@ a hosted server only). An open sign-up can do nothing until its address is confi
 meanwhile.
 
 **Browser sign-ins** are signed `HttpOnly; SameSite=Lax` cookies, over https named `__Host-vr_session` (this host
-only, `Secure`, the whole site: a sibling subdomain can't set or overwrite it; a `vr_session` is never read over https,
-and an answer expires it, so a browser that still holds one signs in once more). They last at most 30 days and end after 14 days
+only, `Secure`, the whole site: a sibling subdomain can't set or overwrite it; a `vr_session` is never read over https:
+a browser that still holds one signs in once more, and the old cookie is expired then, or with any answer to a request
+signed in with the new one). They last at most 30 days and end after 14 days
 without use (`LAMPO_SESSION_DAYS`, `LAMPO_SESSION_IDLE_DAYS`). Signing out ends that session on the server too, so a copy of
 its cookie stops working, and tells the browser to drop its cached renders and pictures; changing the password, disabling the account or *sign out everywhere* ends all of them.
 *Sign out everywhere* and any new password (in Profile, set by an admin, or from a reset link) also end the account's

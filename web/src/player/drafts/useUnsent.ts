@@ -6,6 +6,7 @@
 // Lives in the player's own chunk; the section that shows the drafts (Unsent.tsx) is loaded once there is one.
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { deleteDraft as removeDraft, saveDraft, sendDrafts, useDrafts } from '../../api/drafts.ts';
 import type { NewComment } from '../../api/mutations.ts';
 import { keys } from '../../api/queries.ts';
@@ -184,10 +185,13 @@ export function useUnsent({ slug, enabled, recordings, wake, agent, waiting = fa
       const kept = qc.getQueryData<{ drafts: Comment[] }>(keys.drafts(slug))?.drafts ?? [];
       const ids = one ? (note ? [one] : []) : kept.filter((d) => !hiddenNow.current.has(d.id)).map((d) => d.id);
       const sent = await sendDrafts(slug, { ids, recordings: one ? (note ? false : [one]) : true, start: w === 'start' });
-      qc.setQueryData(keys.drafts(slug), { drafts: kept.filter((d) => !ids.includes(d.id)) });
       // what leaves: the notes (one write: all or none), and the recording drafts that went (all, unless some stayed)
       const spokenOut = one ? (note ? [] : sent.notes.length ? [one] : []) : sent.left ? [] : spoken;
-      leave([...ids, ...spokenOut], kept);
+      // On screen as leaving before they are off the list: the list's own update reaches the page on a schedule of its
+      // own, and seen first it took every card off (and the whole holding area with the last ones) for a moment, to put
+      // them back leaving.
+      flushSync(() => leave([...ids, ...spokenOut], kept));
+      qc.setQueryData(keys.drafts(slug), { drafts: kept.filter((d) => !ids.includes(d.id)) });
       await Promise.all([refresh(), qc.invalidateQueries({ queryKey: keys.review(slug) }), qc.invalidateQueries({ queryKey: keys.library })]);
       if (sent.error) toast(t('{n} note could not be sent: {error}|{n} notes could not be sent: {error}', { n: sent.left || 1, error: sent.error }), 'error');
       if (sent.notes.length) {

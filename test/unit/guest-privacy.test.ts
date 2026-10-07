@@ -315,6 +315,20 @@ test('a visitor’s reply through another link never reaches a link that shows o
     );
   assert.deepEqual(await replies(own, gOwn), ['A again: still small', 'the team: on it'], 'its own visitor and the team');
   assert.deepEqual(await replies(all, gAll), ['from the agency: leave it', 'A again: still small', 'the team: on it'], 'every one where every note shows');
+  // a reference with words is a reply too: the one through the other link stays there, its file as well
+  const refd = await guest('POST', `/api/g/${all}/comments/${id}/refs`, {
+    name: 'Ben',
+    kind: 'link',
+    url: 'https://example.com/agency-board',
+    caption: 'the agency’s board',
+    note: 'see our board',
+  });
+  assert.equal(refd.status, 200, refd.text);
+  const refsOn = async (token: string, gid: string) =>
+    (JSON.parse((await guest('GET', `/api/g/${token}/review/${gid}`)).text).notes.find((n: { id: string }) => n.id === id).refs ?? []) as { url?: string }[];
+  assert.deepEqual(await refsOn(own, gOwn), [], 'not on the note’s own link');
+  assert.equal((await refsOn(all, gAll)).length, 1, 'on the link it came through');
+  assert.ok(!(await guest('GET', `/api/g/${own}/review/${gOwn}`)).text.includes('agency-board'), 'nothing of it on the own link');
 });
 
 /** Bytes to a one-time upload URL, as the review page sends a file: a fresh request, no cookie, no address of the visit. */

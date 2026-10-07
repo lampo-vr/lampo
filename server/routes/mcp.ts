@@ -381,9 +381,9 @@ export function mcpRoutes(ctx: ServerContext): Router {
     };
     // whose agent it is, by account (not the machine's own): a run it is at is that account's (server/runs.ts)
     const account = who.via !== 'local' ? who.id : undefined;
-    ctx.agents.heartbeat(agent, { account });
+    ctx.agents.heartbeat(agent, { account, mcp: true });
     // A long wait_for_feedback keeps it listed (heartbeats expire after 90 s).
-    const timer = setInterval(() => ctx.agents.heartbeat(agent, { account }), 30_000);
+    const timer = setInterval(() => ctx.agents.heartbeat(agent, { account, mcp: true }), 30_000);
     res.on('close', () => clearInterval(timer));
     return { session_id: agent.session_id, name: agent.name, kind: agent.kind };
   }

@@ -493,9 +493,15 @@ export function guestRoutes(ctx: ServerContext): Router {
       fps: moment ? (r.fps ?? null) : null,
     };
   }
+  // A visitor's reference is for the visitors of the link it came through, as their replies and notes are
+  // (visitorReplies): never on a link that shows only its own visitors' notes.
   const guestRefs = (share: ShareWithToken, review: Review, c: Comment): GuestRef[] => {
     const gid = guestId(share, slugify(review.video));
-    return (c.refs || []).map((r) => guestRef(share, gid, r)).filter((r): r is GuestRef => !!r);
+    const theirs = visitorReplies(share, review);
+    return (c.refs || [])
+      .filter(theirs)
+      .map((r) => guestRef(share, gid, r))
+      .filter((r): r is GuestRef => !!r);
   };
 
   function guestNote(share: ShareWithToken, review: Review, ver: Version, c: Comment) {
@@ -813,7 +819,8 @@ export function guestRoutes(ctx: ServerContext): Router {
     const gid = guestId(share, slugify(review.video));
     // Only files of references this link shows (not agents', not moments of videos it doesn't cover, not the stills of
     // versions it doesn't show).
-    const shown = visibleNotes(share, review).flatMap((c) => (c.refs || []).filter((x) => guestRef(share, gid, x) && pictureShown(share, x)));
+    const theirs = visitorReplies(share, review);
+    const shown = visibleNotes(share, review).flatMap((c) => (c.refs || []).filter((x) => theirs(x) && guestRef(share, gid, x) && pictureShown(share, x)));
     if (!refOfFile(shown, req.params.file)) throw fail(404, 'not found');
     await sendRefFile(req, res, slugify(review.video), req.params.file);
   });

@@ -11,6 +11,9 @@ import type { AgentListenState, ClaudeSession, ConnectedAgent } from '../lib/typ
 import type { Broadcast } from './events.ts';
 
 const TTL = 90_000;
+
+/** An id the MCP server gave a connected agent (`mcp-<hash>`), as the registry keys it: cleaned, any case. */
+export const isMcpId = (sessionId: string): boolean => /^mcp-/i.test(cleanAgentName(sessionId, 200));
 /**
  * `betweenMs`: after a wait whose time ran out the agent still listens while it calls the next one. `workingMs`: after
  * a wait that handed it notes, it works on them this long at most before it reads as idle (unless it waits again).
@@ -24,7 +27,7 @@ export interface AgentRegistry {
    * account's id (never listed; agents' runs know it by it: server/runs.ts; none: the machine itself). An agent listed
    * under another account's session id is that account's: false, nothing changed.
    */
-  heartbeat(a: Omit<ConnectedAgent, 'last_seen' | 'state' | 'listened'>, o?: { listens?: boolean; account?: string }): boolean;
+  heartbeat(a: Omit<ConnectedAgent, 'last_seen' | 'state' | 'listened'>, o?: { listens?: boolean; account?: string; mcp?: boolean }): boolean;
   /** The account a connected agent of this workspace is (by its session id), while it is listed. */
   accountOf(sessionId: string): string | undefined;
   /**
@@ -84,7 +87,7 @@ export function createAgentRegistry(broadcast: Broadcast): AgentRegistry {
     broadcast('sessions');
   };
   return {
-    heartbeat(input, { listens = false, account } = {}) {
+    heartbeat(input, { listens = false, account, mcp = false } = {}) {
       // What an agent says of itself, over HTTP or as an MCP client: one line each, short (A12-D3).
       const a = {
         ...input,
@@ -95,6 +98,8 @@ export function createAgentRegistry(broadcast: Broadcast): AgentRegistry {
       };
       const ws = currentWorkspace();
       const key = `${ws}\u0000${a.session_id}`;
+      // the ids the MCP server gives the agents it lists are its own: nothing else makes or speaks for one, whenever
+      if (isMcpId(a.session_id) && !mcp) return false;
       const was = agents.get(key);
       // one account's agent is never spoken for by another (its listening state, its name in the pickers), while listed
       if (was && Date.now() - was.at <= TTL && accounts.get(key) !== account) return false;
