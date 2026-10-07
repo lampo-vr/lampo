@@ -194,5 +194,7 @@ data/playbooks/archive/                  playbooks of deleted folders, kept asid
 ```
 
 Renaming a folder moves its playbook and its subfolders' with it; deleting a folder archives its playbook and moves its
-subfolders' playbooks up with the subfolders. Each render's stamp is `Version.playbook` in `review.json`. The format is
+subfolders' playbooks up with the subfolders. While a project is archived ([workflow.md](workflow.md#in-the-library)), its playbook
+and its folders' are read only: no edit, reference, suggestion or decision until it is restored (`423`), and their
+suggestions leave the inbox meanwhile. Each render's stamp is `Version.playbook` in `review.json`. The format is
 in [data-format.md](data-format.md#playbooks), the routes in [api.md](api.md#playbooks).

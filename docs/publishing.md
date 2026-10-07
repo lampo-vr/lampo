@@ -33,7 +33,8 @@ account before anyone relies on them ([What is not confirmed](#what-is-not-confi
 | A review link | nothing | nothing | nothing |
 
 Retry asks the plan's gate as Publish does. A post that went out before (`remote_id`) is never deleted, by anyone: it is
-the record of what the platform holds. Reviewers read posts on purpose, as the team does: the connection's label, the
+the record of what the platform holds. While the video's project is archived its posts take no draft, change, publish
+or retry (`423`) until it is restored; cancelling and deleting still work. Reviewers read posts on purpose, as the team does: the connection's label, the
 account's name, a post's link (an unlisted or scheduled video's too) and who drafted and published it; the connections
 themselves are not theirs to read.
 

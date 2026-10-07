@@ -22,6 +22,7 @@ const { dir } = isolatedEnv({ vars: { VR_MODE: 'server', VR_PUBLIC_URL: PUBLIC }
 const auth = await import('../../lib/auth.ts');
 const store = await import('../../lib/store.ts');
 const folders = await import('../../lib/folders.ts');
+const posts = await import('../../lib/publish/posts.ts');
 const { slugify, dataDir, reviewDir, reviewFile } = await import('../../lib/paths.ts');
 const { createLocalBackend } = await import('../../lib/backend/local.ts');
 const { createReviewServer } = await import('../../mcp/core.ts');
@@ -455,6 +456,56 @@ test('a render is never tracked into an archived project: refused before it is a
   }
   assert.equal(store.loadReview(slugify(late)), null, 'nothing tracked');
   json(await restore());
+});
+
+test('an archived project’s playbooks and posts take nothing new either, and what waits in it leaves the inbox', async () => {
+  await restore();
+  // from before it was archived: a final video in it with a post that failed, a suggestion for its playbook, a question
+  const fin = filed('acme/final.mp4', 'ACME');
+  store.setFinal(fin, {}, 'tester');
+  const post = posts.draftPost({ slug: fin, platform: 'youtube', fields: { title: 'Before' }, by: 'tester' }).post;
+  posts.changePost(post.id, (p) => Object.assign(p, { state: 'failed', error: 'The platform said no.' }));
+  const suggestion = { folder: 'ACME', section: 'rules', content: 'The logo is in by 1 s', reason: 'asked on three videos' };
+  const waiting = json(await request('POST', '/api/playbook/proposals', { body: suggestion, headers: as.memberToken }), 201);
+  const question = { folder: 'ACME', text: 'Which music?', options: [{ id: 'm', items: [{ id: 'a' }, { id: 'b' }] }] };
+  const asked = json(await request('POST', '/api/asks', { body: question, headers: as.memberToken }));
+  type Item = { proposal?: string; id?: string; post?: { id: string } };
+  const inbox = async () => {
+    const items: Item[] = json(await request('GET', '/api/for-you', { headers: as.owner })).items;
+    return [items.some((i) => i.proposal === waiting.id), items.some((i) => i.id === asked.id), items.some((i) => i.post?.id === post.id)];
+  };
+  assert.deepEqual(await inbox(), [true, true, true], 'the inbox lists the suggestion, the question and the failed post while it is open');
+
+  json(await archive());
+  const text = (folder: string) => ({ folder, section: 'rules', content: 'Written while archived' });
+  refused(await request('PUT', '/api/playbook/text', { body: text('ACME'), headers: as.admin }), 'the project’s playbook edited');
+  refused(await request('PUT', '/api/playbook/text', { body: text('ACME/Reels'), headers: as.owner }), 'a folder’s in it');
+  refused(
+    await request('POST', '/api/playbook/refs', { body: { folder: 'ACME', kind: 'link', url: 'https://example.com/look' }, headers: as.admin }),
+    'a reference',
+  );
+  refused(await request('POST', '/api/playbook/proposals', { body: { ...suggestion, folder: 'ACME/Reels' }, headers: as.memberToken }), 'a suggestion');
+  refused(await request('POST', `/api/playbook/proposals/${waiting.id}/accept`, { body: {}, headers: as.admin }), 'a suggestion accepted');
+  assert.deepEqual(await inbox(), [false, false, false], 'they leave the inbox with the rest of its work');
+  const agent = await mcp('member');
+  try {
+    const r = await agent.call('propose_playbook_change', { folder: 'ACME/Reels', section: 'brief', content: 'A new brief', reason: 'test' });
+    assert.equal(r.text, `Error: ${SENTENCE}`);
+  } finally {
+    await agent.close();
+  }
+  refused(await request('PATCH', `/api/posts/${post.id}`, { body: { title: 'Changed while archived' }, headers: as.owner }), 'a post changed');
+  const confirm = { confirm: { platform: 'youtube', account: post.account ?? null, digest: posts.digestOf(post) } };
+  refused(await request('POST', `/api/posts/${post.id}/publish`, { body: confirm, headers: as.owner }), 'a post published');
+  refused(await request('POST', `/api/posts/${post.id}/retry`, { body: {}, headers: as.owner }), 'a post tried again');
+  assert.equal(posts.findPost(post.id)?.title, 'Before');
+  assert.equal(json(await request('GET', '/api/playbook?folder=ACME', { headers: as.member })).playbook.rules, '', 'the playbook as it was');
+
+  json(await restore());
+  assert.equal(json(await request('PUT', '/api/playbook/text', { body: text('ACME'), headers: as.admin })).rev.after, 'Written while archived');
+  assert.deepEqual(await inbox(), [true, true, true], 'restored: back in the inbox');
+  assert.equal(json(await request('PATCH', `/api/posts/${post.id}`, { body: { title: 'After' }, headers: as.owner })).title, 'After');
+  json(await request('POST', `/api/playbook/proposals/${waiting.id}/reject`, { body: {}, headers: as.admin }));
 });
 
 test('a project called constructor, __proto__ or toString is archived and restored like any other', async () => {

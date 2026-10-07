@@ -419,14 +419,20 @@ export function draftPost(input: DraftInput): { post: StoredPost; created: boole
   return out;
 }
 
-/** Changes a draft (or a failed or cancelled post, which becomes a draft again). */
+/**
+ * Changes a draft (or a failed or cancelled post, which becomes a draft again). Not while the video's project is
+ * archived (lib/archived.ts): its posts take nothing new — no draft, change, publish or retry — until it is restored;
+ * taking one back (cancel, delete) still works.
+ */
 export function updatePost(id: string, fields: PostFields, by: string, o: { person?: boolean } = {}): StoredPost {
   return changePost(id, (p) => {
+    const review = loadReview(p.slug);
+    checkReviewOpen(review);
     if (!EDITABLE.includes(p.state)) throw new PostError(409, `the post is ${p.state}: ${p.state === 'posted' ? 'it is out' : 'cancel it first to change it'}`);
     agentKeepsOff(p, o.person);
     const was = structuredClone(p);
     apply(p, cleanFields(p.platform, fields));
-    const ver = loadReview(p.slug)?.versions.find((x) => x.v === p.v);
+    const ver = review?.versions.find((x) => x.v === p.v);
     if (ver) holdCover(p, ver);
     noteEdit(p, by, changedFields(was, p), was.state === 'draft');
     if (p.state !== 'draft') {
@@ -551,6 +557,8 @@ export function publishPost(id: string, input: PublishInput): StoredPost {
   const p0 = findPost(id);
   if (!p0) throw new PostError(404, 'no such post');
   const review = loadReview(p0.slug);
+  // nothing goes out of an archived project (updatePost)
+  checkReviewOpen(review);
   const why = gateOf(review, p0);
   if (why || !review) throw new PostError(409, why ?? 'the video is gone');
   return changePost(id, (p) => {
@@ -632,6 +640,8 @@ export function retryPost(id: string, by: string, o: { again?: boolean } = {}): 
   const p0 = findPost(id);
   if (!p0) throw new PostError(404, 'no such post');
   const review = loadReview(p0.slug);
+  // nothing goes out of an archived project (updatePost)
+  checkReviewOpen(review);
   return changePost(id, (p) => {
     if (p.state !== 'failed' && p.state !== 'sent') throw new PostError(409, `the post is ${p.state}: only a failed post is tried again`);
     const t = isoLocal();
