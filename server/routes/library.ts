@@ -4,7 +4,7 @@ import path from 'node:path';
 import express, { type Router } from 'express';
 import { z } from 'zod';
 import { AGENT_KINDS } from '../../lib/agentKind.ts';
-import { archivedNow } from '../../lib/folderIds.ts';
+import { archivedNow, checkNotArchived } from '../../lib/folderIds.ts';
 import {
   allFolders,
   archiveProject,
@@ -123,8 +123,8 @@ export function libraryRoutes(ctx: ServerContext): Router {
     if (!fs.existsSync(p) || !fs.statSync(p).isFile()) throw fail(404, `file not found: ${p}`);
     if (!ALL_EXT.includes(path.extname(p).toLowerCase())) throw fail(400, `not a video file (${ALL_EXT.join(', ')})`);
     if (p.startsWith(`${ROOT}/`)) throw fail(400, 'that file lives inside video-review itself');
-    // A folder that can't be made is refused before the video is added, not after.
-    if (b.folder) normFolder(b.folder);
+    // A folder that can't be made, or one in an archived project, is refused before the video is added, not after.
+    if (b.folder) checkNotArchived(normFolder(b.folder));
     const who = ctx.actor(req);
     const { review, created } = store.createOrGetReview(p, { by: who, byId: accountOf(req, who), session: b.session });
     if (created && !review.onboarding_sample) countStep(ctx, 'video_first');

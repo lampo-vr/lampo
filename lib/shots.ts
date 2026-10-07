@@ -188,8 +188,13 @@ export async function makeShots({ file, frame, meta, drawing, dir, id, range, qu
   return shots;
 }
 
-/** What makeShots writes for note `id` in `dir`, whether it got that far or not. */
-const shotFiles = (dir: string, id: string) => ['_clean.png', '_marked.png', '_range.jpg'].map((end) => path.join(dir, `${id}${end}`));
+/**
+ * Removes what makeShots writes for note `id` in `dir`, whether it got that far or not: the screenshots of a note that
+ * wasn't saved after all (refused as it was written) stay behind otherwise, in a folder nothing cleans up.
+ */
+export function dropShots(dir: string, id: string): void {
+  for (const end of ['_clean.png', '_marked.png', '_range.jpg']) fs.rmSync(path.join(dir, `${id}${end}`), { force: true });
+}
 
 /**
  * A note's screenshots, or none when the on-demand gate has no place for them now (MediaBusyError): a note is never
@@ -200,7 +205,7 @@ export async function shotsOrLater(req: ShotRequest): Promise<Shots | undefined>
     return await makeShots(req);
   } catch (e) {
     if (!(e instanceof MediaBusyError)) throw e;
-    for (const f of shotFiles(req.dir, req.id)) fs.rmSync(f, { force: true });
+    dropShots(req.dir, req.id);
     return undefined;
   }
 }
@@ -240,11 +245,9 @@ export function followShots(slug: string, id: string, done?: () => void): void {
   ).then(
     (placed) => {
       if (placed) done?.();
-      else for (const f of shotFiles(dir, id)) fs.rmSync(f, { force: true });
+      else dropShots(dir, id);
     },
-    () => {
-      for (const f of shotFiles(dir, id)) fs.rmSync(f, { force: true });
-    },
+    () => dropShots(dir, id),
   );
 }
 

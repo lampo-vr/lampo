@@ -452,8 +452,9 @@ Details:
   restore it, signed in in the app: an API token gets `403`. Nothing is moved or deleted. While it is archived nothing
   new goes into it: a note, a reply, a status, a reference, a draft, a recording, an approval, final or reopen, a new
   version (an upload, an upload URL, a re-render of a linked file, which waits on disk until it is restored), a folder
-  made, renamed, moved or deleted in it, a video or folder moved into it, a review link, a question with options, a
-  request to its agent, an agent assigned or its status. Each is refused with `423` and one sentence, `{archived:
+  made, renamed, moved or deleted in it, a video or folder moved into it (`POST /api/library` too, before the video is
+  added), a review link, a question with options, a request to its agent, an agent assigned or its status. Each is
+  refused with `423` and one sentence, `{archived:
   "<project>", error: "the project \"<project>\" is archived: it is read-only until a person restores it"}`. Owners and
   admins can still move a video out (`PUT /api/review/:slug/folder`); removing a video and downloading work as before. Its
   review links play watch only meanwhile ([sharing.md](sharing.md#what-a-link-allows)). Storage counts toward the plan

@@ -1,10 +1,11 @@
 // Archived projects (lib/archived.ts) on a hosted server. Owners and admins archive a project and restore it, in the app
 // (people only). While it is archived nothing new goes into it — notes, replies, statuses, drafts, stage changes,
 // versions and uploads, moves into it, review links, questions, agent status — each refused with one sentence (423,
-// `archived`), over HTTP and to agents (MCP, `vr`) alike; owners and admins still take a video out. Its review links
-// play watch only and get their rights back once it is restored; embeds keep playing. The lists leave it out unless
-// asked: search keeps its matches apart, the inbox, Insights' "now" lists and the status page drop it, `list_videos`,
-// `list_folders`, `vr ls` and `vr folders` show it with their `archived` flag.
+// `archived`), over HTTP and to agents (MCP, `vr`) alike, before anything is begun (no screenshot left behind,
+// nothing tracked); owners and admins still take a video out. Its review links play watch only and get their rights
+// back once it is restored; embeds keep playing. The lists leave it out unless asked: search keeps its matches apart,
+// the inbox, Insights' "now" lists and the status page drop it, `list_videos`, `list_folders`, `vr ls` and
+// `vr folders` show it with their `archived` flag.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -21,7 +22,7 @@ const { dir } = isolatedEnv({ vars: { VR_MODE: 'server', VR_PUBLIC_URL: PUBLIC }
 const auth = await import('../../lib/auth.ts');
 const store = await import('../../lib/store.ts');
 const folders = await import('../../lib/folders.ts');
-const { slugify, dataDir, reviewFile } = await import('../../lib/paths.ts');
+const { slugify, dataDir, reviewDir, reviewFile } = await import('../../lib/paths.ts');
 const { createLocalBackend } = await import('../../lib/backend/local.ts');
 const { createReviewServer } = await import('../../mcp/core.ts');
 type User = import('../../lib/auth.ts').User;
@@ -205,9 +206,12 @@ test('owners and admins take a video out of an archived project; nobody puts one
   json(await move(teaser, 'ACME', as.member));
 });
 
-/** An MCP client on the local backend: what an agent on the server reaches over /mcp, refused by the store itself. */
-async function mcp(role: string) {
-  const server = createReviewServer({ backend: createLocalBackend(), principal: { via: 'token', name: 'Max', id: member.id, role } });
+/**
+ * An MCP client on the local backend: what an agent on the server reaches over /mcp (`token`), refused by the store
+ * itself; `local`: the server machine's own (stdio), which names files on its disk.
+ */
+async function mcp(role: string, via: 'token' | 'local' = 'token') {
+  const server = createReviewServer({ backend: createLocalBackend(), principal: { via, name: 'Max', id: member.id, role } });
   const [a, b] = InMemoryTransport.createLinkedPair();
   await server.connect(b);
   const c = new Client({ name: 'agent', version: '1' });
@@ -385,6 +389,71 @@ test('the lists leave an archived project out: search keeps it apart, the inbox,
   assert.ok((await forYou()).includes(spot), 'restored: back in the inbox');
   assert.ok((await status()).includes(spot));
   assert.equal(json(await request('GET', '/api/search?q=spot', { headers: as.owner })).videos[0]?.slug, spot);
+});
+
+/** The screenshot files in a video's folder (`c_<id>_clean.png`, `_marked.png`, `_range.jpg`). */
+const shotsOf = (slug: string) =>
+  fs
+    .readdirSync(reviewDir(slug))
+    .filter((f) => /^c_.*\.(png|jpg)$/.test(f))
+    .sort();
+/** A note as `vr add` (and MCP's add_note) hands it to the backend. */
+const noteAt = (frame: number, text: string) => ({ v: 1, frame, range: null, text, tags: [], severity: 'should' as const, drawing: [], author: 'tester' });
+
+test('a note or reference refused in an archived project leaves nothing behind: no screenshot, no frame grabbed', async () => {
+  await restore();
+  json(await archive());
+  const had = shotsOf(spot);
+  const notes = must(store.loadReview(spot)).comments.length;
+  const agent = await mcp('member');
+  try {
+    for (const args of [
+      { video: spot, frame: 2, text: 'Is the logo late?' },
+      { video: spot, frame: 1, to_frame: 6, text: 'This whole stretch' },
+    ]) {
+      const r = await agent.call('add_note', args);
+      assert.equal(r.text, `Error: ${SENTENCE}`, JSON.stringify(args));
+    }
+    // refused before its frame is grabbed: the archive answers, not the frame past the end
+    const ref = await agent.call('attach_reference', { id: open.id, video: spot, frame: 9999, caption: 'like this' });
+    assert.equal(ref.text, `Error: ${SENTENCE}`);
+  } finally {
+    await agent.close();
+  }
+  // `vr add` on the machine: the same backend
+  await assert.rejects(createLocalBackend().addNote(spot, noteAt(2, 'Late?')), { message: SENTENCE });
+  assert.deepEqual(shotsOf(spot), had, 'no screenshot left in the video’s folder');
+  assert.equal(must(store.loadReview(spot)).comments.length, notes, 'no note either');
+  json(await restore());
+});
+
+test('a note refused once its screenshots are made (archived meanwhile) takes them with it', async () => {
+  await restore();
+  const had = shotsOf(spot);
+  const adding = createLocalBackend().addNote(spot, noteAt(2, 'Late?'));
+  // archived while the screenshots are being made: the store refuses the note as it writes
+  folders.archiveProject('ACME', { name: 'Ada' });
+  await assert.rejects(adding, { message: SENTENCE });
+  assert.deepEqual(shotsOf(spot), had);
+  folders.restoreProject('ACME');
+});
+
+test('a render is never tracked into an archived project: refused before it is added', async () => {
+  await restore();
+  json(await archive());
+  const late = clip('acme/late.mp4');
+  await assert.rejects(createLocalBackend().track(late, { by: 'tester', folder: 'ACME/Reels' }), { message: SENTENCE });
+  assert.equal(store.loadReview(slugify(late)), null, 'nothing tracked');
+  // track_video, the server machine's own agent
+  const machine = await mcp('owner', 'local');
+  try {
+    const r = await machine.call('track_video', { path: late, folder: 'ACME' });
+    assert.equal(r.text, `Error: ${SENTENCE}`);
+  } finally {
+    await machine.close();
+  }
+  assert.equal(store.loadReview(slugify(late)), null, 'nothing tracked');
+  json(await restore());
 });
 
 test('a project archived in one workspace is that workspace’s: the other’s project of the same name stays open', async () => {

@@ -9,7 +9,7 @@ import { localOwner } from '../auth.ts';
 import { loadConfig } from '../config.ts';
 import { computeDiff } from '../diff.ts';
 import { attachElements, pointersOf } from '../elementMaps.ts';
-import { archivedNow, checkReviewOpen } from '../folderIds.ts';
+import { archivedNow, checkNotArchived, checkReviewOpen } from '../folderIds.ts';
 import { moveVideo, normFolder, shownFolders } from '../folders.ts';
 import { ingestPart } from '../parts.ts';
 import { cacheDir, dataDir, projectDirOf, reviewDir, slugify } from '../paths.ts';
@@ -23,13 +23,13 @@ import { frameInRange, normalizeRange } from '../range.ts';
 import { attachRefFile, frameRef, linkRef, saveRefs } from '../refs.ts';
 import { renderKey } from '../renderKey.ts';
 import { listSessions } from '../sessions.ts';
-import { followShots, grabFrame, shotsOrLater } from '../shots.ts';
+import { dropShots, followShots, grabFrame, shotsOrLater } from '../shots.ts';
 import { stageForReview } from '../stageContext.ts';
 import { storage } from '../storage/index.ts';
 import * as store from '../store.ts';
 import { buildTaste, writeTaste } from '../taste.ts';
 import { cachedTranscript, forgetTranscript, makeTranscript } from '../transcripts.ts';
-import type { AskCreated, OptionGroup, ReviewEvent } from '../types.ts';
+import type { AskCreated, Comment, OptionGroup, ReviewEvent } from '../types.ts';
 import type { Backend, PlaybookWhere } from './types.ts';
 
 // A render that is still being written must settle before "the newest version" means anything.
@@ -112,6 +112,8 @@ export function createLocalBackend(): Backend {
     async addNote(slug, n) {
       const review = store.loadReview(slug);
       if (!review) throw new Error(`no review for ${slug}`);
+      // nothing new in an archived project: refused before a screenshot is made (the store asks again as it writes)
+      checkReviewOpen(review);
       const ver = review.versions.find((x) => x.v === n.v);
       if (!ver) throw new Error(`no v${n.v}`);
       const id = store.reservedCommentId();
@@ -132,7 +134,14 @@ export function createLocalBackend(): Backend {
               id,
               range,
             });
-      const comment = store.addComment(slug, { id, ...n, frame, range, ...(n.scope === 'video' ? { frame: 0, drawing: [], range: null } : {}), shots });
+      let comment: Comment;
+      try {
+        comment = store.addComment(slug, { id, ...n, frame, range, ...(n.scope === 'video' ? { frame: 0, drawing: [], range: null } : {}), shots });
+      } catch (e) {
+        // refused as it was written (its project archived meanwhile): its screenshots go with it
+        if (shots) dropShots(reviewDir(slug), id);
+        throw e;
+      }
       if (!comment.shots && comment.scope !== 'video') followShots(slug, comment.id);
       return { comment, review: store.loadReview(slug) || review };
     },
@@ -144,6 +153,8 @@ export function createLocalBackend(): Backend {
     async attachRef(commentId, input) {
       const hit = store.findComment(commentId);
       if (!hit) throw new Error(`no note ${commentId}`);
+      // nothing new in an archived project: refused before a file is stored or a frame grabbed
+      checkReviewOpen(hit.review);
       const req = { caption: input.caption, note: input.note, by: input.by, by_id: input.by_id };
       if (input.kind === 'file') {
         const { ref, comment } = await attachRefFile(commentId, input.path, { ...req, kind: input.as });
@@ -158,8 +169,8 @@ export function createLocalBackend(): Backend {
     setSource: async (slug, v, source, by) => store.setVersionSource(slug, v, source, by),
 
     async track(videoPath, { by, byId, session, folder }) {
-      // A folder that can't be made is refused before the video is tracked, not after.
-      if (folder) normFolder(folder);
+      // A folder that can't be made, or one in an archived project, is refused before the video is tracked, not after.
+      if (folder) checkNotArchived(normFolder(folder));
       // a video in an archived project takes nothing new: a re-render waits on disk until the project is restored
       checkReviewOpen(store.loadReview(slugify(path.resolve(videoPath))));
       let { review, created } = store.createOrGetReview(videoPath, { by, byId, session });

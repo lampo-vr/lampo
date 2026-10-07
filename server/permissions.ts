@@ -392,7 +392,8 @@ const decodedSegment = (s: string): string => {
  * before the route runs, so nothing is begun — no screenshot grabbed, no reference stored. Reading goes on (`view`, a
  * watch report among them), and so do two writes the routes decide themselves: where a video goes (an owner or admin
  * takes one out), and throwing away one's own unsent drafts and recordings. The store refuses the same writes on
- * every other way in (MCP, `vr`, review links: lib/folderIds.ts checkNotArchived).
+ * every other way in (MCP, `vr`, review links: lib/folderIds.ts checkNotArchived), and MCP and `vr` ask before they
+ * begin as well (lib/backend/local.ts): nothing is begun there either.
  */
 function refuseIfArchived(req: Request, rule: Rule | 'none'): void {
   const method = req.method === 'HEAD' ? 'GET' : req.method;
