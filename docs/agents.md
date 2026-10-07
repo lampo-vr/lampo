@@ -671,9 +671,13 @@ with `get_frame`, or several at once with `vr footage sheet <ids…>`. The contr
 
 ## Lampo sees what you do; status calls are optional
 
-The person sees what you're doing while you do it, without any extra work from you: in the agent menu's **Live** part
-(the step you're on and the two actions before it with their times, the last ten on request), on the agent button, and
-in the sidebar's **Agents** list. Lampo builds it from what it sees anyway:
+The person sees what you're doing while you do it, without any extra work from you. On the video, one line under the
+notes panel's head says where your work stands ("fixing 3 of 6 · editing Logo.tsx", "rendering V4 · 42 % · about 1
+min left", "needs you · a question", "V4 is ready · 5 fixed"), and the **Agent** view beside Notes and Transcript shows
+it whole: the notes you were sent as your plan, each with where it stands, what you are doing now and what you said to
+the person, the steps you took, and how it ended. The library's cards, the sidebar's **Agents** list, the version
+picker (who made each version, in how long, what it fixed) and the agent menu's **Live** part say the same. Lampo
+builds it from what it sees anyway:
 
 - **Every call you make to it**, `vr` commands and MCP tools alike: "Reading the note at 00:13:12", "Looking at frame
   324", "Fixed “caption moved to y 1392”" (what your `mark_fixed` note says). People see a note by its moment or its
@@ -689,7 +693,8 @@ in the sidebar's **Agents** list. Lampo builds it from what it sees anyway:
 
 None of it costs you a token or asks anything of you, and none of it is written into the review: it lives in the app's
 memory and a small rolling file in the cache. So `vr status` and `set_status` are optional: use them for what Lampo
-can't see ("waiting for the client's logo file", an estimate for a long render), not to narrate your steps.
+can't see ("waiting for the client's logo file", an estimate for a long render), not to narrate your steps; what you
+say there shows as your own words, quoted, until your next step.
 
 How you're named there: by your Claude Code session, else by `VR_BY=agent:<name>`; an MCP client over HTTP by its name,
 as it is listed under connected agents. Every such name is kept as one line of printable text, at most 80 characters:
