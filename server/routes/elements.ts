@@ -3,6 +3,7 @@
 import express, { type Router } from 'express';
 import { attachElements, pointersOf } from '../../lib/elementMaps.ts';
 import { ELEMENT_LIMITS, ElementMapError } from '../../lib/elements.ts';
+import { wellFormed } from '../../lib/names.ts';
 import type { ServerContext } from '../context.ts';
 import { getReview, getVersion } from '../helpers.ts';
 import { failFrom, router } from '../http.ts';
@@ -15,7 +16,7 @@ export function elementRoutes(_ctx: ServerContext): Router {
     const review = getReview(req.params.slug);
     const ver = getVersion(review, req.params.v);
     try {
-      res.json(attachElements(review, ver.v, req.body));
+      res.json(attachElements(review, ver.v, wellFormed(req.body)));
     } catch (e) {
       if (e instanceof ElementMapError) throw failFrom(400, e);
       throw e;

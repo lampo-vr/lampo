@@ -11,7 +11,7 @@ import { promisify } from 'node:util';
 import { newestLinks, voidLinks } from './accountLinks.ts';
 import { isGated } from './gate.ts';
 import { accountAddress } from './mail/mime.ts';
-import { cleanDisplayName, looksReserved, nameSkeleton } from './names.ts';
+import { cleanDisplayName, cutChars, looksReserved, nameSkeleton } from './names.ts';
 import { startOnboarding } from './onboarding.ts';
 import { DATA, isoLocal } from './paths.ts';
 import { can } from './permissions.ts';
@@ -825,7 +825,7 @@ export function createToken(
     const t: ApiToken = {
       id: `t_${crypto.randomBytes(6).toString('hex')}`,
       user: userId,
-      name: name.trim().slice(0, 80) || 'token',
+      name: cutChars(name.trim(), 80) || 'token',
       hash: sha256(token),
       prefix: token.slice(0, 9),
       created: isoLocal(),

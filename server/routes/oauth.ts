@@ -15,6 +15,7 @@
 import express, { type Request, type Response, type Router } from 'express';
 import { z } from 'zod';
 import { BRAND_NAME } from '../../lib/brand.ts';
+import { wellFormed } from '../../lib/names.ts';
 import {
   ClientError,
   type ClientInfo,
@@ -385,7 +386,7 @@ export function oauthRoutes(ctx: ServerContext): Router {
       limited(registrations, req);
       res.setHeader('Cache-Control', 'no-store');
       const connected = grants.connectedClientIds();
-      res.status(201).json(registerClient(req.body ?? {}, { inUse: (id) => connected.has(id) }));
+      res.status(201).json(registerClient(wellFormed(req.body ?? {}), { inUse: (id) => connected.has(id) }));
     } catch (e) {
       if ((e as { retryAfter?: number }).retryAfter) res.setHeader('Retry-After', String((e as { retryAfter: number }).retryAfter));
       oauthError(res, e);

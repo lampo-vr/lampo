@@ -9,6 +9,7 @@ import express, { type Request, type Router } from 'express';
 import { z } from 'zod';
 import { shownFolders } from '../../lib/folders.ts';
 import { byName, proposalContent, proposalEvidence, proposalReason } from '../../lib/inputs.ts';
+import { wellFormed } from '../../lib/names.ts';
 import { can } from '../../lib/permissions.ts';
 import * as playbooks from '../../lib/playbooks.ts';
 import { PLAYBOOK_LIMITS, parseSkill } from '../../lib/playbookText.ts';
@@ -329,7 +330,7 @@ export function playbookRoutes(ctx: ServerContext): Router {
 }
 
 const parse = <T>(schema: z.ZodType<T>, v: unknown): T => {
-  const out = schema.safeParse(v);
+  const out = schema.safeParse(wellFormed(v));
   if (!out.success) throw fail(400, out.error.issues[0]?.message || 'bad request');
   return out.data;
 };

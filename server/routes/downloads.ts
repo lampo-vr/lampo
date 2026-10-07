@@ -31,7 +31,7 @@ import type { ArchiveInfo, Review, ShareWithToken, Version, VersionDownload } fr
 import type { ServerContext } from '../context.ts';
 import { mediaHostOf, requestHost } from '../guard.ts';
 import { getReview, getVersion } from '../helpers.ts';
-import { attachment, fail, query, router, VersionQuery } from '../http.ts';
+import { attachment, fail, query, router, sendStreamed, VersionQuery } from '../http.ts';
 import { type Source, sendDownload, versionOriginal } from '../playback.ts';
 import { issuerOf, issuerStill } from '../uploadTickets.ts';
 import { ipOf, keptInMemory, open } from './shares/access.ts';
@@ -326,33 +326,9 @@ export function downloadRoutes(ctx: ServerContext): Router {
     }
 
     for (const key of slots) active.set(key, (active.get(key) || 0) + 1);
-    let closed = false;
-    const onClose = () => {
-      closed = true;
-    };
-    res.on('close', onClose);
     try {
-      for await (const chunk of plan.bytes({ start, end })) {
-        if (closed) break;
-        if (!res.write(chunk))
-          await new Promise<void>((resolve) => {
-            const done = () => {
-              res.off('drain', done);
-              res.off('close', done);
-              resolve();
-            };
-            res.on('drain', done);
-            res.on('close', done);
-          });
-      }
-      if (!closed) res.end();
-    } catch (e) {
-      // Headers and bytes are out: all that's left is to break the connection, so the client sees a failed download
-      // (its length won't match) rather than a zip that ends early.
-      console.error('archive failed', (e as Error).message, path.basename(filename));
-      res.destroy(e as Error);
+      await sendStreamed(req, res, () => plan.bytes({ start, end }), `archive ${path.basename(filename)}`);
     } finally {
-      res.off('close', onClose);
       for (const key of slots) {
         const n = (active.get(key) || 1) - 1;
         if (n) active.set(key, n);

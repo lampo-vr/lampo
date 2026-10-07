@@ -9,6 +9,7 @@ import https from 'node:https';
 import net from 'node:net';
 import path from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { cutChars } from './names.ts';
 import { hostOf, isBlockedAddress, pinnedLookup, publicAddress, type Resolver } from './netguard.ts';
 import { currentWorkspace, DEFAULT_WORKSPACE, dataDir, isoLocal } from './paths.ts';
 import { routeIn, wsKey } from './scope.ts';
@@ -138,7 +139,7 @@ export function checkHook(input: Partial<WebhookConfig>): WebhookConfig {
     events: events.length ? events : ['client'],
     format,
     secret: input.secret || undefined,
-    label: (input.label || '').slice(0, 80) || undefined,
+    label: cutChars(input.label || '', 80) || undefined,
   };
 }
 

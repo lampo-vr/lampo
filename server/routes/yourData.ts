@@ -18,7 +18,7 @@ import { RateLimit } from '../../lib/rateLimit.ts';
 import * as workspaces from '../../lib/workspaces.ts';
 import { type Auth, CLEAR_SITE_DATA, requireUser, sessionCookies } from '../auth.ts';
 import type { ServerContext } from '../context.ts';
-import { body, fail, failFrom, query, router } from '../http.ts';
+import { body, fail, failFrom, query, router, sendStreamed } from '../http.ts';
 
 const Nothing = z.object({}).strict();
 /** Your password, or — for a sign-in in the last minutes — `confirm: true`: never an empty body (a stray request). */
@@ -54,8 +54,7 @@ export function yourDataRoutes(ctx: ServerContext): Router {
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Length', String(plan.length));
     res.setHeader('Content-Disposition', `attachment; filename="lampo-data-${day}.zip"`);
-    for await (const chunk of plan.bytes()) if (!res.write(chunk)) await new Promise((ok) => res.once('drain', ok));
-    res.end();
+    await sendStreamed(req, res, () => plan.bytes(), 'export');
   });
 
   r.get('/api/auth/me/deletion', requireUser, (req, res) => {

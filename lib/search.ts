@@ -7,6 +7,7 @@ import path from 'node:path';
 import { archivedIn } from './archived.ts';
 import { archivedNow } from './folderIds.ts';
 import { shownFolders } from './folders.ts';
+import { cutChars } from './names.ts';
 import { slugify } from './paths.ts';
 import { renderKey } from './renderKey.ts';
 import { STAGE_LABELS } from './stage.ts';
@@ -90,7 +91,7 @@ function noteHit(r: Review, c: Comment, reply: string | null): SearchNote {
     v: c.v,
     frame: c.frame,
     timecode: c.timecode,
-    text: c.text.length > 300 ? `${c.text.slice(0, 299)}…` : c.text,
+    text: c.text.length > 300 ? `${cutChars(c.text, 299)}…` : c.text,
     author: c.author,
     status: c.status,
     kind: noteKind(c),

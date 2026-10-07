@@ -58,7 +58,7 @@ import type { ConnectionsResponse, PostFields, PostsResponse, PostView } from '.
 import type { ServerContext } from '../context.ts';
 import { gate } from '../extension.ts';
 import { accountOf } from '../helpers.ts';
-import { body, fail, failFrom, parse, query, router, sendInternal } from '../http.ts';
+import { body, fail, failFrom, parse, query, router, sendInternal, sendStreamed } from '../http.ts';
 
 const postId = z.string().regex(/^po_[0-9a-f]{12}$/, 'expected a post id like po_1a2b3c4d5e6f');
 const connId = z.string().regex(/^pc_[0-9a-f]{12}$/, 'expected a connection id like pc_1a2b3c4d5e6f');
@@ -430,8 +430,7 @@ export function publishRoutes(ctx: ServerContext): Router {
       res.setHeader('Content-Type', 'application/zip');
       res.setHeader('Content-Length', String(plan.length));
       res.setHeader('Content-Disposition', filename(zipName));
-      for await (const chunk of plan.bytes()) if (!res.write(chunk)) await new Promise((ok) => res.once('drain', ok));
-      res.end();
+      await sendStreamed(req, res, () => plan.bytes(), 'kit.zip');
       return;
     }
     const file = kitPath(p.id, name);

@@ -2,6 +2,7 @@
 import { type NextFunction, type Request, type Response, Router } from 'express';
 import { z } from 'zod';
 import { ProjectArchivedError } from '../lib/archived.ts';
+import { wellFormed } from '../lib/names.ts';
 import { type Audience, publicMessage, statusOf } from '../lib/publicError.ts';
 
 /** Review-link paths (also server/guard.ts): nobody on them is identified, so nobody there is the owner. /e/<token> is
@@ -48,9 +49,12 @@ export const audienceOf = (req: Request): Audience => (req.auth?.via === 'local'
  */
 export const router = (): Router => Router({ caseSensitive: true, strict: true });
 
-/** Validates `value` against `schema`; bad input is a 400 that says which field and why. */
+/**
+ * Validates `value` against `schema`; bad input is a 400 that says which field and why. Every string in it comes out
+ * well-formed (`wellFormed`): a JSON body can carry a lone surrogate, and a name kept with one breaks every URL of it.
+ */
 export function parse<S extends z.ZodType>(schema: S, value: unknown, what = 'request'): z.output<S> {
-  const r = schema.safeParse(value);
+  const r = schema.safeParse(wellFormed(value));
   if (r.success) return r.data;
   const issue = r.error.issues[0];
   const where = issue?.path.length ? `${issue.path.join('.')}: ` : '';
@@ -83,6 +87,56 @@ type StatusError = Error & { status?: number; statusCode?: number; retryAfter?: 
 /** A Content-Disposition that downloads as `filename`: an ASCII stand-in for old clients, the real name in filename*. */
 export const attachment = (filename: string): string =>
   `attachment; filename="${filename.replace(/[^\x20-\x7e]|"/g, '_')}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+
+/**
+ * Sends a body made as it goes (a zip's bytes, in order) once the headers are set: the folder zips, a publishing kit's,
+ * a person's export. A HEAD gets the headers only. A viewer who goes away ends it at once — the bytes stop being read
+ * and whatever they came from closes; waiting on 'drain' alone waited for good, with the files open. A failure halfway
+ * breaks the connection, so the client sees a failed download rather than one that ends early. `what` names it in the
+ * log. True when every byte went out.
+ */
+export async function sendStreamed(req: Request, res: Response, bytes: () => AsyncIterable<Uint8Array>, what: string): Promise<boolean> {
+  if (req.method === 'HEAD') {
+    res.end();
+    return true;
+  }
+  let gone = res.destroyed;
+  const onClose = () => {
+    gone = true;
+  };
+  res.on('close', onClose);
+  try {
+    for await (const chunk of bytes()) {
+      if (gone) break;
+      if (!res.write(chunk)) await drainedOrGone(res);
+      // leaving the loop closes the bytes' source: a read stream, its file
+      if (gone) break;
+    }
+    if (gone) return false;
+    res.end();
+    return true;
+  } catch (e) {
+    if (!gone) console.error(`${what} failed`, (e as Error).message);
+    res.destroy(e as Error);
+    return false;
+  } finally {
+    res.off('close', onClose);
+  }
+}
+
+/** Waits until `res` takes more, or until it is closed (a viewer gone never drains it). */
+function drainedOrGone(res: Response): Promise<void> {
+  if (res.destroyed) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    const done = () => {
+      res.off('drain', done);
+      res.off('close', done);
+      resolve();
+    };
+    res.on('drain', done);
+    res.on('close', done);
+  });
+}
 
 /**
  * A path as it may go to the log: review-link tokens, one-time upload tickets and signed media URLs are credentials

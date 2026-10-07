@@ -34,10 +34,19 @@ format stays backwards compatible throughout.
   one, nor an embed another kind of link.
 
 ### Fixed
+- Checking a video or a download without fetching it (what browsers and download managers ask before they start) no
+  longer makes the server read the whole file first: the player, downloads, review links, embeds, the publishing kit
+  and your data export answer with the details alone.
+- A publishing kit's ZIP or your data export cut short (a closed tab, a lost connection) now ends on the server too:
+  before, it went on waiting for the viewer for good, with the kit's files kept open.
 - Video playback, downloads and review-link files that were cut short (a seek, a closed tab) no longer leave the file
   open on the server; and a version's file says when it was made, so a browser can resume a download.
 - A video whose file name held a broken character no longer breaks the library for the whole workspace: names are made
   well-formed when they come in.
+- The same holds for folders: a folder name with a broken character, or a long one cut in the middle of an emoji, no
+  longer breaks the inbox, search, *For you* and the library. Everything people and agents send in — folder and link
+  names, display names, notes — comes in well-formed, names are shortened between characters, never through one, and
+  a store that already holds such a name reads it whole.
 - The skill dialog's instructions field was one line high until you typed.
 - A playbook opened on its suggestions (the inbox's *Open the playbook*) put the focus on Reject, so Enter opened the
   reject form instead of accepting: Accept has it now, on the suggestion the inbox showed.

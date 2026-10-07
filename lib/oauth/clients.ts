@@ -12,6 +12,7 @@ import https from 'node:https';
 import net from 'node:net';
 import path from 'node:path';
 import { z } from 'zod';
+import { cutChars } from '../names.ts';
 import { isBlockedAddress } from '../netguard.ts';
 import { DATA, isoLocal } from '../paths.ts';
 import { withLock, writeAtomic } from '../store.ts';
@@ -128,15 +129,18 @@ export function isVrRedirect(uri: string): boolean {
 export const vrTokenName = (machine: string): string => `vr on ${machine}`;
 
 /** The computer's name as `vr login` says it (anyone can start one): one line, no control or direction characters. */
-export const vrMachine = (raw: unknown): string => cleanName(raw).slice(0, 64).trim();
+export const vrMachine = (raw: unknown): string => cutChars(cleanName(raw), 64).trim();
 
 const cleanName = (name: unknown): string =>
-  String(name ?? '')
-    // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping control characters from a self-declared name is the point
-    .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 100);
+  cutChars(
+    String(name ?? '')
+      .toWellFormed()
+      // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping control characters from a self-declared name is the point
+      .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim(),
+    100,
+  );
 
 const hostOf = (url: unknown): string | null => {
   try {

@@ -8,7 +8,7 @@ import { agentName, ownedAgentName, toolActivity } from '../lib/activityText.ts'
 import type { OptionTarget } from '../lib/askOptions.ts';
 import type { Backend } from '../lib/backend/types.ts';
 import { byName } from '../lib/inputs.ts';
-import { cleanAuthor } from '../lib/names.ts';
+import { cleanAuthor, wellFormed } from '../lib/names.ts';
 import { isoLocal } from '../lib/paths.ts';
 import type { PreviewTarget } from '../lib/previews.ts';
 import { publicMessage } from '../lib/publicError.ts';
@@ -139,8 +139,10 @@ export function createToolKit(server: McpServer, o: ReviewServerOptions): ToolKi
       const frozen = access === 'view' ? null : (o.readOnly?.() ?? null);
       if (frozen) return fail(frozen);
       try {
-        const out = await fn(args, ctx);
-        if (!out.isError) noteActivity(name, args as Record<string, unknown>, ctx);
+        // as the HTTP API's bodies (server/http.ts parse): no lone surrogate goes into a name, a label or a note
+        const given = wellFormed(args);
+        const out = await fn(given, ctx);
+        if (!out.isError) noteActivity(name, given as Record<string, unknown>, ctx);
         return out;
       } catch (e) {
         return fail(publicMessage(e, audienceOf(o.principal), { status: 400, where: `mcp ${name}` }));
