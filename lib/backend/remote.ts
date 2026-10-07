@@ -124,7 +124,13 @@ async function poll<T>(
 }
 
 /** A render as a resumable tus upload: running vr push again continues an unfinished one. */
-async function uploadRender(api: Api, cacheRoot: string, file: string, meta: Record<string, string>): Promise<UploadResult> {
+async function uploadRender(
+  api: Api,
+  cacheRoot: string,
+  file: string,
+  meta: Record<string, string>,
+  onProgress?: (sent: number, total: number) => void,
+): Promise<UploadResult> {
   const size = fs.statSync(file).size;
   fs.mkdirSync(cacheRoot, { recursive: true });
   let resolveBody: (s: string) => void = () => {};
@@ -143,6 +149,7 @@ async function uploadRender(api: Api, cacheRoot: string, file: string, meta: Rec
     // Remembers unfinished uploads (by path, size, mtime and server): running vr push again continues them.
     urlStorage: new FileUrlStorage(path.join(cacheRoot, 'uploads.json')),
     removeFingerprintOnSuccess: true,
+    ...(onProgress ? { onProgress: (sent: number, total: number | null) => onProgress(sent, total ?? size) } : {}),
     onError: (e) => rejectBody(new Error(`upload failed: ${e.message.split('\n')[0]}`)),
     onSuccess: ({ lastResponse }) => resolveBody(lastResponse.getBody() || ''),
   });
@@ -503,7 +510,7 @@ export function createRemoteBackend(c: Credentials, { cacheRoot }: { cacheRoot: 
       return { review: session !== undefined ? await backend.review(slugOf(r.review)) : r.review, created: r.created };
     },
 
-    async push(file, { folder, name, to, part }): Promise<PushResult> {
+    async push(file, { folder, name, to, part, onProgress }): Promise<PushResult> {
       const meta: Record<string, string> = { filename: name || path.basename(file) };
       if (folder) meta.folder = folder;
       if (to) meta.slug = to;
@@ -511,7 +518,7 @@ export function createRemoteBackend(c: Credentials, { cacheRoot }: { cacheRoot: 
         meta.part_at = String(part.at);
         if (part.handles !== undefined) meta.handles = String(part.handles);
       }
-      const r = await uploadRender(api, cacheRoot, file, meta);
+      const r = await uploadRender(api, cacheRoot, file, meta, onProgress);
       return { review: await backend.review(r.slug), created: r.created, duplicate: r.duplicate, v: r.v, ...(r.part ? { part: r.part } : {}) };
     },
 

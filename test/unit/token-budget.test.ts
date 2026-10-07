@@ -11,7 +11,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { approxTokens, imageSize, resultCost, toolListCost } from '../../bench/tokens/count.ts';
 import { buildFixture, type Fixture } from '../../bench/tokens/fixture.ts';
-import { isolatedEnv, ROOT } from '../lib/helpers.ts';
+import { FFMPEG, isolatedEnv, makeVideo, ROOT, vr } from '../lib/helpers.ts';
 
 const BUDGET = {
   /** Every tool's name, description and input schema: on every turn of the agent's conversation (5250 until publishing's
@@ -27,8 +27,14 @@ const BUDGET = {
   waitNone: 58,
   /** The line a hand-off ends with (track_video; mark_fixed and wont_fix once nothing is left open): lib/handoff.ts. */
   handOff: 45,
-  /** skills/lampo/SKILL.md, read into context when the skill applies (1350 until the options bullet: bench/tokens/README.md). */
-  skill: 1450,
+  /** skills/lampo/SKILL.md, read into context when the skill applies (1350 until the options bullet, 1450 until
+   * `vr render`: bench/tokens/README.md). */
+  skill: 1550,
+  /** What `vr render` prints for a render put up as the next version: its line and the hand-off line (instead of the
+   * render's own output, 2248 for a 6 s ffmpeg encode). */
+  render: 50,
+  /** One `vr render wait` while a detached render goes on. */
+  renderWait: 36,
 };
 
 const { dir, env } = isolatedEnv({ vars: { VR_REMOTE: '0' } });
@@ -118,6 +124,24 @@ test('a wait that ends with nothing new, and the line a hand-off ends with', asy
   const { waitNowLine } = await import('../../lib/handoff.ts');
   const line = approxTokens(waitNowLine((/cursor: (\S+)/.exec(textOf(none)) || [])[1] as string));
   assert.ok(line <= BUDGET.handOff, `the hand-off line: ${line} tokens > ${BUDGET.handOff}`);
+});
+
+test('vr render: two lines for a render put up, one for a wait while it goes on', async () => {
+  const clip = makeVideo(path.join(dir, 'Acme', 'export', 'cutdown.mp4'), { w: 320, h: 180, fps: 25, dur: 1 });
+  const old = new Date(Date.now() - 60_000);
+  fs.utimesSync(clip, old, old);
+  assert.equal(vr(['track', clip], env).code, 0);
+  const ff = [FFMPEG, '-y', '-i', fx.video, '-t', '1', '-vf', 'scale=320:180', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', clip];
+  const r = vr(['render', '--to', clip, '--out', clip, '--', ...ff], { ...env, VR_BY: 'agent:spot-edit' });
+  assert.equal(r.code, 0, r.err);
+  assert.equal(r.out.trim().split('\n').length, 2, r.out);
+  const tokens = approxTokens(r.out);
+  assert.ok(tokens <= BUDGET.render, `vr render: ${tokens} tokens > ${BUDGET.render}`);
+  const { stillLine } = await import('../../lib/render/detach.ts');
+  const at = new Date().toISOString();
+  const progress = { what: 'render' as const, stage: 'encoding', pct: 62, eta_s: 230, tool: 'remotion', v: 14 };
+  const still = approxTokens(stillLine({ id: 'r_0a1b2c3d4e', state: 'running', started: at, updated: at, label: 'V14', progress }));
+  assert.ok(still <= BUDGET.renderWait, `vr render wait: ${still} tokens > ${BUDGET.renderWait}`);
 });
 
 test('the Agent Skill', () => {

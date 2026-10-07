@@ -49,6 +49,8 @@ const WORDS: Record<ActivityKey, (v: Params) => string> = {
   'Looking for footage': () => t('Looking for footage'),
   'Rendering… {mb} MB, still growing': (v) => t('Rendering… {mb} MB, still growing', v),
   'Rendering a new version': () => t('Rendering a new version'),
+  'Rendered in {time}': (v) => t('Rendered in {time}', v),
+  'The render failed (exit {code})': (v) => t('Rendering failed (exit {code})', v),
   'Editing {file}': (v) => t('Editing {file}', v),
   'Writing {file}': (v) => t('Writing {file}', v),
   'Reading {file}': (v) => t('Reading {file}', v),

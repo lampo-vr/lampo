@@ -941,13 +941,18 @@ Details:
 - **Activity** (the agents action) answers `{agents: AgentLive[]}`. With `slug`: that video's agents (each
   `{agent, slug, current, recent}`, newest first, 12 lines at most, including what the agent did that named no video;
   `agent` adds the assigned one before it touched the video). Without: every agent's latest. A line is `{at, agent,
-  slug, kind, text, key?, vars?, quote?, target?, since?, pct?}`: `kind` is one of `read`, `note`, `fix`, `reply`,
-  `ask`, `upload`, `render`, `wait`, `playbook`, `status`, `tool`, `say`, `run`; `text` is the English line, `key` and
-  `vars` its template (`ACTIVITY_KEYS` in `lib/activityText.ts`) for the app's language, `since` when a wait began,
-  `pct` an upload's progress. Kept in memory only.
+  slug, kind, text, key?, vars?, quote?, target?, since?, pct?, progress?, run?}`: `kind` is one of `read`, `note`,
+  `fix`, `reply`, `ask`, `upload`, `render`, `wait`, `playbook`, `status`, `tool`, `say`, `run`, `error`; `text` is the
+  English line, `key` and `vars` its template (`ACTIVITY_KEYS` in `lib/activityText.ts`) for the app's language,
+  `since` when a wait began, `pct` an upload's progress (older readers). `progress` is a render or upload under way
+  (`vr render`: `RunProgress` in `lib/types.ts`, `{what, stage, pct, frames?, eta_s?, tool?, v?}`); an `error` is a
+  render that failed, its `quote` the tool's last words (300 characters at most, secrets taken out); `run` the run the
+  agent works for, when Lampo started it for one (`LAMPO_RUN`). Kept in memory only.
 - **Reporting activity**: `{entries: [...]}`, 20 at most, each a line's fields without `slug` and with `video` naming
-  the video, only the kinds an agent's own calls make; at most every 2 s. Each line is listed as `<agent> · <account>`
-  (unless the name already ends with the sending account), and its `at` is held to the last 5 minutes.
+  the video, only the kinds an agent's own calls make (`vr render`'s `render` and `error` among them); at most every
+  2 s. `progress` takes only the stages and tools `vr render` knows and bounded numbers, `run` only a run id's shape.
+  Each line is listed as `<agent> · <account>` (unless the name already ends with the sending account), and its `at`
+  is held to the last 5 minutes.
 - **The inbox** lists 50 events unless `limit` says otherwise (5,000 at most); `all` adds agents' events and every
   event type. Screenshots are paths on the server's disk only for the machine itself, here, in `/api/inbox.md` and
   over MCP; anyone else (the LAN link, a token, every caller of a hosted server) reads them as `/data/<slug>/<file>`
