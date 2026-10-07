@@ -15,10 +15,10 @@ import { RUN_ID } from './activity.ts';
 import { words } from './activityText.ts';
 import { agentKindOf } from './agentKind.ts';
 import { cleanAgentName, cutChars } from './names.ts';
-import { dataDir, isoLocal, reviewDir, reviewFile } from './paths.ts';
+import { cacheDir, dataDir, isoLocal, reviewDir, reviewFile } from './paths.ts';
 import { RENDER_STAGES, RENDER_TOOLS } from './render/tools.ts';
 import { currentWorkspace, wsKey } from './scope.ts';
-import { listSlugs, setVersionRunProvider, withLock, writeAtomic } from './store.ts';
+import { findComment, listSlugs, loadReview, resolveVideo, setVersionRunProvider, withLock, writeAtomic } from './store.ts';
 import { compareTime, oneLine } from './time.ts';
 import type {
   ActivityWords,
@@ -90,6 +90,10 @@ export interface RunClock {
   asked?: number;
   /** The process this machine started for it, when its id isn't the run's. */
   proc?: string;
+  /** When its agent heard that the person stopped it (its next call after the stop). */
+  stopTold?: string;
+  /** When the people who want it were told it went quiet (push, once). */
+  quiet?: string;
 }
 
 /** A run as kept: its head, its steps (oldest first) and its clock. */
@@ -609,6 +613,18 @@ export function askedPerson(r: StoredRun, now: number, needs?: Run['needs']): Ru
   return was !== 'needs_you' ? 'needs_you' : null;
 }
 
+/**
+ * A run Lampo started was denied a permission (its own output says so): it needs the person — not a question it asked,
+ * so nothing is counted as asked and no note in hand moves. Returns the phase to tell.
+ */
+export function needsPermission(r: StoredRun, now: number, needs: { text: ActivityWords; allow: string }): RunPhase | null {
+  if (r.ended !== null) return null;
+  const was = r.state;
+  r.needs = { kind: 'permission', text: needs.text, allow: needs.allow };
+  if (was !== 'needs_you') setState(r, 'needs_you', now);
+  return was !== 'needs_you' ? 'needs_you' : null;
+}
+
 /** A plan note's status as it now is (by anyone on the editor's side, through any way in). */
 export function noteMoved(r: StoredRun, id: string, to: RunPlanItem['state'], now: number): boolean {
   const p = r.plan.find((x) => x.id === id);
@@ -712,6 +728,89 @@ export function answered(r: StoredRun, now: number, still?: string | null): bool
   // its time waiting for the person isn't the agent's, nor does the clock of "lost" count it
   r.seen = at(Math.max(now, ms(r.seen)));
   return true;
+}
+
+/** Deliveries whose agent is stopped by a signal (a process Lampo runs): no line to tell them, they are ended. */
+const SIGNALLED = new Set<RunDelivery>(['machine', 'runner']);
+
+/**
+ * The person stopped it: stopped at once. An agent that listens (not a process Lampo runs, which its caller ends by
+ * signal) is told with its next Lampo answer (`stopLine`) once it had begun: `stop_pending` until then. A run nobody
+ * picked up yet (queued) is only called off.
+ */
+export function stoppedByPerson(r: StoredRun, now: number): void {
+  if (r.ended !== null) return;
+  const began = r.state !== 'queued';
+  endRun(r, 'stopped', now);
+  if (began && !SIGNALLED.has(r.delivery)) r.stop_pending = true;
+}
+
+/** Its agent heard of the stop (its next call): no longer pending. */
+export function heardStop(r: StoredRun, now: number): void {
+  if (!r.stop_pending) return;
+  delete r.stop_pending;
+  r.clock.stopTold = at(now);
+}
+
+/**
+ * The line a listening agent's next Lampo answer ends with after the person stopped its work on a video (§4.6), once.
+ * Agent text: it names the video (someone's file name, so oneLine'd) and says what not to do. Its cost fits
+ * test/unit/token-budget.test.ts.
+ */
+export function stopLine(video: string): string {
+  return oneLine(`The person stopped this work on ${path.basename(video)}: stop now, render nothing, mark nothing, and say you stopped.`);
+}
+
+/** How long the markers of lines already told are kept. */
+const TOLD_DAYS = 7;
+
+/**
+ * Takes the one telling of run `id`'s stop line on this machine: true the first time, false after. Every process that
+ * could tell it (the app's MCP endpoint, `vr`, the stdio MCP server) takes it here first, so the agent hears it once
+ * whichever way it calls. A cache that can't be written tells it anyway (twice at worst, never not at all).
+ */
+export function claimStop(id: string, now = Date.now()): boolean {
+  if (!RUN_ID.test(id)) return false;
+  const dir = path.join(cacheDir(), 'runs-told');
+  try {
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    fs.writeFileSync(path.join(dir, id), '', { flag: 'wx', mode: 0o600 });
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code !== 'EEXIST';
+  }
+  try {
+    const names = fs.readdirSync(dir);
+    if (names.length > 50)
+      for (const n of names)
+        if (RUN_ID.test(n) && now - fs.statSync(path.join(dir, n)).mtimeMs > TOLD_DAYS * 86_400_000) fs.rmSync(path.join(dir, n), { force: true });
+  } catch {}
+  return true;
+}
+
+/**
+ * The stop line for a call an agent of this machine makes outside the app (`vr`, the stdio MCP server on the local
+ * store): its run on the video the call names (by a name, a path, a slug or a note), stopped by the person and not told
+ * yet. The app hears the same call a moment later (the activity file) and clears `stop_pending`; `claimStop` keeps it to
+ * one telling. A wait tells nothing (it went back to waiting: the work is over either way). Read only.
+ */
+export function localStopLine(agent: string | null, about: { kind: AgentActivityKind; slug?: string | null; video?: string | null; target?: string | null }): string | null {
+  if (!agent || about.kind === 'wait') return null;
+  try {
+    let slug = about.slug ?? null;
+    if (!slug && about.video)
+      try {
+        slug = resolveVideo(about.video).slug;
+      } catch {}
+    if (!slug && about.target && /^c_[0-9a-f]+$/i.test(about.target)) slug = findComment(about.target)?.slug ?? null;
+    if (!slug) return null;
+    const name = cleanAgentName(agent);
+    const r = readRuns(slug).find((x) => x.stop_pending && x.agent.name === name);
+    const video = loadReview(slug)?.video;
+    if (!r || !video || !claimStop(r.id)) return null;
+    return stopLine(video);
+  } catch {
+    return null;
+  }
 }
 
 /** How a run Lampo started on this machine ended (server/agentRuns.ts), by the done rule's first part. */

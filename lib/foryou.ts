@@ -8,6 +8,11 @@
 // remembered per person in data/for-you.json, and a dismissal never hides a work item. Last and quieter, videos that
 // stalled — waiting on an agent or a client, or on nobody, for too long (lib/insights.ts attentionOf): listed with a
 // nudge, not counted in the bell's number.
+// Agents' runs (lib/runs.ts), for people with the agents right: one that waits for a permission it was denied (`blocked`:
+// the rule to copy, Send again, Stop — it leaves when the run goes on, is stopped or sent again) and one that failed
+// (`failed`: why, Log, Try again — it leaves with Try again, or once the person opened it: dismissed without a "Got
+// it"), both ahead of fixes to check; one gone quiet (`lost`) or sent and never picked up (`queued`, 10 min) is a
+// stalled video with Nudge and Stop.
 // "Later" puts any item aside for one person, work or not: until a time the browser picks (tomorrow 9:00 in their
 // day) or until its video moves (a render, a note, a reply, a verdict), whichever comes first. A snoozed item is out of
 // the list and out of the bell's number, sent apart as `later`; it changes nothing on the note or the video. Kept per
@@ -24,19 +29,22 @@ import { dataDir, isoLocal, slugify } from './paths.ts';
 import { can } from './permissions.ts';
 import { pendingProposals, scopeLabel } from './playbooks.ts';
 import { failedPosts } from './publish/posts.ts';
+import { due, isAnswered, readRuns, settle, type StoredRun } from './runs.ts';
 import { stageOf } from './stage.ts';
 import { listReviews, readHistory, withLock, writeAtomic } from './store.ts';
 import { compareTime, isAgent, isQuestion, isRequired } from './time.ts';
-import type { Comment, ForYouCounts, ForYouItem, ForYouKind, ForYouResponse, Review, ReviewEvent, Role, StageInfo } from './types.ts';
+import type { Comment, ForYouCounts, ForYouItem, ForYouKind, ForYouResponse, ForYouRun, Review, ReviewEvent, Role, StageInfo } from './types.ts';
 
 const FILE = (): string => path.join(dataDir(), 'for-you.json');
 const LOCK_DIR = (): string => path.join(dataDir(), '.for-you');
 const DAY = 24 * 3600 * 1000;
 /** How long informational items stay when nobody dismisses them. */
-const WINDOW: Partial<Record<ForYouKind, number>> = { approval: 14 * DAY, answer: 14 * DAY, version: 7 * DAY };
+const WINDOW: Partial<Record<ForYouKind, number>> = { approval: 14 * DAY, answer: 14 * DAY, version: 7 * DAY, blocked: 7 * DAY, failed: 7 * DAY };
+/** A run sent and not picked up for this long is a stalled video. */
+export const QUEUED_STALL = 10 * 60_000;
 /** Dismissals older than this are dropped (their items have aged out long before). */
 const KEEP_DISMISSED = 30 * DAY;
-const ORDER: ForYouKind[] = ['question', 'verify', 'review', 'post', 'client', 'playbook', 'approval', 'answer', 'version', 'stalled'];
+const ORDER: ForYouKind[] = ['question', 'blocked', 'failed', 'verify', 'review', 'post', 'client', 'playbook', 'approval', 'answer', 'version', 'stalled'];
 /** A render waits for review this long before it drops off the list on its own. */
 const REVIEW_WINDOW = 30 * DAY;
 /** "Later" reaches this far at most. */
@@ -316,10 +324,11 @@ export function forYou(viewer: ForYouViewer, { server = false, now = Date.now(),
     ...(can(viewer.role, 'playbook') ? playbookItems() : []),
     ...(can(viewer.role, 'comment') ? askItems() : []),
     ...(can(viewer.role, 'publish') ? postItems() : []),
+    ...(can(viewer.role, 'agents') ? runItems(reviews, now) : []),
     // what happened, a moved store's history included (docs/moving.md: the Inbox reads it as what happened)
     ...fromEvents(readHistory({ limit: 3000 }), bySlug, viewer, server, now).filter((i) => i.kind !== 'version' || !reviewing.has(`${i.slug}:${i.v}`)),
   ].filter((i) => !(i.dismissible && dismissed[i.key]) && !archivedIn(i.folder, shut));
-  // A video the list already shows (a fix to check, a question…) isn't listed again as stalled.
+  // A video the list already shows (a fix to check, a question…, an agent gone quiet) isn't listed again as stalled.
   const shown = new Set(listed.map((i) => i.slug));
   const stalled = can(viewer.role, 'approve') ? stalledItems(reviews, stageFor ?? ((r) => stageOf(r, { now })), now).filter((i) => !shown.has(i.slug)) : [];
   const all = [...listed, ...stalled.filter((i) => !dismissed[i.key])].sort(
@@ -366,8 +375,94 @@ const emptyCounts = (): ForYouCounts => ({
   version: 0,
   stalled: 0,
   post: 0,
+  blocked: 0,
+  failed: 0,
   total: 0,
 });
+
+/** A run as an inbox item carries it: who, where it stands, why, and what it last did. */
+function runOf(r: StoredRun): ForYouRun {
+  return {
+    id: r.id,
+    agent: r.agent.name,
+    kind: r.agent.kind,
+    state: r.state,
+    delivery: r.delivery,
+    started: r.started,
+    ended: r.ended,
+    seen: r.seen,
+    ...(r.error ? { error: r.error } : {}),
+    ...(r.needs ? { needs: r.needs } : {}),
+    ...(r.now ? { now: { text: r.now.text, ...(r.now.key ? { key: r.now.key } : {}), ...(r.now.vars ? { vars: r.now.vars } : {}), ...(r.now.quote ? { quote: r.now.quote } : {}) } } : {}),
+    ...(r.log ? { log: true } : {}),
+    planned: r.plan.length,
+    answered: r.plan.filter(isAnswered).length,
+  };
+}
+
+/**
+ * Agents' runs that need the person: per video and agent, its newest run — a newer one (Try again, a new Send) takes an
+ * older failure or block off the list. Time's moves are seen as of `now` (a run gone quiet), never written here.
+ */
+function runItems(reviews: Review[], now: number): ForYouItem[] {
+  const out: ForYouItem[] = [];
+  for (const r of reviews) {
+    if (r.onboarding_sample) continue;
+    const slug = slugify(r.video);
+    let runs: readonly StoredRun[];
+    try {
+      runs = readRuns(slug);
+    } catch {
+      continue;
+    }
+    if (!runs.length) continue;
+    const newest = new Map<string, StoredRun>();
+    for (const x of runs) {
+      const b = newest.get(x.agent.name);
+      if (!b || compareTime(x.started, b.started) >= 0) newest.set(x.agent.name, x);
+    }
+    const v = r.versions.at(-1)?.v ?? 1;
+    const common = { slug, video: base(r), folder: r.folder ?? null, v, poster: poster(slug, v) };
+    for (let run of newest.values()) {
+      if (due(run, now)) {
+        run = structuredClone(run);
+        settle(run, now);
+      }
+      const since = (iso: string | null) => (iso ? now - Date.parse(iso) : 0);
+      if (run.state === 'needs_you' && run.needs?.kind === 'permission' && since(run.ended ?? run.seen) < (WINDOW.blocked ?? 0))
+        out.push({ key: `blocked:${run.id}`, kind: 'blocked', at: run.seen, ...common, text: run.needs.text?.text ?? '', by: `agent:${run.agent.name}`, run: runOf(run), dismissible: false });
+      else if (run.state === 'failed' && since(run.ended) < (WINDOW.failed ?? 0))
+        out.push({
+          key: `failed:${run.id}`,
+          kind: 'failed',
+          at: run.ended ?? run.seen,
+          ...common,
+          text: run.error?.text ?? '',
+          by: `agent:${run.agent.name}`,
+          run: runOf(run),
+          // it leaves once the person opened it (or with Try again): no "Got it" (web/src/inbox/group.ts doneOf)
+          dismissible: true,
+        });
+      else if (run.state === 'lost' || (run.state === 'queued' && since(run.started) >= QUEUED_STALL)) {
+        const lost = run.state === 'lost';
+        out.push({
+          key: `${lost ? 'lost' : 'queued'}:${run.id}`,
+          kind: 'stalled',
+          at: lost ? run.seen : run.started,
+          ...common,
+          waitingOn: 'agents',
+          reason: lost ? 'lost' : 'queued',
+          waitingHours: Math.round((since(lost ? run.seen : run.started) / 3_600_000) * 100) / 100,
+          agent: run.agent.name,
+          by: `agent:${run.agent.name}`,
+          run: runOf(run),
+          dismissible: false,
+        });
+      }
+    }
+  }
+  return out;
+}
 
 // Posts that failed (lib/publish/posts.ts): the person who may publish tries again, edits it or takes it back — work,
 // so it leaves when that is done, never with "Got it". The key carries when it failed: a post that fails again is new.

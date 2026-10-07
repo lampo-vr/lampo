@@ -151,12 +151,18 @@ export function createContext({ cfg, lan = false, dev = false, token, loadSessio
   const playback = createPlayback(broadcast);
   const agents = createAgentRegistry(broadcast);
   // Every activity joins its agent run (server/runs.ts); this machine's processes are runs too.
-  const runs: Runs = createRuns({ broadcast, actor: (req) => actor(req) });
+  // A run that failed, waits for a permission or went quiet: a push (the `agents` and `quiet` categories), once ctx is made.
+  const runs: Runs = createRuns({ broadcast, actor: (req) => actor(req), notify: (n) => ctx.push.run(n) });
   const activity = createActivityStore(broadcast, { onRecord: (a) => runs.sign(a) });
   const agentRuns = createAgentRuns({
     broadcast,
     activity: activity.record,
-    runs: { started: (i, r) => runs.machineStarted(i, r), ended: (i, r, e) => runs.machineEnded(i, r, e), seen: (r) => runs.seen(r) },
+    runs: {
+      started: (i, r) => runs.machineStarted(i, r),
+      ended: (i, r, e) => runs.machineEnded(i, r, e),
+      blocked: (i, r, d) => runs.machineBlocked(i, r, d),
+      seen: (r) => runs.seen(r),
+    },
   });
   // Server mode lists the agents that connected (in memory, always current); locally `claude agents` plus those, plus
   // the sessions Lampo itself started for a request (running from the moment they start, not the next refresh).
@@ -297,7 +303,16 @@ function eligible(server: boolean, localUser: string) {
     const user = auth.getUser(sub.user);
     if (!user || user.disabled) return false;
     if (msg.authors.every((a) => a === user.name)) return false;
-    const need = msg.category === 'fixes' ? 'verify' : msg.category === 'questions' ? 'comment' : msg.category === 'posts' ? 'post' : 'view';
+    const need =
+      msg.category === 'fixes'
+        ? 'verify'
+        : msg.category === 'questions'
+          ? 'comment'
+          : msg.category === 'posts'
+            ? 'post'
+            : msg.category === 'agents' || msg.category === 'quiet'
+              ? 'agents'
+              : 'view';
     return can(roleIn(currentWorkspace(), user.id), need);
   };
 }

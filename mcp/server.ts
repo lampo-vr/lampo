@@ -8,6 +8,7 @@ import { openActivitySink } from '../lib/activity.ts';
 import { readCredentials } from '../lib/backend/credentials.ts';
 import { openBackend } from '../lib/backend/index.ts';
 import { loadConfig } from '../lib/config.ts';
+import { localStopLine } from '../lib/runs.ts';
 import { enterProcessWorkspace } from '../lib/scope.ts';
 import { checkProcessWorkspace } from '../lib/workspaces.ts';
 import { createReviewServer } from './core.ts';
@@ -53,6 +54,7 @@ const woken = () => {
 };
 // What the agent does through these tools shows live in the app (a line in the cache, or a batch to the hosted server).
 const activity = openActivitySink();
+const remote = !!readCredentials();
 // What this agent (the process) was told was waiting for it, across its connections: each thing once.
 const told = ownTold();
 // How long it has heard only "no new feedback" in a row, across its connections (after 30 min it is told to stop).
@@ -65,7 +67,12 @@ serveStdio(
       principal: { via: 'local', name: cfg.user, role: 'owner' },
       sessionAuthor: true,
       appUrl,
-      activity: activity.record,
+      // What the agent does shows in the app; the person stopped its work: the line its next answer ends with, once —
+      // from this machine's runs, or what the hosted server answered an earlier batch with.
+      activity: (a) => {
+        activity.record(a);
+        return remote ? activity.heard().join('\n') || null : localStopLine(a.agent, { kind: a.kind, slug: a.slug ?? null, video: a.video ?? null, target: a.target ?? null });
+      },
       sourceUrl: cfg.source_url,
       told,
       quiet,

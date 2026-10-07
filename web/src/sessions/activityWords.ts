@@ -70,6 +70,10 @@ const WORDS: Record<ActivityKey, (v: Params) => string> = {
   'Stopped after {time}': (v) => t('Stopped after {time}', v),
   'Stopped at the time limit': () => t('Stopped at the time limit'),
   'Couldn’t start': () => t('Couldn’t start'),
+  'Needs permission to run {command}': (v) => t('Needs permission to run {command}', v),
+  'Needs permission to use {tool}': (v) => t('Needs permission to use {tool}', v),
+  'Needs permission to edit files': () => t('Needs permission to edit files'),
+  '{name} asked': (v) => t('{name} asked', v),
 };
 
 /** A note's moment for its id (`00:15:08`), where the video's notes are at hand; null when it isn't one of them. */

@@ -32,6 +32,7 @@ import { platformOf } from './publish/platforms.ts';
 import { postLines } from './publish/posts.ts';
 import { describeRange, normalizeRange } from './range.ts';
 import { describeRef } from './refLine.ts';
+import { localStopLine } from './runs.ts';
 import { enterProcessWorkspace } from './scope.ts';
 import { currentSession, matchesSession, rankSessions } from './sessions.ts';
 import { STAGE_LABELS } from './stage.ts';
@@ -1449,7 +1450,11 @@ export async function main(argv: string[]): Promise<void> {
     await fn(args, openBackend());
     if (name !== 'watch') {
       record();
-      await sink?.flush();
+      // The person stopped this agent's work and it hasn't heard yet: one line after the command's own output, once —
+      // read from this machine's runs, or what the hosted server answered the activity with.
+      const local = guess && !readCredentials() ? localStopLine(agent, { kind: guess.kind, video: guess.video ?? null, target: guess.target ?? null }) : null;
+      const lines = [...(local ? [local] : []), ...((await sink?.flush()) ?? [])];
+      for (const l of lines.slice(0, 2)) out(l);
     }
   } catch (e) {
     if (!(e instanceof Exit)) {

@@ -58,8 +58,11 @@ export interface ReviewServerOptions {
   sourceUrl?: string | null;
   /** Which tools to offer: `all` (default), `lean` (the review loop only) or a comma-separated list; default VR_MCP_TOOLS. */
   tools?: string | null;
-  /** Each tool call an agent makes, as live activity for the UI (lib/activity.ts): no extra tokens, the call itself. */
-  activity?: (a: ActivityRecord) => void;
+  /**
+   * Each tool call an agent makes, as live activity for the UI (lib/activity.ts): no extra tokens, the call itself.
+   * What it returns is a line the answer ends with: the person stopped this agent's work (lib/runs.ts stopLine), once.
+   */
+  activity?: (a: ActivityRecord) => string | null | undefined | void;
   /** The caller's new frames, counted per account (`get_frame`, like `GET /api/review/:slug/frame`); absent: not counted. */
   frameGrabs?: GrabCount;
   /**
@@ -116,7 +119,7 @@ export interface ToolKit {
   /** Whether this server offers a tool (the `tools` option). */
   offers(name: string): boolean;
   /** Records a call as live activity, for tools registered outside `tool` (the wait, the review card). */
-  activity(name: string, args: Record<string, unknown>, ctx: ServerContext): void;
+  activity(name: string, args: Record<string, unknown>, ctx: ServerContext): string | null;
   /** The agent this connection is (`session: "me"`): null when the server can't tell (a client nobody assigns to). */
   me(): { name: string | null; sessionId: string | null } | null;
   /** The agent a call comes from, by its activity name (null: a person's client, or no name). */
@@ -154,9 +157,9 @@ export function createToolKit(server: McpServer, o: ReviewServerOptions): ToolKi
         const given = wellFormed(args);
         const out = await fn(given, ctx);
         if (out.isError) return out;
-        noteActivity(name, given as Record<string, unknown>, ctx);
-        // notes the person added to its run while it worked: one line at the end of its next answer, once
-        const line = newsFor(name, given as Record<string, unknown>, ctx);
+        // the person stopped its work: one line at the end of this answer, once (and nothing else is news then);
+        // else notes the person added to its run while it worked: one line at the end of its next answer, once
+        const line = noteActivity(name, given as Record<string, unknown>, ctx) || newsFor(name, given as Record<string, unknown>, ctx);
         return line ? { ...out, content: [...out.content, { type: 'text', text: line }] } : out;
       } catch (e) {
         return fail(publicMessage(e, audienceOf(o.principal), { status: 400, where: `mcp ${name}` }));
@@ -208,16 +211,19 @@ export function createToolKit(server: McpServer, o: ReviewServerOptions): ToolKi
   const agentOf = (ctx: ServerContext): string | null => (allowed(o.principal, 'agents') || o.principal.via === 'local' ? activityName(ctx) : null);
 
   // What the agent just did, in plain words, for the UI's live view. Only agents' calls (a person's MCP client reading
-  // notes is not agent activity), and never a failure of its own to break the tool.
-  function noteActivity(name: string, args: Record<string, unknown>, ctx: ServerContext) {
-    if (!o.activity) return;
+  // notes is not agent activity), and never a failure of its own to break the tool. Returns the line the answer ends
+  // with when the person stopped this agent's work (its next call hears it), else null.
+  function noteActivity(name: string, args: Record<string, unknown>, ctx: ServerContext): string | null {
+    if (!o.activity) return null;
     try {
       const guess = toolActivity(name, args);
-      if (!guess) return;
+      if (!guess) return null;
       const agent = agentOf(ctx);
-      if (!agent) return;
-      o.activity?.({ ...guess, at: isoLocal(), agent, target: guess.target ?? null, video: guess.video ?? null });
-    } catch {}
+      if (!agent) return null;
+      return o.activity({ ...guess, at: isoLocal(), agent, target: guess.target ?? null, video: guess.video ?? null }) || null;
+    } catch {
+      return null;
+    }
   }
 
   function newsFor(name: string, args: Record<string, unknown>, ctx: ServerContext): string | null {

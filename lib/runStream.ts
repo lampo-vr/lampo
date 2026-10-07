@@ -14,7 +14,10 @@ export interface RunTokens {
 }
 
 export interface StreamStep extends ActivityWords {
-  kind: 'tool' | 'say' | 'run';
+  /** `denied`: a permission the run was denied (its tool call refused): what it needs, and `allow`. */
+  kind: 'tool' | 'say' | 'run' | 'denied';
+  /** denied: the rule in Claude Code's settings syntax that would allow it, for the person to copy. */
+  allow?: string;
 }
 
 export interface StreamState {
@@ -95,6 +98,62 @@ export function toolStep(name: string, input: Record<string, unknown>, cwd: stri
   }
 }
 
+/** A word that ends a command's prefix: an option, a path, an assignment, a quote, an expansion. */
+const NOT_PREFIX = /^-|[/=$`'"(){}<>*?]/;
+
+/**
+ * The start of a shell command that says what it runs — the program and up to two words after it (`npx remotion
+ * render`, `vr render`, `ffmpeg`) — without its paths, options or values: what a permission rule allows. Of a chain,
+ * the first part that isn't a `cd`; leading variable assignments are left out.
+ */
+export function commandPrefix(command: string): string {
+  const parts = command
+    .split(/&&|\|\||;|\||\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const part = parts.find((p) => !/^cd(\s|$)/.test(p)) ?? parts[0] ?? '';
+  const said = part.split(/\s+/).filter(Boolean);
+  while (said.length > 1 && /^[A-Za-z_]\w*=/.test(said[0] as string)) said.shift();
+  const out: string[] = [];
+  for (const w of said) {
+    if (out.length >= 3 || (out.length > 0 && NOT_PREFIX.test(w)) || /[`$'"]/.test(w)) break;
+    out.push(w);
+  }
+  return short(out.join(' '), 60);
+}
+
+/**
+ * What a run needs to be allowed, for a tool call it was refused: the words for the person, and the rule in Claude
+ * Code's settings syntax (`permissions.allow`) that would allow it. Lampo only shows it; the person adds it, or not.
+ */
+export function permissionFor(name: string, input: Record<string, unknown>): { words: ActivityWords; allow: string } {
+  const clean = (rule: string) => short(rule, 120);
+  if (name === 'Bash') {
+    const prefix = commandPrefix(typeof input.command === 'string' ? input.command : '');
+    return prefix
+      ? { words: words('Needs permission to run {command}', { command: prefix }), allow: clean(`Bash(${prefix}:*)`) }
+      : { words: words('Needs permission to use {tool}', { tool: 'Bash' }), allow: 'Bash' };
+  }
+  if (name === 'Edit' || name === 'MultiEdit' || name === 'Write' || name === 'NotebookEdit') return { words: words('Needs permission to edit files'), allow: 'Edit' };
+  const mcp = /^mcp__(.+?)__(.+)$/.exec(name);
+  if (mcp) {
+    // Lampo's own tools, under whatever key the session gave the server: all of them at once
+    const ours = mcp[1] === 'lampo' || mcp[1] === 'video-review';
+    return ours
+      ? { words: words('Needs permission to use {tool}', { tool: 'Lampo' }), allow: clean(`mcp__${mcp[1]}`) }
+      : { words: words('Needs permission to use {tool}', { tool: short(mcp[2].replace(/_/g, ' '), 40) }), allow: clean(name) };
+  }
+  if (name === 'WebFetch' && typeof input.url === 'string') {
+    try {
+      return { words: words('Needs permission to use {tool}', { tool: 'WebFetch' }), allow: clean(`WebFetch(domain:${new URL(input.url).hostname})`) };
+    } catch {}
+  }
+  return { words: words('Needs permission to use {tool}', { tool: short(name, 40) }), allow: clean(name) };
+}
+
+/** Claude Code's words in a refused tool call's result (a headless run has nobody to ask). */
+const DENIED = /requested permissions? to (use|run|write|edit|read)|haven[’']t granted it/i;
+
 /** Reads a run's stream-json as it arrives. `feed` returns the steps that are new since the last feed. */
 export function createRunReader(cwd: string) {
   let partial = '';
@@ -102,6 +161,10 @@ export function createRunReader(cwd: string) {
   const perMessage = new Map<string, RunTokens>();
   let unnamed = 0;
   let final: RunTokens | null = null;
+  /** Its tool calls by id (the latest few hundred), for a refusal that names only the id. */
+  const calls = new Map<string, { name: string; input: Record<string, unknown> }>();
+  /** Refusals already told (by the call's id). */
+  const refused = new Set<string>();
   const state: StreamState = {
     step: null,
     tokens: { input: 0, output: 0, cache_read: 0, cache_write: 0 },
@@ -134,23 +197,56 @@ export function createRunReader(cwd: string) {
       return;
     }
     const push = (s: StreamStep) => {
-      if (state.step?.text === s.text) return;
-      const { kind: _, ...step } = s;
+      if (state.step?.text === s.text && s.kind !== 'denied') return;
+      const { kind: _, allow: _a, ...step } = s;
       state.step = step;
       out.push(s);
+    };
+    // A refused call, once: what it needs and the rule that would allow it.
+    const deny = (id: string, name: string | undefined, input: Record<string, unknown> | undefined) => {
+      if (!name || refused.has(id)) return;
+      refused.add(id);
+      const p = permissionFor(name, input ?? {});
+      push({ kind: 'denied', ...p.words, allow: p.allow });
     };
     if (e.type === 'assistant' && e.message && typeof e.message === 'object') {
       const m = e.message as { id?: string; content?: unknown[]; usage?: Usage };
       if (m.usage) perMessage.set(m.id || `m${unnamed++}`, tokensOf(m.usage));
       for (const b of Array.isArray(m.content) ? m.content : []) {
         const block = b as { type?: string; name?: string; input?: Record<string, unknown>; text?: string };
-        if (block.type === 'tool_use' && block.name) push({ kind: 'tool', ...toolStep(block.name, block.input || {}, cwd) });
+        if (block.type === 'tool_use' && block.name) {
+          const id = (block as { id?: string }).id;
+          if (id) {
+            calls.set(id, { name: block.name, input: block.input || {} });
+            if (calls.size > 500) calls.delete(calls.keys().next().value as string);
+          }
+          push({ kind: 'tool', ...toolStep(block.name, block.input || {}, cwd) });
+        }
         // What it says in its own words: the first sentence, shown as it is.
         else if (block.type === 'text' && block.text?.trim()) push({ kind: 'say', text: short(block.text.split(/(?<=[.!?])\s/)[0] || block.text, 100) });
         else if (block.type === 'thinking') push({ kind: 'say', ...words('Thinking') });
       }
       state.tokens = sum();
+    } else if (e.type === 'user' && e.message && typeof e.message === 'object') {
+      // a tool call refused for want of a permission: its result says so
+      const m = e.message as { content?: unknown[] };
+      for (const b of Array.isArray(m.content) ? m.content : []) {
+        const r = b as { type?: string; tool_use_id?: string; is_error?: boolean; content?: unknown };
+        if (r.type !== 'tool_result' || !r.is_error || !r.tool_use_id) continue;
+        const said =
+          typeof r.content === 'string' ? r.content : Array.isArray(r.content) ? r.content.map((c) => (c as { text?: string }).text ?? '').join(' ') : '';
+        const call = calls.get(r.tool_use_id);
+        if (DENIED.test(said) && call) deny(r.tool_use_id, call.name, call.input);
+      }
     } else if (e.type === 'result') {
+      // the refusals the run had, as its result lists them (permission_denials), any not told yet
+      const denials = Array.isArray(e.permission_denials) ? e.permission_denials : [];
+      for (const d of denials.slice(0, 20)) {
+        const x = d as { tool_name?: unknown; tool_use_id?: unknown; tool_input?: unknown };
+        if (typeof x.tool_name !== 'string') continue;
+        const input = x.tool_input && typeof x.tool_input === 'object' ? (x.tool_input as Record<string, unknown>) : {};
+        deny(typeof x.tool_use_id === 'string' ? x.tool_use_id : `${x.tool_name}:${JSON.stringify(input).slice(0, 200)}`, x.tool_name, input);
+      }
       const usage = e.usage as Usage | undefined;
       if (usage) final = tokensOf(usage);
       state.tokens = sum();

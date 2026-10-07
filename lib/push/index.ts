@@ -14,7 +14,7 @@ import { DEFAULT_PREFS } from '../pushPrefs.ts';
 import { routeIn } from '../scope.ts';
 import { withLock, writeAtomic } from '../store.ts';
 import { isAgent, isQuestion } from '../time.ts';
-import type { PushPrefs, ReviewEvent } from '../types.ts';
+import type { ActivityWords, PushPrefs, ReviewEvent } from '../types.ts';
 import { generateVapidKeys, isPushEndpoint, PushRefused, type PushSubscriptionKeys, sendPush, type VapidKeys } from './webpush.ts';
 
 export { DEFAULT_PREFS };
@@ -164,6 +164,8 @@ function patchSub(id: string, fn: (s: StoredSub) => StoredSub | null): void {
 export interface PushMessage {
   title: string;
   body: string;
+  /** Delivered at once even on a device saving power (a question; an agent waiting for your OK). */
+  urgent?: boolean;
   /** Where tapping it goes (an app route like #/v/<slug>?c=<note>). */
   url: string;
   /** Same tag = the newer notification replaces the older one on the device. */
@@ -179,7 +181,27 @@ export const notFrom =
   (_sub: StoredSub, msg: PushMessage): boolean =>
     !msg.authors.every((a) => a === name);
 
-type Bucket = 'question' | 'release' | 'client' | 'answer' | 'post';
+type Bucket = 'question' | 'release' | 'client' | 'answer' | 'post' | 'agent' | 'quiet';
+
+/**
+ * What an agent's run gives people a ping for (server/runs.ts tells it): it failed, it waits for a permission it was
+ * denied, or there has been no word from it for 30 min. Never that it started, renders or got on: that is the app's to
+ * show, not a reason to reach for the phone.
+ */
+export interface RunNotice {
+  kind: 'failed' | 'permission' | 'quiet';
+  slug: string;
+  /** The video's file name. */
+  video: string;
+  agent: string;
+  run: string;
+  /** failed: why (Run.error); permission: what it needs (Run.needs.text). */
+  words?: ActivityWords;
+  /** permission: the rule that would allow it. */
+  allow?: string;
+  /** quiet: minutes without a word. */
+  minutes?: number;
+}
 const CLIENT_TYPES = new Set(['comment', 'reply', 'status', 'approval', 'download']);
 
 /** Which bundle an event joins, or null when it isn't worth a notification. */
@@ -203,6 +225,74 @@ const quote = (s: string | undefined, max = 140) => {
 const noteUrl = (e: ReviewEvent) =>
   e.slug ? `#/v/${encodeURIComponent(e.slug)}${e.id ? `?c=${e.id}` : ''}` : `#/folder/${encodeURIComponent(e.folder || '')}`;
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** The last line of what a tool printed (oneLine joins its lines with ↵): where it says what went wrong. */
+const lastLine = (s: string | undefined) =>
+  (s || '')
+    .split(' ↵ ')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .at(-1) ?? '';
+const RENDER_TOOL = /\b(remotion|ffmpeg|aerender|blender)\b|^vr render\b/;
+
+/** What a run waits for the person's OK to do, in a few words: "render promo.mp4", "run npm test on promo.mp4". */
+function purpose(n: RunNotice): string {
+  const v = n.words?.vars ?? {};
+  switch (n.words?.key) {
+    case 'Needs permission to run {command}': {
+      const command = String(v.command ?? '');
+      return RENDER_TOOL.test(command) ? `render ${n.video}` : `run ${command} on ${n.video}`;
+    }
+    case 'Needs permission to use {tool}':
+      return `use ${v.tool} on ${n.video}`;
+    case 'Needs permission to edit files':
+      return `edit files for ${n.video}`;
+    default:
+      return `go on with ${n.video}`;
+  }
+}
+
+/** One notification for an agent's runs on one video (the most pressing: a permission, a failure, then quiet). */
+export function runMessage(list: RunNotice[]): PushMessage {
+  const newest = (k: RunNotice['kind']) => [...list].reverse().find((x) => x.kind === k);
+  const n = (newest('permission') ?? newest('failed') ?? newest('quiet')) as RunNotice;
+  const who = n.agent;
+  const file = n.video;
+  const base = { url: '#/inbox', authors: [`agent:${who}`] };
+  if (n.kind === 'permission')
+    return {
+      ...base,
+      title: `${who} is waiting for your OK to ${purpose(n)}`,
+      body: n.allow ? `Allow ${n.allow} in its settings, then send it again.` : 'See what it needs in the inbox.',
+      tag: `run:${n.slug}`,
+      category: 'agents',
+      urgent: true,
+    };
+  if (n.kind === 'failed') {
+    const w = n.words;
+    const said = lastLine(w?.quote);
+    const quoted = said ? quote(said) : '';
+    const title =
+      w?.key === 'The render failed (exit {code})'
+        ? `${who} stopped — the render of ${file} failed`
+        : w?.key === 'Stopped at the time limit'
+          ? `${who} stopped — ${file} hit the time limit`
+          : w?.key === 'Couldn’t start'
+            ? `${who} couldn’t start on ${file}`
+            : `${who} stopped — an error on ${file}`;
+    const body =
+      quoted ||
+      (w?.key === 'The render failed (exit {code})' ? `Exit ${w.vars?.code ?? '?'}. Try again from the inbox.` : w?.key ? 'Try again from the inbox.' : quote(w?.text) || 'Try again from the inbox.');
+    return { ...base, title, body, tag: `run:${n.slug}`, category: 'agents' };
+  }
+  return {
+    ...base,
+    title: `No word from ${who} on ${file} for ${n.minutes ?? 30} min`,
+    body: 'Nudge it or stop it from the inbox.',
+    tag: `quiet:${n.slug}`,
+    category: 'quiet',
+  };
+}
 
 /** One notification for a bundle of events about one video. */
 export function message(bucket: Bucket, events: ReviewEvent[]): PushMessage {
@@ -311,6 +401,8 @@ export interface PushOptions {
 
 export interface Push {
   handle(e: ReviewEvent): void;
+  /** An agent's run failed, waits for a permission or went quiet (server/runs.ts): bundled per video like the rest. */
+  run(n: RunNotice): void;
   /** Sends every waiting bundle now (tests, shutdown). */
   flush(): void;
   /** Resolves when every send started so far has finished. */
@@ -319,7 +411,7 @@ export interface Push {
   test(endpoint: string, user: string | null): Promise<boolean>;
 }
 
-const WINDOWS: Record<Bucket, number> = { question: 4000, release: 20_000, client: 30_000, answer: 8000, post: 2000 };
+const WINDOWS: Record<Bucket, number> = { question: 4000, release: 20_000, client: 30_000, answer: 8000, post: 2000, agent: 3000, quiet: 3000 };
 
 export function createPush(o: PushOptions): Push {
   const log = o.log || ((m: string) => console.error(m));
@@ -327,7 +419,7 @@ export function createPush(o: PushOptions): Push {
   const maxWait = o.maxWaitMs ?? 120_000;
   const retryDelay = o.retryDelayMs ?? 5000;
   // Bundles per workspace (its events only, never mixed with another's video of the same name), sent in it.
-  const waiting = new Map<string, { bucket: Bucket; events: ReviewEvent[]; first: number; timer: NodeJS.Timeout; ws: string }>();
+  const waiting = new Map<string, { bucket: Bucket; events: ReviewEvent[]; runs: RunNotice[]; first: number; timer: NodeJS.Timeout; ws: string }>();
   const inflight = new Set<Promise<unknown>>();
   const track = <T>(p: Promise<T>) => {
     inflight.add(p);
@@ -380,7 +472,7 @@ export function createPush(o: PushOptions): Push {
       // a subscription from before a category existed hears it (posts: on unless turned off)
       if (!(sub.prefs[msg.category] ?? DEFAULT_PREFS[msg.category])) continue;
       if (o.eligible && !o.eligible(sub, msg)) continue;
-      track(deliver(id, sub, payload, topic, msg.category === 'questions' ? 'high' : 'normal'));
+      track(deliver(id, sub, payload, topic, msg.category === 'questions' || msg.urgent ? 'high' : 'normal'));
     }
   }
 
@@ -391,7 +483,7 @@ export function createPush(o: PushOptions): Push {
     clearTimeout(b.timer);
     try {
       inWorkspace(b.ws, () => {
-        const m = message(b.bucket, b.events);
+        const m = b.runs.length ? runMessage(b.runs) : message(b.bucket, b.events);
         // Tapping it opens the workspace it is about (A12 WS-11).
         send({ ...m, url: routeIn(m.url, b.ws) });
       });
@@ -400,21 +492,30 @@ export function createPush(o: PushOptions): Push {
     }
   }
 
+  /** Joins the bundle of `bucket` for this video (in the workspace running now); its quiet time starts again. */
+  function queue(bucket: Bucket, about: string, add: (entry: { events: ReviewEvent[]; runs: RunNotice[] }) => void) {
+    const ws = currentWorkspace();
+    const key = `${ws}\u0000${bucket}:${about}`;
+    const now = Date.now();
+    const b = waiting.get(key);
+    if (b) clearTimeout(b.timer);
+    const entry = b || { bucket, events: [], runs: [], first: now, timer: undefined as unknown as NodeJS.Timeout, ws };
+    add(entry);
+    const wait = Math.max(0, Math.min(windows[bucket], entry.first + maxWait - now));
+    entry.timer = setTimeout(() => release(key), wait);
+    entry.timer.unref?.();
+    waiting.set(key, entry);
+  }
+
   return {
     handle(e) {
       const bucket = bucketOf(e);
       if (!bucket || !listSubs().length) return;
-      const ws = currentWorkspace();
-      const key = `${ws}\u0000${bucket}:${e.slug || `folder:${e.folder}`}`;
-      const now = Date.now();
-      const b = waiting.get(key);
-      if (b) clearTimeout(b.timer);
-      const entry = b || { bucket, events: [], first: now, timer: undefined as unknown as NodeJS.Timeout, ws };
-      entry.events.push(e);
-      const wait = Math.max(0, Math.min(windows[bucket], entry.first + maxWait - now));
-      entry.timer = setTimeout(() => release(key), wait);
-      entry.timer.unref?.();
-      waiting.set(key, entry);
+      queue(bucket, e.slug || `folder:${e.folder}`, (x) => x.events.push(e));
+    },
+    run(n) {
+      if (!listSubs().length) return;
+      queue(n.kind === 'quiet' ? 'quiet' : 'agent', n.slug, (x) => x.runs.push(n));
     },
     flush() {
       for (const key of [...waiting.keys()]) release(key);

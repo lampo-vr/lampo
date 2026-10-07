@@ -146,15 +146,19 @@ export function sessionRoutes(ctx: ServerContext): Router {
   // posts is its poster's (A12 AGENT-10): listed under `name · account` like an MCP connection, so one member can't put
   // words under another's agent, and at a time within the last few minutes (a batch waits ≤ 2 s; a line can't be
   // pinned to the future or slipped into the past).
+  // The answer carries the lines its agent is told (the person stopped its work): its `vr` prints them, its stdio MCP
+  // server adds them to its next answer.
   r.post('/api/agents/activity', express.json({ limit: '64kb' }), (req, res) => {
     const b = body(ActivityBatch, req);
     const account = req.auth?.via !== 'local' ? req.auth?.user?.name : null;
+    const lines: string[] = [];
     for (const e of b.entries) {
       const agent = account ? ownedAgentName(e.agent, account) : e.agent;
       if (!agent) continue;
-      ctx.activity.record({ ...e, agent, at: postedAt(e.at), target: e.target ?? null, video: e.video ?? null, slug: null });
+      const line = ctx.activity.record({ ...e, agent, at: postedAt(e.at), target: e.target ?? null, video: e.video ?? null, slug: null });
+      if (line && lines.length < 2) lines.push(line);
     }
-    res.json({ ok: true });
+    res.json({ ok: true, ...(lines.length ? { lines } : {}) });
   });
 
   // Agents Lampo started on this machine for a request: what they're doing, Stop, and what they printed. Only the

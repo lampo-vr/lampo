@@ -12,7 +12,16 @@ import { body, fail, failFrom, query, router } from '../http.ts';
 
 const Endpoint = z.string().url().max(2000);
 const Prefs = z
-  .object({ questions: z.boolean(), fixes: z.boolean(), versions: z.boolean(), clients: z.boolean(), answers: z.boolean(), posts: z.boolean() })
+  .object({
+    questions: z.boolean(),
+    fixes: z.boolean(),
+    versions: z.boolean(),
+    clients: z.boolean(),
+    answers: z.boolean(),
+    posts: z.boolean(),
+    agents: z.boolean(),
+    quiet: z.boolean(),
+  })
   .partial();
 const Subscribe = z.object({
   subscription: z.object({ endpoint: Endpoint, keys: z.object({ p256dh: z.string().max(200), auth: z.string().max(100) }) }),
