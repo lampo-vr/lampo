@@ -1,5 +1,5 @@
-// `vr admin import <bundle.tar> --workspace <id> --owner <email> [--dry-run] [--people "Name=email,…"]`: a bundle
-// (lib/bundle.ts, made by `vr export` on another machine) into one workspace of this store, typically a hosted server
+// `lampo admin import <bundle.tar> --workspace <id> --owner <email> [--dry-run] [--people "Name=email,…"]`: a bundle
+// (lib/bundle.ts, made by `lampo export` on another machine) into one workspace of this store, typically a hosted server
 // (docs/moving.md). The bundle is a file from outside: it is read twice — once to check everything (the tar's shape,
 // every file against the manifest's size and sha256, every record against a strict schema, every file named by the
 // review it belongs to), once to place what is checked — and nothing is written before the first read is through.
@@ -207,7 +207,7 @@ export async function readBundle(file: string, versionBytes: number): Promise<Re
         throw new BundleError('manifest.json is not JSON');
       }
       const head = raw as { format?: unknown; version?: unknown } | null;
-      if (head?.format !== BUNDLE_FORMAT) throw new BundleError('not a Lampo bundle (made by vr export)');
+      if (head?.format !== BUNDLE_FORMAT) throw new BundleError('not a Lampo bundle (made by lampo export)');
       if (head.version !== BUNDLE_VERSION)
         throw new BundleError(`a bundle of format ${String(head.version)}: this Lampo reads format ${BUNDLE_VERSION} (update it)`);
       // made no later than now (and a little drift)
@@ -484,7 +484,7 @@ function toStored(b: BundleReview, people: People, renamed: Record<string, strin
 export async function importBundle(o: ImportOptions): Promise<ImportReport> {
   const log = o.log ?? (() => {});
   const cfg = loadConfig();
-  if (!getWorkspace(o.workspace)) throw new BundleError(`no workspace ${o.workspace} (vr admin workspaces lists them)`);
+  if (!getWorkspace(o.workspace)) throw new BundleError(`no workspace ${o.workspace} (lampo admin workspaces lists them)`);
   const owner = findUserByEmail(o.owner);
   if (!owner || !roleIn(o.workspace, owner.id)) throw new BundleError(`${o.owner} is not a member of workspace ${o.workspace}`);
   log(`checking ${path.basename(o.file)} …`);
@@ -662,7 +662,7 @@ async function run(o: ImportOptions, read: Read, owner: User, log: (line: string
   for (const p of read.playbooks.values()) for (const n of [p.by, ...p.history.map((h) => h.by)]) if (n) people.map(n);
   report.people = people.lines;
 
-  // ---------------------------------------------------------------- room on the disk (VR_MIN_FREE stays free)
+  // ---------------------------------------------------------------- room on the disk (LAMPO_MIN_FREE stays free)
   // renders go to versions/ (a bucket's through the working folder), records to data/: the fuller disk decides
   const keepFree = loadConfig().min_free_bytes ?? 2e9;
   const free = Math.min(freeBytes(kind === 'local' ? versionsDir() : os.tmpdir()), freeBytes(dataDir()));
@@ -840,7 +840,7 @@ async function run(o: ImportOptions, read: Read, owner: User, log: (line: string
     fs.rmSync(work, { recursive: true, force: true });
   }
   // A taste file is written from the notes (lib/taste.ts): again here for the whole library and for each folder the
-  // bundle had one for. One for a project path of the other machine is made when an agent asks (`vr taste`).
+  // bundle had one for. One for a project path of the other machine is made when an agent asks (`lampo taste`).
   const folderNow = new Set(shownFolders().folders);
   for (const scope of manifest.taste)
     try {

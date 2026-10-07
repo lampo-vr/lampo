@@ -11,6 +11,7 @@
 import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
+import { settings } from '../../lib/env.ts';
 import { ROOT, sleep, tmpdir } from '../lib/helpers.ts';
 import { launch, requireChrome } from './lib/browser.mjs';
 import { assert, check, crashed, finish } from './lib/checks.mjs';
@@ -23,7 +24,7 @@ import { startServer } from './lib/server.mjs';
 // VR_PERF_TIMES=report: the budgets were measured on the maintainer's Mac, so on a machine they weren't (CI's runners)
 // a miss is reported as a warning on the run, never failed and never silent, until budgets are set for that machine.
 const BUSY = 10;
-const REPORT_TIMES = process.env.VR_PERF_TIMES === 'report' && process.env.VR_PERF_STRICT !== '1';
+const REPORT_TIMES = settings.LAMPO_PERF_TIMES === 'report' && settings.LAMPO_PERF_STRICT !== '1';
 const within = (ms, budget, what) => {
   if (ms <= budget) return;
   if (REPORT_TIMES) {
@@ -32,7 +33,7 @@ const within = (ms, budget, what) => {
     return;
   }
   const load = os.loadavg()[0];
-  if (load > BUSY && process.env.VR_PERF_STRICT !== '1') {
+  if (load > BUSY && settings.LAMPO_PERF_STRICT !== '1') {
     console.log(`      over budget while the machine is busy (load ${load.toFixed(0)}), not failing: ${what}`);
     return;
   }

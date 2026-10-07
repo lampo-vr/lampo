@@ -1,4 +1,4 @@
-// The review store on this machine: data/ read and written directly, exactly what `vr` has always done.
+// The review store on this machine: data/ read and written directly, exactly what `lampo` has always done.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,7 +22,7 @@ import { cachedQa, runQa } from '../qa.ts';
 import { frameInRange, normalizeRange } from '../range.ts';
 import { attachRefFile, frameRef, linkRef, saveRefs } from '../refs.ts';
 import { renderKey } from '../renderKey.ts';
-// a version `vr` registers here names the agent run it came from (Version.run): lib/runs.ts tells the store which
+// a version `lampo` registers here names the agent run it came from (Version.run): lib/runs.ts tells the store which
 import '../runs.ts';
 import { listSessions } from '../sessions.ts';
 import { dropShots, followShots, grabFrame, shotsOrLater } from '../shots.ts';
@@ -56,7 +56,7 @@ function scopeOf(where: PlaybookWhere): string {
 }
 
 export function createLocalBackend(): Backend {
-  // `vr` or the MCP server on a hosted instance's own store: the same demuxer limits as the server.
+  // `lampo` or the MCP server on a hosted instance's own store: the same demuxer limits as the server.
   restrictFormats(loadConfig().mode === 'server');
   return {
     kind: 'local',
@@ -273,7 +273,7 @@ export function createLocalBackend(): Backend {
 
     watch(onEvent, { signal } = {}) {
       if (signal?.aborted) return Promise.resolve();
-      // The log of the workspace this process works in (VR_WORKSPACE, lib/scope.ts), never workspace #1's by default.
+      // The log of the workspace this process works in (LAMPO_WORKSPACE, lib/scope.ts), never workspace #1's by default.
       const file = store.eventsFile();
       let pos = 0;
       try {

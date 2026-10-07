@@ -416,12 +416,12 @@ test('mail and sign-up settings: environment over config.json, and the server re
     privacy_url: null,
   };
   assert.deepEqual(mailProblems(base), []);
-  assert.match(mailProblems({ ...base, mail: mailConfig({}, { VR_SMTP_URL: 'smtp://relay.test' }) }).join(), /needs VR_MAIL_FROM/);
+  assert.match(mailProblems({ ...base, mail: mailConfig({}, { VR_SMTP_URL: 'smtp://relay.test' }) }).join(), /needs LAMPO_MAIL_FROM/);
   assert.match(mailProblems({ ...base, mail: mailConfig({}, { VR_SMTP_URL: 'http://relay.test', VR_MAIL_FROM: 'a@b.c' }) }).join(), /must start with smtp/);
-  assert.match(mailProblems({ ...base, mail: mailConfig({}, { VR_MAIL_FROM: 'nobody' }) }).join(), /VR_MAIL_FROM is not an email address/);
+  assert.match(mailProblems({ ...base, mail: mailConfig({}, { VR_MAIL_FROM: 'nobody' }) }).join(), /LAMPO_MAIL_FROM is not an email address/);
   assert.match(mailProblems({ ...base, signup: 'maybe' as 'off' }).join(), /must be off, invite or open/);
-  assert.match(mailProblems({ ...base, signup: 'invite', public_url: null }).join(), /needs VR_PUBLIC_URL/);
-  assert.match(mailProblems({ ...base, terms_url: 'javascript:alert(1)' }).join(), /VR_TERMS_URL must be an http/);
+  assert.match(mailProblems({ ...base, signup: 'invite', public_url: null }).join(), /needs LAMPO_PUBLIC_URL/);
+  assert.match(mailProblems({ ...base, terms_url: 'javascript:alert(1)' }).join(), /LAMPO_TERMS_URL must be an http/);
   assert.deepEqual(mailProblems({ ...base, signup: 'invite' }), []);
 });
 
@@ -435,7 +435,7 @@ test('VR_SIGNUP=open refuses to start until something gives each sign-up a works
   };
   const hosted = mailProblems({ ...base, mode: 'server' });
   assert.equal(hosted.length, 1);
-  assert.match(hosted[0] as string, /^VR_SIGNUP=open needs workspaces: everyone who signs up gets a workspace of their own/);
+  assert.match(hosted[0] as string, /^LAMPO_SIGNUP=open needs workspaces: everyone who signs up gets a workspace of their own/);
   assert.match(mailProblems({ ...base, mode: 'local' })[0] as string, /on your own machine everyone who signs up would join your own store/);
   assert.deepEqual(mailProblems({ ...base, mode: 'server' }, { signupSeam: true }), [], 'with the seam filled it starts');
 });

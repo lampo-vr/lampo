@@ -344,7 +344,7 @@ export function createRemoteStorage(store: RemoteStore, { workCacheBytes = 20e9,
 // ---------------------------------------------------------------- the app's own media host
 
 /**
- * `base` with the app's own media host (VR_MEDIA_ORIGIN, lib/storage/mediaHost.ts): whatever `base` would stream
+ * `base` with the app's own media host (LAMPO_MEDIA_ORIGIN, lib/storage/mediaHost.ts): whatever `base` would stream
  * through the app itself (the disk, a bucket without signed URLs) gets a signed URL on that host instead, so the
  * player, review links and downloads are redirected there like to a CDN. A store's own signed URLs stay as they are.
  */
@@ -400,7 +400,7 @@ export function workspaceStorage(base: Storage, ws: string): Storage {
 }
 
 /**
- * The storage this process uses (from config.json / VR_STORAGE), as the workspace running now sees it (lib/scope.ts);
+ * The storage this process uses (from config.json / LAMPO_STORAGE), as the workspace running now sees it (lib/scope.ts);
  * tests may swap it with setStorage().
  */
 export function storage(): Storage {

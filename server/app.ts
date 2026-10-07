@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
 import { ROLES } from '../lib/auth.ts';
+import { spelledAs } from '../lib/env.ts';
 import { DEFAULT_WORKSPACE, ROOT } from '../lib/paths.ts';
 import { internal } from '../lib/publicError.ts';
 import { rootStorage } from '../lib/storage/index.ts';
@@ -62,19 +63,21 @@ Disallow:
 `;
 
 /**
- * Forwarding headers from a peer VR_TRUST_PROXY doesn't name are ignored, so every visitor looks like that peer and
+ * Forwarding headers from a peer LAMPO_TRUST_PROXY doesn't name are ignored, so every visitor looks like that peer and
  * per-address limits (sign-in, link passwords) hit everyone at once. Said once in the log: the proxy isn't named, or
  * the app's port is reachable without it.
  */
-export function untrustedProxyWarning(trusts: (addr: string, i: number) => boolean, named: string | false, log = console.warn) {
+export function untrustedProxyWarning(trusts: (addr: string, i: number) => boolean, named: string | false, log = console.warn, env = process.env) {
   let warned = false;
+  // named as the operator wrote it (deploy checks look for "which VR_TRUST_PROXY" or "which LAMPO_TRUST_PROXY")
+  const setting = spelledAs('LAMPO_TRUST_PROXY', env);
   return (req: Request, _res: Response, next: NextFunction): void => {
     if (!warned && (req.headers['x-forwarded-for'] || req.headers.forwarded)) {
       const peer = req.socket.remoteAddress || 'unknown';
       if (!trusts(peer, 0)) {
         warned = true;
         log(
-          `warning: a request came with forwarding headers from ${peer}, which VR_TRUST_PROXY (${named || 'not set'}) doesn't name: every visitor looks like ${peer} to sign-in limits. Name your proxy in VR_TRUST_PROXY, and make sure the app's port is only reachable through it (docs/go-live.md).`,
+          `warning: a request came with forwarding headers from ${peer}, which ${setting} (${named || 'not set'}) doesn't name: every visitor looks like ${peer} to sign-in limits. Name your proxy in ${setting}, and make sure the app's port is only reachable through it (docs/go-live.md).`,
         );
       }
     }

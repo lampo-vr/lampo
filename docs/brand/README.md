@@ -1,9 +1,9 @@
 # Lampo: the brand files
 
-The product is called **Lampo** (Italian "a flash", Greek "I shine"; said *lahm·po*). Agents know its MCP server as
-`lampo`, and the repository is `lampo` too. The npm package, the `vr` and `vr-mcp` commands, the `VR_*` settings, the
-MCP tool names, the `vr://` resources and the data folders keep the technical name `video-review` (a setup made under
-the key `video-review` keeps working).
+The product is called **Lampo** (Italian "a flash", Greek "I shine"; said *lahm·po*), and so is everything people
+and agents type: the repository, the `lampo` command, the `LAMPO_*` settings, the MCP server's key `lampo`, the
+`lampo://` resources and the npm package `@lampo-vr/lampo`. The older names (`vr`, `VR_*`, `vr://`, the key
+`video-review`) keep working for setups made with them; the data folders and file formats keep theirs.
 
 ![The logo on light and dark, the marks and the app icons](preview.png)
 

@@ -20,16 +20,16 @@ const dir = path.resolve(dirArg);
 const RUNS = Number(runsArg);
 const port = await freePort();
 const BASE = `http://127.0.0.1:${port}`;
-const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^VR_|^CLAUDE/.test(k)));
+const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(VR|LAMPO)_|^CLAUDE/.test(k)));
 Object.assign(env, {
-  VR_DATA: path.join(dir, 'data'),
-  VR_CACHE: path.join(dir, 'cache'),
-  VR_CONFIG: path.join(dir, 'config.json'),
-  VR_HOST: '127.0.0.1',
-  VR_PORT: String(port),
-  VR_STT: 'off',
-  VR_USER: 'Sam',
-  VR_CLAUDE_BIN: '/usr/bin/false',
+  LAMPO_DATA: path.join(dir, 'data'),
+  LAMPO_CACHE: path.join(dir, 'cache'),
+  LAMPO_CONFIG: path.join(dir, 'config.json'),
+  LAMPO_HOST: '127.0.0.1',
+  LAMPO_PORT: String(port),
+  LAMPO_STT: 'off',
+  LAMPO_USER: 'Sam',
+  LAMPO_CLAUDE_BIN: '/usr/bin/false',
 });
 const proc = spawn(process.execPath, [path.join(ROOT, 'server/index.ts')], { env, stdio: ['ignore', 'ignore', 'inherit'] });
 process.on('exit', () => proc.kill('SIGKILL'));

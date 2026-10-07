@@ -52,6 +52,9 @@ export function registerNoteTools({ b, o, tool, author, accountOf, byArg }: Tool
 
   // ---------------------------------------------------------------- references ("like this")
   const requestRefUpload = o.requestRefUpload;
+  // Over HTTP (where upload URLs are offered) /mcp takes 1 MB a request, base64 and all (server/routes/mcp.ts MAX_BODY):
+  // about 700 KB of file, as mcp/tools/asks.ts says; over stdio a file's REF_LIMITS / PREVIEW_LIMITS.inlineBytes (8 MB).
+  const inline = (upload: unknown) => (upload ? '≤ 700 KB (bigger: leave it out for an upload URL)' : '≤ 8 MB');
   // One reference, described once (attach_reference); add_note and reply take a list of the same.
   const ref = {
     url: refUrl.optional(),
@@ -117,7 +120,7 @@ export function registerNoteTools({ b, o, tool, author, accountOf, byArg }: Tool
     'attach_preview',
     {
       title: 'Show a fix before rendering',
-      description: `Show your fix of a note before rendering: a still (PNG/JPEG/WebP) or a clip ≤ 10 s exported from your project (e.g. After Effects comp.saveFrameToPng at the project time get_note shows). The reviewer can verify on it and the next render is compared with it; a fix verified only on a preview keeps the video from final until a render has it. Same frame shape as the render. Default position: the note's frame in the newest render. ${onThisMachine ? 'File: path or' : 'File:'} base64 data ≤ 8 MB${requestPreviewUpload ? ' (neither: an upload URL)' : ''}.`,
+      description: `Show your fix of a note before rendering: a still (PNG/JPEG/WebP) or a clip ≤ 10 s exported from your project (e.g. After Effects comp.saveFrameToPng at the project time get_note shows). The reviewer can verify on it and the next render is compared with it; a fix verified only on a preview keeps the video from final until a render has it. Same frame shape as the render. Default position: the note's frame in the newest render. ${onThisMachine ? 'File: path or' : 'File:'} base64 data ${inline(requestPreviewUpload)}.`,
       inputSchema: z.object({
         id: z.string(),
         kind: z.enum(['still', 'clip']).optional(),
@@ -219,7 +222,7 @@ export function registerNoteTools({ b, o, tool, author, accountOf, byArg }: Tool
     'attach_reference',
     {
       title: 'Show what you mean: a reference on a note',
-      description: `Attach what "like this" means to a note (at most 8): a link (url), a moment of a render (video + frame, timecode or seconds; v; to_frame ends a range ≤ 60 s), or an image or clip ≤ 60 s (${onThisMachine ? 'path, or ' : ''}base64 data ≤ 8 MB${requestRefUpload ? '; neither: an upload URL' : ''}). On someone else's note, say why in note (it comes as a reply).`,
+      description: `Attach what "like this" means to a note (at most 8): a link (url), a moment of a render (video + frame, timecode or seconds; v; to_frame ends a range ≤ 60 s), or an image or clip ≤ 60 s (${onThisMachine ? 'path, or ' : ''}base64 data ${inline(requestRefUpload)}). On someone else's note, say why in note (it comes as a reply).`,
       inputSchema: z.object({
         id: z.string(),
         ...ref,

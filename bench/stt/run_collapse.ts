@@ -26,8 +26,8 @@ if (!opt.manifest || !opt.models) throw new Error('--manifest and --models are r
 
 // A throwaway store before the app's modules resolve theirs.
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vr-collapse-'));
-process.env.VR_DATA = path.join(tmp, 'data');
-process.env.VR_CACHE = path.join(tmp, 'cache');
+process.env.LAMPO_DATA = path.join(tmp, 'data');
+process.env.LAMPO_CACHE = path.join(tmp, 'cache');
 const { sttConfig } = await import('../../lib/config.ts');
 const { decodePcm, stopStt, transcribeTimed } = await import('../../lib/stt/index.ts');
 const { LocalEngine } = await import('../../lib/stt/local.ts');

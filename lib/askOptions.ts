@@ -1,6 +1,6 @@
 // Making a question with options (lib/options.ts): every item's picture, clip or sound stored first — where the
 // question will live (a video's refs/<slug>/, or asks/<id>/ for a folder's) —, then the note on the video or the
-// folder's ask (lib/asks.ts). One path for the API route, `vr ask` / the MCP tool on this machine, and the upload URL
+// folder's ask (lib/asks.ts). One path for the API route, `lampo ask` / the MCP tool on this machine, and the upload URL
 // that brings an item's file later. Nothing half-made stays: a file that fails takes the others with it.
 import { askFileUrl, createAsk, findAsk, setAskItemRef } from './asks.ts';
 import { checkNotArchived, checkReviewOpen } from './folderIds.ts';

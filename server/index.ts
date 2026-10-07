@@ -1,7 +1,7 @@
-// video-review server: serves the UI, streams videos (HTTP range), grabs exact frames, watches linked renders for
-// re-renders. One app on a hosted server (VR_MODE=server) and on a person's own machine, where its owner is signed in
+// Lampo's server: serves the UI, streams videos (HTTP range), grabs exact frames, watches linked renders for
+// re-renders. One app on a hosted server (LAMPO_MODE=server) and on a person's own machine, where its owner is signed in
 // automatically and the machine's extras switch on. All state lives in data/ (see lib/store.ts); the server is just one
-// writer next to the `vr` CLI.
+// writer next to the `lampo` CLI.
 //   node server/index.ts [--dev] [--lan]
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -12,6 +12,7 @@ import { forgetHeldChanges, listUsers, localOwner, secret, sweepUnconfirmed } fr
 import { migrateAvatars } from '../lib/avatars.ts';
 import { loadConfig, startupProblems } from '../lib/config.ts';
 import { jobsInterrupted } from '../lib/crashGuard.ts';
+import { settings, spelledAs } from '../lib/env.ts';
 import { bindShareLinks } from '../lib/folders.ts';
 import { unknownOperators } from '../lib/operator.ts';
 import { CACHE, DATA, openToOthers, ROOT, VERSIONS } from '../lib/paths.ts';
@@ -51,7 +52,7 @@ const DEV_MODE = args.includes('--dev');
 // A setting the server can't work with ends the start with one plain line each, never a stack trace and never a
 // half-working server (docs/go-live.md).
 const fatal = (problems: string[]): never => {
-  for (const p of problems) console.error(`video-review: ${p}`);
+  for (const p of problems) console.error(`lampo: ${p}`);
   process.exit(1);
 };
 const cfg = (() => {
@@ -61,11 +62,11 @@ const cfg = (() => {
     return fatal([(e as Error).message]);
   }
 })();
-// VR_SIGNUP=open starts only once something gives each sign-up a workspace of its own (server/signup.ts).
+// LAMPO_SIGNUP=open starts only once something gives each sign-up a workspace of its own (server/signup.ts).
 const problems = startupProblems(cfg, process.env, { signupSeam: !!onSignup });
 if (problems.length) fatal(problems);
 const SERVER = cfg.mode === 'server';
-const LAN = !SERVER && (args.includes('--lan') || process.env.VR_LAN === '1');
+const LAN = !SERVER && (args.includes('--lan') || settings.LAMPO_LAN === '1');
 const HOST = SERVER ? cfg.host : LAN ? '0.0.0.0' : cfg.host;
 // The store's folders must be ours to write (the container points TMPDIR into its volume: the root file system is
 // read-only there), its keys whole, and remote storage configured before anything is served.
@@ -144,8 +145,8 @@ function lanToken(): string {
 }
 
 const ctx = createContext({ cfg, lan: LAN, dev: DEV_MODE, token: lanToken() });
-// Lampo Cloud's plans and billing, when VR_CLOUD_MODULE names the module (server/extension.ts); none when self-hosted.
-if (process.env.VR_CLOUD_MODULE) {
+// Lampo Cloud's plans and billing, when LAMPO_CLOUD_MODULE names the module (server/extension.ts); none when self-hosted.
+if (settings.LAMPO_CLOUD_MODULE) {
   const publicUrl = cfg.public_url || `http://localhost:${cfg.port}`;
   const host = hostContext({
     publicUrl,
@@ -154,7 +155,7 @@ if (process.env.VR_CLOUD_MODULE) {
     mail: (m) => ctx.accountMail.workspaceNotice(m),
   });
   const ext = await loadExtension(host).catch((e: Error) => {
-    console.error(`video-review: VR_CLOUD_MODULE could not be loaded: ${e.message}`);
+    console.error(`lampo: ${spelledAs('LAMPO_CLOUD_MODULE')} could not be loaded: ${e.message}`);
     process.exit(1);
   });
   // its sign-up answer (a module's plans for a newcomer) takes the place of the app's own
@@ -164,7 +165,7 @@ if (process.env.VR_CLOUD_MODULE) {
 if (SERVER) store.setInboxFile(false);
 // Linked renders and outside writes: the machine's (workspace #1's) only.
 ctx.watchers = inWorkspace(DEFAULT_WORKSPACE, () => startWatching(ctx.broadcast, ctx.background, ctx.activity));
-// What agents on this machine do through `vr` and the stdio MCP server (lib/activity.ts appends, this reads).
+// What agents on this machine do through `lampo` and the stdio MCP server (lib/activity.ts appends, this reads).
 if (!ctx.hosted) ctx.activity.tail();
 ctx.hub.startPing();
 startServerFeed(ctx);
@@ -202,11 +203,11 @@ try {
 } catch (e) {
   // a module whose routes are the app's own: one line, no stack trace
   if (!(e instanceof ModuleRouteError)) throw e;
-  console.error(`video-review: VR_CLOUD_MODULE refused: ${e.message}`);
+  console.error(`lampo: ${spelledAs('LAMPO_CLOUD_MODULE')} refused: ${e.message}`);
   process.exit(1);
 }
 const http = await listen(app, cfg.port, HOST).catch((e: Error) => {
-  console.error(`video-review: ${e.message}`);
+  console.error(`lampo: ${e.message}`);
   process.exit(1);
 });
 // Kept-alive connections outlast a proxy's idle ones; a render's body may stream for hours, any other within 5 minutes
@@ -217,7 +218,7 @@ const lan = LAN
       .map((ip) => `http://${ip}:${cfg.port}/?t=${ctx.token}`)
       .join('  ')})`
   : '';
-console.log(`video-review${SERVER ? ' (hosted)' : ''} on http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${cfg.port}${lan}`);
+console.log(`Lampo${SERVER ? ' (hosted)' : ''} on http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${cfg.port}${lan}`);
 console.log(`data: ${DATA}`);
 // Other accounts on this machine can read a store their folders don't keep them out of (and, on systems that can't
 // tell who connects, reach the app on localhost as you: SECURITY.md).
@@ -230,12 +231,12 @@ if (owner)
   );
 if (SERVER) {
   const url = cfg.public_url || `http://localhost:${cfg.port}`;
-  console.log(`public url: ${cfg.public_url || '(not set: set VR_PUBLIC_URL so only that host is served and cookies are Secure)'}`);
+  console.log(`public url: ${cfg.public_url || '(not set: set LAMPO_PUBLIC_URL so only that host is served and cookies are Secure)'}`);
   console.log(`storage: ${rootStorage().kind}`);
   // Without a relay nothing reaches anyone: invites, sign-up links and password resets wait in the outbox.
   if (ctx.mail.transport === 'log')
     console.warn(
-      `mail: VR_SMTP_URL is not set, so emails (invites, sign-up confirmations, password resets) are written to ${ctx.mail.outbox} instead of being sent (docs/email.md)`,
+      `mail: LAMPO_SMTP_URL is not set, so emails (invites, sign-up confirmations, password resets) are written to ${ctx.mail.outbox} instead of being sent (docs/email.md)`,
     );
   else console.log(`mail: through ${ctx.mail.where}`);
   // LAMPO_OPERATOR names who runs this server (lib/operator.ts): an entry that is no account here is said once, plainly
@@ -247,13 +248,13 @@ if (SERVER) {
   else if (cfg.operators.length) console.log(`operator: ${cfg.operators.length} account${cfg.operators.length === 1 ? '' : 's'} from LAMPO_OPERATOR`);
   if (cfg.trust_proxy_legacy)
     console.warn(
-      `trust proxy: VR_TRUST_PROXY=true or a hop count now trusts only a proxy on this machine or a private network (${cfg.trust_proxy}); name the proxy's address or subnet to be exact (docs/server-mode.md)`,
+      `trust proxy: ${spelledAs('LAMPO_TRUST_PROXY')}=true or a hop count now trusts only a proxy on this machine or a private network (${cfg.trust_proxy}); name the proxy's address or subnet to be exact (docs/server-mode.md)`,
     );
   if (ctx.setup.token) {
     console.log('');
     console.log('No account exists yet. Open the app and create the owner account with this one-time setup token:');
     console.log(`  ${ctx.setup.token}`);
-    console.log(`  (${url}/?setup)  — or on this machine: vr admin create-user --role owner`);
+    console.log(`  (${url}/?setup)  — or on this machine: lampo admin create-user --role owner`);
     console.log('');
   }
 }

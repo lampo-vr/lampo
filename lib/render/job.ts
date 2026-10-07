@@ -1,7 +1,7 @@
-// One `vr render`, start to end: run the agent's command (lib/render/run.ts), tell Lampo how far it is (progress lines,
+// One `lampo render`, start to end: run the agent's command (lib/render/run.ts), tell Lampo how far it is (progress lines,
 // at most every 500 ms on this machine and every 2 s to a server, through the activity sinks of lib/activity.ts), then
 // put `--out` up as the next version of `--to` (a re-render to the tracked path is registered where it is; anything
-// else goes up as `vr push --to` does, with the upload's progress) and say so in one line for the model, plus the
+// else goes up as `lampo push --to` does, with the upload's progress) and say so in one line for the model, plus the
 // hand-off line. A failure posts the tool's last meaningful lines, redacted, and says them in one line. The same code
 // runs in the foreground and in a detached render's supervisor (lib/render/detach.ts).
 import fs from 'node:fs';
@@ -33,12 +33,12 @@ export interface RenderJob {
   to: { slug: string; next: number; same: boolean } | null;
   /**
    * Or a new video's V1 (`--folder`): the project (or folder) it goes into, and the agent's own session it is assigned
-   * to (inside a Claude Code session, as `vr track --me` does). Never both `to` and `into`.
+   * to (inside a Claude Code session, as `lampo track --me` does). Never both `to` and `into`.
    */
   into?: { folder: string; session?: SessionInput | null } | null;
-  /** The agent it reports as; null for a person's own `vr render` (nothing is recorded). */
+  /** The agent it reports as; null for a person's own `lampo render` (nothing is recorded). */
   agent: string | null;
-  /** The author of the version (`vr push`'s `--by`). */
+  /** The author of the version (`lampo push`'s `--by`). */
   by: string;
 }
 
@@ -60,7 +60,7 @@ export interface RenderHooks {
 
 export interface RenderOutcome {
   ok: boolean;
-  /** What `vr` exits with: the tool's own code when it failed. */
+  /** What `lampo` exits with: the tool's own code when it failed. */
   code: number;
   /** What the model reads: one line, and on success the hand-off line. */
   lines: string[];
@@ -207,7 +207,7 @@ export async function executeRender(job: RenderJob, hooks: RenderHooks): Promise
       const r = await b.sync(to.slug);
       if (!r) throw new Error(`${to.slug} is no longer under review`);
       if (r.archived) throw new Error(`its project ${r.archived} is archived: nothing new goes in until it is restored`);
-      if (r.pending) throw new Error('the file is still being written; run vr sync <video> in a moment');
+      if (r.pending) throw new Error('the file is still being written; run lampo sync <video> in a moment');
       review = r.review;
       got = review.versions.at(-1)?.v ?? before;
       duplicate = got <= before;

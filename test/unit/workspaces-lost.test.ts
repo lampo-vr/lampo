@@ -57,7 +57,7 @@ test('a moved store without workspaces.json: no account becomes a member of #1, 
 
   const r = start(dir, hosted);
   assert.equal(r.status, 1, r.err);
-  assert.match(r.err, /^video-review: .*workspaces\.json is missing, but this store moved to workspaces .*restore it from your backup/m);
+  assert.match(r.err, /^lampo: .*workspaces\.json is missing, but this store moved to workspaces .*restore it from your backup/m);
   assert.doesNotMatch(r.err, /\n\s+at /, 'one plain sentence, no stack trace');
   assert.equal(fs.existsSync(ws.WORKSPACES_FILE), false, 'the start wrote nothing either');
   // the machine's start refuses the same store
@@ -72,7 +72,7 @@ test('a moved store without workspaces.json: no account becomes a member of #1, 
   assert.throws(() => ws.roleIn('w1', bob.id), /workspaces\.json can't be read/);
   const bad = start(dir, hosted);
   assert.equal(bad.status, 1);
-  assert.match(bad.err, /^video-review: .*workspaces\.json can't be read/m);
+  assert.match(bad.err, /^lampo: .*workspaces\.json can't be read/m);
 
   // the file back: everything as it was
   fs.writeFileSync(ws.WORKSPACES_FILE, saved);
@@ -129,13 +129,13 @@ test('a mistyped VR_WORKSPACE on the machine makes nothing, and a stray empty wo
   assert.equal(vr(['track', file], machine).code, 0);
   const typo = vr(['track', file], { ...machine, VR_WORKSPACE: 'w_abcdefghijkl' });
   assert.equal(typo.code, 1);
-  assert.match(typo.err, /^vr: VR_WORKSPACE=w_abcdefghijkl is not a workspace of this store/);
+  assert.match(typo.err, /^lampo: VR_WORKSPACE=w_abcdefghijkl is not a workspace of this store/);
   for (const root of [data, `${data}-versions`, path.join(store, 'cache')]) assert.equal(fs.existsSync(path.join(root, 'w')), false, `nothing made in ${root}`);
   // The app's start gets past its workspace check: it stops at the next step here, a cloud module that isn't there.
   const startsPast = (what: string) => {
     const r = start(store, { VR_CLOUD_MODULE: path.join(store, 'no-such-module.js') });
     assert.equal(r.status, 1, what);
-    assert.match(r.err, /^video-review: VR_CLOUD_MODULE could not be loaded/m, `${what}: ${r.err}`);
+    assert.match(r.err, /^lampo: VR_CLOUD_MODULE could not be loaded/m, `${what}: ${r.err}`);
     assert.doesNotMatch(r.err, /workspaces\.json/, what);
   };
   startsPast('a store that never moved');
@@ -147,7 +147,7 @@ test('a mistyped VR_WORKSPACE on the machine makes nothing, and a stray empty wo
   fs.writeFileSync(path.join(data, 'w', 'w_abcdefghijkl', 'spot.mp4', 'review.json'), '{}');
   const r = start(store);
   assert.equal(r.status, 1);
-  assert.match(r.err, /^video-review: .*workspaces\.json is missing, but this store has workspace folders with files in .* \(w_abcdefghijkl\)/m);
+  assert.match(r.err, /^lampo: .*workspaces\.json is missing, but this store has workspace folders with files in .* \(w_abcdefghijkl\)/m);
   assert.match(r.err, /if this store never had workspaces, those folders are left over .* move them out of /);
   assert.doesNotMatch(r.err, /backup/);
   assert.doesNotMatch(r.err, /\n\s+at /);
@@ -221,7 +221,7 @@ test('a running server whose workspaces.json goes away answers 503 in one senten
     const ready = await request('GET', '/readyz');
     assert.equal(ready.status, 503);
     assert.equal(ready.json().checks.data, false);
-    const lostLines = logged.filter((l) => /^video-review: .*workspaces\.json is missing, but this store moved/.test(l));
+    const lostLines = logged.filter((l) => /^lampo: .*workspaces\.json is missing, but this store moved/.test(l));
     assert.equal(lostLines.length, 1, `said once, not per tick or request:\n${logged.join('\n')}`);
     assert.ok(!logged.some((l) => /\n\s+at /.test(l)), 'no stack trace per request');
 
@@ -284,7 +284,7 @@ test('on a hosted store an empty workspace folder still proves the move, and nob
   assert.match(
     r.err,
     new RegExp(
-      `^video-review: .*workspaces\\.json is missing, but this store has workspace folders in .*${delta.id}.*if this store had workspaces, restore it from your backup.*; if it never had`,
+      `^lampo: .*workspaces\\.json is missing, but this store has workspace folders in .*${delta.id}.*if this store had workspaces, restore it from your backup.*; if it never had`,
       'm',
     ),
   );

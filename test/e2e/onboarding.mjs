@@ -303,7 +303,7 @@ try {
     const titles = await titlesOf(a);
     assert(titles.includes('Link your first video') && titles.includes('Connect Claude Code'), `named after the machine and the pick: ${titles}`);
     assert((await a.$eval('[data-testid=ob-pane]', (e) => e.dataset.pane)) === 'share', 'the next step at work');
-    assert((await textOf(a, '.ob-gs-later')).includes('vr export'), 'later: vr export');
+    assert((await textOf(a, '.ob-gs-later')).includes('lampo export'), 'later: lampo export');
     assert(!(await a.$('[data-testid=ob-plan]')), 'no plan on a machine');
     assert((await a.$eval('.film .vchip.sample-chip', (e) => e.textContent)) === 'Sample', 'the card says Sample');
     assert((await a.$$('h1')).length === 1, 'one h1');

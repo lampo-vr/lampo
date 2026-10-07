@@ -205,7 +205,7 @@ notes panel at all, and the video gets the room. Under the video's name stands t
 one; else the team's name, else who shared it) and the version. The room and the video page end with a quiet
 *Powered by Lampo* and, beside it, *Source*: where the app's source is (`source_url`, AGPL-3.0 §13: visitors use the
 instance over the network too). Under them, the operator's *Imprint* and *Privacy* when the server names them
-(`VR_IMPRINT_URL`, `VR_PRIVACY_URL`). The badge is on for every plan; where a billing provider runs, a paid workspace's
+(`LAMPO_IMPRINT_URL`, `LAMPO_PRIVACY_URL`). The badge is on for every plan; where a billing provider runs, a paid workspace's
 owners and admins may hide it in *Settings → Review links* (*Hide the Lampo badge*): the source offer and the legal
 pages stay. A plan that lapses shows the badge again by itself.
 
@@ -349,16 +349,16 @@ You can also set hooks in `config.json` or the environment. They are listed in S
 }
 ```
 
-One hook from the environment: `VR_WEBHOOK_URL`, `VR_WEBHOOK_FORMAT` (`json` · `slack` · `discord`),
-`VR_WEBHOOK_SECRET`, `VR_WEBHOOK_EVENTS` (comma-separated). In the file or the environment, `events` can also name
+One hook from the environment: `LAMPO_WEBHOOK_URL`, `LAMPO_WEBHOOK_FORMAT` (`json` · `slack` · `discord`),
+`LAMPO_WEBHOOK_SECRET`, `LAMPO_WEBHOOK_EVENTS` (comma-separated). In the file or the environment, `events` can also name
 event types, for example `["approval"]` or `["request"]` (an agent was asked to work: see
 [agents.md](agents.md#on-a-hosted-server-start-agents-from-a-webhook)). While the app runs, hooks fire for events from
-every writer (the app, `vr`, MCP), because they follow `data/events.jsonl`.
+every writer (the app, `lampo`, MCP), because they follow `data/events.jsonl`.
 
 ### What arrives
 
 - **Slack:** `{"text": "Mia (client) left a note on spot.mp4 v2 at 00:03:00: “Logo später” <https://…|Open>"}`
-- **Discord:** `{"content": "…\nhttps://…", "username": "video-review", "allowed_mentions": {"parse": []}}`
+- **Discord:** `{"content": "…\nhttps://…", "username": "Lampo", "allowed_mentions": {"parse": []}}`
 - **JSON:** `{"event": <the event as in events.jsonl>, "text": "…", "url": "https://…/#/v/<slug>?c=<id>"}`.
   Screenshot paths become full URLs on the app's public URL (on your own machine without one, `localhost`), never
   paths on its disk; opening them needs a signed-in session, or the machine itself.
@@ -371,7 +371,7 @@ Settings, never passed on to the person whose note caused them.
 **On a hosted server, webhooks only go to public addresses.** A URL on a private, loopback, link-local or reserved
 address (the server's own network, `localhost`, a cloud's metadata service) is refused when it is saved, and every
 delivery checks the address again and connects to exactly the address it checked. Redirects are never followed. If your
-chat server lives on your own network, opt in with `webhooks_allow_private: true` or `VR_WEBHOOK_ALLOW_PRIVATE=1`.
+chat server lives on your own network, opt in with `webhooks_allow_private: true` or `LAMPO_WEBHOOK_ALLOW_PRIVATE=1`.
 That holds for the first workspace's webhooks (the operator's own team); every other workspace's stay on public
 addresses, whoever runs it. On your own machine webhooks go anywhere.
 
@@ -436,10 +436,10 @@ address counts as its /64), 500 a day per visitor, and 2,000 a day per link whoe
 landed count for the day (a reference's one-time upload URL when its file arrives), so refused or invalid requests and
 unused URLs spend nobody's share; a visitor holds at most 50 such URLs open at once, a link's visitors 500 together. A
 video takes at most 2,000 client notes through each of its links (one link at its limit closes no other), and none while
-the server's disk is down to its reserve (`VR_MIN_FREE`; the page is told to try again later). Approvals and requests
+the server's disk is down to its reserve (`LAMPO_MIN_FREE`; the page is told to try again later). Approvals and requests
 for changes: 20 a minute and 50 a day per visitor (they count in the day's writes too); visits: 60 a minute per link and
 address. Through the local tunnel every visitor arrives from this machine, so there a visitor's address is the one
-Cloudflare names (`CF-Connecting-IP`); a hosted server goes by `VR_TRUST_PROXY`. A preview copy that is still being made
+Cloudflare names (`CF-Connecting-IP`); a hosted server goes by `LAMPO_TRUST_PROXY`. A preview copy that is still being made
 answers `425` with `Retry-After`, and the page looks again every few seconds.
 
 **Archives.** Video is compressed already, so the zip stores the files as they are: it starts at once and its exact

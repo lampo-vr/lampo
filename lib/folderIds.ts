@@ -20,7 +20,7 @@ export const newFolderId = (): string => `f_${crypto.randomBytes(6).toString('he
  * folders.json is there but can't be read or parsed (a busy disk, a permission after a restore, a damaged file). Nothing
  * is taken from it then: a folder change refuses (lib/folders.ts), and a folder link can't be checked, so its visitor is
  * told to come back rather than that the link is gone. Display reads fall back to the videos' own folders
- * (shownFolders); `vr admin repair-folders` rebuilds a damaged file.
+ * (shownFolders); `lampo admin repair-folders` rebuilds a damaged file.
  */
 export class FoldersUnreadableError extends Error {
   status = 503;
@@ -117,7 +117,7 @@ export const archivedProjects = (): Readonly<Record<string, ArchivedProject>> =>
 /**
  * The archived projects as a check or a list reads them: while folders.json can't be read, none — a damaged file costs
  * the archive's lock for a moment, never every note and upload of the workspace (folder changes still refuse:
- * lib/folders.ts, and `vr admin repair-folders` keeps what it still says).
+ * lib/folders.ts, and `lampo admin repair-folders` keeps what it still says).
  */
 export function archivedNow(): Readonly<Record<string, ArchivedProject>> {
   try {

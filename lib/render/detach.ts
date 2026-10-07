@@ -1,8 +1,8 @@
-// Long renders: `vr render --detach` hands the render to a small supervisor of its own (a `vr` process in a session of
+// Long renders: `lampo render --detach` hands the render to a small supervisor of its own (a `lampo` process in a session of
 // its own, so it outlives the agent's shell: Claude Code ends a foreground Bash call after 10 minutes at most and `-p`
-// kills background shells soon after its result) and returns at once; `vr render wait <id>` blocks for at most 9
+// kills background shells soon after its result) and returns at once; `lampo render wait <id>` blocks for at most 9
 // minutes and says one line: still rendering, or how it ended. The supervisor runs the same job as the foreground
-// (lib/render/job.ts) and keeps its state in the cache (`<VR_CACHE>/renders/<id>/`, 0600), never in data/.
+// (lib/render/job.ts) and keeps its state in the cache (`<LAMPO_CACHE>/renders/<id>/`, 0600), never in data/.
 import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -13,7 +13,7 @@ import type { RunProgress } from '../types.ts';
 import { type RenderJob, took } from './job.ts';
 
 export const RENDER_ID = /^r_[0-9a-f]{10}$/;
-/** The longest `vr render wait` blocks: under the 10 minutes a foreground Bash call of Claude Code may take. */
+/** The longest `lampo render wait` blocks: under the 10 minutes a foreground Bash call of Claude Code may take. */
 export const WAIT_MAX_MS = 9 * 60_000;
 /** Finished renders' folders are kept this long (a late `wait` still answers), then cleared at the next detach. */
 const KEEP_MS = 7 * 24 * 3600_000;
@@ -32,7 +32,7 @@ export interface RenderState {
   /** The output's size, when that is all there is to say. */
   bytes?: number;
   elapsed_s?: number;
-  /** How it ended: the exit code `vr` passes on, and its lines for the model. */
+  /** How it ended: the exit code `lampo` passes on, and its lines for the model. */
   code?: number;
   lines?: string[];
 }
@@ -147,7 +147,7 @@ export async function startDetached(d: DetachedJob, label: string): Promise<Rend
 export async function supervise(dir: string): Promise<void> {
   const d = JSON.parse(fs.readFileSync(path.join(dir, 'job.json'), 'utf8')) as DetachedJob;
   let state: RenderState = readState(d.id) ?? { id: d.id, state: 'starting', started: isoLocal(), updated: isoLocal(), label: '' };
-  // 'running' once the tool runs: a command that can't start fails while `vr render --detach` still waits, and says so
+  // 'running' once the tool runs: a command that can't start fails while `lampo render --detach` still waits, and says so
   state = { ...state, supervisor: process.pid };
   writeState(state);
   const { enterProcessWorkspace } = await import('../scope.ts');
@@ -203,7 +203,7 @@ export function stillLine(s: RenderState): string {
   let how: string;
   if (p && p.pct !== null) how = `${stage}${p.pct} %${p.eta_s !== undefined ? `, ${left(p.eta_s)}` : ''}`;
   else how = `${took((s.elapsed_s ?? 0) * 1000)} so far${s.bytes ? `, ${Math.round(s.bytes / 1e6)} MB written` : ''}`;
-  return `Still ${doing}: ${how}. Run vr render wait ${s.id} again now.`;
+  return `Still ${doing}: ${how}. Run lampo render wait ${s.id} again now.`;
 }
 
 /**

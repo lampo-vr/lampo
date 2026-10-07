@@ -1,4 +1,4 @@
-// Footage search over HTTP (docs/footage.md): what `vr footage` and find_footage ask a hosted server. The shots of the
+// Footage search over HTTP (docs/footage.md): what `lampo footage` and find_footage ask a hosted server. The shots of the
 // workspace's own index only (its cache, lib/footage/db.ts); a render's path on this disk only for the machine itself.
 import express from 'express';
 import { z } from 'zod';

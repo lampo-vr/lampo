@@ -90,7 +90,7 @@ const TECHNICAL_KEYS = new Set<string>([
   'Client secret',
   '2 · Its client here',
   'Lampo forgets its client and its Google sign-in, and asks Google to end that sign-in. Posts that went out through it stay where they are.',
-  'Set VR_TOKEN to your API token (Settings → API tokens) before starting the client.', // the MCP client
+  'Set LAMPO_TOKEN to your API token (Settings → API tokens) before starting the client.', // the MCP client
   '<0>Push over HTTP</0>: clients that listen (<1>subscriptions/listen</1>) hear the moment a video’s notes change.',
 ]);
 

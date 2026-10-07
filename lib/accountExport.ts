@@ -3,7 +3,7 @@
 // reply on someone else's note carries only that note's id), its drafts, its unsent recordings with their audio, its
 // verdicts, the review links it made, what it watched, what it asked of agents, and the metadata of what it uploaded
 // (never the videos: they are the team's). JSON files with plain field names and a README that says what each is. The same for Settings →
-// Profile → Export my data and `vr admin export-account`.
+// Profile → Export my data and `lampo admin export-account`.
 //
 // Ownership goes by account id (author_id, by_id, added_by_id: lib/ownership.ts); only verdicts and versions, which
 // record a name and no account, go by the account's name in that workspace (names are unique in a workspace).

@@ -1,8 +1,8 @@
 # Moving to a server
 
 You have reviewed on your own machine for a while and now run Lampo on a server (your own, see
-[go-live.md](go-live.md), or one someone runs for your team). `vr export` packs your store's reviews into one file, a
-**bundle**; `vr admin import` on the server unpacks it into a workspace there. Notes keep their frames, drawings,
+[go-live.md](go-live.md), or one someone runs for your team). `lampo export` packs your store's reviews into one file, a
+**bundle**; `lampo admin import` on the server unpacks it into a workspace there. Notes keep their frames, drawings,
 replies and statuses, approvals and finals keep their history, every version keeps its bytes, and Insights picks up where your
 machine left off.
 
@@ -29,22 +29,22 @@ it other notes point at, playbooks). Two files of the same name in one folder be
 path inside text (an agent's reply naming the file it rendered) becomes the file's name.
 
 **People travel by name; you give them accounts.** Your machine's account, and every name you wrote under (the app's,
-`vr`'s), becomes the account you name with `--owner`, by its id: the server treats those notes as yours. Other people's
+`lampo`'s), becomes the account you name with `--owner`, by its id: the server treats those notes as yours. Other people's
 names go to accounts with `--people "Mia Lang=mia@example.com,…"`: each address must already be a member of the
 workspace (invite them first; the import makes no accounts and refuses an address that isn't one). Agents keep their
 names (`agent:…`), visitors of review links theirs (`guest:…`), and anyone else keeps a name and no account.
 
 **History is history.** The imported events go into a file of their own (`events.imported.jsonl`, beside the
-workspace's `events.jsonl`), each marked as imported: no agent hears them as new feedback (`vr watch`,
-`wait_for_feedback`, INBOX.md, `vr inbox`), no webhook fires, no push goes out, no mail is sent, and however long the
+workspace's `events.jsonl`), each marked as imported: no agent hears them as new feedback (`lampo watch`,
+`wait_for_feedback`, INBOX.md, `lampo inbox`), no webhook fires, no push goes out, no mail is sent, and however long the
 history is, it never crowds out what happens on the server. Insights, the Inbox and each video's history read them as
 what happened.
 
 ## 1. Export, on your machine
 
 ```sh
-vr export ~/lampo-move.tar
-vr export ~/acme.tar --folder "Acme" --folder "Globex/Spring"   # only these folders
+lampo export ~/lampo-move.tar
+lampo export ~/acme.tar --folder "Acme" --folder "Globex/Spring"   # only these folders
 ```
 
 It reads your store and writes nothing into it; it says what it packed, what stays, and what was gone already (a
@@ -67,21 +67,21 @@ docker compose cp /tmp/lampo-move.tar app:/data/import/lampo-move.tar
 
 ## 3. Your account and the workspace
 
-Make your account first (the setup link, or `vr admin create-user`), then find the workspace it goes into:
+Make your account first (the setup link, or `lampo admin create-user`), then find the workspace it goes into:
 
 ```sh
-docker compose exec app vr admin workspaces
+docker compose exec app lampo admin workspaces
 ```
 
 ## 4. A dry run
 
 ```sh
-docker compose exec app vr admin import /data/import/lampo-move.tar \
+docker compose exec app lampo admin import /data/import/lampo-move.tar \
   --workspace w1 --owner you@example.com --dry-run
 ```
 
 It reads and checks the whole bundle and says what would happen to every video, folder, playbook and name, how much
-it writes and whether the disk has room (`VR_MIN_FREE` stays free). Nothing is written.
+it writes and whether the disk has room (`LAMPO_MIN_FREE` stays free). Nothing is written.
 
 ## 5. A backup, then the import
 
@@ -103,7 +103,7 @@ is written, the second places what was checked.
 - **The archive**: plain files only, plain relative names (no `..`, nothing absolute, no link, folder or device), each
   name once, every header's checksum, nothing after its end.
 - **The manifest**: every file listed with its size and sha256, and the archive holds exactly those; each kind of file
-  within its limit (a version within `VR_UPLOAD_MAX`).
+  within its limit (a version within `LAMPO_UPLOAD_MAX`).
 - **Every record**, against a strict schema: a field the format doesn't have refuses the bundle. A video must be an
   upload (`/@uploads/…`), each file must be one its review names, each event about a video the bundle holds. No time
   in it may lie after the bundle was made, nor after the server's clock (10 minutes of drift aside): if one does,

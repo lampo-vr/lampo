@@ -1,5 +1,5 @@
 // The tar a bundle travels in (lib/bundle.ts): POSIX ustar, regular files only, written and read here without a
-// dependency. The reader is for files from outside (`vr admin import`), so it takes only what the writer makes: a
+// dependency. The reader is for files from outside (`lampo admin import`), so it takes only what the writer makes: a
 // header whose checksum adds up, a plain relative name of letters, digits, `.`, `_`, `-` and `/` (never `.` or `..`, never
 // absolute), a regular file or a pax header that carries a size — no link, folder, device or GNU long name — and every
 // name once. Anything else is a TarError and the whole archive is refused.

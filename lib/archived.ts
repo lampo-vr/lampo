@@ -32,7 +32,7 @@ export function archivedWithHeld<T extends Pick<ArchivedProject, 'at'>>(
 }
 
 /**
- * The one sentence every refusal says, to people and agents alike (the API, `vr`, MCP): what is archived and who can
+ * The one sentence every refusal says, to people and agents alike (the API, `lampo`, MCP): what is archived and who can
  * change that. The name is a person's: one line, whatever it holds.
  */
 export const archivedWords = (project: string): string => `the project "${oneLine(project)}" is archived: it is read-only until a person restores it`;

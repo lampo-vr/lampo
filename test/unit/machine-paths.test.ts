@@ -82,7 +82,7 @@ test('“Copy for an agent” (the prompt): the machine itself reads the files, 
     const r = await ask('GET', url);
     assert.equal(r.status, 200, `${what}: ${r.text}`);
     assert.ok(!names(r.text), `${what}: ${r.text.slice(0, 400)}`);
-    assert.match(r.text, /vr show c_[0-9a-f]{6}/, `${what}: the frames through vr`);
+    assert.match(r.text, /lampo show c_[0-9a-f]{6}/, `${what}: the frames through vr`);
   }
 });
 

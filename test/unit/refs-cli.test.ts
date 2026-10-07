@@ -34,7 +34,7 @@ test('vr ref: an image, a link and a moment of another render, each with a note 
   assert.match(moment.out, /frame of other\.mp4 v1 at 00:00:12 \(f12\) to 00:00:20 \(f20\)/);
   const bare = vr(['ref', note.id], env);
   assert.notEqual(bare.code, 0);
-  assert.match(bare.err, /usage: vr ref/);
+  assert.match(bare.err, /usage: lampo ref/);
 
   const show = vr(['show', note.id], env);
   assert.equal(show.code, 0, show.err);

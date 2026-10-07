@@ -113,7 +113,7 @@ export function createReadiness({
   let last = '';
   async function check(): Promise<ReadyReport> {
     const [d, k, f, s] = await Promise.all([data(), disk(), ffmpeg(), store()]);
-    const u = publicUrl === false ? 'no public URL (VR_PUBLIC_URL): fine for a local test, not for people' : null;
+    const u = publicUrl === false ? 'no public URL (LAMPO_PUBLIC_URL): fine for a local test, not for people' : null;
     const found = { data: d, disk: k, ffmpeg: f, storage: s, ...(publicUrl === undefined ? {} : { public_url: u }) };
     const details = Object.fromEntries(Object.entries(found).filter(([, v]) => v !== null)) as ReadyReport['details'];
     const checks = Object.fromEntries(Object.entries(found).map(([name, why]) => [name, !why])) as ReadyReport['checks'];

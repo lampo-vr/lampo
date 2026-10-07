@@ -7,7 +7,7 @@
 // under the video's lock, atomically. A question on a folder before V1 has no video folder yet: its runs live in the
 // workspace's data/runs.jsonl (like the questions themselves in data/asks.json — folders are renamed, and those runs are
 // few). Lines this version can't read are kept as they are. The server holds the files it works with in memory and
-// writes them out soon after a change; every other process (`vr`, the stdio MCP server) only reads them.
+// writes them out soon after a change; every other process (`lampo`, the stdio MCP server) only reads them.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -84,7 +84,7 @@ export const RUN_TIMES = {
   late: 2 * 60_000,
 };
 
-// A run's id: `run_` and 12 hex digits (lib/activity.ts holds the one pattern: `vr` checks LAMPO_RUN by it).
+// A run's id: `run_` and 12 hex digits (lib/activity.ts holds the one pattern: `lampo` checks LAMPO_RUN by it).
 export { RUN_ID };
 export const newRunId = (): string => `run_${crypto.randomBytes(6).toString('hex')}`;
 
@@ -156,8 +156,8 @@ const finite = (n: unknown): n is number => typeof n === 'number' && Number.isFi
 const frameCount = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 0 && n <= 1e8;
 
 /**
- * A render's or upload's progress as a caller sent it (`vr render`, an upload), bounded: a known `what`, a stage and a
- * tool from `vr render`'s lists (lib/render/tools.ts), the percent clamped to 0–100, whole frames (done ≤ total), the
+ * A render's or upload's progress as a caller sent it (`lampo render`, an upload), bounded: a known `what`, a stage and a
+ * tool from `lampo render`'s lists (lib/render/tools.ts), the percent clamped to 0–100, whole frames (done ≤ total), the
  * time left at most a week, a whole version number. Anything else in it is dropped; no known stage, no progress at all.
  * One rule for every way in: the activity file, the hosted batches (whose schema says the same), what runs keep.
  */
@@ -879,7 +879,7 @@ const TOLD_DAYS = 7;
 
 /**
  * Takes the one telling of run `id`'s stop line on this machine: true the first time, false after. Every process that
- * could tell it (the app's MCP endpoint, `vr`, the stdio MCP server) takes it here first, so the agent hears it once
+ * could tell it (the app's MCP endpoint, `lampo`, the stdio MCP server) takes it here first, so the agent hears it once
  * whichever way it calls. A cache that can't be written tells it anyway (twice at worst, never not at all).
  */
 export function claimStop(id: string, now = Date.now()): boolean {
@@ -901,7 +901,7 @@ export function claimStop(id: string, now = Date.now()): boolean {
 }
 
 /**
- * The stop line for a call an agent of this machine makes outside the app (`vr`, the stdio MCP server on the local
+ * The stop line for a call an agent of this machine makes outside the app (`lampo`, the stdio MCP server on the local
  * store): its run on the video the call names (by a name, a path, a slug or a note), stopped by the person and not told
  * yet. The app hears the same call a moment later (the activity file) and clears `stop_pending`; `claimStop` keeps it to
  * one telling. A wait tells nothing (it went back to waiting: the work is over either way). Read only.

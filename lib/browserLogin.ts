@@ -1,8 +1,8 @@
-// `vr login <url>` in the browser, the way gh and gcloud sign in (RFC 8252, OAuth for native apps): vr listens on a
-// one-time loopback port, opens the server's /oauth/authorize as its own client (`vr`, lib/oauth/clients.ts), the person
+// `lampo login <url>` in the browser, the way gh and gcloud sign in (RFC 8252, OAuth for native apps): lampo listens on a
+// one-time loopback port, opens the server's /oauth/authorize as its own client (`lampo`, lib/oauth/clients.ts), the person
 // signs in there if they aren't yet and presses Allow on the consent screen, and the browser brings a one-time code back
-// to that port. vr trades the code and its PKCE verifier for the same API token `vr login --email` makes (POST
-// /api/auth/token): the token never travels in an address, only in that answer to vr. Over SSH (no browser here) vr
+// to that port. lampo trades the code and its PKCE verifier for the same API token `lampo login --email` makes (POST
+// /api/auth/token): the token never travels in an address, only in that answer to lampo. Over SSH (no browser here) lampo
 // prints the address to open elsewhere; the browser there then ends on a page that can't load, and its address, pasted
 // into the terminal, does what the loopback port would have.
 import { spawn } from 'node:child_process';
@@ -12,7 +12,7 @@ import type { AddressInfo } from 'node:net';
 import readline from 'node:readline';
 import { VR_CLIENT_ID } from './oauth/clients.ts';
 
-/** How long vr waits for the browser by default. */
+/** How long lampo waits for the browser by default. */
 export const BROWSER_WAIT_MS = 5 * 60_000;
 
 export interface BrowserLoginOptions {
@@ -37,7 +37,7 @@ export interface BrowserLoginOptions {
 
 export interface BrowserLoginResult {
   token: string;
-  /** The token as Settings → API tokens lists it: its id is what `vr logout` revokes. */
+  /** The token as Settings → API tokens lists it: its id is what `lampo logout` revokes. */
   info: { id: string; name: string };
 }
 
@@ -100,7 +100,9 @@ export async function browserLogin(o: BrowserLoginOptions): Promise<BrowserLogin
     const got = answerOf(u.searchParams, state);
     if (!got) {
       // another page poking at the port, or an old tab: never taken, and the real answer is still awaited
-      res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }).end('This is not the answer vr login is waiting for.\n');
+      res
+        .writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' })
+        .end('This is not the answer lampo login is waiting for.\n');
       return;
     }
     // 204: the browser stays on the server's page, which already says to go back to the terminal
@@ -155,7 +157,7 @@ export async function browserLogin(o: BrowserLoginOptions): Promise<BrowserLogin
           reject(
             new LoginEnded(
               'timeout',
-              `no answer from the browser within ${minutes >= 1 ? `${minutes} minute${minutes === 1 ? '' : 's'}` : `${Math.ceil(timeoutMs / 1000)} s`}; nothing was saved. Run vr login again, or sign in with --email or --token -`,
+              `no answer from the browser within ${minutes >= 1 ? `${minutes} minute${minutes === 1 ? '' : 's'}` : `${Math.ceil(timeoutMs / 1000)} s`}; nothing was saved. Run lampo login again, or sign in with --email or --token -`,
             ),
           ),
         timeoutMs,

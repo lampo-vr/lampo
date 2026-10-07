@@ -443,13 +443,16 @@ try {
   log('drafts → invisible to get_open_notes, list_videos, get_note and vr://inbox; sent → one wait_for_feedback answer with both');
 
   const { resources } = await client.listResources();
-  assert.ok(resources.some((r) => r.uri === 'vr://inbox'));
-  const reviewUri = must(resources.find((r) => r.uri.startsWith('vr://review/'))?.uri, 'review resource');
+  assert.ok(resources.some((r) => r.uri === 'lampo://inbox'));
+  assert.ok(!resources.some((r) => r.uri.startsWith('vr://')), 'the older addresses are read, not listed');
+  const reviewUri = must(resources.find((r) => r.uri.startsWith('lampo://review/'))?.uri, 'review resource');
   const md = await client.readResource({ uri: reviewUri });
   const first = md.contents[0];
   assert.ok('text' in first);
   assert.match(first.text, /# Review: clip\.mp4/);
-  log(`resources → vr://inbox, ${reviewUri.slice(0, 40)}… (review.md)`);
+  const older = (await client.readResource({ uri: reviewUri.replace('lampo://', 'vr://') })).contents[0];
+  assert.ok(older && 'text' in older && older.text === first.text, 'the vr:// address reads the same');
+  log(`resources → lampo://inbox, ${reviewUri.slice(0, 40)}… (review.md); vr:// still read`);
 
   // Errors come back as tool errors, the server keeps running.
   const bad = (await client.callTool({ name: 'get_note', arguments: { id: 'c_000000' } })) as CallToolResult;

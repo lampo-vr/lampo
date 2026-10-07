@@ -67,7 +67,7 @@ decoder is busy replace each other. Timecodes and drawings use the same code as 
 `lib/drawing` at the repo root), so what you see is what the agent gets.
 
 One app: the same screens on a person's own machine (signed in there automatically) and on a hosted server
-(`VR_MODE=server`, behind an account). What only some visits need is its own chunk, asked for when it is needed: the
+(`LAMPO_MODE=server`, behind an account). What only some visits need is its own chunk, asked for when it is needed: the
 sign-in and account screens, Settings, the upload tray (after the first paint), billing where a billing provider runs,
 the operator's pages. `/api/info` says which features and capabilities exist, and the UI shows only those.
 
@@ -95,12 +95,12 @@ its first press. Never import `radix-ui` in a module the first paint needs: a ne
 Code that loads on demand goes through `lib/lazy.ts` (`loader`, `useLoaded`, `screen`), not `lazy()` + Suspense
 where the chunk is usually already here: React holds content that replaces a fallback back for up to 300 ms.
 
-**`#/styleguide`** shows every one of them in every variant and state (dev and test builds only: `VR_STYLEGUIDE=0`, as
+**`#/styleguide`** shows every one of them in every variant and state (dev and test builds only: `LAMPO_STYLEGUIDE=0`, as
 the Dockerfile sets it, leaves the page and its chunk out); `test/e2e/styleguide.mjs` photographs it in both themes
-against `test/e2e/baseline/` (`VR_UPDATE_BASELINE=1` after a deliberate change). One baseline per platform: a
+against `test/e2e/baseline/` (`LAMPO_UPDATE_BASELINE=1` after a deliberate change). One baseline per platform: a
 machine without one records it on the first run, CI fails instead and uploads the screenshot
 (`new-screenshot-baselines`) to be committed. Until the first Linux baselines are committed, CI reports the
-comparison as skipped (`VR_BASELINE_MISSING: skip` in `.github/workflows/ci.yml`), never as passed.
+comparison as skipped (`LAMPO_BASELINE_MISSING: skip` in `.github/workflows/ci.yml`), never as passed.
 
 ### The design system's families (`system.tsx`, drawn by `styles/system.css`)
 

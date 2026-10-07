@@ -1,4 +1,4 @@
-// Runs an agent's render command for `vr render`: an argument list (never a shell), in a process group of its own so a
+// Runs an agent's render command for `lampo render`: an argument list (never a shell), in a process group of its own so a
 // stop reaches everything it started, stdin closed (a tool that asks a question fails instead of hanging), stdout and
 // stderr captured (Remotion prints a line per update when they aren't a terminal) and read by the tool's parser
 // (lib/render/tools.ts). ffmpeg gets `-progress pipe:3`. Without a parser, or before a known tool has said anything,
@@ -114,7 +114,7 @@ export function runTool(o: ToolRunOptions): ToolRun {
   const child = spawn(cmd as string, args, {
     cwd: o.cwd,
     env: o.env,
-    // its own process group (and session): a stop reaches the tool and all it started, never vr itself
+    // its own process group (and session): a stop reaches the tool and all it started, never lampo itself
     detached: group,
     stdio: readsProgress ? ['ignore', 'pipe', 'pipe', 'pipe'] : ['ignore', 'pipe', 'pipe'],
     windowsHide: true,

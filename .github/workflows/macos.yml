@@ -60,5 +60,5 @@ jobs:
       - name: WebKit end to end
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         env:
-          VR_STT: 'off'
+          LAMPO_STT: 'off'
         run: npm run test:webkit

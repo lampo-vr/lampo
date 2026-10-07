@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// `vr`, the agent CLI. Symlink-safe: node resolves the real path of this file, so ../lib is always the project's lib.
+// `vr`, what `lampo` was called before: the same command and the same output, for setups made then (agents' skills,
+// scripts, CI). Symlink-safe like bin/lampo.
 import { launch } from './launch.js';
 
 const { main } = await launch(new URL('../lib/cli.ts', import.meta.url));
-await main(process.argv.slice(2));
+await main(process.argv.slice(2), { as: 'vr' });

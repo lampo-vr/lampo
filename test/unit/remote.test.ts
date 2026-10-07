@@ -72,7 +72,7 @@ test('vr login with a token, whoami, and the server is where everything goes', a
   const r = await vr(['login', url, '--token', ownerToken]);
   assert.equal(r.code, 0, r.err);
   assert.match(r.out, /signed in to http:\/\/127\.0\.0\.1:\d+ as Olivia <olivia@example\.com> \(owner\)/);
-  const file = path.join(agentHome, 'config/video-review/credentials.json');
+  const file = path.join(agentHome, 'config/lampo/credentials.json');
   assert.equal(fs.statSync(file).mode & 0o777, 0o600);
   const who = await vr(['whoami']);
   assert.match(who.out, /server: http:\/\/127\.0\.0\.1:\d+\nsigned in as: Olivia/);
@@ -109,7 +109,7 @@ test('vr add pins a note; screenshots land on this machine; open, show, prompt u
   assert.equal(r.code, 0, r.err);
   noteId = must(/(c_[0-9a-f]{6}) pinned at \S+ \(f12, v1\) by agent:remote/.exec(r.out)?.[1], r.out);
   const marked = must(/marked: (.+\.png)/.exec(r.out)?.[1], 'marked path');
-  assert.ok(marked.startsWith(path.join(agentHome, 'cache/video-review/')), marked);
+  assert.ok(marked.startsWith(path.join(agentHome, 'cache/lampo/')), marked);
   assert.ok(fs.existsSync(marked));
   const open = await vr(['open', 'clip.mp4', '--json']);
   const c = JSON.parse(open.out).comments[0];
@@ -119,7 +119,7 @@ test('vr add pins a note; screenshots land on this machine; open, show, prompt u
   assert.match(prompt, /Open \(1, 1 must\)/);
   assert.match(prompt, new RegExp(`marked: ${agentHome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
   assert.match(prompt, /Review data: http:\/\/127\.0\.0\.1:\d+\/api\/review\//);
-  assert.match(prompt, /vr push <file> --to "\/@uploads\/Acme\/Reels\/clip\.mp4"/);
+  assert.match(prompt, /lampo push <file> --to "\/@uploads\/Acme\/Reels\/clip\.mp4"/);
 
   // Outside a named session vr still writes as an agent (agent:vr): a question, not feedback from the token's person.
   const q = await vr(['add', 'clip.mp4', '--frame', '5', '--text', 'Absicht?']);
@@ -370,7 +370,7 @@ test('an interrupted vr push continues where it stopped', async () => {
   const size = fs.statSync(big).size;
   const tus = await import('tus-js-client');
   const { FileUrlStorage } = tus as unknown as { FileUrlStorage: new (f: string) => never };
-  fs.mkdirSync(path.join(agentHome, 'cache/video-review'), { recursive: true });
+  fs.mkdirSync(path.join(agentHome, 'cache/lampo'), { recursive: true });
   // The first third goes up, then the connection "drops": what an earlier vr push would leave behind.
   const uploadUrl = await new Promise<string>((resolve, reject) => {
     const up = new tus.Upload(fs.createReadStream(big), {
@@ -379,7 +379,7 @@ test('an interrupted vr push continues where it stopped', async () => {
       chunkSize: Math.ceil(size / 3),
       metadata: { filename: 'big.mp4', folder: 'Resume' },
       headers: { Authorization: `Bearer ${ownerToken}` },
-      urlStorage: new FileUrlStorage(path.join(agentHome, 'cache/video-review/uploads.json')),
+      urlStorage: new FileUrlStorage(path.join(agentHome, 'cache/lampo/uploads.json')),
       onChunkComplete: () => {
         up.abort();
         resolve(String(up.url));

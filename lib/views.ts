@@ -94,7 +94,7 @@ export function forgetTeamViewer(slug: string, accountId: string): boolean {
 }
 
 /**
- * The team's watching of a video brought over from another store (`vr admin import`), by the account each record is
+ * The team's watching of a video brought over from another store (`lampo admin import`), by the account each record is
  * now: written only where nobody has watched the video here yet, so nothing recorded here is ever written over.
  */
 export function importViews(slug: string, viewers: Record<string, TeamWatch>): boolean {

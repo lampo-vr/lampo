@@ -26,7 +26,7 @@ export const rangeTimecodes = (r: FrameRange, fps: number): string => `${timecod
 /** "00:12:03 → 00:14:10 · 2.3 s": how the player and the client page show a range. */
 export const formatRange = (r: FrameRange, fps: number): string => `${rangeTimecodes(r, fps)} · ${formatSeconds(rangeSeconds(r, fps))}`;
 
-/** "00:12:03 → 00:14:10 (f360–f372, 2.3 s)": how agents read a range (vr show, INBOX.md, MCP). */
+/** "00:12:03 → 00:14:10 (f360–f372, 2.3 s)": how agents read a range (lampo show, INBOX.md, MCP). */
 export const describeRange = (r: FrameRange, fps: number): string => `${rangeTimecodes(r, fps)} (f${r.in}–f${r.out}, ${formatSeconds(rangeSeconds(r, fps))})`;
 
 /**

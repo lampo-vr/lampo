@@ -356,7 +356,7 @@ export function FunnelPage() {
   // the server no longer answers this person (the operator list changed meanwhile): no such page
   if (err && (err.status === 404 || err.status === 403 || err.status === 401)) return <Gone />;
   const r = q.data;
-  const range = r ? t('{range} · Lampo Cloud sign-ups', { range: `${span(r.from, r.to)} ${new Date(`${r.to}T12:00:00Z`).getUTCFullYear()}` }) : null;
+  const range = r ? t('{range} · sign-ups on this server', { range: `${span(r.from, r.to)} ${new Date(`${r.to}T12:00:00Z`).getUTCFullYear()}` }) : null;
   return (
     <>
       <Head weeks={weeks} onWeeks={setWeeks} range={r ? range : null} />

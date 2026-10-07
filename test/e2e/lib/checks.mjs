@@ -3,6 +3,7 @@
 // kept for inspection otherwise.
 import fs from 'node:fs';
 import path from 'node:path';
+import { settings } from '../../../lib/env.ts';
 
 const results = [];
 let failureShot = null;
@@ -18,7 +19,7 @@ export const skip = (why) => {
  * itself; never throws. With VR_CHECK set, only the checks whose name contains it run (the rest are left out of the
  * count). */
 export async function check(name, fn) {
-  if (process.env.VR_CHECK && !name.includes(process.env.VR_CHECK)) return;
+  if (settings.LAMPO_CHECK && !name.includes(settings.LAMPO_CHECK)) return;
   const t = Date.now();
   try {
     await fn();
@@ -51,7 +52,7 @@ export const assert = (cond, msg) => {
 
 /** With VR_SHOTS set, a failed check also saves what `page()` shows then, as `<prefix>-FAIL-<n>.png`. */
 export function screenshotFailures(page, prefix = 'FAIL') {
-  const dir = process.env.VR_SHOTS;
+  const dir = settings.LAMPO_SHOTS;
   if (!dir) return;
   failureShot = async (n) => page()?.screenshot({ path: path.join(dir, `${prefix}-FAIL-${n}.png`) });
 }

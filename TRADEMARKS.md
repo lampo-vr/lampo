@@ -6,8 +6,9 @@ official project apart from forks and services built on it.
 
 The project's name is **Lampo**, and its logo is the lowercase wordmark `lampo` whose last letter is a frame with an
 orange window, together with that frame alone as the mark (the files are in [docs/brand/](docs/brand/)). This policy
-covers those two and nothing else. The npm package, the `vr` command and the `VR_*` settings keep the technical name
-`video-review`, a plain description of what the tool does: it is not claimed, and forks may keep it.
+covers those two and nothing else. The technical name the tool had before, `video-review` (with its `vr` command
+and `VR_*` settings, still accepted), is a plain description of what the tool does: it is not claimed, and forks may
+keep it.
 
 **Fine without asking:**
 - saying that your product or service is *based on*, *compatible with* or *uses* Lampo;

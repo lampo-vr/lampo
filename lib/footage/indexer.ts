@@ -85,7 +85,7 @@ async function analyseChunk(t: Target, reading: Reading): Promise<boolean> {
   const shots = shotsOf(reading, t.ver);
   const db = openIndex();
   transaction(db, () => {
-    // another process (the app, a `vr footage index`) may have finished it meanwhile: theirs stays
+    // another process (the app, a `lampo footage index`) may have finished it meanwhile: theirs stays
     if (renderRow(t.key)) return;
     db.prepare('INSERT INTO renders (key, width, height, fps, frames, stage, at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
       t.key,
@@ -397,7 +397,7 @@ export function createIndexer(o: IndexerOptions = {}) {
 export type Indexer = ReturnType<typeof createIndexer>;
 
 /**
- * Indexes now, in this process, without the app's queue (`vr footage index` on the machine): every video that isn't
+ * Indexes now, in this process, without the app's queue (`lampo footage index` on the machine): every video that isn't
  * indexed yet, or those named. Progress goes to `progress`.
  */
 export async function indexNow(list: Target[], { e = embedder(), progress }: { e?: Embedder; progress?: (msg: string) => void } = {}): Promise<number> {

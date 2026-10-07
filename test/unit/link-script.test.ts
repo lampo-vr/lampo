@@ -13,17 +13,20 @@ const run = (home: string, PATH: string) =>
   execFileSync('sh', ['-c', script], { cwd: ROOT, env: { HOME: home, PATH, PWD: ROOT }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 const NODE_PATH = path.dirname(process.execPath);
 
-test('npm run link puts vr in ~/.local/bin on a machine without the folder, and says when the shell won’t look there', () => {
+test('npm run link puts lampo (and vr, its older name) in ~/.local/bin on a machine without the folder, and says when the shell won’t look there', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'vr-link-'));
   try {
     const out = run(home, `${NODE_PATH}:/usr/bin:/bin`);
-    const link = path.join(home, '.local/bin/vr');
-    assert.equal(fs.realpathSync(link), fs.realpathSync(path.join(ROOT, 'bin/vr')), 'a link to this checkout’s vr');
-    assert.match(out, /linked vr → .*\.local\/bin\/vr/);
+    const link = path.join(home, '.local/bin/lampo');
+    assert.equal(fs.realpathSync(link), fs.realpathSync(path.join(ROOT, 'bin/lampo')), 'a link to this checkout’s lampo');
+    const old = path.join(home, '.local/bin/vr');
+    assert.equal(fs.realpathSync(old), fs.realpathSync(path.join(ROOT, 'bin/vr')), 'what setups made before call');
+    assert.match(out, /linked lampo → .*\.local\/bin\/lampo/);
     assert.match(out, /not on your PATH[\s\S]*export PATH="\$HOME\/\.local\/bin:\$PATH"/, 'how to make the shell find it');
-    // Again, with the folder on the PATH: the link is replaced in place, and nothing more to do.
+    // Again, with the folder on the PATH: the links are replaced in place, and nothing more to do.
     const again = run(home, `${path.join(home, '.local/bin')}:${NODE_PATH}:/usr/bin:/bin`);
-    assert.equal(fs.realpathSync(link), fs.realpathSync(path.join(ROOT, 'bin/vr')));
+    assert.equal(fs.realpathSync(link), fs.realpathSync(path.join(ROOT, 'bin/lampo')));
+    assert.equal(fs.realpathSync(old), fs.realpathSync(path.join(ROOT, 'bin/vr')));
     assert.doesNotMatch(again, /not on your PATH/);
   } finally {
     fs.rmSync(home, { recursive: true, force: true });

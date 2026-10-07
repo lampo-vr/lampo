@@ -19,7 +19,7 @@ export const OPTION_LIMITS = {
   /** Moments of renders (frame items) in one question: each is grabbed and stored, like a note's references (A12 OPT-1). */
   moments: 8,
   label: 80,
-  /** The question itself, every way in (the API, MCP, `vr ask`). */
+  /** The question itself, every way in (the API, MCP, `lampo ask`). */
   text: 5000,
   /** The question's own free-text prompt. */
   prompt: 200,
@@ -132,7 +132,7 @@ export function picksLine(groups: readonly OptionGroup[] | null, answer: OptionA
 export const optionsSummary = (groups: readonly { id: string; pick?: 'one' | 'many'; items: readonly unknown[] }[]): string =>
   groups.map((g) => `${g.id} (${g.pick === 'many' ? 'any' : 'one'} of ${g.items.length})`).join(', ');
 
-/** One line per group, for agents (get_note, vr show): `options voice "Voice" (pick one): v1 Calm · v2 Warm (audio 3.1 s)`. */
+/** One line per group, for agents (get_note, lampo show): `options voice "Voice" (pick one): v1 Calm · v2 Warm (audio 3.1 s)`. */
 export function optionLines(groups: readonly OptionGroup[]): string[] {
   return groups.map((g) => {
     const items = g.items.map((it) => {
@@ -157,7 +157,7 @@ export const lastAnswer = (c: Pick<Comment, 'replies'>): Reply | null => [...(c.
 
 /**
  * A question whose options were answered after the newest render arrived: the picks are what the agent renders next,
- * so `vr open` keeps it listed until a render comes after them.
+ * so `lampo open` keeps it listed until a render comes after them.
  */
 export function picksToRender(c: Pick<Comment, 'options' | 'replies'>, newestRender: string | undefined): boolean {
   if (!c.options?.length) return false;

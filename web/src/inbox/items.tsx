@@ -199,7 +199,7 @@ export const stalledWhy = (i: ForYouItem): string =>
       : t('Quiet for {d}', { d: hoursWords(i.waitingHours) });
 
 // What a permission and a failure say, from the few templates they are made of (lib/runStream.ts, server/agentRuns.ts,
-// `vr render`): said here, so the list carries none of the activity words' code (the preview has them all).
+// `lampo render`): said here, so the list carries none of the activity words' code (the preview has them all).
 const v = (w: ActivityWords, k: string) => w.vars?.[k] ?? '';
 function permissionText(w: ActivityWords | undefined): string {
   if (w?.key === 'Needs permission to run {command}') return t('Needs permission to run {command}', { command: v(w, 'command') });

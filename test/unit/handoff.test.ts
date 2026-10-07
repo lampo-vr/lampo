@@ -204,7 +204,7 @@ test('vr track, push, fix and wontfix end with how to hear the person’s notes:
   const tracked = vr(['track', f, '--by', 'agent:cli'], env);
   assert.equal(tracked.code, 0, tracked.err);
   assert.equal(lastLine(tracked.out), WATCH_NOW_LINE, tracked.out);
-  assert.match(WATCH_NOW_LINE, /^Now listen with vr watch \(keep it running\): the person's notes arrive together when they press Send\.$/);
+  assert.match(WATCH_NOW_LINE, /^Now listen with lampo watch \(keep it running\): the person's notes arrive together when they press Send\.$/);
   const slug = slugOf(f);
   const a = person(slug, 'Cut later');
   const b = person(slug, 'Fade out');
@@ -217,5 +217,5 @@ test('vr track, push, fix and wontfix end with how to hear the person’s notes:
   const pushed = JSON.parse(vr(['push', film('pushed.mp4'), '--folder', 'Acme/Reels', '--json', '--by', 'agent:cli'], env).out);
   assert.equal(pushed.next, WATCH_NOW_LINE);
   const again = vr(['push', path.join(dir, 'Acme/export/pushed.mp4'), '--folder', 'Acme/Reels', '--by', 'agent:cli'], env);
-  assert.match(again.out, /^unchanged: .*\nNow listen with vr watch/, again.err);
+  assert.match(again.out, /^unchanged: .*\nNow listen with lampo watch/, again.err);
 });

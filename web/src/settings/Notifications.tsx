@@ -28,7 +28,7 @@ const EVENTS = perLang(() => [
   { value: 'post', label: t('Posts going out') },
   { value: 'all', label: t('Everything') },
 ]);
-const SOURCE = perLang((): Record<WebhookInfo['source'], string> => ({ settings: '', config: t('from config.json'), env: t('from VR_WEBHOOK_URL') }));
+const SOURCE = perLang((): Record<WebhookInfo['source'], string> => ({ settings: '', config: t('from config.json'), env: t('from LAMPO_WEBHOOK_URL') }));
 
 function Last({ h }: { h: WebhookInfo }) {
   if (!h.last) return <span>{t('no deliveries yet')}</span>;
@@ -119,7 +119,7 @@ function HookForm({
               ? 'https://hooks.slack.com/services/…'
               : format === 'discord'
                 ? 'https://discord.com/api/webhooks/…'
-                : 'https://example.com/hooks/video-review'
+                : 'https://example.com/hooks/lampo'
           }
           value={url}
           onChange={(e) => setUrl(e.target.value)}
@@ -191,7 +191,7 @@ export function Notifications() {
 
 /**
  * Email about your own account (a server that can email; never at the machine itself, which signs its owner in by
- * itself): an email whenever the account signs in from a browser or `vr` it hasn't been used with before.
+ * itself): an email whenever the account signs in from a browser or `lampo` it hasn't been used with before.
  */
 function EmailAlerts() {
   const status = useAuthStatus().data;
@@ -209,7 +209,7 @@ function EmailAlerts() {
       <div className="set-switch">
         <label htmlFor="signin-alerts">
           <b>{t('New sign-ins')}</b>
-          <span className="set-sub">{t('An email when your account signs in from a browser or vr it hasn’t been used with before.')}</span>
+          <span className="set-sub">{t('An email when your account signs in from a browser or lampo it hasn’t been used with before.')}</span>
         </label>
         <Switch id="signin-alerts" checked={on} disabled={update.isPending} onCheckedChange={set} />
       </div>

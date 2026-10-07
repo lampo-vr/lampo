@@ -40,7 +40,7 @@ test('a bundle lists each package once, with its licence text or at least its SP
     ['alpha', 'MIT', 'https://example.org/alpha'],
   ]);
   const out = renderNotices({ version: '9.9.9', bundled: notices });
-  assert.match(out, /Third-party software in video-review 9\.9\.9/);
+  assert.match(out, /Third-party software in Lampo 9\.9\.9/);
   assert.match(out, /## Bundled into this web app \(2\)/);
   assert.match(out, /alpha 1\.2\.3 — MIT\nhttps:\/\/example\.org\/alpha\n\nMIT License\n\nCopyright \(c\) Alpha/);
   assert.match(out, /@scope\/beta 1\.2\.3 — ISC[\s\S]*no licence file in the package; it declares ISC/);

@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------- a snippet to paste (settings/parts.tsx Code)
-   Its own sheet: Settings and the sign-in screen (Agents sign in with vr login …) both show one. */
+   Its own sheet: Settings and the sign-in screen (Agents sign in with lampo login …) both show one. */
 
 /* the label and its one Copy on top, the text below (no label: the Copy beside it); lines break at spaces only, never
    inside a token, a URL or a path, and what still doesn't fit scrolls sideways with a soft edge */

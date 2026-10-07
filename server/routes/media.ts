@@ -38,7 +38,7 @@ export function mediaRoutes(ctx: ServerContext): Router {
   const { playback } = ctx;
   keptInMemory(ctx, { frameGrabs: ctx.frameGrabs });
 
-  // The app's own media host (VR_MEDIA_ORIGIN, lib/storage/mediaHost.ts): a file by its signed URL, which is the whole
+  // The app's own media host (LAMPO_MEDIA_ORIGIN, lib/storage/mediaHost.ts): a file by its signed URL, which is the whole
   // credential — the redirect that handed it out checked who asked (a session, a token, a review link). Only on that
   // host; on any other the path is nobody's.
   const mediaHost = ctx.hosted ? mediaHostOf(ctx.cfg.media_origin) : null;

@@ -237,7 +237,7 @@ function lastLine(s: string | undefined): string {
   return [...lines].reverse().find((l) => SAYS_ERROR.test(l)) ?? lines.at(-1) ?? '';
 }
 const SAYS_ERROR = /\b(error|failed|fatal|cannot|can[’']t|could not|couldn[’']t|not found|missing|denied|invalid|exception)\b/i;
-const RENDER_TOOL = /\b(remotion|ffmpeg|aerender|blender)\b|^vr render\b/;
+const RENDER_TOOL = /\b(remotion|ffmpeg|aerender|blender)\b|^(?:lampo|vr) render\b/;
 
 /** What a run waits for the person's OK to do, in a few words: "render promo.mp4", "run npm test on promo.mp4". */
 function purpose(n: RunNotice): string {

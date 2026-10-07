@@ -136,7 +136,7 @@ test('the loop, end to end: connect, project, V1, notes, V2, fixed, wait again â
   for (const step of [
     /list_folders/,
     /put up V1 yourself/,
-    /vr render --to <video>/,
+    /lampo render --to <video>/,
     /--folder <project>/,
     /request_upload/,
     /get_playbook/,

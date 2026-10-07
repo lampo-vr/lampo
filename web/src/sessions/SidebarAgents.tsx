@@ -5,7 +5,7 @@
 // above it moves when it arrives. The row itself is the sidebar's (`Item`: its NavItem, handed in so this chunk never
 // pulls the library's).
 import { type ComponentType, type ReactElement, type ReactNode, useMemo } from 'react';
-import { AGENT_KIND_LABELS, agentKindOf, agentKindOfRef } from '../../../lib/agentKind.ts';
+import { agentKindOfRef, agentShown } from '../../../lib/agentKind.ts';
 import type { AgentKind, AgentListenState, ConnectedAgent } from '../../../lib/types.ts';
 import { useAgents, useAuthStatus, useCan } from '../api/auth.ts';
 import type { SessionRef, VideoSummary } from '../api/types.ts';
@@ -49,9 +49,7 @@ const STATE_LINES: Record<AgentListenState, () => string> = {
  * person's own ("Claude Code · Rita"). The full name is in its hover and is what assigning goes by.
  */
 export function shownAgent(name: string, kind: AgentKind | null | undefined, me: string | null | undefined): string {
-  const [client, owner] = name.split(' · ');
-  const known = kind && !['mcp', 'cli', 'api'].includes(kind) && agentKindOf(client) === kind;
-  const what = known ? AGENT_KIND_LABELS[kind] : (client ?? name);
+  const [what = name, owner] = agentShown(name, kind).split(' · ');
   return owner && owner !== me ? `${what} · ${owner}` : what;
 }
 

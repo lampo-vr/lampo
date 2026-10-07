@@ -56,7 +56,7 @@ async function startupWarnings(source_url: string | null): Promise<string[]> {
 test('a hosted instance without a source URL warns at start', async () => {
   const warned = await startupWarnings(null);
   assert.ok(
-    warned.some((w) => /VR_SOURCE_URL.*AGPL/.test(w)),
+    warned.some((w) => /LAMPO_SOURCE_URL.*AGPL/.test(w)),
     warned.join('\n'),
   );
   assert.deepEqual(await startupWarnings('https://example.org/fork'), []);

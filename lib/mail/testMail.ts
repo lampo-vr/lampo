@@ -1,5 +1,5 @@
 // One test message through the server's own mail settings, delivered now (not queued), so a wrong password or a blocked
-// port shows at once: `vr admin mail-test <to>` and the server setup's health check (POST /api/server/mail-test) both
+// port shows at once: `lampo admin mail-test <to>` and the server setup's health check (POST /api/server/mail-test) both
 // send it. The log transport writes it to the outbox instead.
 import path from 'node:path';
 import { CACHE } from '../paths.ts';

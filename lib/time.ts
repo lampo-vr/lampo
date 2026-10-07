@@ -130,7 +130,7 @@ export const STATUSES: readonly CommentStatus[] = ['open', 'fixed', 'verified', 
 export const isAgent = (by: unknown): boolean => typeof by === 'string' && by.startsWith('agent');
 /** A client on a review link wrote it (`guest:<name>`). */
 export const isClient = (by: unknown): boolean => typeof by === 'string' && by.startsWith('guest:');
-/** The flag on a client's note in what agents read (MCP note lines, `vr open` / `vr show`): what an agent writes on it —
+/** The flag on a client's note in what agents read (MCP note lines, `lampo open` / `lampo show`): what an agent writes on it —
  * a reply, the fix note — reaches the client as written, through every review link that shows the note (A12 GUEST-7). */
 export const CLIENT_NOTE_FLAG = 'CLIENT: they read your replies and fix note as written';
 export const isSeverity = (x: unknown): x is Severity => (SEVERITIES as readonly unknown[]).includes(x);
@@ -143,8 +143,8 @@ export const isNoteKind = (x: unknown): x is NoteKind => (NOTE_KINDS as readonly
 const LINE_BREAK = /\r\n|[\n\v\f\r\u001c-\u001e\u0085\u2028\u2029]/g;
 
 /**
- * Text from people (notes, replies, verdicts, captions, names) in the formats agents read line by line: `vr watch`,
- * INBOX.md, review.md, `vr prompt`, the MCP notes. A line break of any kind stays visible (↵) but never starts a line
+ * Text from people (notes, replies, verdicts, captions, names) in the formats agents read line by line: `lampo watch`,
+ * INBOX.md, review.md, `lampo prompt`, the MCP notes. A line break of any kind stays visible (↵) but never starts a line
  * of its own, so what a client types can't read as a note of its own; other control characters become spaces.
  */
 export const oneLine = (s: string): string => s.replace(LINE_BREAK, ' ↵ ').replace(/\p{Cc}/gu, ' ');
@@ -154,14 +154,14 @@ export const oneLine = (s: string): string => s.replace(LINE_BREAK, ' ↵ ').rep
 const NOT_OUR_BREAK = /[\v\f\r\u001c-\u001e\u0085\u2028\u2029]/g;
 
 /**
- * Text whose lines are ours (a tool's answer, a `vr` command's output, INBOX.md) as it leaves: `\n` ends a line and
+ * Text whose lines are ours (a tool's answer, a `lampo` command's output, INBOX.md) as it leaves: `\n` ends a line and
  * nothing else does. A terminator that came in with a name or a text nobody passed through `oneLine` becomes its
  * `\uXXXX` escape: no line of its own in any reader, and in JSON the same string as before (JSON escapes the others).
  */
 export const keepLines = (s: string): string => s.replace(NOT_OUR_BREAK, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
 
 /**
- * An error as a terminal shows it (`vr`'s stderr): `keepLines`, a tab as a space, and no other control character — an
+ * An error as a terminal shows it (`lampo`'s stderr): `keepLines`, a tab as a space, and no other control character — an
  * escape sequence in an error built from outside text (a bundle's record key) could retitle the window, hide what
  * follows or forge it (sweep 2 SW-5).
  */

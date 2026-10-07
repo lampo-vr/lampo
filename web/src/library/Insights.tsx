@@ -9,7 +9,7 @@
 // own (Library.tsx); InsightsFrame.tsx holds the frame and the loading state, the rows each card showed last time.
 import { useQuery } from '@tanstack/react-query';
 import { type CSSProperties, type ReactNode, useEffect, useState } from 'react';
-import { AGENT_KIND_LABELS } from '../../../lib/agentKind.ts';
+import { AGENT_KIND_LABELS, agentShown } from '../../../lib/agentKind.ts';
 import type { AgentKind, BillingInfo } from '../../../lib/types.ts';
 import { useCan } from '../api/auth.ts';
 import { api, enc } from '../api/client.ts';
@@ -351,7 +351,7 @@ function BackAgents({ agents }: { agents: InsightsStillWrong['topics'][number]['
           <span className="bk-mark" data-kind={a.kind}>
             <AgentMark kind={a.kind} size={12} />
           </span>
-          {a.n > 1 ? `${a.name} ×${a.n}` : a.name}
+          {a.n > 1 ? `${agentShown(a.name, a.kind)} ×${a.n}` : agentShown(a.name, a.kind)}
         </span>
       ))}
       {agents.length > 2 && <span className="ag-more">+{agents.length - 2}</span>}
@@ -420,7 +420,7 @@ function AgentRow({ a }: { a: InsightsAgent }) {
           <AgentMark kind={a.kind} size={16} />
         </span>
         <span className="ag-name">
-          <b>{a.name}</b>
+          <b>{agentShown(a.name, a.kind)}</b>
           <span>
             {facts(
               kindLabel(a.kind),
@@ -480,7 +480,7 @@ function TasteModal({ onClose }: { onClose: () => void }) {
   return (
     <Modal title={t('What agents read before they start')} onClose={onClose} width={640}>
       <p className="muted ins-modal-sub">
-        <T k={'Built from your notes. Agents get it per project with <0>vr taste</0> or the MCP tool <0>get_taste</0>.'} tags={[(c) => <code>{c}</code>]} />
+        <T k={'Built from your notes. Agents get it per project with <0>lampo taste</0> or the MCP tool <0>get_taste</0>.'} tags={[(c) => <code>{c}</code>]} />
       </p>
       {error ? (
         <p className="muted">{(error as Error).message}</p>

@@ -7,11 +7,11 @@ opened, and no message loads anything from the internet: the only picture is the
 To send them, give the server an SMTP relay and a sender:
 
 ```sh
-VR_SMTP_URL='smtp://user:password@smtp.example.com:587'
-VR_MAIL_FROM='Lampo <hello@review.example.com>'
+LAMPO_SMTP_URL='smtp://user:password@smtp.example.com:587'
+LAMPO_MAIL_FROM='Lampo <hello@review.example.com>'
 ```
 
-Then try it on the server: `vr admin mail-test you@example.com` sends one message now and prints the relay's answer.
+Then try it on the server: `lampo admin mail-test you@example.com` sends one message now and prints the relay's answer.
 A self-hosted server's setup checks the same from the browser: its health check names the relay and sends a test mail to its owner (`POST /api/server/mail-test`).
 With Brevo, the steps are [below](#sending-through-brevo). Without a relay nothing leaves the server: every message is
 written to the **outbox** in the cache instead ([Testing without sending](#testing-without-sending)), and the server
@@ -21,26 +21,26 @@ says so in its log at start.
 
 | Email | Goes to | When | Link |
 |---|---|---|---|
-| Confirm your email address | the address someone signed up with | an open sign-up (`VR_SIGNUP=open`), or again with *Send it again* | `#/verify/vt_…`, once, 24 hours |
+| Confirm your email address | the address someone signed up with | an open sign-up (`LAMPO_SIGNUP=open`), or again with *Send it again* | `#/verify/vt_…`, once, 24 hours |
 | Confirm your email address (invite) | the address someone gave when taking an invite on a hosted server | taking the invite | `#/verify/vt_…`, once, 24 hours; the person is in once it is opened (on the machine, an invite that named no address: the person is in already) |
 | Confirm your new address | the new address | *Settings → Profile*: a new email | `#/verify/vt_…`, once, 24 hours; the old address stays until then |
 | Your email address was changed | the old address | the new one was confirmed, or an admin changed it | — |
 | Reset your password | the account's address | *Forgot password?* on the sign-in screen (a sign-up nobody confirmed gets its confirmation instead, whose page takes a new password too) | `#/reset/rt_…`, once, 60 minutes |
 | Your password was changed | the account's address | a reset, a change in Profile, or an admin setting a temporary password | a link to *Forgot password?* |
-| You're invited | the address an invite is made out to | *Settings → Users*: *Email the invite*, *Send again*, and on a hosted server *Add a user*; again when that address signs up (`VR_SIGNUP=invite`) | `#/invite/inv_…`, once, until the invite expires |
+| You're invited | the address an invite is made out to | *Settings → Users*: *Email the invite*, *Send again*, and on a hosted server *Add a user*; again when that address signs up (`LAMPO_SIGNUP=invite`) | `#/invite/inv_…`, once, until the invite expires |
 | Welcome | the person who signed up | the moment their address is confirmed | — |
 | You already have an account | an existing account's address | someone tried to sign up with it | sign in, or *Forgot password?* |
-| A new sign-in to your account | the account's address | a sign-in from a browser (or `vr login`) the account hasn't used before — **only when the person turned sign-in alerts on** (Settings → Notifications) | a link to *Forgot password?* |
-| Your account was disabled / removed | the account's address | an admin disabled or removed it, or `vr admin delete-account --yes` deleted it | — |
+| A new sign-in to your account | the account's address | a sign-in from a browser (or `lampo login`) the account hasn't used before — **only when the person turned sign-in alerts on** (Settings → Notifications) | a link to *Forgot password?* |
+| Your account was disabled / removed | the account's address | an admin disabled or removed it, or `lampo admin delete-account --yes` deleted it | — |
 | Your account is deleted | the account's address | the person deleted their own account (*Settings → Profile*) | — |
 | Your workspace is suspended / works again | every member of the workspace not suspended there | the server's operator suspended the workspace, or lifted the suspension ([server-mode.md](server-mode.md#the-operators-pages)) | — |
-| A workspace of yours was deleted | everyone who was in it, each told whether their account went with it | its owner (*Settings → Workspace*), the server's operator, or `vr admin delete-workspace --yes` deleted it | — |
-| Email works | whoever you name | `vr admin mail-test` | — |
+| A workspace of yours was deleted | everyone who was in it, each told whether their account went with it | its owner (*Settings → Workspace*), the server's operator, or `lampo admin delete-workspace --yes` deleted it | — |
+| Email works | whoever you name | `lampo admin mail-test` | — |
 | A message about the workspace (a plan, a trial) | the workspace's owners and admins (or the roles asked for) | a billing provider asks ([server-mode.md](server-mode.md#a-billing-provider)) | a screen of the app, e.g. Settings → Billing |
 
 Notices (changed, welcome, sign-in, disabled, removed, deleted, suspended) only go to an address that was confirmed: someone who typed a
 wrong address never sends someone else their account's news. Accounts from before email count as confirmed, and so do
-addresses an admin vouched for (the owner from setup, `vr admin create-user`, and on the machine *Add a user* and an
+addresses an admin vouched for (the owner from setup, `lampo admin create-user`, and on the machine *Add a user* and an
 invite made out to that address; on a hosted server an invite vouches for nothing,
 [below](#invites-on-a-hosted-server)).
 
@@ -50,7 +50,7 @@ provider's message carries its own words in each language it has (English always
 button are the app's, and its link can only open a screen of this app. Like every notice it goes only to confirmed
 addresses, never to a suspended member or a disabled account.
 
-Every link is built from `VR_PUBLIC_URL`, with the token in the URL's fragment (`#/…`): browsers never send the fragment
+Every link is built from `LAMPO_PUBLIC_URL`, with the token in the URL's fragment (`#/…`): browsers never send the fragment
 to a server, so no token lands in the server's or a proxy's log. The page posts it. A newer link of the same kind
 replaces the older one, and a new address or password ends every link sent before it: a reset link left in an inbox
 the account moved away from resets nothing.
@@ -59,21 +59,21 @@ the account moved away from resets nothing.
 
 | Variable | config.json | Default | What it does |
 |---|---|---|---|
-| `VR_SMTP_URL` | `mail.smtp_url` | none: the outbox | `smtps://user:password@host:465` (TLS from the start) or `smtp://user:password@host:587` (STARTTLS, required). URL-encode `@` and `:` in the login and password (`%40`, `%3A`). A relay on this machine may be plain (`smtp://127.0.0.1:1025`). |
-| `VR_MAIL_FROM` | `mail.from` | `Lampo <lampo@<public host>>` | The sender people see, e.g. `Lampo <hello@review.example.com>`. Required with SMTP; the relay must allow it (a verified sender or domain). |
-| `VR_MAIL_REPLY_TO` | `mail.reply_to` | none | Where replies go. |
-| `VR_MAIL_PER_HOUR` | `mail.per_hour` | 200 | The server's own cap: messages over it wait for the next hour instead of being dropped. Set it under your relay's quota. |
-| `VR_MAIL_PER_WORKSPACE_HOUR` | `mail.per_workspace_hour` | a quarter of `VR_MAIL_PER_HOUR` | Each workspace's own share of that hour for the invites its admins email, and each account's for what it causes across all its workspaces (invites, address changes), so neither one team nor one account with several workspaces can use up everyone's budget. Over it, emailing an invite answers `429` with when to try again, before anything is made (the invite can still be made without emailing it, and its link copied), and an address change answers `429` too; an account changes its address at most 5 times an hour. Password resets go first, then sign-up confirmations, then the rest; the last quarter of `VR_MAIL_PER_HOUR` is kept for resets alone (all other mail takes three quarters at most, confirmations before the rest), so neither other mail nor a flood of sign-ups (anyone can sign up, a reset is someone locked out) holds a reset back past its link's hour. Of what one address asks for signed out (*Forgot password?*, *Send it again*), one message of a kind waits at a time; more are dropped, and the answer says the same. Only mail that went out counts toward the hour: a message whose link expired while it waited is dropped without counting. |
-| `VR_SIGNUP` | `signup` | off | Who may sign up on their own ([below](#sign-up-vr_signup)). |
-| `VR_TERMS_URL`, `VR_PRIVACY_URL` | `terms_url`, `privacy_url` | none | Linked from the sign-up screen (and the sign-in screen's foot); `VR_SIGNUP=open` needs both. |
+| `LAMPO_SMTP_URL` | `mail.smtp_url` | none: the outbox | `smtps://user:password@host:465` (TLS from the start) or `smtp://user:password@host:587` (STARTTLS, required). URL-encode `@` and `:` in the login and password (`%40`, `%3A`). A relay on this machine may be plain (`smtp://127.0.0.1:1025`). |
+| `LAMPO_MAIL_FROM` | `mail.from` | `Lampo <lampo@<public host>>` | The sender people see, e.g. `Lampo <hello@review.example.com>`. Required with SMTP; the relay must allow it (a verified sender or domain). |
+| `LAMPO_MAIL_REPLY_TO` | `mail.reply_to` | none | Where replies go. |
+| `LAMPO_MAIL_PER_HOUR` | `mail.per_hour` | 200 | The server's own cap: messages over it wait for the next hour instead of being dropped. Set it under your relay's quota. |
+| `LAMPO_MAIL_PER_WORKSPACE_HOUR` | `mail.per_workspace_hour` | a quarter of `LAMPO_MAIL_PER_HOUR` | Each workspace's own share of that hour for the invites its admins email, and each account's for what it causes across all its workspaces (invites, address changes), so neither one team nor one account with several workspaces can use up everyone's budget. Over it, emailing an invite answers `429` with when to try again, before anything is made (the invite can still be made without emailing it, and its link copied), and an address change answers `429` too; an account changes its address at most 5 times an hour. Password resets go first, then sign-up confirmations, then the rest; the last quarter of `LAMPO_MAIL_PER_HOUR` is kept for resets alone (all other mail takes three quarters at most, confirmations before the rest), so neither other mail nor a flood of sign-ups (anyone can sign up, a reset is someone locked out) holds a reset back past its link's hour. Of what one address asks for signed out (*Forgot password?*, *Send it again*), one message of a kind waits at a time; more are dropped, and the answer says the same. Only mail that went out counts toward the hour: a message whose link expired while it waited is dropped without counting. |
+| `LAMPO_SIGNUP` | `signup` | off | Who may sign up on their own ([below](#sign-up-vr_signup)). |
+| `LAMPO_TERMS_URL`, `LAMPO_PRIVACY_URL` | `terms_url`, `privacy_url` | none | Linked from the sign-up screen (and the sign-in screen's foot); `LAMPO_SIGNUP=open` needs both. |
 
 The server refuses to start with settings that can't work, each with one sentence: an SMTP URL that isn't one, SMTP
-without a sender, a sender or reply-to that isn't an email address, `VR_SIGNUP` other than off, invite or open,
-sign-up without a public URL, `VR_SIGNUP=open` anywhere but a hosted server or without both `VR_TERMS_URL` and
-`VR_PRIVACY_URL`, and terms or privacy links that aren't http(s). Credentials in `VR_SMTP_URL` are never logged and never sent to a browser; prefer the environment over
+without a sender, a sender or reply-to that isn't an email address, `LAMPO_SIGNUP` other than off, invite or open,
+sign-up without a public URL, `LAMPO_SIGNUP=open` anywhere but a hosted server or without both `LAMPO_TERMS_URL` and
+`LAMPO_PRIVACY_URL`, and terms or privacy links that aren't http(s). Credentials in `LAMPO_SMTP_URL` are never logged and never sent to a browser; prefer the environment over
 config.json for them.
 
-### Sign-up (`VR_SIGNUP`)
+### Sign-up (`LAMPO_SIGNUP`)
 
 - **`off`** (the default): no sign-up screen. Accounts come from setup, invites and admins (*Add a user with a
   temporary password*, which on a hosted server sends an invite instead).
@@ -87,7 +87,7 @@ config.json for them.
   workspace of their own — empty, with them as its owner, named after them until they name it (their first run asks)
   — and never sees the existing team's ([server-mode.md → Workspaces](server-mode.md#workspaces)). Names only have to
   differ inside a workspace, so a sign-up is never told a name is taken by someone in another one. On a person's own
-  machine `VR_SIGNUP=open` refuses to start.
+  machine `LAMPO_SIGNUP=open` refuses to start.
 
 An open sign-up is held until its address is confirmed: it can sign in, but sees only *Check your inbox* (send it
 again, sign out), and the API answers `403` with `unconfirmed: true` for anything else. Its address can't change while
@@ -125,7 +125,7 @@ else's address. The confirm link proves the inbox, never the password. So:
   address loses it at the next start, and the link sent for it stops working: only the address's own inbox confirms it.
 - **The address's owner never confirms someone else's password by asking.** Signing up with an address that has a held
   account: the same password sends its link again (now signing in this browser); any other password sends a reset
-  link instead, so the inbox takes the address with the password just typed. With `VR_SIGNUP=invite`, asking for an
+  link instead, so the inbox takes the address with the password just typed. With `LAMPO_SIGNUP=invite`, asking for an
   invite sends the invites made out to the address as well as the held account's link. *Send it again* sends the held
   account's link, whose page asks as above.
 - **Why *Send it again* sends the confirm link, not a reset.** Under the rules above the link is safe in anyone's hands
@@ -135,8 +135,8 @@ else's address. The confirm link proves the inbox, never the password. So:
 
 ### Invites on a hosted server
 
-A hosted server has workspaces, and whoever runs one may be anyone (someone who signed up, with `VR_SIGNUP=open`, or
-anyone signed in, with `VR_WORKSPACE_CREATE=anyone`): the person who made an invite holds its link as much as the
+A hosted server has workspaces, and whoever runs one may be anyone (someone who signed up, with `LAMPO_SIGNUP=open`, or
+anyone signed in, with `LAMPO_WORKSPACE_CREATE=anyone`): the person who made an invite holds its link as much as the
 person it went to, so taking an invite proves no inbox. Someone who takes one gives a name, an address and a password,
 and sees *Check your inbox*: the account is held (as above), in no workspace, until the confirm link mailed to that
 address is opened. Then it joins the invite's workspace with its role, and the browser that took the invite is signed
@@ -149,7 +149,7 @@ it). With anything else the answer is the same *Check your inbox* whatever the a
 address's inbox hears of it (an account's owner that someone tried, a held sign-up's owner a reset link). A reset link
 proves the inbox too, but replaces the password the invite was taken with: after one, the person takes the invite
 again. Without a mail relay these links wait in the outbox like everything else, so a hosted server meant for people
-needs `VR_SMTP_URL`. On the machine (one team, no workspaces) an invite's link makes the account at once.
+needs `LAMPO_SMTP_URL`. On the machine (one team, no workspaces) an invite's link makes the account at once.
 
 ## Sending through Brevo
 
@@ -162,14 +162,14 @@ needs `VR_SMTP_URL`. On the machine (one team, no workspaces) an invite's link m
 3. **The server** (the login's `@` written as `%40`):
 
    ```sh
-   VR_SMTP_URL='smtp://123abc%40smtp-brevo.com:<smtp key>@smtp-relay.brevo.com:587'
-   VR_MAIL_FROM='Lampo <hello@review.example.com>'
-   VR_MAIL_PER_HOUR=12      # Brevo's free plan sends 300 a day
+   LAMPO_SMTP_URL='smtp://123abc%40smtp-brevo.com:<smtp key>@smtp-relay.brevo.com:587'
+   LAMPO_MAIL_FROM='Lampo <hello@review.example.com>'
+   LAMPO_MAIL_PER_HOUR=12      # Brevo's free plan sends 300 a day
    ```
 
    Port 587 is upgraded with STARTTLS, and Lampo refuses to send without it. Port 465 works too (`smtps://…:465`, TLS
    from the start), but Hetzner Cloud blocks outgoing ports 25 and 465 by default: use 587 there.
-4. **Try it** on the server: `vr admin mail-test you@example.com` sends one message now, through these settings, and
+4. **Try it** on the server: `lampo admin mail-test you@example.com` sends one message now, through these settings, and
    prints the relay's answer or its error (a wrong key, a blocked port, a sender Brevo doesn't know). Then check the
    message's headers in your mail client: `dkim=pass`, `spf=pass`, `dmarc=pass`.
 
@@ -198,13 +198,13 @@ Gmail and Yahoo expect SPF or DKIM, and DMARC, from anyone sending them mail. Us
 
 ## Testing without sending
 
-With no `VR_SMTP_URL` every message goes to `<cache>/outbox/` (`VR_CACHE`, `cache/` next to the store by default) as
+With no `LAMPO_SMTP_URL` every message goes to `<cache>/outbox/` (`LAMPO_CACHE`, `cache/` next to the store by default) as
 three files: `<time>-<n>-<kind>-<id>.json` (headers, text and HTML, the address, the language), `.eml` (the message as it
 would be sent: open it in Mail or Thunderbird) and `.html` (a preview a browser opens). They hold live links, so they are
 readable by the server's user only; the newest 300 are kept. Every test and every browser suite uses this transport and
 reads the links back from the outbox; the suites drop any mail setting from the shell, so a test never reaches a relay.
 
-A mail catcher on your own machine works too: `VR_SMTP_URL=smtp://127.0.0.1:1025` with Mailpit or MailHog (plain SMTP
+A mail catcher on your own machine works too: `LAMPO_SMTP_URL=smtp://127.0.0.1:1025` with Mailpit or MailHog (plain SMTP
 is allowed only to this machine).
 
 ## Details
@@ -220,7 +220,7 @@ random 100–500 ms after the answer, never right after it, where the next reque
   (about 16 hours in all). A 5xx answer (an address that doesn't exist, a refused sender) is not tried again. A message
   whose link expired meanwhile is dropped.
 - **Limits**: at most 8 messages an hour and 30 a day to one address (an address can't be flooded through *Forgot
-  password?* or invites), and `VR_MAIL_PER_HOUR` for the whole server. Asking for links is limited too: 5 an hour per
+  password?* or invites), and `LAMPO_MAIL_PER_HOUR` for the whole server. Asking for links is limited too: 5 an hour per
   address asked about, 20 per 15 minutes per client, 30 wrong links per 15 minutes per client.
 - **Answers that tell nothing**: sign-up, *Forgot password?* and *Send it again* answer `{ok: true}` whether or not the
   address has an account, and take as long either way.

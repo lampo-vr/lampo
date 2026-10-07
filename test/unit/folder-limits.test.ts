@@ -211,7 +211,7 @@ test('MCP: move_video, ask_options and track_video refuse 13 levels, and make no
   }
 });
 
-test('vr: move, track and push refuse 13 levels before doing anything', () => {
+test('lampo: move, track and push refuse 13 levels before doing anything', () => {
   const deep = `V/${levels(12)}`;
   const pushed = clip('pushed.mp4');
   const tracked = clip('tracked-vr.mp4');

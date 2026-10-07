@@ -10,9 +10,10 @@ import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { settings } from '../../lib/env.ts';
 import { FFMPEG, isolatedEnv, tmpdir } from '../lib/helpers.ts';
 
-const REAL_MODEL = process.env.VR_STT_TEST_MODEL;
+const REAL_MODEL = settings.LAMPO_STT_TEST_MODEL;
 const { dir } = isolatedEnv();
 const { pickModel, ensureModel, downloadProgress, MODELS } = await import('../../lib/stt/models.ts');
 const { forSpeaker, needsLanguageRetry, promptCollapsed, transcribeWithPolicy, isSilent, vocabularyPrompt } = await import('../../lib/stt/policy.ts');

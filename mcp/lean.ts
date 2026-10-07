@@ -60,7 +60,7 @@ export function trimmed<S extends z.ZodObject>(schema: S): StandardSchemaWithJSO
 }
 
 /**
- * The lean tool set (`VR_MCP_TOOLS=lean`, or `/mcp?tools=lean`): the review loop and nothing else — read the notes and
+ * The lean tool set (`LAMPO_MCP_TOOLS=lean`, or `/mcp?tools=lean`): the review loop and nothing else — read the notes and
  * the playbook, look at frames, answer, mark fixed, wait. Folders, render sources, fix previews, references, playbook
  * suggestions, statuses and the MCP App card stay out of the list a model carries on every turn.
  */

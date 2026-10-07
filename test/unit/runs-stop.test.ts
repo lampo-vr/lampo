@@ -147,7 +147,7 @@ test('over MCP: the agent’s next answer ends with the stop line, once; the UI 
   );
 });
 
-test('vr: the line after the command’s own output, once; the app clears it from the call it tails; never another agent’s', async () => {
+test('lampo: the line after the command’s own output, once; the app clears it from the call it tails; never another agent’s', async () => {
   const n = note(C.slug, 'Too dark');
   store.assignSession(C.slug, { name: 'cut-cli', sessionId: 'cli-0123456789ab' }, 'tester');
   act({ agent: 'cut-cli', kind: 'fix', w: words('Fixed {id}', { id: n.id }), target: n.id });

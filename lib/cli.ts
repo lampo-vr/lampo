@@ -1,5 +1,5 @@
-// `vr` — the agent side of video-review. Reads/writes the same files as the UI (data/), no server needed; after
-// `vr login <url>` the same commands work against a hosted server (lib/backend).
+// `lampo` — the agent side of Lampo. Reads/writes the same files as the UI (data/), no server needed; after
+// `lampo login <url>` the same commands work against a hosted server (lib/backend).
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,6 +15,7 @@ import { mcpCommand } from './cliMcp.ts';
 import { render } from './cliRender.ts';
 import { describeShape } from './drawing.ts';
 import { ELEMENT_LIMITS, legendLine, NO_POINTERS, onWords, pointerFields, pointerIn, readElementMap } from './elements.ts';
+import { settings } from './env.ts';
 import { eventLine, isInboxEvent, shortEventLine, tags, WATCH_TYPES } from './eventLine.ts';
 import { undismissed } from './findings.ts';
 import { folderName, normFolder } from './folders.ts';
@@ -73,99 +74,103 @@ import type {
 } from './types.ts';
 import { checkProcessWorkspace } from './workspaces.ts';
 
-const help = (where: string) => `vr — frame-exact video feedback for agents (${where})
+const help = (where: string) => `lampo — frame-exact video feedback for agents (${where})
 
 Reading
-  vr ls [--open] [--mine | --session <name>] [--folder <f>] [--archived]   videos under review with counts
-  vr folders [--archived]                                    the project/folder tree with counts
-  vr open <video|slug> [--all] [--brief]                     open comments of one video (--all: every status; --brief:
+  lampo ls [--open] [--mine | --session <name>] [--folder <f>] [--archived]   videos under review with counts
+  lampo folders [--archived]                                 the project/folder tree with counts
+  lampo open <video|slug> [--all] [--brief]                  open comments of one video (--all: every status; --brief:
                                                              screenshot paths once, in the header)
-  vr show <id>                                               one comment in full
-  vr inbox [--since <iso>] [--limit N] [--mine | --session <name>]   newest human feedback across videos (50)
-  vr prompt <video>                                          the "Copy for an agent" text
-  vr watch [--mine | --session <name> | --everyone] [--all] [--brief]   one line per new comment, for a Monitor
+  lampo show <id>                                            one comment in full
+  lampo inbox [--since <iso>] [--limit N] [--mine | --session <name>]   newest human feedback across videos (50)
+  lampo prompt <video>                                       the "Copy for an agent" text
+  lampo watch [--mine | --session <name> | --everyone] [--all] [--brief]   one line per new comment, for a Monitor
                                                              (--brief: without the file paths at the end)
 
 Acting
-  vr fix <id> --note "…" [--v N] [--preview p_…]   mark fixed (N defaults to the newest version; a fresh render is picked up first)
-  vr preview <id> <file> [--fixed --note "…"] [--frame N | --at 00:12:03 | --t 12.1] [--clip]   a still or ≤ 10 s clip
+  lampo fix <id> --note "…" [--v N] [--preview p_…]   mark fixed (N defaults to the newest version; a fresh render is picked up first)
+  lampo preview <id> <file> [--fixed --note "…"] [--frame N | --at 00:12:03 | --t 12.1] [--clip]   a still or ≤ 10 s clip
         [--app "After Effects" --project spot.aep --comp Main --time 12.4]   of the fix, before rendering (docs/agents.md)
-  vr source <video> --app "After Effects" [--project spot.aep] [--comp Main] [--start-frame N] [--fps F] [--v N] | --clear
+  lampo source <video> --app "After Effects" [--project spot.aep] [--comp Main] [--start-frame N] [--fps F] [--v N] | --clear
                                         where the render came from, so frame N maps to the project's time
-  vr ref <id> <file|url> [--caption "…"] [--note "…"]   a reference on a note: an image, a clip (≤ 60 s) or a link
-  vr ref <id> --video <video> (--frame N | --at mm:ss:ff) [--to N] [--v N] [--caption "…"] [--note "…"]
+  lampo ref <id> <file|url> [--caption "…"] [--note "…"]   a reference on a note: an image, a clip (≤ 60 s) or a link
+  lampo ref <id> --video <video> (--frame N | --at mm:ss:ff) [--to N] [--v N] [--caption "…"] [--note "…"]
                                         a moment (or range) of another render; --note makes it a reply
-  vr reply <id> --note "…"              reply without changing status
-  vr wontfix <id> --note "reason"
-  vr verify <id> [--note "…"] · vr reopen <id> [--note "…"]   a fix confirmed · a note open again
-  vr add <video> --frame N --text "…"   pin a question for the reviewer to a frame (--overall: about the whole video)
+  lampo reply <id> --note "…"           reply without changing status
+  lampo wontfix <id> --note "reason"
+  lampo verify <id> [--note "…"] · lampo reopen <id> [--note "…"]   a fix confirmed · a note open again
+  lampo add <video> --frame N --text "…"   pin a question for the reviewer to a frame (--overall: about the whole video)
         [--kind question|info|feedback]   question (the default for agents) · info = what you changed or decided
         [--at 00:12:03 | --t 12.1] [--to 00:14:10 | --range 360-372] [--tags a,b] [--severity must|should|nice|idea]
                                         --to: a range from the position to this end (timecode, seconds or fN)
         [--box x,y,w,h]… [--arrow x1,y1,x2,y2]…   (video pixels)
         [--choice "Yes" --choice "No, it's …"]   a question's likely answers (2–4), picked with one click
-  vr ask (<video> | --folder P) --text "…" --options f.json   before rendering: options to pick from (f.json:
+  lampo ask (<video> | --folder P) --text "…" --options f.json   before rendering: options to pick from (f.json:
                                         [{id, label, pick, items: [{id, label, path}]}]) → ANSWERED … PICKED g=item
-  vr track <video> [--me | --session <name> | --none] [--folder "Project/Sub"]   put a video under review
-  vr push <file> [--folder "Project/Sub"] [--to <video>] [--name clip.mp4]   upload a render (new video, or its next version)
+  lampo track <video> [--me | --session <name> | --none] [--folder "Project/Sub"]   put a video under review
+  lampo push <file> [--folder "Project/Sub"] [--to <video>] [--name clip.mp4]   upload a render (new video, or its next version)
         [--elements map.json]           where its named elements are: notes then say "on #title"
-  vr push <part> --to <video> --part-at <frame> [--handles 12]   only where a note says PART RENDER OK: the stretch (and
+  lampo push <part> --to <video> --part-at <frame> [--handles 12]   only where a note says PART RENDER OK: the stretch (and
                                         its handles before and after), spliced into the newest version for review
-  vr elements <video> <map.json> [--v N]   an elements map for a version already up (docs/agents.md)
-  vr move <video> <folder> | --none     file a video into a project/folder (created if new)
-  vr assign <video> (--me | --session <name> | --none)
-  vr sync <video>                       register a re-render now (otherwise automatic)
-  vr render [--to <video> --out <file>] [--detach] -- <command>   render with its progress in Lampo, then put
-                                        <file> up as the next version (--folder <project>: a new video's V1)
-  vr render wait <id>                   a --detach render (past ~8 min): waits ≤ 9 min, says how far it is
-  vr diff <video> [--v N]               what changed from v(N-1) to vN: changed ranges (with screen region), audio, retimes
-  vr taste <video|folder>               the reviewer's taste for that project: read it before you render
-  vr playbook [<video|folder>]          the team's playbook for it (brief, rules, skills; House without an argument):
+  lampo elements <video> <map.json> [--v N]   an elements map for a version already up (docs/agents.md)
+  lampo move <video> <folder> | --none  file a video into a project/folder (created if new)
+  lampo assign <video> (--me | --session <name> | --none)
+  lampo sync <video>                    register a re-render now (otherwise automatic)
+  lampo render [--to <video> | --folder <project>] [--out <file>] [--detach] [--verbose] -- <command>   render with
+                                        its progress in Lampo, then put <file> up as the next version (--folder: a new
+                                        video's V1; --verbose: the tool's own output too, on stderr)
+  lampo render wait <id>                a --detach render (past ~8 min): waits ≤ 9 min, says how far it is
+  lampo diff <video> [--v N]            what changed from v(N-1) to vN: changed ranges (with screen region), audio, retimes
+  lampo taste <video|folder>            the reviewer's taste for that project: read it before you render
+  lampo playbook [<video|folder>]       the team's playbook for it (brief, rules, skills; House without an argument):
                                         read it before you render
-  vr playbook skill <name> [<video|folder>] [--files]   one skill's SKILL.md (--files: download its files here)
-  vr playbook export [<video|folder>] [--to <dir>]      PLAYBOOK.md and every skill as <dir>/<name>/SKILL.md + files
+  lampo playbook skill <name> [<video|folder>] [--files]   one skill's SKILL.md (--files: download its files here)
+  lampo playbook export [<video|folder>] [--to <dir>]   PLAYBOOK.md and every skill as <dir>/<name>/SKILL.md + files
                                         (default .lampo/playbook; --to .claude/skills works as a skills folder)
-  vr playbook propose <video|folder> --section brief|rules|skill (--file f.md | --text "…") --reason "…" [--evidence c_1,c_2]
+  lampo playbook propose <video|folder> --section brief|rules|skill (--file f.md | --text "…") --reason "…" [--evidence c_1,c_2]
                                         suggest a change; a person accepts or rejects it
-  vr playbook status <pp_…>             where a suggestion stands (accepted, rejected with the reason, pending)
-  vr post draft <video> --platform yt|ig|fb [--title|--text|--tags|--cover|--at|--ai|--kids …]
-                                        a final video's post; a person publishes · vr post [<video>]: where they stand
-  vr qa <video> [--v N] [--rerun]       automatic pre-review: typos in burned-in text, safe zones, flash/black frames, audio
-  vr transcript <video> [--v N] [--words | --srt | --vtt] [--rerun]   what is said, line by line on its frames
+  lampo playbook status <pp_…>          where a suggestion stands (accepted, rejected with the reason, pending)
+  lampo post draft <video> --platform yt|ig|fb [--title|--text|--tags|--cover|--at|--ai|--kids …]
+                                        a final video's post; a person publishes · lampo post [<video>]: where they stand
+  lampo qa <video> [--v N] [--rerun]    automatic pre-review: typos in burned-in text, safe zones, flash/black frames, audio
+  lampo transcript <video> [--v N] [--words | --srt | --vtt] [--rerun]   what is said, line by line on its frames
                                         (a CHANGE WORDS note names the line; --srt/--vtt: captions)
-  vr footage find "<request>" [--aspect 9:16] [--min 2] [--motion push-in] [--no-text] [--sheet]   B-roll: shots with
-                                        exact in–out frames · vr footage sheet <id…> | status | on | off | index
-  vr status <video> "rendering v4" [--eta 90] | --clear   show what you are doing on the video's card
-  vr sessions [--for <video>]           the agents you can assign (ranked for a video)
+  lampo footage find "<request>" [--aspect 9:16] [--min 2] [--motion push-in] [--no-text] [--sheet]   B-roll: shots with
+                                        exact in–out frames · lampo footage sheet <id…> | status | on | off | index
+  lampo status <video> "rendering v4" [--eta 90] | --clear   show what you are doing on the video's card
+  lampo sessions [--for <video>]        the agents you can assign (ranked for a video)
 
 Hosted server
-  vr login <url> [--expires 90d] [--insecure]   use a Lampo server from now on: you allow it in the browser (over SSH:
+  lampo login <url> [--expires 90d] [--insecure]   use a Lampo server from now on: you allow it in the browser (over SSH:
                                         open the address it prints elsewhere; plain http to another machine: --insecure)
-  vr login <url> --email you@example.com [--workspace <id>] | --token -   no browser (CI): password or API token
-  vr logout                             back to the local store (revokes the token vr login made; a pasted one is
+  lampo login <url> --email you@example.com [--workspace <id>] | --token -   no browser (CI): password or API token
+  lampo logout                          back to the local store (revokes the token lampo login made; a pasted one is
                                         only forgotten here)
-  vr whoami                             which store or server this vr uses, and as whom
-  vr admin invite [--role member|reviewer|admin|owner] [--email e] [--name n] [--days 7]   a one-time sign-up link
-  vr admin invites · revoke-invite <id> · create-user --email e --name n [--role r] · reset-password --email e · list-users
-  vr admin workspaces [list] · workspaces create --name n --owner e · workspaces migrate   (--workspace <id> on invite/invites/revoke-invite/create-user/list-users/repair-folders, else VR_WORKSPACE; invites --all)
+  lampo whoami                          which store or server this lampo uses, and as whom
+  lampo admin invite [--role member|reviewer|admin|owner] [--email e] [--name n] [--days 7]   a one-time sign-up link
+  lampo admin invites · revoke-invite <id> · create-user --email e --name n [--role r] · reset-password --email e · list-users
+  lampo admin workspaces [list] · workspaces create --name n --owner e · workspaces migrate   (--workspace <id> on invite/invites/revoke-invite/create-user/list-users/repair-folders, else LAMPO_WORKSPACE; invites --all)
                                         accounts, run on the server with its data directory
-  vr admin repair-folders [--write] [--take-back <link id,…>]
+  lampo admin repair-folders [--write] [--take-back <link id,…>]
                                         rebuild a damaged folders.json from what it still says, the videos and the
                                         review links (a dry run without --write); a link nothing vouches for is a
                                         person's call: --take-back gives it its folder
-  vr admin mail-test <to> [--lang de]   send one test email now through the server's mail settings
-  vr admin delete-account <who>|delete-workspace <id> [--yes] · export-account <who> --out f.zip · erasures
-  vr export <out.tar> [--folder f]… · vr admin import <tar> --workspace w --owner e   move to a server (docs/moving.md)
+  lampo admin mail-test <to> [--lang de]   send one test email now through the server's mail settings
+  lampo admin delete-account <who>|delete-workspace <id> [--yes] · export-account <who> --out f.zip · erasures
+  lampo export <out.tar> [--folder f]…   this store as a bundle, to move it to a server (docs/moving.md)
+  lampo admin import <tar> --workspace w --owner e [--dry-run] [--people "Name=email,…"] [--no-derive]
+                                        a bundle into a workspace here (--dry-run: say it, write nothing;
+                                        --no-derive: posters and waveforms later, when someone opens a video)
 
 Any agent over MCP (Claude Code, Codex, Cursor, VS Code, Antigravity, Windsurf, Gemini CLI, Zed, …)
-  vr mcp config <client> [--stdio | --http] [--url <server>] [--token-env NAME] [--with-token] [--name lampo] [--json]
+  lampo mcp config <client> [--stdio | --http] [--url <server>] [--token-env NAME] [--with-token] [--name lampo] [--json]
                                         a ready config: stdio here, or /mcp on this app or your server
 
 Options: --json on every read command but prompt. --by <name> overrides the author (default: agent:<this session>).
 Paths in output are absolute, so screenshots can be opened directly.`;
 
 /**
- * A command's lines of the help: each line that starts `vr <name>` with the lines that continue it (indented deeper),
+ * A command's lines of the help: each line that starts `lampo <name>` with the lines that continue it (indented deeper),
  * and the options every command takes. The whole help for a command it doesn't name.
  */
 export function usageOf(name: string, text: string): string {
@@ -173,7 +178,7 @@ export function usageOf(name: string, text: string): string {
   const out: string[] = [];
   let taking = false;
   for (const l of lines) {
-    const head = /^ {2}vr ([a-z-]+)\b/.exec(l);
+    const head = /^ {2}lampo ([a-z-]+)\b/.exec(l);
     if (head) taking = head[1] === name;
     else if (!/^ {3,}\S/.test(l)) taking = false;
     if (taking) out.push(l);
@@ -190,12 +195,12 @@ type Opts = Record<string, OptValue | undefined>;
 interface Args {
   pos: string[];
   opt: Opts;
-  /** `vr render`: everything after `--`, the command as given. */
+  /** `lampo render`: everything after `--`, the command as given. */
   cmd?: string[];
 }
 
 const MULTI = new Set(['box', 'arrow', 'choice']);
-/** Options a command takes more than once beyond those (`vr export --folder A --folder B`). */
+/** Options a command takes more than once beyond those (`lampo export --folder A --folder B`). */
 const MULTI_OF: Record<string, string[]> = { export: ['folder'] };
 
 function parseArgs(argv: string[], multi: ReadonlySet<string> = MULTI): Args {
@@ -221,7 +226,7 @@ function parseArgs(argv: string[], multi: ReadonlySet<string> = MULTI): Args {
 const str = (v: OptValue | undefined): string | undefined => (typeof v === 'string' ? v : undefined);
 const list = (v: OptValue | undefined): string[] => (Array.isArray(v) ? v : []);
 
-// What `vr` prints is read line by line (agents, Monitors): only `\n` ends a line (`keepLines`; JSON stays the same).
+// What `lampo` prints is read line by line (agents, Monitors): only `\n` ends a line (`keepLines`; JSON stays the same).
 const out = (s: string): void => {
   process.stdout.write(`${keepLines(s)}\n`);
 };
@@ -229,14 +234,14 @@ class Exit extends Error {}
 // Report a usage error and stop the command: `die()` inside expressions, `throw exit()` where TypeScript should
 // see the control flow end.
 const exit = (msg: string): Exit => {
-  process.stderr.write(`vr: ${terminalText(msg)}\n`);
+  process.stderr.write(`lampo: ${terminalText(msg)}\n`);
   process.exitCode = 1;
   return new Exit(msg);
 };
 const die = (msg: string): never => {
   throw exit(msg);
 };
-/** A folder named for a write (`--folder`, `vr move`): refused here, before anything is sent, past 12 levels or 400 characters. */
+/** A folder named for a write (`--folder`, `lampo move`): refused here, before anything is sent, past 12 levels or 400 characters. */
 const newFolder = (folder: string | undefined): string | undefined => {
   try {
     normFolder(folder);
@@ -248,7 +253,7 @@ const newFolder = (folder: string | undefined): string | undefined => {
 
 /**
  * Where a file a server named lands: `names` under `root`, or null when that would be anywhere else (A12 AGENT-8). The
- * server `vr` talks to may not be honest, so a name is one plain segment (no separator, no `..`, nothing absolute), and
+ * server `lampo` talks to may not be honest, so a name is one plain segment (no separator, no `..`, nothing absolute), and
  * what already exists on the way — a folder or the file itself — must still be inside `root` once symbolic links are
  * followed, or a link would write through to wherever it points.
  */
@@ -285,7 +290,7 @@ function landings(root: string, what: string, all: string[][]): string[] {
   );
 }
 
-/** An elements map file (`--elements`, `vr elements`), read and checked whole here; stops the command when it can't be one. */
+/** An elements map file (`--elements`, `lampo elements`), read and checked whole here; stops the command when it can't be one. */
 function elementMapFile(arg: OptValue): { map: ElementMap; name: string } {
   const name = str(arg) ?? die('--elements needs a file: --elements map.json');
   const file = path.resolve(name);
@@ -312,8 +317,8 @@ function me(): ClaudeSession | null {
   return s?.name ? s : null;
 }
 function author(opt: Opts): string {
-  // `--by`, VR_BY and a session's name go into the store and every agent's reading of it: one line, short (A12-D3).
-  const by = cleanAuthor(str(opt.by) || '') || cleanAuthor(process.env.VR_BY || '');
+  // `--by`, LAMPO_BY and a session's name go into the store and every agent's reading of it: one line, short (A12-D3).
+  const by = cleanAuthor(str(opt.by) || '') || cleanAuthor(settings.LAMPO_BY || '');
   if (by) return by;
   const s = me();
   // Outside a named session still an agent, by a name a hosted server takes (`agent:<name>`): a bare "agent" is
@@ -338,8 +343,8 @@ const latestOf = (review: Review) => review.versions.at(-1) || die(`${review.vid
 
 // ---------------------------------------------------------------- formatting
 
-// `brief` (vr open --brief): the screenshots' folder is said once in the header, so a note names its files only when
-// they don't carry the usual names; references without where their files are (vr show has both).
+// `brief` (lampo open --brief): the screenshots' folder is said once in the header, so a note names its files only when
+// they don't carry the usual names; references without where their files are (lampo show has both).
 // `pointers`: what the notes point at in their versions' elements maps (b.pointers): " · on #card" on the note's line.
 function commentLines(b: Backend, review: Review, c: Comment, { full = false, brief = false, pointers = NO_POINTERS } = {}): string {
   const L: string[] = [];
@@ -389,7 +394,7 @@ function commentLines(b: Backend, review: Review, c: Comment, { full = false, br
   return L.map(oneLine).join('\n');
 }
 
-// A question asked on a folder before any render (vr show): no video, no frames.
+// A question asked on a folder before any render (lampo show): no video, no frames.
 function askText(a: AskView): string {
   const L = [`${a.id}  ${a.status.toUpperCase().padEnd(8)} QUESTION  folder ${a.folder ?? '-'} (no video yet)  by ${a.author}`, `    ${a.text}`];
   for (const l of optionLines(a.options)) L.push(`    ${l}`);
@@ -536,14 +541,14 @@ const commands: Record<string, Command> = {
     const brief = !!opt.brief;
     const shots = brief ? b.shotFile(review, '-') : null;
     out(header(b, review, legendLine(Object.values(pointers.notes), pointers.names)));
-    if (shots) out(`  shots: ${path.dirname(shots)}/<id>_marked.png · <id>_clean.png · <id>_range.jpg (vr show <id>: one note in full)`);
+    if (shots) out(`  shots: ${path.dirname(shots)}/<id>_marked.png · <id>_clean.png · <id>_range.jpg (lampo show <id>: one note in full)`);
     out('');
     if (!list.length) return out(opt.all ? 'no comments.' : 'no open comments.');
     for (const c of list) out(`${commentLines(b, review, c, { brief, pointers })}\n`);
   },
 
   async ask({ pos, opt }, b) {
-    const usage = 'usage: vr ask (<video> | --folder "Project/Sub") --text "…" --options options.json [--prompt "…"]';
+    const usage = 'usage: lampo ask (<video> | --folder "Project/Sub") --text "…" --options options.json [--prompt "…"]';
     const folder = str(opt.folder);
     if (!pos[0] === !folder) throw exit(usage);
     newFolder(folder);
@@ -583,7 +588,7 @@ const commands: Record<string, Command> = {
     });
     if (opt.json) return out(JSON.stringify(made, null, 2));
     out(oneLine(`${made.id} asked ${slug ? `on ${pos[0]}` : `on folder ${made.folder} (no video yet)`}: ${optionsSummary(groups)}`));
-    out('The person auditions and picks in Lampo; vr watch brings: ANSWERED … PICKED <group>=<item> … · note: "…"');
+    out('The person auditions and picks in Lampo; lampo watch brings: ANSWERED … PICKED <group>=<item> … · note: "…"');
   },
 
   async show({ pos, opt }, b) {
@@ -608,13 +613,13 @@ const commands: Record<string, Command> = {
   },
   async preview({ pos, opt }, b) {
     const [id, file] = pos;
-    if (!id || !file) throw exit('usage: vr preview <id> <file> [--fixed --note "…"] [--frame N | --at 00:12:03] [--clip]');
+    if (!id || !file) throw exit('usage: lampo preview <id> <file> [--fixed --note "…"] [--frame N | --at 00:12:03] [--clip]');
     const hit = (await b.findComment(id)) || die(`no comment ${id}`);
     const fixed = !!opt.fixed;
     const lock = fixed ? finalNotice(b, hit.review) : null;
     if (lock) die(`${lock}: nothing to fix until the reviewer reopens it.`);
     const latest = latestOf(await b.review(hit.slug, { wait: true }));
-    // As in vr add: --frame N, --at mm:ss:ff or --t seconds; default: the note's frame in the newest render.
+    // As in lampo add: --frame N, --at mm:ss:ff or --t seconds; default: the note's frame in the newest render.
     const at = str(opt.at) ?? str(opt.t);
     const frame =
       opt.frame !== undefined ? parseInt(String(opt.frame), 10) : at ? (parseFramePosition(at, latest.fps) ?? die(`bad position "${at}"`)) : undefined;
@@ -664,7 +669,7 @@ const commands: Record<string, Command> = {
     const review = res.fresh ? (await b.track(res.video, { by: author(opt) })).review : await b.review(res.slug, { wait: true });
     const slug = slugify(review.video);
     const lock = finalNotice(b, review);
-    if (lock) process.stderr.write(`vr: note: ${lock}; this note waits until someone reopens it.\n`);
+    if (lock) process.stderr.write(`lampo: note: ${lock}; this note waits until someone reopens it.\n`);
     const ver = opt.v ? review.versions.find((x) => x.v === Number(opt.v)) || die(`no v${opt.v}`) : latestOf(review);
     const at = str(opt.at);
     const t = str(opt.t);
@@ -753,7 +758,7 @@ const commands: Record<string, Command> = {
   // A reference on a note: an image, a clip or a link (the second argument), or a moment of a render (--video).
   async ref({ pos, opt }, b) {
     const [id, what] = pos;
-    const usage = 'usage: vr ref <id> <file|url> [--caption "…"] [--note "…"]  or  vr ref <id> --video <video> --frame N [--to N] [--v N]';
+    const usage = 'usage: lampo ref <id> <file|url> [--caption "…"] [--note "…"]  or  lampo ref <id> --video <video> --frame N [--to N] [--v N]';
     if (!id || (!what && !opt.video)) throw exit(usage);
     const hit = (await b.findComment(id)) || die(`no comment ${id}`);
     const base = { caption: str(opt.caption), note: str(opt.note), by: author(opt) };
@@ -784,7 +789,7 @@ const commands: Record<string, Command> = {
     let review: Review;
     let created = false;
     if (b.kind === 'remote' && !res.fresh) {
-      // Already on the server: only the assignment and folder can change here (new renders go up with vr push).
+      // Already on the server: only the assignment and folder can change here (new renders go up with lampo push).
       if (session !== undefined) await b.assign(res.slug, session, author(opt));
       review = folder !== undefined ? await b.move(res.slug, folder, author(opt)) : await b.review(res.slug);
     } else ({ review, created } = await b.track(res.video, { by: author(opt), session, folder }));
@@ -795,7 +800,7 @@ const commands: Record<string, Command> = {
   },
 
   async push({ pos, opt }, b) {
-    const file = path.resolve(pos[0] || die('missing <file>: vr push render.mp4 [--folder "Project/Sub"] [--to <video>]'));
+    const file = path.resolve(pos[0] || die('missing <file>: lampo push render.mp4 [--folder "Project/Sub"] [--to <video>]'));
     newFolder(str(opt.folder));
     // Where its named elements are: read and checked before a byte goes up, attached once the version is there.
     if (opt.elements !== undefined && opt.part_at !== undefined) die('a part takes no elements map: attach one to a full render');
@@ -804,7 +809,7 @@ const commands: Record<string, Command> = {
     // A partial render (only where a note says PART RENDER OK): the frame its stretch starts at in the newest version.
     let part: { at: number; handles?: number } | undefined;
     if (opt.part_at !== undefined) {
-      if (!to) die('a part goes into a video: vr push part.mp4 --to <video> --part-at <frame> [--handles 12]');
+      if (!to) die('a part goes into a video: lampo push part.mp4 --to <video> --part-at <frame> [--handles 12]');
       const latest = latestOf(await b.review(to as string));
       // a plain number is a frame (as the note's PART RENDER OK line names it); timecodes, seconds and fN work too
       const raw = String(opt.part_at);
@@ -822,7 +827,7 @@ const commands: Record<string, Command> = {
       try {
         attached = await b.putElements(slugify(r.review.video), r.v, elements.map);
       } catch (e) {
-        die(`v${r.v} is up, but its elements map was refused: ${(e as Error).message} (fix it, then: vr elements <video> ${elements.name} --v ${r.v})`);
+        die(`v${r.v} is up, but its elements map was refused: ${(e as Error).message} (fix it, then: lampo elements <video> ${elements.name} --v ${r.v})`);
       }
     if (opt.json)
       return out(
@@ -867,7 +872,7 @@ const commands: Record<string, Command> = {
   },
 
   async elements({ pos, opt }, b) {
-    const usage = 'usage: vr elements <video> <map.json> [--v N]';
+    const usage = 'usage: lampo elements <video> <map.json> [--v N]';
     if (!pos[0] || !pos[1]) throw exit(usage);
     const { slug } = await b.resolve(pos[0]);
     const v = opt.v !== undefined ? Number(opt.v) : undefined;
@@ -880,7 +885,7 @@ const commands: Record<string, Command> = {
 
   async move({ pos, opt }, b) {
     const { slug, video } = await b.resolve(pos[0] || die('missing <video>'));
-    if (!opt.none && !pos[1]) die('say where: vr move <video> "Project/Folder"  (or --none for Unsorted)');
+    if (!opt.none && !pos[1]) die('say where: lampo move <video> "Project/Folder"  (or --none for Unsorted)');
     if (!opt.none) newFolder(pos[1]);
     // out of an archived project: the machine's owner may (a server refuses a token: a person takes one out in the app)
     const r = await b.move(slug, opt.none ? null : pos[1], author(opt), { out: true });
@@ -902,7 +907,7 @@ const commands: Record<string, Command> = {
           2,
         ),
       );
-    if (!folders.length) return out('no folders yet. Create one with: vr move <video> "Project/Folder"');
+    if (!folders.length) return out('no folders yet. Create one with: lampo move <video> "Project/Folder"');
     for (const f of folders) {
       const l = count(f);
       const depth = f.split('/').length - 1;
@@ -983,7 +988,7 @@ const commands: Record<string, Command> = {
   // Footage search (docs/footage.md): B-roll from the workspace's videos, as shots with exact in and out frames.
   async footage({ pos, opt }, b) {
     const [sub = 'status', ...args] = pos;
-    const usage = 'vr footage find "<request>" [--aspect 9:16] [--min 2] [--max 8] [--motion push-in] [--no-text] [--sheet [f.jpg]] [--json]';
+    const usage = 'lampo footage find "<request>" [--aspect 9:16] [--min 2] [--max 8] [--motion push-in] [--no-text] [--sheet [f.jpg]] [--json]';
     if (sub === 'find') {
       // a bare flag before the request takes the request as its value: give it back
       const words = [...args];
@@ -1030,7 +1035,7 @@ const commands: Record<string, Command> = {
     }
     if (sub === 'sheet') {
       const ids = args.flatMap((x) => x.split(',')).filter(Boolean);
-      if (!ids.length) die('vr footage sheet <id…> [--out f.jpg]  (ids from vr footage find)');
+      if (!ids.length) die('lampo footage sheet <id…> [--out f.jpg]  (ids from lampo footage find)');
       const r = await b.footageSheet(ids, str(opt.out) ? path.resolve(str(opt.out) as string) : undefined);
       return out(opt.json ? JSON.stringify(r) : `sheet ${r.file}`);
     }
@@ -1038,12 +1043,12 @@ const commands: Record<string, Command> = {
       const s = await b.setFootage(sub === 'on', author(opt));
       if (opt.json) return out(JSON.stringify(s, null, 2));
       out(
-        `footage search is ${s.on ? 'on' : 'off'} for this workspace${s.on && b.kind === 'local' ? ': the app indexes new versions as they come (and the rest at its next start); vr footage index does it now' : ''}`,
+        `footage search is ${s.on ? 'on' : 'off'} for this workspace${s.on && b.kind === 'local' ? ': the app indexes new versions as they come (and the rest at its next start); lampo footage index does it now' : ''}`,
       );
       return;
     }
     if (sub === 'index') {
-      if (b.kind !== 'local') die('the server indexes its footage on its own: vr footage status says how far it is');
+      if (b.kind !== 'local') die('the server indexes its footage on its own: lampo footage status says how far it is');
       const ix = await import('./footage/indexer.ts');
       const { footageState } = await import('./footage/settings.ts');
       const st = footageState();
@@ -1054,7 +1059,7 @@ const commands: Record<string, Command> = {
         for (const a of args) slugs.add((await b.resolve(a)).slug);
         list = list.filter((t) => slugs.has(slugify(t.review.video)));
       }
-      const n = await ix.indexNow(list, { progress: (m) => process.stderr.write(`vr footage: ${keepLines(m)}\n`) });
+      const n = await ix.indexNow(list, { progress: (m) => process.stderr.write(`lampo footage: ${keepLines(m)}\n`) });
       const s = await b.footageStatus();
       if (opt.json) return out(JSON.stringify(s, null, 2));
       return out(`indexed ${n} now · ${s.indexed} of ${s.videos} videos searchable · ${s.shots} shots${s.failed ? ` · ${s.failed} failed` : ''}`);
@@ -1069,7 +1074,7 @@ const commands: Record<string, Command> = {
       if (s.note) out(`  ${s.note}`);
       return;
     }
-    die(`vr footage find | sheet | status | on | off | index  (${usage})`);
+    die(`lampo footage find | sheet | status | on | off | index  (${usage})`);
   },
 
   async taste({ pos, opt }, b) {
@@ -1129,7 +1134,7 @@ const commands: Record<string, Command> = {
         by: author(opt),
       });
       if (opt.json) return out(JSON.stringify(p, null, 2));
-      return out(oneLine(`suggested ${p.section} for ${scopeLabel(p.scope)}: ${p.id} (pending; a person decides — vr playbook status ${p.id})`));
+      return out(oneLine(`suggested ${p.section} for ${scopeLabel(p.scope)}: ${p.id} (pending; a person decides — lampo playbook status ${p.id})`));
     }
     if (sub === 'skill') {
       const name = args[0] || die('missing <skill name>');
@@ -1207,8 +1212,8 @@ const commands: Record<string, Command> = {
     if (mine.length) out(`suggestions: ${mine.map((x) => `${x.id} ${x.status}`).join(' · ')}`);
   },
 
-  // A post of a final video: drafted here, published by a person in the app (docs/publishing.md). `vr post` / `vr posts`
-  // read where posts stand.
+  // A post of a final video: drafted here, published by a person in the app (docs/publishing.md). `lampo post`
+  // reads where posts stand.
   async post({ pos, opt }, b) {
     const sub = pos[0] === 'draft' || pos[0] === 'list' ? pos[0] : 'list';
     const rest = pos[0] === sub ? pos.slice(1) : pos;
@@ -1216,7 +1221,7 @@ const commands: Record<string, Command> = {
       const slug = rest[0] ? (await b.resolve(rest[0])).slug : undefined;
       const posts = await b.posts(slug);
       if (opt.json) return out(JSON.stringify(posts, null, 2));
-      if (!posts.length) return out(slug ? 'no posts yet (vr post draft <video> --platform yt writes one for a final video)' : 'no posts yet');
+      if (!posts.length) return out(slug ? 'no posts yet (lampo post draft <video> --platform yt writes one for a final video)' : 'no posts yet');
       for (const p of posts) out(`${slug ? '' : `${oneLine(p.video)} · `}${postLines(p)}`);
       return;
     }
@@ -1262,7 +1267,7 @@ const commands: Record<string, Command> = {
 
   async status({ pos, opt }, b) {
     const { slug } = await b.resolve(pos[0] || die('missing <video>'));
-    const text = opt.clear ? null : pos.slice(1).join(' ').trim() || die('say what you are doing: vr status <video> "rendering v4"  (or --clear)');
+    const text = opt.clear ? null : pos.slice(1).join(' ').trim() || die('say what you are doing: lampo status <video> "rendering v4"  (or --clear)');
     const s = await b.setStatus(slug, text ? { text, eta_seconds: opt.eta ? Number(opt.eta) : undefined } : null, author(opt));
     out(s ? `status: "${s.text}"${s.until ? ` until ${s.until}` : ''}` : 'status cleared');
   },
@@ -1323,7 +1328,7 @@ const commands: Record<string, Command> = {
     if (opt.mine && !self) die('--mine only works inside a Claude Code session');
     const scope = filt ? `videos assigned to ${filt.name}` : 'all videos';
     process.stderr.write(
-      `vr watch: ${scope}${opt.all ? ', including agent events' : ''}${b.kind === 'remote' ? ` on ${b.where.replace(/^server: /, '')}` : ''}. Ctrl-C to stop.\n`,
+      `lampo watch: ${scope}${opt.all ? ', including agent events' : ''}${b.kind === 'remote' ? ` on ${b.where.replace(/^server: /, '')}` : ''}. Ctrl-C to stop.\n`,
     );
     return b.watch(
       (e) => {
@@ -1337,14 +1342,14 @@ const commands: Record<string, Command> = {
     );
   },
 
-  // This store as a bundle for another (lib/bundleExport.ts): always the store on this machine, whatever vr logs in to.
+  // This store as a bundle for another (lib/bundleExport.ts): always the store on this machine, whatever lampo logs in to.
   async export({ pos, opt }) {
-    const file = pos[0] || die('vr export <out.tar> [--folder <name>]…  (docs/moving.md)');
+    const file = pos[0] || die('lampo export <out.tar> [--folder <name>]…  (docs/moving.md)');
     const { exportBundle } = await import('./bundleExport.ts');
     const r = await exportBundle({
       out: file,
       folders: list(opt.folder),
-      log: (line) => process.stderr.write(`vr export: ${keepLines(line)}\n`),
+      log: (line) => process.stderr.write(`lampo export: ${keepLines(line)}\n`),
     });
     const m = r.manifest;
     if (opt.json) return out(JSON.stringify({ file: r.file, bytes: r.bytes, ...m, files: m.files.length, warnings: r.warnings }, null, 2));
@@ -1363,7 +1368,7 @@ const commands: Record<string, Command> = {
       `  left here: ${l.links} review links, ${l.drafts} drafts, ${l.recordings} unsent recordings, ${l.asks} questions on folders, ${l.samples} samples, ${l.events} events of videos or kinds that stay`,
     );
     for (const w of r.warnings) out(`  note: ${w}`);
-    out('next: copy it to the server and run vr admin import there (docs/moving.md)');
+    out('next: copy it to the server and run lampo admin import there (docs/moving.md)');
   },
 
   login: ({ pos, opt }) => login({ pos, opt }),
@@ -1406,13 +1411,18 @@ async function pickSession(b: Backend, opt: Opts, { required = false } = {}): Pr
   return undefined;
 }
 
-export async function main(argv: string[]): Promise<void> {
-  // The local store's workspace (VR_WORKSPACE, else #1): what every command below reads and writes — one it has.
+/**
+ * Runs one command. `as`: the name it was called by — `vr`, what `lampo` was called before, prints exactly what `lampo`
+ * prints (agents parse it); only a person at a terminal is told the new name, on stderr.
+ */
+export async function main(argv: string[], { as = 'lampo' }: { as?: 'lampo' | 'vr' } = {}): Promise<void> {
+  if (as === 'vr' && process.stderr.isTTY && process.stdout.isTTY) process.stderr.write('vr is now called lampo: the same commands (vr keeps working).\n');
+  // The local store's workspace (LAMPO_WORKSPACE, else #1): what every command below reads and writes — one it has.
   try {
     const ws = enterProcessWorkspace();
     if (!readCredentials()) checkProcessWorkspace(ws);
   } catch (e) {
-    process.stderr.write(`vr: ${terminalText((e as Error).message)}\n`);
+    process.stderr.write(`lampo: ${terminalText((e as Error).message)}\n`);
     process.exitCode = 1;
     return;
   }
@@ -1420,21 +1430,21 @@ export async function main(argv: string[]): Promise<void> {
   const name = cmd === '--help' || cmd === '-h' ? 'help' : cmd;
   const fn = Object.hasOwn(commands, name) ? commands[name] : null;
   if (!fn) {
-    process.stderr.write(`vr: unknown command "${terminalText(cmd)}"\n\n${help(openBackend().where)}\n`);
+    process.stderr.write(`lampo: unknown command "${terminalText(cmd)}"\n\n${help(openBackend().where)}\n`);
     process.exitCode = 2;
     return;
   }
-  // `vr render … -- <command>`: what follows `--` is the agent's command, never vr's options.
+  // `lampo render … -- <command>`: what follows `--` is the agent's command, never lampo's options.
   const split = name === 'render' ? rest.indexOf('--') : -1;
   const args: Args =
     split >= 0 ? { ...parseArgs(rest.slice(0, split)), cmd: rest.slice(split + 1) } : parseArgs(rest, new Set([...MULTI, ...(MULTI_OF[name] ?? [])]));
-  // `vr push --help`: the command's own lines of the help, on stdout (tools read what a command takes from it).
+  // `lampo push --help`: the command's own lines of the help, on stdout (tools read what a command takes from it).
   if (args.opt.help === true && name !== 'help') {
     out(usageOf(name, help(openBackend().where)));
     return;
   }
-  // What an agent does with `vr` shows live in the app (lib/activity.ts): the command it ran anyway, no extra tokens.
-  // A person running `vr` by hand records nothing.
+  // What an agent does with `lampo` shows live in the app (lib/activity.ts): the command it ran anyway, no extra tokens.
+  // A person running `lampo` by hand records nothing.
   const agent = cliAgent();
   const guess = agent ? cliActivity(name, args.pos, args.opt) : null;
   const sink = guess ? openActivitySink() : null;
@@ -1458,7 +1468,7 @@ export async function main(argv: string[]): Promise<void> {
     }
   } catch (e) {
     if (!(e instanceof Exit)) {
-      process.stderr.write(`vr: ${terminalText((e as Error).message)}\n`);
+      process.stderr.write(`lampo: ${terminalText((e as Error).message)}\n`);
       process.exitCode = 1;
     }
   }

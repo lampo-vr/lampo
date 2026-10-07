@@ -32,14 +32,14 @@ const server = (extra: Record<string, string>) =>
 test('the app on a person’s own machine refuses to start with VR_SIGNUP=open (a hosted server gives each sign-up a workspace)', () => {
   const r = server({ VR_PUBLIC_URL: 'https://review.example.com', VR_SIGNUP: 'open' });
   assert.equal(r.status, 1, r.stdout + r.stderr);
-  assert.match(r.stderr, /VR_SIGNUP=open is for a hosted server with workspaces/);
+  assert.match(r.stderr, /LAMPO_SIGNUP=open is for a hosted server with workspaces/);
 });
 
 test('the server refuses SMTP without a sender, and a sign-up mode it doesn’t know', () => {
   const r = server({ VR_MODE: 'server', VR_PUBLIC_URL: 'https://review.example.com', VR_SMTP_URL: 'smtp://u:p@relay.example.com', VR_SIGNUP: 'sometimes' });
   assert.equal(r.status, 1);
-  assert.match(r.stderr, /VR_SMTP_URL needs VR_MAIL_FROM/);
-  assert.match(r.stderr, /VR_SIGNUP must be off, invite or open/);
+  assert.match(r.stderr, /LAMPO_SMTP_URL needs LAMPO_MAIL_FROM/);
+  assert.match(r.stderr, /LAMPO_SIGNUP must be off, invite or open/);
   assert.ok(!r.stderr.includes('u:p@'), 'the credentials are never printed');
 });
 
@@ -47,7 +47,7 @@ test('vr admin mail-test writes to the outbox without a relay, and says it was n
   const e = env({ VR_PUBLIC_URL: 'https://review.example.com' });
   const r = spawnSync(path.join(ROOT, 'bin/vr'), ['admin', 'mail-test', 'mia@example.com', '--lang', 'de'], { env: e, encoding: 'utf8', timeout: 30_000 });
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /no VR_SMTP_URL: the test was written to .*outbox/);
+  assert.match(r.stdout, /no LAMPO_SMTP_URL: the test was written to .*outbox/);
   const box = path.join(e.VR_CACHE as string, 'outbox');
   const json = fs.readdirSync(box).find((f) => f.endsWith('.json')) as string;
   const m = JSON.parse(fs.readFileSync(path.join(box, json), 'utf8'));

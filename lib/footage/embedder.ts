@@ -1,10 +1,11 @@
 // The image/text model as a process of its own (lib/footage/worker.ts): started on first use (the model downloads
 // then, once), shared by every workspace of this process, stopped after a while without work to give its ~0.5–1 GB
 // back. A crash fails the requests in flight and the next call starts a new worker; three crashes in ten minutes park
-// it for five. VR_FOOTAGE_MODEL=fake swaps in the stand-in tests use (lib/footage/fake.ts).
+// it for five. LAMPO_FOOTAGE_MODEL=fake swaps in the stand-in tests use (lib/footage/fake.ts).
 import { type ChildProcess, fork } from 'node:child_process';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { settings } from '../env.ts';
 import { FAKE_SIZE } from './fake.ts';
 import { downloadProgress, ensureModel, footageModelsDir, modelDir, modelReady, SIGLIP } from './models.ts';
 import type { EmbedderKind, EmbedIn, EmbedOut } from './protocol.ts';
@@ -54,13 +55,13 @@ interface Pending {
 /** The vector tag for this machine: `siglip-b16-int8-pad@darwin-arm64`. */
 export const vectorKey = (kind: EmbedderKind): string => (kind === 'fake' ? 'fake' : `${SIGLIP.id}-pad@${process.platform}-${process.arch}`);
 
-const defaultThreads = (): number => Number(process.env.VR_FOOTAGE_THREADS) || Math.max(1, Math.min(4, Math.floor(os.availableParallelism() / 2)));
+const defaultThreads = (): number => Number(settings.LAMPO_FOOTAGE_THREADS) || Math.max(1, Math.min(4, Math.floor(os.availableParallelism() / 2)));
 
 export function createEmbedder(o: EmbedderOptions = {}): Embedder {
-  const kind: EmbedderKind = o.kind ?? (process.env.VR_FOOTAGE_MODEL === 'fake' ? 'fake' : 'siglip');
-  // stderr: `vr footage find --json` keeps its stdout for the answer even while the model downloads
+  const kind: EmbedderKind = o.kind ?? (settings.LAMPO_FOOTAGE_MODEL === 'fake' ? 'fake' : 'siglip');
+  // stderr: `lampo footage find --json` keeps its stdout for the answer even while the model downloads
   const log = o.log ?? ((m: string) => process.stderr.write(`${m}\n`));
-  const idleMs = o.idleMs ?? (Number(process.env.VR_FOOTAGE_IDLE_MINUTES) || 10) * 60_000;
+  const idleMs = o.idleMs ?? (Number(settings.LAMPO_FOOTAGE_IDLE_MINUTES) || 10) * 60_000;
   let child: ChildProcess | null = null;
   const pending = new Map<number, Pending>();
   let seq = 0;
@@ -130,7 +131,7 @@ export function createEmbedder(o: EmbedderOptions = {}): Embedder {
     child ??= start();
     const c = child;
     const id = ++seq;
-    // An idle worker never keeps this process alive (`vr` ends when its command does; the worker follows on disconnect).
+    // An idle worker never keeps this process alive (`lampo` ends when its command does; the worker follows on disconnect).
     c.ref();
     c.channel?.ref();
     return new Promise<Float32Array[]>((resolve, reject) => {

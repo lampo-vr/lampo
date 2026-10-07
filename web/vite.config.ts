@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import zlib from 'node:zlib';
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
+import { settings } from '../lib/env.ts';
 import { THEME_BOOT } from '../lib/themeBoot.ts';
 import { licenseNotices } from '../scripts/licenses.ts';
 
@@ -73,8 +74,8 @@ export default defineConfig({
   // third-party-licenses.txt: the bundled packages' notices plus the server's runtime dependencies (the image ships both).
   plugins: [react(), themeBoot(), serviceWorker(), licenseNotices({ root: fileURLToPath(new URL('..', import.meta.url)), server: true }), precompress()],
   server: { fs: { allow: ['..'] } },
-  // #/styleguide is in dev and test builds; VR_STYLEGUIDE=0 (the Dockerfile) leaves it out of a release.
-  define: { __STYLEGUIDE__: JSON.stringify(process.env.VR_STYLEGUIDE !== '0') },
+  // #/styleguide is in dev and test builds; LAMPO_STYLEGUIDE=0 (the Dockerfile) leaves it out of a release.
+  define: { __STYLEGUIDE__: JSON.stringify(settings.LAMPO_STYLEGUIDE !== '0') },
   build: {
     outDir: 'dist',
     emptyOutDir: true,

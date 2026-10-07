@@ -11,7 +11,7 @@ Where to look:
 - **What the reviewer saw:** `data/<slug>/<id>_marked.png`, the note's exact frame with the drawing on it.
 
 Where `data/`, `versions/` and `cache/` are on disk: [configuration.md](configuration.md#where-data-lives). On a
-hosted server, agents get the same information through `vr` or MCP instead ([agents.md](agents.md)).
+hosted server, agents get the same information through `lampo` or MCP instead ([agents.md](agents.md)).
 
 ## Layout
 
@@ -34,7 +34,7 @@ data/
     views.json                who on the team watched the video (never read by agents)
     runs.jsonl                agents' runs on the video: one line each, its steps kept (below)
   events.jsonl                one line per change, appended
-  events.imported.jsonl       another store's history, as `vr admin import` brought it in
+  events.imported.jsonl       another store's history, as `lampo admin import` brought it in
   INBOX.md                    the newest human feedback across all videos (on your machine)
   folders.json                the project and folder tree
   shares.json                 review links
@@ -86,7 +86,7 @@ cache/footage/index.db        footage search's index of the workspace's videos, 
 cache/agent-runs/             on your machine: the output of each agent run Lampo started,
                               <run id>.log
 cache/w/<workspace id>/       every workspace but #1: its cache
-cache/agent-activity.jsonl    what agents on this machine did through vr and
+cache/agent-activity.jsonl    what agents on this machine did through lampo and
                               the stdio MCP server, one line per call
 ```
 
@@ -108,7 +108,7 @@ cache/agent-activity.jsonl    what agents on this machine did through vr and
 **Slugs.** A video's slug is its absolute path with every `/` replaced by `__`
 (`/home/alex/work/acme/export/ep02.mp4` becomes `__home__alex__work__acme__export__ep02.mp4`). An uploaded video gets
 a virtual path, `/@uploads/<folder>/<name>` (`/@uploads/<name>` when it isn't filed), and its slug is made the same
-way. Don't build slugs yourself: `review.video` is the source of truth, and `vr` and the MCP server take a path, a name
+way. Don't build slugs yourself: `review.video` is the source of truth, and `lampo` and the MCP server take a path, a name
 or a slug.
 
 ### Details
@@ -173,7 +173,7 @@ Times are ISO 8601, mostly with the writer's UTC offset (`2026-10-01T14:02:11+02
 version's `mtime`). Compare them as times, not as text.
 
 A review.json that can't be read (cut short by a crash, edited by hand) takes only its own video away: the library,
-search, status, the inbox and `vr ls` leave it out, the server's log names it once, and `GET /api/library` says
+search, status, the inbox and `lampo ls` leave it out, the server's log names it once, and `GET /api/library` says
 `degraded: ["videos"]` until it is restored from a backup. Opening that video fails.
 
 ### The video
@@ -271,7 +271,7 @@ render is never final.
 | `source`, `recording` | a note made from recorded feedback: `source: "recording"` and `recording: {id: "rec_…", t0, t1}`, the recording and the seconds of its audio the note was said in (optional). Its own clip of that stretch is `voice`, with the words as heard as its `transcript` |
 | `status` | `open` → `fixed` (the agent) → `verified` (the reviewer), or `wontfix` (with a reason). Reopening sets it back to `open` |
 | `author` | the reviewer's name, `agent:<session>`, or `guest:<name>` for a client |
-| `author_id` | the account that wrote it, when a signed-in person did, through the app or `/mcp` (optional; absent on older notes, agents', clients' and local `vr` writes). When present it decides who may edit or delete the note: a renamed account keeps its notes, and a new account with a deleted person's name gets none. Otherwise `author` decides |
+| `author_id` | the account that wrote it, when a signed-in person did, through the app or `/mcp` (optional; absent on older notes, agents', visitors' and local `lampo` writes). When present it decides who may edit or delete the note: a renamed account keeps its notes, and a new account with a deleted person's name gets none. Otherwise `author` decides |
 | `created`, `edited` | when it was written, and when it was last edited: its text, tags, severity, drawing or words, or a reference's caption or removal (optional) |
 | `replies` | `{by, text, status?, fixed_in_v?, preview?, refs?, at, by_id?, edited?, share?}`. Every status change adds a reply with the new `status`. `preview` names the fix preview a fix or check refers to; `refs` the references that came with the reply (their ids; the references themselves are in the note's `refs`). `by_id`: the account of a signed-in person who wrote it; `edited`: when its author last changed its words (only plain replies change; `at` stays); `share`: the review link a visitor wrote it through (a link that shows only its own visitors' notes shows only their replies too) |
 | `check_again`, `carried_to` | an open note carried into a newer render that nobody has checked again yet |
@@ -330,7 +330,7 @@ An arrow's head is at `x2,y2`. Each shape may carry a `color`.
 
 One JSON object per line, appended for every change, written after the change is saved (a change that fails writes
 no event). Two things never log an event: drafts until they are sent, and anything on the first run's sample.
-`vr watch` follows this file on your machine, and the server's event stream elsewhere. Here is the event the note
+`lampo watch` follows this file on your machine, and the server's event stream elsewhere. Here is the event the note
 above made, spread over several lines:
 
 ```json
@@ -368,7 +368,7 @@ Every event has `at`, `type`, `by`, `video`, `slug` and `session` (the assigned 
 | `preview` | by `system`: a newer render matched the fix preview a note was checked on. A mismatch is a `status` event by `system` that sets the note back to `fixed` |
 | `ref` | a reference was added to a note; the event carries it as `ref` |
 | `agent_run` | your machine started the assigned agent for a request, or that run ended: `run` names it, `phase` is `started` (by whoever asked), `finished`, `failed`, `stopped` (by whoever stopped it) or `timeout`, and `exit` is the process's exit code (`null` when it was killed) |
-| `run` | an agent's run on the video ([Agent runs](#agent-runs)) opened, began, waits for the person or ended: `run` names it, `phase` is `opened`, `started`, `needs_you` or `ended`, and `text` says how it was opened (`send`, `request`, `nudge`, `answer`, `retry`, `agent`), what it needs (`question`, `options`, `permission`, `sign_in`) or how it ended (`done`, `failed`, `stopped`, or `needs_you`: it handed back waiting for the person). Not feedback: INBOX.md and `wait_for_feedback` leave it out, `vr watch --all` prints it as `AGENT RUN OPENED`, `WORKING`, `NEEDS YOU` or `ENDED <state>` |
+| `run` | an agent's run on the video ([Agent runs](#agent-runs)) opened, began, waits for the person or ended: `run` names it, `phase` is `opened`, `started`, `needs_you` or `ended`, and `text` says how it was opened (`send`, `request`, `nudge`, `answer`, `retry`, `agent`), what it needs (`question`, `options`, `permission`, `sign_in`) or how it ended (`done`, `failed`, `stopped`, or `needs_you`: it handed back waiting for the person). Not feedback: INBOX.md and `wait_for_feedback` leave it out, `lampo watch --all` prints it as `AGENT RUN OPENED`, `WORKING`, `NEEDS YOU` or `ENDED <state>` |
 | `post` | a post of a final video was drafted, published, scheduled, posted, failed or taken back; it carries `post` ([Publishing](#publishing-publishpostsjson-publishconnectionsjson)). Not feedback: INBOX.md and `wait_for_feedback` leave it out |
 
 What else an event carries:
@@ -379,15 +379,15 @@ What else an event carries:
   the example above) and `shots.range`.
 - A note that changes the words carries `text_edit` (`{from, to}`) on its `comment` and `edit` events.
 - A note or a request that allows a partial render carries `part` (`{in, out, shot?, to_shot?, handles?}`); a
-  request's `text` then ends with its `PART RENDER OK: …` line, and a `comment` event's line in `vr watch` carries it
+  request's `text` then ends with its `PART RENDER OK: …` line, and a `comment` event's line in `lampo watch` carries it
   too. A full render compared with approved parts logs a `version` event by `system` ("V9 matches the part approved
   in V8 …" or "V9 differs from the part approved in V8 at 00:04:12 (f103, …): check it again."), then a `status`
   event for each note sent back to `fixed`.
 - Note events carry `refs` (how many references the note has) when it has some, and `scope: "video"` for a note about
   the whole video.
-- `shots` are absolute paths in the file, and only the machine itself is given them as paths (`vr` and MCP there).
+- `shots` are absolute paths in the file, and only the machine itself is given them as paths (`lampo` and MCP there).
   The app's live event stream and webhooks carry addresses instead (`/data/<slug>/<file>`), on a hosted server and on
-  your machine alike, and so does everything anyone else reads; `vr` against a server downloads the pictures and
+  your machine alike, and so does everything anyone else reads; `lampo` against a server downloads the pictures and
   prints their local paths.
 - `approval` events carry the sign-off in `text`: `APPROVED v3 (client: Mia)`, `CHANGES REQUESTED v3 (team): …`,
   `approval withdrawn v3 (team)`, `APPROVED v4 (team): carried over from v3, identical render`, `FINAL v3: …`,
@@ -399,13 +399,13 @@ What else an event carries:
   `answer` (the picks) beside its PICKED `text`.
 - A question asked on a folder before any render (`asks.json`) logs `comment`, `status`, `reply` and `delete` events like
   a note's, with `slug` empty and `video` = `folder` = the folder, `kind: "question"`, `scope: "video"`, `options`, no
-  frame or timecode. `vr watch` prints them as `NEW QUESTION <id> folder <folder> …` and `ANSWERED <id> folder <folder>
+  frame or timecode. `lampo watch` prints them as `NEW QUESTION <id> folder <folder> …` and `ANSWERED <id> folder <folder>
   by … — PICKED …`.
-- History brought over from another store (`vr admin import`, [moving.md](moving.md)) goes into
+- History brought over from another store (`lampo admin import`, [moving.md](moving.md)) goes into
   `events.imported.jsonl` next to `events.jsonl`, in the same format, each line carrying `imported` (the bundle's id).
-  It is what happened, not news: nothing that follows or reads `events.jsonl` sees it (`vr watch`, the MCP feed and
-  `wait_for_feedback`, the app's live stream, webhooks, push, INBOX.md, `vr inbox`), so however long it is, it never
-  pushes newer events out of what they read; For you reads it as what happened, and `vr export` carries it on. An
+  It is what happened, not news: nothing that follows or reads `events.jsonl` sees it (`lampo watch`, the MCP feed and
+  `wait_for_feedback`, the app's live stream, webhooks, push, INBOX.md, `lampo inbox`), so however long it is, it never
+  pushes newer events out of what they read; For you reads it as what happened, and `lampo export` carries it on. An
   earlier version appended it to `events.jsonl` itself: such lines stay where they are, and the readers pass them by.
 
 ## asks.json
@@ -443,7 +443,7 @@ posted (Studio Channel) https://…").
 The newest 150 events from people (new videos, notes, replies, status changes, edits, assignments, approvals,
 requests, references added to notes), newest first. It is the one file to read for "what did the reviewer say since
 last time". On your machine every process that writes a person's event rewrites it; a hosted server doesn't keep it,
-and answers `vr inbox` and `GET /api/inbox` instead, one line per event.
+and answers `lampo inbox` and `GET /api/inbox` instead, one line per event.
 
 Each entry is a heading with the time, the kind of event, the note id and `→ <the assigned agent>` (when one is
 assigned), then lines of `- field: value`:
@@ -513,7 +513,7 @@ The folders, listed so that empty ones survive. A video's own folder is `folder`
   `links.json` are read the same way. Meanwhile the library, search, playbooks and downloads show the folders videos
   are filed in (`LibraryResponse.degraded: ["folders"]`), the owner's lists of review links and the stages keep every
   link (a folder link's `gone` can't be told meanwhile), and a folder link's visitor is asked to come back later.
-- **`vr admin repair-folders`** rebuilds a damaged file from what it still says, the videos' folders and the review
+- **`lampo admin repair-folders`** rebuilds a damaged file from what it still says, the videos' folders and the review
   links' ids. Without `--write` it is a dry run; with it, the damaged file is kept as `folders.json.damaged-<time>`. An
   id the damage took comes back from a folder link only when nothing says its folder had ended (a later link on that
   name, an id older than the newest the file still holds) and either it is the newest of several on that name or the
@@ -658,7 +658,7 @@ sends it notes (or by the agent's own first write), ended when it hands back ([a
 One JSON object per line, one line per run, oldest first: the run as `GET /api/runs/:id` shows it
 ([api.md](api.md#agent-runs)), plus `steps` (what it did, oldest first) and `clock` (the server's own counters). The
 app rewrites the file under the video's lock (`.lock`), atomically, about a second after a change; nothing else
-writes it, and `vr` only reads it to name a version's run. It is compacted as it is written: at most 200 steps per
+writes it, and `lampo` only reads it to name a version's run. It is compacted as it is written: at most 200 steps per
 run (a stretch of render progress keeps its first and last line; the first step, questions and errors stay), steps
 only on the 20 newest runs that ended, none on a run that ended more than 90 days ago, and past 300 runs on a video
 open runs nobody has heard from go first, then the oldest ended ones. Each file holds at most about 1 MB: past it, the
@@ -672,7 +672,7 @@ Runs on a question asked on a folder before any render (`asks.json`) live in the
 
 ## Live agent activity
 
-`cache/agent-activity.jsonl` is how an agent's process on your machine (`vr`, the stdio MCP server) tells the running
+`cache/agent-activity.jsonl` is how an agent's process on your machine (`lampo`, the stdio MCP server) tells the running
 app what it did, so the person sees it live ([agents.md](agents.md)). One JSON object per line, appended (readable by
 you only: what an agent did is yours); past 512 KB the file becomes `agent-activity.jsonl.1` and a new one begins. The
 app reads only what is added while it runs, keeps the last 12 lines per agent and video in memory, and never writes
@@ -694,9 +694,9 @@ One line, spread out here:
 }
 ```
 
-`agent` is the Claude Code session's name, or the one in `VR_BY` (a person running `vr` by hand writes nothing).
+`agent` is the Claude Code session's name, or the one in `LAMPO_BY` (a person running `lampo` by hand writes nothing).
 `video` names the video as the agent did (a path, a name or a slug), and `target` a note id the app finds the video
-by. `kind`, `text`, `key`, `vars`, `quote`, `pct`, `progress` (a render through `vr render`: its stage, percent,
+by. `kind`, `text`, `key`, `vars`, `quote`, `pct`, `progress` (a render through `lampo render`: its stage, percent,
 frames and time left) and `run` (the run Lampo started the agent for, from `LAMPO_RUN`) are as in
 `GET /api/agent-activity` ([api.md](api.md#sessions-agents-and-the-inbox)). A process with `LAMPO_RUN` and no name of
 its own writes as `agent`.
@@ -720,7 +720,7 @@ its password (an scrypt hash) and `epoch` (raised to end every session at once):
 | `unverified` | since when its address waits to be confirmed by an emailed link (optional; absent: confirmed, or vouched for by whoever made the account) |
 | `signup` | when the person signed up on their own (optional); until the address is confirmed, such an account can do nothing |
 | `pending_email` | a new address waiting for its emailed link (optional); the account keeps signing in with `email` until then |
-| `signed_in` | when it last signed in: a new session, or `vr login` making a token (optional) |
+| `signed_in` | when it last signed in: a new session, or `lampo login` making a token (optional) |
 | `seen` | when the person last used the app through a session, written at most once an hour; never by a review link or an API token (optional). With `signed_in` it is the operator's "last active"; neither leaves the server but in the operator's pages and the person's own data export |
 
 - `account-links.json` (0600) keeps the emailed one-time links, `vt_…` to confirm an address (24 hours) and `rt_…`
@@ -747,8 +747,8 @@ review links, playbooks, events and people. The app on a person's own machine is
   account id and its role there (`owner`, `admin`, `member`, `reviewer`); `suspended` is when an admin of that
   workspace disabled the person there (no role in it until let in again). An account can be a member of several
   workspaces with a different role in each. `signup: true` marks one made for someone who signed up on their own (its
-  name was theirs, a placeholder); `named` is when a person chose its name (made in the app or with `vr admin`, or
-  renamed); `by` is the account it was made by or for (what `VR_WORKSPACE_CREATE_LIMIT` counts); `personas` is who
+  name was theirs, a placeholder); `named` is when a person chose its name (made in the app or with `lampo admin`, or
+  renamed); `by` is the account it was made by or for (what `LAMPO_WORKSPACE_CREATE_LIMIT` counts); `personas` is who
   its videos are for, as its owner picked in the setup (`agency`, `inhouse`, `creator`, `other`; absent: never asked
   or skipped), with `personaOther`, "something else" in a few words. `suspended` (`{at, by, reason}`) is set while
   the server's operator holds the workspace read-only ([server-mode.md](server-mode.md#the-operators-pages)): `by`
@@ -759,22 +759,22 @@ review links, playbooks, events and people. The app on a person's own machine is
 - **A store without `workspaces.json`** is workspace #1 alone, and its members are every account with the account's
   own `role`, exactly how stores always worked (an account that signed up on its own without an invite, `signup` set,
   is never one of them: it gets a workspace of its own). A hosted server moves its store to workspaces once, at start
-  (or `vr admin workspaces migrate`): it copies `users.json`, `invites.json`, `oauth/grants.json` and `shares.json` to
+  (or `lampo admin workspaces migrate`): it copies `users.json`, `invites.json`, `oauth/grants.json` and `shares.json` to
   `data/backups/workspaces-<time>/` first, names `w1` on the tokens, invites and connections from before, and writes
   `workspaces.json` with every account as a member of `w1`. Nothing moves on disk. Running it again does nothing.
 - **A store that moved never goes back.** The store shows the move by a `data/backups/workspaces-*` folder, a
   `data/w/<id>/` folder (on a hosted store even an empty one, on the machine's only one with files in it), a token or
   invite with `workspace`, or an app connection in another workspace. When `workspaces.json` is missing or can't be
-  read on such a store, nothing is implied: instead of making every account a member of `w1`, the server and `vr`
+  read on such a store, nothing is implied: instead of making every account a member of `w1`, the server and `lampo`
   refuse with one sentence until the file is restored from a backup, and a running server answers `503` meanwhile. A
   read that fails is tried again on the next request; it is never taken for a lost file. A store is hosted by its
-  shape, whatever the process was started with (accounts, none of them the machine's own), so an operator's `vr`
-  without `VR_MODE=server` reads a server's store as the server does. When a workspace folder is the only sign, the
-  sentence names it and both ways out (restore the file, or move a folder a mistyped `VR_WORKSPACE` once left), never a
-  backup as certain; on the machine an empty one is no sign at all. The move (`vr admin workspaces migrate`, a hosted
+  shape, whatever the process was started with (accounts, none of them the machine's own), so an operator's `lampo`
+  without `LAMPO_MODE=server` reads a server's store as the server does. When a workspace folder is the only sign, the
+  sentence names it and both ways out (restore the file, or move a folder a mistyped `LAMPO_WORKSPACE` once left), never a
+  backup as certain; on the machine an empty one is no sign at all. The move (`lampo admin workspaces migrate`, a hosted
   start) never runs while `data/w/` holds a workspace folder, empty or not: it would write `w1` alone over the other
   workspaces.
-- **`vr` and the stdio MCP server** on a store work in one workspace: `VR_WORKSPACE=<id>`, else `w1`. An id the store
+- **`lampo` and the stdio MCP server** on a store work in one workspace: `LAMPO_WORKSPACE=<id>`, else `w1`. An id the store
   has no workspace for is refused before anything is read or written.
 - Review links of every workspace but #1 are listed in `data/links.json` (0600) by their token's SHA-256 with their
   workspace, so a visitor's link is looked up in its own workspace first; a token not listed is workspace #1's.

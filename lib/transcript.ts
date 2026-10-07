@@ -279,7 +279,7 @@ export function engineName(engine: string): string {
 
 // ---------------------------------------------------------------- for agents
 
-/** The one line a text edit reads as in every format agents read (vr watch, INBOX.md, vr prompt, the MCP notes):
+/** The one line a text edit reads as in every format agents read (lampo watch, INBOX.md, lampo prompt, the MCP notes):
  * `CHANGE WORDS "from" → "to" at 00:03:12–00:03:15 (f96–f105)`. People's words never break the line. */
 export function textEditLine(edit: TextEdit, where: { frame: number; range: FrameRange | null }, fps: number): string {
   const at = where.range

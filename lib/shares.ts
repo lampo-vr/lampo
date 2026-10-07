@@ -559,7 +559,7 @@ export const revokeVideoLinks = (review: Review): number => revokeShares((s) => 
 
 /**
  * Every folder link not revoked, as stored and in the file's order (a link is added at its end), whatever its folder's
- * state, with the videos a visitor opened through it (`vr admin repair-folders` matches ids with them).
+ * state, with the videos a visitor opened through it (`lampo admin repair-folders` matches ids with them).
  */
 export const folderLinks = (): { id?: string; label: string; folder: string; created: string; folder_id?: string; seen: string[] }[] =>
   Object.values(load())

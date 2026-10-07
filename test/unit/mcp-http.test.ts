@@ -123,7 +123,23 @@ test('wait_for_feedback times out cleanly with a cursor, then wakes up on a new 
   assert.match(textOf(again), /No new feedback/, 'the cursor never hands out the same note twice');
 });
 
-test('subscriptions/listen: a new note is a resources/updated notification for vr://inbox', async () => {
+test('subscriptions/listen: a new note is a resources/updated notification for lampo://inbox, under that address only', async () => {
+  const c = await modern();
+  const updates: string[] = [];
+  c.setNotificationHandler('notifications/resources/updated', (n) => {
+    updates.push(n.params.uri);
+  });
+  const review = `lampo://review/${encodeURIComponent(slug)}`;
+  const sub = await c.listen({ resourceSubscriptions: ['lampo://inbox', review] });
+  await note('Titel kürzer', 14);
+  const deadline = Date.now() + 5000;
+  while (updates.length < 2 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50));
+  await new Promise((r) => setTimeout(r, 300));
+  assert.deepEqual(updates.sort(), ['lampo://inbox', review].sort(), 'not again under the older vr:// addresses');
+  await sub.close();
+});
+
+test('subscriptions/listen: a client set up with the older vr://inbox still hears a new note', async () => {
   const c = await modern();
   const updates: string[] = [];
   c.setNotificationHandler('notifications/resources/updated', (n) => {

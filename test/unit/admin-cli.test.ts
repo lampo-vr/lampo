@@ -40,22 +40,22 @@ test('create-user: the first account owns the store, the next ones are members; 
   assert.equal(ok(['create-user', '--email', 'rita@example.com', '--name', 'Rita', '--role', 'reviewer', '--password', PASSWORD]).split(' ')[1], 'reviewer');
   assert.equal(
     refused(['create-user', '--email', 'x@example.com']),
-    'vr: vr admin create-user --email you@example.com --name "Your Name" [--role owner|admin|member|reviewer] [--workspace <id>]',
+    'lampo: lampo admin create-user --email you@example.com --name "Your Name" [--role owner|admin|member|reviewer] [--workspace <id>]',
   );
   assert.equal(
     refused(['create-user', '--email', 'x@example.com', '--name', 'X', '--role', 'boss']),
-    'vr: --role must be one of owner, admin, member, reviewer',
+    'lampo: --role must be one of owner, admin, member, reviewer',
   );
   assert.equal(
     refused(['create-user', '--email', 'x@example.com', '--name', 'X', '--workspace', 'w_nope']),
-    'vr: no workspace w_nope (vr admin workspaces lists them)',
+    'lampo: no workspace w_nope (lampo admin workspaces lists them)',
   );
   assert.equal(
     refused(['create-user', '--email', 'mia@example.com', '--name', 'Mia Two', '--password', PASSWORD]),
-    'vr: a user with mia@example.com already exists',
+    'lampo: a user with mia@example.com already exists',
   );
   // Nothing on stdin and no --password: an empty password, refused by the rule (no prompt waits).
-  assert.equal(refused(['create-user', '--email', 'x@example.com', '--name', 'X']), 'vr: password must be at least 10 characters');
+  assert.equal(refused(['create-user', '--email', 'x@example.com', '--name', 'X']), 'lampo: password must be at least 10 characters');
   assert.equal(auth.listUsers().length, 3);
 });
 
@@ -90,9 +90,9 @@ test('reset-password: a new password that signs every session out — and a disa
   // Pinned as found: reset-password also re-enables a disabled account (lib/cliAccount.ts passes `disabled: false`);
   // neither the command's message nor docs/go-live.md mentions it.
   assert.equal(after.disabled, undefined);
-  assert.equal(refused(['reset-password', '--email', 'nobody@example.com']), 'vr: vr admin reset-password --email you@example.com (an existing account)');
-  assert.equal(refused(['reset-password']), 'vr: vr admin reset-password --email you@example.com (an existing account)');
-  assert.equal(refused(['reset-password', '--email', 'mia@example.com', '--password', 'short']), 'vr: password must be at least 10 characters');
+  assert.equal(refused(['reset-password', '--email', 'nobody@example.com']), 'lampo: lampo admin reset-password --email you@example.com (an existing account)');
+  assert.equal(refused(['reset-password']), 'lampo: lampo admin reset-password --email you@example.com (an existing account)');
+  assert.equal(refused(['reset-password', '--email', 'mia@example.com', '--password', 'short']), 'lampo: password must be at least 10 characters');
 });
 
 test('invite, invites, revoke-invite: a link that works once, the list, and revoking it', () => {
@@ -111,17 +111,17 @@ test('invite, invites, revoke-invite: a link that works once, the list, and revo
   assert.match(mine, /until \d{4}-\d{2}-\d{2} {2}i_[0-9a-f]{12}$/);
   assert.ok(listed.some((l) => l.startsWith(inviteRow('pending', 'reviewer', 'noa@example.com'))));
   assert.equal(ok(['revoke-invite', id]), `revoked ${id}\n`);
-  assert.equal(refused(['revoke-invite', id]), `vr: no pending invite ${id}`);
+  assert.equal(refused(['revoke-invite', id]), `lampo: no pending invite ${id}`);
   assert.ok(
     ok(['invites'])
       .split('\n')
       .some((l) => l.startsWith(inviteRow('revoked', 'member', '–')) && l.endsWith(id)),
   );
-  assert.equal(refused(['revoke-invite']), 'vr: vr admin revoke-invite <invite id>  (ids: vr admin invites)');
-  assert.equal(refused(['invite', '--role', 'boss']), 'vr: --role must be one of owner, admin, member, reviewer');
-  assert.equal(refused(['invite', '--days', '0']), 'vr: an invite lasts 1–90 days');
-  assert.equal(refused(['invite', '--email', 'olivia@example.com']), 'vr: a user with olivia@example.com already exists');
-  assert.match(refused(['frobnicate']), /^vr: vr admin create-user \| reset-password \| list-users \| invite \| invites \| revoke-invite \| workspaces/);
+  assert.equal(refused(['revoke-invite']), 'lampo: lampo admin revoke-invite <invite id>  (ids: lampo admin invites)');
+  assert.equal(refused(['invite', '--role', 'boss']), 'lampo: --role must be one of owner, admin, member, reviewer');
+  assert.equal(refused(['invite', '--days', '0']), 'lampo: an invite lasts 1–90 days');
+  assert.equal(refused(['invite', '--email', 'olivia@example.com']), 'lampo: a user with olivia@example.com already exists');
+  assert.match(refused(['frobnicate']), /^lampo: lampo admin create-user \| reset-password \| list-users \| invite \| invites \| revoke-invite \| workspaces/);
 });
 
 test('with workspaces, list-users prints each account’s role in the workspace it works in, and its others', async () => {

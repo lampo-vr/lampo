@@ -1,4 +1,4 @@
-// A stage in the UI's language. lib/stage.ts writes its `detail` and `next.label` in English for vr, MCP and agents;
+// A stage in the UI's language. lib/stage.ts writes its `detail` and `next.label` in English for lampo, MCP and agents;
 // the UI says the same things from the structured fields. Each German sentence is built next to the English one the
 // server sent: when they don't describe the same thing (an agent's own status words, a case added later on the server),
 // the server's English stands — the UI never states something the server didn't. Where the UI's words differ from the

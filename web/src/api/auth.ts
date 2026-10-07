@@ -359,7 +359,7 @@ export function useAcceptInvite() {
   });
 }
 
-// ---------------------------------------------------------------- connected agents (vr watch)
+// ---------------------------------------------------------------- connected agents (lampo watch)
 
 /**
  * `poll`: ask more often, e.g. while a page waits for an agent to connect (new agents, and an agent that starts or stops

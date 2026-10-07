@@ -1,6 +1,6 @@
 // The visitor's side of a review link (/api/g/…): the link and its videos, the password, visits and views, and
 // everything a visitor writes (notes, replies, fix checks, verdicts). Each write becomes a normal event by
-// "guest:<name>", so INBOX.md, `vr watch`, agents and webhooks see client feedback like any other.
+// "guest:<name>", so INBOX.md, `lampo watch`, agents and webhooks see client feedback like any other.
 
 import path from 'node:path';
 import express, { type Request, type Router } from 'express';
@@ -198,7 +198,7 @@ export function guestRoutes(ctx: ServerContext): Router {
     };
   };
   // A note's screenshots are full-size pictures (two for a drawn 4K frame are ~30 MB): none when the disk is down to
-  // its reserve (VR_MIN_FREE), which keeps it for renders and the store.
+  // its reserve (LAMPO_MIN_FREE), which keeps it for renders and the store.
   const roomForNotes = () => {
     const free = freeBytes(dataDir());
     if (free !== null && free < (cfg.min_free_bytes ?? 0) + 64e6) throw fail(507, 'The server has no room for new notes right now. Please try again later.');
@@ -223,7 +223,7 @@ export function guestRoutes(ctx: ServerContext): Router {
   // The name a visitor gave on a link (sent with the visit, a note or a verdict), so a view can say who looked.
   const names = new Recent<string>();
   // Whose team visitors are told a link is from: on a server with several workspaces, the link's own (another team's
-  // clients never read workspace #1's name); the server's name (org_name, VR_ORG_NAME) is workspace #1's, the
+  // clients never read workspace #1's name); the server's name (org_name, LAMPO_ORG_NAME) is workspace #1's, the
   // operator's own team, as in the account mails (server/accountMail.ts).
   // A sign-up's workspace starts out named after its owner, a person's name: until someone names it, visitors read no
   // team name — the link names its sharer — rather than a person's name passed off as a team's (workspaceNamed).

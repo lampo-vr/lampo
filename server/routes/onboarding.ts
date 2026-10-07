@@ -94,9 +94,9 @@ function sampleReplyBy(x: NonNullable<Comment['replies']>[number], user: Person,
 }
 
 /**
- * An agent talked to Lampo for this person: one is connected now (over /mcp or `vr watch`; at the machine every local
+ * An agent talked to Lampo for this person: one is connected now (over /mcp or `lampo watch`; at the machine every local
  * agent is the owner's), or one of their API tokens or connected apps was used, or — at the machine — the live
- * monitor saw an agent at work (stdio MCP and `vr` record there without connecting).
+ * monitor saw an agent at work (stdio MCP and `lampo` record there without connecting).
  */
 function agentConnected(ctx: ServerContext, user: Person, machine: boolean, ws: string): boolean {
   // the agent registry lists this workspace's agents only (server/agents.ts)

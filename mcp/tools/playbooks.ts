@@ -73,15 +73,16 @@ export function registerPlaybookTools({ b, o, tool, author, byArg, openReview }:
       if (s.files.length) {
         lines.push('', 'Files:');
         for (const f of s.files) {
-          // On the machine the files can be handed over as paths; anyone else gets them through the API or `vr`.
+          // On the machine the files can be handed over as paths; anyone else gets them through the API or `lampo`.
           const local = o.principal.via === 'local' ? await b.skillFile(s.from, s.name, f.name) : null;
           const url = o.appUrl
             ? `${o.appUrl}/api/playbook/skill/files?folder=${encodeURIComponent(s.from)}&skill=${encodeURIComponent(s.name)}&name=${encodeURIComponent(f.name)}`
             : null;
           lines.push(oneLine(`- ${f.name} (${Math.max(1, Math.round(f.size / 1024))} KB)${local ? ` → ${local}` : url ? ` → ${url}` : ''}`));
         }
-        // a coding agent's shell has `vr` (mcp/loop.ts); everyone else is told the MCP way only
-        if (o.principal.via !== 'local' && o.way === 'coding') lines.push('(`vr playbook export` writes the skill with its files to a folder on your machine)');
+        // a coding agent's shell has `lampo` (mcp/loop.ts); everyone else is told the MCP way only
+        if (o.principal.via !== 'local' && o.way === 'coding')
+          lines.push('(`lampo playbook export` writes the skill with its files to a folder on your machine)');
       }
       return ok(text(lines.join('\n')));
     },

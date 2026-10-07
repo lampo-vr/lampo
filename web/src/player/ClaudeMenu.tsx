@@ -2,7 +2,7 @@
 // none. Its popover says where the agent stands, sends it a request, copies the notes for any agent, and assigns
 // another one — the picker opens in the same popover. Never a dead end: without an agent it offers exactly that.
 import { useState } from 'react';
-import { agentKindOfRef } from '../../../lib/agentKind.ts';
+import { agentKindOfRef, agentShown } from '../../../lib/agentKind.ts';
 import { partWhere } from '../../../lib/part.ts';
 import { timecode } from '../../../lib/time.ts';
 import { api, enc } from '../api/client.ts';
@@ -23,7 +23,7 @@ import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { IconButton, Popover } from '../ui/primitives.tsx';
 
 // Requests in the agent's own words (agent-facing, so in English): what to do, never which command — it knows its way
-// (the server's instructions: MCP, or `vr render` for a coding agent's renders).
+// (the server's instructions: MCP, or `lampo render` for a coding agent's renders).
 const QUICK = (v: number): [string, string][] => [
   [
     'Look this render over before I watch it: check what changed from the version before, and ask me on the frame about anything that looks off.',
@@ -196,7 +196,7 @@ export function AgentMenu({
                 )}
               </>
             ) : (
-              <span className="agent-name ellipsis">{session.name}</span>
+              <span className="agent-name ellipsis">{agentShown(session.name, agentKindOfRef(session))}</span>
             ))}
         </>
       ) : (
@@ -262,7 +262,7 @@ export function AgentMenu({
                   <span className="am-who">
                     <AgentState active={working} />
                     <AgentMark kind={agentKindOfRef(session)} size={15} />
-                    <b className="ellipsis">{session.name}</b>
+                    <b className="ellipsis">{agentShown(session.name, agentKindOfRef(session))}</b>
                   </span>
                   <span className="am-sub" data-testid="agent-listen">
                     {listen ? listenLine(listen) : active ? t('Running: new notes reach it right away') : t('Not running: it gets the notes when it starts')}

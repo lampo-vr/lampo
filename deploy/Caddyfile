@@ -2,6 +2,6 @@
 # resumable (tus) chunks, the live event stream is flushed as it comes, and video is served with range requests —
 # Caddy's reverse_proxy defaults handle all three. No `encode`: the app compresses its answers itself (JSON with
 # brotli, the UI pre-compressed at build time), and compressing the event stream would buffer it.
-{$VR_DOMAIN} {
+{$LAMPO_DOMAIN} {
 	reverse_proxy app:4747
 }

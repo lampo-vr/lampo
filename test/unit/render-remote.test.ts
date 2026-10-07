@@ -94,7 +94,7 @@ test('a render on the agent’s machine goes up as the next version; Lampo hears
   assert.equal(r.code, 0, r.err + r.out);
   const lines = r.out.trim().split('\n');
   assert.match(lines[0], /^V2 rendered in \d+s and put up for review \(50 frames\)\.$/);
-  assert.match(lines[1], /^Now listen with vr watch/);
+  assert.match(lines[1], /^Now listen with lampo watch/);
   // what was posted: batches (≤ 20 lines, one at most every 2 s), the render's progress, then the upload's
   const sent = posted.slice(from).flat();
   assert.ok(sent.length >= 2, JSON.stringify(sent));
@@ -176,7 +176,7 @@ test('--folder: a new video’s V1 goes up into the project on the server (made 
   assert.equal(r.code, 0, r.err + r.out);
   const lines = r.out.trim().split('\n');
   assert.match(lines[0], /^V1 rendered in \d+s and put up for review in Acme\/Launch \(50 frames\)\.$/);
-  assert.match(lines[1], /^Now listen with vr watch/);
+  assert.match(lines[1], /^Now listen with lampo watch/);
   const sent = posted.slice(from).flat();
   assert.ok(
     sent.some((l) => l.kind === 'render' && l.progress?.v === 1),

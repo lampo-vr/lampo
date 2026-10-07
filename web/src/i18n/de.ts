@@ -353,8 +353,8 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Its setup already holds the token.': 'Das Token steckt schon in der Einrichtung.',
   'Your agent': 'Dein Agent',
   Token: 'Token',
-  'Agents that use vr instead: sign in on their machine and paste the token when it asks.':
-    'Agenten, die stattdessen vr nutzen: Melde dich auf ihrem Rechner an und füge das Token ein, wenn danach gefragt wird.',
+  'Agents that use lampo instead: sign in on their machine and paste the token when it asks.':
+    'Agenten, die stattdessen lampo nutzen: Melde dich auf ihrem Rechner an und füge das Token ein, wenn danach gefragt wird.',
   '(marked frame)': '(markierter Frame)',
   '{displayName} · fixed in V{fixed_in_v}': '{displayName} · korrigiert in V{fixed_in_v}',
   '{email} · since {when} · {n} token|{email} · since {when} · {n} tokens': '{email} · seit {when} · {n} Token|{email} · seit {when} · {n} Tokens',
@@ -447,14 +447,14 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Loudness and clipping': 'Lautheit und Übersteuerung',
   Model: 'Modell',
   'Model download': 'Modell-Download',
-  'No source link configured (VR_SOURCE_URL).': 'Kein Quellcode-Link eingerichtet (VR_SOURCE_URL).',
+  'No source link configured (LAMPO_SOURCE_URL).': 'Kein Quellcode-Link eingerichtet (LAMPO_SOURCE_URL).',
   'or in the environment': 'oder in der Umgebung',
   'Reads burned-in text and checks its spelling, German and English.': 'Liest eingebrannten Text und prüft die Rechtschreibung, Deutsch und Englisch.',
   'Runs on': 'Läuft auf',
   'Source code': 'Quellcode',
   'Text in the picture': 'Text im Bild',
-  'Text recognition: <0>VR_OCR</0> is <1>auto</1> (macOS Vision on a Mac, tesseract elsewhere), <2>vision</2>, <3>tesseract</3> or <4>off</4>.':
-    'Texterkennung: <0>VR_OCR</0> ist <1>auto</1> (macOS Vision auf einem Mac, sonst tesseract), <2>vision</2>, <3>tesseract</3> oder <4>off</4>.',
+  'Text recognition: <0>LAMPO_OCR</0> is <1>auto</1> (macOS Vision on a Mac, tesseract elsewhere), <2>vision</2>, <3>tesseract</3> or <4>off</4>.':
+    'Texterkennung: <0>LAMPO_OCR</0> ist <1>auto</1> (macOS Vision auf einem Mac, sonst tesseract), <2>vision</2>, <3>tesseract</3> oder <4>off</4>.',
   'Text under Instagram’s buttons, caption or top bar.': 'Text unter Instagrams Buttons, der Caption oder der oberen Leiste.',
   'The picture stands still where it should move.': 'Das Bild steht still, wo es sich bewegen sollte.',
   'Third-party notices': 'Hinweise zu Drittanbietern',
@@ -760,7 +760,7 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   Freeze: 'Standbild',
   'From review links': 'Aus Review-Links',
   'from config.json': 'aus config.json',
-  'from VR_WEBHOOK_URL': 'aus VR_WEBHOOK_URL',
+  'from LAMPO_WEBHOOK_URL': 'aus LAMPO_WEBHOOK_URL',
   'Get a ping when something needs you': 'Lass dich benachrichtigen, wenn etwas dich braucht',
   'Give a short reason': 'Nenne kurz einen Grund',
   'Go through the open notes': 'Offene Notizen durchgehen',
@@ -858,8 +858,8 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Loading the webhooks': 'Webhooks werden geladen',
   'Loading what waits for you': 'Lädt, was auf dich wartet',
   'Loading your tokens': 'Deine Tokens werden geladen',
-  'Locked out yourself? On the server: <0>vr admin reset-password --email you@example.com</0>':
-    'Selbst ausgesperrt? Auf dem Server: <0>vr admin reset-password --email you@example.com</0>',
+  'Locked out yourself? On the server: <0>lampo admin reset-password --email you@example.com</0>':
+    'Selbst ausgesperrt? Auf dem Server: <0>lampo admin reset-password --email you@example.com</0>',
   'Look it over before I watch': 'Vorab durchsehen, bevor ich schaue',
   'Looking for connected agents': 'Suche nach verbundenen Agenten',
   'Looking for connected agents…': 'Suche nach verbundenen Agenten …',
@@ -968,21 +968,22 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'On {name}.': 'Auf {name}.',
   'On iPhone and iPad, tap Share, then “Add to Home Screen”, and open the app from there.':
     'Tippe auf iPhone und iPad auf „Teilen“, dann auf „Zum Home-Bildschirm“, und öffne die App von dort.',
-  // vr login in the browser: the consent screen when vr asks (web/src/auth/AuthScreens.tsx ConsentScreen)
-  '<0>vr</0> on <1>{machine}</1> wants to work with your reviews in {brand}, as <2>{name}</2>.':
-    '<0>vr</0> auf <1>{machine}</1> möchte in {brand} mit deinen Reviews arbeiten, als <2>{name}</2>.',
-  'vr gets an API token named <0>{token}</0>, valid until you revoke it.': 'vr bekommt ein API-Token namens <0>{token}</0>, gültig, bis du es widerrufst.',
-  'vr gets an API token named <0>{token}</0>, valid for {n} day.|vr gets an API token named <0>{token}</0>, valid for {n} days.':
-    'vr bekommt ein API-Token namens <0>{token}</0>, gültig für {n} Tag.|vr bekommt ein API-Token namens <0>{token}</0>, gültig für {n} Tage.',
-  'What vr may do': 'Was vr darf',
+  // lampo login in the browser: the consent screen when lampo asks (web/src/auth/AuthScreens.tsx ConsentScreen)
+  '<0>lampo</0> on <1>{machine}</1> wants to work with your reviews in {brand}, as <2>{name}</2>.':
+    '<0>lampo</0> auf <1>{machine}</1> möchte in {brand} mit deinen Reviews arbeiten, als <2>{name}</2>.',
+  'lampo gets an API token named <0>{token}</0>, valid until you revoke it.':
+    'lampo bekommt ein API-Token namens <0>{token}</0>, gültig, bis du es widerrufst.',
+  'lampo gets an API token named <0>{token}</0>, valid for {n} day.|lampo gets an API token named <0>{token}</0>, valid for {n} days.':
+    'lampo bekommt ein API-Token namens <0>{token}</0>, gültig für {n} Tag.|lampo bekommt ein API-Token namens <0>{token}</0>, gültig für {n} Tage.',
+  'What lampo may do': 'Was lampo darf',
   'Works as you': 'Arbeitet als du',
   'Whatever your role ({role}) lets you do here, as you would in the app.': 'Alles, was deine Rolle ({role}) hier erlaubt, wie du selbst in der App.',
   'Stays with you': 'Bleibt bei dir',
   'Approving, publishing, review links, and managing people and tokens: only in the app, signed in.':
     'Freigeben, Veröffentlichen, Review-Links sowie Personen und Tokens verwalten: nur in der App, angemeldet.',
-  'It never sees your password. Revoke the token any time under Settings → API tokens, or with vr logout.':
-    'vr sieht dein Passwort nie. Widerrufen kannst du das Token jederzeit unter Einstellungen → API-Tokens oder mit vr logout.',
-  'vr on {machine}': 'vr auf {machine}',
+  'It never sees your password. Revoke the token any time under Settings → API tokens, or with lampo logout.':
+    'lampo sieht dein Passwort nie. Widerrufen kannst du das Token jederzeit unter Einstellungen → API-Tokens oder mit lampo logout.',
+  'lampo on {machine}': 'lampo auf {machine}',
   'Back to the terminal': 'Zurück zum Terminal',
   'You can close this tab.': 'Du kannst diesen Tab schließen.',
   'Onion skin': 'Zwiebelschale',
@@ -1320,8 +1321,8 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'title safe 90%': 'Title Safe 90 %',
   'To review': 'Zu prüfen',
   today: 'heute',
-  'Tokens let <0>vr</0>, the MCP server and scripts work as you from another machine. One per machine or agent makes it easy to revoke just that one.':
-    'Mit Tokens arbeiten <0>vr</0>, der MCP-Server und Skripte von einem anderen Rechner aus in deinem Namen. Eines pro Rechner oder Agent – dann lässt sich genau das eine widerrufen.',
+  'Tokens let <0>lampo</0>, the MCP server and scripts work as you from another machine. One per machine or agent makes it easy to revoke just that one.':
+    'Mit Tokens arbeiten <0>lampo</0>, der MCP-Server und Skripte von einem anderen Rechner aus in deinem Namen. Eines pro Rechner oder Agent – dann lässt sich genau das eine widerrufen.',
   'Too many attempts.': 'Zu viele Versuche.',
   'Too many sign-in attempts from here.': 'Zu viele Anmeldeversuche von hier.',
   'top bar': 'obere Leiste',
@@ -1381,7 +1382,7 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Voice note, transcribed on this server': 'Sprachnotiz, auf diesem Server transkribiert',
   'Voice notes need https or localhost: the browser keeps the microphone off on a plain http address.':
     'Sprachnotizen brauchen https oder localhost: Auf einer reinen http-Adresse lässt der Browser das Mikrofon aus.',
-  'vr on the agent’s machine': 'vr auf dem Rechner des Agenten',
+  'lampo on the agent’s machine': 'lampo auf dem Rechner des Agenten',
   vs: 'vs.',
   'Waiting for fixes from {name}': 'Wartet auf Korrekturen von {name}',
   'Waiting for the link to be opened': 'Wartet darauf, dass der Link geöffnet wird',
@@ -1498,8 +1499,8 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Δ not comparable to V': 'Δ nicht vergleichbar mit V',
   'Δ vs V{v} · {n} change|Δ vs V{v} · {n} changes': 'Δ vs. V{v} · {n} Änderung|Δ vs. V{v} · {n} Änderungen',
   'Reopen, if something must change after all': 'Wieder öffnen, falls sich doch etwas ändern muss',
-  'Built from your notes. Agents get it per project with <0>vr taste</0> or the MCP tool <0>get_taste</0>.':
-    'Aus deinen Notizen gebaut. Agenten holen es pro Projekt mit <0>vr taste</0> oder dem MCP-Tool <0>get_taste</0>.',
+  'Built from your notes. Agents get it per project with <0>lampo taste</0> or the MCP tool <0>get_taste</0>.':
+    'Aus deinen Notizen gebaut. Agenten holen es pro Projekt mit <0>lampo taste</0> oder dem MCP-Tool <0>get_taste</0>.',
   'V{n} and not approved yet': 'V{n} und noch nicht freigegeben',
   'What agents read before they start': 'Was Agenten lesen, bevor sie loslegen',
   Agent: 'Agent',
@@ -1680,8 +1681,8 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Remove {name}': '{name} entfernen',
   'Switched off on the computer Lampo runs on.': 'Auf dem Computer, auf dem Lampo läuft, ausgeschaltet.',
   'Switched off on this server.': 'Auf diesem Server ausgeschaltet.',
-  'The engine is the server’s configuration: config.json under “stt”, or VR_STT_* variables, then a restart. docs/speech.md lists every option.':
-    'Die Engine gehört zur Konfiguration des Servers: config.json unter „stt“ oder VR_STT_*-Variablen, danach ein Neustart. docs/speech.md nennt alle Optionen.',
+  'The engine is the server’s configuration: config.json under “stt”, or LAMPO_STT_* variables, then a restart. docs/speech.md lists every option.':
+    'Die Engine gehört zur Konfiguration des Servers: config.json unter „stt“ oder LAMPO_STT_*-Variablen, danach ein Neustart. docs/speech.md nennt alle Optionen.',
   'The most accurate of the engines here in our tests, also in noise and with German and English mixed; under half a second per note on a graphics chip.':
     'Die genaueste der Engines hier in unseren Tests, auch bei Lärm und mit Deutsch und Englisch gemischt; unter einer halben Sekunde pro Notiz auf einem Grafikchip.',
   'The server’s choice until you change it.': 'Die Wahl des Servers, bis du sie änderst.',
@@ -1816,8 +1817,8 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Pings on your devices when something needs you: agents’ questions, fixes to check, feedback from review links.':
     'Pings auf deinen Geräten, wenn etwas dich braucht: Fragen von Agenten, Korrekturen zum Prüfen, Feedback aus Review-Links.',
   '{a} and {b}': '{a} und {b}',
-  'Anything using it ({prefix}…) stops working at once; agents on that machine need <0>vr login</0> again.':
-    'Alles, was ihn nutzt ({prefix}…), funktioniert sofort nicht mehr; Agenten auf diesem Rechner brauchen erneut <0>vr login</0>.',
+  'Anything using it ({prefix}…) stops working at once; agents on that machine need <0>lampo login</0> again.':
+    'Alles, was ihn nutzt ({prefix}…), funktioniert sofort nicht mehr; Agenten auf diesem Rechner brauchen erneut <0>lampo login</0>.',
   'Delete the folder “{name}”?': 'Den Ordner „{name}“ löschen?',
   'Disconnect “{client_name}”?': '„{client_name}“ trennen?',
   'It loses access at once; to use it again, connect it again from the app.':
@@ -2742,8 +2743,8 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Add an email address above to send it.': 'Trag oben eine E-Mail-Adresse ein, um sie zu senden.',
   'Address confirmed': 'Adresse bestätigt',
   'Already confirmed': 'Schon bestätigt',
-  'An email when your account signs in from a browser or vr it hasn’t been used with before.':
-    'Eine E-Mail, wenn sich dein Konto in einem Browser oder mit vr anmeldet, den es noch nicht kennt.',
+  'An email when your account signs in from a browser or lampo it hasn’t been used with before.':
+    'Eine E-Mail, wenn sich dein Konto in einem Browser oder mit lampo anmeldet, den es noch nicht kennt.',
   'An email with the link went to <0>{email}</0>. It works once, until {until}; whoever opens it first chooses a name and password and is in as {x}.':
     'Eine E-Mail mit dem Link ging an <0>{email}</0>. Er funktioniert einmal, bis {until}; wer ihn zuerst öffnet, wählt Name und Passwort und ist als {x} dabei.',
   'Ask for a new password': 'Neues Passwort anfragen',
@@ -2834,8 +2835,8 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'This link was used already': 'Dieser Link wurde schon benutzt',
   'This server can’t send email. Whoever runs it can set a new password for you in Settings → Users, or on the server:':
     'Dieser Server kann keine E-Mails senden. Die Person, die ihn betreibt, kann dir unter Einstellungen → Nutzer ein neues Passwort setzen, oder auf dem Server:',
-  'This server has no mail relay (<0>VR_SMTP_URL</0>): emails wait in its outbox instead of going out. Copy the link and send it yourself.':
-    'Dieser Server hat keinen Mail-Relay (<0>VR_SMTP_URL</0>): E-Mails warten in seinem Postausgang, statt rauszugehen. Kopier den Link und schick ihn selbst.',
+  'This server has no mail relay (<0>LAMPO_SMTP_URL</0>): emails wait in its outbox instead of going out. Copy the link and send it yourself.':
+    'Dieser Server hat keinen Mail-Relay (<0>LAMPO_SMTP_URL</0>): E-Mails warten in seinem Postausgang, statt rauszugehen. Kopier den Link und schick ihn selbst.',
   'Too many attempts from here. Try again in a few minutes.': 'Zu viele Versuche von hier. Versuch es in ein paar Minuten noch mal.',
   'Too many emails for now. Try again later.': 'Gerade zu viele E-Mails. Versuch es später noch mal.',
   'Too many requests from here. Try again in a few minutes.': 'Zu viele Anfragen von hier. Versuch es in ein paar Minuten noch mal.',
@@ -3393,8 +3394,8 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   '<0>The library</0>: {name}’s videos and a sample': '<0>Die Bibliothek</0>: die Videos von {name} und ein Beispiel',
   '<0>The library</0>: the team’s videos and a sample': '<0>Die Bibliothek</0>: die Videos des Teams und ein Beispiel',
   '<0>The sample</0>: the whole loop': '<0>Das Beispiel</0>: der ganze Ablauf',
-  '<0>vr mcp config vscode</0> prints a ready setup; also antigravity, windsurf, gemini, zed.':
-    '<0>vr mcp config vscode</0> gibt eine fertige Einrichtung aus; ebenso antigravity, windsurf, gemini, zed.',
+  '<0>lampo mcp config vscode</0> prints a ready setup; also antigravity, windsurf, gemini, zed.':
+    '<0>lampo mcp config vscode</0> gibt eine fertige Einrichtung aus; ebenso antigravity, windsurf, gemini, zed.',
   '<0>Where</0> your exports land': '<0>Wo</0> deine Exporte landen',
   '<0>Which agent</0> you use': '<0>Welchen Agent</0> du nutzt',
   '<0>Who</0> the videos are for': '<0>Für wen</0> die Videos sind',
@@ -3557,8 +3558,8 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'No mail relay yet.': 'Noch kein Mail-Relay.',
   'No mail relay yet. Invites and password resets become links you copy and send.':
     'Noch kein Mail-Relay. Einladungen und Passwort-Resets werden zu Links, die du kopierst und verschickst.',
-  'No public address yet: set <0>VR_PUBLIC_URL</0>, so links and emails point here.':
-    'Noch keine öffentliche Adresse: Setz <0>VR_PUBLIC_URL</0>, damit Links und E-Mails hierher zeigen.',
+  'No public address yet: set <0>LAMPO_PUBLIC_URL</0>, so links and emails point here.':
+    'Noch keine öffentliche Adresse: Setz <0>LAMPO_PUBLIC_URL</0>, damit Links und E-Mails hierher zeigen.',
   'No team setup.': 'Keine Team-Einrichtung.',
   'No token to copy: the first time, run /mcp in Claude Code and sign in.':
     'Kein Token zum Kopieren: Führ beim ersten Mal /mcp in Claude Code aus und melde dich an.',
@@ -3612,8 +3613,8 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Sends through <0>{relay}</0> · a test mail went to {email}.': 'Sendet über <0>{relay}</0> · eine Test-Mail ging an {email}.',
   'Sends through <0>{relay}</0>.': 'Sendet über <0>{relay}</0>.',
   'Set up your workspace': 'Workspace einrichten',
-  'Set VR_TOKEN to your API token (Settings → API tokens) before starting the client.':
-    'Setz VR_TOKEN auf deinen API-Token (Einstellungen → API-Tokens), bevor du den Client startest.',
+  'Set LAMPO_TOKEN to your API token (Settings → API tokens) before starting the client.':
+    'Setz LAMPO_TOKEN auf deinen API-Token (Einstellungen → API-Tokens), bevor du den Client startest.',
   'Skip setup': 'Einrichtung überspringen',
   shared: 'hat geteilt',
   'Shorts · 9:16': 'Shorts · 9:16',
@@ -3667,8 +3668,8 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Use an API token instead': 'Lieber einen API-Token nutzen',
   'Use this folder · {n}': 'Diesen Ordner nehmen · {n}',
   'V2 · export to the same path': 'V2 · auf denselben Pfad exportieren',
-  '<0>vr export</0> packs every review into one file, with its notes, frames and versions.':
-    '<0>vr export</0> packt jedes Review in eine Datei, mit Notizen, Frames und Versionen.',
+  '<0>lampo export</0> packs every review into one file, with its notes, frames and versions.':
+    '<0>lampo export</0> packt jedes Review in eine Datei, mit Notizen, Frames und Versionen.',
   Waiting: 'Wartet',
   'Waiting for {name}': 'Warte auf {name}',
   'Waiting for {name}…': 'Warte auf {name} …',
@@ -3704,7 +3705,7 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'your MCP client': 'deinen MCP-Client',
   'Your MCP client': 'Dein MCP-Client',
   'Your server is up, {name}': 'Dein Server läuft, {name}',
-  'Your shell fills in $VR_TOKEN when you run it.': 'Deine Shell setzt $VR_TOKEN beim Ausführen ein.',
+  'Your shell fills in $LAMPO_TOKEN when you run it.': 'Deine Shell setzt $LAMPO_TOKEN beim Ausführen ein.',
   'Your team': 'Dein Team',
   'Your team in this workspace.': 'Dein Team in diesem Workspace.',
   'Your team reviews its videos here. <0>Notes on exact frames, fixes by agents, checks by people.</0>':
@@ -3860,7 +3861,7 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   '{n} weeks': '{n} Wochen',
   '{p} of the step before; {n} stopped here': '{p} des Schritts davor; {n} haben hier aufgehört',
   '{paid} of {base} workspaces': '{paid} von {base} Workspaces',
-  '{range} · Lampo Cloud sign-ups': '{range} · Registrierungen bei Lampo Cloud',
+  '{range} · sign-ups on this server': '{range} · Registrierungen auf diesem Server',
   '{x} day|{x} days': '{x} Tag|{x} Tage',
   '{x} from the first week to the last': '{x} von der ersten zur letzten Woche',
   'Active at trial end': 'Aktiv bei Testphasenende',

@@ -226,12 +226,12 @@ try {
       await page.goto(String(asked), { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('[data-testid=consent]', { timeout: 15000 });
       const t = await text();
-      assert(/vr on studio-mac wants to work with your reviews/.test(t.replace(/\s+/g, ' ')), `names vr and the machine: ${t}`);
-      assert(t.includes('vr on studio-mac') && /valid for 90 days/.test(t), 'names the token as Settings → API tokens will, and how long it works');
+      assert(/lampo on studio-mac wants to work with your reviews/.test(t.replace(/\s+/g, ' ')), `names lampo and the machine: ${t}`);
+      assert(t.includes('lampo on studio-mac') && /valid for 90 days/.test(t), 'names the token as Settings → API tokens will, and how long it works');
       assert(/Works as you/.test(t) && /Stays with you/.test(t), 'what the token may do, and what stays a person’s');
       assert(!/Read reviews|Act on feedback/.test(t), 'no app scopes for vr');
       assert(/127\.0\.0\.1:\d+/.test(t) && /on this computer/.test(t), 'where the answer goes, with the local warning');
-      assert(/or with vr logout/.test(t), 'how to revoke it');
+      assert(/or with lampo logout/.test(t), 'how to revoke it');
       const fit = await fitsAt(page, 'consent');
       assert(!fit.length, fit.join('\n'));
       if (SHOTS) {
@@ -259,7 +259,7 @@ try {
       assert(/^signed in to .* as E2E Owner <owner@e2e\.test> \(owner\) in workspace /.test(out), `vr says who and where: ${out}`);
       assert(page.url() === here, `the page stayed: ${page.url()}`);
       const done = (await text()).replace(/\s+/g, ' ');
-      assert(/Back to the terminal/.test(done) && /vr on studio-mac takes it from here\. You can close this tab\./.test(done), done);
+      assert(/Back to the terminal/.test(done) && /lampo on studio-mac takes it from here\. You can close this tab\./.test(done), done);
       if (SHOTS)
         for (const theme of ['light', 'dark']) {
           await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: theme }]);
@@ -277,7 +277,7 @@ try {
       // the token is listed under its name, like one made in Settings
       const tokens = await page.evaluate(async () => (await (await fetch('/api/auth/tokens')).json()).tokens);
       assert(
-        tokens.some((x) => x.name === 'vr on studio-mac' && x.expires),
+        tokens.some((x) => x.name === 'lampo on studio-mac' && x.expires),
         JSON.stringify(tokens),
       );
     } finally {

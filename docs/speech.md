@@ -66,7 +66,7 @@ starts on; search keeps the lines that say something.
 
 A transcript detects its own language (the language lists for voice notes play no part), or uses the one picked with
 *Listen again*. With speech-to-text off, the tab says so and how to turn it on. Agents read transcripts with
-`vr transcript` or the MCP tool `get_transcript`, and a note that changes the words as one line
+`lampo transcript` or the MCP tool `get_transcript`, and a note that changes the words as one line
 ([agents.md](agents.md#changing-the-words-the-transcript)).
 
 ## Engine and models
@@ -116,7 +116,7 @@ The engine runs in a worker process of its own that keeps one model loaded:
 
 ## Configuration
 
-The engine is the server's configuration: `config.json` under `stt`, or `VR_STT_*` variables, then a restart.
+The engine is the server's configuration: `config.json` under `stt`, or `LAMPO_STT_*` variables, then a restart.
 
 ```json
 {
@@ -135,17 +135,17 @@ The engine is the server's configuration: `config.json` under `stt`, or `VR_STT_
 
 | Setting | Environment | Default | |
 |---|---|---|---|
-| `backend` | `VR_STT` | `local` | `local`, `http` ([your own server](#bring-your-own-server)) or `off` |
-| `model` | `VR_STT_MODEL` | `auto` | `auto`, `whisper-turbo`, `parakeet-v3`, `qwen3-asr-1.7b`, or a path to a `.gguf` file |
-| `languages` | `VR_STT_LANGUAGES` | `[]` (any) | e.g. `de,en`: the languages people speak unless they choose their own; the first is the fallback |
-| `vocabulary` | `VR_STT_VOCABULARY` | `[]` | terms for Whisper (comma-separated in the environment) |
-| `threads` | `VR_STT_THREADS` | `0` (up to 4) | processor threads for the engine |
-| `idle_unload_minutes` | `VR_STT_IDLE_MINUTES` | 30 | |
-| `prefetch` | `VR_STT_PREFETCH` | `false` (`1` in the Docker image) | download the model at start instead of with the first note |
-| `models_dir` | `VR_STT_MODELS_DIR` | `<cache>/models` | |
-| `http.url` | `VR_STT_URL` | none | the speech server for `backend: "http"` |
-| `http.api_key` | `VR_STT_API_KEY` | none | sent as a bearer token |
-| `http.model` | `VR_STT_HTTP_MODEL` | `whisper-1` | the model name the server expects |
+| `backend` | `LAMPO_STT` | `local` | `local`, `http` ([your own server](#bring-your-own-server)) or `off` |
+| `model` | `LAMPO_STT_MODEL` | `auto` | `auto`, `whisper-turbo`, `parakeet-v3`, `qwen3-asr-1.7b`, or a path to a `.gguf` file |
+| `languages` | `LAMPO_STT_LANGUAGES` | `[]` (any) | e.g. `de,en`: the languages people speak unless they choose their own; the first is the fallback |
+| `vocabulary` | `LAMPO_STT_VOCABULARY` | `[]` | terms for Whisper (comma-separated in the environment) |
+| `threads` | `LAMPO_STT_THREADS` | `0` (up to 4) | processor threads for the engine |
+| `idle_unload_minutes` | `LAMPO_STT_IDLE_MINUTES` | 30 | |
+| `prefetch` | `LAMPO_STT_PREFETCH` | `false` (`1` in the Docker image) | download the model at start instead of with the first note |
+| `models_dir` | `LAMPO_STT_MODELS_DIR` | `<cache>/models` | |
+| `http.url` | `LAMPO_STT_URL` | none | the speech server for `backend: "http"` |
+| `http.api_key` | `LAMPO_STT_API_KEY` | none | sent as a bearer token |
+| `http.model` | `LAMPO_STT_HTTP_MODEL` | `whisper-1` | the model name the server expects |
 | `http.response_format` | | `json` | `verbose_json` when the server reports the detected language there |
 
 Upgrading from the old Python/mlx-whisper version: `whisper_python` and `whisper_model` are ignored now, and
@@ -169,7 +169,7 @@ graphics card), speaches, CrispASR, or a hosted API. The audio is sent as 16 kHz
 }
 ```
 
-or `VR_STT=http VR_STT_URL=… VR_STT_API_KEY=… VR_STT_HTTP_MODEL=…`. Set `"response_format": "verbose_json"` when the
+or `LAMPO_STT=http LAMPO_STT_URL=… LAMPO_STT_API_KEY=… LAMPO_STT_HTTP_MODEL=…`. Set `"response_format": "verbose_json"` when the
 server returns the detected language there, so the language rule above can apply (transcripts always ask for it, to
 get word timings). Note that the audio then leaves your server.
 

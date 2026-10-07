@@ -1,14 +1,14 @@
 # Architecture
 
-Lampo (repository `lampo`, npm package `video-review`) is one TypeScript codebase. Node (22.18 or newer) runs the
-server, the `vr` CLI and the MCP server straight from the source, with no build step; Vite builds the web app.
+Lampo (repository `lampo`, npm package `@lampo-vr/lampo`) is one TypeScript codebase. Node (22.18 or newer) runs the
+server, the `lampo` CLI and the MCP server straight from the source, with no build step; Vite builds the web app.
 
-![How Lampo fits together: the browser, MCP clients and vr come in through the server's guard to its routes, which send live updates to every open screen; the routes and watchers write through lib/store, as vr on your machine does directly; lib/store keeps data/ and registers every render in versions/; background jobs read the renders and fill cache/](assets/architecture.svg)
+![How Lampo fits together: the browser, MCP clients and lampo come in through the server's guard to its routes, which send live updates to every open screen; the routes and watchers write through lib/store, as lampo on your machine does directly; lib/store keeps data/ and registers every render in versions/; background jobs read the renders and fill cache/](assets/architecture.svg)
 
 Three ideas carry the design:
 
 - **Plain files are the source of truth.** Every change goes through `lib/store.ts`, under a lock per video, and is
-  written atomically. The server is only one writer: `vr` and the stdio MCP server on your machine read and write the
+  written atomically. The server is only one writer: `lampo` and the stdio MCP server on your machine read and write the
   same files directly, with no server running.
 - **One app, two places.** The same server runs on a person's machine and hosted; what the machine adds is a list of
   capabilities ([below](#one-app-two-places)).
@@ -20,7 +20,7 @@ The data:
 
 | Code | What it does |
 |---|---|
-| `lib/types.ts` | the data contract as types: everything in `data/` and every API answer. The server, `vr`, MCP and the UI import it |
+| `lib/types.ts` | the data contract as types: everything in `data/` and every API answer. The server, `lampo`, MCP and the UI import it |
 | `lib/store.ts` | reviews, versions, notes, replies, approvals, events, INBOX.md and review.md; a lock per video and atomic writes. Listings reuse parsed reviews until their file changes, and hand them out frozen |
 | `lib/paths.ts`, `lib/config.ts` | where things live, and the settings |
 | `lib/workspaces.ts`, `lib/scope.ts` | workspaces on a hosted server: the registry and memberships; which workspace the work running now is for, carried by every request, job and stream it starts |
@@ -34,7 +34,7 @@ The data:
 | `lib/views.ts`, `lib/watch.ts` | who watched what, in hundredths of a version |
 | `lib/insights.ts`, `lib/insightsRounds.ts`, `lib/insightsFlow.ts`, `lib/insightsWatch.ts`, `lib/taste.ts` | Insights (why videos take so many rounds), and the taste file |
 | `lib/search.ts` | the ⌘K search: videos, folders and notes, every word matched, German spellings folded, best first |
-| `lib/bundle.ts`, `lib/bundleExport.ts`, `lib/bundleImport.ts` | moving a store's reviews to another one: `vr export` and `vr admin import` ([moving.md](moving.md)) |
+| `lib/bundle.ts`, `lib/bundleExport.ts`, `lib/bundleImport.ts` | moving a store's reviews to another one: `lampo export` and `lampo admin import` ([moving.md](moving.md)) |
 
 Media (ffmpeg):
 
@@ -68,21 +68,21 @@ Accounts and the outside world:
 | `lib/oauth/`, `lib/scopes.ts` | sign-in for MCP clients, and what a connected app may do |
 | `lib/webhooks.ts`, `lib/push/`, `lib/netguard.ts` | webhooks, push notifications, and the guard on requests to addresses someone chose |
 | `lib/rateLimit.ts` | the one rate limiter (sign-in, invites, emailed links, OAuth, MCP, link passwords and notes), with bounded memory |
-| `lib/accountExport.ts`, `lib/deletion.ts`, `lib/erasure.ts` | a person's own data: the export (a zip), deleting an account or a workspace — from Settings, the operator's pages or `vr admin` — and what goes with it |
+| `lib/accountExport.ts`, `lib/deletion.ts`, `lib/erasure.ts` | a person's own data: the export (a zip), deleting an account or a workspace — from Settings, the operator's pages or `lampo admin` — and what goes with it |
 | `lib/operator.ts`, `lib/legal.ts` | who runs a hosted server (its operator); the operator's legal pages, linked where people sign in, sign up and pay |
 
 Agents:
 
 | Code | What it does |
 |---|---|
-| `lib/cli.ts`, `lib/cliAccount.ts`, `lib/cliMcp.ts`, `bin/` | `vr`; `bin/vr` and `bin/vr-mcp` find a Node that is new enough |
-| `mcp/` | the MCP server: `mcp/core.ts`, the tools in `mcp/tools/`, who may call which in `mcp/access.ts`. Served over stdio (`mcp/server.ts`, `bin/vr-mcp`) and HTTP (`server/routes/mcp.ts` at `/mcp`); `mcp/app.ts` and `web/mcp-app/` are the review card (an MCP App) |
-| `lib/backend/` | what `vr` and the stdio MCP server talk to: the local store, or a hosted server over HTTPS |
-| `lib/eventLine.ts`, `lib/prompt.ts`, `lib/handoff.ts` | the lines agents parse (`vr watch`, `wait_for_feedback`), the *Copy for an agent* text, and the lines that say to wait (a hand-off's last line, a wait with nothing new, the stop after 30 minutes) |
+| `lib/cli.ts`, `lib/cliAccount.ts`, `lib/cliMcp.ts`, `bin/` | `lampo`; `bin/lampo` and `bin/lampo-mcp` (and `bin/vr`, `bin/vr-mcp`, their older names) find a Node that is new enough |
+| `mcp/` | the MCP server: `mcp/core.ts`, the tools in `mcp/tools/`, who may call which in `mcp/access.ts`. Served over stdio (`mcp/server.ts`, `bin/lampo-mcp`) and HTTP (`server/routes/mcp.ts` at `/mcp`); `mcp/app.ts` and `web/mcp-app/` are the review card (an MCP App) |
+| `lib/backend/` | what `lampo` and the stdio MCP server talk to: the local store, or a hosted server over HTTPS |
+| `lib/eventLine.ts`, `lib/prompt.ts`, `lib/handoff.ts` | the lines agents parse (`lampo watch`, `wait_for_feedback`), the *Copy for an agent* text, and the lines that say to wait (a hand-off's last line, a wait with nothing new, the stop after 30 minutes) |
 | `lib/sessions.ts`, `lib/agentKind.ts`, `lib/agentStatus.ts` | Claude Code sessions on this machine, what kind an agent is, "rendering v4" |
 | `lib/agentRun.ts`, `lib/runStream.ts`, `lib/activity.ts`, `lib/activityText.ts` | starting an assigned Claude Code session for a request, reading its output, and what agents do, live |
 | `lib/options.ts`, `lib/asks.ts` | options an agent offers before it renders, and questions on a folder before any render exists |
-| `lib/cliRender.ts`, `lib/render/` | `vr render`: an agent's own render command, run on its machine, its progress shown in the app and the result put up as the next version |
+| `lib/cliRender.ts`, `lib/render/` | `lampo render`: an agent's own render command, run on its machine, its progress shown in the app and the result put up as the next version |
 
 The server:
 
@@ -93,7 +93,7 @@ The server:
 | `server/guard.ts`, `server/auth.ts`, `server/permissions.ts` | who is asking (the machine itself, a cookie, a token) and which action each route needs |
 | `server/workspace.ts` | runs every request in its workspace (a review link's own, else the caller's), with a request budget per workspace |
 | `server/signup.ts`, `server/accountMail.ts` | where a confirmed sign-up works from then on; which email goes out, to which address, in which language |
-| `server/extension.ts` | the one extension point: what a hosted service's module may limit (`402`) and hear, how it answers a sign-up, the workspace mail it may send, its billing routes. It is loaded only when `VR_CLOUD_MODULE` names one; a self-hosted server has none and is complete without it |
+| `server/extension.ts` | the one extension point: what a hosted service's module may limit (`402`) and hear, how it answers a sign-up, the workspace mail it may send, its billing routes. It is loaded only when `LAMPO_CLOUD_MODULE` names one; a self-hosted server has none and is complete without it |
 | `server/routes/` | the API. Review links are in `server/routes/shares/`: `access.ts` (what a request may reach through a link, used by every guest route), `owner.ts`, `guest.ts` (the link, visits, views, a visitor's writes), `media.ts` (playback, posters, screenshots, downloads), `embed.ts` (an Embed link's player and oEmbed) |
 | `server/playback.ts` | what the browser plays: originals, playback proxies, scrub copies |
 | `server/background.ts` | the work done when a render arrives |
@@ -118,9 +118,9 @@ it and watches its folder, and a re-render to the same path becomes the next ver
 machine show up by themselves and can be started for a request. A phone joins with the link `npm run lan` prints, or
 signs in.
 
-**Hosted** (`VR_MODE=server`), everyone signs in, renders arrive as resumable uploads (tus) and can live in Bunny or
-S3, and the server never shows its own disk: no file browser, no tracking by path. Agents run `vr login` and use the
-same commands over HTTPS, or connect to `/mcp`; run inside a Claude Code session, `vr watch` says it's there every 30
+**Hosted** (`LAMPO_MODE=server`), everyone signs in, renders arrive as resumable uploads (tus) and can live in Bunny or
+S3, and the server never shows its own disk: no file browser, no tracking by path. Agents run `lampo login` and use the
+same commands over HTTPS, or connect to `/mcp`; run inside a Claude Code session, `lampo watch` says it's there every 30
 seconds, which makes the session assignable. A hosted server can hold several teams, each in a workspace of its own
 ([below](#security-boundaries)). Details: [server-mode.md](server-mode.md).
 
@@ -152,7 +152,7 @@ links.
 5. **Events.** Every change appends to `events.jsonl` (except drafts until they are sent, and anything on the first
    run's sample), and a change to a review rewrites its `review.md`. On the machine, a person's change also rewrites
    `INBOX.md`, under its own lock (`data/.inbox`), so two processes writing at once can't leave an older version
-   behind. A change that fails writes no event. Live updates tell open browsers what to fetch again, and `vr watch`
+   behind. A change that fails writes no event. Live updates tell open browsers what to fetch again, and `lampo watch`
    follows the same events: from the file on the machine, over the event stream elsewhere.
 6. **Runs.** Notes a team member sends to the video's agent open its run (`data/<slug>/runs.jsonl`); every activity
    the agent's calls make joins it, and the events above (a version, a fix, its question, the answer) move its plan
@@ -160,7 +160,7 @@ links.
    produced names it (`Version.run`, set when it is registered, by whichever process registers it). A clock looks at
    open runs every 30 s for the ones that went quiet.
 
-<!-- picture: render-flow — a render's path in five steps: registered (hash, versions/), warm-up jobs, playback (original or scrub copy), a note (clean and marked screenshots), the event (events.jsonl, live update, vr watch) -->
+<!-- picture: render-flow — a render's path in five steps: registered (hash, versions/), warm-up jobs, playback (original or scrub copy), a note (clean and marked screenshots), the event (events.jsonl, live update, lampo watch) -->
 
 ### Background jobs
 
@@ -231,7 +231,7 @@ Frame accuracy is the product, and it is kept at every step:
   thread a frame can be on screen and gone between two steps, so a check that a frame was shown counts
   `presentedFrames` too (`startOf` in `test/e2e/range.mjs`).
   `npm run webkit:install` downloads WebKit into `cache/playwright` once; without it the suite fails, unless
-  `VR_E2E_SKIP_OK=1`.
+  `LAMPO_E2E_SKIP_OK=1`.
 
 ## The UI
 
@@ -325,7 +325,7 @@ after the first screenful), and no heading loses the tops or tails of its letter
   posters, screenshots and API answers (`/api/`, `/media/`, `/data/`, review links' own included) carry
   `Cross-Origin-Resource-Policy: same-origin`, so no other site's page can load them as an image or a video — but for
   an Embed link's poster, its oEmbed thumbnail, which says `cross-origin` (as does a media host of its own,
-  `VR_MEDIA_ORIGIN`, which answers signed URLs and nothing else).
+  `LAMPO_MEDIA_ORIGIN`, which answers signed URLs and nothing else).
 - **On your machine.** Only requests from the machine itself, with no proxy headers, are the owner without signing in.
   On Linux that is the app's own OS account (or root): the connecting socket's row in `/proc/net/tcp` names it
   (`peerUidFrom` in `server/auth.ts`). macOS and Windows can't tell accounts apart, so there every account on the
@@ -335,7 +335,7 @@ after the first screenful), and no heading loses the tops or tails of its letter
   on every request, which stops DNS rebinding and other sites' forms. And since the machine itself is the owner by its
   address alone, a request another site makes the browser send (`Sec-Fetch-Site: cross-site`, or `same-site`: this host
   on another port) is refused with `403` unless anyone may ask it: the app's pages and files (so links into the app and
-  the LAN link still open), sign-in, OAuth and review links. Agents, `vr` and curl send no Fetch Metadata and aren't
+  the LAN link still open), sign-in, OAuth and review links. Agents, `lampo` and curl send no Fetch Metadata and aren't
   affected. Anything that names a path on the machine must come from the machine itself.
 - **Review links** (`/g/<token>`) reach only their video or folder and the notes meant for their visitors,
   everywhere, and name videos by ids of their own; an Embed link's player (`/e/<token>`) reaches its one video and

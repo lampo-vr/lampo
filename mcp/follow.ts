@@ -1,15 +1,16 @@
 // Change notifications over stdio. /mcp hears every review event from the app's feed (server/routes/mcp.ts); a stdio
 // server has no app around it, so each connection follows the backend's event feed itself — the store's events.jsonl,
-// or a hosted server's live events — from connect until the client goes away, and says the same: vr://inbox and the
-// event's vr://review/<slug> were updated, the list changed when a video arrived, left or moved.
+// or a hosted server's live events — from connect until the client goes away, and says the same: lampo://inbox and the
+// event's lampo://review/<slug> were updated (and their older vr:// addresses), the list changed when a video arrived,
+// left or moved.
 // A 2026-07-28 client asks with subscriptions/listen, which serveStdio answers and filters on its own. A 2025 client
 // asks with resources/subscribe, which the SDK leaves to us: it hears only about what it subscribed to.
 import type { McpServer } from '@modelcontextprotocol/server';
 import type { Backend } from '../lib/backend/types.ts';
 import type { EventType, ReviewEvent } from '../lib/types.ts';
-import { reviewUri } from './format.ts';
+import { changedUris } from './format.ts';
 
-/** Events that add a video to vr://review/{slug}, take one away, or change how it is listed (its folder). */
+/** Events that add a video to lampo://review/{slug}, take one away, or change how it is listed (its folder). */
 const LIST_CHANGES: EventType[] = ['added', 'removed', 'moved'];
 
 export function followChanges(
@@ -45,8 +46,7 @@ export function followChanges(
       (e) => {
         o.onEvent?.(e);
         if (!server.isConnected()) return;
-        updated('vr://inbox');
-        if (e.slug) updated(reviewUri(e.slug));
+        for (const uri of changedUris(e.slug)) updated(uri);
         if (LIST_CHANGES.includes(e.type)) server.sendResourceListChanged();
       },
       { signal: stop.signal },

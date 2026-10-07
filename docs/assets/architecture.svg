@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 944 536" width="944" height="536" role="img" aria-labelledby="arch-t arch-d">
-<title id="arch-t">How Lampo fits together</title><desc id="arch-d">The browser, MCP clients over HTTP, and vr or the stdio MCP server talking to a hosted server all come in through the server’s guard to its routes, which send live updates to every open screen. Routes and watchers write through lib/store, as vr and the stdio MCP server on your machine do directly. lib/store keeps data/ and registers every render in versions/ (on disk, Bunny or S3); background jobs read the renders and fill cache/.</desc>
+<title id="arch-t">How Lampo fits together</title><desc id="arch-d">The browser, MCP clients over HTTP, and lampo or the stdio MCP server talking to a hosted server all come in through the server’s guard to its routes, which send live updates to every open screen. Routes and watchers write through lib/store, as vr and the stdio MCP server on your machine do directly. lib/store keeps data/ and registers every render in versions/ (on disk, Bunny or S3); background jobs read the renders and fill cache/.</desc>
 <style>
 .d-box{fill:var(--panel,#131314);stroke:var(--line-2,#2a2a2b);stroke-width:1}
 .d-lit{fill:var(--panel,#131314);stroke:var(--brand,#f25a1d);stroke-width:1.5}
@@ -24,7 +24,7 @@
 <text class="d-c" x="300" y="38" text-anchor="start">server/ · Express</text>
 <rect class="d-box" x="24" y="52" width="216" height="58" rx="10"/><text class="d-t" x="40" y="77">Browser</text><text class="d-s" x="40" y="97">the app (web/, React)</text>
 <rect class="d-box" x="24" y="124" width="216" height="58" rx="10"/><text class="d-t" x="40" y="149">MCP clients</text><text class="d-s" x="40" y="169">over HTTP at /mcp</text>
-<rect class="d-box" x="24" y="196" width="216" height="58" rx="10"/><text class="d-t" x="40" y="221">vr · stdio MCP</text><text class="d-s" x="40" y="241">to a hosted server: HTTPS</text>
+<rect class="d-box" x="24" y="196" width="216" height="58" rx="10"/><text class="d-t" x="40" y="221">lampo · stdio MCP</text><text class="d-s" x="40" y="241">to a hosted server: HTTPS</text>
 <path class="d-a" d="M240 81L298 81" marker-end="url(#arch-ah)"/>
 <path class="d-a" d="M262 81L262 225"/>
 <path class="d-a" d="M240 153L262 153"/>
@@ -38,7 +38,7 @@
 <rect class="d-box" x="584" y="140" width="336" height="108" rx="10"/><text class="d-t" x="600" y="165">background jobs</text><text class="d-s" x="600" y="185">ffmpeg: scrub copies, posters,</text><text class="d-s" x="600" y="203">diffs, Auto-check, transcripts;</text><text class="d-s" x="600" y="221">one heavy job at a time</text>
 <path class="d-a" d="M540 110L540 316" marker-end="url(#arch-ah)"/>
 <path class="d-a" d="M440 248L440 316" marker-end="url(#arch-ah)"/>
-<rect class="d-box" x="24" y="318" width="216" height="58" rx="10"/><text class="d-t" x="40" y="343">vr · stdio MCP</text><text class="d-s" x="40" y="363">on your machine</text>
+<rect class="d-box" x="24" y="318" width="216" height="58" rx="10"/><text class="d-t" x="40" y="343">lampo · stdio MCP</text><text class="d-s" x="40" y="363">on your machine</text>
 <path class="d-a" d="M240 347L386 347" marker-end="url(#arch-ah)"/>
 <text class="d-c" x="314" y="339" text-anchor="middle">directly</text>
 <rect class="d-lit" x="388" y="318" width="260" height="58" rx="10"/><text class="d-tm" x="404" y="343">lib/store</text><text class="d-s" x="404" y="363">a lock per video · atomic writes</text>

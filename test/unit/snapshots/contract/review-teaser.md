@@ -11,7 +11,7 @@
 - json: <store>/data/__@uploads__Demo__Reels__teaser.mp4/review.json
 
 Frames are 0-based at the file fps; timecode is mm:ss:ff. Drawing coordinates are video pixels.
-Mark done: `vr fix <id> --note "what changed" [--v N]` · reply: `vr reply <id> --note "…"`
+Mark done: `lampo fix <id> --note "what changed" [--v N]` · reply: `lampo reply <id> --note "…"`
 
 ## Open (4)
 

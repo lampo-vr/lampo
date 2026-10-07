@@ -13,7 +13,7 @@ import { isolatedEnv } from '../lib/helpers.ts';
 const { dir } = isolatedEnv();
 const { createRemoteBackend } = await import('../../lib/backend/remote.ts');
 
-const cacheRoot = path.join(dir, 'home', '.cache', 'video-review');
+const cacheRoot = path.join(dir, 'home', '.cache', 'lampo');
 const home = path.join(dir, 'home');
 const event = (slug: string): ReviewEvent =>
   ({

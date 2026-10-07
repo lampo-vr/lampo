@@ -195,14 +195,14 @@ test('on a self-hosted runner a job checks for what it needs, keeps its files in
 });
 
 test('unit test files at a time are held to the self-hosted runner’s CPUs, and left to Node on GitHub’s', () => {
-  const jobs = /\n {6}VR_TEST_JOBS: (.+)\n/.exec(jobsOf(ci).test)?.[1] ?? '';
+  const jobs = /\n {6}LAMPO_TEST_JOBS: (.+)\n/.exec(jobsOf(ci).test)?.[1] ?? '';
   assert.match(jobs, /^\$\{\{ github\.event\.repository\.private && /, 'the same condition as runs-on');
   for (const [what, github, where] of EVENTS) assert.equal(evaluate(jobs, github), where === 'ours' ? '8' : '', what);
   const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
   assert.match(
     pkg.scripts.test,
-    /^node --test \$\{VR_TEST_JOBS:\+--test-concurrency=\$VR_TEST_JOBS\} /,
-    'npm test reads it (before the files: node ignores it after them)',
+    /^node --test \$\{VR_TEST_JOBS:\+--test-concurrency=\$VR_TEST_JOBS\} \$\{LAMPO_TEST_JOBS:\+--test-concurrency=\$LAMPO_TEST_JOBS\} /,
+    'npm test reads it, LAMPO_ last so it wins (before the files: node ignores it after them)',
   );
 });
 

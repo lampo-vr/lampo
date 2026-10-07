@@ -110,7 +110,7 @@ export const requestHost = (req: Request): string =>
     .replace(/:\d+$/, '')
     .replace(/^\[|\]$/g, '');
 
-/** What the app's own media host (VR_MEDIA_ORIGIN, lib/storage/mediaHost.ts) answers: signed files, folder zips, project files. */
+/** What the app's own media host (LAMPO_MEDIA_ORIGIN, lib/storage/mediaHost.ts) answers: signed files, folder zips, project files. */
 export const SIGNED_MEDIA_PATH = /^\/media\/[szf]\/[\w-]+\/[^/]+$/;
 /** The media host's name, when one is configured. */
 export const mediaHostOf = (mediaOrigin: string | null | undefined): string | null => {
@@ -145,7 +145,7 @@ export interface GuardOptions extends HeaderOptions {
   /** Further paths reachable signed out (an extension module's public routes: a payment provider's webhook). */
   alsoPublic?: (method: string, path: string) => boolean;
   /**
-   * The app's own media host (VR_MEDIA_ORIGIN): another host name of this server that answers its signed media URLs and
+   * The app's own media host (LAMPO_MEDIA_ORIGIN): another host name of this server that answers its signed media URLs and
    * one-time uploads only — each is its own credential — and nothing else, signed in or not.
    */
   mediaOrigin?: string | null;
@@ -226,7 +226,7 @@ export function createGuard(opts: GuardOptions) {
     if (Date.now() - hosts.at > 60_000) hosts = { at: Date.now(), set: machineHosts() };
     return hosts.set.has(host);
   };
-  // A hosted server without a public URL (a local test, VR_ALLOW_NO_PUBLIC_URL) serves any host, as before.
+  // A hosted server without a public URL (a local test, LAMPO_ALLOW_NO_PUBLIC_URL) serves any host, as before.
   const hostOk = (host: string) => LOOPBACK_HOSTS.has(host) || (pub ? host === pub.hostname : machine ? machineHost(host) : true);
   const hostOf = requestHost;
   const mediaHost = mediaHostOf(opts.mediaOrigin);

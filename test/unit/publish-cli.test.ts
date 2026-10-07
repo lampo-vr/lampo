@@ -48,7 +48,7 @@ test('vr post draft on the final: written, then changed; vr post says where it s
   assert.deepEqual(json[0].tags, ['spring', 'launch']);
   assert.equal(json[0].ai_generated, false);
   assert.equal(vr(['post', 'publish', id], agent).code === 0 && /published/.test(vr(['post', 'publish', id], agent).out), false, 'no command publishes');
-  assert.doesNotMatch(vr(['help'], env).out, /vr post publish/);
+  assert.doesNotMatch(vr(['help'], env).out, /(lampo|vr) post publish/);
 });
 
 test('PUB-13: a video’s name with a line break stays on its post’s line in vr post', async () => {

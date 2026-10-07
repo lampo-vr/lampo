@@ -1,5 +1,5 @@
-// A bundle: one store's reviews moved to another (docs/moving.md). `vr export` writes it on the machine it comes from
-// (lib/bundleExport.ts), `vr admin import` reads it on the server it goes to (lib/bundleImport.ts). It is a tar
+// A bundle: one store's reviews moved to another (docs/moving.md). `lampo export` writes it on the machine it comes from
+// (lib/bundleExport.ts), `lampo admin import` reads it on the server it goes to (lib/bundleImport.ts). It is a tar
 // (lib/tar.ts) whose first file is manifest.json — every other file listed there with its size and sha256 — and whose
 // names are ours, never a path or a slug of the machine it came from:
 //   manifest.json

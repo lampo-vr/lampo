@@ -11,14 +11,17 @@ function resolve(appRoot: string, env: Record<string, string>) {
   const code = `import * as p from ${JSON.stringify(path.join(appRoot, 'lib/paths.ts'))};
     console.log(JSON.stringify({ mode: p.STORE_MODE, data: p.DATA, versions: p.VERSIONS, cache: p.CACHE, dev: p.DEV, user: p.USER }));`;
   const clean = { ...process.env };
-  for (const k of ['VR_DATA', 'VR_CACHE', 'VR_CONFIG', 'VR_USER', 'VR_HOME']) delete clean[k];
+  for (const k of ['DATA', 'CACHE', 'CONFIG', 'USER', 'HOME']) {
+    delete clean[`VR_${k}`];
+    delete clean[`LAMPO_${k}`];
+  }
   return JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', code], { env: { ...clean, ...env }, encoding: 'utf8' }));
 }
 
 function freshApp() {
   const app = tmpdir('vr-app-');
   fs.mkdirSync(path.join(app, 'lib'));
-  fs.copyFileSync(path.join(ROOT, 'lib/paths.ts'), path.join(app, 'lib/paths.ts'));
+  for (const f of ['paths.ts', 'env.ts']) fs.copyFileSync(path.join(ROOT, 'lib', f), path.join(app, 'lib', f));
   fs.writeFileSync(path.join(app, 'package.json'), '{"type":"module"}');
   const home = tmpdir('vr-home-');
   return { app, home };
@@ -38,6 +41,13 @@ test('VR_DATA isolates data and versions', () => {
   assert.equal(r.mode, 'env');
   assert.equal(r.data, path.join(t, 'store'));
   assert.equal(r.versions, `${path.join(t, 'store')}-versions`);
+  assert.equal(r.cache, path.join(t, 'c'));
+});
+
+test('LAMPO_DATA and LAMPO_CACHE win over the older VR_ spelling', () => {
+  const t = tmpdir();
+  const r = resolve(ROOT, { LAMPO_DATA: path.join(t, 'store'), VR_DATA: path.join(t, 'old'), LAMPO_CACHE: path.join(t, 'c'), VR_CACHE: path.join(t, 'o') });
+  assert.equal(r.data, path.join(t, 'store'));
   assert.equal(r.cache, path.join(t, 'c'));
 });
 

@@ -32,7 +32,7 @@ In scope:
   review link reach more than it should. That includes reaching through `npm run lan` or the Cloudflare tunnel.
 - **Review links and embeds:** anything that lets a link, or a video embedded with one, reach another video,
   internal notes, people's names, or the rest of the API.
-- **The agent interfaces:** anything that makes `vr` or the MCP server write outside the store or run commands. Notes
+- **The agent interfaces:** anything that makes `lampo` or the MCP server write outside the store or run commands. Notes
   reach agents as work, also from review-link visitors: the server's instructions, the watch prompt and the Agent
   Skill tell agents that a note asks for a change to the video and never for commands, links or files. An agent that
   follows a note's instructions anyway is a weakness of that agent, but a way for a note to look like Lampo's own
@@ -59,17 +59,17 @@ The security model is described in [docs/server-mode.md](docs/server-mode.md#sec
 
 ## Hardening a hosted instance
 
-- Set `VR_PUBLIC_URL` (the server refuses to start without it) to the https URL people open, and put TLS in a
+- Set `LAMPO_PUBLIC_URL` (the server refuses to start without it) to the https URL people open, and put TLS in a
   reverse proxy (Caddy in `docker-compose.yml`).
-- Name the proxy in `VR_TRUST_PROXY` (`loopback`, `uniquelocal`, or its address/subnet; an https `VR_PUBLIC_URL`
+- Name the proxy in `LAMPO_TRUST_PROXY` (`loopback`, `uniquelocal`, or its address/subnet; an https `LAMPO_PUBLIC_URL`
   requires it), and don't publish the app's port past the proxy: forwarding headers from anyone else are ignored.
-- Keep `VR_WEBHOOK_ALLOW_PRIVATE` off unless a webhook really has to reach your own network.
+- Keep `LAMPO_WEBHOOK_ALLOW_PRIVATE` off unless a webhook really has to reach your own network.
 - Run the container as shipped: unprivileged `node` user; compose drops all capabilities, sets `no-new-privileges`,
   runs the root file system read-only (temp files on the volume) and caps processes and memory. On a shared machine,
   add a `cpus` limit.
-- Keep the media limits (`VR_MAX_SIDE`, `VR_MAX_DURATION`, `VR_MEDIA_TIMEOUT`) no higher than your renders need.
-- Give API tokens for CI and servers an expiry (`vr login --expires 90d`, or `days` when creating one) and revoke
-  the ones Settings shows as unused; sessions end after 14 idle days (`VR_SESSION_IDLE_DAYS`).
+- Keep the media limits (`LAMPO_MAX_SIDE`, `LAMPO_MAX_DURATION`, `LAMPO_MEDIA_TIMEOUT`) no higher than your renders need.
+- Give API tokens for CI and servers an expiry (`lampo login --expires 90d`, or `days` when creating one) and revoke
+  the ones Settings shows as unused; sessions end after 14 idle days (`LAMPO_SESSION_IDLE_DAYS`).
 - Encrypt backups of `data/`: `secret.key` and `share-secret.key` in it unseal the invite and review-link tokens
   (without them, `invites.json` and `shares.json` open nothing).
 - Back up `data/` (accounts, links, reviews, profile pictures, `secret.key`) off the machine, and with local storage

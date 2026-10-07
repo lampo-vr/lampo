@@ -1,11 +1,12 @@
 // Where an agent's process reports what it did through Lampo (lib/activityText.ts): the app shows it live. On this
-// machine the `vr` CLI and the stdio MCP server append a line to a small rolling file in the cache, which the app
+// machine the `lampo` CLI and the stdio MCP server append a line to a small rolling file in the cache, which the app
 // tails; against a hosted server they send a batch now and then. The app's own MCP endpoint records in memory
 // (server/activity.ts). None of it adds a single token to the agent's work: it is the calls it makes anyway.
 import fs from 'node:fs';
 import path from 'node:path';
 import { readCredentials } from './backend/credentials.ts';
 import { createApi } from './backend/remote.ts';
+import { setting } from './env.ts';
 import { cleanAgentName } from './names.ts';
 import { CACHE, isoLocal } from './paths.ts';
 import { currentSession } from './sessions.ts';
@@ -120,7 +121,10 @@ export const RUN_ID = /^run_[0-9a-f]{12}$/;
 
 /** The run Lampo started this process for (`LAMPO_RUN`), when it names one. Only a hint: the server binds a line to
  * that run only when it is the same agent's, on the same video, in the same workspace (server/runs.ts). */
-export const lampoRun = (env: NodeJS.ProcessEnv = process.env): string | undefined => (RUN_ID.test(env.LAMPO_RUN ?? '') ? env.LAMPO_RUN : undefined);
+export const lampoRun = (env: NodeJS.ProcessEnv = process.env): string | undefined => {
+  const run = setting('LAMPO_RUN', env);
+  return run && RUN_ID.test(run) ? run : undefined;
+};
 
 /** Every activity of a process Lampo started for a run names that run: a hint the server checks (server/runs.ts). */
 export function taggedWithRun(sink: ActivitySink, run = lampoRun()): ActivitySink {
@@ -128,18 +132,18 @@ export function taggedWithRun(sink: ActivitySink, run = lampoRun()): ActivitySin
   return { record: (a) => sink.record({ ...a, run: a.run ?? run }), flush: () => sink.flush(), heard: () => sink.heard() };
 }
 
-/** The agent this process works for, by the name the UI shows: the Claude Code session, else VR_BY's agent name.
- * Null for a person running `vr` by hand: their commands are not agent activity. */
+/** The agent this process works for, by the name the UI shows: the Claude Code session, else LAMPO_BY's agent name.
+ * Null for a person running `lampo` by hand: their commands are not agent activity. */
 export function processAgent(env: NodeJS.ProcessEnv = process.env): string | null {
   const s = currentSession();
   const own = s?.name ? cleanAgentName(s.name) : '';
   if (own) return own;
-  const by = env.VR_BY?.match(/^agent:([\s\S]+)$/)?.[1];
+  const by = setting('LAMPO_BY', env)?.match(/^agent:([\s\S]+)$/)?.[1];
   return (by && cleanAgentName(by)) || null;
 }
 
-/** Who a `vr` command records as: the agent (processAgent), else, in a run Lampo started that names no agent, "agent".
- * Null for a person's own `vr`. */
+/** Who a `lampo` command records as: the agent (processAgent), else, in a run Lampo started that names no agent, "agent".
+ * Null for a person's own `lampo`. */
 export function cliAgent(env: NodeJS.ProcessEnv = process.env): string | null {
   return processAgent(env) ?? (lampoRun(env) ? 'agent' : null);
 }

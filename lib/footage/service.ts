@@ -1,4 +1,4 @@
-// Footage search for the workspace running now, as `vr`, the MCP tools and the API use it: find, a contact sheet of
+// Footage search for the workspace running now, as `lampo`, the MCP tools and the API use it: find, a contact sheet of
 // shots by id, how far the index is, and the workspace's switch.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -42,7 +42,7 @@ export const isOn = (): boolean => footageState().on;
 export const SHEET_MAX = 9;
 export async function sheet(ids: readonly string[], out?: string): Promise<{ file: string; shots: FootageShot[]; width: number; height: number }> {
   const items = shotsById([...new Set(ids)].slice(0, SHEET_MAX), embedder().key);
-  if (!items.length) throw new Error(`no shot ${ids.slice(0, 3).join(', ')} in this workspace's footage (ids come from vr footage find)`);
+  if (!items.length) throw new Error(`no shot ${ids.slice(0, 3).join(', ')} in this workspace's footage (ids come from lampo footage find)`);
   const file =
     out ??
     path.join(

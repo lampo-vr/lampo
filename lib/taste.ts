@@ -258,7 +258,7 @@ export function buildTaste(reviews: Review[], { folder, project, title }: TasteS
   if (open.length) {
     for (const { c, r } of open.slice(0, 15))
       L.push(`- ${c.id} ${c.severity.toUpperCase()} ${c.timecode} ${vname(r)} — ${clip(c.text || '(marked frame)', 90)}`);
-    if (open.length > 15) L.push(`- … ${open.length - 15} more (vr ls --open)`);
+    if (open.length > 15) L.push(`- … ${open.length - 15} more (lampo ls --open)`);
   } else L.push('_Nothing open._');
   L.push('');
 

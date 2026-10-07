@@ -4,6 +4,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { settings } from '../../../lib/env.ts';
 import { ROOT } from '../../lib/helpers.ts';
 import { unavailable } from '../prereq.mjs';
 
@@ -92,7 +93,7 @@ export const signedIn = (page, timeout = 20_000) => page.waitForSelector('.topba
 
 /** Where screenshots go (VR_SHOTS, created here), or null when the suite runs without them. */
 export function shotsDir() {
-  const dir = process.env.VR_SHOTS || null;
+  const dir = settings.LAMPO_SHOTS || null;
   if (dir) fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -180,7 +181,7 @@ export async function launch({ locale = 'en-US', reducedMotion = true, args = []
   await session.detach();
   // VR_E2E_CPU=<n>: every page runs its scripts n times slower (Chrome's CPU throttling), a busy CI runner on a quiet
   // machine, for the races only CI shows. perf.mjs sets its own rate on the pages it measures.
-  const cpu = Number(process.env.VR_E2E_CPU) || 0;
+  const cpu = Number(settings.LAMPO_E2E_CPU) || 0;
   if (cpu > 1)
     browser.on('targetcreated', async (target) => {
       if (target.type() !== 'page') return;

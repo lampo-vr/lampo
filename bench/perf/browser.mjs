@@ -38,7 +38,7 @@ const srv = await startServer({
   prefix: 'vr-perf-bench-',
   user: 'Sam',
   config: { browse_root: dir },
-  env: { VR_DATA: path.join(dir, 'data'), VR_CACHE: path.join(dir, 'cache'), VR_CONFIG: path.join(dir, 'config.json') },
+  env: { LAMPO_DATA: path.join(dir, 'data'), LAMPO_CACHE: path.join(dir, 'cache'), LAMPO_CONFIG: path.join(dir, 'config.json') },
 });
 const BASE = srv.base;
 const lib = await (await fetch(`${BASE}/api/library`)).json();

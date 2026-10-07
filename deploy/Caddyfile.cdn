@@ -1,6 +1,6 @@
 # Lampo with its app host behind a CDN proxy (Cloudflare here) and a media host of its own (docs/go-live.md → Behind
-# a CDN proxy). Use it in place of deploy/Caddyfile: mount it as /etc/caddy/Caddyfile, set VR_DOMAIN (the app host,
-# proxied by the CDN) and VR_MEDIA_DOMAIN (DNS only, straight to this server), and VR_MEDIA_ORIGIN=https://<media host>
+# a CDN proxy). Use it in place of deploy/Caddyfile: mount it as /etc/caddy/Caddyfile, set LAMPO_DOMAIN (the app host,
+# proxied by the CDN) and LAMPO_MEDIA_DOMAIN (DNS only, straight to this server), and LAMPO_MEDIA_ORIGIN=https://<media host>
 # for the app.
 #
 # No `encode`: the app compresses its own answers, and compression would hold the live stream back. No access log: it
@@ -12,7 +12,7 @@
 	remote_ip 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
 }
 
-{$VR_DOMAIN} {
+{$LAMPO_DOMAIN} {
 	# The certificate the CDN checks between itself and this server (Cloudflare: an Origin CA certificate for this name,
 	# SSL mode Full (strict)). Browsers never see it; Caddy doesn't renew it.
 	tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin-key.pem {
@@ -33,7 +33,7 @@
 	handle @cdn {
 		reverse_proxy app:4747 {
 			# The visitor's address: the CDN sets CF-Connecting-IP (a client can't, through it), and this site alone
-			# forwards it as the one X-Forwarded-For address the app reads (VR_TRUST_PROXY names this proxy). Without it
+			# forwards it as the one X-Forwarded-For address the app reads (LAMPO_TRUST_PROXY names this proxy). Without it
 			# every visitor looks like a handful of CDN addresses, and the sign-in limits lock everyone out.
 			header_up X-Forwarded-For {http.request.header.CF-Connecting-IP}
 			# The live stream (/api/events) and /mcp: every byte at once.
@@ -41,7 +41,7 @@
 			transport http {
 				dial_timeout 5s
 				# No read, write or response timeouts: the live stream and an agent's wait stay open, and uploads take as
-				# long as they take. The app limits bodies itself (VR_UPLOAD_MAX).
+				# long as they take. The app limits bodies itself (LAMPO_UPLOAD_MAX).
 			}
 			# A restart of the app takes seconds: hold GET/HEAD requests that long instead of answering 502.
 			lb_try_duration 15s
@@ -53,7 +53,7 @@
 	}
 }
 
-{$VR_MEDIA_DOMAIN} {
+{$LAMPO_MEDIA_DOMAIN} {
 	# Its own certificate from Let's Encrypt (the name is DNS only, so it points here). The app answers only these paths
 	# on this host and refuses the rest itself; Caddy keeps the rest away too.
 	@media path /media/s/* /media/z/* /media/f/* /api/uploads/direct/* /healthz /readyz

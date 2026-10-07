@@ -1,5 +1,5 @@
 // What an agent reads of a footage answer: a head naming what the request was read as, one line per shot, and how far
-// the index is (`vr footage find`, find_footage). Browser-safe.
+// the index is (`lampo footage find`, find_footage). Browser-safe.
 import { oneLine, timecode } from '../time.ts';
 import { readFilters } from './query.ts';
 import type { FootageAnswer, FootageRead, FootageShot } from './types.ts';

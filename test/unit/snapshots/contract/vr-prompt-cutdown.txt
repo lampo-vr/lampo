@@ -9,5 +9,5 @@ Open (1, 1 must):
    marked: <store>/data/__home__alex__work__demo__export__cutdown.mp4/c_6d58d9_marked.png
    clean:  <store>/data/__home__alex__work__demo__export__cutdown.mp4/c_6d58d9_clean.png
 
-When an item is done (after re-rendering to the same path): vr fix <id> --note "what you changed" (version is picked up automatically).
-Question about a frame: vr add "/home/alex/work/demo/export/cutdown.mp4" --frame <N> --text "…"   ·   Live feedback: vr watch
+When an item is done (after re-rendering to the same path): lampo fix <id> --note "what you changed" (version is picked up automatically).
+Question about a frame: lampo add "/home/alex/work/demo/export/cutdown.mp4" --frame <N> --text "…"   ·   Live feedback: lampo watch

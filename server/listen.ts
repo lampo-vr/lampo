@@ -8,7 +8,7 @@ import type { Express } from 'express';
  * The server's timeouts. Kept-alive connections stay open longer than a proxy keeps its idle upstream ones (Caddy,
  * nginx: ≤ 60 s): if Node closed first, the proxy could send the next request into a closing socket and answer 502.
  * A request's headers come within a minute, its body within Node's own 5 minutes (`request`). A render's body may
- * stream for hours (`upload`, `uploadBody`): a whole render in one PUT to a one-time upload URL (up to VR_UPLOAD_MAX,
+ * stream for hours (`upload`, `uploadBody`): a whole render in one PUT to a one-time upload URL (up to LAMPO_UPLOAD_MAX,
  * 20 GB) or a tus piece on an ordinary uplink, which Node's 5 minutes cut off. Uploads have their own bounds (size, a
  * URL's 15 minutes to start, tus resuming), so the long time only ends a body that never finishes; given to every
  * request, it let a JSON body trickled in byte by byte hold a connection for hours (sweep 2 MH-4).
@@ -81,9 +81,9 @@ export function listen(app: Express, port: number, host: string): Promise<Server
       reject(
         new Error(
           code === 'EADDRINUSE'
-            ? `${where} is already in use (another video-review?). Stop it, or pick a free port with VR_PORT.`
+            ? `${where} is already in use (another Lampo?). Stop it, or pick a free port with LAMPO_PORT.`
             : code === 'EACCES'
-              ? `not allowed to listen on ${where} (ports below 1024 need privileges). Pick another with VR_PORT.`
+              ? `not allowed to listen on ${where} (ports below 1024 need privileges). Pick another with LAMPO_PORT.`
               : `can't listen on ${where}: ${err.message}`,
         ),
       );

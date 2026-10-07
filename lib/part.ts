@@ -2,7 +2,7 @@
 // own cuts); the agent sends that stretch with a few frames either side (its handles) and Lampo splices it into the
 // version it patches for playback (lib/splice.ts). Never the default: without a person's PART RENDER OK an agent
 // renders in full, and a part is never final — the next full render is compared with what was approved.
-// Browser-safe (no Node imports): the server, `vr`, MCP and the UI share these rules.
+// Browser-safe (no Node imports): the server, `lampo`, MCP and the UI share these rules.
 import { oneLine, timecode } from './time.ts';
 import type { Comment, FrameRange, PartOk, PartRequest, Version, VersionPart } from './types.ts';
 
@@ -40,7 +40,7 @@ const shots = (p: PartRequest) => (p.shot ? ` (shot${p.to_shot && p.to_shot > p.
 export const partLine = (p: PartRequest): string => oneLine(`PART RENDER OK: frames ${p.in}–${p.out}${shots(p)}, handles ${p.handles ?? PART_HANDLES}`);
 
 /**
- * The stretch a part render for a note may cover, as `vr push --part-at` checks it (lib/parts.ts allowedParts): the
+ * The stretch a part render for a note may cover, as `lampo push --part-at` checks it (lib/parts.ts allowedParts): the
  * note's PART RENDER OK on the newest version's frames. Null where no person allowed one, or the note won't be fixed.
  */
 export function partOk(versions: readonly Version[], c: Pick<Comment, 'part' | 'status' | 'v'>): PartOk | null {

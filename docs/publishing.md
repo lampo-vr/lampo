@@ -15,21 +15,21 @@ one-day test with a real account before anyone relies on them ([What is not conf
    drafting answers `409` with the reason and the video's next step.
 2. **Draft.** One post per platform per final version (`data/publish/posts.json`, per workspace). People write it in
    the composer (*Publish…* is the next step of a final video, and in the video menu); agents write it with MCP
-   `draft_post` or `vr post draft`. A new final's post starts from the same platform's post of the version before.
+   `draft_post` or `lampo post draft`. A new final's post starts from the same platform's post of the version before.
 3. **Publish.** Only a person with the `publish` action (owners and admins), signed in in the app — never with an API
    token, never an agent. The composer asks once more, naming the platform and the account ("Publish to YouTube as
    Studio Channel?"), and sends that confirmation with the request, with the `digest` of every field that goes out as
    the person saw it: a post that names something else since, or that anyone (an agent too) edited after they looked,
    is refused (`409`), and they look again. Every edit is in the post's history with who made it.
 4. **Out.** The queue sends it (see below); the post says where it stands, and so do the video's stage line, the inbox
-   (a failed post is your turn), `vr post` / MCP `get_posts`, webhooks and push.
+   (a failed post is your turn), `lampo post` / MCP `get_posts`, webhooks and push.
 
 | | Draft and download the kit | Publish, schedule, cancel, retry | Connections (keys, sign-ins) |
 |---|---|---|---|
 | Owner, admin | yes | yes | yes |
 | Member | yes | no | sees them (to pick one), changes none |
 | Reviewer | reads posts | no | no |
-| Agents (MCP, `vr`, any API token) | drafts only (`draft_post`, scope `post:draft`): a failed or cancelled post is a person's to change or delete | never (`PERSON_ONLY`) | never |
+| Agents (MCP, `lampo`, any API token) | drafts only (`draft_post`, scope `post:draft`): a failed or cancelled post is a person's to change or delete | never (`PERSON_ONLY`) | never |
 | A review link | nothing | nothing | nothing |
 
 Retry asks the plan's gate as Publish does. A post that went out before (`remote_id`) is never deleted, by anyone: it
@@ -88,7 +88,7 @@ only a person signed in in the app does.
 
 Hardening, besides the above: a platform's link is kept only when it is https; an upload's progress is saved and told
 every ten seconds at most (to the post's page, not the whole library); every field of a draft is capped the same over
-the HTTP API and MCP (`lib/inputs.ts`), past 256 kB a draft's body is a `413`; names in `vr post` and `get_posts` are
+the HTTP API and MCP (`lib/inputs.ts`), past 256 kB a draft's body is a `413`; names in `lampo post` and `get_posts` are
 one line each.
 
 ### YouTube, with your own Google Cloud OAuth client
@@ -207,10 +207,10 @@ A post keeps its history (who drafted, who published, each try, the platform's a
   posted, scheduled, failed, with the link); the stage itself stays `final`;
 - **in the inbox**: a failed post is the `post` item of whoever may publish, with the reason and Retry; it leaves when
   it goes out, is changed or cancelled;
-- **for agents**, read-only: MCP `get_posts`, `vr post [<video>] [--json]`, and `draft_post`'s answer;
+- **for agents**, read-only: MCP `get_posts`, `lampo post [<video>] [--json]`, and `draft_post`'s answer;
 - **events**: `post` events (drafted, published, scheduled, posted, failed, cancelled) in events.jsonl with
   `post: {id, platform, state, url?, account?, error?}` — webhooks hear them (event `post` or `all`), push tells who may
-  draft when a post went out, is scheduled or failed (category `posts`, on by default). They are not feedback: `vr
+  draft when a post went out, is scheduled or failed (category `posts`, on by default). They are not feedback: `lampo
   watch` and `wait_for_feedback` don't wake for them.
 
 ## Outbound requests
@@ -222,7 +222,7 @@ presigned upload URL); YouTube's upload bytes only ever go to YouTube's upload h
 upload may go to any public https host it names: its storage hosts aren't confirmed yet (below), so they aren't pinned.
 Adding a posting-API key, or changing one, asks the platform at once and counts against the same limit as *Check*
 (30 in ten minutes per workspace). What a platform says about its accounts is kept one line per field, 120 characters
-each, 100 accounts per connection. `VR_PUBLISH_ENDPOINTS` (JSON)
+each, 100 accounts per connection. `LAMPO_PUBLISH_ENDPOINTS` (JSON)
 points the adapters elsewhere — the tests' fake platforms, a staging proxy — and the hosts it names may be private and
 plain http. Leave it unset in production.
 

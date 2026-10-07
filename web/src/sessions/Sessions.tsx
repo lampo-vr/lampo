@@ -2,7 +2,7 @@
 // anything) are in pick.ts.
 
 import { type ComponentPropsWithRef, type ReactElement, useEffect, useState } from 'react';
-import { agentKindOfRef } from '../../../lib/agentKind.ts';
+import { agentKindOfRef, agentShown } from '../../../lib/agentKind.ts';
 import { useInfo, useSessions } from '../api/queries.ts';
 import type { Session, SessionPick, SessionRef } from '../api/types.ts';
 import { t } from '../i18n/index.ts';
@@ -46,7 +46,7 @@ interface SessionListProps {
 
 // selected: a session from the list, or null ("no session")
 export function SessionList({ sessions, selected, onSelect, home, refreshing, onRefresh, current }: SessionListProps) {
-  // A hosted server lists the agents that connected with `vr watch`; it cannot see sessions on people's machines.
+  // A hosted server lists the agents that connected with `lampo watch`; it cannot see sessions on people's machines.
   const agents = useInfo()?.features.sessions === 'agents';
   if (!sessions)
     return (
@@ -70,7 +70,7 @@ export function SessionList({ sessions, selected, onSelect, home, refreshing, on
               <span className="session-title">
                 <AgentMark kind={s.agent ?? 'claude-code'} size={14} />
                 <span className="session-name ellipsis" title={s.name}>
-                  {s.name}
+                  {agentShown(s.name, s.agent)}
                 </span>
                 {top === s && <span className="badge claude">{t('SUGGESTED')}</span>}
                 {current && s === rows[0] && <span className="badge">{t('CURRENT')}</span>}
@@ -188,7 +188,7 @@ function SessionDetails({ session, active, listening, videos }: { session: Sessi
       <div className="hc-head">
         <KeyGlyph shape={active ? 'ease' : 'outline'} className={`nav-kg ${active ? 'live' : ''}`} />
         <AgentMark kind={agentKindOfRef(session)} size={14} />
-        <b className="ellipsis">{session.name}</b>
+        <b className="ellipsis">{agentShown(session.name, agentKindOfRef(session))}</b>
       </div>
       <dl className="hc-rows">
         <dt>{t('Status')}</dt>
@@ -231,7 +231,7 @@ export function SessionChip({ session, active, listening, ...rest }: ChipProps) 
       >
         <KeyGlyph shape={active ? 'ease' : 'outline'} className={`nav-kg ${active ? 'live' : ''}`} />
         <AgentMark kind={agentKindOfRef(session)} size={13} />
-        <span className="ellipsis">{session.name}</span>
+        <span className="ellipsis">{agentShown(session.name, agentKindOfRef(session))}</span>
       </button>
     </SessionHover>
   );

@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { build } from 'vite';
+import { settings } from '../../lib/env.ts';
 import { age, makeVideo, ROOT } from '../lib/helpers.ts';
 import { launch, requireChrome } from './lib/browser.mjs';
 import { assert, check, crashed, finish } from './lib/checks.mjs';
@@ -93,7 +94,7 @@ try {
       ]);
     const light = await look();
     assert(light.join() === 'light,rgb(242, 239, 231),rgb(0, 0, 0),rgb(143, 139, 131)', light.join(' | '));
-    if (process.env.VR_SHOTS) await page.screenshot({ path: path.join(process.env.VR_SHOTS, 'mcp-app-card-light.png'), fullPage: true });
+    if (settings.LAMPO_SHOTS) await page.screenshot({ path: path.join(settings.LAMPO_SHOTS, 'mcp-app-card-light.png'), fullPage: true });
     await page.evaluate(() => window.hostTheme('dark'));
     await card.waitForFunction(() => document.documentElement.dataset.theme === 'dark', { timeout: 5000 });
     const dark = await look();
@@ -132,7 +133,7 @@ try {
     assert(url.startsWith(`${BASE}/#/v/`) && /[?&]f=\d+/.test(url), url);
   });
 
-  if (process.env.VR_SHOTS) await page.screenshot({ path: path.join(process.env.VR_SHOTS, 'mcp-app-card.png'), fullPage: true });
+  if (settings.LAMPO_SHOTS) await page.screenshot({ path: path.join(settings.LAMPO_SHOTS, 'mcp-app-card.png'), fullPage: true });
 } catch (e) {
   crashed(e, srv);
 } finally {

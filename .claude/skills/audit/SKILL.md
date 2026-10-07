@@ -29,9 +29,9 @@ already decided.
 
 ## 2. Rules
 
-- Do your repros on **throwaway stores** only: `VR_DATA=<tmp>/data VR_CACHE=<tmp>/cache VR_STT=off`, on a free
+- Do your repros on **throwaway stores** only: `LAMPO_DATA=<tmp>/data LAMPO_CACHE=<tmp>/cache LAMPO_STT=off`, on a free
   port. A `data/` folder next to the app is a live store; never send requests to a running app you didn't start.
-- **Hosted mode:** `VR_MODE=server VR_PUBLIC_URL=http://127.0.0.1:<port> VR_ALLOW_HTTP=1`. It is often faster to load
+- **Hosted mode:** `LAMPO_MODE=server LAMPO_PUBLIC_URL=http://127.0.0.1:<port> LAMPO_ALLOW_HTTP=1`. It is often faster to load
   the app in-process the way `test/unit/*` do (`isolatedEnv` in `test/lib/helpers.ts`).
 - Never run the real `claude` CLI; use a stand-in, the way `test/e2e/lib/server.mjs` does. Make no requests to
   outside services: mail stays on the log transport, and webhook/SSRF tests target listeners you start yourself.

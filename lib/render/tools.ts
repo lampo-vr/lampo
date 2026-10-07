@@ -1,4 +1,4 @@
-// What `vr render` knows about render tools: which one a command runs (by argv[0] / argv[1]) and how each says how far
+// What `lampo render` knows about render tools: which one a command runs (by argv[0] / argv[1]) and how each says how far
 // it is. Pure and browser-safe: lib/render/run.ts feeds it the tool's output as it comes, the tests feed it recorded
 // lines. Checked against the tools' own sources (2026-10-07):
 // - Remotion's CLI (packages/cli/src/progress-bar.ts, render-flows/render.ts): with stdout not a TTY it prints one line
@@ -114,7 +114,7 @@ export interface FfmpegPlan {
   start?: number;
   /** -r after the last input: the output's frames per second. */
   fps?: number;
-  /** The command names its own -progress: vr render can't read it, and leaves it alone. */
+  /** The command names its own -progress: lampo render can't read it, and leaves it alone. */
   ownProgress: boolean;
 }
 

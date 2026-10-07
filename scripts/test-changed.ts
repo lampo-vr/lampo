@@ -4,6 +4,7 @@
 // what isn't committed yet counts too.
 //   node scripts/test-changed.ts [base] [--list] [--test-… options for node --test]
 import { spawnSync } from 'node:child_process';
+import { settings } from '../lib/env.ts';
 import { baseRef, changedFiles, ROOT, unitTestsFor } from '../test/lib/affected.ts';
 
 const args = process.argv.slice(2);
@@ -21,7 +22,7 @@ if (args.includes('--list')) {
   process.exit(0);
 }
 if (!picked.files.length) process.exit(0);
-// VR_TEST_JOBS: test files at a time, as for `npm test` (node --test's own default is one fewer than the CPUs)
-const jobs = process.env.VR_TEST_JOBS ? [`--test-concurrency=${process.env.VR_TEST_JOBS}`] : [];
+// LAMPO_TEST_JOBS: test files at a time, as for `npm test` (node --test's own default is one fewer than the CPUs)
+const jobs = settings.LAMPO_TEST_JOBS ? [`--test-concurrency=${settings.LAMPO_TEST_JOBS}`] : [];
 const r = spawnSync(process.execPath, ['--test', ...jobs, ...args.filter((a) => a.startsWith('--test')), ...picked.files], { cwd: ROOT, stdio: 'inherit' });
 process.exit(r.status ?? 1);

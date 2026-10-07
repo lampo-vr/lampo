@@ -1,8 +1,9 @@
 // Which engines read and spell-check burned-in text for the pre-review:
-//   OCR       macOS Vision (tools/ocr.swift) on a Mac with Xcode tools, else tesseract (deu + eng) — VR_OCR overrides
+//   OCR       macOS Vision (tools/ocr.swift) on a Mac with Xcode tools, else tesseract (deu + eng) — LAMPO_OCR overrides
 //   spelling  NSSpellChecker on macOS, else hunspell with the de_DE / en_US dictionaries
 // A missing engine only skips the text checks; picture and audio checks always run.
 import { execFileSync } from 'node:child_process';
+import { settings } from '../env.ts';
 import { dictionaryShares, hunspellDictionaries, hunspellSpell } from './hunspell.ts';
 import { tesseractLanguages, tesseractOcr } from './tesseract.ts';
 import type { Detect, Ocr, Spell } from './types.ts';
@@ -33,14 +34,14 @@ const hasXcrun = () => {
 
 let cached: Promise<TextTools> | null = null;
 
-/** VR_OCR=auto|vision|tesseract|off. Resolved once per process. */
-export function textTools(choice = process.env.VR_OCR || 'auto'): Promise<TextTools> {
+/** LAMPO_OCR=auto|vision|tesseract|off. Resolved once per process. */
+export function textTools(choice = settings.LAMPO_OCR || 'auto'): Promise<TextTools> {
   if (!cached) cached = pick(choice);
   return cached;
 }
 
 async function pick(choice: string): Promise<TextTools> {
-  if (choice === 'off') return { ocr: null, spell: null, detect: null, engine: null, notes: ['text checks off (VR_OCR=off)'] };
+  if (choice === 'off') return { ocr: null, spell: null, detect: null, engine: null, notes: ['text checks off (LAMPO_OCR=off)'] };
   const notes: string[] = [];
   let ocr: Ocr | null = null;
   let engine: string | null = null;

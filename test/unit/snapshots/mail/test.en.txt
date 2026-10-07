@@ -4,7 +4,7 @@ Email works
 
 This test from review.example.com arrived, so invites, sign-up confirmations and password resets will reach people.
 
-Sent with vr admin mail-test on 2 October 2026, 09:30 UTC.
+Sent with lampo admin mail-test on 2 October 2026, 09:30 UTC.
 
 --
 You get this because someone sent a test from review.example.com.

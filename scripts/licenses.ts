@@ -172,9 +172,9 @@ export function renderNotices(o: {
   elsewhere?: { name: string; version: string; license: string }[];
 }): string {
   const parts = [
-    `Third-party software in video-review ${o.version}`,
+    `Third-party software in Lampo ${o.version}`,
     '',
-    'video-review is licensed under the GNU Affero General Public License v3.0 only (see LICENSE). It includes and',
+    'Lampo is licensed under the GNU Affero General Public License v3.0 only (see LICENSE). It includes and',
     'depends on the software below, each under its own licence. This file is generated at build time by',
     'scripts/licenses.ts. Speech models and system packages (ffmpeg, Tesseract, Hunspell) are listed in NOTICE.md.',
     '',

@@ -155,7 +155,7 @@ export function createAccountMail(cfg: Config, mailer: Mailer): AccountMail {
       // named it: a sign-up's workspace starts out called after its owner, a person's name, not a team's (the inviter is
       // named anyway).
       const ws = listWorkspaces().length > 1 && workspaceNamed(id) ? getWorkspace(id)?.name : undefined;
-      // The server's team name (VR_ORG_NAME) is workspace #1's: an invite into another workspace doesn't carry it.
+      // The server's team name (LAMPO_ORG_NAME) is workspace #1's: an invite into another workspace doesn't carry it.
       const from = id === DEFAULT_WORKSPACE ? site : { ...site, org: null };
       return send(
         invite.email,

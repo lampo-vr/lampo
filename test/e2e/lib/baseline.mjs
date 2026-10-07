@@ -6,6 +6,7 @@
 // then reported as skipped (a warning on the run, never a pass) and the screenshot is still kept for upload.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { settings } from '../../../lib/env.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 export const BASELINE_DIR = path.join(ROOT, 'test/e2e/baseline');
@@ -19,7 +20,7 @@ export const onCI = (env = process.env) => !!env.CI && env.CI !== 'false' && env
  * the first run on this machine), or, on CI without a baseline for this platform, `missing`: fail and keep the
  * screenshot for upload — or `skip` it (kept for upload too) when the workflow set VR_BASELINE_MISSING=skip.
  */
-export function baselinePlan({ exists, update = false, ci = onCI(), missing = process.env.VR_BASELINE_MISSING }) {
+export function baselinePlan({ exists, update = false, ci = onCI(), missing = settings.LAMPO_BASELINE_MISSING }) {
   if (update) return 'record';
   if (exists) return 'compare';
   if (!ci) return 'record';

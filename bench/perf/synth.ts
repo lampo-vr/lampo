@@ -1,13 +1,14 @@
 // A synthetic store for performance work: N videos (hard links of one small generated clip, so nothing is big on
 // disk) in 20 project folders, M notes spread over them with statuses, replies, ranges and drawings, and the events
-// a real store would have logged for them. Never point it at a real store: it refuses a VR_DATA that exists.
+// a real store would have logged for them. Never point it at a real store: it refuses a LAMPO_DATA that exists.
 //
 //   node bench/perf/synth.ts <dir> [videos=1000] [notes=20000]
 //
-// Writes <dir>/data, <dir>/cache, <dir>/config.json; start a server on it with VR_DATA/VR_CACHE/VR_CONFIG set there.
+// Writes <dir>/data, <dir>/cache, <dir>/config.json; start a server on it with LAMPO_DATA/LAMPO_CACHE/LAMPO_CONFIG set there.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { settings } from '../../lib/env.ts';
 
 const [dirArg, videosArg = '1000', notesArg = '20000'] = process.argv.slice(2);
 if (!dirArg) {
@@ -23,8 +24,8 @@ if (fs.existsSync(DATA)) {
   process.exit(1);
 }
 fs.mkdirSync(dir, { recursive: true });
-Object.assign(process.env, { VR_DATA: DATA, VR_CACHE: path.join(dir, 'cache'), VR_CONFIG: path.join(dir, 'config.json'), VR_STT: 'off' });
-fs.writeFileSync(process.env.VR_CONFIG as string, JSON.stringify({ browse_root: dir }));
+Object.assign(process.env, { LAMPO_DATA: DATA, LAMPO_CACHE: path.join(dir, 'cache'), LAMPO_CONFIG: path.join(dir, 'config.json'), LAMPO_STT: 'off' });
+fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ browse_root: dir }));
 
 const { slugify, isoLocal, reviewDir, reviewFile } = await import('../../lib/paths.ts');
 const store = await import('../../lib/store.ts');
@@ -35,7 +36,7 @@ type Comment = import('../../lib/types.ts').Comment;
 // One 4 s clip, aged so the store doesn't take it for a render in progress.
 const base = path.join(dir, 'src', 'base.mp4');
 fs.mkdirSync(path.dirname(base), { recursive: true });
-execFileSync(process.env.VR_FFMPEG || 'ffmpeg', [
+execFileSync(settings.LAMPO_FFMPEG || 'ffmpeg', [
   ...['-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=320x180:rate=25:duration=4', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=4'],
   ...['-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-g', '25', '-c:a', 'aac', '-shortest', '-y', base],
 ]);

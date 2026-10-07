@@ -238,7 +238,7 @@ export interface UploadTickets {
   get(raw: string): Ticket | null;
 }
 
-/** `origin`: where one-time URLs point whatever base a caller names (the app's own media host, VR_MEDIA_ORIGIN). */
+/** `origin`: where one-time URLs point whatever base a caller names (the app's own media host, LAMPO_MEDIA_ORIGIN). */
 export function createUploadTickets({ origin = null }: { origin?: string | null } = {}): UploadTickets {
   const tickets = new Map<string, Ticket>();
   const hashOf = (t: string) => crypto.createHash('sha256').update(t).digest('hex');

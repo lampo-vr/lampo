@@ -43,7 +43,7 @@ const VerifyScreen = accountScreen((m) => m.VerifyScreen);
 const PrintView = lazy(() => import('./share/PrintView.tsx'));
 const Settings = lazy(() => import('./settings/Settings.tsx'));
 const uploadTrayCode = loader(() => import('./uploads/UploadTray.tsx'));
-// Dev and test builds only: a production build (VR_STYLEGUIDE=0) drops the chunk altogether.
+// Dev and test builds only: a production build (LAMPO_STYLEGUIDE=0) drops the chunk altogether.
 const Styleguide = __STYLEGUIDE__ ? lazy(() => import('./styleguide/Styleguide.tsx')) : null;
 
 /** The code of the screen this start opens, asked for before the first render (boot.tsx) while the kept data loads;

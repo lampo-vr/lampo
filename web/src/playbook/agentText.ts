@@ -1,5 +1,5 @@
 // What agents read, beside the playbook as it is written: the merged markdown the server hands out (get_playbook,
-// `vr playbook`, lib/playbooks.ts agentMarkdown), with what is being typed put where saving it would put it — so the
+// `lampo playbook`, lib/playbooks.ts agentMarkdown), with what is being typed put where saving it would put it — so the
 // pane shows what an agent will read once you save, before you do. And each line said whose it is: this playbook's
 // own parts lit, what it inherits quieter. Pure text work, no DOM; test/unit/playbook-agent-text.test.ts holds the
 // result to the server's own text after a real save, so the two can't drift apart.
@@ -39,7 +39,7 @@ const heading = (label: string, rev: number) => `### From ${label} (revision ${r
 // agentMarkdown's fixed sentences, for a playbook that had nothing before the draft (the test compares them with it)
 const INTRO = 'What the team decided before anyone watched your render. Read it before you render, follow it, and cite it when a note seems to contradict it.';
 const CHANGING =
-  'You can suggest a change (propose_playbook_change / `vr playbook propose`) with the reason and the notes behind it; a person accepts or rejects it. Never edit around a rule silently.';
+  'You can suggest a change (propose_playbook_change / `lampo playbook propose`) with the reason and the notes behind it; a person accepts or rejects it. Never edit around a rule silently.';
 const layersLine = (list: string[]) => `Layers, deepest first: ${list.join(' · ')}. Where two layers disagree, the deeper one (listed first) wins.`;
 
 /** Where a section's lines are: from its `## ` heading to the next one (or the end), or null. */
@@ -107,7 +107,7 @@ export function withDrafts(markdown: string, own: Own, drafts: Draft[]): string 
     const others = list.filter((x) => x !== mine);
     const updated = stays ? [`${label} r${next}`, ...others] : others;
     if (!updated.length)
-      return `# Playbook: ${label}\n\nNo playbook applies to ${own.scope ? `"${own.scope}"` : 'the House'} yet. Follow the notes and the taste file.\n\nKnow a rule the team keeps asking for? Suggest it with propose_playbook_change (MCP) or \`vr playbook propose\`; a person decides.\n`;
+      return `# Playbook: ${label}\n\nNo playbook applies to ${own.scope ? `"${own.scope}"` : 'the House'} yet. Follow the notes and the taste file.\n\nKnow a rule the team keeps asking for? Suggest it with propose_playbook_change (MCP) or \`lampo playbook propose\`; a person decides.\n`;
     if (li >= 0) lines[li] = layersLine(updated);
   }
   for (const d of drafts) lines = place(lines, d, label, next);

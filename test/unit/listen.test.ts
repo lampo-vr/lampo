@@ -13,7 +13,7 @@ test('a taken port is an error that names the port and the fix; a free one serve
   try {
     await assert.rejects(listen(express(), port, '127.0.0.1'), (e: Error) => {
       assert.match(e.message, new RegExp(`127\\.0\\.0\\.1:${port} is already in use`));
-      assert.match(e.message, /VR_PORT/);
+      assert.match(e.message, /LAMPO_PORT/);
       return true;
     });
   } finally {

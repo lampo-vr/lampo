@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 // The app's own footage search (lib/footage/) on the bench's test set: every clip tracked as a video in a throwaway
 // store, indexed by the app's indexer with the real model, the 45 requests (and the German ones) asked through the same
-// find() that `vr footage find` and find_footage use, scored as eval.ts scores the prototype. What it should reproduce:
+// find() that `lampo footage find` and find_footage use, scored as eval.ts scores the prototype. What it should reproduce:
 // RESULTS.md, SigLIP B/16 int8 pad with the description alone (93 / 100 / 0.96 with tesseract; 93 / 100 / 0.96 with
 // Vision for the template variant).
 //   node bench/footage/app-eval.ts [--store dir] [--json out.json] [--fresh] [--ocr tesseract]
-// Needs make.ts's clips (VR_FOOTAGE_CACHE) and downloads the model on first use (VR_FOOTAGE_MODELS moves it).
+// Needs make.ts's clips (LAMPO_FOOTAGE_CACHE) and downloads the model on first use (LAMPO_FOOTAGE_MODELS moves it).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { settings } from '../../lib/env.ts';
 import { BENCH, CLIPS_DIR, readJson, writeJson } from './common.ts';
 import type { Source, TruthClip, TruthShot } from './make.ts';
 
@@ -19,16 +20,20 @@ const arg = (name: string, dflt: string) => {
 const STORE = path.resolve(arg('store', path.join(os.tmpdir(), 'vr-footage-app-eval')));
 if (process.argv.includes('--fresh')) fs.rmSync(STORE, { recursive: true, force: true });
 // Lampo's modules against a throwaway store, never a live one
-process.env.VR_DATA = path.join(STORE, 'data');
-process.env.VR_CACHE = path.join(STORE, 'cache');
-process.env.VR_CONFIG = path.join(STORE, 'config.json');
-process.env.VR_STT = 'off';
+const CONFIG = path.join(STORE, 'config.json');
+process.env.LAMPO_DATA = path.join(STORE, 'data');
+process.env.LAMPO_CACHE = path.join(STORE, 'cache');
+process.env.LAMPO_CONFIG = CONFIG;
+process.env.LAMPO_STT = 'off';
 // --ocr tesseract: what a Linux server reads text with (default: Vision on a Mac, tesseract elsewhere)
-if (arg('ocr', '')) process.env.VR_OCR = arg('ocr', '');
-process.env.VR_FOOTAGE ??= 'auto';
-for (const k of ['VR_SERVER', 'VR_TOKEN', 'VR_MODE', 'VR_FOOTAGE_MODEL']) delete process.env[k];
+if (arg('ocr', '')) process.env.LAMPO_OCR = arg('ocr', '');
+process.env.LAMPO_FOOTAGE = settings.LAMPO_FOOTAGE || 'auto';
+for (const k of ['SERVER', 'TOKEN', 'MODE', 'FOOTAGE_MODEL']) {
+  delete process.env[`VR_${k}`];
+  delete process.env[`LAMPO_${k}`];
+}
 fs.mkdirSync(STORE, { recursive: true });
-if (!fs.existsSync(process.env.VR_CONFIG)) fs.writeFileSync(process.env.VR_CONFIG, '{}');
+if (!fs.existsSync(CONFIG)) fs.writeFileSync(CONFIG, '{}');
 
 const store = await import('../../lib/store.ts');
 const { slugify } = await import('../../lib/paths.ts');
@@ -126,7 +131,7 @@ const dirBytes = (d: string): number => {
   for (const x of fs.readdirSync(d, { withFileTypes: true })) s += x.isDirectory() ? dirBytes(path.join(d, x.name)) : fs.statSync(path.join(d, x.name)).size;
   return s;
 };
-const footageDir = path.join(process.env.VR_CACHE as string, 'footage');
+const footageDir = path.join(STORE, 'cache', 'footage');
 const index = {
   videos: list.length,
   indexed_now: n,

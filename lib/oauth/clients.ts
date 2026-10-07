@@ -26,7 +26,7 @@ export type AuthMethod = 'none' | 'client_secret_post' | 'client_secret_basic';
 /** A client as the authorization endpoint and the consent screen see it. */
 export interface ClientInfo {
   client_id: string;
-  /** cimd: a metadata document; dcr: a registration; vr: `vr login`, Lampo's own command line (VR_CLIENT). */
+  /** cimd: a metadata document; dcr: a registration; vr: `lampo login`, Lampo's own command line (VR_CLIENT). */
   kind: 'cimd' | 'dcr' | 'vr';
   name: string;
   /** The host that vouches for the client: the metadata document's host (CIMD), or the self-declared client_uri (DCR). */
@@ -101,19 +101,19 @@ export const isLoopbackRedirect = (uri: string): boolean => {
   }
 };
 
-// ---------------------------------------------------------------- vr login
+// ---------------------------------------------------------------- lampo login
 
 /**
- * `vr login <url>` in the browser (lib/browserLogin.ts): Lampo's own command line, not a registration — registrations
+ * `lampo login <url>` in the browser (lib/browserLogin.ts): Lampo's own command line, not a registration — registrations
  * are `vrc_…` and metadata documents https URLs, so nobody can take this id. Its answer goes only to a loopback address
  * of the computer the browser runs on (RFC 8252 §7.3: 127.0.0.1 or [::1], any port, the path `/`, nothing else), and its
  * code is redeemed for an API token at POST /api/auth/token (lib/oauth/store.ts redeemVrCode), never at /oauth/token.
  */
 export const VR_CLIENT_ID = 'vr';
 const VR_REDIRECTS = ['http://127.0.0.1/', 'http://[::1]/'];
-export const VR_CLIENT: ClientInfo = { client_id: VR_CLIENT_ID, kind: 'vr', name: 'vr', host: null, redirect_uris: VR_REDIRECTS, auth: 'none' };
+export const VR_CLIENT: ClientInfo = { client_id: VR_CLIENT_ID, kind: 'vr', name: 'lampo', host: null, redirect_uris: VR_REDIRECTS, auth: 'none' };
 
-/** Where `vr login`'s answer may go: http://127.0.0.1:<port>/ or http://[::1]:<port>/, as written — never `localhost`. */
+/** Where `lampo login`'s answer may go: http://127.0.0.1:<port>/ or http://[::1]:<port>/, as written — never `localhost`. */
 export function isVrRedirect(uri: string): boolean {
   try {
     checkRedirectUri(uri);
@@ -125,10 +125,10 @@ export function isVrRedirect(uri: string): boolean {
   }
 }
 
-/** The name of the API token `vr login` makes, from the browser or with a password: the same for both. */
-export const vrTokenName = (machine: string): string => `vr on ${machine}`;
+/** The name of the API token `lampo login` makes, from the browser or with a password: the same for both. */
+export const vrTokenName = (machine: string): string => `lampo on ${machine}`;
 
-/** The computer's name as `vr login` says it (anyone can start one): one line, no control or direction characters. */
+/** The computer's name as `lampo login` says it (anyone can start one): one line, no control or direction characters. */
 export const vrMachine = (raw: unknown): string => cutChars(cleanName(raw), 64).trim();
 
 const cleanName = (name: unknown): string =>
@@ -244,7 +244,7 @@ function getDocument(u: URL): Promise<{ status: number; body: string; cacheContr
           port: u.port || 443,
           path: `${u.pathname}${u.search}`,
           method: 'GET',
-          headers: { Host: u.host, Accept: 'application/json', 'User-Agent': 'video-review (oauth client metadata)' },
+          headers: { Host: u.host, Accept: 'application/json', 'User-Agent': 'lampo (oauth client metadata)' },
           ca: cimd.ca,
           timeout: timeoutMs,
           // The address is already chosen; never let the agent resolve again.

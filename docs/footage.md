@@ -6,7 +6,7 @@ add and answers a request in words with a short list of shots, each with its exa
 one labelled contact sheet of them: a few hundred tokens.
 
 ```sh
-vr footage find "product close-up on white, slow push-in, ≥ 2 s, 9:16, no text"
+lampo footage find "product close-up on white, slow push-in, ≥ 2 s, 9:16, no text"
 ```
 
 ```
@@ -36,7 +36,7 @@ For each video, once per render (two videos holding the same file share it):
 - **Keyframes**: one per 2.5 s of a shot (one for a short shot, at most six), away from its cuts, each kept as a
   360 px thumbnail for contact sheets; at most 60 a minute of video (past that, one a shot).
 - **Text in the picture**: OCR of every keyframe (macOS Vision on a Mac, tesseract elsewhere).
-- **What is said**: from the video's transcript when it has one (the player's Transcript tab, `vr transcript`). Footage
+- **What is said**: from the video's transcript when it has one (the player's Transcript tab, `lampo transcript`). Footage
   search makes none of its own: a transcript costs far more than the rest.
 - **One image embedding per keyframe**: the whole frame letterboxed to a square, by SigLIP B/16 (below).
 
@@ -50,27 +50,27 @@ model: asked the raw request, the same model finds a right shot first 76 % of th
 
 | | default | turned on or off by |
 |---|---|---|
-| A person's own machine | on | `vr footage on` / `off` |
-| A hosted server | off, per workspace | its owners and admins: `vr footage on`, `PUT /api/footage/settings` |
-| Anywhere | `footage: "off"` in config.json, or `VR_FOOTAGE=off`: nothing is indexed, nothing downloaded | the operator |
+| A person's own machine | on | `lampo footage on` / `off` |
+| A hosted server | off, per workspace | its owners and admins: `lampo footage on`, `PUT /api/footage/settings` |
+| Anywhere | `footage: "off"` in config.json, or `LAMPO_FOOTAGE=off`: nothing is indexed, nothing downloaded | the operator |
 
 The index is built in the background by the app's one job queue, after everything a review needs (`PRIORITY.footage`,
 after sprites): a video's work is cut into jobs of a minute of video or 48 keyframes within a minute of each other,
 so a long take never holds a player's scrub copy back. Turned on, every video is queued; a new version is indexed
-when it arrives and the old one's shots leave the index. `vr footage status` says how far it is.
+when it arrives and the old one's shots leave the index. `lampo footage status` says how far it is.
 
-On a machine without the app running, `vr footage index` indexes in its own process (the model's worker included) and
-`vr footage find` reads what is there.
+On a machine without the app running, `lampo footage index` indexes in its own process (the model's worker included) and
+`lampo footage find` reads what is there.
 
 **The model** is [SigLIP B/16-224](https://huggingface.co/Xenova/siglip-base-patch16-224), int8 (Google, Apache-2.0):
-213 MB, downloaded once on first use into `<cache>/models/siglip-base-patch16-224/` (`VR_FOOTAGE_MODELS` moves it),
+213 MB, downloaded once on first use into `<cache>/models/siglip-base-patch16-224/` (`LAMPO_FOOTAGE_MODELS` moves it),
 from one pinned revision, every file checked by size and SHA-256 before it is used: the model never comes at install
 time. On Linux x64, onnxruntime-node's own install fetches about 500 MB of CUDA libraries the model doesn't use, unless
 `ONNXRUNTIME_NODE_INSTALL=skip` is set (the Docker image and CI set it; an npm setting for it would make npm warn on
 every command). It runs in a process of its own through ONNX Runtime (`onnxruntime-node`, an optional dependency: without it,
 footage search answers by filters and words only), one picture at a time with half the cores (at most four;
-`VR_FOOTAGE_THREADS`), and stops after ten idle minutes (`VR_FOOTAGE_IDLE_MINUTES`). A copy of the files put in that
-folder by hand is checked and used. On a Mac footage is decoded with VideoToolbox (`VR_FOOTAGE_HWACCEL=off` decodes
+`LAMPO_FOOTAGE_THREADS`), and stops after ten idle minutes (`LAMPO_FOOTAGE_IDLE_MINUTES`). A copy of the files put in that
+folder by hand is checked and used. On a Mac footage is decoded with VideoToolbox (`LAMPO_FOOTAGE_HWACCEL=off` decodes
 it in software). Every setting: [configuration.md](configuration.md#footage-search).
 
 **Vectors belong to a CPU family**: ONNX Runtime's int8 kernels differ between ARM and x86 (cosine 0.98–0.99), so every
@@ -89,9 +89,9 @@ keyframes) on an M1 Max (`bench/footage/app-eval.ts`; CPU of the whole process t
 | a search | tens of milliseconds on a quiet machine (the text embedding, a scan over every keyframe in JS, the ranking) |
 | memory | the model's worker ≈ 0.5 GB while it runs; it stops after ten idle minutes |
 
-## The answer: `vr footage find --json`
+## The answer: `lampo footage find --json`
 
-The same JSON from `vr footage find --json` (on the machine or logged in to a server) and `GET /api/footage/find`.
+The same JSON from `lampo footage find --json` (on the machine or logged in to a server) and `GET /api/footage/find`.
 New fields may be added; none is renamed (`footage_version`).
 
 ```json
@@ -117,7 +117,7 @@ New fields may be added; none is renamed (`footage_version`).
 |---|---|
 | `read` | what the request was read as: `show` (the description compared with the pictures), `aspect`, `min_s`, `max_s`, `motion` (the moves that count), `speed`, `no_text`, `words` and `words_in` (`text`, `said` or `any`) |
 | `shots[].id` | `s` + a number: stable while the video's version stays the same; each index numbers from a random start, so an old id (or another workspace's) names no shot rather than a wrong one |
-| `video`, `v` | the video's slug (what `vr open`, `get_frame` and the API take) and its version (always the newest) |
+| `video`, `v` | the video's slug (what `lampo open`, `get_frame` and the API take) and its version (always the newest) |
 | `in`, `out` | the shot's first and last frame, **both included** (Lampo's frame ranges); frame N is ffmpeg's `select=eq(n,N)` |
 | `t0`, `t1` | the same in seconds: `in / fps` and `(out + 1) / fps`, where the last frame ends: cut `[t0, t1)` |
 | `length_s` | `t1 − t0`, rounded to tenths |
@@ -126,24 +126,24 @@ New fields may be added; none is renamed (`footage_version`).
 | `text`, `said` | text read in the picture, words said during the shot (`""` when none) |
 | `score` | higher is better; comparable within one answer only |
 | `matched` | where the request's words were found (`text`, `said`), when they were |
-| `file` | the render's file on this machine: **only for the machine itself** (`vr` on it, its own agent over stdio or loopback). Over the network (a token, the LAN link, `vr` logged in to a server, `/mcp`) it is left out; fetch by `video` and `v` instead |
+| `file` | the render's file on this machine: **only for the machine itself** (`lampo` on it, its own agent over stdio or loopback). Over the network (a token, the LAN link, `lampo` logged in to a server, `/mcp`) it is left out; fetch by `video` and `v` instead |
 | `index` | how far the workspace's index is; `note` says why it is off, or that an answer used filters and words only (the model still downloading, or no picture indexed yet) |
 | `sheet` | with `--sheet`: the contact sheet, a JPEG on this machine |
 
-`vr footage find` without `--json` prints the compact list above: a head naming what was read, one line per shot
+`lampo footage find` without `--json` prints the compact list above: a head naming what was read, one line per shot
 (`id folder/name [Vn] in–out length aspect move [speed] [text "…"] [said "…"] · score`), and a last line in brackets
 when the index isn't complete.
 
 ## Commands, tool, routes
 
 ```sh
-vr footage find "<request>" [--aspect 9:16] [--min 2] [--max 8] [--motion push-in]
+lampo footage find "<request>" [--aspect 9:16] [--min 2] [--max 8] [--motion push-in]
                             [--no-text | --text "SALE"] [--said "…"] [--limit 6]
                             [--sheet [out.jpg]] [--json]
-vr footage sheet <id…> [--out sheet.jpg]   # one labelled contact sheet (at most 9 shots)
-vr footage status [--json]                 # videos indexed, waiting, failed; the model
-vr footage on | off                        # the workspace's switch
-vr footage index [<video>…]                # on the machine: index now, in this process
+lampo footage sheet <id…> [--out sheet.jpg]   # one labelled contact sheet (at most 9 shots)
+lampo footage status [--json]                 # videos indexed, waiting, failed; the model
+lampo footage on | off                        # the workspace's switch
+lampo footage index [<video>…]                # on the machine: index now, in this process
 ```
 
 Flags win over the words. `--motion` takes `static`, `push-in`, `pull-out`, `pan`, `pan-left`, `pan-right`, `tilt`,
@@ -166,7 +166,7 @@ in the full tool list (325 tokens on every turn), not in the lean set. An agent 
 
 Each workspace's index is a file in its own cache (`footage/index.db`, node:sqlite, vectors as BLOBs scanned in JS;
 thumbnails beside it): a workspace can only ever open its own, deleting the workspace deletes it, and clearing the
-cache only costs indexing again. A shot id names a shot of the caller's workspace or nothing. The routes, `vr` and the
+cache only costs indexing again. A shot id names a shot of the caller's workspace or nothing. The routes, `lampo` and the
 MCP tool all search the workspace the caller is in (`test/unit/footage-api.test.ts`,
 `test/unit/workspace-isolation.test.ts`).
 

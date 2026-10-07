@@ -96,7 +96,7 @@ const PART = 64 * 1024 * 1024;
 /** Files above `partSize` (64 MB; S3's minimum part is 5 MB) go up as multipart uploads. */
 export function createS3Store(cfg: S3Config | undefined, { partSize = PART } = {}): RemoteStore {
   if (!cfg?.endpoint || !cfg.bucket || !cfg.access_key_id || !cfg.secret_access_key)
-    throw new Error('storage "s3" needs s3.endpoint, s3.bucket, s3.access_key_id and s3.secret_access_key (VR_S3_*)');
+    throw new Error('storage "s3" needs s3.endpoint, s3.bucket, s3.access_key_id and s3.secret_access_key (LAMPO_S3_*)');
   const creds: Credentials = { accessKeyId: cfg.access_key_id, secretAccessKey: cfg.secret_access_key, region: cfg.region || 'auto' };
   const base = `${cfg.endpoint.replace(/\/+$/, '')}/${enc(cfg.bucket)}`;
   const prefix = (cfg.prefix || '').replace(/^\/+|\/+$/g, '');

@@ -109,7 +109,7 @@ export function serverHealthRoutes(ctx: ServerContext): Router {
   });
 
   // One test mail to the asker's own confirmed address, sent now through the server's mail settings (the log transport
-  // writes it to the outbox): "I've set it, check again" in the setup, `vr admin mail-test` in a terminal.
+  // writes it to the outbox): "I've set it, check again" in the setup, `lampo admin mail-test` in a terminal.
   r.post('/api/server/mail-test', express.json(), async (req, res) => {
     const user = operator(req);
     const { lang } = body(MailTest, req);
@@ -124,7 +124,7 @@ export function serverHealthRoutes(ctx: ServerContext): Router {
     } catch (e) {
       // What the relay said goes to the log; the answer stays a sentence (it can name hosts and replies).
       console.error(`mail test: ${(e as Error).message}`);
-      const why = 'the test mail couldn’t be sent through the relay: check VR_SMTP_URL and VR_MAIL_FROM (vr admin mail-test shows why)';
+      const why = 'the test mail couldn’t be sent through the relay: check LAMPO_SMTP_URL and LAMPO_MAIL_FROM (lampo admin mail-test shows why)';
       throw Object.assign(fail(502, why), { publicText: why });
     }
     const out: MailTestResult = { ok: true, to: user.email };

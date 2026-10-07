@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { AGENT_KIND_LABELS, AGENT_KINDS, agentKindOf, agentKindOfRef } from '../../lib/agentKind.ts';
+import { AGENT_KIND_LABELS, AGENT_KINDS, agentKindOf, agentKindOfRef, agentShown } from '../../lib/agentKind.ts';
 import { BRAND_NAME as LIB_NAME } from '../../lib/brand.ts';
 import { MCP_NAME } from '../../lib/mcpConfig.ts';
 import { AGENT_LOGOS } from '../../web/src/ui/agentLogos.ts';
@@ -44,10 +44,23 @@ test('agents know it as lampo: the MCP name and the Agent Skill; the skill’s o
   assert.match(skill, /^---\nname: lampo\n/, 'the frontmatter names the folder');
   // Anything that loads the skill from skills/video-review (a link made before the rename) gets the same file.
   assert.equal(read('skills/video-review/SKILL.md'), skill);
-  // What stays: the package's name and its commands (installs and agents depend on them).
+});
+
+test('the command is lampo, and the package @lampo-vr/lampo; vr and vr-mcp stay as older names of the same files', () => {
   const pkg = JSON.parse(read('package.json'));
-  assert.equal(pkg.name, 'video-review');
-  assert.deepEqual(Object.keys(pkg.bin).sort(), ['vr', 'vr-mcp']);
+  assert.equal(pkg.name, '@lampo-vr/lampo', 'plain `lampo` is someone else’s on npm');
+  assert.equal(pkg.private, true, 'nothing is published by accident');
+  assert.deepEqual(pkg.bin, { lampo: 'bin/lampo', 'lampo-mcp': 'bin/lampo-mcp', vr: 'bin/vr', 'vr-mcp': 'bin/vr-mcp' });
+  const lock = JSON.parse(read('package-lock.json'));
+  assert.equal(lock.name, pkg.name);
+  assert.deepEqual(lock.packages[''].bin, pkg.bin);
+  for (const f of Object.values(pkg.bin) as string[]) assert.ok(fs.statSync(path.join(ROOT, f)).mode & 0o111, `${f} runs`);
+  // the older names run the same code: the CLI's entry (told only the name it was called by) and the MCP server's
+  const entry = (f: string) => /await launch\(new URL\('([^']+)'/.exec(read(f))?.[1];
+  assert.equal(entry('bin/vr'), entry('bin/lampo'));
+  assert.equal(entry('bin/vr-mcp'), entry('bin/lampo-mcp'));
+  assert.match(read('bin/vr'), /main\(process\.argv\.slice\(2\), \{ as: 'vr' \}\)/);
+  assert.match(read('Dockerfile'), /ln -s \/app\/bin\/lampo \/usr\/local\/bin\/lampo && ln -s \/app\/bin\/vr \/usr\/local\/bin\/vr /);
 });
 
 test('the app draws the kit’s geometry: the logo in Wordmark, the frame o in BrandMark, the window in --brand', () => {
@@ -199,4 +212,14 @@ test('MCP clients are recognised by their own names; older assignments get a kin
   assert.equal(agentKindOfRef({ name: 'Cursor · Sam', id: 'mcp-0123456789ab' }), 'cursor', 'an MCP client by its name');
   assert.equal(agentKindOfRef({ name: 'edit-session', id: '5b0c…' }), 'claude-code', 'before kinds: a Claude Code session');
   assert.equal(agentKindOfRef({ name: 'edit-session', id: null }), 'claude-code');
+});
+
+test('an agent named by its MCP client’s id reads as its kind’s name; names people gave stay', () => {
+  assert.equal(agentShown('claude-code · Mia', 'claude-code'), 'Claude Code · Mia');
+  assert.equal(agentShown('codex-mcp-client', 'codex'), 'Codex');
+  assert.equal(agentShown('claude-ai · Sam'), 'Claude · Sam', 'the kind from the name');
+  assert.equal(agentShown('Cursor · Sam', 'cursor'), 'Cursor · Sam', 'already a name');
+  assert.equal(agentShown('promo-edit', 'claude-code'), 'promo-edit', 'a Claude Code session’s own name');
+  assert.equal(agentShown('my-script · Mia', 'mcp'), 'my-script · Mia', 'only an MCP client: its own name');
+  assert.equal(agentShown('agent:vr', 'cli'), 'agent:vr');
 });

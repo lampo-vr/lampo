@@ -26,4 +26,4 @@ body:
     attributes:
       label: Data contract
       options:
-        - label: This would change what agents read (review.json, events.jsonl, INBOX.md or `vr` output).
+        - label: This would change what agents read (review.json, events.jsonl, INBOX.md or `lampo` output).

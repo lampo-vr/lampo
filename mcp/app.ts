@@ -25,8 +25,8 @@ import { type Access, audienceOf, type Principal } from './access.ts';
 import { text } from './format.ts';
 import { trimmed } from './lean.ts';
 
-// The card's address keeps `video-review` now that the MCP name is lampo, like the `vr://` resources: hosts may hold
-// the UI resource by its URI (tools name it in `_meta.ui.resourceUri`), and no person ever reads it.
+// The card's address keeps `video-review` now that the MCP name is lampo: hosts may hold the UI resource by its URI
+// (tools name it in `_meta.ui.resourceUri`), and no person ever reads it.
 export const APP_URI = 'ui://video-review/review.html';
 const BUILT = path.join(ROOT, 'web', 'dist-mcp', 'review.html');
 
@@ -243,6 +243,6 @@ export function appHtml(): string {
     if (!cached || cached.mtime !== st.mtimeMs) cached = { mtime: st.mtimeMs, html: fs.readFileSync(BUILT, 'utf8') };
     return cached.html;
   } catch {
-    return '<!doctype html><meta charset="utf-8"><body style="font:14px system-ui;background:#0b0b0c;color:#eeebe4;padding:16px">The review card is not built yet: run <code>npm run build</code> in video-review.</body>';
+    return '<!doctype html><meta charset="utf-8"><body style="font:14px system-ui;background:#0b0b0c;color:#eeebe4;padding:16px">The review card is not built yet: run <code>npm run build</code> in Lampo’s folder.</body>';
   }
 }

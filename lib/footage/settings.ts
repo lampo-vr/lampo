@@ -1,10 +1,11 @@
 // Whether footage search indexes a workspace's videos. On a person's own machine it is on unless they turn it off; on a
 // hosted server a workspace's owner or admin turns it on (it costs the server's CPU: ~10–40 CPU-minutes per hour of
-// footage, bench/footage/RESULTS.md). `footage: "off"` in config.json (or VR_FOOTAGE=off) turns it off everywhere:
+// footage, bench/footage/RESULTS.md). `footage: "off"` in config.json (or LAMPO_FOOTAGE=off) turns it off everywhere:
 // nothing is indexed and no model is downloaded.
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadConfig } from '../config.ts';
+import { settings } from '../env.ts';
 import { dataDir, readConfigFile } from '../paths.ts';
 import { writeAtomic } from '../store.ts';
 
@@ -17,9 +18,9 @@ export interface FootageSetting {
 
 const file = () => path.join(dataDir(), 'footage.json');
 
-/** Off for the whole machine or server (config.json `footage: "off"`, VR_FOOTAGE=off). */
+/** Off for the whole machine or server (config.json `footage: "off"`, LAMPO_FOOTAGE=off). */
 export function footageOffEverywhere(): boolean {
-  const v = (process.env.VR_FOOTAGE || readConfigFile().footage || 'auto').trim().toLowerCase();
+  const v = (settings.LAMPO_FOOTAGE || readConfigFile().footage || 'auto').trim().toLowerCase();
   return v === 'off' || v === '0' || v === 'false';
 }
 
@@ -50,11 +51,12 @@ export function readSetting(): FootageSetting | null | 'unreadable' {
 
 /** Whether the workspace running now has footage search, and if not, why (for whoever asks). */
 export function footageState(): { on: boolean; why?: string } {
-  if (footageOffEverywhere()) return { on: false, why: 'footage search is off on this machine or server (footage: "off" / VR_FOOTAGE=off)' };
+  if (footageOffEverywhere()) return { on: false, why: 'footage search is off on this machine or server (footage: "off" / LAMPO_FOOTAGE=off)' };
   const s = readSetting();
-  if (s === 'unreadable') return { on: false, why: 'footage search is off: its setting (footage.json) can’t be read — vr footage on or off writes it again' };
-  if (s) return s.on ? { on: true } : { on: false, why: 'footage search is off for this workspace (vr footage on turns it on)' };
-  if (isHosted()) return { on: false, why: 'footage search is off for this workspace: an owner or admin turns it on (vr footage on)' };
+  if (s === 'unreadable')
+    return { on: false, why: 'footage search is off: its setting (footage.json) can’t be read — lampo footage on or off writes it again' };
+  if (s) return s.on ? { on: true } : { on: false, why: 'footage search is off for this workspace (lampo footage on turns it on)' };
+  if (isHosted()) return { on: false, why: 'footage search is off for this workspace: an owner or admin turns it on (lampo footage on)' };
   return { on: true };
 }
 

@@ -7,12 +7,21 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { LAMPO_NAMES, settings } from '../../lib/env.ts';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-export const VR = path.join(ROOT, 'bin/vr');
+const VR_BIN = path.join(ROOT, 'bin/vr');
+const LAMPO_BIN = path.join(ROOT, 'bin/lampo');
+/** The command the tests run: bin/vr, as setups made before the rename call it; LAMPO_TEST_CLI=lampo runs them all
+ * through bin/lampo instead (test/unit/cli-names.test.ts holds the two to the same output). */
+export const VR = settings.LAMPO_TEST_CLI === 'lampo' ? LAMPO_BIN : VR_BIN;
+
+// A setting in the shell's LAMPO_ spelling would win over the VR_ one a test sets (lib/env.ts reads LAMPO_ first) and
+// point a test's store, server, mail or stand-in tools elsewhere: tests start without them.
+for (const k of LAMPO_NAMES) delete process.env[k];
 
 const bin = (name: string) => ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin'].map((d) => `${d}/${name}`).find((p) => fs.existsSync(p)) || name;
-export const FFMPEG = process.env.VR_FFMPEG || bin('ffmpeg');
+export const FFMPEG = settings.LAMPO_FFMPEG || bin('ffmpeg');
 
 export function tmpdir(prefix = 'vr-test-'): string {
   return fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), prefix));
@@ -95,7 +104,7 @@ let ffmpegBuild: string | null = null;
 /** An ffmpeg encode (its arguments without the output) made once per machine and copied to `file`. */
 export function encodeOnce(file: string, args: string[]): string {
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  if (process.env.VR_TEST_MEDIA_CACHE === 'off') {
+  if (settings.LAMPO_TEST_MEDIA_CACHE === 'off') {
     execFileSync(FFMPEG, [...args, '-y', file]);
     return file;
   }

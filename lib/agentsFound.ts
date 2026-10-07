@@ -5,6 +5,7 @@
 // minute. The machine's owner only (server/routes/onboarding.ts).
 import fs from 'node:fs';
 import path from 'node:path';
+import { settings } from './env.ts';
 import { findClaude } from './sessions.ts';
 import type { OnboardingAgentsFound } from './types.ts';
 
@@ -13,7 +14,7 @@ type Found = OnboardingAgentsFound['found'][number];
 export interface LookOptions {
   /** PATH as the server runs with it. */
   pathVar?: string;
-  /** Where Claude Code is when findClaude finds it (VR_CLAUDE_BIN, PATH, the usual places), or null. */
+  /** Where Claude Code is when findClaude finds it (LAMPO_CLAUDE_BIN, PATH, the usual places), or null. */
   claude?: string | null;
   /** Where macOS keeps apps (Cursor.app). */
   apps?: string;
@@ -112,7 +113,7 @@ let memo: { at: number; key: string; value: OnboardingAgentsFound } | null = nul
 
 /** What lookForAgents finds, remembered for a minute (the setup asks as its tiles show). */
 export function agentsFound(now = Date.now()): OnboardingAgentsFound {
-  const key = `${process.env.PATH || ''}\u0000${process.env.VR_CLAUDE_BIN || ''}`;
+  const key = `${process.env.PATH || ''}\u0000${settings.LAMPO_CLAUDE_BIN || ''}`;
   if (memo && memo.key === key && now - memo.at < 60_000) return memo.value;
   memo = { at: now, key, value: lookForAgents() };
   return memo.value;

@@ -9,7 +9,7 @@ import { agentKindOfRef } from './agentKind.ts';
 import { oneLine } from './time.ts';
 import type { AssignedSession, WakePref } from './types.ts';
 
-/** How long a run may take before it is stopped (VR_AGENT_RUN_TIMEOUT, seconds, overrides it: server/agentRuns.ts). */
+/** How long a run may take before it is stopped (LAMPO_AGENT_RUN_TIMEOUT, seconds, overrides it: server/agentRuns.ts). */
 export const RUN_TIMEOUT_MS = 30 * 60_000;
 /** Starts per session within RUN_RATE_WINDOW_MS. */
 export const RUN_RATE_MAX = 5;
@@ -42,7 +42,7 @@ const clip = (s: string, max: number) => (s.length > max ? `${s.slice(0, max - 1
 export function wakePrompt(o: { who: string; video: string; slug: string; v: number | null | undefined; text: string }): string {
   const text = clip(oneLine(o.text).trim(), PROMPT_TEXT_MAX) || 'Look at the new feedback.';
   return oneLine(
-    `Lampo: ${clip(o.who, 80)} asks about ${clip(o.video, 200)} (${clip(o.slug, 200)}${o.v ? `, V${o.v}` : ''}): ${text}${/[.!?…]$/.test(text) ? '' : '.'} Read the open notes with vr (or the lampo MCP) and act on them.`,
+    `Lampo: ${clip(o.who, 80)} asks about ${clip(o.video, 200)} (${clip(o.slug, 200)}${o.v ? `, V${o.v}` : ''}): ${text}${/[.!?…]$/.test(text) ? '' : '.'} Read the open notes with lampo (the command or the MCP server) and act on them.`,
   );
 }
 

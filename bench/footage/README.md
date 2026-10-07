@@ -51,6 +51,6 @@ node bench/footage/find.ts "product close-up on white, slow push-in, ≥ 2 s, 9:
 ```
 
 Everything lands in `cache/footage/` (gitignored): photos, clips, models, the index (`work/index.db`), results
-(`results/*.json`). `VR_FOOTAGE_CACHE` moves it. The indexer points Lampo's own modules at a throwaway store
-(`VR_DATA`/`VR_CACHE` under `cache/footage/work/store`), never a live one. Voice-overs need macOS `say`; elsewhere the
+(`results/*.json`). `LAMPO_FOOTAGE_CACHE` moves it. The indexer points Lampo's own modules at a throwaway store
+(`LAMPO_DATA`/`LAMPO_CACHE` under `cache/footage/work/store`), never a live one. Voice-overs need macOS `say`; elsewhere the
 two "said" queries are skipped. OCR with Vision needs macOS with Xcode tools; tesseract needs `eng` + `deu` data.

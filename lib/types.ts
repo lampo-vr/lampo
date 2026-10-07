@@ -393,7 +393,7 @@ export interface Comment {
   /**
    * The account that wrote it, when a signed-in person did (through the server). Who may edit or delete a note is
    * decided by it when present — a rename keeps the note theirs, a new account with an old name doesn't get it — and by
-   * `author` for notes without one (older notes, agents', clients', local `vr` writes).
+   * `author` for notes without one (older notes, agents', clients', local `lampo` writes).
    */
   author_id?: string;
   created: string;
@@ -431,10 +431,10 @@ export interface Comment {
   /** A note made from a recording: which one, and the stretch of its audio it was said in (seconds). Its own clip of
    * that stretch is `voice`. */
   recording?: NoteRecording;
-  /** The person allows a partial render for this note: only these shots, sent with `vr push --part-at` (lib/part.ts). */
+  /** The person allows a partial render for this note: only these shots, sent with `lampo push --part-at` (lib/part.ts). */
   part?: PartRequest;
   /**
-   * Not sent yet: saved by its author, seen by nobody else — never in review.json, events, INBOX.md, `vr`, MCP, review
+   * Not sent yet: saved by its author, seen by nobody else — never in review.json, events, INBOX.md, `lampo`, MCP, review
    * links or any count (lib/drafts.ts keeps it in data/<slug>/drafts/). Sending clears it and logs the note's events.
    */
   draft?: true;
@@ -873,8 +873,8 @@ export interface ReviewEvent {
   /** post events: the post and where it stands. */
   post?: PostEventInfo;
   /**
-   * History brought over from another store (`vr admin import`): the id of the bundle it came in. Live followers (the
-   * server's feed — the live stream, webhooks, push —, `vr watch`, the MCP feed) skip it: it is never news.
+   * History brought over from another store (`lampo admin import`): the id of the bundle it came in. Live followers (the
+   * server's feed — the live stream, webhooks, push —, `lampo watch`, the MCP feed) skip it: it is never news.
    */
   imported?: string;
 }
@@ -946,7 +946,7 @@ export interface ActivityWords {
   quote?: string;
 }
 
-/** One thing an agent did through Lampo (an MCP tool, a `vr` command, an upload) or that a run Lampo started printed.
+/** One thing an agent did through Lampo (an MCP tool, a `lampo` command, an upload) or that a run Lampo started printed.
  * Kept in memory and a small rolling file in the cache; never in review.json. */
 export interface AgentActivity extends ActivityWords {
   at: string;
@@ -960,7 +960,7 @@ export interface AgentActivity extends ActivityWords {
   since?: string;
   /** An upload's progress, 0–100. */
   pct?: number;
-  /** A render or upload under way (`vr render`, uploads): stage, %, frames, time left. `pct` stays for older readers. */
+  /** A render or upload under way (`lampo render`, uploads): stage, %, frames, time left. `pct` stays for older readers. */
   progress?: RunProgress;
   /** The run this came from (`LAMPO_RUN` of a run Lampo started). A hint only: the server binds it to that run only
    * when the run is the same agent's, on the same video, in the same workspace. */
@@ -999,7 +999,7 @@ export type RunPlanState = 'todo' | 'doing' | 'fixed' | 'asked' | 'wontfix' | 'r
  * reply → action; ask → elicitation; upload, render → progress; status, say → thought; run → the run's own state. */
 export type RunStepType = 'thought' | 'action' | 'elicitation' | 'response' | 'error' | 'progress';
 
-/** A render, upload or Auto-check under way (`vr render`, tus uploads): replaces itself in place. */
+/** A render, upload or Auto-check under way (`lampo render`, tus uploads): replaces itself in place. */
 export interface RunProgress {
   what: 'render' | 'upload' | 'check';
   /** The stage in words' key terms: 'bundling', 'rendering', 'encoding', 'uploading', 'checking'. */
@@ -1010,7 +1010,7 @@ export interface RunProgress {
   frames?: [done: number, total: number];
   /** Seconds left, from a moving average; absent for the first 5 % and while the rate swings. */
   eta_s?: number;
-  /** The tool as `vr render` knew it: 'remotion', 'ffmpeg', 'aerender', 'blender', or absent. */
+  /** The tool as `lampo render` knew it: 'remotion', 'ffmpeg', 'aerender', 'blender', or absent. */
   tool?: string;
   /** The version it will become. */
   v?: number;
@@ -1468,7 +1468,7 @@ export interface ShareInput extends Partial<ShareSettings> {
 
 export type WebhookFormat = 'json' | 'slack' | 'discord';
 
-/** One webhook: config.json "webhooks", VR_WEBHOOK_URL, or managed in the UI (data/webhooks.json). */
+/** One webhook: config.json "webhooks", LAMPO_WEBHOOK_URL, or managed in the UI (data/webhooks.json). */
 export interface WebhookConfig {
   url: string;
   /** 'client' (default): client notes, replies, fix checks and approvals; 'all': every review event; or event types. */
@@ -1511,7 +1511,7 @@ export interface FolderSuggestion {
 /** A running Claude Code session (`claude agents --json` or ~/.claude/sessions). */
 /**
  * What kind of agent: a Claude Code session found on this machine, Codex, Cursor, Claude, ChatGPT, Gemini, VS Code,
- * Windsurf or Zed over MCP, any other MCP client, a script on the HTTP API that announced itself (`api`), or `vr` itself
+ * Windsurf or Zed over MCP, any other MCP client, a script on the HTTP API that announced itself (`api`), or `lampo` itself
  * (lib/agentKind.ts has the labels, web/src/ui/agentMarks.ts the marks). Only ever extended: stored assignments keep it.
  */
 export type AgentKind =
@@ -1531,7 +1531,7 @@ export type AgentKind =
 
 /**
  * An agent a video can be handed to: a Claude Code session running on this machine (`claude agents`), or an agent
- * that connected — any MCP client, or `vr watch` (heartbeats). Named "session" for the stored assignment's sake.
+ * that connected — any MCP client, or `lampo watch` (heartbeats). Named "session" for the stored assignment's sake.
  */
 export interface ClaudeSession {
   name: string | null;
@@ -1681,7 +1681,7 @@ export interface ReviewPointers {
   names: Record<string, string>;
 }
 
-/** A map attached to a version (`PUT /api/review/:slug/versions/:v/elements`, `vr elements`, `vr push --elements`). */
+/** A map attached to a version (`PUT /api/review/:slug/versions/:v/elements`, `lampo elements`, `lampo push --elements`). */
 export interface ElementsAttached {
   v: number;
   elements: number;
@@ -2033,7 +2033,7 @@ export interface PlaybookSummary {
 /** What a file is, from its bytes and its name (lib/fileText.ts `kindOf`): how lists group it, how agents filter. */
 export type FileKind = 'footage' | 'audio' | 'image' | 'graphic' | 'font' | 'project' | 'document' | 'archive' | 'other';
 
-/** How a version came in: the app, the CLI (`vr`/`lampo`), an agent's MCP tool, a transfer or an import. */
+/** How a version came in: the app, the CLI (`lampo`/`lampo`), an agent's MCP tool, a transfer or an import. */
 export type FileVia = 'browser' | 'vr' | 'mcp' | 'transfer' | 'import';
 
 /** What a push does when the file changed since the version it was based on: refuse (409), or keep it as a copy beside. */
@@ -3016,7 +3016,7 @@ export interface VideoSummary {
   /** null = no session assigned; else whether that session is running (a connected agent: listening or working). */
   sessionActive: boolean | null;
   /**
-   * Whether the assigned agent hears new notes by itself: true while it waits for them (`wait_for_feedback`, `vr
+   * Whether the assigned agent hears new notes by itself: true while it waits for them (`wait_for_feedback`, `lampo
    * watch`), false for an agent connected over MCP that doesn't (it acts when a person tells it to), null when Lampo
    * can't tell (no agent, a Claude Code session on this machine). Absent from older servers.
    */
@@ -3041,7 +3041,7 @@ export interface LibraryResponse {
   archived_projects?: Record<string, Omit<ArchivedProject, 'by_id'>>;
   /**
    * What is shown in part only: `folders` — the workspace's folders.json can't be read right now, so `folders` holds only
-   * the folders videos are filed in (no empty ones) and folders can't be changed until it can (`vr admin
+   * the folders videos are filed in (no empty ones) and folders can't be changed until it can (`lampo admin
    * repair-folders`); `videos` — a video's review.json can't be read, so that video is left out (the server's log names
    * it). Absent: everything as it is.
    */
@@ -3259,7 +3259,7 @@ export interface GuestLinkResponse {
    * did (A13 CLOUD-7). Absent (older servers): shown.
    */
   badge?: boolean;
-  /** The operator's imprint and privacy policy (VR_IMPRINT_URL, VR_PRIVACY_URL), linked at the page's foot; null: none. */
+  /** The operator's imprint and privacy policy (LAMPO_IMPRINT_URL, LAMPO_PRIVACY_URL), linked at the page's foot; null: none. */
   imprint_url?: string | null;
   privacy_url?: string | null;
 }
@@ -3412,10 +3412,10 @@ export interface InfoResponse {
   capabilities: Capabilities;
   /** What this server can do, so the UI shows only what works (kept for older clients; see `capabilities`). */
   features: InfoFeatures;
-  /** The configured public URL (server mode), for share links and `vr login`. */
+  /** The configured public URL (server mode), for share links and `lampo login`. */
   public_url: string | null;
   /**
-   * A hosted server's own media host (VR_MEDIA_ORIGIN), to someone signed in: one-time upload URLs point there, so a chat
+   * A hosted server's own media host (LAMPO_MEDIA_ORIGIN), to someone signed in: one-time upload URLs point there, so a chat
    * app's sandbox must be allowed to reach it (Settings → Connect an agent). Not a secret: every signed URL and the
    * page's CSP name it.
    */
@@ -3425,11 +3425,11 @@ export interface InfoResponse {
   version: string;
   /** Email flows work here (a public URL to build links from): forgot password, invites by email, confirming addresses. */
   mail?: boolean;
-  /** Admins only: how mail leaves — `log` writes it to the server's outbox instead of sending it (no VR_SMTP_URL). */
+  /** Admins only: how mail leaves — `log` writes it to the server's outbox instead of sending it (no LAMPO_SMTP_URL). */
   mail_transport?: 'log' | 'smtp';
-  /** Who may sign up on their own (VR_SIGNUP): off, invite (addresses with a pending invite), open. */
+  /** Who may sign up on their own (LAMPO_SIGNUP): off, invite (addresses with a pending invite), open. */
   signup?: 'off' | 'invite' | 'open';
-  /** The operator's terms and privacy policy (VR_TERMS_URL, VR_PRIVACY_URL): the sign-up screen, the checkout, the feet. */
+  /** The operator's terms and privacy policy (LAMPO_TERMS_URL, LAMPO_PRIVACY_URL): the sign-up screen, the checkout, the feet. */
   terms_url?: string | null;
   privacy_url?: string | null;
   /** The operator's imprint, withdrawal information and contract cancellation page (lib/legal.ts); null when not set. */
@@ -3576,7 +3576,7 @@ export interface WorkspaceSuspensionShown {
 
 /**
  * What deleting a workspace takes with it, counted before anyone confirms (`GET /api/operator/workspaces/:id/deletion`,
- * `GET /api/workspaces/current/deletion`, `vr admin delete-workspace --dry-run`). Never a note or a name of a video.
+ * `GET /api/workspaces/current/deletion`, `lampo admin delete-workspace --dry-run`). Never a note or a name of a video.
  */
 export interface WorkspaceDeletionPlan {
   id: string;
@@ -3740,7 +3740,7 @@ export interface BillingInfo {
 
 /**
  * The body of a 402 (server/extension.ts refusal): the workspace's plan has no room for this now, or it is read-only.
- * `error` and `messages` are the billing provider's sentence (agents and `vr` read `error`); the rest is for the limit
+ * `error` and `messages` are the billing provider's sentence (agents and `lampo` read `error`); the rest is for the limit
  * sheet.
  */
 export interface PlanRefusal {
@@ -3906,7 +3906,7 @@ export interface InfoFeatures {
   accounts: boolean;
   /** Public tunnel for share links (cloudflared, local mode). */
   tunnel: boolean;
-  /** Where the session list comes from: `claude agents` on this machine, and/or agents that connected with `vr watch`. */
+  /** Where the session list comes from: `claude agents` on this machine, and/or agents that connected with `lampo watch`. */
   sessions: 'claude' | 'agents';
   /** Largest accepted upload in bytes. */
   upload_max_bytes: number;
@@ -4086,13 +4086,13 @@ export interface PushState {
 
 /**
  * Whether a connected agent hears new notes (server/agents.ts): `listening` — in `wait_for_feedback` now (or between
- * two of them), or following with `vr watch`; `working` — its last wait handed it something a few minutes ago and it
+ * two of them), or following with `lampo watch`; `working` — its last wait handed it something a few minutes ago and it
  * is still calling (it waits again when done); `idle` — connected, but nothing makes it look: new notes wait until a
  * person tells it to (an MCP client acts only when prompted).
  */
 export type AgentListenState = 'listening' | 'working' | 'idle';
 
-/** An agent that announced itself: `vr watch` (POST /api/agents/heartbeat), or an MCP client calling /mcp. */
+/** An agent that announced itself: `lampo watch` (POST /api/agents/heartbeat), or an MCP client calling /mcp. */
 export interface ConnectedAgent {
   session_id: string;
   name: string;
@@ -4101,7 +4101,7 @@ export interface ConnectedAgent {
   /** The account the agent works for; null when it runs on the machine itself. */
   user: string | null;
   last_seen: string;
-  /** What kind of agent (from the MCP client's name, or what `vr` says it runs in). */
+  /** What kind of agent (from the MCP client's name, or what `lampo` says it runs in). */
   kind?: AgentKind;
   /** Whether it hears new notes (absent from older servers). */
   state?: AgentListenState;
@@ -4209,7 +4209,7 @@ export interface PublicUser {
    * the account (setup, an admin, an invite made out to it) — accounts from before email count as confirmed.
    */
   unverified?: string;
-  /** When the person signed up on their own (VR_SIGNUP): until the address is confirmed such an account can do nothing. */
+  /** When the person signed up on their own (LAMPO_SIGNUP): until the address is confirmed such an account can do nothing. */
   signup?: string;
   /** A new address waiting for its emailed link; the account keeps signing in with `email` until then. */
   pending_email?: string;
@@ -4239,7 +4239,7 @@ export interface UserPrefs {
    * as done and never see it. Only the server writes `done` and `complete`, from what the person did.
    */
   onboarding?: OnboardingPrefs;
-  /** An email when the account signs in from a browser or `vr` it hasn't seen (absent: off). */
+  /** An email when the account signs in from a browser or `lampo` it hasn't seen (absent: off). */
   signin_alerts?: boolean;
   /**
    * Conversion moments this person put away, per workspace: the moment's id → until when (ISO). Written only by `PUT
@@ -4316,7 +4316,7 @@ export interface PersonaUpdate {
  * admins of the server's first workspace only, people only; no secrets (no relay password, no storage keys).
  */
 export interface ServerHealth {
-  /** Review links and emails point here (VR_PUBLIC_URL); ok when it is set and https (or loopback). */
+  /** Review links and emails point here (LAMPO_PUBLIC_URL); ok when it is set and https (or loopback). */
   public_url: { ok: boolean; url: string | null };
   /** Where renders live: written to and read back just now; free space when the disk says. */
   storage: { ok: boolean; kind: 'local' | 's3' | 'bunny'; writable: boolean; free_bytes: number | null; where: string | null };
@@ -4422,7 +4422,7 @@ export interface OAuthRequestView {
   /** The workspace the app will act in (the session's current one); absent on a store with one workspace. */
   workspace?: WorkspaceInfo;
   /**
-   * `vr login` asking (no scopes): the computer as it names itself, the days its API token works (null: until revoked)
+   * `lampo login` asking (no scopes): the computer as it names itself, the days its API token works (null: until revoked)
    * and the token's name as Settings → API tokens lists it.
    */
   vr?: { machine: string; days: number | null; token: string };
@@ -4490,9 +4490,9 @@ export interface StoredWorkspace extends WorkspaceInfo {
   members: WorkspaceMember[];
   /** Suspended by the server's operator; absent while it works as usual. */
   suspended?: WorkspaceSuspension;
-  /** Made for someone who signed up on their own (VR_SIGNUP=open): its name was a placeholder (their name). */
+  /** Made for someone who signed up on their own (LAMPO_SIGNUP=open): its name was a placeholder (their name). */
   signup?: true;
-  /** When a person chose its name (made from the app or `vr admin`, or renamed); absent: never named by anyone. */
+  /** When a person chose its name (made from the app or `lampo admin`, or renamed); absent: never named by anyone. */
   named?: string;
   /** The account that made it (its first owner); absent on workspace #1 and on workspaces made before it was kept. */
   by?: string;
@@ -4540,7 +4540,7 @@ export interface WorkspacesResponse {
   workspaces: MyWorkspace[];
   /** Whether this instance hosts workspaces at all (a hosted server; never the app on a person's own machine). */
   enabled: boolean;
-  /** Whether this person may make a new one (VR_WORKSPACE_CREATE). */
+  /** Whether this person may make a new one (LAMPO_WORKSPACE_CREATE). */
   create: boolean;
 }
 

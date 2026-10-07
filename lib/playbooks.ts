@@ -100,7 +100,7 @@ function update<T>(scope: PlaybookScope, fn: (p: Playbook) => T): T {
 }
 
 /**
- * A playbook brought over from another store (`vr admin import`) with ids of this store (`withFreshIds`: its id names
+ * A playbook brought over from another store (`lampo admin import`) with ids of this store (`withFreshIds`: its id names
  * where its files are; the caller stored them first), its history as it was. Refuses a scope that has a playbook here,
  * and an id one has: nothing written here is ever replaced.
  */
@@ -114,7 +114,7 @@ export function importPlaybook(p: Playbook): void {
 }
 
 /**
- * A playbook from another store with ids of this one (`vr admin import`): its own id and its skills' ids name where
+ * A playbook from another store with ids of this one (`lampo admin import`): its own id and its skills' ids name where
  * their files are kept, and proposals are found by id across playbooks, so a bundle's ids could name this store's and
  * write over their files (sweep 2 SW-2). `skills`: each skill's id in the bundle → its new one (revisions name a
  * proposal by its new id too).
@@ -578,7 +578,7 @@ export function agentMarkdown(scope: PlaybookScope): string {
   if (!layers.length) {
     L.push(oneLine(`No playbook applies to ${scope ? `"${scope}"` : 'the House'} yet. Follow the notes and the taste file.`));
     L.push('');
-    L.push('Know a rule the team keeps asking for? Suggest it with propose_playbook_change (MCP) or `vr playbook propose`; a person decides.');
+    L.push('Know a rule the team keeps asking for? Suggest it with propose_playbook_change (MCP) or `lampo playbook propose`; a person decides.');
     return `${L.join('\n')}\n`;
   }
   // one line per paragraph: the app shows this text as it is, and a hard wrap wraps again, raggedly, when narrower
@@ -607,7 +607,7 @@ export function agentMarkdown(scope: PlaybookScope): string {
   if (skills.length) {
     L.push('## Skills');
     L.push('');
-    L.push('Instructions for recurring work (the Agent Skills format). Load one with get_skill or `vr playbook skill <name>`.');
+    L.push('Instructions for recurring work (the Agent Skills format). Load one with get_skill or `lampo playbook skill <name>`.');
     L.push('');
     for (const s of skills)
       L.push(
@@ -625,7 +625,7 @@ export function agentMarkdown(scope: PlaybookScope): string {
   L.push('## Changing it');
   L.push('');
   L.push(
-    'You can suggest a change (propose_playbook_change / `vr playbook propose`) with the reason and the notes behind it; a person accepts or rejects it. Never edit around a rule silently.',
+    'You can suggest a change (propose_playbook_change / `lampo playbook propose`) with the reason and the notes behind it; a person accepts or rejects it. Never edit around a rule silently.',
   );
   return `${L.join('\n')}\n`;
 }

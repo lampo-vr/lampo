@@ -9,25 +9,25 @@ hosted server works: [server-mode.md](server-mode.md).
 1. Build the image and start it:
 
    ```sh
-   docker build -t video-review .
-   docker run -d --name video-review \
+   docker build -t lampo .
+   docker run -d --name lampo \
      -p 4747:4747 \
      -v vr-data:/data \
-     -e VR_PUBLIC_URL=http://localhost:4747 \
-     video-review
+     -e LAMPO_PUBLIC_URL=http://localhost:4747 \
+     lampo
    ```
 
 2. Read the one-time setup token from the log:
 
    ```sh
-   docker logs video-review
+   docker logs lampo
    ```
 
 3. Open http://localhost:4747/?setup, paste the token, and create the owner account.
 
-Plain http is for this machine only: a `VR_PUBLIC_URL` like `http://192.168.1.20:4747` is refused at start, because
+Plain http is for this machine only: a `LAMPO_PUBLIC_URL` like `http://192.168.1.20:4747` is refused at start, because
 passwords would cross the network unencrypted. For other people, put the app behind TLS
-([below](#production-compose-and-caddy-https)); on a closed test network, `-e VR_ALLOW_HTTP=1` says that is on
+([below](#production-compose-and-caddy-https)); on a closed test network, `-e LAMPO_ALLOW_HTTP=1` says that is on
 purpose.
 
 ## Production: compose and Caddy (HTTPS)
@@ -45,8 +45,8 @@ after each, is [go-live.md](go-live.md).
    cp .env.example .env
    ```
 
-   Set `VR_DOMAIN` (the domain Caddy gets a certificate for) and `VR_PUBLIC_URL` (the address people open).
-   `VR_TRUST_PROXY=uniquelocal` is already set: Caddy reaches the app over the compose network, and an https address
+   Set `LAMPO_DOMAIN` (the domain Caddy gets a certificate for) and `LAMPO_PUBLIC_URL` (the address people open).
+   `LAMPO_TRUST_PROXY=uniquelocal` is already set: Caddy reaches the app over the compose network, and an https address
    needs it. Every other setting in the file is optional and explained there; the full list is in
    [configuration.md](configuration.md).
 3. Start it, and read the setup token:
@@ -62,22 +62,22 @@ The Caddyfile stays three lines: the app compresses its own answers and sends th
 ([server-mode.md → Speed](server-mode.md#speed-over-a-real-network)).
 
 To connect agents from any machine, create an API token in Settings → API tokens, then run
-`vr login https://<your domain> --token -`, paste the token when asked, and run `vr watch`
+`lampo login https://<your domain> --token -`, paste the token when asked, and run `lampo watch`
 ([more](server-mode.md#agents-against-a-hosted-server)).
 
-`vr` also works inside the container, on the store itself. What it writes is signed `agent:vr` unless you pass
-`--by "Your Name"` (or set `VR_BY`):
+`lampo` also works inside the container, on the store itself. What it writes is signed `agent:vr` unless you pass
+`--by "Your Name"` (or set `LAMPO_BY`):
 
 ```sh
 # an invite link to send someone
-docker compose exec app vr admin invite --role member
+docker compose exec app lampo admin invite --role member
 # one email through the mail relay, sent now (docs/email.md)
-docker compose exec app vr admin mail-test you@example.com
-docker compose exec app vr admin list-users
-docker compose exec app vr ls
+docker compose exec app lampo admin mail-test you@example.com
+docker compose exec app lampo admin list-users
+docker compose exec app lampo ls
 ```
 
-`vr admin` also has `create-user`, `reset-password`, `invites`, `revoke-invite`, `workspaces`
+`lampo admin` also has `create-user`, `reset-password`, `invites`, `revoke-invite`, `workspaces`
 ([server-mode.md → Workspaces](server-mode.md#workspaces)), `import` (reviews from your own machine,
 [moving.md](moving.md)), `delete-account`, `delete-workspace`, `export-account` and `erasures`
 ([server-mode.md → Deleting and exporting](server-mode.md#deleting-and-exporting)), and `repair-folders`, which
@@ -85,7 +85,7 @@ rebuilds a damaged `folders.json` ([go-live.md](go-live.md#13-when-something-els
 
 ## The /data volume
 
-The image sets `VR_HOME=/data`, so one volume holds everything:
+The image sets `LAMPO_HOME=/data`, so one volume holds everything:
 
 | Path | What | Back up? |
 |---|---|---|
@@ -96,7 +96,7 @@ The image sets `VR_HOME=/data`, so one volume holds everything:
 | `/data/tmp/` | temporary files (Auto-check's frames, pictures and clips being checked) | no |
 
 With Bunny or S3 storage the renders and profile pictures live there instead, and the cache also holds working copies
-of the renders, up to `VR_WORK_CACHE` (20 GB).
+of the renders, up to `LAMPO_WORK_CACHE` (20 GB).
 
 ### Backups
 
@@ -105,25 +105,25 @@ A backup lives somewhere else than what it backs up, and it keeps what was delet
 **1. The volume's `data/` and, with local storage, `versions/`.** They are plain files written by atomic renames, so a
 copy taken while the app runs is consistent file by file. Back them up every night to another machine, for example
 with [restic](https://restic.net) to a Hetzner Storage Box or any S3 bucket. Compose names the volume after the
-project folder, such as `video-review_vr-data`:
+project folder, such as `lampo_vr-data`:
 
 ```sh
 # as root, whose SSH key the Storage Box has (it speaks SSH on port 23); once:
 #   ssh-keyscan -p 23 u123.your-storagebox.de >> /root/.ssh/known_hosts
 #   docker run --rm -v /root/.ssh:/root/.ssh:ro -e RESTIC_PASSWORD restic/restic \
-#     -r sftp://u123@u123.your-storagebox.de:23/video-review init
+#     -r sftp://u123@u123.your-storagebox.de:23/lampo init
 docker run --rm \
-  -v video-review_vr-data:/data:ro \
+  -v lampo_vr-data:/data:ro \
   -v /root/.ssh:/root/.ssh:ro \
   -e RESTIC_PASSWORD \
-  restic/restic -r sftp://u123@u123.your-storagebox.de:23/video-review \
+  restic/restic -r sftp://u123@u123.your-storagebox.de:23/lampo \
   backup /data/data /data/versions /data/config.json
 # keep a history: the same docker run, ending in
 #   forget --keep-daily 14 --keep-weekly 8 --keep-monthly 12 --prune
 ```
 
 A backup keeps what people deleted (their account, a workspace) until its history drops it. After restoring one, put
-the newest `data/erasures.jsonl` back and run `vr admin erasures --apply`: what was deleted since goes again
+the newest `data/erasures.jsonl` back and run `lampo admin erasures --apply`: what was deleted since goes again
 ([server-mode.md → Deleting and exporting](server-mode.md#deleting-and-exporting)).
 
 restic skips a path that doesn't exist yet (no config.json). A one-off archive works too: stop the app
@@ -149,21 +149,21 @@ checksums rebuild by themselves; the cache never needs restoring.
 - **Health checks.** `/healthz` answers while the process runs. `/readyz` says whether it can work, and the image's
   health check uses it:
   - data is writable;
-  - more than `VR_MIN_FREE` (2 GB) is free for data, the cache and local renders;
+  - more than `LAMPO_MIN_FREE` (2 GB) is free for data, the cache and local renders;
   - ffmpeg is found and answers within 5 seconds (a hung ffmpeg fails the check instead of hanging it);
   - the storage accepts its credentials (checked at most every 30 seconds);
-  - `VR_PUBLIC_URL` is set.
+  - `LAMPO_PUBLIC_URL` is set.
 
   It answers one true or false per check, with status 503 when one fails; the reason goes to the log, which also
-  lists the checks at start. Uploads that would eat into `VR_MIN_FREE` are refused before they start.
+  lists the checks at start. Uploads that would eat into `LAMPO_MIN_FREE` are refused before they start.
 - **Stopping** (`docker compose stop`, a deploy). The app takes no new connections and ends live streams (browsers
-  and `vr watch` reconnect by themselves). It then waits up to 30 seconds for uploads being registered and the job
+  and `lampo watch` reconnect by themselves). It then waits up to 30 seconds for uploads being registered and the job
   that is running, which is why `stop_grace_period` is 45 seconds in `docker-compose.yml`. Queued jobs run again after
   the restart.
 - **Logs.** `docker compose logs app` (and `caddy`). Both rotate at 5 × 10 MB in `docker-compose.yml`; Docker keeps
   them forever otherwise. The app logs no tokens, passwords or email addresses, and no requests except one line per
   `/mcp` tool call that never holds what was asked or answered ([mcp.md](mcp.md#what-the-server-logs);
-  `VR_MCP_LOG=off` turns it off).
+  `LAMPO_MCP_LOG=off` turns it off).
 
 ## Upgrades
 
@@ -180,7 +180,7 @@ image to roll back to ([go-live.md → Updates and rollback](go-live.md#11-updat
 ## Resources
 
 - **Memory**: the whole container measured 1.2 GB with the speech model loaded and idle. The model unloads after 30
-  idle minutes, and ffmpeg jobs run one at a time on top of that. 4 GB leaves room for both; with `VR_STT=off` a
+  idle minutes, and ffmpeg jobs run one at a time on top of that. 4 GB leaves room for both; with `LAMPO_STT=off` a
   smaller box works. `docker-compose.yml` caps the container at 6 GB.
 - **CPU**: two cores or more. Measured on four arm64 cores: a voice note takes about 0.5 seconds with Parakeet, and an
   Auto-check of a 6-second 1080×1920 reel took 6.6 seconds (tesseract reads a frame every half second, so it grows
@@ -196,33 +196,33 @@ image to roll back to ([go-live.md → Updates and rollback](go-live.md#11-updat
 - Listens on port 4747 and sets these variables:
 
   ```sh
-  VR_MODE=server
-  VR_HOME=/data
-  VR_PORT=4747
-  VR_STT_PREFETCH=1
-  VR_USER=admin
+  LAMPO_MODE=server
+  LAMPO_HOME=/data
+  LAMPO_PORT=4747
+  LAMPO_STT_PREFETCH=1
+  LAMPO_USER=admin
   TMPDIR=/data/tmp
   NODE_ENV=production
   ```
 
 - Its health check asks `/readyz` every 30 seconds: ready, not just alive ([Running it](#running-it)).
 - The speech model (Parakeet v3, 740 MB, as there is no GPU in the container) downloads in the background at the
-  first start. `VR_STT_PREFETCH=0` waits for the first voice note instead; `VR_STT=off` turns voice notes off.
+  first start. `LAMPO_STT_PREFETCH=0` waits for the first voice note instead; `LAMPO_STT=off` turns voice notes off.
 - Footage search is off until a workspace's owner or admin turns it on ([footage.md](footage.md)); its model (SigLIP,
   213 MB) downloads into `/data/cache/models/` then, once. The image carries ONNX Runtime's binary for its own platform
   only (about 45 MB on x86-64), not the CUDA providers. Indexing costs about 30–40 CPU-minutes per hour of 1080p
-  footage, one job at a time after the review work; `VR_FOOTAGE=off` turns it off for the whole server.
+  footage, one job at a time after the review work; `LAMPO_FOOTAGE=off` turns it off for the whole server.
 - Only what runs ships: the built web app, the server, the CLI and MCP code, the production dependencies, the license
   and the third-party notices. No tests, docs, benchmarks, `.env` files or data, and nothing `.gitignore` keeps
   private (local working files such as `*.local.md` notes, `cloud/`) even reaches the build context (see `.dockerignore`).
-- `docker images video-review` shows its size on your platform.
+- `docker images lampo` shows its size on your platform.
 - CI builds it (linux/amd64) on every push to main and every pull request, and checks that a container started from it
   answers `/healthz` (`.github/workflows/ci.yml`).
 - Its OCI labels say where its source is (`org.opencontainers.image.source` and `.url`: the `SOURCE_URL` build
   argument, the project's repository by default), its licence (`AGPL-3.0-only`) and the commit it was built from
   (`.revision`: the `REVISION` build argument; CI passes it). Build with the commit:
-  `docker build --build-arg REVISION=$(git rev-parse HEAD) -t video-review .`. A changed copy run for others builds
-  with `--build-arg SOURCE_URL=<its repository>` and sets `VR_SOURCE_URL` to the same, so the app offers that source
+  `docker build --build-arg REVISION=$(git rev-parse HEAD) -t lampo .`. A changed copy run for others builds
+  with `--build-arg SOURCE_URL=<its repository>` and sets `LAMPO_SOURCE_URL` to the same, so the app offers that source
   too.
 
 `docker-compose.yml` hardens the app container further:

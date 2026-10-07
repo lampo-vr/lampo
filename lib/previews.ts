@@ -62,7 +62,7 @@ export function previewFrameIn(review: Review, p: Pick<FixPreview, 'frame' | 'v'
   return timeToFrame(p.frame / own.fps, ver.fps);
 }
 
-/** "p_1a2b3c4d5e still of f123 on v3 by agent:x · confirmed in v4", for agents (vr, MCP). */
+/** "p_1a2b3c4d5e still of f123 on v3 by agent:x · confirmed in v4", for agents (lampo, MCP). */
 export function describePreview(p: FixPreview): string {
   const what = p.kind === 'clip' ? `clip f${p.frame}–${p.frame + (p.frames || 1) - 1}` : `still of f${p.frame}`;
   const outcome = p.confirmed ? ` · confirmed in v${p.confirmed.v}` : p.mismatch ? ` · v${p.mismatch.v} differs: ${p.mismatch.reason}` : '';

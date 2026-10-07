@@ -20,5 +20,5 @@ Open (3):
 
 Already marked fixed, waiting for verification (1): c_1d55b9 (00:00:12, v2)
 
-When an item is done: upload the new render with vr push <file> --to "/@uploads/Demo/Reels/teaser.mp4", then vr fix <id> --note "what you changed".
-Question about a frame: vr add "/@uploads/Demo/Reels/teaser.mp4" --frame <N> --text "…"   ·   Live feedback: vr watch
+When an item is done: upload the new render with lampo push <file> --to "/@uploads/Demo/Reels/teaser.mp4", then lampo fix <id> --note "what you changed".
+Question about a frame: lampo add "/@uploads/Demo/Reels/teaser.mp4" --frame <N> --text "…"   ·   Live feedback: lampo watch

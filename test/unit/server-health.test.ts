@@ -85,7 +85,7 @@ test('the test mail goes to the asker’s own address now: the outbox without a 
 test('a relay that refuses: a sentence to fix it by, not what the relay said', async () => {
   const r = await relayed.request('POST', '/api/server/mail-test', { body: {}, ...as(owner) });
   assert.equal(r.status, 502, r.text);
-  assert.match(r.json().error, /VR_SMTP_URL/);
+  assert.match(r.json().error, /LAMPO_SMTP_URL/);
   for (const secret of [SECRET, 'ECONNREFUSED', '127.0.0.1']) assert.ok(!r.text.includes(secret), `no ${secret} in the answer`);
 });
 

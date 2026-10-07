@@ -383,9 +383,9 @@ export function GetStarted(props: GetStartedProps) {
           <OIcon name="package" size={16} />
           <span>
             <b>{t('Later: take it to a server or Lampo Cloud.')}</b>{' '}
-            <T k="<0>vr export</0> packs every review into one file, with its notes, frames and versions." tags={[(c) => <code>{c}</code>]} />
+            <T k="<0>lampo export</0> packs every review into one file, with its notes, frames and versions." tags={[(c) => <code>{c}</code>]} />
           </span>
-          <CopyButton text="vr export ~/lampo-move.tar" />
+          <CopyButton text="lampo export ~/lampo-move.tar" />
         </div>
       )}
     </section>

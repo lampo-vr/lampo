@@ -323,7 +323,7 @@ const Login = z.object({ email: Email, password: Password });
 const TokenDays = z.number().int().min(1).max(3650).optional();
 const WorkspaceId = z.string().regex(workspaces.WORKSPACE_ID, 'not a workspace id');
 const TokenLogin = Login.extend({ name: z.string().max(80).optional(), days: TokenDays, workspace: WorkspaceId.optional() });
-// `vr login` from the browser: the one-time code its loopback listener got, the PKCE verifier and where the code went.
+// `lampo login` from the browser: the one-time code its loopback listener got, the PKCE verifier and where the code went.
 const CodeLogin = z
   .object({
     code: z.string().min(1).max(200),
@@ -358,7 +358,7 @@ const MePatch = z.object({
         .optional(),
       // On the machine: sending something to an agent that isn't running asks, starts it, or only sends.
       wake: z.enum(['ask', 'start', 'send']).optional(),
-      // An email when the account signs in from a browser or `vr` it hasn't seen.
+      // An email when the account signs in from a browser or `lampo` it hasn't seen.
       signin_alerts: z.boolean().optional(),
     })
     .strict()
@@ -566,7 +566,7 @@ export function authRoutes({ cfg, setupToken, setupDone, extension = () => NO_EX
   const HOUR = 60 * 60000;
   const signInsByAccount = new RateLimit(30, HOUR);
   const signInsByIp = new RateLimit(30, HOUR);
-  // Codes `vr login` brings back from the browser, per address: each one random and one-time, so a handful is plenty.
+  // Codes `lampo login` brings back from the browser, per address: each one random and one-time, so a handful is plenty.
   const vrCodes = new RateLimit(30, WINDOW);
   const cookies = sessionCookies(cfg);
   const setCookie = cookies.set;
@@ -577,7 +577,7 @@ export function authRoutes({ cfg, setupToken, setupDone, extension = () => NO_EX
   const person = (req: Request, what: string) => {
     if (req.auth?.via === 'token') throw fail(403, `${what} signed in, in the app: not with an API token`);
   };
-  // A sign-in from a browser (or a `vr`) the account hasn't used before: an email when the person asked for those.
+  // A sign-in from a browser (or a `lampo`) the account hasn't used before: an email when the person asked for those.
   const alert = (user: auth.User, device: string) => {
     if (user.prefs?.signin_alerts) accountMail.newSignIn(user, device);
   };
@@ -592,7 +592,7 @@ export function authRoutes({ cfg, setupToken, setupDone, extension = () => NO_EX
     return ws;
   };
 
-  // Throttled password check shared by the browser login and `vr login`.
+  // Throttled password check shared by the browser login and `lampo login`.
   async function checkLogin(req: Request, email: string, password: string): Promise<auth.User> {
     const ip = addressKey(req.ip || 'unknown');
     const account = auth.emailKey(email);
@@ -672,7 +672,7 @@ export function authRoutes({ cfg, setupToken, setupDone, extension = () => NO_EX
     res.json({ user: userIn(user, ws), ...workspaceFacts({ user, workspace: ws }) });
   });
 
-  // `vr login`: email + password → a named API token (no cookie); or, from the browser, the code the person allowed on
+  // `lampo login`: email + password → a named API token (no cookie); or, from the browser, the code the person allowed on
   // the consent screen (server/routes/oauth.ts, client `vr`) + its PKCE verifier → the same token, named after the machine.
   r.post('/api/auth/token', express.json(), async (req, res) => {
     if (req.body && typeof req.body === 'object' && 'code' in req.body) return codeLogin(req, res);
@@ -680,14 +680,14 @@ export function authRoutes({ cfg, setupToken, setupDone, extension = () => NO_EX
     const user = await checkLogin(req, b.email, b.password);
     // A sign-up that isn't confirmed can do nothing yet; a token would only be a way around that.
     if (auth.isGated(user)) throw fail(403, 'confirm your email address first: the link is in your inbox');
-    // The token acts in the workspace asked for (vr login --workspace), else where the person works.
+    // The token acts in the workspace asked for (lampo login --workspace), else where the person works.
     const ws = b.workspace ?? workspaces.homeWorkspace(user.id);
     if (!ws || !workspaces.roleIn(ws, user.id))
       throw fail(403, b.workspace ? 'you are not a member of that workspace' : 'this account is not in any workspace any more');
-    const { token, info } = auth.createToken(user.id, b.name || 'vr login', { days: b.days, ...(ws !== DEFAULT_WORKSPACE ? { workspace: ws } : {}) });
+    const { token, info } = auth.createToken(user.id, b.name || 'lampo login', { days: b.days, ...(ws !== DEFAULT_WORKSPACE ? { workspace: ws } : {}) });
     auth.noteSignIn(user.id);
-    alert(user, b.name || 'vr login');
-    // `several`: the person (who just gave their password) works in more than one: `vr login` names the token's.
+    alert(user, b.name || 'lampo login');
+    // `several`: the person (who just gave their password) works in more than one: `lampo login` names the token's.
     res.json({ token, info: auth.publicToken(info), user: userIn(user, ws), several: workspaces.workspacesOf(user.id).length > 1 });
   });
 
@@ -950,7 +950,7 @@ export function authRoutes({ cfg, setupToken, setupDone, extension = () => NO_EX
     const ws = me.workspace;
     if (workspaces.isMigrated()) {
       if (accountMail.enabled) mailRoom(ws, me.user?.id);
-      // A server with workspaces: whoever runs one may be anyone (VR_WORKSPACE_CREATE), so nobody makes an account — a
+      // A server with workspaces: whoever runs one may be anyone (LAMPO_WORKSPACE_CREATE), so nobody makes an account — a
       // password, a confirmed address — for someone else's address. The address gets an invite into this workspace
       // instead (its link makes the account with the person's own password, or adds the account they have), sent with
       // fixed words: the same answer whatever the address, so nothing tells whether it has an account on this server.
@@ -1024,7 +1024,7 @@ export function authRoutes({ cfg, setupToken, setupDone, extension = () => NO_EX
       if (newEmail && !self) throw fail(403, 'an address is changed by its person, in Profile (it is confirmed from the new inbox)');
       // A password too, once its person proved the address from their inbox (a confirm or reset link): whoever runs a
       // workspace may be anyone, and an account taken back with a reset must stay its person's. An admin sets one only
-      // for an account nobody confirmed (made with `vr admin create-user`, or before workspaces).
+      // for an account nobody confirmed (made with `lampo admin create-user`, or before workspaces).
       if (account.password !== undefined && !self && auth.addressProven(target))
         throw fail(403, 'their password is theirs: they confirmed their address, so they change it themselves (Forgot password? on the sign-in screen)');
       if (account.name !== undefined) nameFreeFor(target, account.name);

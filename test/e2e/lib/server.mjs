@@ -11,7 +11,7 @@ import { freePort, ROOT, sleep, tmpdir } from '../../lib/helpers.ts';
 
 // Mail settings are dropped too: a suite never reaches a real relay, its messages land in <cache>/outbox/.
 const DROPPED =
-  /^(CLAUDE_PID|CLAUDE_CODE_SESSION_ID|LAMPO_OPERATOR|VR_(MODE|HOST|PORT|DATA|CACHE|CONFIG|HOME|USER|BY|PASSWORD|STORAGE|BUNNY_\w+|S3_\w+|PUBLIC_URL|SOURCE_URL|ALLOW_NO_PUBLIC_URL|TRUST_PROXY|SERVER|TOKEN|REMOTE|LAN|TUNNEL|WEBHOOK_\w+|CLAUDE_BIN|STT\w*|MIN_FREE|ONBOARDING|ONBOARDING_SAMPLE|SMTP_URL|MAIL_\w+|SIGNUP|TERMS_URL|PRIVACY_URL|IMPRINT_URL|WITHDRAWAL_URL|CANCEL_URL))$/;
+  /^(CLAUDE_PID|CLAUDE_CODE_SESSION_ID|LAMPO_OPERATOR|(?:VR|LAMPO)_(MODE|HOST|PORT|DATA|CACHE|CONFIG|HOME|USER|BY|PASSWORD|STORAGE|BUNNY_\w+|S3_\w+|PUBLIC_URL|SOURCE_URL|ALLOW_NO_PUBLIC_URL|TRUST_PROXY|SERVER|TOKEN|REMOTE|LAN|TUNNEL|WEBHOOK_\w+|CLAUDE_BIN|STT\w*|MIN_FREE|ONBOARDING|ONBOARDING_SAMPLE|SMTP_URL|MAIL_\w+|SIGNUP|TERMS_URL|PRIVACY_URL|IMPRINT_URL|WITHDRAWAL_URL|CANCEL_URL))$/;
 
 /**
  * The operator's legal pages a suite's server links (lib/legal.ts): `VR_SIGNUP=open` refuses to start without the terms
@@ -102,8 +102,10 @@ export async function startServer({ prefix, mode = 'local', user, publicUrl, con
     ...(typeof extra === 'function' ? extra({ port, base }) : extra),
     // A `vr` a suite runs with this environment works on the suite's store, never on a server this machine is signed
     // in to (`vr login`'s credentials.json and its download cache: lib/backend/credentials.ts). Last, so no suite's
-    // settings undo it; a suite that wants a remote `vr` sets VR_REMOTE and the rest on that one command.
+    // settings undo it; a suite that wants a remote `vr` sets LAMPO_REMOTE and the rest on that one command. Both
+    // spellings: LAMPO_ is read first, VR_ by an older `vr`.
     VR_REMOTE: '0',
+    LAMPO_REMOTE: '0',
     XDG_CONFIG_HOME: path.join(dir, 'xdg-config'),
     XDG_CACHE_HOME: path.join(dir, 'xdg-cache'),
   });

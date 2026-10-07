@@ -1,7 +1,7 @@
 # Hosting: on your machine or a server
 
 Lampo is one app. On your own machine it signs you in by itself and can link renders where they are on your disk. On
-a server (`VR_MODE=server`) everyone signs in, renders arrive as uploads, and they can be kept in Bunny Storage or an
+a server (`LAMPO_MODE=server`) everyone signs in, renders arrive as uploads, and they can be kept in Bunny Storage or an
 S3 bucket. Accounts, invites, API tokens, uploads, review links, sign-in for MCP clients and the settings work the
 same in both places. A server can also hold several teams, each in a [workspace](#workspaces) of its own.
 
@@ -13,10 +13,10 @@ step by step, is [go-live.md](go-live.md); every setting is in [configuration.md
 1. Start the server with the address people will open:
 
    ```sh
-   VR_MODE=server \
-   VR_PUBLIC_URL=https://review.example.com \
-   VR_HOST=127.0.0.1 \
-   VR_TRUST_PROXY=loopback \
+   LAMPO_MODE=server \
+   LAMPO_PUBLIC_URL=https://review.example.com \
+   LAMPO_HOST=127.0.0.1 \
+   LAMPO_TRUST_PROXY=loopback \
    npm start
    ```
 
@@ -25,44 +25,44 @@ step by step, is [go-live.md](go-live.md); every setting is in [configuration.md
 
 2. On its first start the log prints a one-time **setup token**. Open `https://review.example.com/?setup` and enter
    it with your email, name and password: that creates the **owner** account. On the server itself,
-   `vr admin create-user --email you@example.com --name "You" --role owner` does the same.
+   `lampo admin create-user --email you@example.com --name "You" --role owner` does the same.
 
    ![A hosted server’s first start: the setup screen with the one-time setup token, name, email and password](assets/hosted-setup.webp)
 
-3. Invite the others from **Settings → Users**, or with `vr admin invite`.
+3. Invite the others from **Settings → Users**, or with `lampo admin invite`.
 
 4. On each machine where an agent works (the sign-in screen has the command under *Sign in an agent*):
 
    ```sh
-   vr login https://review.example.com        # opens your browser; keeps an API token here
-   vr push render.mp4 --folder "Acme/Reels"   # upload; the same name again becomes v2, v3, …
-   vr watch                                   # live feedback
+   lampo login https://review.example.com        # opens your browser; keeps an API token here
+   lampo push render.mp4 --folder "Acme/Reels"   # upload; the same name again becomes v2, v3, …
+   lampo watch                                   # live feedback
    ```
 
-   Inside a Claude Code session, `vr watch` also makes that session one you can pick in *Assign agent…* while it
+   Inside a Claude Code session, `lampo watch` also makes that session one you can pick in *Assign agent…* while it
    watches.
 
-`vr login` opens your browser at the server: sign in there if you aren't, and press **Allow** on the consent screen,
-which names the machine (`vr on <machine>` is the API token it gets, in the workspace you work in there) and what the
+`lampo login` opens your browser at the server: sign in there if you aren't, and press **Allow** on the consent screen,
+which names the machine (`lampo on <machine>` is the API token it gets, in the workspace you work in there) and what the
 token may do. The terminal says what is happening and who you are signed in as; Ctrl-C cancels, and it gives up after
 5 minutes. Over SSH it prints the address instead: open it in a browser on any device, and after Allow paste the
 address that browser ends on (a page that can't load) into the terminal. Where no browser can reach (CI, scripts),
-`vr login https://review.example.com --email you@example.com` asks for your password, and with an API token from
+`lampo login https://review.example.com --email you@example.com` asks for your password, and with an API token from
 Settings, `--token -` asks for it or reads it from a pipe. Don't type the token itself on the command line: the
-process list and your shell's history would keep it. `vr login` refuses a plain `http://` address on another machine
+process list and your shell's history would keep it. `lampo login` refuses a plain `http://` address on another machine
 (the password, the token and every note would cross the network unencrypted) unless you add `--insecure`, for a
-network that is yours alone; `http://localhost` needs nothing. `vr logout` goes back to the local store: a token
-`vr login` made is revoked, one you pasted is only forgotten (revoke it in Settings → API tokens). In CI or a
-container, `VR_SERVER` and `VR_TOKEN` do the same as `vr login` without a file; `VR_REMOTE=0` keeps `vr` on the local
+network that is yours alone; `http://localhost` needs nothing. `lampo logout` goes back to the local store: a token
+`lampo login` made is revoked, one you pasted is only forgotten (revoke it in Settings → API tokens). In CI or a
+container, `LAMPO_SERVER` and `LAMPO_TOKEN` do the same as `lampo login` without a file; `LAMPO_REMOTE=0` keeps `lampo` on the local
 store.
 
 ## Your machine or a server
 
-| | On your machine (the default) | Hosted (`VR_MODE=server`) |
+| | On your machine (the default) | Hosted (`LAMPO_MODE=server`) |
 |---|---|---|
-| Signing in | You are signed in automatically at the machine; your owner account is made on the first start. Teammates sign in with their accounts; a phone can also use the link `npm run lan` prints. | Everyone signs in. The first account is made with the one-time setup token; others come through invites or, when `VR_SIGNUP` allows it, sign up. |
-| Videos come from | uploads, and renders linked where they are on this disk (a re-render to the same path becomes the next version) | uploads: the browser, `vr push`, MCP |
-| Agents | Claude Code sessions on this machine show up by themselves; any MCP client or `vr` connects too | any MCP client (by signing in, or with an API token) and `vr login` |
+| Signing in | You are signed in automatically at the machine; your owner account is made on the first start. Teammates sign in with their accounts; a phone can also use the link `npm run lan` prints. | Everyone signs in. The first account is made with the one-time setup token; others come through invites or, when `LAMPO_SIGNUP` allows it, sign up. |
+| Videos come from | uploads, and renders linked where they are on this disk (a re-render to the same path becomes the next version) | uploads: the browser, `lampo push`, MCP |
+| Agents | Claude Code sessions on this machine show up by themselves; any MCP client or `lampo` connects too | any MCP client (by signing in, or with an API token) and `lampo login` |
 | Renders are kept in | `versions/` on this disk | local disk, Bunny Storage, or an S3-compatible bucket |
 | Extras | linking files and browsing folders, Claude Code sessions (and starting one for a request), Finder and macOS text recognition on a Mac, project timelines, INBOX.md, the tunnel for review links, the phone link | none: a hosted server never touches anyone's disk or machine |
 
@@ -76,7 +76,7 @@ from then on), or sign in with an email and a password you set in **Settings →
 **Settings → Users**, as on a server; they sign in with their own accounts. The tunnel serves review links only.
 
 A store that ran on a machine works on a server for its uploads only: linked renders point at a disk the server can't
-see. To move one, linked renders and all, use `vr export` there and `vr admin import` here: [moving.md](moving.md).
+see. To move one, linked renders and all, use `lampo export` there and `lampo admin import` here: [moving.md](moving.md).
 
 ## Configuration
 
@@ -85,48 +85,48 @@ The settings that matter most on a server. All the others, and where config.json
 
 | Variable | config.json | Default | What it does |
 |---|---|---|---|
-| `VR_MODE` | `mode` | local | `server` turns on sign-in for everyone and the restrictions in the [security model](#security-model). |
-| `VR_PUBLIC_URL` | `public_url` | none (required) | The address people open: scheme and host only, such as `https://review.example.com` (a path is refused). Only this host name (and localhost) is served, writes must come from it, emailed links are built from it, and on https cookies are marked Secure. Plain `http://` is refused unless the host is this machine or `VR_ALLOW_HTTP=1`. |
-| `VR_ALLOW_HTTP` | | off | `1` lets a hosted server start with a plain-http `VR_PUBLIC_URL` on another host (a closed test network); passwords and cookies then cross the network unencrypted. |
-| `VR_TRUST_PROXY` | `trust_proxy` | none | Which proxies may tell the app the visitor's address and that the connection is https: their addresses or subnets, `loopback` (a proxy on this machine), `uniquelocal` (a private network, such as the compose network), `linklocal`; separated by commas. Required when `VR_PUBLIC_URL` is https: the server refuses to start without it (`false` says on purpose that no proxy forwards addresses). |
-| `VR_MEDIA_ORIGIN` | `media_origin` | none | A second host name of this server for video, such as `https://media.example.com`: the player, review links, downloads and folder zips are sent there with signed URLs ([below](#a-host-of-its-own-for-video)). For an app host behind a CDN proxy that must not carry video. |
-| `VR_HOST` | `host` | 0.0.0.0 | The address to listen on. Behind a proxy on the same machine: 127.0.0.1. |
-| `VR_PORT` | `port` | 4747 | |
-| `VR_UPLOAD_MAX` | `upload_max_bytes` | 20 GB | The largest upload accepted. |
-| `VR_MIN_FREE` | `min_free_bytes` | 2 GB | Free disk to keep: below it the server reports not ready, and uploads that don't fit are refused. |
-| `VR_STORAGE` | `storage` | local | Where renders are kept ([Storage](#storage)). |
-| `VR_SOURCE_URL` | `source_url` | the project's repository | Where people get this instance's source code (AGPL-3.0). The default is right for an unmodified copy; a changed one points it at its own source. A server with none at all warns at start. |
-| `VR_SMTP_URL`, `VR_MAIL_FROM` | `mail.smtp_url`, `mail.from` | none: the outbox | The mail relay invites, password resets and account notices go out through, and the sender people see. Without a relay, every email is written to the outbox in the cache instead ([email.md](email.md)). |
-| `VR_SIGNUP` | `signup` | off | Who may sign up on their own: `off`, `invite` or `open` ([below](#accounts-and-tokens)). |
-| `VR_IMPRINT_URL`, `VR_PRIVACY_URL`, `VR_TERMS_URL` | `imprint_url`, `privacy_url`, `terms_url` | none | Your imprint, privacy policy and terms, linked at the foot of the sign-in screens and of review links, and in *Settings → About* ([configuration.md → Legal pages](configuration.md#legal-pages)). `VR_SIGNUP=open` needs the terms and the privacy policy. |
+| `LAMPO_MODE` | `mode` | local | `server` turns on sign-in for everyone and the restrictions in the [security model](#security-model). |
+| `LAMPO_PUBLIC_URL` | `public_url` | none (required) | The address people open: scheme and host only, such as `https://review.example.com` (a path is refused). Only this host name (and localhost) is served, writes must come from it, emailed links are built from it, and on https cookies are marked Secure. Plain `http://` is refused unless the host is this machine or `LAMPO_ALLOW_HTTP=1`. |
+| `LAMPO_ALLOW_HTTP` | | off | `1` lets a hosted server start with a plain-http `LAMPO_PUBLIC_URL` on another host (a closed test network); passwords and cookies then cross the network unencrypted. |
+| `LAMPO_TRUST_PROXY` | `trust_proxy` | none | Which proxies may tell the app the visitor's address and that the connection is https: their addresses or subnets, `loopback` (a proxy on this machine), `uniquelocal` (a private network, such as the compose network), `linklocal`; separated by commas. Required when `LAMPO_PUBLIC_URL` is https: the server refuses to start without it (`false` says on purpose that no proxy forwards addresses). |
+| `LAMPO_MEDIA_ORIGIN` | `media_origin` | none | A second host name of this server for video, such as `https://media.example.com`: the player, review links, downloads and folder zips are sent there with signed URLs ([below](#a-host-of-its-own-for-video)). For an app host behind a CDN proxy that must not carry video. |
+| `LAMPO_HOST` | `host` | 0.0.0.0 | The address to listen on. Behind a proxy on the same machine: 127.0.0.1. |
+| `LAMPO_PORT` | `port` | 4747 | |
+| `LAMPO_UPLOAD_MAX` | `upload_max_bytes` | 20 GB | The largest upload accepted. |
+| `LAMPO_MIN_FREE` | `min_free_bytes` | 2 GB | Free disk to keep: below it the server reports not ready, and uploads that don't fit are refused. |
+| `LAMPO_STORAGE` | `storage` | local | Where renders are kept ([Storage](#storage)). |
+| `LAMPO_SOURCE_URL` | `source_url` | the project's repository | Where people get this instance's source code (AGPL-3.0). The default is right for an unmodified copy; a changed one points it at its own source. A server with none at all warns at start. |
+| `LAMPO_SMTP_URL`, `LAMPO_MAIL_FROM` | `mail.smtp_url`, `mail.from` | none: the outbox | The mail relay invites, password resets and account notices go out through, and the sender people see. Without a relay, every email is written to the outbox in the cache instead ([email.md](email.md)). |
+| `LAMPO_SIGNUP` | `signup` | off | Who may sign up on their own: `off`, `invite` or `open` ([below](#accounts-and-tokens)). |
+| `LAMPO_IMPRINT_URL`, `LAMPO_PRIVACY_URL`, `LAMPO_TERMS_URL` | `imprint_url`, `privacy_url`, `terms_url` | none | Your imprint, privacy policy and terms, linked at the foot of the sign-in screens and of review links, and in *Settings → About* ([configuration.md → Legal pages](configuration.md#legal-pages)). `LAMPO_SIGNUP=open` needs the terms and the privacy policy. |
 | `LAMPO_OPERATOR` | | the first workspace's owners | Who runs this server, by email address or account id ([below](#the-operators-pages)). |
 
 Where the store is on disk: [configuration.md → Where data lives](configuration.md#where-data-lives).
 
-A server refuses to start without `VR_PUBLIC_URL`: it would otherwise answer to any host name, take its sign-in
+A server refuses to start without `LAMPO_PUBLIC_URL`: it would otherwise answer to any host name, take its sign-in
 address for MCP clients from the request, and might not mark cookies Secure. For a quick local test,
-`VR_ALLOW_NO_PUBLIC_URL=1` starts it anyway; it then reports itself not ready.
+`LAMPO_ALLOW_NO_PUBLIC_URL=1` starts it anyway; it then reports itself not ready.
 
 It also refuses to start on settings that would be unsafe or can't work, with one line in the log for each that says
 what to change:
 
-- a `VR_PUBLIC_URL` with a path, or without its scheme;
-- plain `http://` on a host other than this machine, without `VR_ALLOW_HTTP=1`;
-- an https `VR_PUBLIC_URL` without `VR_TRUST_PROXY`;
-- a `VR_MEDIA_ORIGIN` that isn't a host of its own: with a path, plain http off this machine, or the public URL's host;
-- `VR_BUNNY_CDN_URL` without `VR_BUNNY_TOKEN_KEY`;
-- an unknown `VR_STORAGE`, `VR_STT` or `VR_SIGNUP`, incomplete storage settings, or a port, size or `VR_TRUST_PROXY`
+- a `LAMPO_PUBLIC_URL` with a path, or without its scheme;
+- plain `http://` on a host other than this machine, without `LAMPO_ALLOW_HTTP=1`;
+- an https `LAMPO_PUBLIC_URL` without `LAMPO_TRUST_PROXY`;
+- a `LAMPO_MEDIA_ORIGIN` that isn't a host of its own: with a path, plain http off this machine, or the public URL's host;
+- `LAMPO_BUNNY_CDN_URL` without `LAMPO_BUNNY_TOKEN_KEY`;
+- an unknown `LAMPO_STORAGE`, `LAMPO_STT` or `LAMPO_SIGNUP`, incomplete storage settings, or a port, size or `LAMPO_TRUST_PROXY`
   entry it can't read;
-- a `VR_SMTP_URL` that isn't one, or one without `VR_MAIL_FROM`; a sender or reply-to address that isn't one; a legal
-  page (`VR_IMPRINT_URL`, `VR_TERMS_URL`, `VR_PRIVACY_URL`, `VR_WITHDRAWAL_URL`, `VR_CANCEL_URL`) that isn't http(s);
-- sign-up without a public URL, `VR_SIGNUP=open` anywhere but a hosted server, or `VR_SIGNUP=open` without
-  `VR_TERMS_URL` and `VR_PRIVACY_URL` (strangers who sign up accept your terms and read your privacy policy first);
+- a `LAMPO_SMTP_URL` that isn't one, or one without `LAMPO_MAIL_FROM`; a sender or reply-to address that isn't one; a legal
+  page (`LAMPO_IMPRINT_URL`, `LAMPO_TERMS_URL`, `LAMPO_PRIVACY_URL`, `LAMPO_WITHDRAWAL_URL`, `LAMPO_CANCEL_URL`) that isn't http(s);
+- sign-up without a public URL, `LAMPO_SIGNUP=open` anywhere but a hosted server, or `LAMPO_SIGNUP=open` without
+  `LAMPO_TERMS_URL` and `LAMPO_PRIVACY_URL` (strangers who sign up accept your terms and read your privacy policy first);
 - a store folder it can't write;
 - a damaged key file (`secret.key`, `share-secret.key`);
-- a `VR_CLOUD_MODULE` that can't be loaded, or one that names a route the server answers itself
+- a `LAMPO_CLOUD_MODULE` that can't be loaded, or one that names a route the server answers itself
   ([below](#a-billing-provider)).
 
-Forwarding headers from a peer that `VR_TRUST_PROXY` doesn't name are reported once in the log: the proxy isn't
+Forwarding headers from a peer that `LAMPO_TRUST_PROXY` doesn't name are reported once in the log: the proxy isn't
 named, or the app's port can be reached without it.
 
 ### Behind a reverse proxy
@@ -141,14 +141,14 @@ review.example.com {
 
 Caddy's defaults already pass the live event stream through as it comes, accept uploads of any size and keep range
 requests (frame-exact seeking) intact. Run the app as in the [quick start](#quick-start): listening on 127.0.0.1 only,
-and trusting the proxy's forwarding headers with `VR_TRUST_PROXY=loopback`. With the proxy on another machine, listen
-on an address it can reach and name its address or subnet in `VR_TRUST_PROXY` instead.
+and trusting the proxy's forwarding headers with `LAMPO_TRUST_PROXY=loopback`. With the proxy on another machine, listen
+on an address it can reach and name its address or subnet in `LAMPO_TRUST_PROXY` instead.
 
 With nginx:
 
 - turn `proxy_buffering` off for the live streams, `/api/events` and `/mcp`;
 - set `client_max_body_size` to your upload limit (or `0`) and turn `proxy_request_buffering` off. Browsers and
-  `vr push` send uploads in pieces of up to 64 MB, but a one-time upload address (`request_upload`) takes the whole
+  `lampo push` send uploads in pieces of up to 64 MB, but a one-time upload address (`request_upload`) takes the whole
   file in one request.
 
 ### Speed over a real network
@@ -186,8 +186,8 @@ its proxy, and its limits (a request size, a timeout) don't fit renders of sever
 name that points straight at the server, without the proxy, and tell the app:
 
 ```sh
-VR_PUBLIC_URL=https://review.example.com    # behind the CDN proxy
-VR_MEDIA_ORIGIN=https://media.example.com   # DNS only, straight to this server
+LAMPO_PUBLIC_URL=https://review.example.com    # behind the CDN proxy
+LAMPO_MEDIA_ORIGIN=https://media.example.com   # DNS only, straight to this server
 ```
 
 The same TLS proxy on the server serves both names to the same app:
@@ -213,10 +213,10 @@ What changes:
   valid, and the team member who asked must still be one (the same API token or browser session, still in the
   workspace, still allowed to download); the folder must also hold what it held when the URL was made. Otherwise the
   zip doesn't start, and asking the app host again gives a new URL to whoever may still have it.
-- **One-time upload URLs** (`request_upload`, `vr` for big references and previews) point at the media host too, so a
+- **One-time upload URLs** (`request_upload`, `lampo` for big references and previews) point at the media host too, so a
   whole render in one request never meets the proxy's request limit. Such a request may take up to 6 hours to send
-  (Node's own limit of 5 minutes is raised); a TLS proxy in front keeps its own timeouts, so give it as long. Browsers and `vr push` upload in pieces through
-  the app host (48 MiB from a browser, 64 MiB from `vr push`: under the 100 MB a CDN usually takes per request). A chat
+  (Node's own limit of 5 minutes is raised); a TLS proxy in front keeps its own timeouts, so give it as long. Browsers and `lampo push` upload in pieces through
+  the app host (48 MiB from a browser, 64 MiB from `lampo push`: under the 100 MB a CDN usually takes per request). A chat
   app's sandbox must be allowed to reach the media host to upload there
   ([uploads from a chat app's sandbox](mcp.md#claude-and-chatgpt)).
 - **The media host answers nothing else**: no page, no API, no sign-in; every other path is a 404 there, whoever
@@ -244,18 +244,18 @@ on your own machine always has exactly one.
 1. **Make one.** In the app: Settings → Workspace → *New workspace…* (the account menu has it too once you belong to
    two or more); whoever makes it becomes its owner. By default only whoever runs the server may ([the
    operator](#the-operators-pages)): whoever runs a workspace invites and emails people and takes turns in the server's
-   job queue, so handing that out is the operator's choice. `VR_WORKSPACE_CREATE=anyone` lets everyone signed in make some: each account at most
-   `VR_WORKSPACE_CREATE_LIMIT` (3; the workspace its sign-up gave it counts, the operator has no limit) and ten a day, counted on the server. On the server,
-   `vr admin workspaces create --name "Acme" --owner you@example.com` makes one owned by an existing account.
+   job queue, so handing that out is the operator's choice. `LAMPO_WORKSPACE_CREATE=anyone` lets everyone signed in make some: each account at most
+   `LAMPO_WORKSPACE_CREATE_LIMIT` (3; the workspace its sign-up gave it counts, the operator has no limit) and ten a day, counted on the server. On the server,
+   `lampo admin workspaces create --name "Acme" --owner you@example.com` makes one owned by an existing account.
 2. **Bring people in.** Settings → Users shows the current workspace's members and invites; invites work as
    [below](#accounts-and-tokens). Someone who already has an account on the server joins with it: signed in, the
    invite screen asks only for their password, checked and limited like a sign-in. On the server:
-   `vr admin invite --workspace <id>` or `vr admin create-user --workspace <id>`.
+   `lampo admin invite --workspace <id>` or `lampo admin create-user --workspace <id>`.
 3. **Switch.** People switch between their workspaces in the account menu or in Settings → Workspace, where owners
    and admins also rename it. The switch belongs to the browser's sign-in, so every tab follows.
 
 **Roles are per workspace**: someone can own one and review in another. An API token acts in the workspace it was made
-in (`vr login <server> --email <address> --workspace <id>` picks it; signed in through the browser, it is the one you
+in (`lampo login <server> --email <address> --workspace <id>` picks it; signed in through the browser, it is the one you
 work in there), and an app connected through sign-in in the one its consent screen named,
 each with the person's role there. Admins manage their workspace's members and roles, and disable them there: a
 disabled member has no role in that workspace (their sessions there, tokens and apps stop) until let in again, while
@@ -264,7 +264,7 @@ Someone who also works in another workspace changes their own name, email and pa
 address is never an admin's to change: its person changes it, confirmed from the new inbox.
 
 **No accounts for other people's addresses.** On a hosted server whoever runs a workspace may be anyone (a sign-up's
-own, or anyone's with `VR_WORKSPACE_CREATE=anyone`), so *Add a user with a temporary password* makes no account there:
+own, or anyone's with `LAMPO_WORKSPACE_CREATE=anyone`), so *Add a user with a temporary password* makes no account there:
 it sends the address an invite into the workspace, and answers the same whatever the address, so a workspace's admins
 learn nothing about who has an account on the server. Taking an invite proves no inbox either, since its maker holds
 the link too: an account that gives its own password joins at once; anyone else is held until the confirm link mailed
@@ -273,7 +273,7 @@ and the answer to taking one is the same whatever the address ([email.md](email.
 person has proved their address from their inbox (a confirm or reset link), no workspace admin sets their password.
 Invite emails are in the server's own words; the inviter's and the workspace's names are only quoted, in a line of
 their own: the workspace's once someone named it (a sign-up's workspace starts out called after its owner, a person's
-name, so the invite email and page then name only the inviter), and the subject carries `VR_ORG_NAME` for the first
+name, so the invite email and page then name only the inviter), and the subject carries `LAMPO_ORG_NAME` for the first
 workspace's invites only. On your own machine, which has no workspaces, admins still add people with a temporary
 password.
 
@@ -283,9 +283,9 @@ the last 30 days (`429` past any of them). A revoked or expired invite leaves th
 lists that long) and counts toward the 200 until then, so revoking one makes no room; accepted ones stay, since they
 say who invited whom, and don't count.
 
-**Sign-up.** With `VR_SIGNUP=open` ([email.md](email.md#sign-up-vr_signup)), everyone who signs up gets a workspace
+**Sign-up.** With `LAMPO_SIGNUP=open` ([email.md](email.md#sign-up-vr_signup)), everyone who signs up gets a workspace
 of their own once their address is confirmed: empty, with them as its owner, named after them until they rename it.
-They never see anyone else's. With `VR_SIGNUP=invite` an invited address gets its invite again, and the invite's link
+They never see anyone else's. With `LAMPO_SIGNUP=invite` an invited address gets its invite again, and the invite's link
 puts them in its workspace.
 
 **Links name their workspace.** A notification, a chat webhook's link and an agent's "open in the player" link carry
@@ -301,20 +301,20 @@ it is told so and lands in their library.
   workspaces with their members (`data/workspaces.json`) belong to no workspace.
 - **The move.** A hosted server moves its store to workspaces once, the first time it starts with them. It first
   copies `users.json`, `invites.json`, `oauth/grants.json` and `shares.json` to `data/backups/workspaces-<time>/`,
-  and the log names that folder. `vr admin workspaces migrate` does the same by hand; run again, it does nothing.
+  and the log names that folder. `lampo admin workspaces migrate` does the same by hand; run again, it does nothing.
   It never runs while `data/w/` holds a workspace folder, empty or not: it would write `w1` alone over the others.
   Afterwards a version of Lampo from before workspaces can't open the store without losing them.
 - **A lost `workspaces.json`.** A store that moved and then lost `data/workspaces.json`, or can't read it, doesn't
-  start: the log says to restore it (`video-review: … restore it from your backup`). Without the file every account
+  start: the log says to restore it (`lampo: … restore it from your backup`). Without the file every account
   would read as a member of the first workspace, so the memberships are never rebuilt from the accounts. A server that
   loses the file while it runs, or can't read it for a moment, stays up: it answers signed-in requests with 503, and
   `/readyz` is red until the file can be read again; then it serves as before.
-- **On the server's own store**, `vr admin workspaces` lists the workspaces and their members. `vr admin list-users`
+- **On the server's own store**, `lampo admin workspaces` lists the workspaces and their members. `lampo admin list-users`
   shows every account with its role in one workspace (`--workspace <id>`) and, on a store with several, its role in
-  the others. `vr admin invite` says which workspace its link is for, and `vr admin invites` and `revoke-invite` keep
-  to one (`invites --all` lists every workspace's, each named). `VR_WORKSPACE=<id>` points `vr` and the stdio MCP
-  server at one (default: the first, `w1`): everything they read, write and follow (`vr watch`, the MCP change feed,
-  `vr admin` without `--workspace`) is that workspace's. An id the store has no workspace for is refused at the
+  the others. `lampo admin invite` says which workspace its link is for, and `lampo admin invites` and `revoke-invite` keep
+  to one (`invites --all` lists every workspace's, each named). `LAMPO_WORKSPACE=<id>` points `lampo` and the stdio MCP
+  server at one (default: the first, `w1`): everything they read, write and follow (`lampo watch`, the MCP change feed,
+  `lampo admin` without `--workspace`) is that workspace's. An id the store has no workspace for is refused at the
   start, in one sentence.
 - **Isolation** is enforced where the data lives, not only in the routes. Each workspace's files are a tree of their
   own; every request, job, timer and event runs in its workspace, and work that loses it is refused once a server has
@@ -334,12 +334,12 @@ it is told so and lands in their library.
 - **Webhooks** from config.json or the environment belong to the first workspace; other workspaces add theirs in
   Settings → Notifications.
 - **One way in.** Every workspace is made by `createWorkspace({ name, ownerId })` in `lib/workspaces.ts`, whether
-  through `vr admin`, the app or a sign-up: the place to start for a sign-up flow of your own.
+  through `lampo admin`, the app or a sign-up: the place to start for a sign-up flow of your own.
 
 ### A billing provider
 
 A self-hosted server is complete and unlimited. A hosted service that sells plans adds a module of its own, which the
-server loads when `VR_CLOUD_MODULE` names its file (the one extension point, `server/extension.ts`; without it nothing
+server loads when `LAMPO_CLOUD_MODULE` names its file (the one extension point, `server/extension.ts`; without it nothing
 below exists). Lampo Cloud ([lampo.video](https://lampo.video)) runs its plans and billing this way, in a module kept
 outside this repository. What such a module may do:
 
@@ -475,16 +475,16 @@ People's own data is theirs to take home and to end (GDPR Art. 15, 17, 20); the 
   module cancels the subscription at once and forgets its state). Never the server's own workspace.
 - **The erasure log** (`data/erasures.jsonl`, ids only): every deleted account and workspace. Your nightly backups keep
   what was deleted until their retention drops it (with `restic forget --keep-monthly 12`, up to a year). After you
-  restore one, run `vr admin erasures` (what is back that was deleted) and `vr admin erasures --apply` (delete it
+  restore one, run `lampo admin erasures` (what is back that was deleted) and `lampo admin erasures --apply` (delete it
   again) — keep the newest `erasures.jsonl` aside before the restore and put it back first.
-- **On the server**: `vr admin delete-account <email|id>` and `vr admin delete-workspace <id>` say what would go and
-  delete nothing; `--yes` deletes it (and emails the people, through the server's mail settings). `vr admin
+- **On the server**: `lampo admin delete-account <email|id>` and `lampo admin delete-workspace <id>` say what would go and
+  delete nothing; `--yes` deletes it (and emails the people, through the server's mail settings). `lampo admin
   export-account <email|id> --out data.zip` writes an account's export.
 
 ```sh
-vr admin delete-workspace w_0a1b2c3d4e5f        # what goes: videos, links, members, accounts
-vr admin delete-workspace w_0a1b2c3d4e5f --yes  # and gone
-vr admin export-account mia@example.com --out mia.zip
+lampo admin delete-workspace w_0a1b2c3d4e5f        # what goes: videos, links, members, accounts
+lampo admin delete-workspace w_0a1b2c3d4e5f --yes  # and gone
+lampo admin export-account mia@example.com --out mia.zip
 ```
 
 ## Accounts and tokens
@@ -531,29 +531,29 @@ profile, password and API tokens; a reviewer's token carries a reviewer's rights
 last owner can't be removed, demoted or disabled.
 
 **Invites.** Owners and admins create a one-time link in **Settings → Users**, or with
-`vr admin invite --role reviewer --email mia@example.com`. An invite has a role, optionally a name and email to fill
+`lampo admin invite --role reviewer --email mia@example.com`. An invite has a role, optionally a name and email to fill
 in, and lasts 7 days unless you choose otherwise (1 to 90; `--days`). Whoever opens it chooses a name, email and
 password; on a hosted server they are in once that address is confirmed ([above](#workspaces)), on your own machine at
 once. With an email address the app can email the invite (*Email the invite*, and *Send again*
 in the list); otherwise it gives you a message to send. Without a mail relay an emailed invite only reaches the
-outbox, so copy the link instead. `vr admin invite` only prints the link.
+outbox, so copy the link instead. `lampo admin invite` only prints the link.
 
 - The link is `<public URL>/#/invite/inv_…`. The token sits after the `#`, so it never reaches a server's or a
   proxy's logs.
-- Pending invites can be copied again, sent again or revoked (`vr admin invites`, `vr admin revoke-invite <id>`). A
+- Pending invites can be copied again, sent again or revoked (`lampo admin invites`, `lampo admin revoke-invite <id>`). A
   used, revoked or expired link says so.
 - On your own machine an invite made out to an address confirms that address, and someone who joins through an
   invite that named none is in at once and gets a link to confirm the address they typed. On a hosted server an
   invite confirms nothing: the address is confirmed from its inbox.
 
-**Email** ([email.md](email.md)). With `VR_SMTP_URL` and `VR_MAIL_FROM` set (Brevo or any SMTP relay), the server
+**Email** ([email.md](email.md)). With `LAMPO_SMTP_URL` and `LAMPO_MAIL_FROM` set (Brevo or any SMTP relay), the server
 sends invites, password resets (*Forgot password?* on the sign-in screen: a link that works for 60 minutes; the new
 password ends every other session of the account, and its API tokens and connected apps), confirmations of a new
 address (the old one gets a notice) and account notices. Without them every message is written to the outbox in the
-cache instead, and the server says so at start. `vr admin mail-test <to>` sends one message now and prints the
+cache instead, and the server says so at start. `lampo admin mail-test <to>` sends one message now and prints the
 relay's answer.
 
-**Sign-up** (`VR_SIGNUP`, [email.md](email.md#sign-up-vr_signup)): `off` (the default), `invite` (an address a pending
+**Sign-up** (`LAMPO_SIGNUP`, [email.md](email.md#sign-up-vr_signup)): `off` (the default), `invite` (an address a pending
 invite names gets the invite again; its link makes the account) or `open` (anyone, each into a workspace of their own;
 a hosted server only). An open sign-up can do nothing until its address is confirmed, and can't change that address
 meanwhile.
@@ -561,7 +561,7 @@ meanwhile.
 **Browser sign-ins** are signed `HttpOnly; SameSite=Lax` cookies, over https named `__Host-vr_session` (this host
 only, `Secure`, the whole site: a sibling subdomain can't set or overwrite it; a `vr_session` is never read over https,
 and an answer expires it, so a browser that still holds one signs in once more). They last at most 30 days and end after 14 days
-without use (`VR_SESSION_DAYS`, `VR_SESSION_IDLE_DAYS`). Signing out ends that session on the server too, so a copy of
+without use (`LAMPO_SESSION_DAYS`, `LAMPO_SESSION_IDLE_DAYS`). Signing out ends that session on the server too, so a copy of
 its cookie stops working, and tells the browser to drop its cached renders and pictures; changing the password, disabling the account or *sign out everywhere* ends all of them.
 *Sign out everywhere* and any new password (in Profile, set by an admin, or from a reset link) also end the account's
 notifications on every device (its push subscriptions); a new password also ends its apps connected through sign-in,
@@ -569,8 +569,8 @@ and a reset its API tokens. A browser told its session is gone (a `401`, or a st
 data it kept for the next visit. Any sign-out also clears what the screens remembered in the browser's storage (open
 folders, the last video, zoom per video); the theme and language chosen on the device stay.
 
-**API tokens** (`vr_…`) are for `vr`, MCP clients and scripts. They are created in Settings → API tokens or by
-`vr login`, shown once, listed with their last use, and can be revoked or made to expire (`vr login --expires 90d`).
+**API tokens** (`vr_…`) are for `lampo`, MCP clients and scripts. They are created in Settings → API tokens or by
+`lampo login`, shown once, listed with their last use, and can be revoked or made to expire (`lampo login --expires 90d`).
 Send them as `Authorization: Bearer vr_…`. Whatever the role, a token can't make or change credentials, roles, members,
 invites, tokens, connected apps, webhooks, workspaces or review links, subscribe a device to notifications, connect
 publishing accounts or publish, schedule, cancel or retry a post, end a person's first run (`PUT /api/onboarding`),
@@ -593,7 +593,7 @@ in `data/mail/`, all readable only by the app's user. Back them up with the rest
 ## Uploads
 
 Uploads use the [tus](https://tus.io) protocol at `/api/uploads`, so a dropped connection resumes instead of starting
-over; `vr push` also resumes an interrupted upload when run again. Each upload names a file and either a folder
+over; `lampo push` also resumes an interrupted upload when run again. Each upload names a file and either a folder
 ("Acme/Reels") or the video it is a new version of.
 
 When the last byte arrives, the server checks the file and registers it:
@@ -609,7 +609,7 @@ The finishing request answers with `{slug, v, created, duplicate, video}`. A ren
 to register (a big file going into remote storage) answers `{pending: true, id}` instead, and the result appears at
 `GET /api/upload-results/<id>` for an hour. Unfinished uploads are deleted after a day.
 
-An upload under way holds its room from its start: the disk's reserve (`VR_MIN_FREE`) counts the bytes every
+An upload under way holds its room from its start: the disk's reserve (`LAMPO_MIN_FREE`) counts the bytes every
 unfinished upload still has to send, and a workspace's plan counts their whole sizes as stored already, so two uploads
 can't each take the room that was left for one. The rest of an upload must still fit on the disk each time more of it
 arrives (else `507`), and one account may have 50 uploads under way at once (`429` past that: let some finish, or
@@ -655,18 +655,18 @@ piece instead, without filling the working copies.
 4. **Configure the server:**
 
    ```sh
-   VR_STORAGE=bunny
-   VR_BUNNY_ZONE=acme-review   # storage zone name
-   VR_BUNNY_ACCESS_KEY=…       # storage zone password
-   VR_BUNNY_REGION=de          # de (Frankfurt), uk, ny, la, sg, se, br, jh, syd
-   VR_BUNNY_CDN_URL=https://acme-review.b-cdn.net
-   VR_BUNNY_TOKEN_KEY=…        # pull zone token authentication key
-   VR_BUNNY_PREFIX=review      # optional: a folder inside the zone
-   VR_WORK_CACHE=20GB          # optional: local working copies (default 20 GB)
+   LAMPO_STORAGE=bunny
+   LAMPO_BUNNY_ZONE=acme-review   # storage zone name
+   LAMPO_BUNNY_ACCESS_KEY=…       # storage zone password
+   LAMPO_BUNNY_REGION=de          # de (Frankfurt), uk, ny, la, sg, se, br, jh, syd
+   LAMPO_BUNNY_CDN_URL=https://acme-review.b-cdn.net
+   LAMPO_BUNNY_TOKEN_KEY=…        # pull zone token authentication key
+   LAMPO_BUNNY_PREFIX=review      # optional: a folder inside the zone
+   LAMPO_WORK_CACHE=20GB          # optional: local working copies (default 20 GB)
    ```
 
-Without `VR_BUNNY_CDN_URL` the server streams video from its working copies instead. `VR_BUNNY_CDN_URL` needs
-`VR_BUNNY_TOKEN_KEY`: a server with a CDN address and no token key refuses to start, because unsigned CDN links would
+Without `LAMPO_BUNNY_CDN_URL` the server streams video from its working copies instead. `LAMPO_BUNNY_CDN_URL` needs
+`LAMPO_BUNNY_TOKEN_KEY`: a server with a CDN address and no token key refuses to start, because unsigned CDN links would
 let anyone who has one watch the render. Don't use Bunny *Stream* (Bunny's video product): it re-encodes renders into
 streaming copies with keyframes far apart, which loses quality and makes frame-exact scrubbing slow.
 
@@ -676,14 +676,14 @@ Cloudflare R2, Hetzner Object Storage, MinIO, Backblaze B2 and Bunny S3 speak th
 mock S3, not against each of these.
 
 ```sh
-VR_STORAGE=s3
-VR_S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com
-VR_S3_REGION=auto     # the provider's region name
-VR_S3_BUCKET=review
-VR_S3_ACCESS_KEY_ID=…
-VR_S3_SECRET_ACCESS_KEY=…
-VR_S3_PREFIX=review   # optional: a folder inside the bucket
-VR_S3_PRESIGN=true    # the default: browsers get signed links; false streams through the server
+LAMPO_STORAGE=s3
+LAMPO_S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com
+LAMPO_S3_REGION=auto     # the provider's region name
+LAMPO_S3_BUCKET=review
+LAMPO_S3_ACCESS_KEY_ID=…
+LAMPO_S3_SECRET_ACCESS_KEY=…
+LAMPO_S3_PREFIX=review   # optional: a folder inside the bucket
+LAMPO_S3_PRESIGN=true    # the default: browsers get signed links; false: through the server
 ```
 
 Signed links expire after 6 hours. Files above 64 MB are uploaded in parts, and path-style addresses are used, which
@@ -751,20 +751,20 @@ Connecting, per client (the address is always `https://<your server>/mcp`; detai
 
 Registered clients are kept in `data/oauth/clients.json` and connections with their hashed tokens in
 `data/oauth/grants.json` (both readable only by the app's user). Pending consent requests (10 minutes) and one-time
-codes (60 seconds; `vr login`'s 2 minutes) are kept in memory only.
+codes (60 seconds; `lampo login`'s 2 minutes) are kept in memory only.
 
 ## Agents against a hosted server
 
 Agents can use MCP straight against the server: `https://<server>/mcp` with `Authorization: Bearer <token>`, nothing
-to install on their machine ([mcp.md](mcp.md); Settings → Connect an agent shows ready configs). After `vr login`,
-every `vr` command and the stdio MCP server (`bin/vr-mcp`) talk to the server too:
+to install on their machine ([mcp.md](mcp.md); Settings → Connect an agent shows ready configs). After `lampo login`,
+every `lampo` command and the stdio MCP server (`bin/lampo-mcp`) talk to the server too:
 
 - Reading (`ls`, `open`, `show`, `prompt`, `inbox`, `qa`, `diff`, `taste`) downloads screenshots into
-  `~/.cache/video-review/<host>/` and prints those paths, so an agent opens them like local files.
+  `~/.cache/lampo/<host>/` and prints those paths, so an agent opens them like local files.
 - Writing (`add`, `fix`, `reply`, `wontfix`, `move`, `assign`, `status`) goes through the API.
-- `vr push` and MCP `track_video` upload renders; agents on `/mcp` without `vr` use `request_upload` and one
-  `curl -T`. `vr sync` only means something for files on a local store.
-- `vr watch` follows the server's event stream (`GET /api/events`, whose `event` messages carry the whole event).
+- `lampo push` and MCP `track_video` upload renders; agents on `/mcp` without `lampo` use `request_upload` and one
+  `curl -T`. `lampo sync` only means something for files on a local store.
+- `lampo watch` follows the server's event stream (`GET /api/events`, whose `event` messages carry the whole event).
   Run inside a Claude Code session, it also says it's there every 30 seconds, so that session shows in
   *Assign agent…* while it watches.
 
@@ -785,7 +785,7 @@ every `vr` command and the stdio MCP server (`bin/vr-mcp`) talk to the server to
   everyone. `test/unit/route-walk.test.ts` tries every route in every spelling.
 - **Signing in.** Failed attempts are limited per address (20 in 15 minutes), per account and address (8), and per
   account from anywhere (30). The last limit never applies to a browser that signed in to that account before (a
-  signed `vr_device` cookie, one year), so guessing wrong on purpose can't lock a person out; `vr login` from a new
+  signed `vr_device` cookie, one year), so guessing wrong on purpose can't lock a person out; `lampo login` from a new
   machine waits it out. Such a browser has a budget of its own instead (10 failures in 15 minutes for its cookie,
   whatever address a copy of it comes from, and 60 for all the account's known browsers together), and its failures
   count against the account too. Successful sign-ins are limited too, to 30 an hour per account and per address.
@@ -795,14 +795,14 @@ every `vr` command and the stdio MCP server (`bin/vr-mcp`) talk to the server to
 - **Request budgets.** Each workspace's signed-in requests share 20,000 a minute. `/mcp` takes requests of up to
   1 MiB, 600 a minute per account and 6,000 per workspace, and caps open waits and listens per connection and per
   person ([mcp.md](mcp.md#security-hosted)).
-- **Sessions and tokens.** Signing out ends that session on the server. A session ends after `VR_SESSION_IDLE_DAYS`
-  (14) without use and after `VR_SESSION_DAYS` (30) in any case. API tokens can be made to expire (1 day to 10
-  years). Forwarding headers count only from the proxies named in `VR_TRUST_PROXY`. Account names are normalised and
+- **Sessions and tokens.** Signing out ends that session on the server. A session ends after `LAMPO_SESSION_IDLE_DAYS`
+  (14) without use and after `LAMPO_SESSION_DAYS` (30) in any case. API tokens can be made to expire (1 day to 10
+  years). Forwarding headers count only from the proxies named in `LAMPO_TRUST_PROXY`. Account names are normalised and
   can't imitate an agent (`agent:` in any script) or another account (look-alike letters).
 - **Outgoing requests** to addresses someone chose (webhooks, OAuth client metadata, a device's push service) reach
   public addresses only, pinned to the address that was checked, without following redirects (`lib/netguard.ts`). A
   push goes only to the four browser makers' push services, and only while their name resolves to public addresses.
-  `VR_WEBHOOK_ALLOW_PRIVATE=1` lets the first workspace's webhooks (the operator's own team) reach private addresses;
+  `LAMPO_WEBHOOK_ALLOW_PRIVATE=1` lets the first workspace's webhooks (the operator's own team) reach private addresses;
   every other workspace's stay on public ones.
 - **CSRF.** Writes signed in with a cookie must come from the app's own address (the `Origin` header, or
   `Sec-Fetch-Site: same-origin`); signing in and setup from other pages are refused. Browsers never send tokens by
@@ -813,15 +813,15 @@ every `vr` command and the stdio MCP server (`bin/vr-mcp`) talk to the server to
   `/data/<video>/<file>` serves only screenshots and voice notes of existing reviews, and video ids that look like
   paths are refused before anything touches the disk. `/api/info` shows no paths (where the speech model is and what
   the speech engine said when it failed only to the server's operator, signed in in the browser, or the machine's
-  owner at the machine), and events (the live stream, `vr watch`, MCP, webhooks, the inbox)
+  owner at the machine), and events (the live stream, `lampo watch`, MCP, webhooks, the inbox)
   carry screenshot addresses, never server paths.
 - **Hostile media.** ffmpeg and ffprobe only read local files and pipes (`-protocol_whitelist file,pipe` on every
   call). On a server they only read the formats uploads may use (MP4/QuickTime, Matroska/WebM, Ogg, WAV, and PNG,
   JPEG, WebP and GIF pictures), so a playlist dressed up as a video is refused before it is read as one. Files that
   always come from outside (references on notes, voice notes, profile pictures, fix-preview clips) are held to that
-  list in every mode, on your machine too. Every run has a time limit (`VR_MEDIA_TIMEOUT`), and uploads whose headers
-  claim more than `VR_MAX_SIDE` pixels, `VR_MAX_DURATION` seconds or 240 frames per second, less than 32 pixels on a
-  side, or a shape thinner than `VR_MAX_ASPECT` (8:1 either way) are refused before any work starts. Analyses (the
+  list in every mode, on your machine too. Every run has a time limit (`LAMPO_MEDIA_TIMEOUT`), and uploads whose headers
+  claim more than `LAMPO_MAX_SIDE` pixels, `LAMPO_MAX_DURATION` seconds or 240 frames per second, less than 32 pixels on a
+  side, or a shape thinner than `LAMPO_MAX_ASPECT` (8:1 either way) are refused before any work starts. Analyses (the
   diff, Auto-check, shots, footage search) look at small pictures of a fixed width and at most four times as tall, so
   no shape of render makes them big. What someone waits for outside the job queue (a frame for an agent or a finding,
   a note's screenshots, a contact sheet, a reference, a voice note, a fix preview's clip) runs at most four ffmpeg at
@@ -871,12 +871,12 @@ every `vr` command and the stdio MCP server (`bin/vr-mcp`) talk to the server to
   only (pinned to the checked address, so DNS rebinding can't swap in an internal one), without redirects, at most
   16 KB and 5 seconds, and cached. Registration is rate-limited. The OAuth endpoints answer browsers from any origin
   (CORS without credentials) because they never use cookies.
-- **`vr login` in the browser** is a client of its own (`client_id=vr`, never a registration). Its answer goes only to
+- **`lampo login` in the browser** is a client of its own (`client_id=vr`, never a registration). Its answer goes only to
   a loopback port of the computer the browser runs on (`http://127.0.0.1:<port>/` or `http://[::1]:<port>/`, nothing
-  else), with PKCE S256 and a `state` vr checks. The consent screen names the machine (as it calls itself, one line)
+  else), with PKCE S256 and a `state` lampo checks. The consent screen names the machine (as it calls itself, one line)
   and the token's name. Its one-time code lives 2 minutes and is redeemed only at `POST /api/auth/token`, with its
-  verifier and the same redirect address, for the same API token `vr login --email` makes (never at `/oauth/token`,
+  verifier and the same redirect address, for the same API token `lampo login --email` makes (never at `/oauth/token`,
   never an app's connection); a repeat revokes that token, and 30 attempts per 15 minutes from one address are
-  allowed. The token travels only in that answer to vr, never in an address.
+  allowed. The token travels only in that answer to lampo, never in an address.
 
 Found a problem? See [SECURITY.md](../SECURITY.md).

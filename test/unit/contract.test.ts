@@ -10,13 +10,14 @@ import path from 'node:path';
 import { mock, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
+import { settings } from '../../lib/env.ts';
 import type { Comment, LibraryResponse, Review, ReviewEvent, ReviewResponse } from '../../lib/types.ts';
 import { startApp } from '../lib/app.ts';
 import { isolatedEnv, must, sleep, tmpdir, vr, vrAsync } from '../lib/helpers.ts';
 
 const FIXTURE = fileURLToPath(new URL('../fixtures/store-v0/', import.meta.url));
 const SNAPSHOTS = fileURLToPath(new URL('./snapshots/contract/', import.meta.url));
-const UPDATE = process.env.VR_UPDATE_SNAPSHOTS === '1';
+const UPDATE = settings.LAMPO_UPDATE_SNAPSHOTS === '1';
 const TEASER = '__@uploads__Demo__Reels__teaser.mp4';
 const CUTDOWN = '__home__alex__work__demo__export__cutdown.mp4';
 

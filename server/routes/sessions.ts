@@ -1,4 +1,4 @@
-// Agents — Claude Code sessions on this machine and agents that connected (MCP clients, `vr watch`): which are running
+// Agents — Claude Code sessions on this machine and agents that connected (MCP clients, `lampo watch`): which are running
 // (ranked for a video), which one a video is handed to, and the agent side of a remote setup (heartbeats, the inbox).
 import fs from 'node:fs';
 import express, { type Router } from 'express';
@@ -37,7 +37,7 @@ const Heartbeat = z.object({
 });
 const RunsQuery = z.object({ slug: z.string().max(1000).optional() });
 const ActivityQuery = z.object({ slug: z.string().max(1000).optional(), agent: z.string().max(200).optional() });
-// A render or upload under way, as `vr render` posts it: only the contract's words and sane numbers (cleanProgress in
+// A render or upload under way, as `lampo render` posts it: only the contract's words and sane numbers (cleanProgress in
 // lib/runs.ts keeps to the same rules for what comes in any other way).
 const Progress = z
   .object({
@@ -51,7 +51,7 @@ const Progress = z
   })
   .strict();
 // What an agent of a hosted server did (lib/activity.ts remoteSink batches it): plain words, small, at most 20. Only
-// the kinds an agent's own `vr` / MCP calls make (`vr render`'s progress and failure among them): what Lampo saw
+// the kinds an agent's own `lampo` / MCP calls make (`lampo render`'s progress and failure among them): what Lampo saw
 // itself (a run, a render growing on disk) isn't for posting.
 const ActivityBatch = z.object({
   entries: z
@@ -114,8 +114,8 @@ export function sessionRoutes(ctx: ServerContext): Router {
     res.json({ ok: true });
   });
 
-  // `vr watch` says "I'm here" every 30 s; the session picker lists who is. It follows new notes as they come, so it
-  // listens for as long as it is listed (only `vr watch` sends this: lib/backend/remote.ts watchEvents).
+  // `lampo watch` says "I'm here" every 30 s; the session picker lists who is. It follows new notes as they come, so it
+  // listens for as long as it is listed (only `lampo watch` sends this: lib/backend/remote.ts watchEvents).
   r.post('/api/agents/heartbeat', express.json(), (req, res) => {
     const b = body(Heartbeat, req);
     // the ids MCP gives the agents it lists are its own: a heartbeat never speaks for one
@@ -148,11 +148,11 @@ export function sessionRoutes(ctx: ServerContext): Router {
     res.json(out);
   });
 
-  // An agent of a hosted server says what it did (its `vr` / stdio MCP batches it; no tokens of the agent's). What it
+  // An agent of a hosted server says what it did (its `lampo` / stdio MCP batches it; no tokens of the agent's). What it
   // posts is its poster's (A12 AGENT-10): listed under `name · account` like an MCP connection, so one member can't put
   // words under another's agent, and at a time within the last few minutes (a batch waits ≤ 2 s; a line can't be
   // pinned to the future or slipped into the past).
-  // The answer carries the lines its agent is told (the person stopped its work): its `vr` prints them, its stdio MCP
+  // The answer carries the lines its agent is told (the person stopped its work): its `lampo` prints them, its stdio MCP
   // server adds them to its next answer.
   r.post('/api/agents/activity', express.json({ limit: '64kb' }), (req, res) => {
     const b = body(ActivityBatch, req);
@@ -215,7 +215,7 @@ export function sessionRoutes(ctx: ServerContext): Router {
     res.json({ agents: ctx.agents.list().map((a) => agentView.agent(req, a)) });
   });
 
-  // Newest human feedback across videos, as events (what `vr inbox` prints).
+  // Newest human feedback across videos, as events (what `lampo inbox` prints).
   r.get('/api/inbox', (req, res) => {
     const q = query(InboxQuery, req);
     let evs = store.readEvents({ limit: 5000 });

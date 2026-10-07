@@ -18,29 +18,30 @@ Windsurf, Gemini CLI, Zed, Claude, ChatGPT and any other MCP client.
 
 ![Settings → Connect an agent with Claude Code picked: the command that adds Lampo, and “Connected: claude-code”, seen just now](assets/settings-connect-agent.webp)
 
-**In a terminal**, `vr mcp config <client>` prints the same config. The clients are `claude`, `codex`, `cursor`,
+**In a terminal**, `lampo mcp config <client>` prints the same config. The clients are `claude`, `codex`, `cursor`,
 `vscode`, `antigravity`, `windsurf`, `gemini`, `zed` and `json` (the common shape for any other client).
 
 ```sh
-vr mcp config cursor                 # no vr login: the client starts its own server
-vr mcp config cursor --http          # no vr login: through the app running on this machine
-vr mcp config codex                  # after vr login: the server, with the token from $VR_TOKEN
-vr mcp config codex --with-token     # the same, with this login's token written in
-vr mcp config cursor --stdio         # its own server (stdio), even after a vr login
+lampo mcp config cursor               # no lampo login: the client starts its own server
+lampo mcp config cursor --http        # no lampo login: through the app running on this machine
+# after lampo login: the server, with the token from $LAMPO_TOKEN
+lampo mcp config codex
+lampo mcp config codex --with-token   # the same, with this login's token written in
+lampo mcp config cursor --stdio         # its own server (stdio), even after a lampo login
 ```
 
 The config goes to standard output (so `> file` works); where it belongs goes to standard error. `--json` prints both
 as one JSON object instead (`client`, `label`, `where`, `language`, `text` and, when there is one, `note`).
 `--url <server>` names another server, `--token-env NAME` another variable, and `--name` another key than `lampo`. For
-Claude Code, `--with-token` prints a command with the token in it, which your shell keeps in its history: `vr` warns
-about it, and the default (`$VR_TOKEN`) avoids it. A config made before, with the key `video-review`, keeps working.
+Claude Code, `--with-token` prints a command with the token in it, which your shell keeps in its history: `lampo` warns
+about it, and the default (`$LAMPO_TOKEN`) avoids it. A config made before, with the key `video-review`, keeps working.
 
 ## Two ways to connect
 
 | | Through the app (HTTP) | Its own server (stdio) |
 |---|---|---|
-| **How** | the client calls the app's address: `http://localhost:4747/mcp` on your machine, `https://review.example.com/mcp` on a server | the client starts `bin/vr-mcp` from this checkout |
-| **Needs** | the app running; on a server, signing in or an API token | this checkout on the agent's machine (it uses `vr login`, if there is one) |
+| **How** | the client calls the app's address: `http://localhost:4747/mcp` on your machine, `https://review.example.com/mcp` on a server | the client starts `bin/lampo-mcp` from this checkout |
+| **Needs** | the app running; on a server, signing in or an API token | this checkout on the agent's machine (it uses `lampo login`, if there is one) |
 | **Good to know** | the app lists the agent among the connected agents, so a video can be assigned to it | works while the app is closed; it doesn't show up among the connected agents |
 
 Both offer the same review tools, with one difference: putting up a render is `track_video` over stdio (and from the
@@ -58,10 +59,10 @@ agent needs one of two things:
   ([how it works](server-mode.md#apps-that-sign-in-oauth)).
 - **An API token.** Create one in **Settings → API tokens**, one per agent or machine, so you can revoke it alone.
   Right after you create it, the page shows the token once, the setup for the agent you pick with the token already
-  in it, and the `vr login … --token -` line. To keep the token out of config files, see
+  in it, and the `lampo login … --token -` line. To keep the token out of config files, see
   [With an API token](#with-an-api-token).
 
-![Settings → API tokens right after creating “Studio Mac · Codex”: the token shown once, the vr login line, and the Codex config with the token in it](assets/settings-api-token-fresh.webp)
+![Settings → API tokens right after creating “Studio Mac · Codex”: the token shown once, the lampo login line, and the Codex config with the token in it](assets/settings-api-token-fresh.webp)
 
 ## Per client
 
@@ -212,7 +213,7 @@ can reach.
   developer-mode app with the address. It signs in through the server.
 
 **Uploads from a chat app's sandbox.** A chat app runs the agent's code in a sandbox whose network reaches only the
-domains it allows. `request_upload` hands out a URL on the server's media host (`VR_MEDIA_ORIGIN`; without one, the
+domains it allows. `request_upload` hands out a URL on the server's media host (`LAMPO_MEDIA_ORIGIN`; without one, the
 app's own address), and a sandbox that may not reach it gets a 403 from its own proxy: the render never reaches Lampo.
 Add that host to the app's allowed domains — in Claude under **Settings → Capabilities**, where on Team and Enterprise
 plans the organization's owner adds it; **Settings → Connect an agent → Claude** shows the domain to copy. Or the person
@@ -226,7 +227,7 @@ On your own machine, without a hosted server, Claude's desktop app can start the
 {
   "mcpServers": {
     "lampo": {
-      "command": "/path/to/lampo/bin/vr-mcp"
+      "command": "/path/to/lampo/bin/lampo-mcp"
     }
   }
 }
@@ -235,20 +236,20 @@ On your own machine, without a hosted server, Claude's desktop app can start the
 ### Any other client
 
 - **Address:** `https://review.example.com/mcp` (Streamable HTTP), with `Authorization: Bearer <token>` or the sign-in.
-- **Or its own server:** the command `/path/to/lampo/bin/vr-mcp`.
-- `vr mcp config json` prints the common `mcpServers` shape.
+- **Or its own server:** the command `/path/to/lampo/bin/lampo-mcp`.
+- `lampo mcp config json` prints the common `mcpServers` shape.
 
 ### With an API token
 
-Put the token in the environment as `VR_TOKEN`, and add a header in the client's own syntax. A client with a header
+Put the token in the environment as `LAMPO_TOKEN`, and add a header in the client's own syntax. A client with a header
 doesn't sign in.
 
 | Client | Add |
 |---|---|
-| Claude Code | `--header "Authorization: Bearer $VR_TOKEN"` at the end of the command (your shell fills in the token) |
-| Codex | `bearer_token_env_var = "VR_TOKEN"` |
-| Cursor, Windsurf | `"headers": { "Authorization": "Bearer ${env:VR_TOKEN}" }` |
-| Gemini CLI | `"headers": { "Authorization": "Bearer $VR_TOKEN" }` |
+| Claude Code | `--header "Authorization: Bearer $LAMPO_TOKEN"` at the end of the command (your shell fills in the token) |
+| Codex | `bearer_token_env_var = "LAMPO_TOKEN"` |
+| Cursor, Windsurf | `"headers": { "Authorization": "Bearer ${env:LAMPO_TOKEN}" }` |
+| Gemini CLI | `"headers": { "Authorization": "Bearer $LAMPO_TOKEN" }` |
 | VS Code | a header with `${input:vr-token}`: VS Code asks for the token once and keeps it in its secret storage (below) |
 | Zed | `"headers": { "Authorization": "Bearer <your API token>" }`: Zed reads no variables there, so the token goes in as it is |
 | Antigravity | `"headers": { "Authorization": "Bearer <your API token>" }`: Antigravity documents no variables there, so the token goes in as it is |
@@ -276,33 +277,33 @@ VS Code's version:
 }
 ```
 
-After `vr login`, `vr mcp config <client>` prints these configs; with `--with-token` it writes the login's token in.
+After `lampo login`, `lampo mcp config <client>` prints these configs; with `--with-token` it writes the login's token in.
 
 ### Its own server (stdio)
 
-Instead of an address, the client can start `bin/vr-mcp` itself:
+Instead of an address, the client can start `bin/lampo-mcp` itself:
 
 | Client | The entry |
 |---|---|
-| Claude Code | `claude mcp add lampo -- /path/to/lampo/bin/vr-mcp` |
-| Codex | `command = "/path/to/lampo/bin/vr-mcp"` in place of `url` |
-| Cursor, Antigravity, Windsurf, Gemini CLI, Claude desktop | `"command": "/path/to/lampo/bin/vr-mcp"` in place of the address |
-| VS Code | `"type": "stdio", "command": "/path/to/lampo/bin/vr-mcp"` |
-| Zed | `"command": "/path/to/lampo/bin/vr-mcp", "args": []` in place of `url` |
+| Claude Code | `claude mcp add lampo -- /path/to/lampo/bin/lampo-mcp` |
+| Codex | `command = "/path/to/lampo/bin/lampo-mcp"` in place of `url` |
+| Cursor, Antigravity, Windsurf, Gemini CLI, Claude desktop | `"command": "/path/to/lampo/bin/lampo-mcp"` in place of the address |
+| VS Code | `"type": "stdio", "command": "/path/to/lampo/bin/lampo-mcp"` |
+| Zed | `"command": "/path/to/lampo/bin/lampo-mcp", "args": []` in place of `url` |
 
-- `bin/vr-mcp` finds a Node that can run it (22.18 or newer) even when your default Node is older; `VR_NODE` names
+- `bin/lampo-mcp` finds a Node that can run it (22.18 or newer) even when your default Node is older; `LAMPO_NODE` names
   one.
-- After `vr login` it works against that server; `VR_SERVER` and `VR_TOKEN` in its environment do the same and take
-  precedence over the login, and `VR_REMOTE=0` keeps it on the local store. On a hosted server's own store,
-  `VR_WORKSPACE=<id>` picks the workspace (default `w1`); an id the store has no workspace for stops it at the start.
-- Screenshots from a server are downloaded to `~/.cache/video-review/<host>/`, so paths in its answers open like local
+- After `lampo login` it works against that server; `LAMPO_SERVER` and `LAMPO_TOKEN` in its environment do the same and take
+  precedence over the login, and `LAMPO_REMOTE=0` keeps it on the local store. On a hosted server's own store,
+  `LAMPO_WORKSPACE=<id>` picks the workspace (default `w1`); an id the store has no workspace for stops it at the start.
+- Screenshots from a server are downloaded to `~/.cache/lampo/<host>/`, so paths in its answers open like local
   files.
 
 ## Typical loop
 
 The server's instructions tell it to every agent that connects, in its first read, the way that kind of agent works
 ([agents.md](agents.md#one-way-per-kind-of-agent)): chat and desktop apps hear MCP only and put versions up with
-`request_upload`; coding agents (Claude Code, Codex) render through `vr render`; the agent on the machine the app runs
+`request_upload`; coding agents (Claude Code, Codex) render through `lampo render`; the agent on the machine the app runs
 on tracks its renders where they are.
 
 1. `list_folders`: the project the person named or the work belongs to (none: a new name becomes the project with V1;
@@ -346,7 +347,7 @@ Connect an agent and Connected agents ("connected", "waiting for your notes", "w
 
 | State | Means |
 |---|---|
-| listening | it waits for new notes now (or is about to call the next wait), or it follows them with `vr watch` |
+| listening | it waits for new notes now (or is about to call the next wait), or it follows them with `lampo watch` |
 | working | its last wait handed it notes a few minutes ago, and it is still calling: it listens again when it's done |
 | not listening | connected, but nothing makes it look: new notes wait until you start it |
 | not connected | an agent connected over MCP that hasn't called for over a minute: the same |
@@ -363,15 +364,15 @@ An agent hears about new feedback without asking:
 | How | For |
 |---|---|
 | **`wait_for_feedback`** | any MCP client: one call waits until a person says something new |
-| **Change notifications** | clients that listen (`subscriptions/listen`; over stdio also `resources/subscribe`): `vr://inbox` and `vr://review/<slug>` changed |
-| **`vr watch`** | scripts and agents without MCP: one line per new note, reply or request ([agents.md](agents.md#what-vr-watch-prints)) |
+| **Change notifications** | clients that listen (`subscriptions/listen`; over stdio also `resources/subscribe`): `lampo://inbox` and `lampo://review/<slug>` changed |
+| **`lampo watch`** | scripts and agents without MCP: one line per new note, reply or request ([agents.md](agents.md#what-vr-watch-prints)) |
 | **INBOX.md** | agents that read files on your own machine (a hosted server doesn't write it): rewritten on every event from a person ([agents.md](agents.md#what-vr-watch-prints)) |
 
 **`wait_for_feedback`** waits until a person leaves new feedback (a note, a reply, an edit, a check or reopen, an
 assignment, a decision, a request, or a reference on a note) or the time is up: 50 s by default, 300 s at most
 (`timeout_s`). It returns only what is new:
 
-- the events as one line each, the way `vr watch --brief` prints them, and each video's path once (`video: …`);
+- the events as one line each, the way `lampo watch --brief` prints them, and each video's path once (`video: …`);
 - the marked frames of new notes **with a drawing**, cropped to it (`images: "all"`: every new note's whole frame;
   `"none"`: no pictures), four at most;
 - a `cursor`: pass it back as `since`, and nothing is missed or repeated.
@@ -418,9 +419,9 @@ Details:
 - **Over HTTP** a waiting call sleeps until an event of its workspace is written, which wakes it at once (no
   polling; the waiting calls share one read of the event log), and the app sends `notifications/resources/updated` to
   clients that listen (`subscriptions/listen`).
-- **Over stdio** the server follows the store's event log (after `vr login`: the server's live events) and sends the
+- **Over stdio** the server follows the store's event log (after `lampo login`: the server's live events) and sends the
   same notifications to clients that subscribed (2026 clients with `subscriptions/listen`, 2025 clients with
-  `resources/subscribe`). A waiting call re-reads the store's (cached) log once a second; after `vr login` it sleeps
+  `resources/subscribe`). A waiting call re-reads the store's (cached) log once a second; after `lampo login` it sleeps
   until the live stream says something happened, then asks the server only for what is new since its cursor (and
   every 20 s for safety).
 - `notifications/resources/list_changed`: over stdio, a video arrived, was removed or moved; over HTTP, something in
@@ -438,7 +439,7 @@ wait now, with a cursor from that very moment: a note written before the agent's
 | `track_video` (a render put up, a part too) | `Now call wait_for_feedback with since "<cursor>": the person's notes arrive together when they press Send.` |
 | `mark_fixed`, `wont_fix` | the same once none of the video's notes is open (ideas and your questions don't count); before that `2 notes still open on this video.` |
 | `request_upload`'s `PUT` (and the `GET` after it) | the JSON carries `cursor` and `next` (that line) |
-| `vr track`, `vr push`, `vr fix`, `vr wontfix` | `Now listen with vr watch (keep it running): …` (`vr watch` takes no cursor; `vr push --json` has `next`) |
+| `lampo track`, `lampo push`, `lampo fix`, `lampo wontfix` | `Now listen with lampo watch (keep it running): …` (`lampo watch` takes no cursor; `lampo push --json` has `next`) |
 
 ```
 PUT → {"slug":"…","v":2,"created":false,"duplicate":false,"video":"…",
@@ -584,7 +585,7 @@ the coordinates are not). Read tools are marked read-only, so clients can allow 
 - **`set_render_source({video, v?, app, project?, comp?, start_frame?, fps?, clear?})`.** Only the project's file name
   is kept. `clear: true` removes it.
 - **`track_video({path, folder?, session?})`.** `session: "me"`: this Claude Code session (over stdio). After
-  `vr login` the stdio server uploads the file to the server; the same name again is its next version.
+  `lampo login` the stdio server uploads the file to the server; the same name again is its next version.
 - **`request_upload({filename, folder?, video?})`.** A new video in `folder`, or the next version of `video`. The
   `PUT` answers the outcome (with `cursor` and `next`: wait now); a `GET` on the URL reports it later. It takes no `by`: the render is credited to the
   account that asked. The answer ends with the app's page where the person can upload the same file (the folder, or
@@ -592,7 +593,7 @@ the coordinates are not). Read tools are marked read-only, so clients can allow 
   ([uploads from a chat app's sandbox](#claude-and-chatgpt)).
 - **`move_video({video, folder})`** and **`set_status({video, text, eta_seconds?})`.** An empty `text` clears the
   status; so does the next version. Out of an archived project only the machine's own agent moves a video, as
-  `vr move` there does; over HTTP that is a person's, in the app.
+  `lampo move` there does; over HTTP that is a person's, in the app.
 - **Partial renders**, only where a note says PART RENDER OK: `track_video` also takes `part_of` (the video),
   `part_at` (the frame the stretch starts at) and `handles`, and `request_upload` takes `part_at` and `handles` with
   `video`. They are accepted but not listed with the tools
@@ -609,9 +610,11 @@ the coordinates are not). Read tools are marked read-only, so clients can allow 
   first, six by default; `sheet: true` adds one contact sheet of them. Not in the lean set ([footage.md](footage.md)).
 - **`review_frame`** is the card's own tool. Hosts that support tool visibility hide it from the model.
 
-**Resources:** `vr://inbox` (the newest feedback from people, INBOX.md) and `vr://review/{slug}` (one video's
+**Resources:** `lampo://inbox` (the newest feedback from people, INBOX.md) and `lampo://review/{slug}` (one video's
 review.md). Both can be subscribed to. For anyone but the machine itself, they name the screenshots (and review.md its
-data file) by URL instead of a path on the server's disk. `ui://video-review/review.html` is the review card's own
+data file) by URL instead of a path on the server's disk. Their addresses before the command was `lampo`,
+`vr://inbox` and `vr://review/{slug}`, still read the same and hear about changes too.
+`ui://video-review/review.html` is the review card's own
 page (an MCP App resource; hosts load it for `show_review`).
 
 **Prompts:** `watch` (one optional argument, `video`): "use Lampo" in one command — work the notes on the videos
@@ -628,7 +631,7 @@ and no more.
   `include_images` are accepted but not announced.
 - **The lean set** offers only the review loop, for about half the tokens: `list_videos`, `get_open_notes`,
   `get_note`, `get_frame`, `get_playbook`, `get_skill`, `get_taste`, `get_transcript`, `wait_for_feedback`, `add_note`,
-  `reply`, `mark_fixed`, `wont_fix`, `track_video` and `request_upload`. Ask for it with `VR_MCP_TOOLS=lean` in the
+  `reply`, `mark_fixed`, `wont_fix`, `track_video` and `request_upload`. Ask for it with `LAMPO_MCP_TOOLS=lean` in the
   server's environment, or with the address `https://review.example.com/mcp?tools=lean`. A list of tool names,
   separated by commas, works too. `ask_options` is a tool of its own outside the lean set (286 tokens
   more in the full list, none in the lean one); so are `draft_post` and `get_posts` (345 together) and `find_footage`
@@ -645,7 +648,7 @@ and no more.
 ## Who writes
 
 A write is signed with, in this order: the tool's `by` argument (accepted on every write except `request_upload`, not
-announced: the default is right for one agent), `VR_BY` (stdio), `agent:<Claude Code session>` when the stdio server
+announced: the default is right for one agent), `LAMPO_BY` (stdio), `agent:<Claude Code session>` when the stdio server
 runs inside a session, else `agent:<MCP client name>`.
 
 On a hosted server every call acts as the token's (or the signed-in app's) account, with its role in the workspace the
@@ -689,7 +692,7 @@ with agents (a reviewer) writes as itself, and an `agent:…` name is refused fo
 - **When access ends**, every open response asks at once: one that wouldn't get in is cut before the next event
   reaches it, and a wait hands out nothing more. That is access ended on the server itself (a token or app revoked, a
   member removed, an account disabled, signed out everywhere or given a new password), and any change of the files
-  access is decided by (accounts and tokens, app connections, workspaces), whoever made it (`vr admin` in another
+  access is decided by (accounts and tokens, app connections, workspaces), whoever made it (`lampo admin` in another
   process, a restore). Only what really ends access counts: revoking a token none of the client's connections holds
   (`/oauth/revoke` answers anyone, as RFC 7009 says) or a refresh token nobody was given ends nothing, writes nothing
   and makes no response ask.
@@ -724,7 +727,7 @@ mcp: w1 mcp-2755e61ea6ed prompt watch
 A line names the workspace, the agent's session id (as Settings → Connected agents and the video's assignment have
 it; `-` for a client that isn't an agent), the tool, how long it took and how it ended (`ok`, `error`; a wait:
 `N events`, `waiting N` for what it handed over at once, `timeout`, `cancelled`, `refused`, `access ended`). Never
-what a tool was given or answered: no note text, no names, no file names, no tokens, no addresses. `VR_MCP_LOG=off`
+what a tool was given or answered: no note text, no names, no file names, no tokens, no addresses. `LAMPO_MCP_LOG=off`
 turns it off. The stdio server logs nothing.
 
 ## Tests

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Searching the footage index (prototype of `vr footage find` / MCP find_footage): a request in plain words → the
+// Searching the footage index (prototype of `lampo footage find` / MCP find_footage): a request in plain words → the
 // filters it names (aspect, length, camera move, "no text", words on screen or said) + what it should show → shots
 // ranked by image–text similarity (best keyframe of each shot), words matched in OCR text and transcripts.
 //   node bench/footage/find.ts "product close-up on white, slow push-in, ≥ 2 s, 9:16, no text" [--k 6]

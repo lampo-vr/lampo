@@ -4,7 +4,7 @@
 // in cache/agent-runs/<id>.log, an `agent_run` event when it starts and when it ends, and Stop ends the whole process
 // group (SIGINT first: Claude Code ends its turn cleanly; SIGTERM 5 s later, SIGKILL 5 s after that). A permission the
 // run is denied (its own output says so) makes it need the person, with the settings rule that would allow it. Each is an agent run (server/runs.ts) with delivery `machine`: its process carries the run's id in LAMPO_RUN,
-// so what it does through `vr` and the stdio MCP server joins that run. Runs belong to this process: when the app
+// so what it does through `lampo` and the stdio MCP server joins that run. Runs belong to this process: when the app
 // stops, its runs stop with it (nobody would be left to time them out).
 import { type ChildProcess, spawn } from 'node:child_process';
 import crypto from 'node:crypto';
@@ -14,6 +14,7 @@ import { StringDecoder } from 'node:string_decoder';
 import type { ActivityRecord } from '../lib/activity.ts';
 import { words } from '../lib/activityText.ts';
 import { claudeRunArgs, RUN_RATE_MAX, RUN_RATE_WINDOW_MS, RUN_TIMEOUT_MS } from '../lib/agentRun.ts';
+import { setting } from '../lib/env.ts';
 import { CACHE, isoLocal } from '../lib/paths.ts';
 import { RateLimit } from '../lib/rateLimit.ts';
 import { createRunReader } from '../lib/runStream.ts';
@@ -33,9 +34,9 @@ export function runEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return Object.fromEntries(Object.entries(env).filter(([k]) => !DROPPED_ENV.test(k)));
 }
 
-/** How long a run may go without a sign of it: VR_AGENT_RUN_TIMEOUT in seconds (1 s – 24 h), else RUN_TIMEOUT_MS. */
+/** How long a run may go without a sign of it: LAMPO_AGENT_RUN_TIMEOUT in seconds (1 s – 24 h), else RUN_TIMEOUT_MS. */
 export function runTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
-  const s = Number(env.VR_AGENT_RUN_TIMEOUT);
+  const s = Number(setting('LAMPO_AGENT_RUN_TIMEOUT', env));
   return Number.isFinite(s) && s >= 1 && s <= 86_400 ? Math.round(s * 1000) : RUN_TIMEOUT_MS;
 }
 
@@ -105,7 +106,7 @@ export interface AgentRuns {
 
 export interface AgentRunOptions {
   broadcast: Broadcast;
-  /** The binary (VR_CLAUDE_BIN or the one found; tests point it at a stand-in). */
+  /** The binary (LAMPO_CLAUDE_BIN or the one found; tests point it at a stand-in). */
   bin?: () => string;
   /** Stopped after this long without a sign (its output, its calls). */
   timeoutMs?: number;
@@ -306,7 +307,7 @@ export function createAgentRuns({
       runs.set(id, r);
       try {
         // An argument list, never a shell; its own process group, so Stop reaches whatever it starts.
-        // what it does through `vr` and the stdio MCP server names its run (a hint the server checks: server/runs.ts)
+        // what it does through `lampo` and the stdio MCP server names its run (a hint the server checks: server/runs.ts)
         r.proc = spawn(bin(), args, { cwd: o.cwd, env: { ...runEnv(process.env), LAMPO_RUN: run }, detached: true, stdio: ['ignore', out, out] });
       } catch (e) {
         fs.closeSync(out);

@@ -26,7 +26,7 @@ test('vr open: the note says a part is fine', () => {
 
 test('vr push --part-at: only with its video, only with the length it replaces', () => {
   const part = cutFrames(fixed, 28, 92, path.join(dir, 'parts/part.mp4'));
-  assert.match(vr(['push', part, '--part-at', '40'], env).err, /a part goes into a video: vr push part\.mp4 --to <video> --part-at <frame>/);
+  assert.match(vr(['push', part, '--part-at', '40'], env).err, /a part goes into a video: lampo push part\.mp4 --to <video> --part-at <frame>/);
   const longer = vr(['push', cutFrames(fixed, 28, 97, path.join(dir, 'parts/longer.mp4')), '--to', 'spot.mp4', '--part-at', '40'], env);
   assert.notEqual(longer.code, 0);
   assert.match(longer.err, /the length changed: frames 40–79 with 12 handles are 64 frames, the part has 69/);
@@ -35,7 +35,7 @@ test('vr push --part-at: only with its video, only with the length it replaces',
   assert.equal(r.code, 0, r.err);
   assert.match(
     r.out,
-    /^new version: .*spot\.mp4 \(v2, a part: frames 40–79 of v1\) · seams clean\n {4}a part is never final: send a full render once it is approved\nNow listen with vr watch \(keep it running\): the person's notes arrive together when they press Send\.\n$/,
+    /^new version: .*spot\.mp4 \(v2, a part: frames 40–79 of v1\) · seams clean\n {4}a part is never final: send a full render once it is approved\nNow listen with lampo watch \(keep it running\): the person's notes arrive together when they press Send\.\n$/,
   );
   const json = JSON.parse(vr(['push', part, '--to', 'spot.mp4', '--part-at', '40', '--json'], env).out);
   assert.equal(json.duplicate, true);

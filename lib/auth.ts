@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { newestLinks, voidLinks } from './accountLinks.ts';
+import { settings } from './env.ts';
 import { isGated } from './gate.ts';
 import { accountAddress } from './mail/mime.ts';
 import { cleanDisplayName, cutChars, looksReserved, nameSkeleton } from './names.ts';
@@ -46,7 +47,7 @@ export interface User extends PublicUser {
    * its role in #1 — every account of a store without workspaces.
    */
   outside_w1?: true;
-  /** When the account last signed in (a new session, or `vr login` making a token): the server's operator reads it. */
+  /** When the account last signed in (a new session, or `lampo login` making a token): the server's operator reads it. */
   signed_in?: string;
   /**
    * When the person last used the app through their session (a request with its cookie; written at most once an hour,
@@ -121,7 +122,7 @@ function load(): UsersFile {
 }
 
 // Every request reads this file (a token or a session names its account), so it is parsed again only when it changed:
-// inode, size or mtime (every write is an atomic rename, from this process or `vr admin` in another). What the reads
+// inode, size or mtime (every write is an atomic rename, from this process or `lampo admin` in another). What the reads
 // return is shared between callers and frozen; changes go through change(), which loads the file fresh.
 let parsed: { key: string; file: UsersFile; revoked: Set<string> } | null = null;
 function current(): { file: UsersFile; revoked: Set<string> } {
@@ -158,7 +159,7 @@ const change = <T>(fn: (f: UsersFile) => T): T =>
 /**
  * Access ended in this process: a token revoked, an app disconnected, a member removed, an account disabled, deleted,
  * signed out or given a new password. Whatever holds a response open for someone (server/routes/mcp.ts: waits and
- * listen streams) asks again at once instead of at its next turn. Changes made by another process (`vr admin`) reach
+ * listen streams) asks again at once instead of at its next turn. Changes made by another process (`lampo admin`) reach
  * it at that next turn.
  */
 const accessListeners = new Set<() => void>();
@@ -197,7 +198,7 @@ function accountGone(u: User): void {
 }
 
 /**
- * A sign-in happened (a new session, a `vr login` token): when, for the operator's accounts page. Nothing else reads it,
+ * A sign-in happened (a new session, a `lampo login` token): when, for the operator's accounts page. Nothing else reads it,
  * and no answer but the operator's carries it (publicUser leaves it out).
  */
 export function noteSignIn(id: string): void {
@@ -292,7 +293,7 @@ export function localOwner(): User | null {
 }
 
 /**
- * The name the machine's owner account starts with (see ensureLocalOwner): config.json "user", VR_USER or the OS
+ * The name the machine's owner account starts with (see ensureLocalOwner): config.json "user", LAMPO_USER or the OS
  * login name. Nobody chose it for others to read, so review links don't show it (lib/shares.ts sharerName).
  */
 export function startingName(name: string): string {
@@ -304,7 +305,7 @@ export function startingName(name: string): string {
 }
 
 // New accounts start with the first run (lib/onboarding.ts) unless the instance turned it off (config `onboarding`,
-// VR_ONBOARDING): the server and `vr admin` set this from the config before they make accounts. Every way an account
+// LAMPO_ONBOARDING): the server and `lampo admin` set this from the config before they make accounts. Every way an account
 // is made goes through insertUser or ensureLocalOwner — signup too (SEAM(signup): a new account made with createUser
 // gets its first run; the first run shows after its first successful sign-in, nothing else to do).
 let firstRuns = false;
@@ -646,16 +647,16 @@ export type SignUpResult =
    */
   | { exists: User; fits?: boolean; invited?: string[] }
   /**
-   * VR_SIGNUP=invite and pending invites are made out to the address (their ids): nothing is made. The caller sends
+   * LAMPO_SIGNUP=invite and pending invites are made out to the address (their ids): nothing is made. The caller sends
    * them there again, and only an invite's own link makes the account, with its role — knowing an invited address
    * gets nobody anything, and the invite stays the invitee's.
    */
   | { invited: string[] }
-  /** VR_SIGNUP=invite and no pending invite is made out to the address. */
+  /** LAMPO_SIGNUP=invite and no pending invite is made out to the address. */
   | { refused: 'no-invite' };
 
 /**
- * Someone signs up on their own (VR_SIGNUP). `open`: anyone, as a reviewer until the onSignup seam gives them their own
+ * Someone signs up on their own (LAMPO_SIGNUP). `open`: anyone, as a reviewer until the onSignup seam gives them their own
  * workspace (server/signup.ts); the account starts unconfirmed and held (isGated), and the password is hashed before
  * anything is looked up, so every answer takes as long (the route answers all of them alike). `invite`: no account at
  * all — an address a pending invite is made out to gets that invite again (`invited`), whose link is the way in.
@@ -1559,9 +1560,9 @@ export function secret(): Buffer {
 
 const mac = (payload: string) => crypto.createHmac('sha256', secret()).update(payload).digest('base64url');
 
-/** How long a sign-in lasts at most (VR_SESSION_DAYS), and how long it survives without use (VR_SESSION_IDLE_DAYS). */
-export const SESSION_DAYS = Number(process.env.VR_SESSION_DAYS) || 30;
-export const SESSION_IDLE_DAYS = Number(process.env.VR_SESSION_IDLE_DAYS) || 14;
+/** How long a sign-in lasts at most (LAMPO_SESSION_DAYS), and how long it survives without use (LAMPO_SESSION_IDLE_DAYS). */
+export const SESSION_DAYS = Number(settings.LAMPO_SESSION_DAYS) || 30;
+export const SESSION_IDLE_DAYS = Number(settings.LAMPO_SESSION_IDLE_DAYS) || 14;
 // A session in use gets a fresh "last active" at most this often (one Set-Cookie per half day, not per request).
 const REFRESH_MS = 12 * 3600000;
 

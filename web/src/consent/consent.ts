@@ -30,7 +30,7 @@ const told = () => {
   for (const fn of changes) fn();
 };
 
-/** A link to the operator's privacy policy, where the server names one (VR_PRIVACY_URL). */
+/** A link to the operator's privacy policy, where the server names one (LAMPO_PRIVACY_URL). */
 const link = (url: string | null | undefined, words: string) => (url ? ` <a href="${encodeURI(url)}" target="_blank" rel="noreferrer">${words}</a>` : '');
 
 /** The box's and the settings' words in the page's language (the library asks again after a switch: setLanguage). */

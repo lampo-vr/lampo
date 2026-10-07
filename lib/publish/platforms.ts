@@ -9,7 +9,7 @@ export const PLATFORMS: readonly PublishPlatform[] = ['youtube', 'instagram', 'f
 /** The platforms' names as people read them (brand names: never translated). */
 export const PLATFORM_NAMES: Record<PublishPlatform, string> = { youtube: 'YouTube', instagram: 'Instagram', facebook: 'Facebook' };
 
-/** Short codes agents may use (`vr post draft --platform yt`, draft_post's `platform`). */
+/** Short codes agents may use (`lampo post draft --platform yt`, draft_post's `platform`). */
 const SHORT: Record<string, PublishPlatform> = { yt: 'youtube', ig: 'instagram', fb: 'facebook' };
 
 /** A platform from its name or short code; null when it isn't one. */

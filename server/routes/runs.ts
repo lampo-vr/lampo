@@ -112,7 +112,7 @@ export function runRoutes(ctx: ServerContext): Router {
     checkReviewOpen(review);
     if (b.start) checkWake(req, ctx, review);
     const run = ctx.runs.retry(req, id);
-    // a listening agent hears it as a request (what wait_for_feedback and `vr watch` hand over)
+    // a listening agent hears it as a request (what wait_for_feedback and `lampo watch` hand over)
     const n = run.plan.length;
     const text = n ? `Try again: ${n} note${n === 1 ? '' : 's'} still open.` : `Try again${run.request ? `: ${run.request}` : '.'}`;
     const words = store.addRequest(slug, text, ctx.actor(req));

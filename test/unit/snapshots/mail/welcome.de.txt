@@ -7,7 +7,7 @@ Deine Adresse ist bestätigt, dein Konto auf review.example.com ist bereit. Lade
 Lampo öffnen:
 https://review.example.com/
 
-Agenten verbinden sich mit vr login https://review.example.com oder als MCP-Server: Einstellungen → Agent verbinden zeigt, wie.
+Agenten verbinden sich mit lampo login https://review.example.com oder als MCP-Server: Einstellungen → Agent verbinden zeigt, wie.
 
 --
 Du bekommst diese E-Mail, weil du ein Konto auf review.example.com hast.

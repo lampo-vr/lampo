@@ -215,7 +215,7 @@ export function ForgotScreen() {
         <EntranceHead icon="key" title={t('Ask for a new password')}>
           {t('This server can’t send email. Whoever runs it can set a new password for you in Settings → Users, or on the server:')}
         </EntranceHead>
-        <Cmd name="vr admin" args="reset-password --email you@example.com" label={t('Set a new password on the server')} />
+        <Cmd name="lampo admin" args="reset-password --email you@example.com" label={t('Set a new password on the server')} />
         <a className="gate-alt" href="#/">
           {t('Back to sign-in')}
         </a>

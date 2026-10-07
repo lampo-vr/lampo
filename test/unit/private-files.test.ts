@@ -49,7 +49,7 @@ test('AGENT-13: the activity file is its owner’s alone, also one made before a
 });
 
 test('AGENT-13: vr’s download cache for a hosted server is its owner’s alone', () => {
-  const root = path.join(tmpdir(), 'xdg-cache', 'video-review');
+  const root = path.join(tmpdir(), 'xdg-cache', 'lampo');
   createRemoteBackend({ server: 'http://127.0.0.1:9', token: 'vr_x' }, { cacheRoot: root });
   assert.equal(mode(root), 0o700);
   // one made by an older version

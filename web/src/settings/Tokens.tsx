@@ -1,4 +1,4 @@
-// API tokens: how `vr`, the MCP server and scripts act as you. Shown once when created, stored hashed on the server.
+// API tokens: how `lampo`, the MCP server and scripts act as you. Shown once when created, stored hashed on the server.
 // Below them the apps connected through OAuth (ChatGPT, Claude, Cursor, …): each one allowed on a consent screen,
 // disconnectable here; admins also see everyone's.
 import { type FormEvent, useState } from 'react';
@@ -22,7 +22,7 @@ import { Card, Code, Confirm, expiry, serverUrl, when } from './parts.tsx';
 /**
  * A token that was just made, shown this once: copy it, then connect an agent with it — the same choice as Connect an
  * agent (the chat apps sign in instead, so they aren't offered), its setup with this server's /mcp, the key lampo and
- * the token filled in. `vr` takes the token at its prompt: on the command line the process list and the shell's history
+ * the token filled in. `lampo` takes the token at its prompt: on the command line the process list and the shell's history
  * would keep it.
  */
 function Fresh({ token, name, url, onDone }: { token: string; name: string; url: string; onDone: () => void }) {
@@ -64,8 +64,8 @@ function Fresh({ token, name, url, onDone }: { token: string; name: string; url:
           {s.text}
         </Code>
         {s.note && <p className="set-sub">{s.note}</p>}
-        <p className="set-sub">{t('Agents that use vr instead: sign in on their machine and paste the token when it asks.')}</p>
-        <Code label={t('vr on the agent’s machine')} testid="token-login">{`vr login ${url} --token -`}</Code>
+        <p className="set-sub">{t('Agents that use lampo instead: sign in on their machine and paste the token when it asks.')}</p>
+        <Code label={t('lampo on the agent’s machine')} testid="token-login">{`lampo login ${url} --token -`}</Code>
       </div>
     </section>
   );
@@ -233,7 +233,7 @@ export function Tokens() {
         <p>
           <T
             k={
-              'Tokens let <0>vr</0>, the MCP server and scripts work as you from another machine. One per machine or agent makes it easy to revoke just that one.'
+              'Tokens let <0>lampo</0>, the MCP server and scripts work as you from another machine. One per machine or agent makes it easy to revoke just that one.'
             }
             tags={[(c) => <code>{c}</code>]}
           />
@@ -287,7 +287,7 @@ export function Tokens() {
           onConfirm={revoke}
         >
           <T
-            k={'Anything using it ({prefix}…) stops working at once; agents on that machine need <0>vr login</0> again.'}
+            k={'Anything using it ({prefix}…) stops working at once; agents on that machine need <0>lampo login</0> again.'}
             values={{ prefix: revoking.prefix }}
             tags={[(c) => <code>{c}</code>]}
           />

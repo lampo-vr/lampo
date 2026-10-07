@@ -6,10 +6,10 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { isolatedEnv, ROOT } from '../../test/lib/helpers.ts';
 
-const { env } = isolatedEnv({ vars: { VR_REMOTE: '0' } });
+const { env } = isolatedEnv({ vars: { LAMPO_REMOTE: '0' } });
 const client = new Client({ name: 'dump-tools', version: '1.0.0' });
 await client.connect(
-  new StdioClientTransport({ command: process.execPath, args: [path.join(ROOT, 'bin/vr-mcp')], env: env as Record<string, string>, stderr: 'ignore' }),
+  new StdioClientTransport({ command: process.execPath, args: [path.join(ROOT, 'bin/lampo-mcp')], env: env as Record<string, string>, stderr: 'ignore' }),
 );
 const { tools } = await client.listTools();
 const names = process.argv.slice(2);

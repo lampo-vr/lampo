@@ -6,7 +6,7 @@ import { currentLang, t } from './index.ts';
 
 export const severityLabel = (s: Severity | string): string => ({ must: t('Must'), should: t('Should'), nice: t('Nice'), idea: t('Idea') })[s] ?? s;
 
-/** A note's tag as people read it; the stored tag (what agents and `vr` see) stays as it is. Unknown tags as they are. */
+/** A note's tag as people read it; the stored tag (what agents and `lampo` see) stays as it is. Unknown tags as they are. */
 export const tagLabel = (tag: string): string =>
   ({
     cut: t('cut'),

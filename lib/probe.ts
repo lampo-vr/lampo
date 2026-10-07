@@ -4,11 +4,12 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { settings } from './env.ts';
 import { explicitWorkspace, severalWorkspaces } from './paths.ts';
 import type { ProbeResult } from './types.ts';
 
-export const FFMPEG = process.env.VR_FFMPEG || findBin('ffmpeg');
-export const FFPROBE = process.env.VR_FFPROBE || findBin('ffprobe');
+export const FFMPEG = settings.LAMPO_FFMPEG || findBin('ffmpeg');
+export const FFPROBE = settings.LAMPO_FFPROBE || findBin('ffprobe');
 
 function findBin(name: string): string {
   for (const dir of ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin']) {
@@ -152,8 +153,8 @@ export const INCOMING_FORMATS = ['mov,mp4,m4a,3gp,3g2,mj2', 'matroska,webm', 'og
 
 // ffprobe only reads headers: a probe that takes longer is stuck on a hostile file.
 const PROBE_TIMEOUT_MS = 30_000;
-/** The longest one ffmpeg run may take (VR_MEDIA_TIMEOUT, seconds); work on long renders passes its own limit. */
-export const MEDIA_TIMEOUT_MS = (Number(process.env.VR_MEDIA_TIMEOUT) || 3600) * 1000;
+/** The longest one ffmpeg run may take (LAMPO_MEDIA_TIMEOUT, seconds); work on long renders passes its own limit. */
+export const MEDIA_TIMEOUT_MS = (Number(settings.LAMPO_MEDIA_TIMEOUT) || 3600) * 1000;
 
 let hostedFormats: string | null = null;
 /**
@@ -450,14 +451,14 @@ export function probeSync(file: string): ProbeResult {
 }
 
 /**
- * What an incoming render may be before any real work starts on it (VR_MAX_SIDE px, VR_MAX_DURATION s, VR_MAX_ASPECT
+ * What an incoming render may be before any real work starts on it (LAMPO_MAX_SIDE px, LAMPO_MAX_DURATION s, LAMPO_MAX_ASPECT
  * between its long and its short side).
  */
 export const INCOMING_LIMITS = {
-  maxSide: Number(process.env.VR_MAX_SIDE) || 8192,
+  maxSide: Number(settings.LAMPO_MAX_SIDE) || 8192,
   minSide: 32,
-  maxAspect: Math.max(1, Number(process.env.VR_MAX_ASPECT) || 8),
-  maxSeconds: Number(process.env.VR_MAX_DURATION) || 4 * 3600,
+  maxAspect: Math.max(1, Number(settings.LAMPO_MAX_ASPECT) || 8),
+  maxSeconds: Number(settings.LAMPO_MAX_DURATION) || 4 * 3600,
   maxFps: 240,
 };
 

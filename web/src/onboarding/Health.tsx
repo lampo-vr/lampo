@@ -112,7 +112,7 @@ export function Health({ frame, next }: StepProps) {
         ) : h.public_url.url ? (
           <T k="<0>{url}</0> isn’t https: review links work, chat apps can’t connect." values={{ url: h.public_url.url }} tags={[(c) => <code>{c}</code>]} />
         ) : (
-          <T k="No public address yet: set <0>VR_PUBLIC_URL</0>, so links and emails point here." tags={[(c) => <code>{c}</code>]} />
+          <T k="No public address yet: set <0>LAMPO_PUBLIC_URL</0>, so links and emails point here." tags={[(c) => <code>{c}</code>]} />
         );
       case 'storage': {
         const free = gb(h.storage.free_bytes);
@@ -176,7 +176,7 @@ export function Health({ frame, next }: StepProps) {
           <span className="ob-fine ob-fg2">
             <T k="Add a relay to <0>lampo.env</0> (or the compose file), then restart:" tags={[(c) => <code>{c}</code>]} />
           </span>
-          <Cmd text={`VR_SMTP_URL='smtp://user:password@smtp.example.com:587'\nVR_MAIL_FROM='Lampo <lampo@${host}>'`} />
+          <Cmd text={`LAMPO_SMTP_URL='smtp://user:password@smtp.example.com:587'\nLAMPO_MAIL_FROM='Lampo <lampo@${host}>'`} />
           <Cmd text="docker compose up -d" />
           <div className="ob-row">
             <button type="button" className="ob-btn ob-sm ob-raised" onClick={again} data-testid="ob-mail-recheck">

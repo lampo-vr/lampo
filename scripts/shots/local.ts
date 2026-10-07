@@ -3,7 +3,7 @@
 // settings, a playbook and the MCP review card; then an agent at work (a fix preview, a question with choices, the board,
 // the inbox, the live monitor); then V3 approved (the player's next step); then the review links' activity and room.
 // Every state is made the way people and agents make it: the HTTP API the app uses, the guest API a client's browser
-// uses, `vr` run as the agent (VR_BY=agent:…), an MCP client over /mcp, and the app's own UI.
+// uses, `lampo` run as the agent (LAMPO_BY=agent:…), an MCP client over /mcp, and the app's own UI.
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -74,25 +74,25 @@ export async function localPictures(s: LocalScene): Promise<void> {
     throw new Error(`timed out: ${what}`);
   };
 
-  // `vr` as the agent would run it: the store's own environment, and the agent's name in VR_BY (that is what makes its
+  // `lampo` as the agent would run it: the store's own environment, and the agent's name in LAMPO_BY (that is what makes its
   // commands show in the live monitor). Nothing of this machine's own session or account goes in.
-  const vrEnv = (agent: string): NodeJS.ProcessEnv => ({
+  const agentEnv = (agent: string): NodeJS.ProcessEnv => ({
     PATH: process.env.PATH,
     HOME: path.join(s.dir, 'home'),
     XDG_CONFIG_HOME: path.join(s.dir, 'home/.config'),
     XDG_CACHE_HOME: path.join(s.dir, 'home/.cache'),
-    VR_DATA: path.join(s.dir, 'data'),
-    VR_CACHE: path.join(s.dir, 'cache'),
-    VR_CONFIG: path.join(s.dir, 'config.json'),
-    VR_STT: 'off',
-    VR_FOOTAGE: 'off',
-    VR_BY: `agent:${agent}`,
+    LAMPO_DATA: path.join(s.dir, 'data'),
+    LAMPO_CACHE: path.join(s.dir, 'cache'),
+    LAMPO_CONFIG: path.join(s.dir, 'config.json'),
+    LAMPO_STT: 'off',
+    LAMPO_FOOTAGE: 'off',
+    LAMPO_BY: `agent:${agent}`,
   });
-  const vr = (agent: string, ...args: string[]) =>
-    execFileSync(process.execPath, [path.join(ROOT, 'bin/vr'), ...args], { env: vrEnv(agent), encoding: 'utf8', cwd: s.work });
+  const lampo = (agent: string, ...args: string[]) =>
+    execFileSync(process.execPath, [path.join(ROOT, 'bin/lampo'), ...args], { env: agentEnv(agent), encoding: 'utf8', cwd: s.work });
   const vrWatching: ChildProcess[] = [];
   const vrWatch = (agent: string) => {
-    const p = spawn(process.execPath, [path.join(ROOT, 'bin/vr'), 'watch', '--mine'], { env: vrEnv(agent), stdio: 'ignore', cwd: s.work });
+    const p = spawn(process.execPath, [path.join(ROOT, 'bin/lampo'), 'watch', '--mine'], { env: agentEnv(agent), stdio: 'ignore', cwd: s.work });
     vrWatching.push(p);
     // a watch waits for good: it ends with this script, however the script ends
     process.on('exit', () => p.kill());
@@ -338,9 +338,9 @@ export async function localPictures(s: LocalScene): Promise<void> {
     '-y',
     clip,
   ]);
-  vr('launch-edit', 'open', 'northwind-launch.mp4');
-  vr('launch-edit', 'show', glow);
-  vr(
+  lampo('launch-edit', 'open', 'northwind-launch.mp4');
+  lampo('launch-edit', 'show', glow);
+  lampo(
     'launch-edit',
     'preview',
     glow,
@@ -359,7 +359,7 @@ export async function localPictures(s: LocalScene): Promise<void> {
     '--time',
     '7.0',
   );
-  vr(
+  lampo(
     'launch-edit',
     'preview',
     endCard,
@@ -379,7 +379,7 @@ export async function localPictures(s: LocalScene): Promise<void> {
     '--time',
     '11.0',
   );
-  vr(
+  lampo(
     'launch-edit',
     'add',
     'northwind-launch.mp4',
@@ -408,8 +408,8 @@ export async function localPictures(s: LocalScene): Promise<void> {
   await settle(`/api/qa/${enc(ep)}/1`);
 
   // The teaser's agent says what it is rendering (its card shows it while it works).
-  vr('teaser-edit', 'open', 'field-notes-teaser.mp4');
-  vr('teaser-edit', 'status', 'field-notes-teaser.mp4', 'Rendering V2 with a short dissolve', '--eta', '300');
+  lampo('teaser-edit', 'open', 'field-notes-teaser.mp4');
+  lampo('teaser-edit', 'status', 'field-notes-teaser.mp4', 'Rendering V2 with a short dissolve', '--eta', '300');
   await open('#/status');
   await until("document.querySelectorAll('.bcard').length >= 5");
   await imagesLoaded('.bcard img');
@@ -473,7 +473,7 @@ export async function localPictures(s: LocalScene): Promise<void> {
   media.renderFilmV3();
   const settled = new Date(Date.now() - 60_000);
   fs.utimesSync(media.film, settled, settled);
-  vr('launch-edit', 'sync', 'northwind-launch.mp4');
+  lampo('launch-edit', 'sync', 'northwind-launch.mp4');
   await waitFor('V3 registered', async () => (await review(demo.film)).versions.length === 3);
   await settle(`/api/diff/${enc(demo.film)}/3`);
   await settle(`/api/analysis/${enc(demo.film)}/3`);

@@ -1,4 +1,4 @@
-// MCP over Streamable HTTP at /mcp: the same tools as bin/vr-mcp for any client that takes a URL (Codex, Cursor, VS
+// MCP over Streamable HTTP at /mcp: the same tools as bin/lampo-mcp for any client that takes a URL (Codex, Cursor, VS
 // Code, Antigravity, Claude Code, Windsurf, Gemini CLI, Zed, …). Local mode: this machine's agents (the guard limits it to loopback
 // or the LAN token, like the rest of the app). Server mode: a signed-in account — an API token (`Bearer vr_…`), or an
 // app connected through OAuth (`Bearer vro_…`, bound to this endpoint, capped by its scopes; see routes/oauth.ts).
@@ -16,6 +16,7 @@ import { accountTag } from '../../lib/activityText.ts';
 import { agentKindOf } from '../../lib/agentKind.ts';
 import { onAccessEnded, USERS_FILE } from '../../lib/auth.ts';
 import { createLocalBackend } from '../../lib/backend/local.ts';
+import { settings } from '../../lib/env.ts';
 import { cleanAgentName } from '../../lib/names.ts';
 import { GRANTS_FILE, verifyAccess } from '../../lib/oauth/store.ts';
 import { can } from '../../lib/permissions.ts';
@@ -26,7 +27,7 @@ import { grabCount } from '../../lib/shots.ts';
 import * as store from '../../lib/store.ts';
 import type { AgentKind } from '../../lib/types.ts';
 import * as workspaces from '../../lib/workspaces.ts';
-import { type Access, allowed, createReviewServer, type Principal, reviewUri, TOOL_ACCESS, wayOf } from '../../mcp/core.ts';
+import { type Access, allowed, changedUris, createReviewServer, type Principal, TOOL_ACCESS, wayOf } from '../../mcp/core.ts';
 import { type Hold, type QuietRun, quietIn, toldIn, type Wake } from '../../mcp/feedback.ts';
 import type { Auth } from '../auth.ts';
 import { sessionOf } from '../auth.ts';
@@ -42,9 +43,9 @@ const PER_MINUTE = 600;
 /**
  * One log line per tool call — workspace, the agent's session id, the tool, how long, how it ended (a wait also when
  * it starts) — so "the agent never got my notes" can be answered from the log. Never what a tool was given or said,
- * no names, no tokens, no addresses. `VR_MCP_LOG=off` leaves it out.
+ * no names, no tokens, no addresses. `LAMPO_MCP_LOG=off` leaves it out.
  */
-const LOG_CALLS = process.env.VR_MCP_LOG !== 'off';
+const LOG_CALLS = settings.LAMPO_MCP_LOG !== 'off';
 
 /** A connected agent as a request names it (announce, below). */
 interface CallingAgent {
@@ -128,7 +129,7 @@ const RECHECK_MS = 15_000;
 /**
  * An open response asks again at most this often however many events there are (each answer is remembered that
  * long); access ended in this process (lib/auth.ts accessEnded) makes every one ask at once, and so does a change of
- * the files access is decided by (another process: `vr admin`, a restore). A yes is never remembered past the moment
+ * the files access is decided by (another process: `lampo admin`, a restore). A yes is never remembered past the moment
  * the credential ends by itself (a token's expiry, an OAuth access token's hour, a session's end).
  */
 export const RECHECK_MIN_MS = 5_000;
@@ -224,7 +225,7 @@ export function mcpRoutes(ctx: ServerContext): Router {
         return createReviewServer({
           backend,
           principal,
-          // the loop as this kind of agent works it: a coding agent renders through `vr render`, any other uses MCP only
+          // the loop as this kind of agent works it: a coding agent renders through `lampo render`, any other uses MCP only
           way: wayOf(principal.via, agent?.kind),
           wake,
           hold: holdFor(holder),
@@ -350,7 +351,7 @@ export function mcpRoutes(ctx: ServerContext): Router {
     };
   }
 
-  // Every review event (from the UI, `vr`, other sessions — the feed tails events.jsonl) wakes the tool calls waiting in
+  // Every review event (from the UI, `lampo`, other sessions — the feed tails events.jsonl) wakes the tool calls waiting in
   // its workspace and becomes a notification for that workspace's clients listening on `subscriptions/listen`.
   ctx.hub.listen((type, data, ws) => {
     const handler = handlers.get(ws);
@@ -358,9 +359,7 @@ export function mcpRoutes(ctx: ServerContext): Router {
     if (type === 'event') {
       for (const w of [...(waiters.get(ws) ?? [])]) w();
       if (!handler) return;
-      handler.notify.resourceUpdated('vr://inbox');
-      const slug = (data as { slug?: string }).slug;
-      if (slug) handler.notify.resourceUpdated(reviewUri(slug));
+      for (const uri of changedUris((data as { slug?: string }).slug)) handler.notify.resourceUpdated(uri);
     } else if (type === 'library') handler?.notify.resourcesChanged();
   });
 

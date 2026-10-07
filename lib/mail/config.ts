@@ -1,14 +1,16 @@
 // How this server sends email, and who may sign up. Environment first, then config.json:
-//   VR_SMTP_URL / mail.smtp_url     smtp://user:pass@host:587 (STARTTLS) or smtps://…:465 — without it, the log transport
-//   VR_MAIL_FROM / mail.from        "Lampo <hello@review.example.com>", the sender people see (required with SMTP)
-//   VR_MAIL_REPLY_TO / mail.reply_to where replies go (optional)
-//   VR_MAIL_PER_HOUR / mail.per_hour the server's own cap on messages an hour (default 200)
-//   VR_MAIL_PER_WORKSPACE_HOUR / mail.per_workspace_hour  what one workspace's people may send an hour (invites):
+//   LAMPO_SMTP_URL / mail.smtp_url     smtp://user:pass@host:587 (STARTTLS) or smtps://…:465 — without it, the log transport
+//   LAMPO_MAIL_FROM / mail.from        "Lampo <hello@review.example.com>", the sender people see (required with SMTP)
+//   LAMPO_MAIL_REPLY_TO / mail.reply_to where replies go (optional)
+//   LAMPO_MAIL_PER_HOUR / mail.per_hour the server's own cap on messages an hour (default 200)
+//   LAMPO_MAIL_PER_WORKSPACE_HOUR / mail.per_workspace_hour  what one workspace's people may send an hour (invites):
 //                                    its own share, so one team can't use up the server's (default a quarter of it)
-//   VR_SIGNUP / signup              off (default) · invite · open (needs both of the next two)
-//   VR_TERMS_URL, VR_PRIVACY_URL     the operator's terms and privacy policy: linked from the sign-up screen and the
+//   LAMPO_SIGNUP / signup              off (default) · invite · open (needs both of the next two)
+//   LAMPO_TERMS_URL, LAMPO_PRIVACY_URL     the operator's terms and privacy policy: linked from the sign-up screen and the
 //                                    checkout (the other legal links: lib/legal.ts)
 // The log transport writes every message to <cache>/outbox/ instead of sending it: the default, and what tests use.
+
+import { settingsIn } from '../env.ts';
 import { httpUrl } from '../legal.ts';
 import type { ConfigFile } from '../paths.ts';
 import { type Address, parseAddress } from './mime.ts';
@@ -43,15 +45,16 @@ export const workspaceShare = (c: Pick<MailConfig, 'per_hour' | 'per_workspace_h
 export const DEFAULT_PER_HOUR = 200;
 
 export function mailConfig(file: ConfigFile & { mail?: MailFileConfig }, env: NodeJS.ProcessEnv): MailConfig {
+  const s = settingsIn(env);
   const m = file.mail ?? {};
-  const smtp = env.VR_SMTP_URL?.trim() || m.smtp_url?.trim() || null;
-  const perHour = Number(env.VR_MAIL_PER_HOUR || m.per_hour || DEFAULT_PER_HOUR);
-  const perWorkspace = Number(env.VR_MAIL_PER_WORKSPACE_HOUR || m.per_workspace_hour || 0);
+  const smtp = s.LAMPO_SMTP_URL?.trim() || m.smtp_url?.trim() || null;
+  const perHour = Number(s.LAMPO_MAIL_PER_HOUR || m.per_hour || DEFAULT_PER_HOUR);
+  const perWorkspace = Number(s.LAMPO_MAIL_PER_WORKSPACE_HOUR || m.per_workspace_hour || 0);
   return {
     transport: smtp ? 'smtp' : 'log',
     smtp_url: smtp,
-    from: env.VR_MAIL_FROM?.trim() || m.from?.trim() || null,
-    reply_to: env.VR_MAIL_REPLY_TO?.trim() || m.reply_to?.trim() || null,
+    from: s.LAMPO_MAIL_FROM?.trim() || m.from?.trim() || null,
+    reply_to: s.LAMPO_MAIL_REPLY_TO?.trim() || m.reply_to?.trim() || null,
     per_hour: Number.isFinite(perHour) && perHour > 0 ? Math.floor(perHour) : DEFAULT_PER_HOUR,
     ...(Number.isFinite(perWorkspace) && perWorkspace > 0 ? { per_workspace_hour: Math.floor(perWorkspace) } : {}),
   };
@@ -70,11 +73,12 @@ export interface SignupSettings {
 }
 
 export function signupConfig(file: ConfigFile & { signup?: string; terms_url?: string; privacy_url?: string }, env: NodeJS.ProcessEnv) {
-  const raw = (env.VR_SIGNUP || file.signup || 'off').trim().toLowerCase();
+  const s = settingsIn(env);
+  const raw = (s.LAMPO_SIGNUP || file.signup || 'off').trim().toLowerCase();
   return {
     signup: raw as SignupMode,
-    terms_url: env.VR_TERMS_URL?.trim() || file.terms_url?.trim() || null,
-    privacy_url: env.VR_PRIVACY_URL?.trim() || file.privacy_url?.trim() || null,
+    terms_url: s.LAMPO_TERMS_URL?.trim() || file.terms_url?.trim() || null,
+    privacy_url: s.LAMPO_PRIVACY_URL?.trim() || file.privacy_url?.trim() || null,
   };
 }
 
@@ -96,11 +100,11 @@ export function mailProblems(c: MailProblemInput, { signupSeam = false }: { sign
     } catch (e) {
       out.push((e as Error).message);
     }
-    if (!c.mail.from) out.push('VR_SMTP_URL needs VR_MAIL_FROM, the sender people see, e.g. VR_MAIL_FROM="Lampo <hello@review.example.com>".');
+    if (!c.mail.from) out.push('LAMPO_SMTP_URL needs LAMPO_MAIL_FROM, the sender people see, e.g. LAMPO_MAIL_FROM="Lampo <hello@review.example.com>".');
   }
   for (const [name, value] of [
-    ['VR_MAIL_FROM', c.mail.from],
-    ['VR_MAIL_REPLY_TO', c.mail.reply_to],
+    ['LAMPO_MAIL_FROM', c.mail.from],
+    ['LAMPO_MAIL_REPLY_TO', c.mail.reply_to],
   ] as const) {
     if (!value) continue;
     try {
@@ -109,26 +113,26 @@ export function mailProblems(c: MailProblemInput, { signupSeam = false }: { sign
       out.push(`${name} is not an email address: write it as "Name <address@example.com>" or address@example.com.`);
     }
   }
-  if (!SIGNUP_MODES.includes(c.signup)) out.push(`VR_SIGNUP must be off, invite or open (got "${c.signup}").`);
+  if (!SIGNUP_MODES.includes(c.signup)) out.push(`LAMPO_SIGNUP must be off, invite or open (got "${c.signup}").`);
   else if (c.signup !== 'off' && !c.public_url)
-    out.push(`VR_SIGNUP=${c.signup} needs VR_PUBLIC_URL: sign-up confirms each address with an emailed link, and links are built from it.`);
+    out.push(`LAMPO_SIGNUP=${c.signup} needs LAMPO_PUBLIC_URL: sign-up confirms each address with an emailed link, and links are built from it.`);
   // Open sign-up gives each person a workspace of their own (server/signup.ts): only a hosted server has workspaces.
   else if (c.signup === 'open' && (c.mode !== 'server' || !signupSeam))
     out.push(
       c.mode === 'server'
-        ? 'VR_SIGNUP=open needs workspaces: everyone who signs up gets a workspace of their own, and this server has none yet, so they would join the existing team. Until workspaces exist, use VR_SIGNUP=invite (the people you invited sign up themselves) or off.'
-        : 'VR_SIGNUP=open is for a hosted server with workspaces (VR_MODE=server): on your own machine everyone who signs up would join your own store. Use VR_SIGNUP=invite or off.',
+        ? 'LAMPO_SIGNUP=open needs workspaces: everyone who signs up gets a workspace of their own, and this server has none yet, so they would join the existing team. Until workspaces exist, use LAMPO_SIGNUP=invite (the people you invited sign up themselves) or off.'
+        : 'LAMPO_SIGNUP=open is for a hosted server with workspaces (LAMPO_MODE=server): on your own machine everyone who signs up would join your own store. Use LAMPO_SIGNUP=invite or off.',
     );
   for (const [name, value] of [
-    ['VR_TERMS_URL', c.terms_url],
-    ['VR_PRIVACY_URL', c.privacy_url],
+    ['LAMPO_TERMS_URL', c.terms_url],
+    ['LAMPO_PRIVACY_URL', c.privacy_url],
   ] as const)
     if (value && !httpUrl(value)) out.push(`${name} must be an http(s) URL.`);
   // Strangers who sign up agree to terms and are told what happens to their data before they have an account (A13 CLOUD-1).
-  const missing = [!c.terms_url && 'VR_TERMS_URL', !c.privacy_url && 'VR_PRIVACY_URL'].filter((x): x is string => !!x);
+  const missing = [!c.terms_url && 'LAMPO_TERMS_URL', !c.privacy_url && 'LAMPO_PRIVACY_URL'].filter((x): x is string => !!x);
   if (c.signup === 'open' && missing.length)
     out.push(
-      `VR_SIGNUP=open needs ${missing.join(' and ')}: everyone who signs up accepts your terms and is told how their data is used, so link your own pages first.`,
+      `LAMPO_SIGNUP=open needs ${missing.join(' and ')}: everyone who signs up accepts your terms and is told how their data is used, so link your own pages first.`,
     );
   return out;
 }

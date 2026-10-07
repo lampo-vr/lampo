@@ -40,7 +40,7 @@ export const CAPTIONS_KEPT = { summaries: 10_000, texts: 2_000, textBytes: 32 * 
 // An embed's player asks on every page view of the site it sits on whether its version has captions, and for them when
 // they are turned on. A long transcript is megabytes to read and parse, so both are kept per render (`wsKey`: each
 // workspace its own entries), each checked against the file — inode, size and time: every write is an atomic rename,
-// `vr` in another process too — and dropped with the transcript. Bounded: visitors reach these. What is asked for stays
+// `lampo` in another process too — and dropped with the transcript. Bounded: visitors reach these. What is asked for stays
 // (a hit counts as a use), and a full memory makes room in the workspace holding the most (`Memo`), so one workspace's
 // many long videos can't push the other workspaces' captions out.
 const summaries = new Memo<{ stamp: string; has: boolean; lang: string | null }>(CAPTIONS_KEPT.summaries, { groupOf: workspaceOfKey });

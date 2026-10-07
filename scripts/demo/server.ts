@@ -1,4 +1,4 @@
-// Start a video-review server on a throwaway store for the demo and the screenshots. It runs with its own HOME and a
+// Start a Lampo server on a throwaway store for the demo and the screenshots. It runs with its own HOME and a
 // stub `claude` that reports two made-up sessions, so nothing about the machine it runs on ends up on screen.
 import { type ChildProcess, spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -43,13 +43,13 @@ export async function startServer(
   const env: NodeJS.ProcessEnv = {
     PATH: process.env.PATH,
     HOME: home,
-    VR_DATA: path.join(dir, 'data'),
-    VR_CACHE: path.join(dir, 'cache'),
-    VR_CONFIG: config,
-    VR_PORT: String(p),
-    VR_CLAUDE_BIN: claude,
+    LAMPO_DATA: path.join(dir, 'data'),
+    LAMPO_CACHE: path.join(dir, 'cache'),
+    LAMPO_CONFIG: config,
+    LAMPO_PORT: String(p),
+    LAMPO_CLAUDE_BIN: claude,
     // the demo is a store in use (and the README's screenshots come from it): no first run
-    VR_ONBOARDING: 'off',
+    LAMPO_ONBOARDING: 'off',
     XDG_CONFIG_HOME: path.join(home, '.config'),
     XDG_CACHE_HOME: path.join(home, '.cache'),
     ...vars,

@@ -1,8 +1,8 @@
-// Agents that connected — `vr watch` in a Claude Code session, any MCP client over /mcp (Codex, Cursor, ChatGPT,
+// Agents that connected — `lampo watch` in a Claude Code session, any MCP client over /mcp (Codex, Cursor, ChatGPT,
 // Claude …) — announce themselves every 30 s. On a hosted server this is the list a video can be handed to (it can't
 // see anyone's Claude Code sessions); on the person's own machine it complements `claude agents`.
 // And whether each one hears new notes: an MCP client acts only when prompted, so it hears them only while it sits in
-// wait_for_feedback (each open wait is told here); `vr watch` follows them by nature. That is what the app shows where
+// wait_for_feedback (each open wait is told here); `lampo watch` follows them by nature. That is what the app shows where
 // a video is assigned, so nobody writes notes to an agent that won't look.
 import { cleanAgentName, cleanFolderLine } from '../lib/names.ts';
 import { isoLocal } from '../lib/paths.ts';
@@ -20,7 +20,7 @@ export const LISTEN_TIMES = { betweenMs: 20_000, workingMs: 10 * 60_000 };
 
 export interface AgentRegistry {
   /**
-   * `listens`: it follows new notes by itself while it is listed (`vr watch`). `account`: whose agent it is, by the
+   * `listens`: it follows new notes by itself while it is listed (`lampo watch`). `account`: whose agent it is, by the
    * account's id (never listed; agents' runs know it by it: server/runs.ts; none: the machine itself). An agent listed
    * under another account's session id is that account's: false, nothing changed.
    */

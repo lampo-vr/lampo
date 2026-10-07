@@ -15,8 +15,8 @@ test('addresses, subnets and named ranges; never "anyone"', () => {
   assert.deepEqual(trustProxy('10.0.0.5, 172.18.0.0/16,fd00::/8'), { value: '10.0.0.5, 172.18.0.0/16, fd00::/8', legacy: false });
   assert.deepEqual(trustProxy('false'), { value: false, legacy: false });
   assert.deepEqual(trustProxy(false), { value: false, legacy: false });
-  assert.throws(() => trustProxy('everyone'), /VR_TRUST_PROXY/);
-  assert.throws(() => trustProxy('10.0.0.0/33'), /VR_TRUST_PROXY/);
+  assert.throws(() => trustProxy('everyone'), /LAMPO_TRUST_PROXY/);
+  assert.throws(() => trustProxy('10.0.0.0/33'), /LAMPO_TRUST_PROXY/);
 });
 
 test('the old forms (true, a hop count) mean a proxy on this machine or a private network, with a warning', () => {

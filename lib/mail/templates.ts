@@ -12,7 +12,7 @@ export interface MailSite {
   url: string;
   /** Its host, as people read it. */
   host: string;
-  /** The team's name (VR_ORG_NAME), for an invite's subject. */
+  /** The team's name (LAMPO_ORG_NAME), for an invite's subject. */
   org: string | null;
 }
 

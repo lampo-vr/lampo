@@ -9,7 +9,7 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
-CACHE="${VR_FOOTAGE_CACHE:-$ROOT/cache/footage}"
+CACHE="${LAMPO_FOOTAGE_CACHE:-$ROOT/cache/footage}"
 VOL=lampo-footage-bench-x64
 PKGS="@huggingface/transformers@4.3.0 onnxruntime-node@1.30.0 sqlite-vec@0.1.9"
 [ "${1:-}" = "--with-lancedb" ] && PKGS="$PKGS @lancedb/lancedb@0.39.0 apache-arrow@18.1.0"
@@ -22,4 +22,4 @@ docker run --rm --platform linux/amd64 -e ONNXRUNTIME_NODE_INSTALL=skip -v "$VOL
   echo 'onnxruntime-node binaries kept for linux/x64:'; du -sh /mods/onnxruntime-node/bin/napi-v6/linux/x64"
 docker run --rm --platform linux/amd64 --cpus 4 --memory 6g \
   -v "$ROOT:$ROOT:ro" -v "$VOL:$HERE/node_modules:ro" -v "$CACHE/work/linux:$CACHE/work/linux" \
-  -e VR_FOOTAGE_CACHE="$CACHE" node:24-slim node "$HERE/linux_check.ts" --check
+  -e LAMPO_FOOTAGE_CACHE="$CACHE" node:24-slim node "$HERE/linux_check.ts" --check

@@ -2,13 +2,14 @@
 // copy the one snippet or connector address it needs, then tell it one sentence — "Use Lampo for <project>" is the
 // whole loop (the server's instructions: it finds the project, puts up V1, works the notes and keeps waiting for the
 // next ones until the person approves) — and see it work, live (the connected-agents registry: every client over /mcp
-// and every `vr watch` announces itself). Copy-only: nothing here writes an agent's configuration (`vr mcp config
+// and every `lampo watch` announces itself). Copy-only: nothing here writes an agent's configuration (`lampo mcp config
 // <client>` prints the same). At the machine the app runs on, clients reach the running app without signing in; they
 // may also start the MCP server themselves (then they don't show up in the registry).
 import { useState } from 'react';
+import { agentShown } from '../../../lib/agentKind.ts';
 import { WAKE_DEFAULT } from '../../../lib/agentRun.ts';
 import { BRAND_NAME } from '../../../lib/brand.ts';
-import { lampoFor, MCP_NAME, type McpClient, type McpTarget, mcpSnippet } from '../../../lib/mcpConfig.ts';
+import { lampoFor, MCP_NAME, type McpClient, type McpTarget, mcpSnippet, stdioCommand } from '../../../lib/mcpConfig.ts';
 import { compareTime } from '../../../lib/time.ts';
 import type { AgentKind, AgentListenState, WakePref } from '../../../lib/types.ts';
 import { useAgents, useAuthStatus, useUpdateMe } from '../api/auth.ts';
@@ -78,7 +79,7 @@ function setup(
       return {
         code: {
           label: t('Claude desktop app · Settings → Developer → Edit Config'),
-          text: mcpSnippet('json', { kind: 'stdio', command: `${ctx.root}/bin/vr-mcp` }).text,
+          text: mcpSnippet('json', { kind: 'stdio', command: stdioCommand(ctx.root) }).text,
         },
         notes: [t('Restart Claude afterwards. Claude on the web connects once the app runs on a server with an https address.')],
         live: false,
@@ -131,7 +132,7 @@ function ConnectState({ pick, live }: { pick: AgentPick; live: boolean }) {
       {first ? (
         <>
           <AgentMark kind={first.kind ?? 'cli'} size={16} />
-          <Badge tone="ok">{t('Connected: {name}', { name: first.name })}</Badge>
+          <Badge tone="ok">{t('Connected: {name}', { name: agentShown(first.name, first.kind) })}</Badge>
           <span className="set-sub">
             {t('seen {when}', { when: when(first.last_seen) })}
             {first.state && ` · ${STATE[first.state]()}`}
@@ -198,7 +199,7 @@ export function Mcp() {
   const base = (info?.public_url || location.origin).replace(/\/+$/, '');
   const https = info?.public_url?.startsWith('https://') ? info.public_url.replace(/\/+$/, '') : null;
   const stdio = atMachine && own && pick !== 'chatgpt' && pick !== 'claude';
-  const target: McpTarget = stdio ? { kind: 'stdio', command: `${info?.root}/bin/vr-mcp` } : { kind: 'http', url: `${base}/mcp` };
+  const target: McpTarget = stdio ? { kind: 'stdio', command: stdioCommand(info?.root ?? '') } : { kind: 'http', url: `${base}/mcp` };
   const s = info ? setup(pick, other, target, { atMachine, https, root: info.root, mediaHost: hostOf(info.media_origin) }) : null;
   const chat = pick === 'chatgpt' || pick === 'claude';
   return (

@@ -1,6 +1,6 @@
 // What people and agents write, capped the same on every way in: the HTTP API (server/routes/*, server/uploadTickets.ts)
 // and the MCP tools (mcp/tools/*) parse it with these schemas, so a cap can't be skipped by asking the other way — a
-// 1 MB note over MCP went into review.json and every agent's next read (A12 AGENT-6). `vr` goes through one or the
+// 1 MB note over MCP went into review.json and every agent's next read (A12 AGENT-6). `lampo` goes through one or the
 // other. MCP doesn't announce the length caps in its tool list (mcp/lean.ts); every call is checked all the same.
 import { z } from 'zod';
 import { OPTION_LIMITS } from './options.ts';

@@ -1,4 +1,4 @@
-// `vr export <out.tar> [--folder <name>]…`: this store's reviews as a bundle (lib/bundle.ts) for another store,
+// `lampo export <out.tar> [--folder <name>]…`: this store's reviews as a bundle (lib/bundle.ts) for another store,
 // typically a hosted server (docs/moving.md). It reads the store the way the app does (listReviews, the storage
 // adapter, the event log) and writes nothing into it. What the bundle carries is the history people and agents made;
 // what belongs to this machine stays: paths (a video tracked from a file becomes an upload, `__Users__…` →
@@ -123,7 +123,7 @@ export async function exportBundle(o: ExportOptions): Promise<ExportResult> {
   // ------------------------------------------------------------------ what goes
   const known = shownFolders().folders;
   const wanted = (o.folders ?? []).map((f) => folderName(f)).filter((f): f is string => !!f);
-  for (const w of wanted) if (!known.includes(w)) throw new Error(`there is no folder "${w}" (vr folders lists them)`);
+  for (const w of wanted) if (!known.includes(w)) throw new Error(`there is no folder "${w}" (lampo folders lists them)`);
   const inside = (f: string | null | undefined) => !wanted.length || (!!f && wanted.some((w) => f === w || f.startsWith(`${w}/`)));
   const above = (f: string) => wanted.some((w) => w.startsWith(`${f}/`));
 
@@ -135,7 +135,7 @@ export async function exportBundle(o: ExportOptions): Promise<ExportResult> {
     .sort((a, b) => slugify(a.video).localeCompare(slugify(b.video)));
 
   // ------------------------------------------------------------------ people
-  // The machine's owner (and the names `vr` and the app wrote under) becomes the --owner account on the server. A hosted
+  // The machine's owner (and the names `lampo` and the app wrote under) becomes the --owner account on the server. A hosted
   // store has no such one: every account there travels as a person of its own.
   const owner = loadConfig().mode === 'server' ? null : localOwner();
   const ownerNames = new Set<string>();
@@ -554,7 +554,7 @@ export async function exportBundle(o: ExportOptions): Promise<ExportResult> {
           continue;
         }
         const wrote = await tar.file(n, src.get(n) as string);
-        if (wrote.sha256 !== hashes.get(n)) throw new Error(`${n} changed while the bundle was written: run vr export again`);
+        if (wrote.sha256 !== hashes.get(n)) throw new Error(`${n} changed while the bundle was written: run lampo export again`);
       }
     await tar.buffer('folders.json', json.get('folders.json') as Buffer);
     await tar.buffer('events.jsonl', json.get('events.jsonl') as Buffer);

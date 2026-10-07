@@ -2,13 +2,14 @@
 // Source: `claude agents --json` (supported, ~4 s). Fallback / fast path for "who am I": ~/.claude/sessions/<pid>.json.
 import fs from 'node:fs';
 import path from 'node:path';
+import { settings } from './env.ts';
 import { HOME } from './paths.ts';
 import { run } from './probe.ts';
 import type { AssignedSession, ClaudeSession, RankedSession, Review } from './types.ts';
 
-/** The `claude` binary: VR_CLAUDE_BIN (tests point it at a stand-in), else the first one found; 'claude' when none is. */
+/** The `claude` binary: LAMPO_CLAUDE_BIN (tests point it at a stand-in), else the first one found; 'claude' when none is. */
 export function findClaude(): string {
-  if (process.env.VR_CLAUDE_BIN) return process.env.VR_CLAUDE_BIN;
+  if (settings.LAMPO_CLAUDE_BIN) return settings.LAMPO_CLAUDE_BIN;
   for (const dir of (process.env.PATH || '').split(':')) {
     const p = path.join(dir, 'claude');
     if (dir && fs.existsSync(p)) return p;
@@ -88,7 +89,7 @@ export async function listSessions({ timeoutMs = 10_000 }: { timeoutMs?: number 
   return fromRegistry();
 }
 
-// The session this process runs in (vr called from a Claude Code Bash tool), or null.
+// The session this process runs in (lampo called from a Claude Code Bash tool), or null.
 export function currentSession(): ClaudeSession | null {
   const pid = process.env.CLAUDE_PID;
   const id = process.env.CLAUDE_CODE_SESSION_ID;

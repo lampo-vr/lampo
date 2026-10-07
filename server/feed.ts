@@ -1,5 +1,5 @@
 // Every new line of data/events.jsonl goes out as an SSE "event" with the full event, whoever wrote it (the server,
-// the CLI, another session). Remote `vr watch` and MCP clients follow the review this way. Each workspace has its own
+// the CLI, another session). Remote `lampo watch` and MCP clients follow the review this way. Each workspace has its own
 // log (lib/workspaces.ts): its lines go out in that workspace only, and webhooks, push and checks run there.
 import fs from 'node:fs';
 import { inWorkspace } from '../lib/scope.ts';
@@ -23,7 +23,7 @@ interface FeedOptions {
 
 /**
  * The feed as the server process runs it: public events to browsers and agents, raw ones to webhooks and push. A new
- * render registered by another process (`vr push`, `vr sync`) is compared with the fix previews of its notes.
+ * render registered by another process (`lampo push`, `lampo sync`) is compared with the fix previews of its notes.
  */
 export function startServerFeed(ctx: Pick<ServerContext, 'broadcast' | 'publicEvent' | 'webhooks' | 'push' | 'background' | 'runs'>, interval?: number): Feed {
   return startFeed(ctx.broadcast, {
@@ -72,7 +72,7 @@ export function startFeed(broadcast: Broadcast, { interval = 500, publicEvent = 
       return list;
     } catch (e) {
       const why = (e as Error).message;
-      if (why !== down) console.error(`video-review: ${why}`);
+      if (why !== down) console.error(`lampo: ${why}`);
       down = why;
       return null;
     }

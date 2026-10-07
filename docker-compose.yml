@@ -1,4 +1,4 @@
-# Lampo behind Caddy (automatic HTTPS). Setup: cp .env.example .env, set VR_DOMAIN / VR_PUBLIC_URL, point DNS
+# Lampo behind Caddy (automatic HTTPS). Setup: cp .env.example .env, set LAMPO_DOMAIN / LAMPO_PUBLIC_URL, point DNS
 # at the server, then `docker compose up -d` and read the one-time setup token: `docker compose logs app`.
 # Details: docs/docker.md
 # Docker keeps container logs forever by default: a few rotated files each is plenty (the app logs little and never a
@@ -12,7 +12,7 @@ x-logging: &logging
 services:
   app:
     build: .
-    image: video-review:local
+    image: lampo:local
     restart: unless-stopped
     env_file: .env
     volumes:
@@ -31,13 +31,13 @@ services:
     tmpfs:
       - /tmp:size=64m,mode=1777
     pids_limit: 512
-    # The speech model and ffmpeg jobs need room; lower on a small box and switch speech off (VR_STT=off) if needed.
+    # The speech model and ffmpeg jobs need room; lower on a small box and switch speech off (LAMPO_STT=off) if needed.
     mem_limit: 6g
     # On stop the app finishes uploads being registered and the running job (up to 30 s) before it exits.
     stop_grace_period: 45s
     logging: *logging
     healthcheck:
-      # Ready, not just alive: data writable, disk above VR_MIN_FREE, ffmpeg, storage credentials (see /readyz).
+      # Ready, not just alive: data writable, disk above LAMPO_MIN_FREE, ffmpeg, storage credentials (see /readyz).
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4747/readyz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
       interval: 30s
       timeout: 10s
@@ -55,7 +55,8 @@ services:
       - "443:443"
       - "443:443/udp"
     environment:
-      VR_DOMAIN: ${VR_DOMAIN:?set VR_DOMAIN in .env}
+      # LAMPO_DOMAIN, else the older VR_DOMAIN of an .env from before
+      LAMPO_DOMAIN: ${LAMPO_DOMAIN:-${VR_DOMAIN:?set LAMPO_DOMAIN in .env}}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

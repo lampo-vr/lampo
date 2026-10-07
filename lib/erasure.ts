@@ -13,7 +13,7 @@
 // - eraseWorkspaceFiles: a deleted workspace's storage prefix (renders, previews, references, playbooks' files: the
 //   adapter's `remove('w/<id>/')`) and its data and cache folders. Never workspace #1 (its folders are the store's own).
 // - the erasure log (data/erasures.jsonl): one line per deleted account or workspace — ids only —, so that whoever
-//   restores a backup taken before can delete them again (`vr admin erasures --apply`, lib/deletion.ts).
+//   restores a backup taken before can delete them again (`lampo admin erasures --apply`, lib/deletion.ts).
 import fs from 'node:fs';
 import path from 'node:path';
 import { forgetLinksOf } from './accountLinks.ts';

@@ -16,6 +16,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { settings } from '../../../lib/env.ts';
 import type { AgentKind, Comment, Review, Severity, ShareWatch, TeamWatch } from '../../../lib/types.ts';
 
 const shape = process.argv[2] === 'team' ? 'team' : 'solo';
@@ -23,7 +24,7 @@ const DATA = process.env.VR_DATA;
 if (!DATA) throw new Error('insightsStore: VR_DATA must name the new store');
 if (fs.existsSync(DATA) && fs.readdirSync(DATA).length) throw new Error(`insightsStore: ${DATA} is not empty`);
 const ROOT = path.dirname(DATA);
-const FFMPEG = process.env.VR_FFMPEG || 'ffmpeg';
+const FFMPEG = settings.LAMPO_FFMPEG || 'ffmpeg';
 
 const { slugify, isoLocal, reviewDir } = await import('../../../lib/paths.ts');
 const store = await import('../../../lib/store.ts');

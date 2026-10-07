@@ -1,4 +1,4 @@
-// The stand-in for the image/text model that tests use (VR_FOOTAGE_MODEL=fake): deterministic vectors, no model files,
+// The stand-in for the image/text model that tests use (LAMPO_FOOTAGE_MODEL=fake): deterministic vectors, no model files,
 // no download. A picture's vector says which named colours it is close to; a text's, which colour words it names. So a
 // test clip of red, blue and green shots answers "red" with its red shot, the way the real model answers "a red car".
 const COLOURS: [string, [number, number, number]][] = [

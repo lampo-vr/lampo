@@ -20,6 +20,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { settings } from '../../../lib/env.ts';
 import { baseRef, changedFiles, suitesFor } from '../../lib/affected.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -148,7 +149,7 @@ function options(argv) {
     else if (a === '--changed') o.changed = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : '';
     else throw new Error(`unknown option ${a}`);
   }
-  if (!o.jobs) o.jobs = Math.max(1, Number(process.env.VR_E2E_JOBS) || Math.min(4, Math.floor(os.cpus().length / 2)));
+  if (!o.jobs) o.jobs = Math.max(1, Number(settings.LAMPO_E2E_JOBS) || Math.min(4, Math.floor(os.cpus().length / 2)));
   return o;
 }
 
@@ -173,7 +174,7 @@ async function main() {
   }
 
   const gha = process.env.GITHUB_ACTIONS === 'true';
-  const limit = (Number(process.env.VR_E2E_SUITE_MINUTES) || 15) * 60_000;
+  const limit = (Number(settings.LAMPO_E2E_SUITE_MINUTES) || 15) * 60_000;
   const running = new Set();
   // Stopped by hand: every running suite closes its Chrome and server (SIGINT), then their groups go.
   const stopAll = (signal) => {

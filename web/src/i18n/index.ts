@@ -14,7 +14,7 @@
 // - A context prefix keeps words apart that German says differently: 'client::…' are the client pages (their own
 //   file, de.client.ts, which addresses the reader as "Sie"; the owner app says "du").
 // - Rich text (<b>, <code>, links inside a sentence) goes through <T> (T.tsx) with numbered tags: 'Press <0>C</0>'.
-// - Agent-facing text (vr, MCP, INBOX.md, events) is never translated: it is a data contract.
+// - Agent-facing text (lampo, MCP, INBOX.md, events) is never translated: it is a data contract.
 import { LANG_KEY, type Lang, pickLang } from '../../../lib/themeBoot.ts';
 import type { Key } from './en.ts';
 

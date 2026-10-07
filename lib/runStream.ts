@@ -103,7 +103,7 @@ const NOT_PREFIX = /^-|[/=$`'"(){}<>*?]/;
 
 /**
  * The start of a shell command that says what it runs — the program and up to two words after it (`npx remotion
- * render`, `vr render`, `ffmpeg`) — without its paths, options or values: what a permission rule allows. Of a chain,
+ * render`, `lampo render`, `ffmpeg`) — without its paths, options or values: what a permission rule allows. Of a chain,
  * the first part that isn't a `cd`; leading variable assignments are left out.
  */
 export function commandPrefix(command: string): string {

@@ -1,4 +1,4 @@
-// Webhooks managed in the UI (Settings → Notifications). Hooks from config.json and VR_WEBHOOK_URL are listed too,
+// Webhooks managed in the UI (Settings → Notifications). Hooks from config.json and LAMPO_WEBHOOK_URL are listed too,
 // read-only. Admins only: a webhook sends review content to another service.
 import express, { type Router } from 'express';
 import { z } from 'zod';

@@ -114,7 +114,7 @@ export function cleanDisplayName(raw: string): string {
 export const AGENT_NAME_MAX = 80;
 
 /**
- * An agent's or session's name as it comes in — an assignment, a heartbeat, an MCP client's own name, `--by` / VR_BY,
+ * An agent's or session's name as it comes in — an assignment, a heartbeat, an MCP client's own name, `--by` / LAMPO_BY,
  * a Claude Code session —: one line of printable text, at most `max` characters. Never a line break, a control
  * character or a bidi override, which would let it pass for another line or another agent wherever people and agents
  * read it (audit A12-D3).
@@ -123,7 +123,7 @@ export function cleanAgentName(raw: string, max = AGENT_NAME_MAX): string {
   return [...cleanDisplayName(raw.replace(/\s+/g, ' '))].slice(0, max).join('').trim();
 }
 
-/** A write's author as given on this machine (`--by`, VR_BY, a session): `agent:` stays, the name is cleaned. */
+/** A write's author as given on this machine (`--by`, LAMPO_BY, a session): `agent:` stays, the name is cleaned. */
 export function cleanAuthor(raw: string): string {
   const m = /^agent:([\s\S]*)$/.exec(raw);
   if (!m) return cleanAgentName(raw);

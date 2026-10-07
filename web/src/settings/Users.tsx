@@ -199,7 +199,7 @@ function InviteForm({ me, onCreated, many }: { me: Role; onCreated: (made: Invit
       {info?.mail_transport === 'log' && (
         <p className="set-sub set-note" data-testid="mail-outbox">
           <T
-            k={'This server has no mail relay (<0>VR_SMTP_URL</0>): emails wait in its outbox instead of going out. Copy the link and send it yourself.'}
+            k={'This server has no mail relay (<0>LAMPO_SMTP_URL</0>): emails wait in its outbox instead of going out. Copy the link and send it yourself.'}
             tags={[(c) => <code>{c}</code>]}
           />
         </p>
@@ -531,7 +531,7 @@ export function Users() {
         {/* a command on the server's own machine: only for whoever runs it (the machine's owner, a hosted server's operator) */}
         {(!here || status?.operator) && (
           <div className="set-sub" data-testid="locked-out">
-            <T k={'Locked out yourself? On the server: <0>vr admin reset-password --email you@example.com</0>'} tags={[(c) => <code>{c}</code>]} />
+            <T k={'Locked out yourself? On the server: <0>lampo admin reset-password --email you@example.com</0>'} tags={[(c) => <code>{c}</code>]} />
           </div>
         )}
       </Card>

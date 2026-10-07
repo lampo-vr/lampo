@@ -1,5 +1,5 @@
 // What an error may tell whom. The machine's owner at the machine (`via: 'local'`: the app on loopback, a stdio MCP
-// server, `vr`) sees every error as it is: the paths are their own files, the tool output is their own ffmpeg. Anyone
+// server, `lampo`) sees every error as it is: the paths are their own files, the tool output is their own ffmpeg. Anyone
 // else — a review-link visitor (even on the machine, through the tunnel or the LAN), a signed-in person on another
 // device, an agent with a token or an app, every caller of a hosted server — gets a sentence meant for them, with a ref
 // to the log line that holds the rest. Decided by who asks, never by the mode.

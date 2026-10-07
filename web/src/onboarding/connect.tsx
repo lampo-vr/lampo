@@ -1,12 +1,12 @@
 // Connecting an agent, one block for every place that offers it (the setup's agent step on Cloud, at the machine and on
 // a self-hosted server, and Get started's agent step): the tiles to pick it, the one snippet it needs for this app
-// (lib/mcpConfig.ts, the same Settings → Connect an agent and `vr mcp config` hand out) with Copy, the one sentence
+// (lib/mcpConfig.ts, the same Settings → Connect an agent and `lampo mcp config` hand out) with Copy, the one sentence
 // that sets it to work ("Use Lampo for <project>": the whole loop), and its live status from the connected-agents
 // registry (GET /api/agents, refetched when the `sessions` event says one arrived: every client over /mcp and every
-// `vr watch` announces itself). Copy-only: nothing here writes an agent's configuration.
+// `lampo watch` announces itself). Copy-only: nothing here writes an agent's configuration.
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { BRAND_NAME } from '../../../lib/brand.ts';
-import { lampoFor, MCP_NAME, type McpTarget, mcpSnippet } from '../../../lib/mcpConfig.ts';
+import { lampoFor, MCP_NAME, type McpTarget, mcpSnippet, stdioCommand } from '../../../lib/mcpConfig.ts';
 import { compareTime } from '../../../lib/time.ts';
 import type { AgentKind, ConnectedAgent, SetupAgent } from '../../../lib/types.ts';
 import { useAgents, useAuthStatus, useTokenActions } from '../api/auth.ts';
@@ -51,7 +51,7 @@ export interface Where {
   atMachine: boolean;
   /** The public https address, when there is one (chat apps connect over the internet only). */
   https: string | null;
-  /** The app's folder at the machine (Claude's desktop config names its vr-mcp). */
+  /** The app's folder at the machine (Claude's desktop config names its lampo-mcp). */
   root: string;
   /** The host people see (app.lampo.video, localhost:4747). */
   host: string;
@@ -91,8 +91,8 @@ export interface Setup {
 
 export function setupOf(pick: SetupAgent, w: Where, token: string | null): Setup | null {
   const hosted = !w.atMachine;
-  const target: McpTarget = { kind: 'http', url: w.url, ...(token ? { tokenEnv: 'VR_TOKEN' } : {}) };
-  const env = t('Set VR_TOKEN to your API token (Settings → API tokens) before starting the client.');
+  const target: McpTarget = { kind: 'http', url: w.url, ...(token ? { tokenEnv: 'LAMPO_TOKEN' } : {}) };
+  const env = t('Set LAMPO_TOKEN to your API token (Settings → API tokens) before starting the client.');
   const local = t('No sign-in: it reaches the app on this computer.');
   switch (pick) {
     case 'claude-code':
@@ -101,7 +101,7 @@ export function setupOf(pick: SetupAgent, w: Where, token: string | null): Setup
         code: mcpSnippet('claude', target).text,
         notes: [
           token
-            ? t('Your shell fills in $VR_TOKEN when you run it.')
+            ? t('Your shell fills in $LAMPO_TOKEN when you run it.')
             : hosted
               ? t('No token to copy: the first time, run /mcp in Claude Code and sign in.')
               : local,
@@ -156,7 +156,7 @@ export function setupOf(pick: SetupAgent, w: Where, token: string | null): Setup
       if (pick === 'claude' && w.atMachine)
         return {
           label: t('Claude desktop app · Settings → Developer → Edit Config'),
-          code: mcpSnippet('json', { kind: 'stdio', command: `${w.root}/bin/vr-mcp` }).text,
+          code: mcpSnippet('json', { kind: 'stdio', command: stdioCommand(w.root) }).text,
           notes: [t('Restart Claude afterwards. Claude on the web connects once the app runs on a server with an https address.')],
           live: false,
           offline: t('It starts its own server, so it doesn’t show up here. To check, ask it: “What’s waiting for me in {name}?”', { name: BRAND_NAME }),
@@ -175,7 +175,7 @@ export function setupOf(pick: SetupAgent, w: Where, token: string | null): Setup
       return {
         label: t('Address, for any MCP client'),
         code: w.url,
-        notes: [hosted ? t('It signs in the first time, or takes an API token.') : local, 'vr mcp config'],
+        notes: [hosted ? t('It signs in the first time, or takes an API token.') : local, 'lampo mcp config'],
         live: true,
         tokenable: hosted,
       };
@@ -338,10 +338,10 @@ export function ConnectBlock({
       {s.notes.length > 0 && (
         <p className="ob-fine">
           {s.notes.map((n) =>
-            n === 'vr mcp config' ? (
+            n === 'lampo mcp config' ? (
               <span key={n}>
                 {' '}
-                <T k="<0>vr mcp config vscode</0> prints a ready setup; also antigravity, windsurf, gemini, zed." tags={[(c) => <code>{c}</code>]} />
+                <T k="<0>lampo mcp config vscode</0> prints a ready setup; also antigravity, windsurf, gemini, zed." tags={[(c) => <code>{c}</code>]} />
               </span>
             ) : (
               <span key={n}>{n} </span>

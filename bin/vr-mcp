@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// MCP server over stdio. Symlink-safe: node resolves the real path of this file, so ../mcp is always the project's.
+// What bin/lampo-mcp was called before: the same server, for MCP configs written then.
 import { launch } from './launch.js';
 
 await launch(new URL('../mcp/server.ts', import.meta.url));

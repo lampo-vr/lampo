@@ -165,7 +165,7 @@ same row in the agent menu for the frame on screen. It is never the default.
 | Owner, admin, member | yes | yes | yes |
 | Reviewer | yes | yes | no |
 | Anyone on a review link that allows approving | the newest version, through the link | no | no |
-| Agents (`vr`, MCP, any API token) | no | no | no |
+| Agents (`lampo`, MCP, any API token) | no | no | no |
 
 On your own machine you are the owner and can do everything. On a hosted server these are the *approve* and
 *finalize* rights of the role table ([`lib/permissions.ts`](../lib/permissions.ts)).
@@ -177,7 +177,7 @@ Two more rights of that table touch where a video stands:
   version* lists the others. Owners, admins and members may, as for whole folders; reviewers watch and leave notes.
   Visitors download only what their review link allows ([sharing.md](sharing.md)).
 - **Archiving a project** and restoring it: owners and admins, in the app. Taking a video out of an archived one is
-  theirs too; no API token or connected app does it (on your own machine, `vr move` and the machine's own agent may,
+  theirs too; no API token or connected app does it (on your own machine, `lampo move` and the machine's own agent may,
   as the owner).
 
 ## How the stage is decided
@@ -224,15 +224,15 @@ review* is `needs_you`), and the next step reads in their own words: *Hand it to
 agent*, *Waiting for the client's verdict* where you see *Waiting for their decision*, *Send to the client* where you
 see *Send out for review*.
 
-- `vr ls` ends every line with `stage:<stage>`; `--json` adds `stage` and `stage_detail`.
-- `vr open` shows `stage: FINAL — Final V3 · marked by alex (fix nothing until it is reopened)` under its header;
-  `vr open --json` carries the whole stage.
+- `lampo ls` ends every line with `stage:<stage>`; `--json` adds `stage` and `stage_detail`.
+- `lampo open` shows `stage: FINAL — Final V3 · marked by alex (fix nothing until it is reopened)` under its header;
+  `lampo open --json` carries the whole stage.
 - MCP `list_videos` ends each video with `· stage <stage> (<detail>)`; `get_open_notes` and `get_note` put
   `stage <stage> · <detail>` into their header.
-- **A final video is locked for agents.** `vr fix`, `vr wontfix` and the MCP tools `mark_fixed` and `wont_fix` are
+- **A final video is locked for agents.** `lampo fix`, `lampo wontfix` and the MCP tools `mark_fixed` and `wont_fix` are
   refused: "film.mp4 is final (v3, by alex): nothing to fix until the reviewer reopens it". A new note is still saved,
   with a warning that it waits until someone reopens the video.
-- `vr watch` and `INBOX.md` print decisions with the party:
+- `lampo watch` and `INBOX.md` print decisions with the party:
 
   ```
   APPROVED v3 (client: Mia)

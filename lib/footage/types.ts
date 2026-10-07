@@ -1,4 +1,4 @@
-// Footage search (docs/footage.md): what an agent asks for and what it gets back — the contract `vr footage find --json`,
+// Footage search (docs/footage.md): what an agent asks for and what it gets back — the contract `lampo footage find --json`,
 // GET /api/footage/find and the MCP tool find_footage share. Browser-safe: no Node imports.
 
 export type FootageAspect = '16:9' | '9:16' | '1:1';
@@ -48,9 +48,9 @@ export interface FootageRead {
 
 /** One shot: a stretch of a video between two cuts. */
 export interface FootageShot {
-  /** "s412": stable while the video's version stays the same; good for `vr footage sheet` in the same workspace. */
+  /** "s412": stable while the video's version stays the same; good for `lampo footage sheet` in the same workspace. */
   id: string;
-  /** The video's slug (what get_frame, vr open and the API take). */
+  /** The video's slug (what get_frame, lampo open and the API take). */
   video: string;
   /** Its file name, as the library shows it. */
   name: string;
@@ -82,7 +82,7 @@ export interface FootageShot {
   score: number;
   /** Where the request's words were found. */
   matched?: ('text' | 'said')[];
-  /** The render's file on this machine: only for the machine itself (`vr` on it, its own agent), never over the network. */
+  /** The render's file on this machine: only for the machine itself (`lampo` on it, its own agent), never over the network. */
   file?: string;
 }
 

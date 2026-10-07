@@ -3,7 +3,7 @@
 // restart picks up where it was. Two transports:
 //   log   every message is written to <cache>/outbox/ (JSON, the raw .eml and an .html preview) instead of being sent —
 //         the default when no SMTP relay is configured, and what every test uses;
-//   smtp  through VR_SMTP_URL (lib/mail/smtp.ts).
+//   smtp  through LAMPO_SMTP_URL (lib/mail/smtp.ts).
 // Limits: per recipient (an address can't be flooded through "forgot password" or invites) and for the whole server
 // (the relay's quota). Logs name recipients only by a keyed hash (addrHash) and never print a link or a token.
 // The queue file holds each message sealed (AES-256-GCM, a key derived from the store's secret): a copy of the file
@@ -159,7 +159,7 @@ function prune(dir: string): void {
   }
 }
 
-/** What the outbox holds, oldest first (tests, `vr admin mail-test`, the docs' recipe). */
+/** What the outbox holds, oldest first (tests, `lampo admin mail-test`, the docs' recipe). */
 export function readOutbox(dir: string): (MailMessage & { id: string; at: string; headers: Record<string, string> })[] {
   if (!fs.existsSync(dir)) return [];
   return fs
@@ -196,7 +196,7 @@ interface Entry {
   expires?: number;
   /** The keyed hash of who asked for it (MailMessage.asker), when someone signed out did. */
   asker?: string;
-  /** The last error, for `vr admin mail-test` and diagnostics (no address in it). */
+  /** The last error, for `lampo admin mail-test` and diagnostics (no address in it). */
   error?: string;
 }
 
@@ -332,7 +332,7 @@ export function createMailer(o: MailerOptions): Mailer {
     const due = load().reduce((m, e) => Math.min(m, e.next), Number.POSITIVE_INFINITY);
     if (!Number.isFinite(due)) return;
     timer = setTimeout(() => void flush(), Math.max(0, due - now()));
-    // A queued message never keeps the process alive (tests, `vr`): the server's process is alive anyway.
+    // A queued message never keeps the process alive (tests, `lampo`): the server's process is alive anyway.
     timer.unref();
   };
 

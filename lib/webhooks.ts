@@ -1,5 +1,5 @@
 // Webhooks: Slack, Discord or any URL hears about client feedback as it happens, so nobody has to keep the app open.
-// Hooks come from config.json ("webhooks"), VR_WEBHOOK_URL, or the Settings page (data/webhooks.json). Deliveries
+// Hooks come from config.json ("webhooks"), LAMPO_WEBHOOK_URL, or the Settings page (data/webhooks.json). Deliveries
 // are fire-and-forget: 5 s timeout, 3 retries with backoff, failures logged and remembered for the Settings page,
 // never thrown at the request that caused the event. On a hosted server they only go to public addresses (guard).
 import crypto from 'node:crypto';
@@ -9,6 +9,8 @@ import https from 'node:https';
 import net from 'node:net';
 import path from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { BRAND_NAME } from './brand.ts';
+import { settingsIn } from './env.ts';
 import { cutChars } from './names.ts';
 import { hostOf, isBlockedAddress, pinnedLookup, publicAddress, type Resolver } from './netguard.ts';
 import { currentWorkspace, DEFAULT_WORKSPACE, dataDir, isoLocal } from './paths.ts';
@@ -48,7 +50,8 @@ export function wants(hook: WebhookConfig, e: ReviewEvent): boolean {
   return events.includes(e.type);
 }
 
-const who = (by: string) => (by.startsWith('guest:') ? `${by.slice(6)} (client)` : by.startsWith('agent:') ? `${by.slice(6)} (agent)` : by);
+// someone on a review link is named by how they came, never "client" (the vocabulary in AGENTS.md)
+const who = (by: string) => (by.startsWith('guest:') ? `${by.slice(6)} (via review link)` : by.startsWith('agent:') ? `${by.slice(6)} (agent)` : by);
 const quote = (s: string | undefined, max = 280) => {
   const t = (s || '').replace(/\s+/g, ' ').trim();
   return t ? `“${t.length > max ? `${t.slice(0, max - 1)}…` : t}”` : '';
@@ -58,7 +61,7 @@ const quote = (s: string | undefined, max = 280) => {
 export function describe(e: ReviewEvent): string {
   const name = path.basename(e.video);
   const at = e.timecode ? ` at ${e.timecode}` : '';
-  const v = e.v ? ` v${e.v}` : '';
+  const v = e.v ? ` V${e.v}` : '';
   // a reply changed or taken back by its author (not the note itself)
   if (e.reply && e.type === 'edit') return `${who(e.by)} edited their reply on ${name}${at}: ${quote(e.reply.text)}`;
   if (e.reply && e.type === 'delete') return `${who(e.by)} deleted their reply on ${name}${at}`;
@@ -96,7 +99,7 @@ const slackEscape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;'
 export function payload(format: WebhookFormat, e: ReviewEvent, link: string): string {
   const text = describe(e);
   if (format === 'slack') return JSON.stringify({ text: `${slackEscape(text)} <${link}|Open>` });
-  if (format === 'discord') return JSON.stringify({ content: `${text}\n${link}`, username: 'video-review', allowed_mentions: { parse: [] } });
+  if (format === 'discord') return JSON.stringify({ content: `${text}\n${link}`, username: BRAND_NAME, allowed_mentions: { parse: [] } });
   return JSON.stringify({ event: e, text, url: link });
 }
 
@@ -198,7 +201,7 @@ async function pinnedPost(
 export interface WebhookOptions {
   /** config.json "webhooks" (ids cfg_0, cfg_1, …). */
   config?: WebhookConfig[];
-  /** VR_WEBHOOK_URL & co (id env). */
+  /** LAMPO_WEBHOOK_URL & co (id env). */
   env?: WebhookConfig | null;
   /** Where a link in a message points (public URL, or this machine). */
   baseUrl: string;
@@ -208,7 +211,7 @@ export interface WebhookOptions {
   /** Public addresses only (server mode); null or absent: any address (local mode). */
   guard?: WebhookGuard | null;
   /**
-   * The instance opted in to private addresses (VR_WEBHOOK_ALLOW_PRIVATE: an internal chat server): for workspace #1's
+   * The instance opted in to private addresses (LAMPO_WEBHOOK_ALLOW_PRIVATE: an internal chat server): for workspace #1's
    * hooks only, the operator's own team. Every other workspace's stay on public addresses — whoever runs one may be
    * anyone, and the opt-in would hand them the operator's network (A12 WS-9).
    */
@@ -234,14 +237,15 @@ export interface Webhooks {
   idle(): Promise<void>;
 }
 
-/** VR_WEBHOOK_URL, VR_WEBHOOK_FORMAT, VR_WEBHOOK_SECRET, VR_WEBHOOK_EVENTS (comma-separated). */
+/** LAMPO_WEBHOOK_URL, LAMPO_WEBHOOK_FORMAT, LAMPO_WEBHOOK_SECRET, LAMPO_WEBHOOK_EVENTS (comma-separated). */
 export function envHook(env: NodeJS.ProcessEnv = process.env): WebhookConfig | null {
-  if (!env.VR_WEBHOOK_URL) return null;
+  const s = settingsIn(env);
+  if (!s.LAMPO_WEBHOOK_URL) return null;
   return checkHook({
-    url: env.VR_WEBHOOK_URL,
-    format: (env.VR_WEBHOOK_FORMAT as WebhookFormat) || 'json',
-    secret: env.VR_WEBHOOK_SECRET,
-    events: env.VR_WEBHOOK_EVENTS ? env.VR_WEBHOOK_EVENTS.split(',') : undefined,
+    url: s.LAMPO_WEBHOOK_URL,
+    format: (s.LAMPO_WEBHOOK_FORMAT as WebhookFormat) || 'json',
+    secret: s.LAMPO_WEBHOOK_SECRET,
+    events: s.LAMPO_WEBHOOK_EVENTS ? s.LAMPO_WEBHOOK_EVENTS.split(',') : undefined,
   });
 }
 
@@ -316,7 +320,7 @@ export function createWebhooks(o: WebhookOptions): Webhooks {
       if (attempt) await sleep(delays[attempt - 1]);
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        'User-Agent': 'video-review-webhooks',
+        'User-Agent': 'lampo-webhooks',
         'X-VR-Event': e.type,
         'X-VR-Delivery': delivery,
       };
@@ -403,7 +407,7 @@ export function createWebhooks(o: WebhookOptions): Webhooks {
       const sample: ReviewEvent = {
         at: isoLocal(),
         type: 'comment',
-        by: 'guest:Test client',
+        by: 'guest:Test visitor',
         video: '/example/launch-film.mp4',
         slug: 'example',
         session: null,
@@ -411,7 +415,7 @@ export function createWebhooks(o: WebhookOptions): Webhooks {
         v: 2,
         frame: 120,
         timecode: '00:05:00',
-        text: 'This is a test from video-review: the logo could come in a little later.',
+        text: `This is a test from ${BRAND_NAME}: the logo could come in a little later.`,
       };
       return track(deliver(id, hit.hook, sample));
     },

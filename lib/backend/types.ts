@@ -1,4 +1,4 @@
-// What the `vr` CLI and the MCP server need from a review store. LocalBackend reads and writes data/ directly (no
+// What the `lampo` CLI and the MCP server need from a review store. LocalBackend reads and writes data/ directly (no
 // server needed, the classic setup); RemoteBackend talks to a hosted server over HTTP with an API token. Both hand
 // out plain data; screenshots always come back as paths on this machine, so an agent can open them either way.
 import type { FootageAnswer, FootageRequest, FootageStatus } from '../footage/types.ts';

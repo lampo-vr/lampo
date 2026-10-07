@@ -88,7 +88,7 @@ export function parseSkill(md: string): SkillText {
   return { name, description, body, ...(extra.length ? { extra: extra.join('\n') } : {}) };
 }
 
-/** A skill as the SKILL.md an agent reads (and `vr playbook export` writes). */
+/** A skill as the SKILL.md an agent reads (and `lampo playbook export` writes). */
 export function skillMarkdown(s: SkillText): string {
   return `---\nname: ${s.name}\ndescription: ${yamlString(s.description)}\n${s.extra ? `${s.extra}\n` : ''}---\n\n${s.body}\n`;
 }

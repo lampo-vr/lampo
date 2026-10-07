@@ -1,5 +1,5 @@
-// A hosted video-review server, reached with an API token (`vr login`). Screenshots and frames are downloaded into
-// ~/.cache/video-review/<host>/ so an agent can open them like local files; renders go up as resumable tus uploads.
+// A hosted Lampo server, reached with an API token (`lampo login`). Screenshots and frames are downloaded into
+// ~/.cache/lampo/<host>/ so an agent can open them like local files; renders go up as resumable tus uploads.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -83,7 +83,7 @@ export function createApi(c: Credentials) {
         // what to do instead, when the server says (a post drafted before final: the stage's next step)
         if (j.next) msg = `${msg} (next: ${j.next})`;
       } catch {}
-      if (res.status === 401) msg = `${msg} (${base}: the token was rejected, run vr login again)`;
+      if (res.status === 401) msg = `${msg} (${base}: the token was rejected, run lampo login again)`;
       throw new RemoteError(res.status, msg);
     }
     const type = res.headers.get('content-type') || '';
@@ -123,7 +123,7 @@ async function poll<T>(
   }
 }
 
-/** A render as a resumable tus upload: running vr push again continues an unfinished one. */
+/** A render as a resumable tus upload: running lampo push again continues an unfinished one. */
 async function uploadRender(
   api: Api,
   cacheRoot: string,
@@ -146,7 +146,7 @@ async function uploadRender(
     metadata: meta,
     headers: api.auth,
     retryDelays: [0, 1000, 3000, 5000, 10000],
-    // Remembers unfinished uploads (by path, size, mtime and server): running vr push again continues them.
+    // Remembers unfinished uploads (by path, size, mtime and server): running lampo push again continues them.
     urlStorage: new FileUrlStorage(path.join(cacheRoot, 'uploads.json')),
     removeFingerprintOnSuccess: true,
     ...(onProgress ? { onProgress: (sent: number, total: number | null) => onProgress(sent, total ?? size) } : {}),
@@ -237,7 +237,7 @@ async function watchEvents(
         name: session.name || 'agent',
         cwd: session.cwd || process.cwd(),
         host: os.hostname(),
-        // `vr watch` announces itself only from inside a Claude Code session (lib/sessions.ts currentSession).
+        // `lampo watch` announces itself only from inside a Claude Code session (lib/sessions.ts currentSession).
         kind: 'claude-code',
       })
       .catch(() => {});
@@ -247,7 +247,7 @@ async function watchEvents(
   for (let delay = 1000; !signal?.aborted; delay = Math.min(delay * 2, 30_000)) {
     try {
       const res = await fetch(`${api.base}/api/events`, { headers: { ...api.auth, Accept: 'text/event-stream' }, signal });
-      if (res.status === 401) throw new Error('the token was rejected, run vr login again');
+      if (res.status === 401) throw new Error('the token was rejected, run lampo login again');
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
       delay = 1000;
       let buf = '';
@@ -267,7 +267,7 @@ async function watchEvents(
     } catch (e) {
       if (signal?.aborted) return;
       if (/token was rejected/.test((e as Error).message)) throw e;
-      process.stderr.write(`vr watch: connection lost (${(e as Error).message}), reconnecting…\n`);
+      process.stderr.write(`lampo watch: connection lost (${(e as Error).message}), reconnecting…\n`);
     }
     await sleep(delay, undefined, { signal }).catch(() => {});
   }
@@ -331,7 +331,7 @@ export function createRemoteBackend(c: Credentials, { cacheRoot }: { cacheRoot: 
     async resolve(arg, { mustExist = true } = {}) {
       if (!arg) throw new Error('missing <video>');
       const reviews = await backend.listReviews();
-      // The path as `vr ls` prints it, also without its leading slash ("@uploads/Acme/x.mp4" is that video, not every x.mp4).
+      // The path as `lampo ls` prints it, also without its leading slash ("@uploads/Acme/x.mp4" is that video, not every x.mp4).
       const exact = reviews.find((r) => slugOf(r) === arg || r.video === arg || r.video === `/${arg}`);
       if (exact) return { video: exact.video, slug: slugOf(exact) };
       const local = path.resolve(arg);
@@ -341,7 +341,7 @@ export function createRemoteBackend(c: Credentials, { cacheRoot }: { cacheRoot: 
       if (hits.length === 1) return { video: hits[0].video, slug: slugOf(hits[0]) };
       // one line each: a file's name is someone's, and may hold a line break (a name kept from before)
       if (hits.length > 1) throw new Error(`"${oneLine(arg)}" matches ${hits.length} videos:\n  ${hits.map((r) => oneLine(r.video)).join('\n  ')}`);
-      // A render on this machine, about to be uploaded (vr add / track): only when the caller asked to track one.
+      // A render on this machine, about to be uploaded (lampo add / track): only when the caller asked to track one.
       if (!mustExist) return { video: local, slug: '', fresh: true };
       throw new Error(`no reviewed video matches "${arg}" on ${api.base}`);
     },

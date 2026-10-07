@@ -9,6 +9,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
+import { settings } from '../../lib/env.ts';
 import type { ForYouItem, PostView, PublishConnectionInfo } from '../../lib/types.ts';
 import { startApp } from '../lib/app.ts';
 import { startFakePlatforms } from '../lib/fakePlatforms.ts';
@@ -29,7 +30,7 @@ for (const k of ['log', 'error', 'warn'] as const) {
   const orig = console[k].bind(console);
   console[k] = (...a: unknown[]) => {
     said.push(a.map(String).join(' '));
-    if (process.env.VR_TEST_VERBOSE) orig(...a);
+    if (settings.LAMPO_TEST_VERBOSE) orig(...a);
   };
 }
 

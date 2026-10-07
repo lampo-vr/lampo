@@ -28,9 +28,9 @@ export type Started<K extends string, T> =
   | { pending: true }
   | { none: true; error?: string; failed?: true };
 
-/** What a pre-review that couldn't read its render says, to `vr qa` and the API (the player has its own words): never
+/** What a pre-review that couldn't read its render says, to `lampo qa` and the API (the player has its own words): never
  * ffmpeg's output, which goes to the server's log. */
-export const QA_FAILED = 'the pre-review could not read this version; `vr qa --rerun` tries it again';
+export const QA_FAILED = 'the pre-review could not read this version; `lampo qa --rerun` tries it again';
 
 export interface Background {
   /** Everything the latest version needs before someone opens it. */
@@ -187,7 +187,7 @@ export function createBackground(broadcast: Broadcast, playback: Playback, { pro
   }
 
   // A check that failed on a render (ffmpeg couldn't read it) isn't started again by itself: every look at the player,
-  // its poll and `vr qa`'s poll each started it again, and the player said "Checking…" for good. Until the next start
+  // its poll and `lampo qa`'s poll each started it again, and the player said "Checking…" for good. Until the next start
   // or Run again; a full queue is no failure.
   const qaFailed = new Set<string>();
 
@@ -333,7 +333,7 @@ export function createBackground(broadcast: Broadcast, playback: Playback, { pro
   }
 
   // What is said in a render, heard once per its bytes (lib/transcripts.ts); asked for by the player's Transcript tab,
-  // an agent (get_transcript, vr transcript), or a new version whose predecessor has one (so what changed is ready).
+  // an agent (get_transcript, lampo transcript), or a new version whose predecessor has one (so what changed is ready).
   const transcriptJobs = sharedJobs();
   const transcriptFailed = new Map<string, string>();
   function startTranscript(review: Review, v: number, language?: string, again = false): TranscriptAnswer {

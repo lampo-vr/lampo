@@ -1,6 +1,6 @@
 // #/styleguide: every building block of the design system, in every variant and state, on one page — the place to
 // look before adding a class, and what test/e2e/styleguide.mjs photographs in both themes. Only in dev and test builds
-// (VR_STYLEGUIDE=0 leaves it out: the Dockerfile does). A tool page for people building the app, so its words are plain
+// (LAMPO_STYLEGUIDE=0 leaves it out: the Dockerfile does). A tool page for people building the app, so its words are plain
 // English, not translated.
 import { type CSSProperties, type ReactNode, useState } from 'react';
 import { AGENT_KIND_LABELS, AGENT_KINDS } from '../../../lib/agentKind.ts';

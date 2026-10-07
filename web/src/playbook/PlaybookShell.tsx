@@ -75,7 +75,7 @@ export function PlaybookSkeleton() {
           <div className="pb-pane-in">
             <div className="pb-pane-head">
               <h2 className="pb-pane-title">{t('What agents read')}</h2>
-              <p className="pb-pane-sub mono">get_playbook · vr playbook</p>
+              <p className="pb-pane-sub mono">get_playbook · lampo playbook</p>
             </div>
             <div className="pb-agent">
               <SkeletonText lines={10} />

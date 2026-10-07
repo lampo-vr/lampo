@@ -160,7 +160,7 @@ test('MCP: open notes, a note’s references, the video list, the review card an
   assert.deepEqual(problems, []);
 });
 
-test('vr: open, ls, show, taste, prompt and playbook status keep every field on its line', () => {
+test('lampo: open, ls, show, taste, prompt and playbook status keep every field on its line', () => {
   const run = (args: string[]) => {
     const r = vr(args, { ...env, VR_REMOTE: '0' });
     assert.equal(r.code, 0, `${args.join(' ')}: ${r.err}`);

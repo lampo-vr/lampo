@@ -109,7 +109,7 @@ const t = setInterval(() => {
 );
 const sawFile = path.join(dir, 'remotion-saw.json');
 
-const HAND_OFF = /^Now listen with vr watch/;
+const HAND_OFF = /^Now listen with lampo watch/;
 
 test('ffmpeg, re-rendered to the tracked path: the next version, its progress in Lampo, two lines for the model', () => {
   assert.equal(run(['track', clip], env).code, 0);
@@ -357,8 +357,8 @@ test('usage: the command after --, --to with --out, and a video that isn’t the
   assert.ok(!fs.existsSync(marker), 'nothing ran');
   const help = run(['render', '--help']);
   assert.equal(help.code, 0);
-  assert.match(help.out, /^ {2}vr render \[--to <video> --out <file>\] \[--detach\] -- <command>/m);
-  assert.match(help.out, /^ {2}vr render wait <id>/m);
+  assert.match(help.out, /^ {2}lampo render \[--to <video> \| --folder <project>\] \[--out <file>\] \[--detach\] \[--verbose\] -- <command>/m);
+  assert.match(help.out, /^ {2}lampo render wait <id>/m);
   // what follows -- is the tool's: vr reads no option of it
   assert.equal(run(['render', '--', FFMPEG, '-hide_banner', '-version']).code, 0);
 });
@@ -389,7 +389,7 @@ test('--detach + vr render wait: returns at once, waits at most its bound, then 
   const go = path.join(dir, 'go-1');
   const d = run(['render', '--detach', '--to', 'pushed.mp4', '--out', 'detached.mp4', '--', process.execPath, hold, go, 'detached.mp4', '0']);
   assert.equal(d.code, 0, d.err);
-  const m = /^Rendering V4 \(render (r_[0-9a-f]{10})\): run vr render wait \1 now\.\n$/.exec(d.out);
+  const m = /^Rendering V4 \(render (r_[0-9a-f]{10})\): run lampo render wait \1 now\.\n$/.exec(d.out);
   assert.ok(m, d.out);
   const id = m[1];
   // its state lives in the cache, readable by its owner only; never in data/
@@ -399,7 +399,7 @@ test('--detach + vr render wait: returns at once, waits at most its bound, then 
   // a wait that ends at its bound (a tiny one only tests set): one line, call again
   const still = run(['render', 'wait', id], { ...agentEnv, VR_RENDER_WAIT_MS: '300' });
   assert.equal(still.code, 0);
-  assert.match(still.out, new RegExp(`^Still rendering V4: .*\\. Run vr render wait ${id} again now\\.\\n$`));
+  assert.match(still.out, new RegExp(`^Still rendering V4: .*\\. Run lampo render wait ${id} again now\\.\\n$`));
   fs.writeFileSync(go, '');
   const done = run(['render', 'wait', id]);
   assert.equal(done.code, 0, done.out + done.err);

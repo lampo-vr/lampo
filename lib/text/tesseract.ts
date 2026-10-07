@@ -1,10 +1,11 @@
 // Linux (or any machine without macOS Vision): tesseract, one process per frame, a few in parallel. The TSV output
 // has word boxes and confidences; words are grouped back into lines so the result looks like Vision's.
 import os from 'node:os';
+import { settings } from '../env.ts';
 import { runBg } from '../probe.ts';
 import type { OcrLine, OcrPage, OcrWord } from './types.ts';
 
-const tesseract = () => process.env.VR_TESSERACT || 'tesseract';
+const tesseract = () => settings.LAMPO_TESSERACT || 'tesseract';
 
 /** Installed language data, e.g. ["deu", "eng", "osd"]; null when tesseract is missing. */
 export async function tesseractLanguages(): Promise<string[] | null> {

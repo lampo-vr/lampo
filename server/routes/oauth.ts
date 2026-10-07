@@ -6,7 +6,7 @@
 //   GET  /oauth/authorize    validates client + redirect URI + PKCE + resource, then hands over to the consent screen
 //                            (#/oauth/<request> in the app: sign in there if needed, Allow or Deny); nothing goes to
 //                            the app's address until the person decides (any problem before is the app's own page).
-//                            `client_id=vr` is `vr login` itself (lib/oauth/clients.ts VR_CLIENT): a loopback answer,
+//                            `client_id=vr` is `lampo login` itself (lib/oauth/clients.ts VR_CLIENT): a loopback answer,
 //                            `machine` and `days`, and a code redeemed for an API token at POST /api/auth/token
 //   POST /oauth/token        authorization_code (PKCE) and refresh_token (rotation, reuse detection)
 //   POST /oauth/register     RFC 7591 dynamic registration (deprecated by MCP, still used by some clients)
@@ -209,7 +209,7 @@ export function oauthRoutes(ctx: ServerContext): Router {
     code_challenge_method: z.string().max(20).optional(),
     scope: z.string().max(1000).optional(),
     resource: z.string().max(2000).optional(),
-    // vr login's own: the computer it runs on, and the days its token works (absent: until revoked)
+    // lampo login's own: the computer it runs on, and the days its token works (absent: until revoked)
     machine: z.string().max(200).optional(),
     days: z
       .string()
@@ -247,7 +247,7 @@ export function oauthRoutes(ctx: ServerContext): Router {
     } catch {
       return showError(res, 'invalid_client');
     }
-    // vr's answer goes to a loopback port of the person's own computer and nowhere else, whatever else it asks
+    // lampo's answer goes to a loopback port of the person's own computer and nowhere else, whatever else it asks
     if (!p.redirect_uri || !(vr ? isVrRedirect(p.redirect_uri) : redirectMatches(client.redirect_uris, p.redirect_uri)))
       return showError(res, 'invalid_request');
     const { resource } = oauthBase(ctx, req);
@@ -257,7 +257,7 @@ export function oauthRoutes(ctx: ServerContext): Router {
     const from = addressKey(req.ip || 'unknown');
     if (!pendingByAddress.allows(from)) return showError(res, 'slow_down');
     if (vr) {
-      // no scopes and no resource: what vr gets is an API token, the account's role in the workspace the screen names
+      // no scopes and no resource: what lampo gets is an API token, the account's role in the workspace the screen names
       const machine = vrMachine(p.machine);
       if (!machine || p.state === undefined) return showError(res, 'invalid_request');
       const vrAsk = { machine, days: p.days === undefined ? null : Number(p.days) };
@@ -312,7 +312,7 @@ export function oauthRoutes(ctx: ServerContext): Router {
       scopes: p.scopes,
       capped: cappedFor(a, p.scopes),
       resource: p.resource,
-      // vr login: the computer and the token it gets (named as Settings → API tokens will list it)
+      // lampo login: the computer and the token it gets (named as Settings → API tokens will list it)
       ...(p.vr ? { vr: { machine: p.vr.machine, days: p.vr.days, token: vrTokenName(p.vr.machine) } } : {}),
     };
     // The app will act in the workspace the person works in now (and only there), so the screen names it.

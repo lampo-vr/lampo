@@ -126,7 +126,7 @@ export function libraryRoutes(ctx: ServerContext): Router {
     if (!path.isAbsolute(p)) throw fail(400, 'please give an absolute path');
     if (!fs.existsSync(p) || !fs.statSync(p).isFile()) throw fail(404, `file not found: ${p}`);
     if (!ALL_EXT.includes(path.extname(p).toLowerCase())) throw fail(400, `not a video file (${ALL_EXT.join(', ')})`);
-    if (p.startsWith(`${ROOT}/`)) throw fail(400, 'that file lives inside video-review itself');
+    if (p.startsWith(`${ROOT}/`)) throw fail(400, 'that file lives inside Lampo itself');
     // A folder that can't be made, or one in an archived project, is refused before the video is added, not after.
     if (b.folder) checkNotArchived(normFolder(b.folder));
     const who = ctx.actor(req);

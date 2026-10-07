@@ -90,5 +90,5 @@ test('vr ask --folder before any render: a new project made, vr show tells it, I
   );
   const usage = vr(['ask', 'launch.mp4', '--folder', 'X', '--text', 'x', '--options', file], env);
   assert.equal(usage.code, 1);
-  assert.match(usage.err, /usage: vr ask/);
+  assert.match(usage.err, /usage: lampo ask/);
 });

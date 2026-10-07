@@ -16,9 +16,9 @@ together, read [docs/architecture.md](docs/architecture.md) first.
   them already. `scripts/ci-runner.sh need ffmpeg fonts python3 unzip` says what a machine lacks.
 - Optional: `tesseract-ocr` (with the `deu` language) and `hunspell` (de_DE, en_US) on Linux, for the pre-review's
   text checks; macOS uses its built-in Vision framework and spell checker. To try the Linux path on a Mac:
-  `brew install tesseract tesseract-lang hunspell` and `VR_OCR=tesseract`.
+  `brew install tesseract tesseract-lang hunspell` and `LAMPO_OCR=tesseract`.
 - Speech-to-text needs nothing extra: transcribe.cpp comes with `npm install`. Set
-  `VR_STT_TEST_MODEL=/path/to/model.gguf` to run the real transcription test.
+  `LAMPO_STT_TEST_MODEL=/path/to/model.gguf` to run the real transcription test.
 - On Linux x64, `npm install` also fetches about 500 MB of CUDA libraries for footage search's onnxruntime-node,
   which nothing here uses: `ONNXRUNTIME_NODE_INSTALL=skip npm install` leaves them out (CI does the same).
 
@@ -28,7 +28,7 @@ npm run dev        # the UI with hot reload on http://localhost:4747
 npm run demo       # or: a throwaway store with synthetic renders and a full review history
 ```
 
-Your real reviews are never touched by the tests or the demo: each uses its own temporary store (`VR_DATA`).
+Your real reviews are never touched by the tests or the demo: each uses its own temporary store (`LAMPO_DATA`).
 
 ## Scripts
 
@@ -36,26 +36,26 @@ Your real reviews are never touched by the tests or the demo: each uses its own 
 |---|---|
 | `npm run check` | typecheck (strict TypeScript, backend and web) and lint (Biome) |
 | `npm run format` | apply the formatting and safe lint fixes |
-| `npm test` | the fast tier, for every commit: unit and integration tests (`node:test`), including server mode, storage adapters against mocks, `vr` + MCP against a server, and the frozen older store (`test/fixtures/store-v0/`) whose agent-facing text must not change. `VR_TEST_JOBS=<n>` runs n test files at a time (default: one fewer than the CPUs) |
+| `npm test` | the fast tier, for every commit: unit and integration tests (`node:test`), including server mode, storage adapters against mocks, `lampo` + MCP against a server, and the frozen older store (`test/fixtures/store-v0/`) whose agent-facing text must not change. `LAMPO_TEST_JOBS=<n>` runs n test files at a time (default: one fewer than the CPUs) |
 | `npm run test:changed` | only the unit tests your change can affect (see [Testing what you changed](#testing-what-you-changed)); `npm run test:changed <base>` compares with another branch, `-- --list` names them |
 | `npm run test:mcp` | the MCP server end to end through the real SDK client |
 | `npm run test:qa` | the pre-review on a generated clip |
-| `npm run test:e2e` | the full tier: every browser suite, one after another — headless Chrome against a real server, locally and in server mode, the phone layout on an emulated iPhone, and WebKit. Every suite runs whatever failed before it; the failures are listed at the end. `-- --only a,b`, `--except a,b`, `--shard 1/2` pick suites, `--changed [base]` only those your change can affect, `--list` names them; the speed budgets (`perf`) run on CI, with `--perf`, in `test:all` or when `--only`/`--changed` picks them; a suite still running after `VR_E2E_SUITE_MINUTES` (15) is stopped and counts as failed. Needs `npm run build` and `npm run webkit:install` first |
-| `npm run test:e2e:parallel` | the same suites side by side (`VR_E2E_JOBS=<n>`, default half the cores, at most 4), for a faster local round; `test:e2e` stays the reference run |
-| `VR_E2E_CPU=4 npm run test:e2e -- --only <suite>` | every page the suites open runs its scripts that many times slower (Chrome's CPU throttling): a busy CI runner on a quiet machine, for a race only CI shows |
+| `npm run test:e2e` | the full tier: every browser suite, one after another — headless Chrome against a real server, locally and in server mode, the phone layout on an emulated iPhone, and WebKit. Every suite runs whatever failed before it; the failures are listed at the end. `-- --only a,b`, `--except a,b`, `--shard 1/2` pick suites, `--changed [base]` only those your change can affect, `--list` names them; the speed budgets (`perf`) run on CI, with `--perf`, in `test:all` or when `--only`/`--changed` picks them; a suite still running after `LAMPO_E2E_SUITE_MINUTES` (15) is stopped and counts as failed. Needs `npm run build` and `npm run webkit:install` first |
+| `npm run test:e2e:parallel` | the same suites side by side (`LAMPO_E2E_JOBS=<n>`, default half the cores, at most 4), for a faster local round; `test:e2e` stays the reference run |
+| `LAMPO_E2E_CPU=4 npm run test:e2e -- --only <suite>` | every page the suites open runs its scripts that many times slower (Chrome's CPU throttling): a busy CI runner on a quiet machine, for a race only CI shows |
 | `npm run chrome:install` | download chrome-headless-shell and Chrome for Testing into `cache/chrome`, once: the suites prefer the shell (worktrees find the main checkout's), since the Chrome app on a Mac quits headless instances it thinks are idle; a suite that checks shown notifications (`launch({ notifications: true })`, the shell has none) gets Chrome for Testing. Without them the suites use Chrome/Chromium; `CHROME_PATH` overrides all |
 | `npm run webkit:install` | download Playwright's WebKit (Safari's engine) into `cache/playwright`, once |
 | `npm run test:webkit` | frame exactness in WebKit on an emulated iPhone (Playwright's Linux WebKit has no H.264: there it reports a skip) |
 | `npm run test:all` | the build, then all of the above |
-| `VR_TEST_MEDIA_CACHE=off npm test` | encode every generated clip afresh; by default each is made once per machine and copied from `<tmp>/vr-test-media/` (ffmpeg gives the same bytes for the same arguments) |
-| `VR_PERF_STRICT=1 npm run test:perf` | the speed budgets as hard failures even on a busy machine; by default a time budget missed while the 1-minute load is above 10 is reported, not failed (the numbers then measure the machine) — run this on a quiet machine before merging speed work |
+| `LAMPO_TEST_MEDIA_CACHE=off npm test` | encode every generated clip afresh; by default each is made once per machine and copied from `<tmp>/vr-test-media/` (ffmpeg gives the same bytes for the same arguments) |
+| `LAMPO_PERF_STRICT=1 npm run test:perf` | the speed budgets as hard failures even on a busy machine; by default a time budget missed while the 1-minute load is above 10 is reported, not failed (the numbers then measure the machine) — run this on a quiet machine before merging speed work |
 | `npm run build` | build the web UI into `web/dist` |
 | `npm run screenshots` | make every picture of the app in `docs/assets/` again (README and docs, dark and light) from the synthetic demo; `npm run screenshots -- --only a,b` for some |
 
 Tests generate their clips with ffmpeg, so there are no fixtures to download.
 
 A browser suite that can't run (no Chrome, no `web/dist`, no WebKit) **fails** instead of passing silently, so a
-green run always means the suites ran. On a machine without a browser, `VR_E2E_SKIP_OK=1 npm run test:all` turns
+green run always means the suites ran. On a machine without a browser, `LAMPO_E2E_SKIP_OK=1 npm run test:all` turns
 those into visible skips on purpose.
 
 ### Testing what you changed
@@ -74,7 +74,7 @@ base after `--changed` or `test:changed`) and count what isn't committed yet. `t
 decides, from facts rather than a list kept by hand:
 
 - **Unit tests** run when they import a changed file, directly or through local imports (static or
-  dynamic), when a helper they call runs it (`vr()` runs `bin/vr`), when they name it as a path
+  dynamic), when a helper they call runs it (`vr()` runs `bin/vr`, or `bin/lampo` with `LAMPO_TEST_CLI=lampo`), when they name it as a path
   (`path.join(ROOT, 'docs')`), or when the test itself changed. A test that reads files in a way no
   string shows says so on its first line: `// covers: **` (every file, as `audits.test.ts` does).
 - **Browser suites** each say on their first line what they test:
@@ -103,7 +103,7 @@ import { assert, check, crashed, finish } from './lib/checks.mjs';
 import { startServer } from './lib/server.mjs';
 
 const LABEL = 'my e2e';
-// no Chrome or no web/dist: fails (or skips with VR_E2E_SKIP_OK=1)
+// no Chrome or no web/dist: fails (or skips with LAMPO_E2E_SKIP_OK=1)
 requireChrome(LABEL);
 // also mode: 'server', publicUrl, config, env, sessions
 const srv = await startServer({ prefix: 'vr-my-e2e-', user: 'Sam' });
@@ -124,16 +124,16 @@ try {
 }
 ```
 
-`startServer` gives the server its own temp store, a free port on 127.0.0.1, `VR_STT=off` and a stand-in for the
+`startServer` gives the server its own temp store, a free port on 127.0.0.1, `LAMPO_STT=off` and a stand-in for the
 `claude` CLI (`sessions` sets what `claude agents` reports; a run the app starts is written down in
 `<dir>/bin/runs.log`, prints `<dir>/bin/stream.jsonl` when a suite puts one there (stream-json, a line every
 `bin/stream.delay` s) and waits while `<dir>/bin/hold` exists; see `test/e2e/wake.mjs` and `monitor.mjs`), drops the
-`VR_*` settings of your shell that would change the instance (mode, storage, URLs, tokens, proxies), and stops the
+`LAMPO_*` and `VR_*` settings of your shell that would change the instance (mode, storage, URLs, tokens, proxies), and stops the
 server when the suite exits; `await srv.setupToken()` is a hosted server's one-time setup token. Its fresh store stands
 for one in use: new accounts there get no first run unless the suite asks (`onboarding: true`, see
-`test/e2e/onboarding.mjs`). Screenshots go to `VR_SHOTS` when it is set (`shotsDir()`; `screenshotFailures(() => page)`
-adds one per failed check). `VR_CHECK=<part of a name>` runs only the checks whose name contains it
-(`VR_CHECK=skeleton node test/e2e/quality-load.mjs`).
+`test/e2e/onboarding.mjs`). Screenshots go to `LAMPO_SHOTS` when it is set (`shotsDir()`; `screenshotFailures(() => page)`
+adds one per failed check). `LAMPO_CHECK=<part of a name>` runs only the checks whose name contains it
+(`LAMPO_CHECK=skeleton node test/e2e/quality-load.mjs`).
 
 Wait for a state, never for a time: `until(fn, what)` (test/lib/helpers.ts) polls until `fn` gives something,
 `jsonApi(base)` (`test/e2e/lib/api.mjs`) sets up what the page then shows, and `settle(page)` (`layout.mjs`) waits
@@ -159,9 +159,9 @@ can't decide here calls `skip(why)`: it shows as skipped, never as passed. In un
   self-hosted runner (labels `self-hosted`, `linux`, `x64`, `lampo-ci`; never for a pull request from a fork or from
   Dependabot, never the Docker build); a job there has no sudo, installs nothing, fails naming what the machine lacks
   (`scripts/ci-runner.sh`), and stops whatever it left running. On CI's runners perf's time budgets are
-  warnings (`VR_PERF_TIMES=report`), and the styleguide's screenshot comparison is *skipped* until Linux baselines are
+  warnings (`LAMPO_PERF_TIMES=report`), and the styleguide's screenshot comparison is *skipped* until Linux baselines are
   committed: take them from the run's `new-screenshot-baselines-<part>` artifact into `test/e2e/baseline/` and remove
-  `VR_BASELINE_MISSING: skip` from the workflow. macOS (the unit and MCP tests and WebKit,
+  `LAMPO_BASELINE_MISSING: skip` from the workflow. macOS (the unit and MCP tests and WebKit,
   `.github/workflows/macos.yml`) runs on demand, since GitHub's macOS runners are scarcer than its Linux ones: label the
   pull request `macos`, or start it from the Actions tab.
 - **Screenshots** for visible UI changes.
@@ -178,7 +178,7 @@ can't decide here calls `skip(why)`: it shows as skipped, never as passed. In un
 
 ## The data contract is a public format
 
-`review.json`, `review.md`, `events.jsonl`, `INBOX.md`, the screenshot names and the `vr` output are read by agents
+`review.json`, `review.md`, `events.jsonl`, `INBOX.md`, the screenshot names and the `lampo` output are read by agents
 that never open the UI. Treat them like an API:
 - add fields, but don't rename or remove them;
 - keep old stores loading;
@@ -209,7 +209,7 @@ re-runs.
 
 - **Local-first.** On your own machine: no telemetry, no sign-up, nothing calls home; the network is used only for
   what you turn on (the speech model download, push, the tunnel, webhooks) and for footage search's model, about
-  213 MB from Hugging Face, downloaded once when the first video is indexed (`VR_FOOTAGE=off` or `vr footage off`
+  213 MB from Hugging Face, downloaded once when the first video is indexed (`LAMPO_FOOTAGE=off` or `lampo footage off`
   prevents it).
 - **The renders under review are read-only.** Write only inside the store.
 - **The server never exposes its disk** in server mode. Every path a client can influence is validated before it

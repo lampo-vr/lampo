@@ -7,7 +7,7 @@ Your address is confirmed and your account on review.example.com is ready. Uploa
 Open Lampo:
 https://review.example.com/
 
-Agents connect with vr login https://review.example.com or as an MCP server: Settings → Connect an agent shows how.
+Agents connect with lampo login https://review.example.com or as an MCP server: Settings → Connect an agent shows how.
 
 --
 You get this because you have an account on review.example.com.

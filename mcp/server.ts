@@ -1,7 +1,7 @@
 // Lampo as an MCP server over stdio: any MCP-capable agent can read frame-exact feedback — including the
-// marked frames as images — and answer it. Same store as the UI and the `vr` CLI: data/ on this machine, or the
-// hosted server `vr login` points at (lib/backend). The same tools are served over HTTP at /mcp by the app.
-//   claude mcp add lampo -- /path/to/lampo/bin/vr-mcp      (or: vr mcp config <client>)
+// marked frames as images — and answer it. Same store as the UI and the `lampo` CLI: data/ on this machine, or the
+// hosted server `lampo login` points at (lib/backend). The same tools are served over HTTP at /mcp by the app.
+//   claude mcp add lampo -- /path/to/lampo/bin/lampo-mcp     (or: lampo mcp config <client>)
 // Never write to stdout here except through the transport: it is the protocol channel.
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import { openActivitySink } from '../lib/activity.ts';
@@ -15,13 +15,13 @@ import { createReviewServer } from './core.ts';
 import { ownQuiet, ownTold, type Wake } from './feedback.ts';
 import { followChanges } from './follow.ts';
 
-// The local store's workspace (VR_WORKSPACE, else #1), for everything this process serves — one the store has.
+// The local store's workspace (LAMPO_WORKSPACE, else #1), for everything this process serves — one the store has.
 try {
   const ws = enterProcessWorkspace();
   if (!readCredentials()) checkProcessWorkspace(ws);
 } catch (e) {
   // Written out before the exit: stderr to a pipe is asynchronous on macOS.
-  await new Promise((done) => process.stderr.write(`video-review mcp: ${(e as Error).message}\n`, done));
+  await new Promise((done) => process.stderr.write(`lampo-mcp: ${(e as Error).message}\n`, done));
   process.exit(1);
 }
 const backend = openBackend();
@@ -29,7 +29,7 @@ const cfg = loadConfig();
 // Where the reviewer's player lives, for "open in the player" links: the hosted server, or the app on this machine.
 const appUrl = readCredentials()?.server.replace(/\/+$/, '') || `http://localhost:${cfg.port}`;
 
-const onerror = (e: Error) => process.stderr.write(`video-review mcp: ${e.message}\n`);
+const onerror = (e: Error) => process.stderr.write(`lampo-mcp: ${e.message}\n`);
 
 // Against a hosted server, wait_for_feedback sleeps until the live stream this connection follows anyway (follow.ts)
 // says something happened — then one small read of what is new, and every 20 s for safety — instead of reading the

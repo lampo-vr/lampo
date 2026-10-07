@@ -1,5 +1,5 @@
 // Deleting a workspace or an account (A13 CLOUD-5 takedown, PEOPLE-1 erasure), the same way from the operator's page,
-// Settings and `vr admin`: what goes is said first (the plans: counts, never contents), then it goes in an order that
+// Settings and `lampo admin`: what goes is said first (the plans: counts, never contents), then it goes in an order that
 // never leaves a way in to something half gone.
 //
 // A workspace: out of the registry first (nobody reaches it from then on: sessions fall back to their other workspaces,
@@ -22,7 +22,7 @@ import { listReviews } from './store.ts';
 import type { AccountDeletionPlan, StoredWorkspace, WorkspaceDeletionPlan, WorkspaceInfo } from './types.ts';
 import * as workspaces from './workspaces.ts';
 
-/** Who asked, for the erasure log: the person themselves, a workspace's owner, the server's operator, `vr admin`. */
+/** Who asked, for the erasure log: the person themselves, a workspace's owner, the server's operator, `lampo admin`. */
 export type Deleter = 'self' | 'owner' | 'operator' | 'cli' | 'restore';
 
 /** The workspace's own people with an active owner role (not suspended there, not disabled). */

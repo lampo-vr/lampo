@@ -17,16 +17,17 @@ changed. You see exactly what changed on screen and check every fix before and a
 
 It runs on your machine (no sign-up, no telemetry) or as a server for a team and its clients. On your machine, nothing
 leaves it unless a feature you use needs to: the speech model downloads once from Hugging Face, and so does footage
-search's model (about 213 MB) when the first video is indexed (`VR_FOOTAGE=off` or `vr footage off` prevents it);
+search's model (about 213 MB) when the first video is indexed (`LAMPO_FOOTAGE=off` or `lampo footage off` prevents it);
 phone notifications travel end-to-end encrypted through Apple's, Google's, Mozilla's or Microsoft's push service, and
 the public tunnel for review links goes through Cloudflare.
 
 [AGPL-3.0](LICENSE) · Node ≥ 22.18 · ffmpeg · macOS and Linux (Windows through WSL2)
 
-The product is called Lampo, and so is its repository (`lampo-vr/lampo`). Agents know its MCP server as `lampo`. The
-npm package, the `vr` and `vr-mcp` commands, the `VR_*` settings, the MCP tool names, the `vr://` resources and the
-data folders keep the technical name `video-review` (a setup made under the key `video-review` keeps working). The
-logo and its rules are in [docs/brand/](docs/brand/).
+The product is called Lampo, and so is everything people and agents type: the repository (`lampo-vr/lampo`), the
+`lampo` command (and `lampo-mcp`), the `LAMPO_*` settings, the MCP server's key `lampo`, the `lampo://` resources and the
+npm package `@lampo-vr/lampo`. Setups from before keep working: `vr` and `vr-mcp` run the same commands, `VR_*`
+settings are still read, and `vr://` addresses and the key `video-review` still answer. The data folders
+(`~/.video-review`, `data/`) and file formats keep their names. The logo and its rules are in [docs/brand/](docs/brand/).
 
 ## Why
 
@@ -116,7 +117,7 @@ the exact frame and what's on it. Lampo turns review into data an agent can act 
 - **One app, on your machine or hosted.** The same accounts, invites, API tokens, uploads and review links in both
   places ([docs/server-mode.md](docs/server-mode.md)). On your machine you're signed in automatically, renders can
   stay where they are, and Claude Code sessions, Apple's text recognition and plain files come on top. Hosted, renders
-  live on disk, Bunny Storage + CDN or an S3-compatible bucket, and agents connect with `vr login` or OAuth.
+  live on disk, Bunny Storage + CDN or an S3-compatible bucket, and agents connect with `lampo login` or OAuth.
 
 | Library | Check mode |
 |---|---|
@@ -134,7 +135,7 @@ You need **Node ≥ 22.18** and **ffmpeg** with ffprobe on your PATH (macOS: `br
 git clone https://github.com/lampo-vr/lampo.git && cd lampo
 npm install
 npm start          # http://localhost:4747, signed in as you (builds the UI on first start)
-npm run link       # puts vr in ~/.local/bin (and says if that is not on your PATH)
+npm run link       # puts lampo in ~/.local/bin (and says if that is not on your PATH)
 ```
 
 Press <kbd>A</kbd> (*Add video*) to add a render: drop or choose files to upload a copy, or *Link a file on this
@@ -174,18 +175,18 @@ separate module that is not part of this repository and that a self-hosted serve
 ([docs/server-mode.md](docs/server-mode.md#a-billing-provider)):
 
 ```sh
-cp .env.example .env      # set VR_DOMAIN and VR_PUBLIC_URL (VR_TRUST_PROXY=uniquelocal is
-                          # already set), and storage for Bunny or S3 (.env is gitignored)
+cp .env.example .env      # set LAMPO_DOMAIN and LAMPO_PUBLIC_URL (LAMPO_TRUST_PROXY=uniquelocal
+                          # is already set), and storage for Bunny or S3 (.env is gitignored)
 docker compose up -d      # the app behind Caddy, with automatic HTTPS
 docker compose logs       # the first start prints a one-time setup token
 ```
 
 Open your URL, enter the token and create the owner account. Then invite people, upload renders (drop them on the
-library, or `vr push`), and connect agents with an API token:
+library, or `lampo push`), and connect agents with an API token:
 
 ```sh
-vr login https://review.example.com
-vr push render.mp4 --folder "Acme/Reels"   # the same name again becomes v2, v3, …
+lampo login https://review.example.com
+lampo push render.mp4 --folder "Acme/Reels"   # the same name again becomes v2, v3, …
 ```
 
 [docs/docker.md](docs/docker.md) covers the image, volumes, upgrades and backups.
@@ -239,28 +240,28 @@ sidebar's Agents and in Settings → Connect an agent. Claude Code's `/lampo:wat
 | The agent | Lampo through | A version goes up with |
 |---|---|---|
 | Claude, ChatGPT, Cursor's chat, any MCP client | MCP only | `request_upload` (one `PUT`) |
-| Claude Code, Codex | MCP | `vr render --to <video> --out <file> -- <render command>` (`--folder <project>` for V1): the person sees the progress |
+| Claude Code, Codex | MCP | `lampo render --to <video> --out <file> -- <render command>` (`--folder <project>` for V1): the person sees the progress |
 | the agent on the machine Lampo runs on | MCP (stdio or the app) | `track_video`, then re-renders to the same path |
-| scripts without MCP | `vr` (`npm run link`; `--json` on every read) | `vr render`, `vr push` |
+| scripts without MCP | `lampo` (`npm run link`; `--json` on every read) | `lampo render`, `lampo push` |
 
 - **Connect:** Settings → Connect an agent gives each client its one snippet (or a chat app its connector address);
-  `vr mcp config <client>` prints the same ([docs/mcp.md](docs/mcp.md)): stdio (`bin/vr-mcp`) or Streamable HTTP at
+  `lampo mcp config <client>` prints the same ([docs/mcp.md](docs/mcp.md)): stdio (`bin/lampo-mcp`) or Streamable HTTP at
   `/mcp` (the local app, or a hosted server by signing in or with an API token).
 
   ```sh
-  claude mcp add lampo -- /path/to/lampo/bin/vr-mcp
-  vr mcp config codex   # or claude, cursor, vscode, antigravity, windsurf, gemini, zed, json
+  claude mcp add lampo -- /path/to/lampo/bin/lampo-mcp
+  lampo mcp config codex   # or claude, cursor, vscode, antigravity, windsurf, gemini, zed, json
   ```
 - **Few tokens:** pictures only for notes with a drawing, cropped to it; only what changed when an agent hands back
-  what it was told (`since`, `known`); a lean tool set on request (`VR_MCP_TOOLS=lean`). Measured in
+  what it was told (`since`, `known`); a lean tool set on request (`LAMPO_MCP_TOOLS=lean`). Measured in
   [bench/tokens](bench/tokens/README.md).
 - **An [Agent Skill](skills/lampo/SKILL.md)** teaches the same loop to agents that load skills.
-- **A hosted server:** `vr login <url>` once, then every `vr` command and the stdio MCP server work against it.
+- **A hosted server:** `lampo login <url>` once, then every `lampo` command and the stdio MCP server work against it.
   Screenshots are downloaded, so the printed paths still open like local files. `show_review` shows the review inline
   in hosts that render MCP Apps.
 
 On your machine, `data/INBOX.md` is the one file for "what did the reviewer say since last time": the newest 150
-events from people, newest first, tagged `→ <session>`. `vr inbox --mine [--since <iso>]` gives the same as lines,
+events from people, newest first, tagged `→ <session>`. `lampo inbox --mine [--since <iso>]` gives the same as lines,
 also against a hosted server.
 
 ### The data contract
@@ -268,7 +269,7 @@ also against a hosted server.
 ```
 data/
   INBOX.md                  newest human feedback across all videos
-  events.jsonl              append-only log of every event (what `vr watch` tails)
+  events.jsonl              append-only log of every event (what `lampo watch` tails)
   <slug>/review.json        source of truth for one video: versions, notes, replies, approvals
   <slug>/review.md          the same, readable
   <slug>/<id>_clean.png     the exact frame, full resolution
@@ -278,16 +279,16 @@ versions/<slug>/vN.<ext>    the bytes of every registered render
 
 `slug` is the video's absolute path with every `/` replaced by `__` (shortened with a hash when that would exceed
 255 bytes, see [data-format.md](docs/data-format.md)). Frames are 0-based at the render's fps,
-timecodes `mm:ss:ff`, drawings in video pixels. `vr` and the MCP server lock and write atomically, so don't
+timecodes `mm:ss:ff`, drawings in video pixels. `lampo` and the MCP server lock and write atomically, so don't
 hand-edit `review.json`, and never move or modify the renders under review: the tool only reads them. Field by
 field: [docs/data-format.md](docs/data-format.md).
 
 ## How it works
 
-![How Lampo fits together: the browser, MCP clients and vr come in through the server's guard to its routes, which send live updates to every open screen; the routes and watchers write through lib/store, as vr on your machine does directly; lib/store keeps data/ and registers every render in versions/; background jobs read the renders and fill cache/](docs/assets/architecture.svg)
+![How Lampo fits together: the browser, MCP clients and lampo come in through the server's guard to its routes, which send live updates to every open screen; the routes and watchers write through lib/store, as lampo on your machine does directly; lib/store keeps data/ and registers every render in versions/; background jobs read the renders and fill cache/](docs/assets/architecture.svg)
 
 One TypeScript codebase that Node runs directly: `lib/` is the store and the domain (versions, notes, diffs,
-Auto-check, taste), `server/` exposes it over HTTP, `web/` is the React UI, and `bin/vr` / `mcp/` are the agent
+Auto-check, taste), `server/` exposes it over HTTP, `web/` is the React UI, and `bin/lampo` / `mcp/` are the agent
 interfaces. [docs/architecture.md](docs/architecture.md) goes deeper: modes, storage, job priorities, and how frame
 accuracy is kept end to end. The HTTP API is in [docs/api.md](docs/api.md).
 
@@ -308,7 +309,7 @@ accuracy is kept end to end. The HTTP API is in [docs/api.md](docs/api.md).
 | [docs/server-mode.md](docs/server-mode.md) | hosting: accounts and workspaces, uploads, storage, reverse proxy, security model |
 | [docs/docker.md](docs/docker.md) | the Docker image and compose setup |
 | [docs/go-live.md](docs/go-live.md) | the first production deploy on one server: DNS, TLS, env, backups and restore, monitoring, updates |
-| [docs/moving.md](docs/moving.md) | moving your machine's reviews to a server: `vr export`, `vr admin import`, what moves and what stays |
+| [docs/moving.md](docs/moving.md) | moving your machine's reviews to a server: `lampo export`, `lampo admin import`, what moves and what stays |
 | [docs/email.md](docs/email.md) | the emails a hosted server sends (invites, confirmations, password resets, notices), sign-up, the mail relay |
 | [docs/onboarding.md](docs/onboarding.md) | the first run: what someone new sees, the steps per role, the sample video |
 | [docs/speech.md](docs/speech.md) | speech-to-text: voice notes, recorded feedback, transcripts |
@@ -332,7 +333,7 @@ Copyright © 2026 nprompt UG (haftungsbeschränkt), Stuttgart, Germany.
 
 Lampo is free software under the [GNU Affero General Public License v3.0 only](LICENSE). You may use,
 study, modify and self-host it. If you run a modified version as a network service, you must offer its users the
-source of your changes under the same license (set `VR_SOURCE_URL` to your fork; the app links to it). If the AGPL
+source of your changes under the same license (set `LAMPO_SOURCE_URL` to your fork; the app links to it). If the AGPL
 doesn't work for your organisation, a commercial license is available from the maintainers: hello@lampo.video.
 
 To be plain about what the [CLA](CLA.md) means: contributors keep their copyright and grant the maintainers the right

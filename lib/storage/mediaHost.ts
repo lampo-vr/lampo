@@ -1,4 +1,4 @@
-// Signed, short-lived URLs on the app's own media host (VR_MEDIA_ORIGIN): a second host name served by this same app,
+// Signed, short-lived URLs on the app's own media host (LAMPO_MEDIA_ORIGIN): a second host name served by this same app,
 // which answers nothing but these URLs and one-time uploads. It is for a server whose app host sits behind a front
 // that must not carry video (a CDN proxy whose terms or limits keep video off it): the player, review links and
 // downloads are redirected there exactly as they are to Bunny's or S3's own signed URLs (SIGNED_URL_SECONDS), and the

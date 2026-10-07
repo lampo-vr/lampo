@@ -10,6 +10,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { settings } from '../../lib/env.ts';
 import { ROOT, tmpdir, until, VR } from '../lib/helpers.ts';
 import { client } from '../lib/http.ts';
 import { launch, requireChrome, shotsDir } from './lib/browser.mjs';
@@ -20,7 +21,7 @@ const LABEL = 'moving e2e';
 requireChrome(LABEL);
 const SHOTS = shotsDir();
 const enc = encodeURIComponent;
-const given = process.env.VR_MOVING_BASE || null;
+const given = settings.LAMPO_MOVING_BASE || null;
 
 let browser;
 let page;
@@ -34,7 +35,7 @@ try {
     const r = await fetch(`${base}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Origin: base },
-      body: JSON.stringify({ email: process.env.VR_MOVING_EMAIL, password: process.env.VR_MOVING_PASSWORD }),
+      body: JSON.stringify({ email: settings.LAMPO_MOVING_EMAIL, password: settings.LAMPO_MOVING_PASSWORD }),
     });
     assert(r.ok, `sign-in at ${base}: ${r.status}`);
     cookie = r.headers

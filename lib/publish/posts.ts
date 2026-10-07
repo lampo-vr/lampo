@@ -1,5 +1,5 @@
 // Posts of final videos: one per platform per final version, kept per workspace in data/publish/posts.json under one
-// lock. People and agents write drafts (draft_post, `vr post draft`, the composer); only a person publishes one, after
+// lock. People and agents write drafts (draft_post, `lampo post draft`, the composer); only a person publishes one, after
 // the gate here says yes: the video is final and nothing newer arrived, the post names that final render, nothing in it
 // breaks a platform's rule, the required answers are given, and the person confirmed the platform and account it now
 // names. The queue (lib/publish/queue.ts) sends it; what happens is told as `post` events (webhooks, push, the inbox).
@@ -331,7 +331,7 @@ export interface DraftInput {
   fields: PostFields;
   by: string;
   by_id?: string;
-  /** A person in the app (not an API token, an MCP tool or `vr`): only a person changes a failed or cancelled post. */
+  /** A person in the app (not an API token, an MCP tool or `lampo`): only a person changes a failed or cancelled post. */
   person?: boolean;
 }
 
@@ -697,7 +697,7 @@ function findConnectionQuiet(id: string | null): StoredConnection | null {
   }
 }
 
-/** One line for a post, as agents, webhooks and `vr` read it: "YouTube posted (Brand channel) https://…". */
+/** One line for a post, as agents, webhooks and `lampo` read it: "YouTube posted (Brand channel) https://…". */
 export function postLine(p: Pick<Post, 'platform' | 'state' | 'url' | 'schedule_at' | 'error' | 'locked' | 'v'>, account?: string | null): string {
   const name = PLATFORM_NAMES[p.platform];
   const to = account ? ` (${account})` : '';
@@ -721,7 +721,7 @@ export function postLine(p: Pick<Post, 'platform' | 'state' | 'url' | 'schedule_
   }
 }
 
-/** One post in a line, as agents read it (draft_post, get_posts, `vr post`): where it stands, what it still needs, where a
+/** One post in a line, as agents read it (draft_post, get_posts, `lampo post`): where it stands, what it still needs, where a
  * person opens it. */
 export function postLines(p: PostView, appUrl?: string | null): string {
   const head = `${p.id} ${postLine(p, p.account_name)}`;

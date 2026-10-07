@@ -2,8 +2,8 @@
 // loop for every agent — find the project, put up V1, read the playbook and the notes, fix, put up the next version,
 // mark each note fixed, wait for the person's next notes, again until they approve — told one way per kind of agent:
 //   machine  the agent on the machine the store is on (stdio, or /mcp from it): a render is put up where it is;
-//   coding   a coding agent with a shell elsewhere (Claude Code, Codex): renders through `vr render`, else request_upload;
-//   chat     everything else (Claude, ChatGPT, Cursor's chat, any other client): MCP only, never a `vr` command.
+//   coding   a coding agent with a shell elsewhere (Claude Code, Codex): renders through `lampo render`, else request_upload;
+//   chat     everything else (Claude, ChatGPT, Cursor's chat, any other client): MCP only, never a `lampo` command.
 // Agent-facing text: measured by test/unit/token-budget.test.ts (Claude Code cuts instructions at 2,048 characters;
 // ChatGPT reads the first 512 most closely, so the loop starts there).
 import { BRAND_NAME } from '../lib/brand.ts';
@@ -14,7 +14,7 @@ import type { AgentKind } from '../lib/types.ts';
 export type AgentWay = 'machine' | 'coding' | 'chat';
 
 /**
- * Coding agents with a shell of their own: they render, so they put up versions through `vr render` (else an upload
+ * Coding agents with a shell of their own: they render, so they put up versions through `lampo render` (else an upload
  * URL). Every other client — Claude and ChatGPT, Cursor's chat, any other — is told the MCP way only.
  */
 export const isCodingAgent = (kind: AgentKind | null | undefined): boolean => kind === 'claude-code' || kind === 'codex';
@@ -25,9 +25,9 @@ export const wayOf = (via: string, kind: AgentKind | null | undefined): AgentWay
 /** Step 2's second half: how this kind of agent puts a version up. */
 const PUT_UP: Record<AgentWay, string> = {
   machine:
-    'track_video puts a render up where it is (folder: the project); the next version is a re-render to the same path, through vr render --to <video> --out <that path> -- <your render command> so the person sees its progress.',
+    'track_video puts a render up where it is (folder: the project); the next version is a re-render to the same path, through lampo render --to <video> --out <that path> -- <your render command> so the person sees its progress.',
   coding:
-    'Render through vr render --to <video> --out <file> -- <your render command> (V1: --folder <project> instead of --to): the person sees its progress, and it puts the file up. Without vr: request_upload.',
+    'Render through lampo render --to <video> --out <file> -- <your render command> (V1: --folder <project> instead of --to): the person sees its progress, and it puts the file up. Without lampo: request_upload.',
   chat: 'request_upload: one PUT to its URL (folder for a new video, video for its next version).',
 };
 

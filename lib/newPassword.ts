@@ -1,4 +1,4 @@
-// What a new password ends, wherever it is set: Profile, an admin, a reset link, `vr admin reset-password`. The
+// What a new password ends, wherever it is set: Profile, an admin, a reset link, `lampo admin reset-password`. The
 // sessions end with the account's epoch (lib/auth.ts updateUser) and the links it had with voidLinks; what lives on
 // elsewhere is ended here — whoever had the old password may have left one of these behind, and each would outlast it.
 import { revokeAppsOf, voidCodesOf } from './oauth/store.ts';

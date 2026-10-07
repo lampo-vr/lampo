@@ -198,7 +198,7 @@ export interface AskInput {
   author_id?: string;
 }
 
-/** A question on a folder, told like a note (a `comment` event: the inbox, push, webhooks and `vr watch` hear it). */
+/** A question on a folder, told like a note (a `comment` event: the inbox, push, webhooks and `lampo watch` hear it). */
 export function createAsk(input: AskInput): FolderAsk {
   const text = input.text.trim();
   if (text.length > ASK_LIMITS.text) throw new Error(`a question is at most ${ASK_LIMITS.text} characters long`);

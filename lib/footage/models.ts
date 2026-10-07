@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { settings } from '../env.ts';
 import { CACHE } from '../paths.ts';
 
 export interface ModelFile {
@@ -54,8 +55,8 @@ export const SIGLIP: FootageModel = {
 export const filesOf = (m: FootageModel): ModelFile[] => [m.vision, m.text, m.tokenizer, m.tokenizerConfig];
 export const modelBytes = (m: FootageModel): number => filesOf(m).reduce((n, f) => n + f.bytes, 0);
 
-/** Where the models live: VR_FOOTAGE_MODELS, else <cache>/models/ (shared by every workspace: the model is no team's). */
-export const footageModelsDir = (): string => process.env.VR_FOOTAGE_MODELS || path.join(CACHE, 'models');
+/** Where the models live: LAMPO_FOOTAGE_MODELS, else <cache>/models/ (shared by every workspace: the model is no team's). */
+export const footageModelsDir = (): string => settings.LAMPO_FOOTAGE_MODELS || path.join(CACHE, 'models');
 export const modelDir = (m: FootageModel, root = footageModelsDir()): string => path.join(root, m.repo.split('/').at(-1) as string);
 /** A file checked once is marked (`.ok`), so a start doesn't hash 200 MB again. */
 const marker = (file: string, f: ModelFile) => `${file}.${f.sha256.slice(0, 12)}.ok`;

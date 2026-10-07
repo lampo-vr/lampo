@@ -21,7 +21,7 @@ async function sha256Hex(file: string): Promise<string> {
 }
 
 export function createBunnyStore(cfg: BunnyConfig | undefined): RemoteStore {
-  if (!cfg?.zone || !cfg.access_key) throw new Error('storage "bunny" needs bunny.zone and bunny.access_key (VR_BUNNY_ZONE, VR_BUNNY_ACCESS_KEY)');
+  if (!cfg?.zone || !cfg.access_key) throw new Error('storage "bunny" needs bunny.zone and bunny.access_key (LAMPO_BUNNY_ZONE, LAMPO_BUNNY_ACCESS_KEY)');
   const region = (cfg.region || '').toLowerCase();
   if (!(region in REGIONS) && !cfg.storage_url) throw new Error(`unknown bunny region "${cfg.region}" (${Object.keys(REGIONS).filter(Boolean).join(', ')})`);
   const base = (cfg.storage_url || `https://${REGIONS[region]}storage.bunnycdn.com`).replace(/\/+$/, '');

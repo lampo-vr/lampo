@@ -6,11 +6,11 @@ knows why it matters. Done work moves to `CHANGELOG.md`.
 ## Now
 
 **A real deployment: running** (since 2026-10-03; open sign-up since 2026-10-06). The first hosted instance serves the
-app behind a CDN proxy with video from a media host of its own (`VR_MEDIA_ORIGIN`), mail from a verified sending
+app behind a CDN proxy with video from a media host of its own (`LAMPO_MEDIA_ORIGIN`), mail from a verified sending
 domain, nightly backups, and the smoke test green; CI runs on GitHub's runners in the public repository (outside contributors' workflows wait for
 approval). Still to do there: the OAuth connectors in ChatGPT and Claude.ai for real, backups to a second
 place, an uptime check from outside, the Linux screenshot baselines from CI's artifact (then drop
-`VR_BASELINE_MISSING`), perf budgets measured on CI's runners (then drop `VR_PERF_TIMES`), a Parakeet voice note and an
+`LAMPO_BASELINE_MISSING`), perf budgets measured on CI's runners (then drop `LAMPO_PERF_TIMES`), a Parakeet voice note and an
 Auto-check run measured on x86, `npm audit` of the pinned versions. Open: whether review links speak the visitor's
 browser language (clients have no Settings, so today they always get English).
 
@@ -32,13 +32,13 @@ and complete.
 
 **Publish from Lampo** (phase 1 built, 2026-10-03; [docs/publishing.md](docs/publishing.md)). A gated step after
 Final: one post per platform per final version, published by a person from the exact final file (or the platform's
-encode of it); agents only draft (`draft_post`, `vr post draft`, never "publish").
+encode of it); agents only draft (`draft_post`, `lampo post draft`, never "publish").
 - Landed, tested against local fakes only (no real platform was called): drafts with each platform's limits and the
   required answers (made for kids, realistic AI content); Settings → Publishing per workspace — YouTube with your own
   Google OAuth client (resumable upload, `publishAt`, the cover; the private lock of an unaudited project said where
   it matters), Instagram and Facebook through Zernio with your own key; the publish queue (retries, pausing when the
   final moves, resuming an upload); the publish kit; status on the video, failed posts in the inbox, `post` events,
-  `get_posts` / `vr post`.
+  `get_posts` / `lampo post`.
 - Next in the open app: the one-day test of Zernio (and Upload-Post) with a real master — field names, the cover, the
   AI flag, numbers — then a second posting-API adapter; letting the provider hold a schedule (so a sleeping laptop
   still posts) with cancel-on-reopen against it; YouTube captions from the transcript (`captions.insert`, the
@@ -66,7 +66,7 @@ website's clips.
   `prefs.onboarding.done`).
 
 - **Footage search for B-roll**, next steps (step 1 is built: `docs/footage.md` — the index of every video's newest
-  version in the background, `vr footage find|sheet|status|on|off|index`, `find_footage`, the API, per workspace, the
+  version in the background, `lampo footage find|sheet|status|on|off|index`, `find_footage`, the API, per workspace, the
   model downloaded on first use; research: `bench/footage/RESULTS.md`, reproduced by `bench/footage/app-eval.ts`).
   2. **A Footage view** (search with the filters it read as chips, shot cards with hover-scrub, the shot player with
      in and out marked) and *Offer to the agent* through options to audition; a `footage` SSE event already fires.
@@ -78,10 +78,10 @@ website's clips.
   5. Later: audio tags per shot, subject motion, near-duplicate grouping. Open: a multilingual model for German
      search; a separate *Footage* library (files that aren't videos under review).
 
-- **Render progress, next** (done: `vr render -- <cmd>` with Remotion, ffmpeg, aerender and Blender, `--detach` and
-  `vr render wait`, the progress in the player's agent line and on the library's cards; CHANGELOG): DaVinci Resolve
+- **Render progress, next** (done: `lampo render -- <cmd>` with Remotion, ffmpeg, aerender and Blender, `--detach` and
+  `lampo render wait`, the progress in the player's agent line and on the library's cards; CHANGELOG): DaVinci Resolve
   (`GetRenderJobStatus`) and Remotion Lambda (`getRenderProgress`); an image sequence counted by its frames rather
-  than its size; `vr render stop <id>` for a detached render (today its supervisor stops on SIGTERM).
+  than its size; `lampo render stop <id>` for a detached render (today its supervisor stops on SIGTERM).
 
 - Options before a render, next (done: an agent asks, the person auditions and picks, the answer is one PICKED line;
   CHANGELOG): **options through a review link** — a client picks the narrator or the look on the link (a question
@@ -159,8 +159,8 @@ website's clips.
   menus or tooltips of their own, windows that render their rows in the first pass, windowed notes and inbox lists.
 
 - Tokens, what is left (bench/tokens/): `add_note` is still a sixth of the tool list (positions, ranges, drawings,
-  choices); the MCP App tools only for hosts that announce the UI extension; `vr mcp config --lean`; a check of the
-  heuristic against a real tokenizer (it overcounts JSON); `since` for `vr open`.
+  choices); the MCP App tools only for hosts that announce the UI extension; `lampo mcp config --lean`; a check of the
+  heuristic against a real tokenizer (it overcounts JSON); `since` for `lampo open`.
 - MCP over HTTP: 2025-era clients are told resource subscriptions work, but the stateless `/mcp` route can't deliver
   them (`resources/subscribe` answers "Method not found"); 2026-07-28 clients get them through `subscriptions/listen`.
   Either stop advertising `subscribe` to 2025 clients there or keep a session for them.
@@ -280,15 +280,14 @@ Findings of audit A13 (2026-10-05, `AUDITS.md`) and its verification rounds that
 - Distribution: a published CLI / MCP package (`npx`) and a registry container image, so agents on other machines
   don't need a clone.
 - Accounts scoped to folders (clients with their own logins) or share links only. (Importing an existing local store
-  into a hosted instance: `vr export` / `vr admin import`, docs/moving.md. Not in a bundle yet: questions asked on a
+  into a hosted instance: `lampo export` / `lampo admin import`, docs/moving.md. Not in a bundle yet: questions asked on a
   folder before any video (`asks.json`), and notes made on a video after it moved, which a later export can't merge.)
-- The npm package's name at the first publish: `video-review` (what `npx`, `bin/` and docs say today) or the brand; a
-  published name can't be taken back, so decide before publishing.
 
 ## Decided
 
 - **The name is Lampo** (2026-09-29), with the logo "out of the o, a frame" (`docs/brand/`). Agents connect to the
   MCP server as `lampo` since 2026-10-02 (setups under `video-review` keep working: the key never reaches the server).
-  The repository is `lampo` (github.com/lampo-vr/lampo) since its first public release. The npm package, the `vr`
-  command, `VR_*` variables, the MCP tool names, data paths and file formats keep `video-review`; renaming those would
-  break installs and agents, and is not planned.
+  The repository is `lampo` (github.com/lampo-vr/lampo) since its first public release. **The command is `lampo`**
+  (2026-10-07), with `lampo-mcp`, `LAMPO_*` settings, `lampo://` resources and the npm package `@lampo-vr/lampo`
+  (plain `lampo` is someone else's on npm; nothing is published yet). `vr`, `vr-mcp`, `VR_*` and `vr://` keep working
+  for setups made with them. The MCP tool names, data paths and file formats keep their names.

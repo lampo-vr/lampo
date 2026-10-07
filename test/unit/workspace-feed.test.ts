@@ -53,7 +53,7 @@ test('vr watch with VR_WORKSPACE prints its workspace’s notes, never workspace
   child.stderr.on('data', (d) => {
     err += d;
   });
-  await until('the watch to start', () => err.includes('vr watch:'));
+  await until('the watch to start', () => err.includes('lampo watch:'));
   await sleep(300);
   note('w1', 'ALPHA confidential note');
   note(bravo, 'bravo own note');
@@ -89,11 +89,11 @@ test('VR_WORKSPACE naming no workspace of this store: vr and the stdio MCP serve
   const phantom = { ...childEnv, VR_WORKSPACE: 'w_nothere12345' };
   const r = vr(['ls'], phantom);
   assert.equal(r.code, 1);
-  assert.equal(r.err.trim(), 'vr: VR_WORKSPACE=w_nothere12345 is not a workspace of this store (vr admin workspaces lists them)');
+  assert.equal(r.err.trim(), 'lampo: VR_WORKSPACE=w_nothere12345 is not a workspace of this store (lampo admin workspaces lists them)');
   assert.equal(r.out, '');
   const mcp = spawnSync(process.execPath, [path.join(ROOT, 'bin/vr-mcp')], { env: phantom, input: '', encoding: 'utf8', timeout: 20000 });
   assert.equal(mcp.status, 1);
-  assert.equal(mcp.stderr.trim(), 'video-review mcp: VR_WORKSPACE=w_nothere12345 is not a workspace of this store (vr admin workspaces lists them)');
+  assert.equal(mcp.stderr.trim(), 'lampo-mcp: VR_WORKSPACE=w_nothere12345 is not a workspace of this store (lampo admin workspaces lists them)');
   // Nothing was made for it: no phantom store to find later.
   for (const root of [env.VR_DATA, env.VR_CACHE]) assert.equal(fs.existsSync(path.join(String(root), 'w', 'w_nothere12345')), false);
   // Not an id at all: one sentence too, no stack trace.

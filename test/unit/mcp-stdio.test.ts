@@ -17,7 +17,7 @@ import { age, isolatedEnv, makeVideo, ROOT, sleep } from '../lib/helpers.ts';
 const { dir, env } = isolatedEnv();
 const store = await import('../../lib/store.ts');
 const { slugify } = await import('../../lib/paths.ts');
-const { reviewUri } = await import('../../mcp/format.ts');
+const { oldReviewUri, reviewUri } = await import('../../mcp/format.ts');
 
 function track(rel: string): string {
   const file = makeVideo(path.join(dir, rel), { w: 160, h: 90, dur: 1 });
@@ -95,6 +95,34 @@ test('a 2026-07-28 client: subscriptions/listen gets the same notifications over
   store.addComment(one, { frame: 6, text: 'Farbe wärmer', author: 'Mia' });
   await until('the inbox and the review', () => updates.includes('vr://inbox') && updates.includes(reviewUri(one)));
   await sub.close();
+});
+
+test('the resources are lampo://; the vr:// addresses from before still read the same and are heard by who asks for them', async () => {
+  const c = new LegacyClient({ name: 'stdio-addresses', version: '1.0.0' });
+  await c.connect(new LegacyStdio({ command: process.execPath, args: [MCP], env: childEnv, stderr: 'inherit' }));
+  closers.push(() => c.close());
+  const listed = (await c.listResources()).resources.map((r) => r.uri);
+  assert.ok(listed.includes('lampo://inbox') && listed.includes(reviewUri(one)), listed.join(' '));
+  assert.ok(reviewUri(one).startsWith('lampo://review/'));
+  assert.deepEqual(
+    listed.filter((u) => u.startsWith('vr://')),
+    [],
+    'the older addresses are not listed twice',
+  );
+  const textOf = async (uri: string) => (await c.readResource({ uri })).contents.map((x) => ('text' in x ? x.text : '')).join('\n');
+  assert.equal(await textOf('vr://inbox'), await textOf('lampo://inbox'));
+  assert.match(await textOf(oldReviewUri(one)), /one\.mp4/);
+  assert.equal(await textOf(oldReviewUri(one)), await textOf(reviewUri(one)));
+
+  const updates: string[] = [];
+  c.setNotificationHandler(ResourceUpdatedNotificationSchema, (n) => {
+    updates.push(n.params.uri);
+  });
+  await c.subscribeResource({ uri: 'lampo://inbox' });
+  store.addComment(two, { frame: 7, text: 'Titel länger stehen lassen', author: 'Mia' });
+  await until('the inbox', () => updates.includes('lampo://inbox'));
+  await sleep(300);
+  assert.deepEqual(updates, ['lampo://inbox'], 'one notification, under the address it subscribed to');
 });
 
 test('the server stops following the store when its client goes away (stdin closes, the process exits)', async () => {

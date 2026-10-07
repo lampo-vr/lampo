@@ -10,27 +10,39 @@ const video = makeVideo(path.join(dir, 'proj/export/cli.mp4'), { dur: 1 });
 age(video);
 let id = '';
 
-test('vr help and unknown commands', () => {
+test('help and unknown commands', () => {
   const help = vr(['help'], env).out;
   assert.match(help, /frame-exact video feedback for agents/);
   // Every command and option that exists, in the app's words; agents read it, so it stays compact.
-  for (const s of ['vr verify <id>', 'vr reopen <id>', '--limit N', '--t 12.1', '--token-env NAME', '--url <server>', '"Copy for an agent"', 'Lampo server'])
+  for (const s of [
+    'lampo verify <id>',
+    'lampo reopen <id>',
+    '--limit N',
+    '--t 12.1',
+    '--token-env NAME',
+    '--url <server>',
+    '"Copy for an agent"',
+    'Lampo server',
+  ])
     assert.ok(help.includes(s), `help names ${s}`);
   assert.doesNotMatch(help, /Claude Code sessions|video-review server|Copy for Claude/);
   // 7200 until `vr ask` (options before a render) took its two lines, 7450 until `vr post` (publishing) took two more,
   // 7700 until `vr export` / `vr admin import` (moving to a server) took one, 7820 until `vr footage` took two, 8050
   // until elements maps took two (`vr push … --elements`, `vr elements`) and `vr admin`'s deletion and export (A13
-  // PEOPLE-1) one, 8360 until `vr render` and `vr render wait` took three
+  // PEOPLE-1) one, 8360 until `vr render` and `vr render wait` took three, 8660 until the command became `lampo` (3
+  // letters more on each line that starts with it and was past its column: the same tokens, bench/tokens/count.ts),
+  // 8790 until `render --folder/--verbose` and `admin import`'s options were named (they were taken, not listed)
   // measured with the data folder's path as a placeholder: the temp folder's length differs by machine
   const sized = help.replace(/\(data: [^)\n]*\)/, '(data: <data>)').length;
-  assert.ok(sized < 8660, `help is ${sized} characters`);
-  assert.ok(help.includes('vr footage find "<request>"'), 'help names vr footage');
-  assert.ok(help.includes('vr post draft <video> --platform yt|ig|fb'), 'help names vr post');
-  // what each takes, as it is: repair-folders works in a workspace too; sessions lists a server's agents after vr login
-  assert.ok(help.includes('list-users/repair-folders, else VR_WORKSPACE'), 'repair-folders takes --workspace');
-  assert.doesNotMatch(help, /vr sessions .*the agents running on this machine/);
+  assert.ok(sized < 9250, `help is ${sized} characters`);
+  assert.ok(help.includes('lampo footage find "<request>"'), 'help names lampo footage');
+  assert.ok(help.includes('lampo post draft <video> --platform yt|ig|fb'), 'help names lampo post');
+  assert.doesNotMatch(help, /(^|\s)vr\s/, 'the command’s one name');
+  // what each takes, as it is: repair-folders works in a workspace too; sessions lists a server's agents after lampo login
+  assert.ok(help.includes('list-users/repair-folders, else LAMPO_WORKSPACE'), 'repair-folders takes --workspace');
+  assert.doesNotMatch(help, /lampo sessions .*the agents running on this machine/);
   const mcp = vr(['mcp', 'config'], env);
-  assert.match(`${mcp.out}${mcp.err}`, /\[--json\]/, 'vr mcp config names --json');
+  assert.match(`${mcp.out}${mcp.err}`, /\[--json\]/, 'lampo mcp config names --json');
   const bad = vr(['frobnicate'], env);
   assert.equal(bad.code, 2);
   assert.match(bad.err, /unknown command/);

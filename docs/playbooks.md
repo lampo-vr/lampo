@@ -89,21 +89,21 @@ there too (a topic a rule already names says so there: "Rule exists — still 6 
 | | Read | Edit, accept, reject | Suggest |
 |---|---|---|---|
 | Owner, admin, member | ✓ | ✓, in the app | ✓ |
-| Reviewer | ✓ | – | ✓ (through `vr` or MCP) |
-| Agents (MCP, `vr`, any API token) | ✓ | – | ✓ |
+| Reviewer | ✓ | – | ✓ (through `lampo` or MCP) |
+| Agents (MCP, `lampo`, any API token) | ✓ | – | ✓ |
 | Clients on review links | – | – | – |
 
 ## For agents
 
-| | MCP | `vr` |
+| | MCP | `lampo` |
 |---|---|---|
-| the playbook for a video or folder | `get_playbook({video \| folder})` | `vr playbook [<video\|folder>]` |
-| one skill, with its files | `get_skill({name, video \| folder})` | `vr playbook skill <name> [<video\|folder>] [--files]` |
-| everything as files (e.g. into `.claude/skills`) | – | `vr playbook export [<video\|folder>] [--to <dir>]` (default `.lampo/playbook`: `PLAYBOOK.md`, then `<name>/SKILL.md` with its files) |
-| suggest a change | `propose_playbook_change({…, section, content, reason, evidence})` | `vr playbook propose <video\|folder> --section brief\|rules\|skill (--file f.md \| --text "…") --reason "…" [--evidence c_1,c_2]` |
-| where a suggestion stands | `get_playbook` lists the latest ten | `vr playbook status <pp_…>` |
+| the playbook for a video or folder | `get_playbook({video \| folder})` | `lampo playbook [<video\|folder>]` |
+| one skill, with its files | `get_skill({name, video \| folder})` | `lampo playbook skill <name> [<video\|folder>] [--files]` |
+| everything as files (e.g. into `.claude/skills`) | – | `lampo playbook export [<video\|folder>] [--to <dir>]` (default `.lampo/playbook`: `PLAYBOOK.md`, then `<name>/SKILL.md` with its files) |
+| suggest a change | `propose_playbook_change({…, section, content, reason, evidence})` | `lampo playbook propose <video\|folder> --section brief\|rules\|skill (--file f.md \| --text "…") --reason "…" [--evidence c_1,c_2]` |
+| where a suggestion stands | `get_playbook` lists the latest ten | `lampo playbook status <pp_…>` |
 
-`vr` writes files only into the folder it was given (`--files`: the current folder; `export`: `--to`). The server
+`lampo` writes files only into the folder it was given (`--files`: the current folder; `export`: `--to`). The server
 names them, so every name is checked first: a skill or file name that isn't a plain name (a `/`, `..`, an absolute
 path), or that would land outside the folder through a symbolic link, stops the command before anything is written.
 
@@ -145,7 +145,7 @@ Calm type, real footage, nothing shouty.
 ## Skills
 
 Instructions for recurring work (the Agent Skills format).
-Load one with get_skill or `vr playbook skill <name>`.
+Load one with get_skill or `lampo playbook skill <name>`.
 
 - **reels-export** (from Acme/Reels): Export an Acme reel for Instagram and TikTok:
   H.264, -14 LUFS, 9:16

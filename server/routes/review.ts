@@ -258,7 +258,7 @@ export function reviewRoutes(ctx: ServerContext): Router {
     res.json(out);
   });
 
-  // Every review in full (remote `vr` and MCP read the library through this).
+  // Every review in full (remote `lampo` and MCP read the library through this).
   r.get('/api/reviews', (req, res) => {
     const projects = archivedList();
     res.json({
@@ -283,7 +283,7 @@ export function reviewRoutes(ctx: ServerContext): Router {
 
   r.get('/api/review/:slug/prompt', (req, res) => {
     // Paths on this disk for the machine itself (dataDir's rule); anyone else — a hosted server's callers, the LAN, a
-    // token on the machine — is pointed at `vr` and this server instead (A12 VE2a-3).
+    // token on the machine — is pointed at `lampo` and this server instead (A12 VE2a-3).
     const hosted = dataDir(req, req.params.slug) ? undefined : ctx.cfg.public_url || `${req.protocol}://${req.get('host')}`;
     res.type('text/plain').send(claudePrompt(getReview(req.params.slug), { hosted }));
   });

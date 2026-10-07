@@ -49,7 +49,7 @@ const Skill = z.union([
       base_rev,
     })
     .strict(),
-  // A whole SKILL.md (an import, or what `vr playbook` sends).
+  // A whole SKILL.md (an import, or what `lampo playbook` sends).
   z.object({ folder, markdown: z.string().max(PLAYBOOK_LIMITS.skillBody + 6000), rename_from: skillName.optional(), message, base_rev }).strict(),
 ]);
 const SkillQuery = z.object({ folder, video: slug, name: skillName }).strict();

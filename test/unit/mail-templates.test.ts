@@ -6,13 +6,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { settings } from '../../lib/env.ts';
 
 const { renderMail, siteOf, when } = await import('../../lib/mail/templates.ts');
 const { WORDS } = await import('../../lib/mail/words.ts');
 type Params = Parameters<typeof renderMail>[0];
 
 const DIR = fileURLToPath(new URL('./snapshots/mail/', import.meta.url));
-const UPDATE = process.env.VR_UPDATE_SNAPSHOTS === '1';
+const UPDATE = settings.LAMPO_UPDATE_SNAPSHOTS === '1';
 const site = siteOf('https://review.example.com', null);
 const T = new Date('2026-10-02T09:30:00Z');
 const URL_V = 'https://review.example.com/#/verify/vt_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';

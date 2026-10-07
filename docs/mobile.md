@@ -9,7 +9,7 @@ phone, tablet or computer, and **notifications** bring the inbox to the lock scr
 **A hosted server** is the way to review from anywhere (see [server-mode.md](server-mode.md) and
 [docker.md](docker.md)): open its address on the phone and sign in with the same account as on your computer.
 
-**Your own machine, on the same Wi-Fi.** `npm run lan` (or `VR_LAN=1`) also serves the app on your network and prints
+**Your own machine, on the same Wi-Fi.** `npm run lan` (or `LAMPO_LAN=1`) also serves the app on your network and prints
 a link with an access token. Open it on the phone once; the phone stays signed in. This is meant for your desk, not for
 on the go, and notifications don't work over it (see [where they work](#where-they-work)).
 
@@ -189,7 +189,7 @@ password reset drop every device of the account, so a lost phone stops showing n
 | `data/push/subscriptions.json` | one entry per device: its push address and keys, name, what it wants to hear about, and its account on a hosted server (readable by the owner only) |
 | `data/for-you.json` | per person: what they waved through (*Got it*, kept 30 days) and what they put aside (*Later*) |
 
-**The contact push services see** is `push_subject` (`VR_PUSH_SUBJECT`): `mailto:you@example.com` or an https URL.
+**The contact push services see** is `push_subject` (`LAMPO_PUSH_SUBJECT`): `mailto:you@example.com` or an https URL.
 The default is the server's `public_url` when it is https, else a placeholder.
 
 **API.**

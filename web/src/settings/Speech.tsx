@@ -1,6 +1,6 @@
 // Voice notes: whether they are written down, the languages you speak (yours, on your account), and — folded away —
 // which engine and model do it and why. The engine itself is the server's configuration (config.json "stt" or
-// VR_STT_* variables, a restart), so only whoever runs the app sees it and where to change it; the languages are a
+// LAMPO_STT_* variables, a restart), so only whoever runs the app sees it and where to change it; the languages are a
 // person’s choice.
 import { can } from '../../../lib/permissions.ts';
 import { useAuthStatus, useUpdateMe } from '../api/auth.ts';
@@ -217,11 +217,11 @@ export function Speech() {
             <>
               <p className="set-sub">
                 {t(
-                  'The engine is the server’s configuration: config.json under “stt”, or VR_STT_* variables, then a restart. docs/speech.md lists every option.',
+                  'The engine is the server’s configuration: config.json under “stt”, or LAMPO_STT_* variables, then a restart. docs/speech.md lists every option.',
                 )}
               </p>
               <Code label="config.json">{'{\n  "stt": {\n    "backend": "local",\n    "model": "auto",\n    "languages": ["de", "en"]\n  }\n}'}</Code>
-              <Code label={t('or in the environment')}>{'VR_STT=local\nVR_STT_MODEL=auto\nVR_STT_LANGUAGES=de,en'}</Code>
+              <Code label={t('or in the environment')}>{'LAMPO_STT=local\nLAMPO_STT_MODEL=auto\nLAMPO_STT_LANGUAGES=de,en'}</Code>
             </>
           )}
         </Details>

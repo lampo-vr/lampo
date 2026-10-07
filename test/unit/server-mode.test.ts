@@ -215,7 +215,7 @@ test('uploads: first upload creates the review, the next one is v2 with notes ca
   assert.ok(inbox.includes('Logo größer') && inbox.includes('/data/'), 'the note is in the inbox with a screenshot URL');
   assert.ok(!inbox.includes(dir), 'no server paths for remote agents');
   const prompt = (await request('GET', `/api/review/${encodeURIComponent(res.slug)}/prompt`, { headers: bearer })).text;
-  assert.ok(prompt.includes(`vr login ${PUBLIC}`) && prompt.includes('vr show c_'), prompt);
+  assert.ok(prompt.includes(`lampo login ${PUBLIC}`) && prompt.includes('lampo show c_'), prompt);
   assert.ok(!prompt.includes(dir), '"Copy for an agent" has no server paths either');
 
   const again = await tusUpload(request, a, { filename: 'spot.mp4', folder: 'Acme/Reels' }, bearer);

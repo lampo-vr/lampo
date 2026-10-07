@@ -46,7 +46,7 @@ try {
     port: localPort,
     // the machine's reviewer as the OS names them; the name they chose in the app (below) is the one clients see
     user: 'alex',
-    vars: { VR_STT: 'http', VR_STT_URL: speech.url, VR_STT_HTTP_MODEL: 'whisper-large-v3-turbo' },
+    vars: { LAMPO_STT: 'http', LAMPO_STT_URL: speech.url, LAMPO_STT_HTTP_MODEL: 'whisper-large-v3-turbo' },
   });
   stops.push(local.stop);
   const me = await fetch(`${local.url}/api/auth/me`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: '{"name":"Alex"}' });

@@ -1,6 +1,6 @@
 # Third-party notices
 
-Lampo (the repository `lampo`, the npm package `video-review`) is licensed under the GNU Affero General Public License
+Lampo (the repository `lampo`, the npm package `@lampo-vr/lampo`) is licensed under the GNU Affero General Public License
 v3.0 (see LICENSE). It uses the following third-party software, models and artwork, each under its own license.
 
 ## Speech-to-text

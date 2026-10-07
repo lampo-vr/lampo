@@ -1,4 +1,4 @@
-// What an emailed link starts, and what asks for one: signing up (VR_SIGNUP), confirming an address, a password
+// What an emailed link starts, and what asks for one: signing up (LAMPO_SIGNUP), confirming an address, a password
 // reset, and sending a link again. Every answer that could tell whether an address has an account is the same either
 // way ({ok: true}) and takes as long; tokens come in the request body, never in a URL (the emails put them in the
 // fragment and the page posts them); all of it is rate-limited per address and per email.
@@ -20,7 +20,7 @@ import { body, fail, failFrom, router } from '../http.ts';
 
 const Email = z.string().max(254);
 const Lang = z.enum(['en', 'de']).optional();
-// With VR_SIGNUP=invite only the address counts (an invite's link asks for the rest); open sign-up needs all three.
+// With LAMPO_SIGNUP=invite only the address counts (an invite's link asks for the rest); open sign-up needs all three.
 // `plan`: what the website's sign-up link named (`?plan=`); a known id rides with the account, anything else is ignored.
 const Signup = z
   .object({ name: z.string().max(80).optional(), email: Email, password: z.string().max(1024).optional(), lang: Lang, plan: z.string().max(40).optional() })
@@ -202,7 +202,7 @@ export function accountRoutes(ctx: ServerContext): Router {
   });
 
   /**
-   * VR_SIGNUP=invite: an invited address asked to sign up. Its invites go to it again — only their links make the
+   * LAMPO_SIGNUP=invite: an invited address asked to sign up. Its invites go to it again — only their links make the
    * account (with the invite's role), so whoever merely knows the address gets nothing out of asking.
    */
   function sendInvites(ids: string[], lang: ReturnType<typeof mail.langOf>) {
@@ -335,7 +335,7 @@ export function accountRoutes(ctx: ServerContext): Router {
       const u = auth.findUserByEmail(email);
       // A held account's link (its page asks whoever didn't choose the password for it, or a new one: A12 INV-REV-1).
       if (u && auth.isGated(u) && !u.disabled) mail.verify(u, u.email, mail.langOf(u, b.lang), { asker });
-      // VR_SIGNUP=invite: what such an address waits for is its invite — a held account there never stands in for it.
+      // LAMPO_SIGNUP=invite: what such an address waits for is its invite — a held account there never stands in for it.
       if ((!u || auth.isGated(u)) && cfg.signup === 'invite') sendInvites(auth.pendingInvitesFor(email), mail.langOf(null, b.lang));
     });
   });

@@ -313,9 +313,9 @@ push-in slow · 3.3`), ids stable across calls (no session state over stateless 
 (`?tools=lean,footage` adds them). An agent may ask for *more like this*: `find_footage({ like: "s412" })` reuses the
 shot's vector (no new schema field until it is built).
 
-**`vr footage`** (both backends): `vr footage add <files…> [--folder X]`, `vr footage find "<request>" [--aspect 9:16]
+**`lampo footage`** (both backends): `lampo footage add <files…> [--folder X]`, `lampo footage find "<request>" [--aspect 9:16]
 [--min 2] [--motion push-in] [--no-text] [--said "…"] [--sheet out.jpg] [--json]` — the free text is parsed the way
-`find.ts` does (filters out of the words), flags win —, `vr footage sheet <ids…> -o sheet.jpg`, `vr footage status`.
+`find.ts` does (filters out of the words), flags win —, `lampo footage sheet <ids…> -o sheet.jpg`, `lampo footage status`.
 
 **UI.** *Footage* in the sidebar's Library section (after All videos). The view: a search field that takes the request
 in words and shows the filters it read as chips you can remove; results as shot cards (best keyframe, hover-scrub over
@@ -336,7 +336,7 @@ question.
 1. **The index, on the machine** (~2 weeks): `lib/footage/` (the one-decode analysis with `cutsFromDiffs`, the move
    estimator, keyframes from the decode, OCR through `lib/text`, words through `lib/transcripts`), the embedding worker
    (`onnxruntime-node` + `@huggingface/tokenizers`, model download on first use into `CACHE/models/` with size + SHA-256
-   like the speech models), node:sqlite store and scan, `PRIORITY.footage`, `vr footage add/find/sheet/status`; tests
+   like the speech models), node:sqlite store and scan, `PRIORITY.footage`, `lampo footage add/find/sheet/status`; tests
    on generated clips (cuts and moves against known ground truth, a tiny fake model for the ranking).
 2. **Agents** (~3–4 days): `find_footage`, `footage_sheet`, budgets, SKILL.md and `docs/agents.md`, the activity
    templates, both backends.

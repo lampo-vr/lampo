@@ -7,6 +7,7 @@ import { type ActivityRecord, processAgent } from '../lib/activity.ts';
 import { agentName, ownedAgentName, toolActivity } from '../lib/activityText.ts';
 import type { OptionTarget } from '../lib/askOptions.ts';
 import type { Backend } from '../lib/backend/types.ts';
+import { settings } from '../lib/env.ts';
 import { byName } from '../lib/inputs.ts';
 import { cleanAuthor, wellFormed } from '../lib/names.ts';
 import { isoLocal } from '../lib/paths.ts';
@@ -45,7 +46,7 @@ export interface ReviewServerOptions {
   publicEvent?: (e: ReviewEvent) => ReviewEvent;
   /** The inbox as this client may see it (hosted: rendered with screenshot URLs); default: the backend's INBOX.md. */
   inboxMarkdown?: () => Promise<string>;
-  /** The HTTP server hands out one-time upload URLs (`request_upload`); absent over stdio, where `vr push` exists. */
+  /** The HTTP server hands out one-time upload URLs (`request_upload`); absent over stdio, where `lampo push` exists. */
   requestUpload?: (input: {
     filename: string;
     folder?: string | null;
@@ -71,7 +72,7 @@ export interface ReviewServerOptions {
   dropUpload?: (url: string) => void;
   /** Where this server's source is (AGPL-3.0 §13), announced as the implementation's website. */
   sourceUrl?: string | null;
-  /** Which tools to offer: `all` (default), `lean` (the review loop only) or a comma-separated list; default VR_MCP_TOOLS. */
+  /** Which tools to offer: `all` (default), `lean` (the review loop only) or a comma-separated list; default LAMPO_MCP_TOOLS. */
   tools?: string | null;
   /**
    * Each tool call an agent makes, as live activity for the UI (lib/activity.ts): no extra tokens, the call itself.
@@ -146,7 +147,7 @@ export interface ToolKit {
 
 export function createToolKit(server: McpServer, o: ReviewServerOptions): ToolKit {
   const b = o.backend;
-  const offers = toolFilter(o.tools ?? process.env.VR_MCP_TOOLS);
+  const offers = toolFilter(o.tools ?? settings.LAMPO_MCP_TOOLS);
 
   function tool<S extends z.ZodObject>(
     name: string,
@@ -189,7 +190,7 @@ export function createToolKit(server: McpServer, o: ReviewServerOptions): ToolKi
     (server.registerTool as (n: string, c: object, cb: unknown) => unknown)(name, { ...config, inputSchema: trimmed(config.inputSchema), annotations }, cb);
   }
 
-  // Author for writes: `by` (hosted: only agent:… or yourself) > VR_BY > the Claude Code session (stdio) > the client.
+  // Author for writes: `by` (hosted: only agent:… or yourself) > LAMPO_BY > the Claude Code session (stdio) > the client.
   function author(by: string | undefined, ctx: ServerContext): string {
     // Writing as agent:… is an 'agents' action, as in the HTTP API: a reviewer's notes can't pass for an agent's.
     const asAgent = allowed(o.principal, 'agents');
@@ -204,7 +205,7 @@ export function createToolKit(server: McpServer, o: ReviewServerOptions): ToolKi
       throw new Error('by must be agent:<name> (or your own name)');
     }
     if (!asAgent) return o.principal.name;
-    const vrBy = o.principal.via === 'local' ? cleanAuthor(process.env.VR_BY || '') : '';
+    const vrBy = o.principal.via === 'local' ? cleanAuthor(settings.LAMPO_BY || '') : '';
     if (vrBy) return vrBy;
     if (o.sessionAuthor) {
       const s = currentSession();
@@ -216,7 +217,7 @@ export function createToolKit(server: McpServer, o: ReviewServerOptions): ToolKi
   }
 
   // Who is calling, by the name the app lists it under, the same for every call of the connection (a `by` on some
-  // writes doesn't split it): the Claude Code session or VR_BY for the stdio server, else the MCP client as a
+  // writes doesn't split it): the Claude Code session or LAMPO_BY for the stdio server, else the MCP client as a
   // connected agent is named (server/routes/mcp.ts).
   function activityName(ctx: ServerContext): string | null {
     if (o.sessionAuthor) {

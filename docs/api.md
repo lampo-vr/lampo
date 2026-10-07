@@ -1,6 +1,6 @@
 # HTTP API
 
-The web app and review links use this API, and so do `vr` and the stdio MCP server when they work against a hosted
+The web app and review links use this API, and so do `lampo` and the stdio MCP server when they work against a hosted
 server. It is JSON over HTTP, with a stream of server-sent events for live updates.
 
 This page is an overview. The route modules in [`server/routes/`](../server/routes) (accounts:
@@ -12,9 +12,9 @@ This page is an overview. The route modules in [`server/routes/`](../server/rout
 Create an API token in **Settings → API tokens**, then:
 
 ```sh
-export VR_TOKEN=vr_…        # the token, shown once
-curl -H "Authorization: Bearer $VR_TOKEN" https://review.example.com/api/library
-curl -N -H "Authorization: Bearer $VR_TOKEN" https://review.example.com/api/events
+export LAMPO_TOKEN=vr_…        # the token, shown once
+curl -H "Authorization: Bearer $LAMPO_TOKEN" https://review.example.com/api/library
+curl -N -H "Authorization: Bearer $LAMPO_TOKEN" https://review.example.com/api/events
 ```
 
 The first call lists the videos; the second stays open and prints an event whenever something changes, until the access
@@ -36,7 +36,7 @@ The rules for every call:
 - `<slug>` in a path is URL-encoded (`encodeURIComponent`).
 - A `v` (in a path, the query or a body) names a version of the video; without one, the newest. A version the video
   doesn't have is `404 {error: "no v5"}`, never the newest instead: a note, a render source or a transcript lands on
-  the version it names or nowhere, as with `vr` on the machine.
+  the version it names or nowhere, as with `lampo` on the machine.
 - Paths match exactly: they are case-sensitive, and a trailing slash, `//` or a `.` segment is a `404`.
 
 ## Authentication
@@ -63,7 +63,7 @@ Then these rules apply:
   pages and static files.
 - **Unconfirmed sign-ups.** An account that signed up on its own and hasn't confirmed its address yet gets
   `403 {error, unconfirmed: true}` from every private route except its own profile and status, the confirm and reset
-  links, sending the link again, dropping a new address and signing out; `vr login` gets no token until then.
+  links, sending the link again, dropping a new address and signing out; `lampo login` gets no token until then.
 - **Roles.** Each route needs an action from the role table ([server-mode.md](server-mode.md#accounts-and-tokens);
   per route: [`server/permissions.ts`](../server/permissions.ts)). Without it the answer is
   `403 {error: "your role (reviewer) can't do that"}`. A write that isn't in the table is refused to everyone
@@ -108,7 +108,7 @@ a new upload, video, member or review link, a publishing connection or a post pu
 other languages, by code). A self-hosted server has no such limits.
 
 **Billing.** The `/api/billing…` routes are not part of this repository. They belong to a separate billing module,
-which a hosted service that sells plans (Lampo Cloud does) loads through the one extension point (`VR_CLOUD_MODULE`,
+which a hosted service that sells plans (Lampo Cloud does) loads through the one extension point (`LAMPO_CLOUD_MODULE`,
 [`server/extension.ts`](../server/extension.ts), [server-mode.md](server-mode.md#a-billing-provider)). A self-hosted
 server has none of them. They are described here because the open web app's Settings → Billing calls them where a
 module provides billing.
@@ -182,7 +182,7 @@ says since when (never the reason).
 | `POST /api/auth/login` | sign in: `{email, password}` sets the session cookie → `{user, workspace?, workspaces?}`. `401` if wrong, `429` with `Retry-After` when throttled |
 | `POST /api/auth/logout` | sign this browser out |
 | `POST /api/auth/logout-everywhere` | end all your sessions, any OAuth authorization code not redeemed yet, and your devices' notifications (push subscriptions); this browser gets `Clear-Site-Data: "cache", "storage"`. API tokens keep working |
-| `POST /api/auth/token` | what `vr login` uses: `{email, password, name?, days?, workspace?}`, or from the browser `{code, code_verifier, redirect_uri}` ([below](#oauth-for-mcp-clients)) → `{token, info, user, several}` (`several`: the person works in more than one workspace) |
+| `POST /api/auth/token` | what `lampo login` uses: `{email, password, name?, days?, workspace?}`, or from the browser `{code, code_verifier, redirect_uri}` ([below](#oauth-for-mcp-clients)) → `{token, info, user, several}` (`several`: the person works in more than one workspace) |
 | `GET` · `PATCH /api/auth/me` | your profile and preferences (below) |
 | `PUT` · `DELETE /api/auth/me/avatar` | your picture (below) |
 | `GET /api/auth/me/export` | your data as a zip, `lampo-data-<day>.zip` (below) |
@@ -218,7 +218,7 @@ Details:
 - **Preferences** (`prefs`): `theme` (`light`, `dark`, `system`), `lang` (`en`, `de`, `auto`), `wake` (`ask`, `start`,
   `send`: what sending something to an agent that isn't running does), `voice_languages`: the ISO 639-1 codes (8
   at most) your voice notes and recorded feedback are heard in (`[]` is Automatic, any language, detected; `null`
-  goes back to the server's list), and `signin_alerts`: `true` sends an email for each sign-in from a browser or `vr`
+  goes back to the server's list), and `signin_alerts`: `true` sends an email for each sign-in from a browser or `lampo`
   the account hasn't used before.
 - **Picture.** `PUT {data}`: base64 PNG, JPEG, WebP or GIF, 8 MB and 8192 px a side at most → `{user}`. It is kept as a
   256 px square JPEG through the storage adapter (`avatars/…`). `DELETE` goes back to initials.
@@ -234,7 +234,7 @@ Details:
   for `{confirm: true}`, a sign-in in the last 10 minutes; `409` while `blockedBy` names a workspace, and on a person's
   own machine. It signs this browser out (`Clear-Site-Data`) and emails you.
 - **Tokens.** A new token is shown once and acts in one workspace: the current one for `POST /api/auth/tokens`; for
-  `POST /api/auth/token` (`vr login`), `workspace` (one the person is a member of, else `403`) or else their first.
+  `POST /api/auth/token` (`lampo login`), `workspace` (one the person is a member of, else `403`) or else their first.
   `days` (1–3650) makes it expire; `info.expires` says when. An API token can't make tokens or sign out everywhere
   (`403`). Tokens are credentials of their own: signing out everywhere and a new password set in Profile or by an admin
   end browser sessions but keep them (revoke them one by one in Settings → API tokens, or
@@ -285,7 +285,7 @@ answer about an address is the same whether or not it has an account:
 
 | Route | What it does |
 |---|---|
-| `POST /api/auth/signup` | public, with sign-up on (`VR_SIGNUP` `invite` or `open`): `{email, lang?}` with `invite`, `{name, email, password, lang?, plan?}` with `open` → `{ok: true}`, always, and no session (below) |
+| `POST /api/auth/signup` | public, with sign-up on (`LAMPO_SIGNUP` `invite` or `open`): `{email, lang?}` with `invite`, `{name, email, password, lang?, plan?}` with `open` → `{ok: true}`, always, and no session (below) |
 | `POST /api/auth/verify` | public: `{token, password?, new_password?, name?, lang?}` (`vt_…`; `lang`, the page's language, is what a new workspace's sample is written in) → `{kind: "confirmed" \| "changed", email, released, signedIn, user}` (below) |
 | `POST /api/auth/verify/resend` | the confirm link again: signed in, `{lang?}` → `{ok, to}` (your unconfirmed or new address, masked); signed out, `{email, lang?}` → `{ok: true}` (a held sign-up gets its link; with `invite`, an invited address its invite) |
 | `POST /api/auth/email/cancel` | signed in: drop the new address that waits for its link → `{user}` |
@@ -378,7 +378,7 @@ Details:
 - **Making one** needs a signed-in browser (`403` with an API token or on the machine itself) and answers `409` on a
   server without workspaces. Only whoever runs the server may ([the operator](server-mode.md#the-operators-pages);
   `403` for anyone else), unless
-  `VR_WORKSPACE_CREATE=anyone`: then each account makes at most `VR_WORKSPACE_CREATE_LIMIT` (3, the workspace its
+  `LAMPO_WORKSPACE_CREATE=anyone`: then each account makes at most `LAMPO_WORKSPACE_CREATE_LIMIT` (3, the workspace its
   sign-up gave it included; `403` past it). `create` in the list says whether you may now; `429` after 10 a day per
   account. A name is 1 to 80 characters.
 - **Switching** needs a signed-in browser too. A workspace you aren't a member of, or one that doesn't exist, is a
@@ -443,13 +443,13 @@ Details:
   cookies).
 - Errors on the token, registration and revocation endpoints follow OAuth: `{error, error_description}` with
   `invalid_grant`, `invalid_client`, `invalid_scope`, `invalid_target`, `unsupported_grant_type`, ….
-- **`vr login`** signs in here as a client of its own, `client_id=vr` (no registration, no `scope` or `resource`):
+- **`lampo login`** signs in here as a client of its own, `client_id=vr` (no registration, no `scope` or `resource`):
   `redirect_uri` is `http://127.0.0.1:<port>/` or `http://[::1]:<port>/` exactly as written (never `localhost`, a
   path, a query or another host), `state` and PKCE S256 are required, `machine` names the computer (one line, at most
   64 characters) and `days` (1–3650) how long the token works. The consent screen's request carries
-  `vr: {machine, days, token}` (`token`: the name it gets, `vr on <machine>`). The code lives 2 minutes and is redeemed
+  `vr: {machine, days, token}` (`token`: the name it gets, `lampo on <machine>`). The code lives 2 minutes and is redeemed
   only at `POST /api/auth/token` with `{code, code_verifier, redirect_uri}` for an API token in the workspace the
-  screen named, the same `vr login --email` makes; a failed try uses the code up, a repeat also revokes the token it
+  screen named, the same `lampo login --email` makes; a failed try uses the code up, a repeat also revokes the token it
   made, and more than 30 tries in 15 minutes from one address get `429`. `/oauth/token` never redeems it.
 
 ## Library and folders
@@ -518,7 +518,7 @@ Details:
 | Route | What it does |
 |---|---|
 | `GET /api/review/:slug` | one video in full: `{review, summary, approvals, media, …}`, the notes file plus what the player needs. `summary.stage` is where it stands, `approvals` the decisions so far |
-| `GET /api/reviews` | every review in full, each with its `stage` (what `vr` and MCP read against a server) |
+| `GET /api/reviews` | every review in full, each with its `stage` (what `lampo` and MCP read against a server) |
 | `GET /api/review/:slug/prompt` · `/md` | the Copy for an agent text; review.md, with paths on this disk only for the machine itself (everyone else, and every caller of a hosted server, gets `/data/…` and `/api/review/…` URLs) |
 | `POST /api/review/:slug/sync` | register a re-render now |
 | `POST /api/review/:slug/comments` | a new note (below); both screenshots are grabbed |
@@ -590,7 +590,7 @@ agents action; otherwise, and for any other value, the caller's own name is used
 ### Drafts
 
 A person can keep notes as drafts (**Save**) and send them later (**Send**). Drafts are only ever their author's, in the
-app: they are never in `review.json`, events, INBOX.md, `vr`, MCP, review links or any count. An API token (even the
+app: they are never in `review.json`, events, INBOX.md, `lampo`, MCP, review links or any count. An API token (even the
 author's own) gets `403`, and anyone else's draft is a `404`.
 
 | Route | What it does |
@@ -820,7 +820,7 @@ kept in `data/<slug>/views.json` for the signed-in account. With an API token th
 Details:
 
 - **Playback.** `?s=1` serves the scrub copy. With Bunny (a pull zone) or S3 storage (unless `presign: false`), or a
-  media host of its own (`VR_MEDIA_ORIGIN`, [below](#the-media-host)), the answer is a `302` to a signed URL that
+  media host of its own (`LAMPO_MEDIA_ORIGIN`, [below](#the-media-host)), the answer is a `302` to a signed URL that
   works for 6 hours; a review link's (`/media/g/…`) works for 5 minutes, and the player asks for a fresh one when one
   stops working and plays on from the same frame. `425` while a copy the browser can play is being made, `410` when
   the version's bytes are gone.
@@ -848,7 +848,7 @@ Details:
 
 ### The media host
 
-With `VR_MEDIA_ORIGIN` set ([server-mode.md](server-mode.md#a-host-of-its-own-for-video)), a second host name of the
+With `LAMPO_MEDIA_ORIGIN` set ([server-mode.md](server-mode.md#a-host-of-its-own-for-video)), a second host name of the
 same server answers video by signed URLs, and nothing else:
 
 | Route (on the media host only) | What it does |
@@ -987,7 +987,7 @@ Details:
 |---|---|
 | `GET /api/sessions?video=` | the agents you can assign, ranked for a video (below) |
 | `PUT /api/review/:slug/session` | assign `{name, sessionId?, cwd?, agent?}` (`agent`: the kind, as `/api/sessions` lists it), or `{}` to unassign. The name is kept as one line of printable text, 80 characters at most (`400` when nothing printable is left); the session id and folder lose line breaks and control characters |
-| `POST /api/review/:slug/request` | ask the assigned agent: `{text?, start?, part?, nudge?}` (it arrives as a `REQUEST` in `vr watch`) → `{ok, run}` |
+| `POST /api/review/:slug/request` | ask the assigned agent: `{text?, start?, part?, nudge?}` (it arrives as a `REQUEST` in `lampo watch`) → `{ok, run}` |
 | `POST /api/review/:slug/wake` | start the assigned agent without a request of its own (its question was answered): `{text?}` → `{run}` |
 | `GET /api/agent-runs?slug=` | runs Lampo started on this machine, newest first: `{runs}` (below) |
 | `POST /api/agent-runs/:id/stop` | end a run and everything it started (SIGINT, SIGTERM after 5 s, then SIGKILL after 5 s more) |
@@ -996,13 +996,13 @@ Details:
 | `POST /api/agents/heartbeat` | an agent checking in: `{session_id, name, cwd?, host?, kind?}` (below) |
 | `GET /api/agents` | the agents that checked in within the last 90 s |
 | `GET /api/agent-activity?slug=&agent=` | what agents are doing (below) |
-| `POST /api/agents/activity` | what `vr` and the stdio MCP server report to a hosted server (below); answers `{ok, lines?}`, `lines` being what the agent is told now (the person stopped its work) |
+| `POST /api/agents/activity` | what `lampo` and the stdio MCP server report to a hosted server (below); answers `{ok, lines?}`, `lines` being what the agent is told now (the person stopped its work) |
 | `GET /api/inbox?since=&limit=&all=` · `GET /api/inbox.md` | the newest feedback from people, as events or as INBOX.md |
 
 Details:
 
 - **Sessions** answers `{sessions, at, refreshing}`: running Claude Code sessions (on a person's own machine, with the
-  runs Lampo started) and connected agents (`vr watch`, MCP clients over HTTP), each with its `score` and `reason` for
+  runs Lampo started) and connected agents (`lampo watch`, MCP clients over HTTP), each with its `score` and `reason` for
   the video. `?fresh=1` reads the machine's sessions again. A role without the agents action doesn't see their folders.
 - **A request** needs `text` or `part`. `part` (like a note's) allows a partial render of the newest version: the
   request's text then ends with its PART RENDER OK line, and the event carries `part`.
@@ -1018,9 +1018,9 @@ Details:
   only when the run states it). Runs are kept in memory (running ones and the last 20), so the list is empty after a
   restart. The event `agent-runs` says when one starts, moves on (at most every 0.5 s) or ends. These routes need the
   agents action and the machine itself.
-- **A heartbeat**'s `kind` is an agent kind (the mark the app shows; `400` for an unknown one). `vr watch` sends one
+- **A heartbeat**'s `kind` is an agent kind (the mark the app shows; `400` for an unknown one). `lampo watch` sends one
   every 30 s from inside a Claude Code session, as `claude-code`; without `kind` an agent counts as `cli` (shown as
-  "vr"); a script on the HTTP API sends `api`. Names are listed as one line of printable text, the name 80 characters
+  "lampo"); a script on the HTTP API sends `api`. Names are listed as one line of printable text, the name 80 characters
   at most, and end in whose agent it is (`claude · Alex`) unless it runs on the machine itself. A heartbeat speaks
   for its own account only: a `session_id` another account's agent is listed under answers `409`, and ids starting
   with `mcp-` (the MCP server's own) `400`.
@@ -1031,12 +1031,12 @@ Details:
   `fix`, `reply`, `ask`, `upload`, `render`, `wait`, `playbook`, `status`, `tool`, `say`, `run`, `error`; `text` is the
   English line, `key` and `vars` its template (`ACTIVITY_KEYS` in `lib/activityText.ts`) for the app's language,
   `since` when a wait began, `pct` an upload's progress (older readers). `progress` is a render or upload under way
-  (`vr render`: `RunProgress` in `lib/types.ts`, `{what, stage, pct, frames?, eta_s?, tool?, v?}`); an `error` is a
+  (`lampo render`: `RunProgress` in `lib/types.ts`, `{what, stage, pct, frames?, eta_s?, tool?, v?}`); an `error` is a
   render that failed, its `quote` the tool's last words (300 characters at most, secrets taken out); `run` the run the
   agent works for, when Lampo started it for one (`LAMPO_RUN`). Kept in memory only.
 - **Reporting activity**: `{entries: [...]}`, 20 at most, each a line's fields without `slug` and with `video` naming
-  the video, only the kinds an agent's own calls make (`vr render`'s `render` and `error` among them); at most every
-  2 s. `progress` takes only the stages and tools `vr render` knows and bounded numbers, `run` only a run id's shape.
+  the video, only the kinds an agent's own calls make (`lampo render`'s `render` and `error` among them); at most every
+  2 s. `progress` takes only the stages and tools `lampo render` knows and bounded numbers, `run` only a run id's shape.
   Each line is listed as `<agent> · <account>` (unless the name already ends with the sending account), and its `at`
   is held to the last 5 minutes.
 - **Reporting activity** may name `run` (`run_…`, from `LAMPO_RUN`): a hint, taken only when that run is the same
@@ -1093,7 +1093,7 @@ Details:
   tokens?, cost_usd?}`, `error`, `needs` (`{kind, note?, text?, allow?}`: `allow` is the settings rule a permission it
   was refused needs), `request`, `follows`, `log`, `stop_pending` (stopped by a person, its agent not told yet).
 - **Stop and the agent.** A run that isn't a process Lampo runs (`delivery` other than `machine`) and had begun gets
-  `stop_pending`; the agent's next Lampo call (an MCP tool, a `vr` command about the video, a batch to
+  `stop_pending`; the agent's next Lampo call (an MCP tool, a `lampo` command about the video, a batch to
   `POST /api/agents/activity`, which then answers `lines`) ends with one line, once: `The person stopped this work on
   <file>: stop now, render nothing, mark nothing, and say you stopped.` A wait clears it without the line; a new
   Send, request or nudge to the same agent clears it too. A request (Tell it…) while a run is open joins that run: its
@@ -1101,7 +1101,7 @@ Details:
 - **Permissions.** A run this machine started that is refused a tool call (its stream-json says so) turns `needs_you`
   with `needs.kind: "permission"`, its words and `allow`; it stays so when its process ends (`ended` set).
 - **States.** A run begins at its agent's first sign (a wait that hands the notes over included). `needs_you` comes
-  with the agent's question or options and goes with the answer. `failed` with an error (`vr render`) or a non-zero
+  with the agent's question or options and goes with the answer. `failed` with an error (`lampo render`) or a non-zero
   exit. No sign for 20 minutes (5 for a run this machine started, 10 more while a render reports) reads as `lost`; any
   sign revives it; an hour later it is closed as `stopped`, without an error. It is `done` by the first of: its process
   exits 0 with no question open (else it ends `needs_you`), the agent waits again after handing back (a version, or
@@ -1112,8 +1112,8 @@ Details:
   that ended in the past 24 hours, with `planned` and `answered` counts.
 - **Events.** SSE `run` `{slug, id}` (at most once per run every 0.3 s) says which to fetch again. The event log gets
   `run` events (`phase`: `opened`, `started`, `needs_you`, `ended`; `text`: how it was opened or how it ended), which
-  `vr watch --all` prints as `AGENT RUN OPENED`, `AGENT RUN WORKING`, `AGENT RUN NEEDS YOU` and `AGENT RUN ENDED
-  <STATE>`; INBOX.md, `vr inbox`, `wait_for_feedback` and `vr watch` without `--all` leave them out.
+  `lampo watch --all` prints as `AGENT RUN OPENED`, `AGENT RUN WORKING`, `AGENT RUN NEEDS YOU` and `AGENT RUN ENDED
+  <STATE>`; INBOX.md, `lampo inbox`, `wait_for_feedback` and `lampo watch` without `--all` leave them out.
 
 ## Uploads (tus)
 
@@ -1137,7 +1137,7 @@ Details:
 **Upload tickets** are for agents without a tus client. `POST /api/uploads/tickets` with
 `{filename, folder?, slug?, part_at?, handles?}` (the upload action) answers `{url, expires}`: a one-time URL
 (`/api/uploads/direct/vrup_…`), valid for 15 minutes, that takes one `PUT` with the file as the body. On a server
-with a media host of its own (`VR_MEDIA_ORIGIN`) the URL is on that host, so a whole render never meets the request
+with a media host of its own (`LAMPO_MEDIA_ORIGIN`) the URL is on that host, so a whole render never meets the request
 limit of a proxy in front of the app ([below](#the-media-host)).
 
 - The `PUT` answers like the last tus `PATCH`, or `202 {pending: true}` for a slow render; a `GET` on the same URL
@@ -1185,7 +1185,7 @@ Details:
 
 `GET /api/events` is a stream of server-sent events. Each event names what changed, so a client fetches exactly that
 again. A stream hears only its own workspace. A person holds at most 32 streams at once (a browser holds one for all
-its tabs; `vr watch` and each agent's stdio MCP server hold one each; the machine itself isn't counted), and one more
+its tabs; `lampo watch` and each agent's stdio MCP server hold one each; the machine itself isn't counted), and one more
 answers `429` with `Retry-After`. The events:
 
 | Event | Data | Meaning |
@@ -1194,7 +1194,7 @@ answers `429` with `Retry-After`. The events:
 | `review` | `{slug}` | a review changed: notes, versions, decisions, status, a review link that covers it |
 | `sessions` | | the agents you can assign changed |
 | `events` | | the event log changed (any write, the CLI's included) |
-| `event` | a `ReviewEvent` | every new line of the event log, as `events.jsonl` has it but with screenshot URLs (`/data/…`) instead of paths on the server's disk: what remote `vr watch` and `/mcp` follow |
+| `event` | a `ReviewEvent` | every new line of the event log, as `events.jsonl` has it but with screenshot URLs (`/data/…`) instead of paths on the server's disk: what remote `lampo watch` and `/mcp` follow |
 | `poster` | `{slug}` | a poster is ready |
 | `sprite` | `{slug, v}` | a hover-scrub sprite is ready |
 | `analysis` · `diff` · `qa` | `{slug, v}` | a background result is ready |

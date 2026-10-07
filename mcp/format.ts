@@ -28,7 +28,14 @@ export const text = (t: string): Content => ({ type: 'text', text: keepLines(t) 
 export const ok = (...content: (Content | Content[])[]): CallToolResult => ({ content: content.flat() });
 export const fail = (msg: string): CallToolResult => ({ content: [text(`Error: ${msg}`)], isError: true });
 
-export const reviewUri = (slug: string): string => `vr://review/${encodeURIComponent(slug)}`;
+/** The agents' inbox (INBOX.md) and one video's review (review.md), as MCP resources. */
+export const INBOX_URI = 'lampo://inbox';
+export const reviewUri = (slug: string): string => `lampo://review/${encodeURIComponent(slug)}`;
+/** The same under the scheme they had before the command was `lampo`: still read, still told about, not listed. */
+export const OLD_INBOX_URI = 'vr://inbox';
+export const oldReviewUri = (slug: string): string => `vr://review/${encodeURIComponent(slug)}`;
+/** Every address a change is announced under (a client hears only those it subscribed to): the inbox, the video. */
+export const changedUris = (slug?: string | null): string[] => [INBOX_URI, OLD_INBOX_URI, ...(slug ? [reviewUri(slug), oldReviewUri(slug)] : [])];
 
 /**
  * The last line of an answer that hands something to the person (a render put up): wait now, with a cursor from this

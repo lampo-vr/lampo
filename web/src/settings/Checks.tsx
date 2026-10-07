@@ -41,7 +41,7 @@ export function Checks() {
       <Card title={t('Change it')}>
         <p className="set-hint">
           <T
-            k={'Text recognition: <0>VR_OCR</0> is <1>auto</1> (macOS Vision on a Mac, tesseract elsewhere), <2>vision</2>, <3>tesseract</3> or <4>off</4>.'}
+            k={'Text recognition: <0>LAMPO_OCR</0> is <1>auto</1> (macOS Vision on a Mac, tesseract elsewhere), <2>vision</2>, <3>tesseract</3> or <4>off</4>.'}
             tags={[(c) => <code>{c}</code>, (c) => <code>{c}</code>, (c) => <code>{c}</code>, (c) => <code>{c}</code>, (c) => <code>{c}</code>]}
           />
         </p>

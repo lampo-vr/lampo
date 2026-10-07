@@ -34,7 +34,7 @@ export interface Adapters {
   zernio: Adapter;
 }
 
-/** The adapters as this process is configured (VR_PUBLISH_ENDPOINTS for fakes and proxies). */
+/** The adapters as this process is configured (LAMPO_PUBLISH_ENDPOINTS for fakes and proxies). */
 export function createAdapters(o: { env?: NodeJS.ProcessEnv; net?: NetOptions; chunkBytes?: number; resumeWaits?: number[] } = {}): Adapters {
   const { endpoints, named } = endpointsFrom(o.env);
   const net: NetOptions = { named, ...o.net };

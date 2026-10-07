@@ -189,7 +189,7 @@ export function Cmd({ text, onCopied, testid }: { text: string; onCopied?: () =>
   const multi = text.includes('\n');
   const token = !multi && !/\s/.test(text);
   const [more, setMore] = useState(false);
-  const prompt = /^(claude|vr|docker|codex) /.test(text);
+  const prompt = /^(claude|lampo|vr|docker|codex) /.test(text);
   return (
     <div className={`ob-cmd ${multi ? 'ob-multi' : ''} ${more ? 'ob-more' : ''}`} data-testid={testid}>
       {multi || token ? (

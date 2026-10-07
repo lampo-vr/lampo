@@ -1,5 +1,5 @@
-// Shared by bin/vr and bin/vr-mcp. The CLI and MCP server are TypeScript that Node ≥ 22.18 runs directly (type
-// stripping). Agents often call `vr` from a shell whose default Node is older (nvm), so an old Node re-runs the same
+// Shared by bin/lampo and bin/lampo-mcp (and bin/vr, bin/vr-mcp, their older names). The CLI and MCP server are
+// TypeScript that Node ≥ 22.18 runs directly (type stripping). Agents often call `lampo` from a shell whose default Node is older (nvm), so an old Node re-runs the same
 // entry with a capable one instead of failing. Plain JavaScript on purpose: this file must load on any Node.
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -20,7 +20,8 @@ const newestFirst = (a, b) => {
 
 function candidates() {
   const list = [
-    process.env.VR_NODE,
+    // LAMPO_NODE, else the older VR_NODE: lib/env.ts reads every other setting, but this file must load on any Node.
+    process.env.LAMPO_NODE || process.env.VR_NODE,
     '/opt/homebrew/opt/node@24/bin/node',
     '/opt/homebrew/opt/node@22/bin/node',
     '/opt/homebrew/bin/node',
@@ -43,15 +44,15 @@ function capable(bin) {
 /** This Node runs the TypeScript sources directly (type stripping, on by default from 22.18). */
 export const canRunTypeScript = () => !!process.features?.typescript;
 
-/** A capable Node elsewhere on this machine (Homebrew, nvm, VR_NODE), or null. */
+/** A capable Node elsewhere on this machine (Homebrew, nvm, LAMPO_NODE), or null. */
 export const capableNode = () => candidates().find(capable) || null;
 
 /** What to tell someone whose Node is too old; `found` is a capable one on this machine, if any. */
 export function tooOld(found, command = 'npm start') {
   const hint = found
     ? `A capable one is installed: ${found}\n  e.g. PATH="${path.dirname(found)}:$PATH" ${command}\n`
-    : 'Install a current Node (e.g. `brew install node@24` or `nvm install 24`, see .nvmrc), or point VR_NODE at one.\n';
-  return `video-review needs Node.js ${MIN.join('.')} or newer (this is ${process.version}).\n${hint}`;
+    : 'Install a current Node (e.g. `brew install node@24` or `nvm install 24`, see .nvmrc), or point LAMPO_NODE at one.\n';
+  return `Lampo needs Node.js ${MIN.join('.')} or newer (this is ${process.version}).\n${hint}`;
 }
 
 /** Imports `entry` (a file URL) when this Node can run TypeScript; otherwise re-runs this command with one that can. */

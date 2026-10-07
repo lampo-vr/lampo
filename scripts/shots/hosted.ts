@@ -1,4 +1,4 @@
-// The pictures of a hosted server (VR_MODE=server) at a believable public address, https://review.northwind.example
+// The pictures of a hosted server (LAMPO_MODE=server) at a believable public address, https://review.northwind.example
 // (an https front in this process; Chrome resolves the name to it): its first start's setup screen, a fresh API token,
 // the consent screen an app's sign-in opens, and the sign-in screen. Nothing but the app's own screens and API.
 import crypto from 'node:crypto';
@@ -26,7 +26,7 @@ export async function hostedPictures(h: HostedScene): Promise<void> {
     mediaRoot: h.mediaRoot,
     port: h.port,
     // an https URL means a TLS proxy in front, which a hosted server must be told about (lib/config.ts)
-    vars: { VR_MODE: 'server', VR_PUBLIC_URL: `https://${PUBLIC_HOST}`, VR_TRUST_PROXY: 'loopback', VR_STT: 'off' },
+    vars: { LAMPO_MODE: 'server', LAMPO_PUBLIC_URL: `https://${PUBLIC_HOST}`, LAMPO_TRUST_PROXY: 'loopback', LAMPO_STT: 'off' },
   });
   const ctx = await browser.createBrowserContext();
   try {

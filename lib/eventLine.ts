@@ -1,4 +1,4 @@
-// One line per review event, as `vr watch` prints it and the MCP tool `wait_for_feedback` returns it (there without
+// One line per review event, as `lampo watch` prints it and the MCP tool `wait_for_feedback` returns it (there without
 // the file paths: shortEventLine). Agents parse these lines, so the format stays stable.
 import path from 'node:path';
 import { partLine } from './part.ts';
@@ -8,9 +8,9 @@ import type { EventType, ReviewEvent } from './types.ts';
 
 /** Human feedback an agent should act on: what wakes `wait_for_feedback` (`ref`: a reference added to a note). */
 export const FEEDBACK_TYPES: EventType[] = ['comment', 'reply', 'status', 'edit', 'assigned', 'approval', 'request', 'ref'];
-/** What INBOX.md, `vr inbox` and GET /api/inbox list: the feedback, and new videos. */
+/** What INBOX.md, `lampo inbox` and GET /api/inbox list: the feedback, and new videos. */
 export const INBOX_TYPES: EventType[] = [...FEEDBACK_TYPES, 'added'];
-/** Everything `vr watch` follows (`preview`: a newer render compared with a fix preview the reviewer verified on; `ref`:
+/** Everything `lampo watch` follows (`preview`: a newer render compared with a fix preview the reviewer verified on; `ref`:
  * an image, clip, link or moment of a render added to a note; `agent_run`: Lampo started the assigned agent on the
  * machine for a request, or that run ended). An agent's run opening, working, needing the person or ending (`run`)
  * shows with `--all` only. */
@@ -31,11 +31,11 @@ export const WATCH_TYPES: EventType[] = [
 
 /**
  * News for an agent: what a person did here. History another store's import appended (`imported`, docs/moving.md) is
- * never news, whatever its time: `wait_for_feedback`, INBOX.md, `vr://inbox` and `vr inbox` skip it, as the live
- * followers do (server/feed.ts, `vr watch`).
+ * never news, whatever its time: `wait_for_feedback`, INBOX.md, `lampo://inbox` and `lampo inbox` skip it, as the live
+ * followers do (server/feed.ts, `lampo watch`).
  */
 export const isFeedback = (e: ReviewEvent): boolean => !e.imported && !isAgent(e.by) && FEEDBACK_TYPES.includes(e.type);
-/** What the agents' inbox lists (INBOX.md, `vr://inbox`, `vr inbox`, GET /api/inbox): new feedback and new videos. */
+/** What the agents' inbox lists (INBOX.md, `lampo://inbox`, `lampo inbox`, GET /api/inbox): new feedback and new videos. */
 export const isInboxEvent = (e: ReviewEvent): boolean => !e.imported && !isAgent(e.by) && INBOX_TYPES.includes(e.type);
 
 const STATUS_LABEL: Record<string, string> = { verified: 'VERIFIED', open: 'REOPENED', wontfix: 'WONTFIX', fixed: 'FIXED' };
@@ -131,7 +131,7 @@ function line(e: ReviewEvent, paths: boolean): string {
       return e.phase === 'started'
         ? `[${t}] AGENT RUN STARTED ${e.session || '-'} ${name} v${e.v} by ${e.by} · run ${e.run}${vid}`
         : `[${t}] AGENT RUN ${(e.phase || 'finished').toUpperCase()} ${e.session || '-'} exit ${e.exit ?? '-'} ${name} · run ${e.run}${vid}`;
-    // An agent's run (lib/runs.ts), for `vr watch --all`: tokens of their own beside AGENT RUN STARTED|FINISHED.
+    // An agent's run (lib/runs.ts), for `lampo watch --all`: tokens of their own beside AGENT RUN STARTED|FINISHED.
     case 'run':
       if (e.phase === 'opened')
         return `[${t}] AGENT RUN OPENED ${e.session || '-'} ${name} v${e.v ?? '-'} by ${e.by} (${e.text || 'send'}) · run ${e.run}${vid}`;

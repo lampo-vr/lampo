@@ -164,7 +164,7 @@ export async function buildFixture(dir: string): Promise<Fixture> {
     {
       name: 'export-reels',
       description: 'Export 9:16 reels for TikTok and Instagram with the right codec, loudness and safe zones.',
-      body: '# Export reels\n\n1. Render 1080×1920, 30 fps, H.264 High, 12 Mbit/s, AAC 320.\n2. Loudness −14 LUFS integrated, true peak −1 dBTP.\n3. Check the safe zones overlay before export.\n4. Name: <campaign>_<cut>_v<NN>.mp4.\n5. Upload with vr push into Acme/Reels.',
+      body: '# Export reels\n\n1. Render 1080×1920, 30 fps, H.264 High, 12 Mbit/s, AAC 320.\n2. Loudness −14 LUFS integrated, true peak −1 dBTP.\n3. Check the safe zones overlay before export.\n4. Name: <campaign>_<cut>_v<NN>.mp4.\n5. Upload with lampo push into Acme/Reels.',
     },
     { by: REVIEWER },
   );

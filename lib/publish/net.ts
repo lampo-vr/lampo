@@ -1,15 +1,16 @@
 // Every request publishing makes leaves through here: to the platforms' fixed hosts and to the URLs they hand back (an
 // upload session, a presigned upload URL — addresses someone else chose). Each goes through lib/netguard.ts: only to
 // public internet addresses, the connection pinned to the address that was checked, https only, no redirect followed,
-// answers read up to a bound. The hosts named in VR_PUBLISH_ENDPOINTS (tests' fake platforms, a staging proxy) may be
+// answers read up to a bound. The hosts named in LAMPO_PUBLISH_ENDPOINTS (tests' fake platforms, a staging proxy) may be
 // private and plain http: the operator named them. Nothing here logs a header or a body: they carry keys and tokens.
 import fs from 'node:fs';
 import http from 'node:http';
 import https from 'node:https';
 import net from 'node:net';
+import { setting, spelledAs } from '../env.ts';
 import { hostOf, isBlockedAddress, pinnedLookup, publicAddress, type Resolver } from '../netguard.ts';
 
-/** Where the platforms are. Defaults are the real ones; VR_PUBLISH_ENDPOINTS (JSON) replaces any of them. */
+/** Where the platforms are. Defaults are the real ones; LAMPO_PUBLISH_ENDPOINTS (JSON) replaces any of them. */
 export interface Endpoints {
   /** Google's sign-in page (only the browser goes there). */
   googleAuth: string;
@@ -31,31 +32,33 @@ export const DEFAULT_ENDPOINTS: Endpoints = {
   zernio: 'https://zernio.com/api',
 };
 
-/** The endpoints as configured: VR_PUBLISH_ENDPOINTS='{"youtube":"http://127.0.0.1:9000/youtube/v3", …}'. */
+/** The endpoints as configured: LAMPO_PUBLISH_ENDPOINTS='{"youtube":"http://127.0.0.1:9000/youtube/v3", …}'. */
 export function endpointsFrom(env: NodeJS.ProcessEnv = process.env): { endpoints: Endpoints; named: Set<string> } {
-  const raw = env.VR_PUBLISH_ENDPOINTS;
+  const raw = setting('LAMPO_PUBLISH_ENDPOINTS', env);
+  // named as the operator wrote it (a start-up refusal: lib/config.ts)
+  const name = spelledAs('LAMPO_PUBLISH_ENDPOINTS', env);
   if (!raw) return { endpoints: DEFAULT_ENDPOINTS, named: new Set() };
   let given: Partial<Endpoints>;
   try {
     given = JSON.parse(raw) as Partial<Endpoints>;
   } catch {
-    throw new Error('VR_PUBLISH_ENDPOINTS is not JSON');
+    throw new Error(`${name} is not JSON`);
   }
-  if (!given || typeof given !== 'object' || Array.isArray(given)) throw new Error('VR_PUBLISH_ENDPOINTS must be a JSON object of endpoint URLs');
+  if (!given || typeof given !== 'object' || Array.isArray(given)) throw new Error(`${name} must be a JSON object of endpoint URLs`);
   const endpoints = { ...DEFAULT_ENDPOINTS };
   const named = new Set<string>();
   for (const k of Object.keys(DEFAULT_ENDPOINTS) as (keyof Endpoints)[]) {
     const v = given[k];
     if (typeof v !== 'string') continue;
     const u = URL.canParse(v) ? new URL(v) : null;
-    if (!u || (u.protocol !== 'https:' && u.protocol !== 'http:')) throw new Error(`VR_PUBLISH_ENDPOINTS: ${k} must be an http(s) URL`);
+    if (!u || (u.protocol !== 'https:' && u.protocol !== 'http:')) throw new Error(`${name}: ${k} must be an http(s) URL`);
     endpoints[k] = v.replace(/\/+$/, '');
     named.add(u.host);
   }
   return { endpoints, named };
 }
 
-/** What is wrong with VR_PUBLISH_ENDPOINTS, as start-up refusals (lib/config.ts startupProblems): one line each. */
+/** What is wrong with LAMPO_PUBLISH_ENDPOINTS, as start-up refusals (lib/config.ts startupProblems): one line each. */
 export function endpointsProblems(env: NodeJS.ProcessEnv = process.env): string[] {
   try {
     endpointsFrom(env);
@@ -77,7 +80,7 @@ export class NetError extends Error {
 }
 
 export interface NetOptions {
-  /** Hosts (host:port) that may be private and plain http: the ones VR_PUBLISH_ENDPOINTS names. */
+  /** Hosts (host:port) that may be private and plain http: the ones LAMPO_PUBLISH_ENDPOINTS names. */
   named?: Set<string>;
   /** Tests: the resolver and what counts as private. */
   resolve?: Resolver;

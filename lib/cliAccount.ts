@@ -1,4 +1,4 @@
-// `vr login | logout | whoami` (which store this vr talks to) and `vr admin …` (accounts, run on the server itself).
+// `lampo login | logout | whoami` (which store this lampo talks to) and `lampo admin …` (accounts, run on the server itself).
 import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
@@ -7,6 +7,7 @@ import { type Credentials, clearCredentials, readCredentials, saveCredentials } 
 import { createApi } from './backend/remote.ts';
 import { BROWSER_WAIT_MS, browserCommand, browserLogin, LoginEnded, launchBrowser } from './browserLogin.ts';
 import { loadConfig } from './config.ts';
+import { settings } from './env.ts';
 import { FoldersUnreadableError } from './folderIds.ts';
 import { repairFolders } from './folders.ts';
 import { mailProblems } from './mail/config.ts';
@@ -21,7 +22,7 @@ import * as workspaces from './workspaces.ts';
 
 type Opts = Record<string, string | true | string[] | undefined>;
 const str = (v: Opts[string]): string | undefined => (typeof v === 'string' ? v : undefined);
-// Read line by line like `vr`'s own output: only `\n` ends a line (lib/time.ts keepLines).
+// Read line by line like `lampo`'s own output: only `\n` ends a line (lib/time.ts keepLines).
 const out = (s: string): void => {
   process.stdout.write(`${keepLines(s)}\n`);
 };
@@ -35,9 +36,9 @@ async function nextPipedLine(): Promise<string> {
   return next.done ? '' : next.value;
 }
 
-/** A password from VR_PASSWORD, a hidden prompt on a terminal, or the next line of stdin (scripts). */
+/** A password from LAMPO_PASSWORD, a hidden prompt on a terminal, or the next line of stdin (scripts). */
 export async function readSecret(prompt: string): Promise<string> {
-  if (process.env.VR_PASSWORD) return process.env.VR_PASSWORD;
+  if (settings.LAMPO_PASSWORD) return settings.LAMPO_PASSWORD;
   if (!process.stdin.isTTY) return nextPipedLine();
   return hiddenPrompt(prompt);
 }
@@ -98,7 +99,7 @@ interface Me {
   workspaces?: { id: string }[];
 }
 
-/** `--expires 90d` (or `90`): how many days the token `vr login` asks for works; without it, until revoked. */
+/** `--expires 90d` (or `90`): how many days the token `lampo login` asks for works; without it, until revoked. */
 export function tokenDays(raw: string | undefined): number | null {
   if (!raw) return null;
   const m = /^(\d{1,4})d?$/.exec(raw.trim());
@@ -108,31 +109,33 @@ export function tokenDays(raw: string | undefined): number | null {
 }
 
 /**
- * The API token `vr login` signs in with: `--token -` reads it from stdin (a hidden prompt on a terminal), since a
+ * The API token `lampo login` signs in with: `--token -` reads it from stdin (a hidden prompt on a terminal), since a
  * process's arguments are readable by other users of the machine while it runs (ps) and stay in the shell's history.
  */
 async function givenToken(opt: Opts): Promise<string | undefined> {
   const flag = str(opt.token);
   if (flag === '-') {
     const token = (process.stdin.isTTY ? await hiddenPrompt('API token: ') : await nextPipedLine()).trim();
-    if (!token) throw new Error('no token on stdin: paste it at the prompt, or pipe it in (… | vr login <url> --token -)');
+    if (!token) throw new Error('no token on stdin: paste it at the prompt, or pipe it in (… | lampo login <url> --token -)');
     return token;
   }
   if (flag) {
-    process.stderr.write('vr: warning: a token on the command line shows in the process list and your shell history; use --token - to paste or pipe it in\n');
+    process.stderr.write(
+      'lampo: warning: a token on the command line shows in the process list and your shell history; use --token - to paste or pipe it in\n',
+    );
     return flag;
   }
-  return process.env.VR_TOKEN && !str(opt.email) ? process.env.VR_TOKEN : undefined;
+  return settings.LAMPO_TOKEN && !str(opt.email) ? settings.LAMPO_TOKEN : undefined;
 }
 
 /**
- * `vr login <url>`: in the browser by default (lib/browserLogin.ts: the person allows it there, vr gets an API token
+ * `lampo login <url>`: in the browser by default (lib/browserLogin.ts: the person allows it there, lampo gets an API token
  * named after this machine); `--email` signs in with the password instead and `--token -` takes a token, for where no
  * browser can reach (CI, containers, scripts).
  */
 export async function login({ pos, opt }: { pos: string[]; opt: Opts }): Promise<void> {
   const raw = pos[0];
-  if (!raw) throw new Error('say which server: vr login https://review.example.com [--email you@example.com | --token -]');
+  if (!raw) throw new Error('say which server: lampo login https://review.example.com [--email you@example.com | --token -]');
   const server = serverUrl(raw);
   // Plain http to another machine sends the password (or the token) and then every note unencrypted: only when asked.
   if (plainHttpElsewhere(server)) {
@@ -140,7 +143,7 @@ export async function login({ pos, opt }: { pos: string[]; opt: Opts }): Promise
       throw new Error(
         `${server} is plain http: your password or token, and every note after it, would cross the network unencrypted. Use https, or add --insecure if this network is yours alone`,
       );
-    process.stderr.write('vr: warning: plain http to another machine (--insecure): the token and every note travel unencrypted\n');
+    process.stderr.write('lampo: warning: plain http to another machine (--insecure): the token and every note travel unencrypted\n');
   }
   let creds: Credentials;
   const days = tokenDays(str(opt.expires));
@@ -187,7 +190,7 @@ export async function login({ pos, opt }: { pos: string[]; opt: Opts }): Promise
   // Who, and in which workspace whenever the server has them: a token acts in one.
   const where = me.workspace ? ` in workspace "${oneLine(me.workspace.name)}" (${me.workspace.id})` : '';
   out(`signed in to ${server} as ${oneLine(me.name)}${me.user ? ` <${me.user.email}> (${me.role})` : ''}${where}`);
-  out(`every vr command and the MCP server now use that server (credentials: ${file}; vr logout to go back to the local store)`);
+  out(`every lampo command and the MCP server now use that server (credentials: ${file}; lampo logout to go back to the local store)`);
 }
 
 /**
@@ -235,14 +238,15 @@ async function readSecretLine(): Promise<string> {
 
 export async function logout(): Promise<void> {
   const c = readCredentials();
-  if (!c) return out('not signed in to a server; vr uses the local store.');
-  if (process.env.VR_SERVER && process.env.VR_TOKEN) return out('VR_SERVER / VR_TOKEN are set in the environment; unset them to go back to the local store.');
+  if (!c) return out('not signed in to a server; lampo uses the local store.');
+  if (settings.LAMPO_SERVER && settings.LAMPO_TOKEN)
+    return out('LAMPO_SERVER / LAMPO_TOKEN are set in the environment; unset them to go back to the local store.');
   if (c.token_id)
     await createApi(c)
       .call('DELETE', `/api/auth/tokens/${encodeURIComponent(c.token_id)}`)
       .catch(() => {});
   clearCredentials();
-  out(`signed out of ${c.server}${c.token_id ? ' (token revoked)' : ''}; vr uses the local store again.`);
+  out(`signed out of ${c.server}${c.token_id ? ' (token revoked)' : ''}; lampo uses the local store again.`);
 }
 
 export async function whoami({ opt }: { opt: Opts }, author: string): Promise<void> {
@@ -256,12 +260,12 @@ export async function whoami({ opt }: { opt: Opts }, author: string): Promise<vo
   out(`server: ${c.server}\nsigned in as: ${me.name}${me.user ? ` <${me.user.email}> (${me.role})` : ''}\nwriting as: ${author}`);
 }
 
-// ---------------------------------------------------------------- vr admin (on the server's own store)
+// ---------------------------------------------------------------- lampo admin (on the server's own store)
 
 export async function admin({ pos, opt }: { pos: string[]; opt: Opts }): Promise<void> {
   const [sub] = pos;
   if (sub === 'list-users') {
-    // Every account, with its role in the workspace this command works in (VR_WORKSPACE or --workspace, else #1; '–'
+    // Every account, with its role in the workspace this command works in (LAMPO_WORKSPACE or --workspace, else #1; '–'
     // when it isn't a member there) — never the account's own `role`, workspace #1's mirror — and, on a store with
     // several workspaces, its role in each of the others.
     const ws = workspaceOpt(opt);
@@ -297,7 +301,8 @@ export async function admin({ pos, opt }: { pos: string[]; opt: Opts }): Promise
     const name = str(opt.name);
     const ws = workspaceOpt(opt);
     const role = (str(opt.role) || (ws.membersOf(ws.id).length ? 'member' : 'owner')) as auth.Role;
-    if (!email || !name) throw new Error(`vr admin create-user --email you@example.com --name "Your Name" [--role ${auth.ROLES.join('|')}] [--workspace <id>]`);
+    if (!email || !name)
+      throw new Error(`lampo admin create-user --email you@example.com --name "Your Name" [--role ${auth.ROLES.join('|')}] [--workspace <id>]`);
     if (!auth.ROLES.includes(role)) throw new Error(`--role must be one of ${auth.ROLES.join(', ')}`);
     const password = str(opt.password) || (await readSecret(`password for ${email}: `));
     // made here like in the app: a new person starts with the first run, unless the instance turned it off
@@ -308,7 +313,7 @@ export async function admin({ pos, opt }: { pos: string[]; opt: Opts }): Promise
   if (sub === 'reset-password') {
     const email = str(opt.email);
     const u = email ? auth.findUserByEmail(email) : null;
-    if (!u) throw new Error('vr admin reset-password --email you@example.com (an existing account)');
+    if (!u) throw new Error('lampo admin reset-password --email you@example.com (an existing account)');
     const password = str(opt.password) || (await readSecret(`new password for ${u.email}: `));
     await auth.updateUser(u.id, { password, disabled: false });
     afterNewPassword(u.id);
@@ -319,7 +324,7 @@ export async function admin({ pos, opt }: { pos: string[]; opt: Opts }): Promise
     if (!auth.ROLES.includes(role)) throw new Error(`--role must be one of ${auth.ROLES.join(', ')}`);
     const days = str(opt.days) ? Number(str(opt.days)) : undefined;
     const ws = workspaceOpt(opt);
-    // Who the invitee is told invites them: the name notes from here are signed with (config.json "user" / VR_USER —
+    // Who the invitee is told invites them: the name notes from here are signed with (config.json "user" / LAMPO_USER —
     // "admin" in the container), never the OS account the command runs as ("node" there).
     const { token, invite } = auth.createInvite({
       role,
@@ -334,14 +339,14 @@ export async function admin({ pos, opt }: { pos: string[]; opt: Opts }): Promise
     const url = `${base}/#/invite/${token}`;
     if (opt.json) return out(JSON.stringify({ invite, url }, null, 2));
     out(url);
-    // which team the link brings someone into, said whenever the store has more than one (VR_WORKSPACE may be set)
+    // which team the link brings someone into, said whenever the store has more than one (LAMPO_WORKSPACE may be set)
     out(
       `invites a ${invite.role}${invite.email ? ` (${invite.email})` : ''}${whereIn(ws.id, 'into')}; works once, until ${invite.expires.slice(0, 16).replace('T', ' ')}.`,
     );
     return;
   }
   if (sub === 'invites') {
-    // The workspace this command works in (VR_WORKSPACE or --workspace, else #1); --all: every workspace's, each named.
+    // The workspace this command works in (LAMPO_WORKSPACE or --workspace, else #1); --all: every workspace's, each named.
     const ws = workspaceOpt(opt);
     const all = opt.all === true;
     const list = auth.listInvites(all ? undefined : ws.id);
@@ -370,14 +375,14 @@ export async function admin({ pos, opt }: { pos: string[]; opt: Opts }): Promise
   if (sub === 'import') return importAdmin(pos[1], opt);
   if (sub === 'repair-folders') return repairFoldersAdmin(opt);
   if (sub === 'revoke-invite') {
-    if (!pos[1]) throw new Error('vr admin revoke-invite <invite id>  (ids: vr admin invites)');
+    if (!pos[1]) throw new Error('lampo admin revoke-invite <invite id>  (ids: lampo admin invites)');
     // only an invite of the workspace this command works in: another team's is --workspace <id> away, never by accident
     const ws = workspaceOpt(opt);
     if (!auth.revokeInvite(pos[1], ws.id)) throw new Error(`no pending invite ${pos[1]}${whereIn(ws.id)}`);
     return out(`revoked ${pos[1]}${whereIn(ws.id)}`);
   }
   throw new Error(
-    'vr admin create-user | reset-password | list-users | invite | invites | revoke-invite | workspaces | repair-folders | mail-test <to> | import <bundle.tar> | delete-account <email|id> | delete-workspace <id> | export-account <email|id> | erasures  (run on the server, with its data directory)',
+    'lampo admin create-user | reset-password | list-users | invite | invites | revoke-invite | workspaces | repair-folders | mail-test <to> | import <bundle.tar> | delete-account <email|id> | delete-workspace <id> | export-account <email|id> | erasures  (run on the server, with its data directory)',
   );
 }
 
@@ -386,7 +391,7 @@ export async function admin({ pos, opt }: { pos: string[]; opt: Opts }): Promise
 /** An account by its address or its id (`u_…`). */
 function accountArg(raw: string | undefined, usage: string): auth.User {
   const u = raw ? (auth.getUser(raw) ?? auth.findUserByEmail(raw)) : null;
-  if (!u) throw new Error(`${usage}  (an existing account: its address or id; vr admin list-users)`);
+  if (!u) throw new Error(`${usage}  (an existing account: its address or id; lampo admin list-users)`);
   return u;
 }
 
@@ -408,24 +413,24 @@ async function mailNow() {
     from: senderOf(cfg.mail, host),
     host,
     secret: auth.secret,
-    log: (line) => process.stderr.write(`vr admin: ${line}\n`),
+    log: (line) => process.stderr.write(`lampo admin: ${line}\n`),
   });
   return { mail: createAccountMail(cfg, mailer), flush: () => mailer.flush() };
 }
 
 /**
- * The billing module the server runs (VR_CLOUD_MODULE), loaded for one deletion: it hears it and stops billing the
+ * The billing module the server runs (LAMPO_CLOUD_MODULE), loaded for one deletion: it hears it and stops billing the
  * workspace, as it would in the server. None configured: nothing to tell.
  */
 async function moduleFor(): Promise<{ idle(): Promise<void>; stop(): void } | null> {
-  if (!process.env.VR_CLOUD_MODULE?.trim()) return null;
+  if (!settings.LAMPO_CLOUD_MODULE?.trim()) return null;
   const { hostContext, loadExtension } = await import('../server/extension.ts');
   const cfg = loadConfig();
   const host = hostContext({
     publicUrl: cfg.public_url ?? 'http://localhost',
     who: () => null,
     sameOrigin: () => false,
-    log: (event, fields) => process.stderr.write(`vr admin: ${event} ${JSON.stringify(fields ?? {})}\n`),
+    log: (event, fields) => process.stderr.write(`lampo admin: ${event} ${JSON.stringify(fields ?? {})}\n`),
   });
   return loadExtension(host);
 }
@@ -434,13 +439,13 @@ const sizeOf = (bytes: number) =>
   bytes >= 1e12 ? `${(bytes / 1e12).toFixed(1)} TB` : bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${Math.round(bytes / 1e6)} MB`;
 
 /**
- * `vr admin delete-workspace <id> [--yes] [--json]`: what deleting a workspace takes with it, and with --yes, deleted
+ * `lampo admin delete-workspace <id> [--yes] [--json]`: what deleting a workspace takes with it, and with --yes, deleted
  * (lib/deletion.ts: its files and storage objects, links, invites, tokens, apps, the accounts it leaves in no
  * workspace; the billing module stops billing it; its people are emailed). Never workspace #1.
  */
 async function deleteWorkspaceAdmin(id: string | undefined, opt: Opts): Promise<void> {
-  const usage = 'vr admin delete-workspace <workspace id> [--yes]';
-  if (!id || !workspaces.getWorkspace(id)) throw new Error(`${usage}  (ids: vr admin workspaces)`);
+  const usage = 'lampo admin delete-workspace <workspace id> [--yes]';
+  if (!id || !workspaces.getWorkspace(id)) throw new Error(`${usage}  (ids: lampo admin workspaces)`);
   const { deleteWorkspace, planWorkspaceDeletion } = await import('./deletion.ts');
   const plan = planWorkspaceDeletion(id);
   if (opt.json && opt.yes !== true) return out(JSON.stringify(plan, null, 2));
@@ -463,11 +468,11 @@ async function deleteWorkspaceAdmin(id: string | undefined, opt: Opts): Promise<
 }
 
 /**
- * `vr admin delete-account <email|id> [--yes] [--json]`: what deleting an account means (the workspaces that go with it,
+ * `lampo admin delete-account <email|id> [--yes] [--json]`: what deleting an account means (the workspaces that go with it,
  * those it leaves, those it must hand over first) and with --yes, deleted with everything it kept (lib/erasure.ts).
  */
 async function deleteAccountAdmin(raw: string | undefined, opt: Opts): Promise<void> {
-  const u = accountArg(raw, 'vr admin delete-account <email|id> [--yes]');
+  const u = accountArg(raw, 'lampo admin delete-account <email|id> [--yes]');
   const { deleteAccount, planAccountDeletion } = await import('./deletion.ts');
   const plan = planAccountDeletion(u.id);
   if (opt.json && opt.yes !== true) return out(JSON.stringify(plan, null, 2));
@@ -478,7 +483,7 @@ async function deleteAccountAdmin(raw: string | undefined, opt: Opts): Promise<v
   if (plan.refused) throw new Error(plan.refused);
   if (plan.blockedBy.length)
     throw new Error(
-      `it is the last owner of ${names(plan.blockedBy)}, where others work: make someone else an owner there, or delete the workspace first (vr admin delete-workspace)`,
+      `it is the last owner of ${names(plan.blockedBy)}, where others work: make someone else an owner there, or delete the workspace first (lampo admin delete-workspace)`,
     );
   if (opt.yes !== true) return out('nothing deleted (a dry run): run it again with --yes to delete it');
   const ext = plan.goWith.length ? await moduleFor() : null;
@@ -492,11 +497,11 @@ async function deleteAccountAdmin(raw: string | undefined, opt: Opts): Promise<v
   out(`deleted ${u.id}${plan.goWith.length ? ` and ${plan.goWith.length} workspace${plan.goWith.length === 1 ? '' : 's'}` : ''}`);
 }
 
-/** `vr admin export-account <email|id> --out <file.zip>`: the account's own data as one zip (lib/accountExport.ts). */
+/** `lampo admin export-account <email|id> --out <file.zip>`: the account's own data as one zip (lib/accountExport.ts). */
 async function exportAccountAdmin(raw: string | undefined, opt: Opts): Promise<void> {
-  const u = accountArg(raw, 'vr admin export-account <email|id> --out data.zip');
+  const u = accountArg(raw, 'lampo admin export-account <email|id> --out data.zip');
   const to = str(opt.out);
-  if (!to) throw new Error('vr admin export-account <email|id> --out data.zip  (where to write the zip)');
+  if (!to) throw new Error('lampo admin export-account <email|id> --out data.zip  (where to write the zip)');
   const { accountExport, exportZip } = await import('./accountExport.ts');
   const files = await accountExport(u.id);
   const plan = exportZip(files);
@@ -512,7 +517,7 @@ async function exportAccountAdmin(raw: string | undefined, opt: Opts): Promise<v
 }
 
 /**
- * `vr admin erasures [--apply] [--json]`: the deletions written down (data/erasures.jsonl). After restoring a backup
+ * `lampo admin erasures [--apply] [--json]`: the deletions written down (data/erasures.jsonl). After restoring a backup
  * taken before some of them: what is back that was deleted, and with --apply, deleted again.
  */
 async function erasuresAdmin(opt: Opts): Promise<void> {
@@ -528,7 +533,7 @@ async function erasuresAdmin(opt: Opts): Promise<void> {
 }
 
 /**
- * `vr admin repair-folders [--write] [--take-back <link id,…>] [--workspace <id>] [--json]`: a workspace's folders.json
+ * `lampo admin repair-folders [--write] [--take-back <link id,…>] [--workspace <id>] [--json]`: a workspace's folders.json
  * that can't be parsed any more, rebuilt from what it still says, the videos' folders and the review links' ids
  * (lib/folders.ts repairFolders). A dry run unless --write; the damaged file is kept beside the new one. Each link whose
  * id the damage took is named with what became of it; one nothing in the store vouches for is a person's call.
@@ -575,12 +580,12 @@ async function repairFoldersAdmin(opt: Opts): Promise<void> {
 }
 
 /**
- * `vr admin import <bundle.tar> --workspace <id> --owner <email> [--dry-run] [--people "Name=email,…"] [--no-derive]
- * [--json]`: a bundle from `vr export` into a workspace of this store (lib/bundleImport.ts, docs/moving.md). Says what
+ * `lampo admin import <bundle.tar> --workspace <id> --owner <email> [--dry-run] [--people "Name=email,…"] [--no-derive]
+ * [--json]`: a bundle from `lampo export` into a workspace of this store (lib/bundleImport.ts, docs/moving.md). Says what
  * happens to every video, folder, playbook and name; `--dry-run` says it and writes nothing.
  */
 async function importAdmin(file: string | undefined, opt: Opts): Promise<void> {
-  const usage = 'vr admin import <bundle.tar> --workspace <id> --owner you@example.com [--dry-run] [--people "Name=email,…"]';
+  const usage = 'lampo admin import <bundle.tar> --workspace <id> --owner you@example.com [--dry-run] [--people "Name=email,…"] [--no-derive]';
   const workspace = str(opt.workspace);
   const owner = str(opt.owner);
   if (!file || !workspace || !owner) throw new Error(usage);
@@ -594,7 +599,7 @@ async function importAdmin(file: string | undefined, opt: Opts): Promise<void> {
     people: str(opt.people),
     dryRun: opt.dry_run === true,
     derive: opt.no_derive !== true,
-    log: (line) => process.stderr.write(`vr admin import: ${oneLine(line)}\n`),
+    log: (line) => process.stderr.write(`lampo admin import: ${oneLine(line)}\n`),
   });
   if (opt.json) return out(JSON.stringify(r, null, 2));
   // Every string the report prints came from the bundle or was made from it: one line each, no control character.
@@ -635,16 +640,16 @@ async function importAdmin(file: string | undefined, opt: Opts): Promise<void> {
 const whereIn = (id: string, word = 'in'): string =>
   workspaces.listWorkspaces().length > 1 ? ` ${word} workspace ${id} (${oneLine(workspaces.getWorkspace(id)?.name ?? '')})` : '';
 
-/** `--workspace <id>`, else the one this process works in (VR_WORKSPACE, else #1), checked against the store's. */
+/** `--workspace <id>`, else the one this process works in (LAMPO_WORKSPACE, else #1), checked against the store's. */
 function workspaceOpt(opt: Opts) {
   const id = str(opt.workspace) || currentWorkspace();
   const w = workspaces;
-  if (!w.getWorkspace(id)) throw new Error(`no workspace ${id} (vr admin workspaces lists them)`);
+  if (!w.getWorkspace(id)) throw new Error(`no workspace ${id} (lampo admin workspaces lists them)`);
   return { ...w, id };
 }
 
 /**
- * `vr admin workspaces [list]` — every workspace with its members; `create --name "Acme" --owner you@example.com` — a new
+ * `lampo admin workspaces [list]` — every workspace with its members; `create --name "Acme" --owner you@example.com` — a new
  * one, its owner an existing account (migrates the store first, with a backup); `migrate` — just that, once.
  */
 async function workspacesAdmin(pos: string[], opt: Opts): Promise<void> {
@@ -653,14 +658,14 @@ async function workspacesAdmin(pos: string[], opt: Opts): Promise<void> {
     const list = workspaces.listWorkspaces().map((w) => ({ ...workspaces.workspaceInfo(w), members: w.members.length }));
     if (opt.json) return out(JSON.stringify({ migrated: workspaces.isMigrated(), workspaces: list }, null, 2));
     for (const w of list) out(`${w.id.padEnd(15)} ${String(w.members).padStart(3)} member${w.members === 1 ? ' ' : 's'}  ${w.name}`);
-    if (!workspaces.isMigrated()) out('(one workspace: this store has not moved to workspaces yet — `vr admin workspaces migrate`)');
+    if (!workspaces.isMigrated()) out('(one workspace: this store has not moved to workspaces yet — `lampo admin workspaces migrate`)');
     return;
   }
   if (sub === 'create') {
     const name = str(opt.name);
     const email = str(opt.owner);
     const owner = email ? auth.findUserByEmail(email) : null;
-    if (!name || !owner) throw new Error('vr admin workspaces create --name "Acme" --owner you@example.com  (an existing account)');
+    if (!name || !owner) throw new Error('lampo admin workspaces create --name "Acme" --owner you@example.com  (an existing account)');
     const w = workspaces.createWorkspace({ name, ownerId: owner.id });
     if (opt.json) return out(JSON.stringify(w, null, 2));
     return out(`created workspace ${w.id} "${w.name}", owned by ${owner.email}`);
@@ -670,16 +675,16 @@ async function workspacesAdmin(pos: string[], opt: Opts): Promise<void> {
     if (opt.json) return out(JSON.stringify(r, null, 2));
     return out(r.migrated ? `moved to workspaces: everything is workspace w1 (backup: ${r.backup})` : 'already on workspaces: nothing to do.');
   }
-  throw new Error('vr admin workspaces [list] | create --name "Acme" --owner you@example.com | migrate');
+  throw new Error('lampo admin workspaces [list] | create --name "Acme" --owner you@example.com | migrate');
 }
 
 /**
- * `vr admin mail-test <to> [--lang de]`: one message through the server's own mail settings, sent now (not queued),
+ * `lampo admin mail-test <to> [--lang de]`: one message through the server's own mail settings, sent now (not queued),
  * so a wrong password or a blocked port shows here instead of in a log later. The log transport writes it to the
  * outbox and says where.
  */
 async function mailTest(to: string | undefined, opt: Opts): Promise<void> {
-  if (!to) throw new Error('vr admin mail-test you@example.com [--lang de]');
+  if (!to) throw new Error('lampo admin mail-test you@example.com [--lang de]');
   const address = checkAddress(to);
   const cfg = loadConfig();
   const problems = mailProblems({ ...cfg, signup: 'off' });
@@ -690,7 +695,7 @@ async function mailTest(to: string | undefined, opt: Opts): Promise<void> {
     mailLang(str(opt.lang)),
   );
   if (sent.transport === 'log') {
-    out(`no VR_SMTP_URL: the test was written to ${sent.where} (open the .eml or .html there), not sent.`);
-    out('set VR_SMTP_URL and VR_MAIL_FROM to send for real (docs/email.md).');
+    out(`no LAMPO_SMTP_URL: the test was written to ${sent.where} (open the .eml or .html there), not sent.`);
+    out('set LAMPO_SMTP_URL and LAMPO_MAIL_FROM to send for real (docs/email.md).');
   } else out(`sent a test to ${address} through ${sent.where}, from ${sent.from}. Check the inbox (and the spam folder).`);
 }

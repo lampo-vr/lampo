@@ -6,6 +6,7 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { settings } from '../../lib/env.ts';
 import { MODELS_DIR } from './common.ts';
 import { MODELS, type ModelSpec } from './models.ts';
 
@@ -61,8 +62,8 @@ export async function loadEmbedder(key: string, dtype: Dtype, threads: number, {
   const spec = specOf(key);
   if (!spec.vision[dtype]) throw new Error(`${key} has no ${dtype} vision model in this bench`);
   const T = await transformers();
-  // VR_ORT_SPIN=0: worker threads sleep instead of spin-waiting between ops — less CPU burnt on a shared server
-  const spin = process.env.VR_ORT_SPIN === '0' ? { extra: { session: { intra_op: { allow_spinning: '0' }, inter_op: { allow_spinning: '0' } } } } : {};
+  // LAMPO_ORT_SPIN=0: worker threads sleep instead of spin-waiting between ops — less CPU burnt on a shared server
+  const spin = settings.LAMPO_ORT_SPIN === '0' ? { extra: { session: { intra_op: { allow_spinning: '0' }, inter_op: { allow_spinning: '0' } } } } : {};
   const session_options = { intraOpNumThreads: threads, interOpNumThreads: 1, graphOptimizationLevel: 'all', ...spin };
   const pre = JSON.parse(fs.readFileSync(path.join(MODELS_DIR, spec.repo, 'preprocessor_config.json'), 'utf8')) as {
     do_normalize?: boolean;

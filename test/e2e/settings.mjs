@@ -159,7 +159,10 @@ try {
         `tiles ${JSON.stringify(tiles)}`,
       );
       assert((await snippetOf(page)) === `claude mcp add --transport http lampo ${BASE}/mcp --header "Authorization: Bearer ${token}"`, await snippetOf(page));
-      assert((await page.$eval('[data-testid="token-login"] pre', (e) => e.textContent)) === `vr login ${BASE} --token -`, 'vr takes the token at its prompt');
+      assert(
+        (await page.$eval('[data-testid="token-login"] pre', (e) => e.textContent)) === `lampo login ${BASE} --token -`,
+        'lampo takes the token at its prompt',
+      );
       // One Copy per block.
       for (const id of ['token-value', 'token-snippet', 'token-login'])
         assert((await page.$$(`[data-testid="${id}"] .set-copy`)).length === 1, `${id}: one Copy`);
@@ -340,7 +343,7 @@ try {
     const details = await text('[data-testid="speech-details"]');
     assert(details.includes('An OpenAI-compatible endpoint'), details);
     const change = await page.$$eval('[data-testid="speech-details"] .set-code pre', (p) => p.map((e) => e.textContent).join('\n'));
-    assert(change.includes('"stt"') && change.includes('VR_STT_LANGUAGES'), change);
+    assert(change.includes('"stt"') && change.includes('LAMPO_STT_LANGUAGES'), change);
     await shot('02b-voice-details');
   });
 
@@ -377,8 +380,8 @@ try {
     await page.evaluate(() =>
       [...document.querySelectorAll('[data-testid="agent-snippet"] button')].find((b) => b.textContent.startsWith('Or let it')).click(),
     );
-    await until(() => document.querySelector('[data-testid="agent-snippet"] pre')?.textContent.includes('bin/vr-mcp'), 'the stdio command');
-    assert((await snippet()) === `claude mcp add lampo -- ${info.root}/bin/vr-mcp`, `stdio ${await snippet()}`);
+    await until(() => document.querySelector('[data-testid="agent-snippet"] pre')?.textContent.includes('bin/lampo-mcp'), 'the stdio command');
+    assert((await snippet()) === `claude mcp add lampo -- ${info.root}/bin/lampo-mcp`, `stdio ${await snippet()}`);
     assert((await state()).includes('doesn’t show up here'), await state());
     await page.evaluate(() =>
       [...document.querySelectorAll('[data-testid="agent-snippet"] button')].find((b) => b.textContent.startsWith('Connect through')).click(),
@@ -395,7 +398,7 @@ try {
       body: JSON.stringify({ session_id: 'e2e-codex', name: 'codex-mcp-client', kind: 'codex' }),
     });
     assert(beat.ok, `heartbeat ${beat.status}`);
-    await until(() => document.querySelector('[data-testid="agent-state"]')?.textContent.includes('Connected: codex-mcp-client'), 'Connected: the Codex');
+    await until(() => document.querySelector('[data-testid="agent-state"]')?.textContent.includes('Connected: Codex'), 'Connected: the Codex, by its name');
     // what it does now, in the sidebar's words: it follows the notes (vr watch), so it waits for them
     assert((await state()).includes('waiting for your notes'), await state());
     assert(!(await page.$('[data-testid="agent-shortcut"]')), 'the shortcut is Claude Code’s only');
@@ -414,7 +417,7 @@ try {
         .querySelector('input')
         .click(),
     );
-    await until(() => document.querySelector('[data-testid="agent-snippet"] pre')?.textContent.includes('bin/vr-mcp'), 'the Claude desktop config');
+    await until(() => document.querySelector('[data-testid="agent-snippet"] pre')?.textContent.includes('bin/lampo-mcp'), 'the Claude desktop config');
     assert(!(await page.$('[data-testid="agent-allow"]')), 'no domain to allow on the machine');
     assert(info.media_origin === undefined, `the machine names no media host: ${info.media_origin}`);
     // Any other client: its format, one tab each.

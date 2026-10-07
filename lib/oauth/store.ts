@@ -1,7 +1,7 @@
 // OAuth state of a hosted server, for apps that connect to its MCP endpoint (MCP authorization 2026-07-28):
 //   pending authorization requests  memory, 10 min  what the consent screen shows; one decision each
 //   authorization codes             memory, 60 s    one-time, PKCE-bound; reuse revokes what the code produced
-//     (`vr login`'s: 2 min, redeemed for an API token at POST /api/auth/token — redeemVrCode)
+//     (`lampo login`'s: 2 min, redeemed for an API token at POST /api/auth/token — redeemVrCode)
 //   grants ("connected apps")       data/oauth/grants.json (0600)
 //     one per consent: user, client, scopes, the resource the tokens are bound to, the current refresh token and the
 //     live access tokens (all stored as sha256). Refresh tokens rotate on every use; presenting an old one again means
@@ -26,7 +26,7 @@ export const ACCESS_TTL_S = 3600;
 const REFRESH_TTL_MS = 60 * 86400_000;
 const CODE_TTL_MS = 60_000;
 /**
- * How long a code for `vr login` works (tests shorten it): its loopback listener redeems it at once, but over SSH the
+ * How long a code for `lampo login` works (tests shorten it): its loopback listener redeems it at once, but over SSH the
  * person pastes the address a browser on another computer ended on, which takes a moment.
  */
 export const VR_CODE = { ttlMs: 120_000 };
@@ -55,7 +55,7 @@ export interface AuthRequest {
   scopes: Scope[];
   resource: string;
   expires: number;
-  /** `vr login` (lib/oauth/clients.ts VR_CLIENT): the computer, as it names itself, and the days its token works. */
+  /** `lampo login` (lib/oauth/clients.ts VR_CLIENT): the computer, as it names itself, and the days its token works. */
   vr?: VrAsk;
 }
 
@@ -126,9 +126,9 @@ interface Code {
    * moves it on, and a code from before is worth nothing after — it would become a fresh grant the change never saw.
    */
   epoch: number;
-  /** A code for `vr login`: redeemed for an API token (redeemVrCode), never for a grant. */
+  /** A code for `lampo login`: redeemed for an API token (redeemVrCode), never for a grant. */
   vr?: VrAsk;
-  /** The API token a `vr login` code made, once redeemed: a second try revokes it. */
+  /** The API token a `lampo login` code made, once redeemed: a second try revokes it. */
   token?: string;
 }
 
@@ -199,7 +199,7 @@ export function redeemCode(o: {
   const key = sha256(o.code || '');
   const c = codes.get(key);
   if (!c || c.expires <= Date.now()) throw new GrantError('invalid_grant', 'the authorization code is unknown or has expired');
-  // `vr login`'s code makes an API token at POST /api/auth/token, never an app's grant here; shown, it is used up.
+  // `lampo login`'s code makes an API token at POST /api/auth/token, never an app's grant here; shown, it is used up.
   if (c.vr) {
     codes.delete(key);
     throw new GrantError('invalid_grant', 'the authorization code is unknown or has expired');
@@ -247,14 +247,14 @@ export function redeemCode(o: {
   return { access_token: access, token_type: 'Bearer', expires_in: ACCESS_TTL_S, refresh_token: refresh, scope: c.scopes.join(' ') };
 }
 
-/** What a `vr login` code was allowed for: the account, the workspace the consent screen named, the computer. */
+/** What a `lampo login` code was allowed for: the account, the workspace the consent screen named, the computer. */
 export interface VrCodeUse extends VrAsk {
   user: User;
   workspace: string;
 }
 
 /**
- * `vr login`'s code for its API token (POST /api/auth/token): one redemption, the same redirect URI, PKCE verified, the
+ * `lampo login`'s code for its API token (POST /api/auth/token): one redemption, the same redirect URI, PKCE verified, the
  * account as it was when the person allowed it. `mint` makes the token once all of that holds (it may still refuse:
  * the code is used up then too). A second try with the same code means someone else saw the answer: the token the first
  * one made is revoked as well (RFC 6749 §4.1.2), and so it ends for whoever holds it.
@@ -265,11 +265,11 @@ export function redeemVrCode<T extends { info: { id: string } }>(
 ): T {
   const key = sha256(o.code || '');
   const c = codes.get(key);
-  if (!c?.vr || c.expires <= Date.now()) throw new GrantError('invalid_grant', 'the sign-in code is unknown or has expired: run vr login again');
+  if (!c?.vr || c.expires <= Date.now()) throw new GrantError('invalid_grant', 'the sign-in code is unknown or has expired: run lampo login again');
   if (c.token) {
     codes.delete(key);
     revokeApiToken(c.token, c.user);
-    throw new GrantError('invalid_grant', 'the sign-in code was already used, so the token it made is revoked too: run vr login again');
+    throw new GrantError('invalid_grant', 'the sign-in code was already used, so the token it made is revoked too: run lampo login again');
   }
   const refuse = (message: string) => {
     codes.delete(key);
@@ -279,7 +279,7 @@ export function redeemVrCode<T extends { info: { id: string } }>(
   if (!pkceOk(o.code_verifier, c.code_challenge)) throw refuse('PKCE verification failed');
   const user = getUser(c.user);
   if (!user || user.disabled) throw refuse('the account is not active');
-  if (user.epoch !== c.epoch) throw refuse('the account’s password or sessions changed since you allowed it: run vr login again');
+  if (user.epoch !== c.epoch) throw refuse('the account’s password or sessions changed since you allowed it: run lampo login again');
   let made: T;
   try {
     made = mint({ user, workspace: c.workspace, machine: c.vr.machine, days: c.vr.days });

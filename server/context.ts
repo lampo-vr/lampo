@@ -42,7 +42,7 @@ import type { Watchers } from './watch.ts';
 export interface ServerContext {
   cfg: Config;
   /**
-   * A hosted server (`VR_MODE=server`): no access to anyone's machine — its files, its Claude Code sessions, its
+   * A hosted server (`LAMPO_MODE=server`): no access to anyone's machine — its files, its Claude Code sessions, its
    * speech hardware. Otherwise the app runs on the person's own machine: the same app (accounts, uploads, links …)
    * plus what the machine offers (see `capabilities`), and the machine's owner is signed in there automatically.
    */
@@ -222,7 +222,7 @@ export function createContext({ cfg, lan = false, dev = false, token, loadSessio
   try {
     env = envHook();
   } catch (e) {
-    console.error(`VR_WEBHOOK_URL ignored: ${(e as Error).message}`);
+    console.error(`LAMPO_WEBHOOK_URL ignored: ${(e as Error).message}`);
   }
   const ctx: ServerContext = {
     cfg,
@@ -266,10 +266,11 @@ export function createContext({ cfg, lan = false, dev = false, token, loadSessio
       minFree: cfg.min_free_bytes ?? 2e9,
       stopping: () => ctx.stopping,
       // AGPL-3.0 §13: people who use a hosted instance over the network must be offered its source.
-      warnings: server && !cfg.source_url ? ['no source_url / VR_SOURCE_URL: set it to where people can get the source of this instance (AGPL-3.0 §13)'] : [],
+      warnings:
+        server && !cfg.source_url ? ['no source_url / LAMPO_SOURCE_URL: set it to where people can get the source of this instance (AGPL-3.0 §13)'] : [],
       publicUrl: server ? !!cfg.public_url : undefined,
     }),
-    // With a media host of its own (VR_MEDIA_ORIGIN) one-time upload URLs point there: a whole render in one request
+    // With a media host of its own (LAMPO_MEDIA_ORIGIN) one-time upload URLs point there: a whole render in one request
     // never meets the request-size limit of a proxy in front of the app host.
     uploadTickets: createUploadTickets({ origin: server ? cfg.media_origin : null }),
     frameGrabs: new RateLimit(GRAB_LIMITS.perAccount, GRAB_LIMITS.windowMs),
@@ -299,7 +300,7 @@ export const mailHost = (cfg: Config): string => (cfg.public_url ? new URL(cfg.p
 // Apple wants a real contact (mailto: or https:); push_subject says who runs this instance.
 function pushSubject(cfg: Config): string {
   if (cfg.push_subject) return cfg.push_subject;
-  return cfg.public_url?.startsWith('https:') ? cfg.public_url : 'mailto:video-review@localhost';
+  return cfg.public_url?.startsWith('https:') ? cfg.public_url : 'mailto:lampo@localhost';
 }
 
 // Each account hears only what its role may act on, in the workspace the news is from (a device of someone who isn't

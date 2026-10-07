@@ -1,4 +1,4 @@
-// What an agent did through Lampo, in plain words: an MCP tool call or a `vr` command becomes one activity line
+// What an agent did through Lampo, in plain words: an MCP tool call or a `lampo` command becomes one activity line
 // ("Reading note c_7f3a", "Fixed c_7f3a", "Waiting for your answer"). Browser-safe (no Node imports): the server
 // records with it and the tests read it. Lampo learns this from the calls it serves anyway, so it costs the agent no
 // tokens; nothing here asks an agent to report anything.
@@ -10,7 +10,7 @@ import { oneLine } from './time.ts';
 import type { ActivityWords, AgentActivityKind } from './types.ts';
 
 export const ACTIVITY_KEYS = [
-  // the calls agents make (MCP tools, vr)
+  // the calls agents make (MCP tools, lampo)
   'Looking through the library',
   'Reading the inbox',
   'Reading the open notes',
@@ -54,7 +54,7 @@ export const ACTIVITY_KEYS = [
   'Looking for footage',
   'Rendering… {mb} MB, still growing',
   'Rendering a new version',
-  // how a render through `vr render` ended (lib/render/job.ts)
+  // how a render through `lampo render` ended (lib/render/job.ts)
   'Rendered in {time}',
   'The render failed (exit {code})',
   // what a run Lampo started printed (lib/runStream.ts) and how it went (server/agentRuns.ts)
@@ -96,7 +96,7 @@ export interface ActivityGuess extends ActivityWords {
   target?: string | null;
 }
 
-/** An agent's status (`set_status`, `vr status`) as long as it is kept (lib/inputs.ts INPUT_LIMITS.status): its own
+/** An agent's status (`set_status`, `lampo status`) as long as it is kept (lib/inputs.ts INPUT_LIMITS.status): its own
  * sentence, shown whole where there is room (the Agent view) and cut only by the places that have none. */
 export const STATUS_CHARS = 200;
 
@@ -213,7 +213,7 @@ export function toolActivity(tool: string, args: Args = {}): ActivityGuess | nul
   }
 }
 
-/** A `vr` command (its name and parsed arguments) as an activity, or null. */
+/** A `lampo` command (its name and parsed arguments) as an activity, or null. */
 export function cliActivity(cmd: string, positional: string[] = [], flags: Args = {}): ActivityGuess | null {
   const first = positional[0] ?? null;
   const note = isNote(first) ? first : null;

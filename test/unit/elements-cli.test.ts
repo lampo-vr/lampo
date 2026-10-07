@@ -21,16 +21,16 @@ const mapFile = writeJson(path.join(dir, 'renders/launch.elements.json'), SCENE_
 let slug = '';
 const ids: Record<string, string> = {};
 
-test('vr push --help prints its usage on stdout, --elements in it; any command’s --help its own lines', () => {
+test('push --help prints its usage on stdout, --elements in it; any command’s --help its own lines', () => {
   const r = vr(['push', '--help'], env);
   assert.equal(r.code, 0, r.err);
   assert.equal(r.err, '');
-  assert.match(r.out, /^ {2}vr push <file> \[--folder "Project\/Sub"\]/m);
+  assert.match(r.out, /^ {2}lampo push <file> \[--folder "Project\/Sub"\]/m);
   assert.match(r.out, /\[--elements map\.json\]/);
   assert.match(r.out, /--part-at <frame>/);
-  assert.doesNotMatch(r.out, /vr open|vr login/, 'only push’s lines');
-  assert.match(vr(['elements', '--help'], env).out, /^ {2}vr elements <video> <map\.json> \[--v N\]/m);
-  assert.match(vr(['open', '--help'], env).out, /^ {2}vr open <video\|slug> \[--all\] \[--brief\]/m);
+  assert.doesNotMatch(r.out, /lampo open|lampo login/, 'only push’s lines');
+  assert.match(vr(['elements', '--help'], env).out, /^ {2}lampo elements <video> <map\.json> \[--v N\]/m);
+  assert.match(vr(['open', '--help'], env).out, /^ {2}lampo open <video\|slug> \[--all\] \[--brief\]/m);
 });
 
 test('a bad map is refused before the render goes up; nothing is made', () => {
@@ -137,7 +137,7 @@ test('vr elements replaces a version’s map, refuses a bad one whole and keeps 
   assert.match(vr(['elements', 'launch.mp4', writeJson(path.join(dir, 'many.json'), tooMany)], env).err, /2001 keys, at most 2000 for v1 \(120 frames\)/);
   assert.ok(fs.readFileSync(file).equals(before), 'the map in place is untouched');
   assert.match(vr(['elements', 'launch.mp4', mapFile, '--v', '9'], env).err, /no v9/);
-  assert.match(vr(['elements', 'launch.mp4'], env).err, /usage: vr elements <video> <map\.json> \[--v N\]/);
+  assert.match(vr(['elements', 'launch.mp4'], env).err, /usage: lampo elements <video> <map\.json> \[--v N\]/);
 });
 
 test('a new version gets its own map; notes on the old one keep reading the old one', () => {

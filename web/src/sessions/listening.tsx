@@ -35,7 +35,7 @@ export function useListening(session: SessionRef | null, summary?: { active: boo
   if (!agents) return summary?.listening ? 'listening' : summary?.active ? 'working' : summary?.listening === false ? 'idle' : null;
   const a = agents.find((x) => !!session.id && x.session_id === session.id) ?? agents.find((x) => x.name === session.name);
   if (!a) return 'offline';
-  // an older server lists only agents that follow the notes (`vr watch`)
+  // an older server lists only agents that follow the notes (`lampo watch`)
   return a.state ?? 'listening';
 }
 
@@ -53,8 +53,8 @@ export const waitsForStart = (state: Listen | null): boolean => state === 'idle'
 /** What starts it: the command in Claude Code, a sentence for any other agent. */
 export function startWith(session: SessionRef): { claude: boolean; text: string } {
   const claude = agentKindOfRef(session) === 'claude-code';
-  // A Claude Code session that followed with `vr watch` (not an MCP connection) listens again by running it.
-  if (claude && session.id && !session.id.startsWith('mcp-')) return { claude, text: 'vr watch' };
+  // A Claude Code session that followed with `lampo watch` (not an MCP connection) listens again by running it.
+  if (claude && session.id && !session.id.startsWith('mcp-')) return { claude, text: 'lampo watch' };
   return { claude, text: claude ? WATCH_COMMAND : WATCH_WORDS };
 }
 

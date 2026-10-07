@@ -118,7 +118,7 @@ let browser;
 try {
   const setupToken = await srv.setupToken();
   assert(setupToken, `no setup token in the server log:\n${srv.log()}`);
-  assert(/mail: VR_SMTP_URL is not set/.test(srv.log()), 'the server warns that nothing is sent');
+  assert(/mail: LAMPO_SMTP_URL is not set/.test(srv.log()), 'the server warns that nothing is sent');
   const setup = await fetch(`${BASE}/api/auth/setup`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', origin: BASE },
@@ -324,7 +324,7 @@ try {
           ]),
         `the legal line at the foot: ${JSON.stringify(look.legal)}`,
       );
-      assert(look.code?.includes(`vr login ${BASE}`), `the agents' command to copy: ${look.code}`);
+      assert(look.code?.includes(`lampo login ${BASE}`), `the agents' command to copy: ${look.code}`);
       assert(look.closed && look.unreachable, 'the agents’ command waits behind “Sign in an agent”, out of reach while closed');
       await page.click('.ent-disc');
       await page.waitForFunction(() => getComputedStyle(document.querySelector('.ent-disc-body > div')).visibility === 'visible', { timeout: 5000 });

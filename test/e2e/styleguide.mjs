@@ -10,6 +10,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { settings } from '../../lib/env.ts';
 import { ROOT, sleep } from '../lib/helpers.ts';
 import { cutLabels, fitsAt } from './layout.mjs';
 import { BASELINE_DIR, baselineFiles, baselinePlan } from './lib/baseline.mjs';
@@ -22,7 +23,7 @@ import { startServer } from './lib/server.mjs';
 const LABEL = 'styleguide e2e';
 requireChrome(LABEL);
 const SHOTS = shotsDir();
-const UPDATE = process.env.VR_UPDATE_BASELINE === '1';
+const UPDATE = settings.LAMPO_UPDATE_BASELINE === '1';
 // Nothing moves while the picture is taken: no transitions, no indeterminate sweeps, no caret.
 const CALM = '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}';
 // Pixels whose channels differ by more than this count as changed; more than this share of them fails.

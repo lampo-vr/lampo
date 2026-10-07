@@ -11,9 +11,9 @@ What the team decides on purpose belongs in a [playbook](playbooks.md).
 ## Seeing it
 
 - **In the app:** *See what agents read*, under *Agents: right the first time* on *Insights*, shows it for all videos.
-- **Agents:** MCP `get_taste({video})` or `get_taste({folder: "Acme"})`, or `vr taste <video|folder>` in a terminal.
+- **Agents:** MCP `get_taste({video})` or `get_taste({folder: "Acme"})`, or `lampo taste <video|folder>` in a terminal.
 - **As a file:** `data/taste/acme.md` (the numbers in `acme.json` beside it), written each time an agent reads it.
-  Against a hosted server, `vr` keeps its copy in its cache folder.
+  Against a hosted server, `lampo` keeps its copy in its cache folder.
 
 ## Which notes count
 

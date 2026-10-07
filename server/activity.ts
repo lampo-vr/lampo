@@ -1,5 +1,5 @@
 // What agents are doing, live: one small store per agent and video, fed by the calls the app serves itself (its MCP
-// endpoint), by agents on this machine (`vr`, the stdio MCP server: lib/activity.ts appends to a rolling file this
+// endpoint), by agents on this machine (`lampo`, the stdio MCP server: lib/activity.ts appends to a rolling file this
 // tails), by agents of a hosted server (a batch now and then), and by the runs Lampo started (server/agentRuns.ts
 // reads their output). Memory is bounded; nothing is written to the review; an SSE `agent-activity` (coalesced) tells
 // the UI something moved. The agents spend no tokens on any of it.
@@ -61,7 +61,7 @@ export interface ActivityOptions {
 }
 
 /** Who sent an activity, beyond the name it is listed under: the account (by id) whose token, app or session it came
- * with; none for this machine's own (`vr`, the stdio MCP server, a run Lampo started here). Never shown. */
+ * with; none for this machine's own (`lampo`, the stdio MCP server, a run Lampo started here). Never shown. */
 export interface ActivityFrom {
   account?: string;
 }

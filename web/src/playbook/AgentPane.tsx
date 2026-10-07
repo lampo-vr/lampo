@@ -1,4 +1,4 @@
-// What agents read, shown rather than described: the merged playbook exactly as get_playbook and `vr playbook` hand it
+// What agents read, shown rather than described: the merged playbook exactly as get_playbook and `lampo playbook` hand it
 // out, beside the document on a wide screen (a dialog on a narrow one). This playbook's own lines are lit, what it
 // inherits quieter; while a section is being written, the pane already shows the text with it (agentText.ts), the
 // unsaved lines marked.
@@ -58,7 +58,7 @@ export function AgentPane({ view, drafts }: { view: PlaybookView; drafts: Draft[
               {t('With what you’re writing — once you save it')}
             </span>
           ) : (
-            <span className="mono">get_playbook · vr playbook</span>
+            <span className="mono">get_playbook · lampo playbook</span>
           )}
         </p>
       </header>
@@ -76,7 +76,7 @@ export function AgentDialog({ view, drafts, onClose }: { view: PlaybookView; dra
       width={760}
       foot={
         <>
-          <span className="pb-agent-hint mono">get_playbook · vr playbook</span>
+          <span className="pb-agent-hint mono">get_playbook · lampo playbook</span>
           <span className="grow" />
           <button type="button" className="btn ghost" onClick={() => copy(view.markdown)}>
             {t('Copy')}

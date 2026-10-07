@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS vectors (kf_id INT NOT NULL, model TEXT NOT NULL, vec
 
 type Sqlite = typeof import('node:sqlite');
 let sqlite: Sqlite | null = null;
-/** node:sqlite, without the "experimental" warning Node 22 prints on stderr (it would end up in `vr`'s output). */
+/** node:sqlite, without the "experimental" warning Node 22 prints on stderr (it would end up in `lampo`'s output). */
 function sqliteModule(): Sqlite {
   if (sqlite) return sqlite;
   const emit = process.emitWarning;
@@ -83,7 +83,7 @@ export function openIndex(): DatabaseSync {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const { DatabaseSync } = sqliteModule();
   const db = new DatabaseSync(file);
-  // the server indexing and a `vr` on the same machine may write at once: wait for the other, don't fail
+  // the server indexing and a `lampo` on the same machine may write at once: wait for the other, don't fail
   db.exec('PRAGMA busy_timeout = 5000');
   db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA synchronous = NORMAL');

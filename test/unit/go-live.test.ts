@@ -35,11 +35,11 @@ test('the public URL: an origin, over https across a network, with the TLS proxy
   assert.match(sub ?? '', /only the scheme and host.*not under a path/);
 
   const [clear] = problems({ VR_PUBLIC_URL: 'http://review.example.com' });
-  assert.match(clear ?? '', /plain http on a host other than this machine.*VR_ALLOW_HTTP=1/);
+  assert.match(clear ?? '', /plain http on a host other than this machine.*LAMPO_ALLOW_HTTP=1/);
   assert.deepEqual(problems({ VR_PUBLIC_URL: 'http://review.example.com', VR_ALLOW_HTTP: '1' }), [], 'a closed test network, on purpose');
 
   const [proxy] = problems({ VR_PUBLIC_URL: 'https://review.example.com' });
-  assert.match(proxy ?? '', /VR_TRUST_PROXY.*loopback.*uniquelocal.*lock everyone out/);
+  assert.match(proxy ?? '', /LAMPO_TRUST_PROXY.*loopback.*uniquelocal.*lock everyone out/);
   assert.deepEqual(problems({ VR_PUBLIC_URL: 'https://review.example.com', VR_TRUST_PROXY: 'false' }), [], 'saying so explicitly is a choice');
 });
 
@@ -49,7 +49,7 @@ test('ports, storage kinds and a CDN without signed addresses', () => {
   assert.match(problems({ ...ok, VR_STORAGE: 'bunnny' })[0] ?? '', /VR_STORAGE must be local, bunny or s3 \(got "bunnny"\)/);
   const bunny = { ...ok, VR_STORAGE: 'bunny', VR_BUNNY_ZONE: 'z', VR_BUNNY_ACCESS_KEY: 'k', VR_BUNNY_REGION: 'de' };
   assert.deepEqual(problems(bunny), [], 'streams through the server without a CDN');
-  assert.match(problems({ ...bunny, VR_BUNNY_CDN_URL: 'https://z.b-cdn.net' })[0] ?? '', /without VR_BUNNY_TOKEN_KEY.*anyone who has or guesses one/);
+  assert.match(problems({ ...bunny, VR_BUNNY_CDN_URL: 'https://z.b-cdn.net' })[0] ?? '', /without LAMPO_BUNNY_TOKEN_KEY.*anyone who has or guesses one/);
   assert.deepEqual(problems({ ...bunny, VR_BUNNY_CDN_URL: 'https://z.b-cdn.net', VR_BUNNY_TOKEN_KEY: 't' }), []);
   assert.deepEqual(startupProblems(loadConfig({}), {}), [], 'the machine needs none of it');
 });
@@ -111,7 +111,7 @@ function start(env: Record<string, string>, prepare?: (store: string) => void) {
 test('the process stops at once on a bad setting, saying what to do in one line, without a stack trace', () => {
   const cases: [Record<string, string>, RegExp, ((store: string) => void)?][] = [
     [{ VR_PUBLIC_URL: 'review.test' }, /VR_PUBLIC_URL must be the address people open/],
-    [{ VR_TRUST_PROXY: 'caddy' }, /VR_TRUST_PROXY: "caddy" is not an address/],
+    [{ VR_TRUST_PROXY: 'caddy' }, /LAMPO_TRUST_PROXY: "caddy" is not an address/],
     [{ VR_UPLOAD_MAX: 'lots' }, /not a size: lots/],
     [{ VR_STORAGE: 'bunny' }, /storage "bunny" needs bunny\.zone/],
     [
@@ -137,7 +137,7 @@ test('the process stops at once on a bad setting, saying what to do in one line,
     const { status, err } = start(env, prepare);
     assert.equal(status, 1, `${JSON.stringify(env)} exits 1: ${err}`);
     assert.match(err, want);
-    assert.match(err, /^video-review: /, 'starts with the app name');
+    assert.match(err, /^lampo: /, 'starts with the app name');
     assert.doesNotMatch(err, /^\s+at /m, `no stack trace: ${err}`);
   }
 });

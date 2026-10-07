@@ -1,4 +1,4 @@
-// How a reference on a note reads for agents (vr, MCP, INBOX.md, `vr watch`): one line each. Browser-safe.
+// How a reference on a note reads for agents (lampo, MCP, INBOX.md, `lampo watch`): one line each. Browser-safe.
 import { timecode } from './time.ts';
 import type { NoteRef } from './types.ts';
 

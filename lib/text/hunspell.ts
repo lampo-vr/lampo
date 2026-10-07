@@ -2,11 +2,13 @@
 // (Debian/Ubuntu: hunspell-de-de, hunspell-en-us). Same rules as tools/ocr.swift: a word is fine when any case
 // variant is valid in either language or it splits into valid compound parts (with a linking "s"); a misspelling
 // gets the closest suggestion.
+
+import { settings } from '../env.ts';
 import { runBg } from '../probe.ts';
 import type { SpellResult } from './types.ts';
 import { distance } from './words.ts';
 
-const hunspell = () => process.env.VR_HUNSPELL || 'hunspell';
+const hunspell = () => settings.LAMPO_HUNSPELL || 'hunspell';
 const WANTED = ['de_DE', 'en_US', 'en_GB'];
 
 /** Installed dictionaries we can use (e.g. ["de_DE", "en_US"]); null when hunspell is missing. */

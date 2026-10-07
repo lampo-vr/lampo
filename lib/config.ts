@@ -2,6 +2,7 @@
 // so a container can be configured without a file. Everything has a sane default.
 import fs from 'node:fs';
 import net from 'node:net';
+import { type SettingName, settingsIn, spelledAs } from './env.ts';
 import { type LegalUrls, legalConfig, legalProblems } from './legal.ts';
 import { type MailConfig, mailConfig, mailProblems, type SignupMode, signupConfig } from './mail/config.ts';
 import { type ConfigFile, readConfigFile, type StorageConfig, type SttConfig, USER } from './paths.ts';
@@ -14,9 +15,9 @@ export interface Config extends Omit<ConfigFile, 'mail' | 'signup' | 'terms_url'
   host: string;
   port: number;
   public_url: string | null;
-  /** The app's own media host (VR_MEDIA_ORIGIN): video by signed URLs on a host of its own (lib/storage/mediaHost.ts). */
+  /** The app's own media host (LAMPO_MEDIA_ORIGIN): video by signed URLs on a host of its own (lib/storage/mediaHost.ts). */
   media_origin: string | null;
-  /** Where network users get the source (AGPL-3.0 §13): source_url / VR_SOURCE_URL, else package.json's repository
+  /** Where network users get the source (AGPL-3.0 §13): source_url / LAMPO_SOURCE_URL, else package.json's repository
    * (the project's own: right for an unmodified copy; a fork points it at itself). */
   source_url: string | null;
   /** Proxies whose forwarding headers count (trustProxy), or false. */
@@ -28,7 +29,7 @@ export interface Config extends Omit<ConfigFile, 'mail' | 'signup' | 'terms_url'
   upload_max_bytes: number;
   storage: StorageConfig;
   stt: SttConfig;
-  /** Author name for notes made in the local UI: config.json "user" > VR_USER > OS account name. */
+  /** Author name for notes made in the local UI: config.json "user" > LAMPO_USER > OS account name. */
   user: string;
   /** How email goes out (lib/mail/config.ts): SMTP, or the log transport (<cache>/outbox/). */
   mail: MailConfig;
@@ -94,7 +95,7 @@ export function trustProxy(v: string | number | boolean): { value: false | strin
     const family = net.isIP(ip ?? '');
     const prefixOk = bits === undefined || (/^\d+$/.test(bits) && Number(bits) <= (family === 6 ? 128 : 32));
     if (!TRUST_NAMES.has(e) && !(family && prefixOk && extra === undefined))
-      throw new Error(`VR_TRUST_PROXY: "${e}" is not an address, a subnet or one of loopback, linklocal, uniquelocal`);
+      throw new Error(`LAMPO_TRUST_PROXY: "${e}" is not an address, a subnet or one of loopback, linklocal, uniquelocal`);
   }
   return { value: entries.join(', '), legacy: false };
 }
@@ -117,37 +118,38 @@ function defined<T extends object>(o: T): Partial<T> {
   return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined && v !== '')) as Partial<T>;
 }
 
-// VR_STORAGE=bunny|s3 plus VR_BUNNY_* / VR_S3_* layer over the config.json "storage" section.
+// LAMPO_STORAGE=bunny|s3 plus LAMPO_BUNNY_* / LAMPO_S3_* layer over the config.json "storage" section.
 function storageConfig(base: StorageConfig | undefined, env: NodeJS.ProcessEnv): StorageConfig {
-  const kind = (env.VR_STORAGE as StorageConfig['kind'] | undefined) || base?.kind || 'local';
+  const s = settingsIn(env);
+  const kind = (s.LAMPO_STORAGE as StorageConfig['kind'] | undefined) || base?.kind || 'local';
   const out: StorageConfig = { ...base, kind };
   const bunny = {
     ...base?.bunny,
     ...defined({
-      zone: env.VR_BUNNY_ZONE,
-      access_key: env.VR_BUNNY_ACCESS_KEY,
-      region: env.VR_BUNNY_REGION,
-      cdn_url: env.VR_BUNNY_CDN_URL,
-      token_key: env.VR_BUNNY_TOKEN_KEY,
-      prefix: env.VR_BUNNY_PREFIX,
-      storage_url: env.VR_BUNNY_STORAGE_URL,
+      zone: s.LAMPO_BUNNY_ZONE,
+      access_key: s.LAMPO_BUNNY_ACCESS_KEY,
+      region: s.LAMPO_BUNNY_REGION,
+      cdn_url: s.LAMPO_BUNNY_CDN_URL,
+      token_key: s.LAMPO_BUNNY_TOKEN_KEY,
+      prefix: s.LAMPO_BUNNY_PREFIX,
+      storage_url: s.LAMPO_BUNNY_STORAGE_URL,
     }),
   };
   if (Object.keys(bunny).length) out.bunny = bunny as StorageConfig['bunny'];
   const s3 = {
     ...base?.s3,
     ...defined({
-      endpoint: env.VR_S3_ENDPOINT,
-      region: env.VR_S3_REGION,
-      bucket: env.VR_S3_BUCKET,
-      access_key_id: env.VR_S3_ACCESS_KEY_ID,
-      secret_access_key: env.VR_S3_SECRET_ACCESS_KEY,
-      prefix: env.VR_S3_PREFIX,
-      presign: env.VR_S3_PRESIGN === undefined ? undefined : env.VR_S3_PRESIGN !== 'false',
+      endpoint: s.LAMPO_S3_ENDPOINT,
+      region: s.LAMPO_S3_REGION,
+      bucket: s.LAMPO_S3_BUCKET,
+      access_key_id: s.LAMPO_S3_ACCESS_KEY_ID,
+      secret_access_key: s.LAMPO_S3_SECRET_ACCESS_KEY,
+      prefix: s.LAMPO_S3_PREFIX,
+      presign: s.LAMPO_S3_PRESIGN === undefined ? undefined : s.LAMPO_S3_PRESIGN !== 'false',
     }),
   };
   if (Object.keys(s3).length) out.s3 = s3 as StorageConfig['s3'];
-  const work = parseBytes(env.VR_WORK_CACHE);
+  const work = parseBytes(s.LAMPO_WORK_CACHE);
   if (work) out.work_cache_bytes = work;
   return out;
 }
@@ -159,9 +161,10 @@ const list = (v: string) =>
     .filter(Boolean);
 const flag = (v: string) => !/^(0|false|no|off)$/i.test(v.trim());
 
-// VR_STT_* layer over the config.json "stt" section. An old `whisper_language: "de"` (from the Python/MLX days)
+// LAMPO_STT_* layer over the config.json "stt" section. An old `whisper_language: "de"` (from the Python/MLX days)
 // becomes languages ["de", "en"]: auto-detect, with German as the fallback.
 export function sttConfig(file: ConfigFile, env: NodeJS.ProcessEnv = process.env): SttConfig {
+  const s = settingsIn(env);
   const base = file.stt || {};
   const migrated = file.whisper_language ? [...new Set([file.whisper_language.toLowerCase(), 'en'])] : [];
   const out: SttConfig = {
@@ -171,34 +174,37 @@ export function sttConfig(file: ConfigFile, env: NodeJS.ProcessEnv = process.env
     vocabulary: base.vocabulary ?? [],
     http: base.http ? { ...base.http } : null,
   };
-  if (env.VR_STT) {
-    if (!['local', 'http', 'off'].includes(env.VR_STT)) throw new Error(`VR_STT must be local, http or off (got "${env.VR_STT}")`);
-    out.backend = env.VR_STT as SttConfig['backend'];
+  if (s.LAMPO_STT) {
+    if (!['local', 'http', 'off'].includes(s.LAMPO_STT)) throw new Error(`LAMPO_STT must be local, http or off (got "${s.LAMPO_STT}")`);
+    out.backend = s.LAMPO_STT as SttConfig['backend'];
   }
-  if (env.VR_STT_MODEL) out.model = env.VR_STT_MODEL;
-  if (env.VR_STT_LANGUAGES !== undefined) out.languages = list(env.VR_STT_LANGUAGES.toLowerCase());
-  if (env.VR_STT_VOCABULARY !== undefined) out.vocabulary = list(env.VR_STT_VOCABULARY);
-  if (env.VR_STT_THREADS) out.threads = Number(env.VR_STT_THREADS);
-  if (env.VR_STT_IDLE_MINUTES) out.idle_unload_minutes = Number(env.VR_STT_IDLE_MINUTES);
-  if (env.VR_STT_PREFETCH) out.prefetch = flag(env.VR_STT_PREFETCH);
-  if (env.VR_STT_MODELS_DIR) out.models_dir = env.VR_STT_MODELS_DIR;
-  if (env.VR_STT_URL) out.http = { ...out.http, url: env.VR_STT_URL };
-  if (out.http && env.VR_STT_API_KEY) out.http.api_key = env.VR_STT_API_KEY;
-  if (out.http && env.VR_STT_HTTP_MODEL) out.http.model = env.VR_STT_HTTP_MODEL;
+  if (s.LAMPO_STT_MODEL) out.model = s.LAMPO_STT_MODEL;
+  if (s.LAMPO_STT_LANGUAGES !== undefined) out.languages = list(s.LAMPO_STT_LANGUAGES.toLowerCase());
+  if (s.LAMPO_STT_VOCABULARY !== undefined) out.vocabulary = list(s.LAMPO_STT_VOCABULARY);
+  if (s.LAMPO_STT_THREADS) out.threads = Number(s.LAMPO_STT_THREADS);
+  if (s.LAMPO_STT_IDLE_MINUTES) out.idle_unload_minutes = Number(s.LAMPO_STT_IDLE_MINUTES);
+  if (s.LAMPO_STT_PREFETCH) out.prefetch = flag(s.LAMPO_STT_PREFETCH);
+  if (s.LAMPO_STT_MODELS_DIR) out.models_dir = s.LAMPO_STT_MODELS_DIR;
+  if (s.LAMPO_STT_URL) out.http = { ...out.http, url: s.LAMPO_STT_URL };
+  if (out.http && s.LAMPO_STT_API_KEY) out.http.api_key = s.LAMPO_STT_API_KEY;
+  if (out.http && s.LAMPO_STT_HTTP_MODEL) out.http.model = s.LAMPO_STT_HTTP_MODEL;
   return out;
 }
 
 /**
  * Settings the server must not start with. A hosted server without its public URL serves any Host header (DNS
  * rebinding), takes the OAuth issuer from the request and may not mark cookies Secure behind a TLS proxy; a local test
- * can still run one with VR_ALLOW_NO_PUBLIC_URL=1 (and /readyz then says it isn't ready).
+ * can still run one with LAMPO_ALLOW_NO_PUBLIC_URL=1 (and /readyz then says it isn't ready).
  */
 export function startupProblems(cfg: Config, env: NodeJS.ProcessEnv = process.env, { signupSeam = false }: { signupSeam?: boolean } = {}): string[] {
+  const s = settingsIn(env);
+  // a setting named as the operator wrote it (VR_ or LAMPO_), a setting to set by its new name
+  const say = (name: SettingName) => spelledAs(name, env);
   const problems: string[] = [];
   if (!Number.isInteger(cfg.port) || cfg.port < 1 || cfg.port > 65535)
-    problems.push(`VR_PORT must be a port number from 1 to 65535 (got "${env.VR_PORT ?? cfg.port}").`);
+    problems.push(`${say('LAMPO_PORT')} must be a port number from 1 to 65535 (got "${s.LAMPO_PORT ?? cfg.port}").`);
   if (!['local', 'bunny', 's3'].includes(cfg.storage.kind))
-    problems.push(`VR_STORAGE must be local, bunny or s3 (got "${cfg.storage.kind}"); see docs/server-mode.md#storage.`);
+    problems.push(`${say('LAMPO_STORAGE')} must be local, bunny or s3 (got "${cfg.storage.kind}"); see docs/server-mode.md#storage.`);
   // Email and sign-up, in either mode (docs/email.md).
   problems.push(...mailProblems(cfg, { signupSeam }));
   problems.push(...legalProblems(cfg));
@@ -206,16 +212,16 @@ export function startupProblems(cfg: Config, env: NodeJS.ProcessEnv = process.en
   problems.push(...endpointsProblems(env));
   if (cfg.mode !== 'server') return problems;
   if (!cfg.public_url) {
-    if (!flag(env.VR_ALLOW_NO_PUBLIC_URL || '0'))
+    if (!flag(s.LAMPO_ALLOW_NO_PUBLIC_URL || '0'))
       problems.push(
-        'server mode needs VR_PUBLIC_URL, the URL people open (e.g. https://review.example.com): without it any host name is served and cookies may not be Secure. For a local test only: VR_ALLOW_NO_PUBLIC_URL=1.',
+        `server mode needs ${say('LAMPO_PUBLIC_URL')}, the URL people open (e.g. https://review.example.com): without it any host name is served and cookies may not be Secure. For a local test only: ${say('LAMPO_ALLOW_NO_PUBLIC_URL')}=1.`,
       );
   } else problems.push(...publicUrlProblems(cfg, env));
   if (cfg.media_origin) problems.push(...mediaOriginProblems(cfg, env));
   const bunny = cfg.storage.kind === 'bunny' ? cfg.storage.bunny : undefined;
   if (bunny?.cdn_url && !bunny.token_key)
     problems.push(
-      'VR_BUNNY_CDN_URL is set without VR_BUNNY_TOKEN_KEY: the player would get unsigned CDN addresses, and anyone who has or guesses one could watch the render. Turn on Token Authentication on the pull zone and set its key, or leave VR_BUNNY_CDN_URL out to stream through the server (docs/server-mode.md#bunny-storage--cdn).',
+      `${say('LAMPO_BUNNY_CDN_URL')} is set without ${say('LAMPO_BUNNY_TOKEN_KEY')}: the player would get unsigned CDN addresses, and anyone who has or guesses one could watch the render. Turn on Token Authentication on the pull zone and set its key, or leave ${say('LAMPO_BUNNY_CDN_URL')} out to stream through the server (docs/server-mode.md#bunny-storage--cdn).`,
     );
   return problems;
 }
@@ -226,56 +232,62 @@ const loopbackHost = (host: string) => host === 'localhost' || host.endsWith('.l
 /**
  * What a hosted server's public URL must be: an origin people open (no path: the app is served from the root of its
  * host), over https unless it is this machine (passwords and cookies would cross the network in the clear), and with
- * https the TLS proxy in front named in VR_TRUST_PROXY (the app speaks plain http, so an https URL means a proxy, and
+ * https the TLS proxy in front named in LAMPO_TRUST_PROXY (the app speaks plain http, so an https URL means a proxy, and
  * without trusting it every visitor shares its address: one person's wrong passwords would lock everyone out).
  */
 function publicUrlProblems(cfg: Config, env: NodeJS.ProcessEnv): string[] {
+  const s = settingsIn(env);
+  // a setting named as the operator wrote it (VR_ or LAMPO_), a setting to set by its new name
+  const say = (name: SettingName) => spelledAs(name, env);
   const raw = cfg.public_url ?? '';
   let url: URL;
   try {
     url = new URL(raw);
   } catch {
-    return [`VR_PUBLIC_URL must be the address people open, with its scheme, like https://review.example.com (got "${raw}").`];
+    return [`${say('LAMPO_PUBLIC_URL')} must be the address people open, with its scheme, like https://review.example.com (got "${raw}").`];
   }
-  if (url.protocol !== 'https:' && url.protocol !== 'http:') return [`VR_PUBLIC_URL must start with https:// (got "${raw}").`];
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return [`${say('LAMPO_PUBLIC_URL')} must start with https:// (got "${raw}").`];
   if (url.username || url.password || url.search || url.hash || url.pathname !== '/')
     return [
-      `VR_PUBLIC_URL must be only the scheme and host, like https://review.example.com (got "${raw}"): Lampo is served from the root of its own host name, not under a path.`,
+      `${say('LAMPO_PUBLIC_URL')} must be only the scheme and host, like https://review.example.com (got "${raw}"): Lampo is served from the root of its own host name, not under a path.`,
     ];
   const problems: string[] = [];
-  if (url.protocol === 'http:' && !loopbackHost(url.hostname) && !flag(env.VR_ALLOW_HTTP || '0'))
+  if (url.protocol === 'http:' && !loopbackHost(url.hostname) && !flag(s.LAMPO_ALLOW_HTTP || '0'))
     problems.push(
-      `VR_PUBLIC_URL is plain http on a host other than this machine (${url.host}): passwords, session cookies and review-link passwords would cross the network unencrypted. Put the app behind a TLS proxy and use https:// (docs/go-live.md); on a closed test network only: VR_ALLOW_HTTP=1.`,
+      `${say('LAMPO_PUBLIC_URL')} is plain http on a host other than this machine (${url.host}): passwords, session cookies and review-link passwords would cross the network unencrypted. Put the app behind a TLS proxy and use https:// (docs/go-live.md); on a closed test network only: ${say('LAMPO_ALLOW_HTTP')}=1.`,
     );
   if (url.protocol === 'https:' && !cfg.trust_proxy_set)
     problems.push(
-      'VR_PUBLIC_URL is https, so a proxy in front of the app ends TLS (the app itself speaks plain http): name that proxy in VR_TRUST_PROXY — loopback for Caddy on this machine, uniquelocal for the compose network, or its address. Without it every visitor looks like the proxy: one person guessing passwords would lock everyone out of signing in. If your proxy really forwards no addresses: VR_TRUST_PROXY=false.',
+      `${say('LAMPO_PUBLIC_URL')} is https, so a proxy in front of the app ends TLS (the app itself speaks plain http): name that proxy in ${say('LAMPO_TRUST_PROXY')} — loopback for Caddy on this machine, uniquelocal for the compose network, or its address. Without it every visitor looks like the proxy: one person guessing passwords would lock everyone out of signing in. If your proxy really forwards no addresses: ${say('LAMPO_TRUST_PROXY')}=false.`,
     );
   return problems;
 }
 
 /**
- * What the media host (VR_MEDIA_ORIGIN) must be: an origin of its own (scheme and host, no path), https unless it is
+ * What the media host (LAMPO_MEDIA_ORIGIN) must be: an origin of its own (scheme and host, no path), https unless it is
  * this machine, and another host than the public URL's — it serves video by signed URLs and nothing else, and the
  * app's sign-in cookie must never reach it.
  */
 function mediaOriginProblems(cfg: Config, env: NodeJS.ProcessEnv): string[] {
+  const s = settingsIn(env);
+  // a setting named as the operator wrote it (VR_ or LAMPO_), a setting to set by its new name
+  const say = (name: SettingName) => spelledAs(name, env);
   const raw = cfg.media_origin ?? '';
   let url: URL;
   try {
     url = new URL(raw);
   } catch {
-    return [`VR_MEDIA_ORIGIN must be an address with its scheme, like https://media.example.com (got "${raw}").`];
+    return [`${say('LAMPO_MEDIA_ORIGIN')} must be an address with its scheme, like https://media.example.com (got "${raw}").`];
   }
-  if (url.protocol !== 'https:' && url.protocol !== 'http:') return [`VR_MEDIA_ORIGIN must start with https:// (got "${raw}").`];
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return [`${say('LAMPO_MEDIA_ORIGIN')} must start with https:// (got "${raw}").`];
   if (url.username || url.password || url.search || url.hash || url.pathname !== '/')
     return [
-      `VR_MEDIA_ORIGIN must be only the scheme and host, like https://media.example.com (got "${raw}"): signed URLs are served from the root of its host.`,
+      `${say('LAMPO_MEDIA_ORIGIN')} must be only the scheme and host, like https://media.example.com (got "${raw}"): signed URLs are served from the root of its host.`,
     ];
   const problems: string[] = [];
-  if (url.protocol === 'http:' && !loopbackHost(url.hostname) && !flag(env.VR_ALLOW_HTTP || '0'))
+  if (url.protocol === 'http:' && !loopbackHost(url.hostname) && !flag(s.LAMPO_ALLOW_HTTP || '0'))
     problems.push(
-      `VR_MEDIA_ORIGIN is plain http on a host other than this machine (${url.host}): its signed URLs would cross the network readable by anyone on the way. Give it https (docs/server-mode.md#a-host-of-its-own-for-video).`,
+      `${say('LAMPO_MEDIA_ORIGIN')} is plain http on a host other than this machine (${url.host}): its signed URLs would cross the network readable by anyone on the way. Give it https (docs/server-mode.md#a-host-of-its-own-for-video).`,
     );
   let app: URL | null = null;
   try {
@@ -283,7 +295,7 @@ function mediaOriginProblems(cfg: Config, env: NodeJS.ProcessEnv): string[] {
   } catch {}
   if (app && app.hostname === url.hostname)
     problems.push(
-      `VR_MEDIA_ORIGIN must be a host name of its own, not VR_PUBLIC_URL's (${url.hostname}): it answers signed media URLs only, and the app's sign-in must never reach it.`,
+      `${say('LAMPO_MEDIA_ORIGIN')} must be a host name of its own, not ${say('LAMPO_PUBLIC_URL')}'s (${url.hostname}): it answers signed media URLs only, and the app's sign-in must never reach it.`,
     );
   return problems;
 }
@@ -304,13 +316,14 @@ export function operatorList(raw: string | undefined): string[] {
   return out.slice(0, OPERATORS_MAX);
 }
 
-/** How many workspaces one account may make where anyone may make them (VR_WORKSPACE_CREATE=anyone). */
+/** How many workspaces one account may make where anyone may make them (LAMPO_WORKSPACE_CREATE=anyone). */
 export const WORKSPACE_CREATE_LIMIT = 3;
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
+  const s = settingsIn(env);
   const file = readConfigFile();
-  const mode: Mode = (env.VR_MODE || file.mode) === 'server' ? 'server' : 'local';
-  const trustRaw = env.VR_TRUST_PROXY || file.trust_proxy;
+  const mode: Mode = (s.LAMPO_MODE || file.mode) === 'server' ? 'server' : 'local';
+  const trustRaw = s.LAMPO_TRUST_PROXY || file.trust_proxy;
   const trust = trustProxy(trustRaw || false);
   const cfg: Config = {
     ...DEFAULTS,
@@ -319,35 +332,35 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     trust_proxy_legacy: trust.legacy,
     trust_proxy_set: trustRaw !== undefined && trustRaw !== null && String(trustRaw).trim() !== '',
     mode,
-    host: env.VR_HOST || file.host || (mode === 'server' ? '0.0.0.0' : '127.0.0.1'),
+    host: s.LAMPO_HOST || file.host || (mode === 'server' ? '0.0.0.0' : '127.0.0.1'),
     storage: storageConfig(file.storage, env),
     stt: sttConfig(file, env),
     user: USER,
     mail: mailConfig(file, env),
     ...signupConfig(file, env),
     ...legalConfig(file, env),
-    operators: operatorList(env.LAMPO_OPERATOR),
+    operators: operatorList(s.LAMPO_OPERATOR),
   };
-  if (env.VR_PORT) cfg.port = Number(env.VR_PORT);
-  if (env.VR_PUBLIC_URL) cfg.public_url = env.VR_PUBLIC_URL;
+  if (s.LAMPO_PORT) cfg.port = Number(s.LAMPO_PORT);
+  if (s.LAMPO_PUBLIC_URL) cfg.public_url = s.LAMPO_PUBLIC_URL;
   if (cfg.public_url) cfg.public_url = cfg.public_url.replace(/\/+$/, '');
-  cfg.media_origin = (env.VR_MEDIA_ORIGIN || file.media_origin || '').trim().replace(/\/+$/, '') || null;
-  cfg.source_url = env.VR_SOURCE_URL || file.source_url || repositoryUrl(PACKAGE);
-  if (env.VR_ORG_NAME !== undefined) cfg.org_name = env.VR_ORG_NAME.trim() || null;
-  if (env.VR_PUSH_SUBJECT) cfg.push_subject = env.VR_PUSH_SUBJECT;
-  if (env.VR_WEBHOOK_ALLOW_PRIVATE) cfg.webhooks_allow_private = flag(env.VR_WEBHOOK_ALLOW_PRIVATE);
+  cfg.media_origin = (s.LAMPO_MEDIA_ORIGIN || file.media_origin || '').trim().replace(/\/+$/, '') || null;
+  cfg.source_url = s.LAMPO_SOURCE_URL || file.source_url || repositoryUrl(PACKAGE);
+  if (s.LAMPO_ORG_NAME !== undefined) cfg.org_name = s.LAMPO_ORG_NAME.trim() || null;
+  if (s.LAMPO_PUSH_SUBJECT) cfg.push_subject = s.LAMPO_PUSH_SUBJECT;
+  if (s.LAMPO_WEBHOOK_ALLOW_PRIVATE) cfg.webhooks_allow_private = flag(s.LAMPO_WEBHOOK_ALLOW_PRIVATE);
   // Making a workspace is the operator's to hand out (A12-D9): whoever runs one invites people, mails them and takes turns
   // in the job queue, so only whoever runs the server (lib/operator.ts) makes them unless the instance says anyone may — and then each
   // account makes a few. Lampo Cloud's sign-up makes each person's own through placeSignup, not through this.
-  const create = env.VR_WORKSPACE_CREATE || file.workspace_create;
+  const create = s.LAMPO_WORKSPACE_CREATE || file.workspace_create;
   cfg.workspace_create = create === 'anyone' ? 'anyone' : 'owners';
-  const limit = env.VR_WORKSPACE_CREATE_LIMIT?.trim() || file.workspace_create_limit;
+  const limit = s.LAMPO_WORKSPACE_CREATE_LIMIT?.trim() || file.workspace_create_limit;
   cfg.workspace_create_limit = limit !== undefined && Number.isInteger(Number(limit)) && Number(limit) >= 0 ? Number(limit) : WORKSPACE_CREATE_LIMIT;
-  if (env.VR_ONBOARDING) cfg.onboarding = flag(env.VR_ONBOARDING);
-  if (env.VR_ONBOARDING_SAMPLE) cfg.onboarding_sample = flag(env.VR_ONBOARDING_SAMPLE);
-  const max = parseBytes(env.VR_UPLOAD_MAX);
+  if (s.LAMPO_ONBOARDING) cfg.onboarding = flag(s.LAMPO_ONBOARDING);
+  if (s.LAMPO_ONBOARDING_SAMPLE) cfg.onboarding_sample = flag(s.LAMPO_ONBOARDING_SAMPLE);
+  const max = parseBytes(s.LAMPO_UPLOAD_MAX);
   if (max) cfg.upload_max_bytes = max;
-  const minFree = parseBytes(env.VR_MIN_FREE);
+  const minFree = parseBytes(s.LAMPO_MIN_FREE);
   if (minFree !== undefined) cfg.min_free_bytes = minFree;
   return cfg;
 }

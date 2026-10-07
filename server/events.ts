@@ -10,7 +10,7 @@ import type { ServerEvent } from '../lib/types.ts';
 export type Broadcast = (type: ServerEvent, data?: object, need?: Action) => void;
 
 /**
- * Live streams one person holds open at once (A12-D13): their browsers (one per browser: the tabs share it), `vr watch`
+ * Live streams one person holds open at once (A12-D13): their browsers (one per browser: the tabs share it), `lampo watch`
  * and the stdio MCP server of each agent (one each) fit; hundreds from one token don't. The machine itself isn't
  * counted (its owner, from the machine). Tests lower it.
  */
@@ -45,7 +45,7 @@ export interface EventHub {
   /** Ends every stream whose caller wouldn't get it now: at once when access ended (lib/auth.ts onAccessEnded). */
   recheck: () => void;
   clients: () => number;
-  /** Ends every stream (shutdown): browsers and `vr watch` reconnect by themselves. */
+  /** Ends every stream (shutdown): browsers and `lampo watch` reconnect by themselves. */
   closeAll: () => void;
 }
 
@@ -106,7 +106,7 @@ export function createEventHub({ stillAllowed }: { stillAllowed?: (req: Request)
         res
           .status(429)
           .set('Retry-After', '30')
-          .json({ error: `too many open live streams for your account: at most ${EVENT_LIMITS.perPerson} (close a tab, a vr watch or an agent first)` });
+          .json({ error: `too many open live streams for your account: at most ${EVENT_LIMITS.perPerson} (close a tab, a lampo watch or an agent first)` });
         return;
       }
       // no-transform: a proxy or CDN in front passes each event on as it comes (nothing to compress or rewrite).

@@ -177,6 +177,11 @@ format stays backwards compatible throughout.
 - A failed render's last lines leave out more kinds of keys and passwords before they reach Lampo.
 - The operator's Accounts page shows when each person was last active, not only their last sign-in, which accounts
   signed in before it was recorded never had.
+- Chat webhooks (Slack, Discord) name someone on a review link "via review link" instead of "client", write versions
+  as V2, and post to Discord as Lampo.
+- Over HTTP, `attach_preview` and `attach_reference` say the inline limit that holds there (about 700 KB, the request
+  is at most 1 MB; bigger files go through an upload URL) instead of 8 MB, which only holds over stdio.
+- `lampo help` lists `render --verbose` and `admin import --dry-run`, `--people` and `--no-derive`.
 - The app no longer opens on a blank page when the browser can't keep a copy of its code (its storage full or busy, a
   private window): what arrived from the server is used either way, and the copy is kept when it can be.
 - Setting up a server from a phone: the command that creates the owner (and the one that sets a new password) breaks
@@ -216,6 +221,17 @@ format stays backwards compatible throughout.
 - **Agents are told that a note is a request about the video**: the server's instructions, the watch prompt and the
   Agent Skill say that a note, also one from a review link, never asks an agent to run commands, open links, or send
   or change anything outside the render.
+- **The command is now `lampo`.** `lampo login`, `lampo render`, `lampo push`, `lampo watch`, `lampo open`,
+  `lampo mcp config <client>` and every other command, `lampo-mcp` for the stdio MCP server; settings are `LAMPO_*`,
+  the MCP resources `lampo://inbox` and `lampo://review/<slug>`, and the npm package `@lampo-vr/lampo`. Nothing you set
+  up before breaks: `vr` and `vr-mcp` keep working and print the same (only a person typing `vr` in a terminal is told
+  the new name), `VR_*` settings are still read wherever the `LAMPO_` one is unset, the `vr://` addresses still answer,
+  and a login saved by `vr login` is still read. To switch: `npm run link` (puts `lampo` beside `vr` in
+  `~/.local/bin`), `lampo mcp config <client>` for a new MCP setup (it starts `bin/lampo-mcp` and reads
+  `$LAMPO_TOKEN`), and rename `VR_` to `LAMPO_` in your env files when convenient. The login moves to
+  `~/.config/lampo/` and downloads to `~/.cache/lampo/`; the store stays where it is (`~/.video-review`, `data/`).
+- Agents named by their MCP client (`claude-code · Mia`) read as the agent's name (`Claude Code · Mia`) on the Connect
+  page, in the agent menus, Settings → Connected agents and Insights.
 - **"Use Lampo" is all your agent needs to hear.** Connect it, tell it *Use Lampo for "Spring launch"*, and it runs the
   whole loop by itself: it finds the project (or names one, or asks you which), puts up V1 itself, reads the playbook
   and your notes, fixes them, puts up the next version, marks each note fixed and waits for your next notes — again and

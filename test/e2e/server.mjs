@@ -9,6 +9,7 @@
 // Without Chrome or web/dist it fails (see prereq.mjs).
 import fs from 'node:fs';
 import path from 'node:path';
+import { settings } from '../../lib/env.ts';
 import { readOutbox } from '../../lib/mail/index.ts';
 import { makeVideo, sleep } from '../lib/helpers.ts';
 import { fitsAt } from './layout.mjs';
@@ -261,7 +262,7 @@ try {
     const token = await page.$eval('[data-testid="token-value"] pre', (e) => e.textContent);
     const login = await page.$eval('[data-testid="token-login"] pre', (e) => e.textContent);
     assert(/^vr_\S{20,}$/.test(token), `token ${token}`);
-    assert(login === `vr login ${BASE} --token -`, `login command ${login} (the token is pasted at the prompt, never on the command line)`);
+    assert(login === `lampo login ${BASE} --token -`, `login command ${login} (the token is pasted at the prompt, never on the command line)`);
     const r = await fetch(`${BASE}/api/library`, { headers: { Authorization: `Bearer ${token}` } });
     assert(r.status === 200 && (await r.json()).videos.some((v) => v.slug === slug), `bearer: ${r.status}`);
     const listed = await inPage('/api/auth/tokens');
@@ -277,8 +278,8 @@ try {
     });
     const codex = await snippet();
     assert(codex.includes(`url = "${BASE}/mcp"`) && codex.includes(`Bearer ${token}`), `codex config ${codex}`);
-    if (process.env.VR_SHOTS)
-      await (await page.$('[data-testid="token-fresh"]')).screenshot({ path: path.join(process.env.VR_SHOTS, 'settings-mcp-tabs.png') });
+    if (settings.LAMPO_SHOTS)
+      await (await page.$('[data-testid="token-fresh"]')).screenshot({ path: path.join(settings.LAMPO_SHOTS, 'settings-mcp-tabs.png') });
   });
 
   await check('a token can be made to expire, and the list says when', async () => {

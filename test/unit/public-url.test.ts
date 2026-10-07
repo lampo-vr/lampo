@@ -12,8 +12,8 @@ const { loadConfig, startupProblems } = await import('../../lib/config.ts');
 test('server mode without VR_PUBLIC_URL is refused, unless explicitly allowed for a local test', () => {
   const cfg = loadConfig({ VR_MODE: 'server' });
   const [why] = startupProblems(cfg, {});
-  assert.match(why ?? '', /VR_PUBLIC_URL/);
-  assert.match(why ?? '', /VR_ALLOW_NO_PUBLIC_URL/, 'says how to run a local test anyway');
+  assert.match(why ?? '', /LAMPO_PUBLIC_URL/);
+  assert.match(why ?? '', /LAMPO_ALLOW_NO_PUBLIC_URL/, 'says how to run a local test anyway');
   assert.deepEqual(startupProblems(cfg, { VR_ALLOW_NO_PUBLIC_URL: '1' }), []);
   assert.deepEqual(startupProblems(loadConfig({ VR_MODE: 'server', VR_PUBLIC_URL: 'https://review.example.com', VR_TRUST_PROXY: 'loopback' }), {}), []);
   assert.deepEqual(startupProblems(loadConfig({}), {}), [], 'local mode has no public URL');

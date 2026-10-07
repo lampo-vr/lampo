@@ -273,13 +273,13 @@ try {
     await shot(ana, '04-agent-connected');
   });
 
-  await check('Agent: “Use an API token instead” makes a token, shown once, and the snippet reads $VR_TOKEN', async () => {
+  await check('Agent: “Use an API token instead” makes a token, shown once, and the snippet reads $LAMPO_TOKEN', async () => {
     await ana.click('[data-testid=ob-token-toggle]');
     await ana.waitForSelector('[data-testid=ob-token]');
     const tok = await ana.$eval('[data-testid=ob-token]', (e) => e.textContent);
     assert(/vr_[A-Za-z0-9_-]{8,}/.test(tok), tok);
     const snippet = await ana.$eval('[data-testid=ob-snippet]', (e) => e.textContent);
-    assert(snippet.includes('Authorization: Bearer $VR_TOKEN'), snippet);
+    assert(snippet.includes('Authorization: Bearer $LAMPO_TOKEN'), snippet);
     // the step is taller than the window now: the toggle is scrolled clear of the sticky action bar first
     await ana.$eval('[data-testid=ob-token-toggle]', (e) => e.scrollIntoView({ block: 'center' }));
     await ana.click('[data-testid=ob-token-toggle]');
@@ -493,7 +493,7 @@ try {
     assert(mailRow.includes('No mail relay yet'), mailRow);
     await mia.click('[data-testid=ob-mail-show-fix]');
     const fix = await mia.$eval('[data-testid=ob-mail-fix]', (e) => e.textContent);
-    assert(fix.includes('VR_SMTP_URL') && fix.includes('VR_MAIL_FROM') && fix.includes('docker compose up -d'), fix);
+    assert(fix.includes('LAMPO_SMTP_URL') && fix.includes('LAMPO_MAIL_FROM') && fix.includes('docker compose up -d'), fix);
     await shot(mia, '09-health-mail-off');
     await mia.click('[data-testid=ob-health-rerun]');
     await mia.waitForFunction(() => document.querySelector('[data-check=mail]')?.dataset.s === 'warn', { timeout: 20000 });

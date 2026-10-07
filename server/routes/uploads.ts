@@ -293,7 +293,7 @@ export function uploadRoutes(ctx: ServerContext): Router {
             const status = statusOf(e);
             const words = publicMessage(e, who?.via === 'local' ? 'owner' : 'other', { status, where: 'upload' });
             const { details } = e as { details?: Record<string, unknown> };
-            // A person's browser reads the refusal's reason and numbers (the limit's sheet); an agent and `vr` keep the sentence.
+            // A person's browser reads the refusal's reason and numbers (the limit's sheet); an agent and `lampo` keep the sentence.
             const said = who?.via !== 'token' && status === 402 && details ? JSON.stringify({ error: words, ...details }) : words;
             throw reject(status, said);
           }

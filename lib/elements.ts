@@ -110,7 +110,7 @@ export function checkElementMap(value: unknown): ElementMap {
   return r.data as ElementMap;
 }
 
-/** A map file's text (`vr push --elements`, `vr elements`, MCP `track_video`): its size first, then JSON, then the map. */
+/** A map file's text (`lampo push --elements`, `lampo elements`, MCP `track_video`): its size first, then JSON, then the map. */
 export function readElementMap(text: string): ElementMap {
   if (bytesOf(text) > ELEMENT_LIMITS.bytes) refuse(`it is over ${ELEMENT_LIMITS.bytes / 1024 / 1024} MB`);
   let value: unknown;
@@ -401,7 +401,7 @@ export const NO_POINTERS: ReviewPointers = Object.freeze({ notes: {}, names: {} 
 /** A note's pointer in a review's answer, if it has one. */
 export const pointerIn = (p: ReviewPointers, id: string): NotePointer | undefined => (Object.hasOwn(p.notes, id) ? p.notes[id] : undefined);
 
-/** A note's elements as structured answers carry them (`vr open --json`, `get_open_notes`): ids, and the one it is near. */
+/** A note's elements as structured answers carry them (`lampo open --json`, `get_open_notes`): ids, and the one it is near. */
 export const pointerFields = (p: NotePointer | undefined): { elements: string[]; near?: string } => ({
   elements: p?.elements ?? [],
   ...(p?.near ? { near: p.near } : {}),

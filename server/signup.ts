@@ -6,12 +6,12 @@
 //   workspaces of the invites it took, with their roles — the first account confirmed takes an invite. A reset link
 //   proves the inbox too, but replaces the password the invites were taken with, so after one they are dropped (they
 //   stay pending; the person takes them again with the new password).
-// - VR_SIGNUP=open (a hosted server only; lib/mail/config.ts refuses it anywhere else): a workspace of their own, empty,
+// - LAMPO_SIGNUP=open (a hosted server only; lib/mail/config.ts refuses it anywhere else): a workspace of their own, empty,
 //   with them as its owner, named after them until they name it (their first run asks) — never the existing team's
 //   store. The account was created with the least role (`reviewer`, lib/auth.ts signUp) and belongs to no workspace
 //   until this runs. On a server not open to sign-ups nobody gets a workspace here.
 //
-// VR_SIGNUP=invite makes no account at all (an invited address gets its invite again; its link is the way in).
+// LAMPO_SIGNUP=invite makes no account at all (an invited address gets its invite again; its link is the way in).
 //
 // Contract:
 // - it runs when the address of a held account is confirmed (the emailed link, or a password reset from that inbox:

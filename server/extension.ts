@@ -1,5 +1,5 @@
 // The one extension point of the open app: what a private module (Lampo Cloud's plans and billing) may decide and
-// hear. It is loaded only when VR_CLOUD_MODULE names one (a file whose default export is a CloudModuleFactory); without
+// hear. It is loaded only when LAMPO_CLOUD_MODULE names one (a file whose default export is a CloudModuleFactory); without
 // it the app is self-hosted and complete: no limits, no extra routes, hooks that do nothing.
 //
 // What the open app asks, and where:
@@ -28,6 +28,7 @@
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import type { Request } from 'express';
+import { bothSpellings, setting } from '../lib/env.ts';
 import { filesUsage } from '../lib/files.ts';
 import { recordStep } from '../lib/funnel.ts';
 import { wellFormed } from '../lib/names.ts';
@@ -349,7 +350,7 @@ export interface Extension {
   operator: OperatorPlans | null;
   /** Stops hearing workspace changes, and the module's timers. */
   stop(): void;
-  /** Resolves once the module's hooks heard so far have ended (`vr admin` waits before it exits). */
+  /** Resolves once the module's hooks heard so far have ended (`lampo admin` waits before it exits). */
   idle(): Promise<void>;
 }
 
@@ -584,13 +585,14 @@ export function installExtension(ctx: { extension: Extension; onSignup: OnSignup
   if (ext.onSignup) ctx.onSignup = ext.onSignup;
 }
 
-/** Loads the module VR_CLOUD_MODULE names (none: NO_EXTENSION). A module that fails to load stops the server. */
+/** Loads the module LAMPO_CLOUD_MODULE names (none: NO_EXTENSION). A module that fails to load stops the server. */
 export async function loadExtension(host: HostContext, env: NodeJS.ProcessEnv = process.env): Promise<Extension> {
-  const file = env.VR_CLOUD_MODULE?.trim();
+  const file = setting('LAMPO_CLOUD_MODULE', env)?.trim();
   if (!file) return NO_EXTENSION;
   const mod = (await import(pathToFileURL(file).href)) as { default?: CloudModuleFactory };
-  if (typeof mod.default !== 'function') throw new Error(`VR_CLOUD_MODULE (${file}) has no default export to call`);
-  return createExtension(await mod.default(host, { ...env }), host);
+  if (typeof mod.default !== 'function') throw new Error(`LAMPO_CLOUD_MODULE (${file}) has no default export to call`);
+  // The module reads some settings itself (LAMPO_SIGNUP, the legal pages): it gets each under both names.
+  return createExtension(await mod.default(host, bothSpellings(env)), host);
 }
 
 /**

@@ -14,7 +14,7 @@ export const ACTIONS = {
   organize: 'folders, moving videos, assigning Claude sessions, checking for new renders',
   remove: 'remove any video (members may remove what they uploaded)',
   archive: 'archive a project and restore it; take videos out of an archived project',
-  share: 'create, change and revoke client links',
+  share: 'create, change and revoke review links',
   download: 'download videos (any version, as rendered) and whole folders (originals or previews) from the library',
   files: 'see, list and download the project files (footage, music, fonts, project files) of the House, projects and folders',
   'files-write': 'add, replace, rename, move, trash and restore project files, every change a version (trashing what someone else added needs remove)',

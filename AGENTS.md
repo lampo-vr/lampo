@@ -14,8 +14,8 @@ Agents that only *use* the tool to receive feedback on their renders want the RE
 
 A frame-exact video review tool. A reviewer pins notes (with drawings) to exact frames; the notes land as plain files
 (`data/<slug>/review.json`, `INBOX.md`, screenshots) or behind a hosted server, where AI agents read and act on them
-through the `vr` CLI or the MCP server. One app, on a person's own machine (signed in there automatically, renders
-linked where they live, Claude Code sessions and other machine extras) or hosted (`VR_MODE=server`: storage
+through the `lampo` CLI or the MCP server. One app, on a person's own machine (signed in there automatically, renders
+linked where they live, Claude Code sessions and other machine extras) or hosted (`LAMPO_MODE=server`: storage
 adapters, everyone signs in, teams in workspaces). Clients review through review links without an account.
 
 ## Map
@@ -31,7 +31,7 @@ adapters, everyone signs in, teams in workspaces). Clients review through review
 | `lib/storage/` | where renders live in server mode: local, Bunny, S3 |
 | `lib/scope.ts`, `lib/workspaces.ts` | which workspace work is for; the registry and memberships |
 | `lib/auth.ts`, `lib/shares.ts`, `lib/mail/`, `server/permissions.ts` | accounts + API tokens; review links; the mailer; the one permission table |
-| `lib/backend/` | what `vr` and MCP talk to: `local` (the store) or `remote` (a hosted server over HTTP) |
+| `lib/backend/` | what `lampo` and MCP talk to: `local` (the store) or `remote` (a hosted server over HTTP) |
 | `lib/cli.ts`, `mcp/`, `bin/` | the agent interfaces; tools in `mcp/tools/`, their rights in `mcp/access.ts` |
 | `lib/playbook*.ts` | playbooks: editing, suggestions, files, what agents read |
 | `lib/publish/` | publishing a final video: posts and the gate, the platforms' limits (browser-safe `platforms.ts`), connections with sealed secrets, the YouTube and Zernio adapters, the queue, the kit; every request through `net.ts` ([docs/publishing.md](docs/publishing.md)) |
@@ -43,7 +43,7 @@ adapters, everyone signs in, teams in workspaces). Clients review through review
 
 ## Run and verify
 
-Node ≥ 22.18 runs the TypeScript directly (`.nvmrc` pins 24; `bin/vr` finds a capable Node by itself).
+Node ≥ 22.18 runs the TypeScript directly (`.nvmrc` pins 24; `bin/lampo` finds a capable Node by itself).
 
 ```sh
 npm install
@@ -61,21 +61,21 @@ npm run test:all     # all of the above
 Tests wait for states, never for times (a loaded machine is slow, not wrong): `until` (test/lib/helpers.ts), `settle`
 (test/e2e/layout.mjs). API tests start their app with `startApp()` (test/lib/app.ts: production keep-alive, its own
 `after`; top level, before the tests). A browser suite is any `test/e2e/*.mjs` on `./lib/checks.mjs` — no list to keep.
-Generated clips are cached per machine in `<tmp>/vr-test-media/` (`VR_TEST_MEDIA_CACHE=off` to encode afresh).
+Generated clips are cached per machine in `<tmp>/vr-test-media/` (`LAMPO_TEST_MEDIA_CACHE=off` to encode afresh).
 CI (`.github/workflows/ci.yml`: Linux on GitHub's `ubuntu-latest`; only a private copy sends its own jobs to a
 self-hosted runner; `macos.yml` only on the `macos` label or by hand) is described in CONTRIBUTING.md; its styleguide
 comparison is skipped until Linux baselines are committed.
 
-Anything you start by hand (server, `vr`, scripts) must use a throwaway store: `VR_DATA=<tmp>/data VR_CACHE=<tmp>/cache`
-(and `VR_STT=off` unless you test speech). A checkout with a `data/` folder next to the app **is a live store**.
+Anything you start by hand (server, `lampo`, scripts) must use a throwaway store: `LAMPO_DATA=<tmp>/data LAMPO_CACHE=<tmp>/cache`
+(and `LAMPO_STT=off` unless you test speech). A checkout with a `data/` folder next to the app **is a live store**.
 
 ## Invariants
 
 - **Frame exactness is the product.** Browser seeks go to `(N + 0.5) / fps`, frame grabs to `(N − 0.5) / fps` (which
   matches ffmpeg's `select=eq(n,N)`), the shown frame comes from `requestVideoFrameCallback` `mediaTime`. Any change to
   seeking, timecodes, proxies or screenshots needs a test that compares against ffmpeg's decoded frame.
-- **The data contract stays backwards compatible.** Existing stores must load unchanged; agents parse `vr watch` lines,
-  `vr prompt` and `INBOX.md`. New fields are optional; nothing is renamed.
+- **The data contract stays backwards compatible.** Existing stores must load unchanged; agents parse `lampo watch` lines,
+  `lampo prompt` and `INBOX.md`. New fields are optional; nothing is renamed.
 - **`versions/` can't be regenerated.** Never delete or rewrite it; `cache/` is disposable. Never run experiments or
   tests against a live store, and never bulk-delete in one.
 - **Server mode is hostile territory.** No filesystem paths from clients, no shell strings, ffmpeg only with
@@ -121,9 +121,13 @@ to") · *Copy for an agent* · *Review link*, its kinds *Review* · *Watch only*
 whoever reviews through a link is never "client" in UI text: the link's name, "via review link", "visitors"
 ("reviewer" is a workspace role) · *Inbox* only for the person's to-do list · counted musts are "must-fix" · a range is
 a "section".
-Agent-facing text (`lib/stage.ts`, `vr`, MCP, INBOX.md) keeps its words; the UI maps them. The product is Lampo and
-agents add it as `lampo`; the repository is `lampo` too. The npm package, `vr`, `VR_*`, data paths, MCP tool names and
-`vr://` URIs stay `video-review`.
+Agent-facing text (`lib/stage.ts`, `lampo`, MCP, INBOX.md) keeps its words; the UI maps them. The product is Lampo,
+and so is everything people and agents type: the `lampo` command and `lampo-mcp`, `LAMPO_*` settings (read through
+`lib/env.ts`), the MCP key `lampo`, `lampo://` resources, the repository and the npm package `@lampo-vr/lampo`. The
+older names keep working and stay out of new text: `vr` / `vr-mcp` run the same code (`bin/`), `VR_*` is read where
+`LAMPO_*` is unset, `vr://` and the key `video-review` still answer. Data paths (`~/.video-review`, `data/`), file
+formats, MCP tool names, the OAuth client id `vr` and crypto labels keep their names: changing them would break stores,
+sessions or installs.
 
 ## Rules learned the hard way
 
@@ -179,10 +183,12 @@ agents add it as `lampo`; the repository is `lampo` too. The npm package, `vr`, 
 
 ### What agents read
 - Every person-written field in a line format goes through `oneLine`: names, captions, reasons, not only notes.
-- Text whose lines are ours leaves through `keepLines` (MCP `text()`, `vr` output): only `\n` ends a line.
+- Text whose lines are ours leaves through `keepLines` (MCP `text()`, `lampo` output): only `\n` ends a line.
 - Clean agent names where they come in (`cleanAgentName`) and stored ones on read (`shownName`, `shownEvent`).
 - What a caller posts under an agent's name carries the caller's account (`ownedAgentName`).
-- Agent formats keep their tokens (`vr` lines, INBOX.md, `CHANGE WORDS`, `PICKED`): append, never reword.
+- Agent formats keep their tokens (`lampo` lines, INBOX.md, `CHANGE WORDS`, `PICKED`): append, never reword.
+- New texts say `lampo` and `LAMPO_*`, never `vr` or `VR_*` (those are only the aliases' own code and their docs);
+  a setting is read through `lib/env.ts` (`setting`, `settings`), never `process.env.LAMPO_X ?? process.env.VR_X`.
 - A new MCP tool, field or line must fit `token-budget.test.ts`; raise a budget only with a `bench/tokens/` run.
 - MCP schemas go through `trimmed()`, inputs for the few are `.meta({ hidden })`; a new tool gets its `TOOL_ACCESS`.
 - Starting an agent: an argument list, no permission flag (`FORBIDDEN_FLAGS`), from the machine only.

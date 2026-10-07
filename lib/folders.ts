@@ -144,7 +144,7 @@ const warned = new Map<string, string>();
  * The folders as people see them — the library, search, lists, playbooks, downloads: allFolders while folders.json can
  * be read, else the folders videos are filed in (`degraded`; empty folders and their names wait for the file), logged
  * once per workspace and problem. A damaged file costs a moment's empty folders, never the library; changes still
- * refuse (allFolders), and `vr admin repair-folders` rebuilds the file.
+ * refuse (allFolders), and `lampo admin repair-folders` rebuilds the file.
  */
 export function shownFolders(reviews: Review[] = listReviews()): { folders: string[]; degraded: boolean } {
   try {
@@ -155,7 +155,7 @@ export function shownFolders(reviews: Review[] = listReviews()): { folders: stri
     if (!(e instanceof FoldersUnreadableError)) throw e;
     if (warned.get(FILE()) !== e.message) {
       console.error(
-        `folders: ${e.message}: the library shows only the folders videos are in, and folders can't be changed, until it can be read (vr admin repair-folders rebuilds a damaged one)`,
+        `folders: ${e.message}: the library shows only the folders videos are in, and folders can't be changed, until it can be read (lampo admin repair-folders rebuilds a damaged one)`,
       );
       warned.set(FILE(), e.message);
     }
@@ -395,7 +395,7 @@ export function suggestFolder(videoPath: string, reviews: Review[] = listReviews
   return { folder, reason: 'from the project path', exists: !!folder && shownFolders(reviews).folders.includes(folder) };
 }
 
-// ---------------------------------------------------------------- repair (vr admin repair-folders)
+// ---------------------------------------------------------------- repair (lampo admin repair-folders)
 
 export interface FolderRepairLink {
   /** The link's public id: what `--take-back` names. */

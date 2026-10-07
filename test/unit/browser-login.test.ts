@@ -104,14 +104,14 @@ test('in the browser: the consent screen names the machine and the token, Allow 
   const got = await result;
   const b = (await browsing()) as Browsed;
   assert.match(got.token, /^vr_/);
-  assert.equal(got.info.name, 'vr on studio-mac', 'named like --email names it');
+  assert.equal(got.info.name, 'lampo on studio-mac', 'named like --email names it');
   const held = must(auth.verifyToken(got.token));
   assert.equal(held.user.id, olivia.id);
   assert.equal(held.token.expires, undefined, 'until revoked');
   // the consent screen: vr, the machine, the token's name; no scopes; the local answer, warned about
   const view = must(b.view);
-  assert.deepEqual(view.vr, { machine: 'studio-mac', days: null, token: 'vr on studio-mac' });
-  assert.equal(view.client_name, 'vr');
+  assert.deepEqual(view.vr, { machine: 'studio-mac', days: null, token: 'lampo on studio-mac' });
+  assert.equal(view.client_name, 'lampo', 'the client id stays vr, its name is the command’s');
   assert.deepEqual(view.scopes, []);
   assert.equal(view.local_redirect, true);
   assert.match(view.redirect_host, /^127\.0\.0\.1:\d+$/);
@@ -179,7 +179,7 @@ test('a code works once: a second try is refused and revokes the token the first
   const first = await redeem({ code, code_verifier: verifier, redirect_uri: redirect });
   assert.equal(first.status, 200, await first.clone().text());
   const made = (await first.json()) as { token: string; info: { id: string; name: string }; user: { name: string } };
-  assert.equal(made.info.name, 'vr on studio-mac');
+  assert.equal(made.info.name, 'lampo on studio-mac');
   assert.equal(made.user.name, 'Olivia');
   assert.match(first.headers.get('cache-control') || '', /\bno-store\b/);
   assert.ok(auth.verifyToken(made.token));
@@ -256,7 +256,7 @@ test('the machine name is shown as one line: control and direction characters go
     follow: false,
   });
   assert.equal(b.view?.vr?.machine, 'studio-mac two');
-  assert.equal(b.view?.vr?.token, 'vr on studio-mac two');
+  assert.equal(b.view?.vr?.token, 'lampo on studio-mac two');
 });
 
 test('the OAuth store never turns a vr code into an app’s connection, whichever client asks', async () => {
@@ -326,7 +326,7 @@ test('the consent screen and its decision are a person’s: an API token is refu
   assert.deepEqual(await out.json(), { error: 'please sign in' });
   const guess = await redeem({ code: 'vra_guess', code_verifier: pkce().verifier, redirect_uri: 'http://127.0.0.1:61000/' });
   assert.equal(guess.status, 400);
-  assert.deepEqual(await guess.json(), { error: 'the sign-in code is unknown or has expired: run vr login again' });
+  assert.deepEqual(await guess.json(), { error: 'the sign-in code is unknown or has expired: run lampo login again' });
   // zod on the body: unknown fields, a short verifier, a missing redirect
   for (const body of [
     { code: 'x', code_verifier: pkce().verifier },
@@ -382,7 +382,7 @@ test('over SSH: the address to open elsewhere, and the address the browser ended
   await until(() => said.some((l) => l.startsWith('That isn’t the address of this sign-in')), 'a word about a wrong paste');
   input.write(`  ${b.answer}  \n`);
   const got = await result;
-  assert.equal(got.info.name, 'vr on build-box');
+  assert.equal(got.info.name, 'lampo on build-box');
 });
 
 test('which browser: BROWSER when set; none over SSH or on a Linux without a screen; else the system’s', () => {
@@ -425,7 +425,7 @@ const env: NodeJS.ProcessEnv = {
 };
 for (const k of ['VR_MODE', 'VR_TOKEN', 'VR_SERVER', 'BROWSER', 'SSH_CONNECTION', 'SSH_CLIENT', 'SSH_TTY', 'CLAUDE_PID', 'CLAUDE_CODE_SESSION_ID'])
   delete env[k];
-const credentials = path.join(home, 'config', 'video-review', 'credentials.json');
+const credentials = path.join(home, 'config', 'lampo', 'credentials.json');
 // The stand-in browser: it writes down the address it was asked to open.
 const opened = path.join(home, 'opened.txt');
 const browser = path.join(home, 'browser.sh');
@@ -470,11 +470,11 @@ test('vr login <url>: the browser BROWSER names opens, Allow, and every line the
     must(out[0]),
     new RegExp(`^signed in to ${base.replace(/[.:/]/g, '\\$&')} as Olivia <olivia@example\\.com> \\(owner\\) in workspace ".+" \\(w1\\)$`),
   );
-  assert.match(must(out[1]), /^every vr command and the MCP server now use that server \(credentials: .+credentials\.json; vr logout to go back/);
+  assert.match(must(out[1]), /^every lampo command and the MCP server now use that server \(credentials: .+credentials\.json; lampo logout to go back/);
   const saved = JSON.parse(fs.readFileSync(credentials, 'utf8')) as { server: string; token: string; token_id: string };
   assert.equal(saved.server, base);
   assert.equal(must(auth.verifyToken(saved.token)).token.id, saved.token_id);
-  assert.match(must(auth.verifyToken(saved.token)).token.name, /^vr on /);
+  assert.match(must(auth.verifyToken(saved.token)).token.name, /^lampo on /);
   // vr logout revokes the token vr login made, as it does --email's
   const logout = vr(['logout']);
   assert.equal(await logout.done, 0);

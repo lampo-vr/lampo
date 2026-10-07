@@ -1,4 +1,4 @@
-// video-review's service worker: the app's code from a local cache for an instant start, an offline screen when the
+// Lampo's service worker: the app's code from a local cache for an instant start, an offline screen when the
 // server is out of reach, and push notifications. It never stores data — /api, /media, /data, /mcp, /oauth always go
 // to the network. (The app itself keeps the screens it last showed in IndexedDB for the signed-in account, and deletes
 // them on sign-out: web/src/api/persist.ts.)

@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as auth from './auth.ts';
 import { type Config, loadConfig, WORKSPACE_CREATE_LIMIT } from './config.ts';
+import { spelledAs } from './env.ts';
 import { afterMemberGone, eraseAccount } from './erasure.ts';
 import { setJobOwner } from './jobs.ts';
 import { cleanDisplayName } from './names.ts';
@@ -81,7 +82,7 @@ function holdsFiles(dir: string, depth = 4): boolean {
 /**
  * A hosted store, whatever the process was started with: accounts, and none of them the machine's own owner (the app on
  * a person's own machine makes `local` at its first start). What reads a store goes by what the store is, not by the
- * shell it is read from: an operator's `vr` without VR_MODE=server reads the server's store (A12 VE1r2-3).
+ * shell it is read from: an operator's `lampo` without LAMPO_MODE=server reads the server's store (A12 VE1r2-3).
  */
 function hostedStore(): boolean {
   if (workspacesEnabled()) return true;
@@ -99,7 +100,7 @@ const workspaceFolders = (): string[] => names(path.join(DATA, 'w')).filter((n) 
  * these, and the move writes the file, so it was there and a backup of the store holds it. So does another
  * workspace's folder on a hosted store, empty or not: there a workspace's folders are made with it (createWorkspace),
  * and a workspace nobody has used yet still has members (A12 VE1-2) — but a folder alone can't tell a moved store from
- * one that never had workspaces and kept a folder a mistyped VR_WORKSPACE once left, so it names both ways out, and no
+ * one that never had workspaces and kept a folder a mistyped LAMPO_WORKSPACE once left, so it names both ways out, and no
  * backup as certain. The app on a person's own machine never makes a workspace: there only a folder with something in
  * it counts. `every`: every folder counts, whatever the store (the move itself, which would write #1 alone over them).
  */
@@ -120,8 +121,8 @@ function signsOfMove({ every = false }: { every?: boolean } = {}): { why: string
   return {
     why: `is missing, but this store has ${folders}`,
     until: all
-      ? `it is back: if this store had workspaces, restore it from your backup of ${DATA}; if it never had (a folder a mistyped VR_WORKSPACE once left), move those folders out of ${W}`
-      : `it is back: if this store never had workspaces, those folders are left over (made with a mistyped VR_WORKSPACE) — move them out of ${W}; if it had, put workspaces.json back`,
+      ? `it is back: if this store had workspaces, restore it from your backup of ${DATA}; if it never had (a folder a mistyped LAMPO_WORKSPACE once left), move those folders out of ${W}`
+      : `it is back: if this store never had workspaces, those folders are left over (made with a mistyped LAMPO_WORKSPACE) — move them out of ${W}; if it had, put workspaces.json back`,
   };
 }
 
@@ -185,12 +186,12 @@ export function checkWorkspaces(): void {
   stored();
 }
 
-/** Workspace #1's name until someone names it: the team's (org_name / VR_ORG_NAME), else a plain word. */
+/** Workspace #1's name until someone names it: the team's (org_name / LAMPO_ORG_NAME), else a plain word. */
 const defaultName = (): string => loadConfig().org_name || 'Workspace';
 
 /**
  * A store without workspaces.json: workspace #1, every account a member with its own role — except someone who signed
- * up on their own (VR_SIGNUP=open) without an invite: they get a workspace of their own (placeSignup), never this one.
+ * up on their own (LAMPO_SIGNUP=open) without an invite: they get a workspace of their own (placeSignup), never this one.
  */
 function implied(): WorkspacesFile {
   const all = auth.listUsers().filter((u) => !u.outside_w1);
@@ -233,17 +234,17 @@ export const listWorkspaces = (): readonly StoredWorkspace[] => registry().works
 export const workspaceIds = (): string[] => listWorkspaces().map((w) => w.id);
 export const getWorkspace = (id: string): StoredWorkspace | null => listWorkspaces().find((w) => w.id === id) ?? null;
 export const workspaceInfo = (w: StoredWorkspace): WorkspaceInfo => ({ id: w.id, name: w.name, created: w.created });
-/** The workspace made for an account's own sign-up (VR_SIGNUP=open), or null (server/extension.ts placeSignupOf). */
+/** The workspace made for an account's own sign-up (LAMPO_SIGNUP=open), or null (server/extension.ts placeSignupOf). */
 export const signupWorkspaceOf = (userId: string): string | null => listWorkspaces().find((w) => w.signup && w.by === userId)?.id ?? null;
 
 /**
- * A process working on this store directly (`vr`, the stdio MCP server) in workspace `id` (VR_WORKSPACE): it must be
+ * A process working on this store directly (`lampo`, the stdio MCP server) in workspace `id` (LAMPO_WORKSPACE): it must be
  * one the store has. An unknown id would work in an empty store of its own under `w/<id>/`, named nowhere — notes and
  * renders no one in the app ever sees (audit A12-D1).
  */
 export function checkProcessWorkspace(id: string): void {
   if (id === DEFAULT_WORKSPACE || getWorkspace(id)) return;
-  throw new WorkspaceError(`VR_WORKSPACE=${id} is not a workspace of this store (vr admin workspaces lists them)`);
+  throw new WorkspaceError(`${spelledAs('LAMPO_WORKSPACE')}=${id} is not a workspace of this store (lampo admin workspaces lists them)`);
 }
 
 /** Whether this instance hosts workspaces at all: a hosted server (never the app on a person's own machine). */
@@ -433,7 +434,7 @@ function newWorkspaceId(f: WorkspacesFile): string {
 
 /**
  * The workspaces an account made (`by`; one made before that was kept counts for its first member, who made it). What
- * VR_WORKSPACE_CREATE_LIMIT counts (A12-D9).
+ * LAMPO_WORKSPACE_CREATE_LIMIT counts (A12-D9).
  */
 const madeBy = (f: WorkspacesFile, userId: string): number =>
   f.workspaces.filter((w) => w.id !== DEFAULT_WORKSPACE && (w.by ?? w.members[0]?.user) === userId).length;
@@ -442,14 +443,14 @@ const madeBy = (f: WorkspacesFile, userId: string): number =>
 export const workspacesMadeBy = (userId: string): number => madeBy(registry(), userId);
 
 /**
- * The most workspaces this account may have made (VR_WORKSPACE_CREATE_LIMIT where anyone may make them, A12-D9), or
+ * The most workspaces this account may have made (LAMPO_WORKSPACE_CREATE_LIMIT where anyone may make them, A12-D9), or
  * none: whoever runs the server (lib/operator.ts) has no limit — never a role in workspace #1 as such.
  */
 export const createLimitOf = (userId: string, cfg: Pick<Config, 'workspace_create_limit'> & OperatorConfig): number | undefined =>
   isOperator(cfg, userId) ? undefined : (cfg.workspace_create_limit ?? WORKSPACE_CREATE_LIMIT);
 
 /**
- * Whether this account may make a workspace here (VR_WORKSPACE_CREATE: `owners`, the default, is whoever runs the
+ * Whether this account may make a workspace here (LAMPO_WORKSPACE_CREATE: `owners`, the default, is whoever runs the
  * server; `anyone` adds everyone signed in, a few each): what POST /api/workspaces allows, and what the account menu
  * offers (/api/auth/status `workspace_create`).
  */
@@ -467,7 +468,7 @@ export function mayCreateWorkspace(userId: string, cfg: Pick<Config, 'workspace_
  * owner may have made, this one included (counted under the lock, so two requests at once can't both pass it).
  */
 export function createWorkspace({ name, ownerId, signup = false, limit }: { name: string; ownerId: string; signup?: boolean; limit?: number }): WorkspaceInfo {
-  if (!workspacesEnabled()) throw new WorkspaceError('workspaces are for a hosted server (VR_MODE=server)', 409);
+  if (!workspacesEnabled()) throw new WorkspaceError('workspaces are for a hosted server (LAMPO_MODE=server)', 409);
   const owner = auth.getUser(ownerId);
   if (!owner || owner.disabled) throw new WorkspaceError('no such account', 404);
   const n = checkWorkspaceName(name);
@@ -481,7 +482,7 @@ export function createWorkspace({ name, ownerId, signup = false, limit }: { name
     const id = newWorkspaceId(f);
     const created = isoLocal();
     const members: WorkspaceMember[] = [{ user: owner.id, role: 'owner', since: created }];
-    // A sign-up's workspace starts with a placeholder name; one made in the app or with `vr admin` was named by a person.
+    // A sign-up's workspace starts with a placeholder name; one made in the app or with `lampo admin` was named by a person.
     f.workspaces.push({ id, name: n, created, members, by: owner.id, ...(signup ? { signup: true as const } : { named: created }) });
     return { id, name: n, created, existed: false };
   });
@@ -627,7 +628,7 @@ export function setBadgeHidden(ws: string, hidden: boolean): StoredWorkspace {
  * - `reset`: the address was proven with a reset link, which replaced the password the invites were accepted with —
  *   whoever accepted them may not have been the address's owner, so they are dropped (the invites stay pending: their
  *   person takes them with the new password);
- * - anyone else on a server open to sign-ups (VR_SIGNUP=open) gets a workspace of their own, empty, as its owner —
+ * - anyone else on a server open to sign-ups (LAMPO_SIGNUP=open) gets a workspace of their own, empty, as its owner —
  *   never the existing team's; on any other server nobody gets one here (null).
  * An invite taken at accept time by a held sign-up of an earlier release still places it as before. Runs again
  * harmlessly (a second click on the same link): nothing changes for someone who is placed already.
@@ -811,7 +812,7 @@ export const suspendedIn = (ws: string, userId: string): string | null => member
 // ---------------------------------------------------------------- accounts that join a workspace
 
 /**
- * A new account in workspace `ws` with `role` (setup's first owner, an admin's "Add user", `vr admin create-user`). On a
+ * A new account in workspace `ws` with `role` (setup's first owner, an admin's "Add user", `lampo admin create-user`). On a
  * store without workspaces.json: an account with that role, as always. Otherwise its name only has to differ from the
  * workspace's people, and the role is its membership's.
  */

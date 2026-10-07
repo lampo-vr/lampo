@@ -61,8 +61,7 @@ export function About() {
           testid="about-facts"
           rows={[
             { label: t('Version'), value: info?.version || '…', mono: true },
-            // the name on disk and on the command line stays the old one (lib/brand.ts)
-            { label: t('Package and command'), value: 'video-review · vr', mono: true },
+            { label: t('Package and command'), value: '@lampo-vr/lampo · lampo', mono: true },
             { label: t('Runs'), value: machine ? t('On your own machine, with its extras') : t('On a hosted server') },
             !!info?.dataDir && { label: t('Notes and videos'), value: info.dataDir, mono: true },
             !!info?.root && { label: t('App'), value: info.root, mono: true },
@@ -81,7 +80,7 @@ export function About() {
               {t('Source code')}
             </a>
           ) : (
-            <span className="set-sub">{t('No source link configured (VR_SOURCE_URL).')}</span>
+            <span className="set-sub">{t('No source link configured (LAMPO_SOURCE_URL).')}</span>
           )}
           <a href="/third-party-licenses.txt" target="_blank" rel="noreferrer" data-testid="notices-link">
             {t('Third-party notices')}

@@ -1,5 +1,5 @@
 {
-  "name": "video-review",
+  "name": "@lampo-vr/lampo",
   "version": "0.1.0",
   "private": true,
   "description": "Frame-exact video review for AI video agents: notes pinned to exact frames, delivered as plain files, a CLI and an MCP server. Local-first, or self-hosted as a server.",
@@ -26,6 +26,8 @@
   ],
   "type": "module",
   "bin": {
+    "lampo": "bin/lampo",
+    "lampo-mcp": "bin/lampo-mcp",
     "vr": "bin/vr",
     "vr-mcp": "bin/vr-mcp"
   },
@@ -45,7 +47,7 @@
     "mcp": "node mcp/server.ts",
     "link": "node scripts/link.mjs",
     "pretest": "node scripts/node-check.mjs",
-    "test": "node --test ${VR_TEST_JOBS:+--test-concurrency=$VR_TEST_JOBS} 'test/unit/*.test.ts'",
+    "test": "node --test ${VR_TEST_JOBS:+--test-concurrency=$VR_TEST_JOBS} ${LAMPO_TEST_JOBS:+--test-concurrency=$LAMPO_TEST_JOBS} 'test/unit/*.test.ts'",
     "pretest:changed": "node scripts/node-check.mjs",
     "test:changed": "node scripts/test-changed.ts",
     "test:qa": "node --test test/qa-smoke.ts",

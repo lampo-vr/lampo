@@ -4,6 +4,7 @@
 // (bench/footage/RESULTS.md: 314 of 315 cuts within ±1 frame, 97.9 % of moves right). The decode goes in chunks, each
 // its own job in the queue, so a long take never holds a player's scrub copy back for minutes.
 import { cutsFromDiffs } from '../cuts.ts';
+import { settings } from '../env.ts';
 import { analysisRows, FFMPEG, lower, spawnMedia } from '../probe.ts';
 import { seekTime } from '../shots.ts';
 import type { FootageMotion } from './types.ts';
@@ -134,7 +135,7 @@ export function estimatePair(a: Uint8Array, b: Uint8Array, w: number, h: number)
 }
 
 /** VideoToolbox on a Mac: the decode is the analysis's largest cost, and the hardware does it at a fifth of the CPU. */
-const hwaccel = (): string[] => (process.platform === 'darwin' && process.env.VR_FOOTAGE_HWACCEL !== 'off' ? ['-hwaccel', 'videotoolbox'] : []);
+const hwaccel = (): string[] => (process.platform === 'darwin' && settings.LAMPO_FOOTAGE_HWACCEL !== 'off' ? ['-hwaccel', 'videotoolbox'] : []);
 
 /**
  * Decodes frames [from, to) at 128 px wide (plus the STEP frames before `from` that the first diff and pair need) and

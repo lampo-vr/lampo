@@ -265,7 +265,7 @@ export function SignInScreen({ resumed }: { resumed: boolean }) {
           {t('Sign in')}
         </GoButton>
       </form>
-      <Fine after={forApp ? undefined : agent.body(<Cmd name="vr login" args={server} label={t('Agents sign in with')} />)}>
+      <Fine after={forApp ? undefined : agent.body(<Cmd name="lampo login" args={server} label={t('Agents sign in with')} />)}>
         <p>
           {/* the line kept while /api/info says whether this server has sign-up: the sign-up-off sentence showed first
               on every server, then swapped */}
@@ -371,7 +371,7 @@ export function SetupScreen() {
           hint={
             <>
               <span>{t('Printed in the server log at start. Or run on the server:')}</span>
-              <Cmd name="vr admin" args="create-user --role owner" label={t('Create the owner on the server')} />
+              <Cmd name="lampo admin" args="create-user --role owner" label={t('Create the owner on the server')} />
             </>
           }
         />
@@ -692,7 +692,7 @@ const LibraryLink = () => (
 
 // The consent screen of the OAuth sign-in for MCP clients (ChatGPT, Claude, Cursor, …). The server already checked the
 // app, where the answer goes and PKCE; this is where the person decides, seeing who asks, where the answer goes and
-// what the app may do — capped by their role either way. `vr login` asks here too (`r.vr`): the same screen names the
+// what the app may do — capped by their role either way. `lampo login` asks here too (`r.vr`): the same screen names the
 // computer, the API token it gets and what that token may do.
 export function ConsentScreen({ request }: { request: string }) {
   const { data: status, refetch: refetchStatus } = useAuthStatus();
@@ -720,8 +720,8 @@ export function ConsentScreen({ request }: { request: string }) {
   const gone = q.error instanceof ApiError && q.error.status === 404;
   const vr = r?.vr ?? null;
   if (handedTo) {
-    // vr's loopback port answers without a page of its own: the browser stays here, and this says where to go on
-    const name = vr ? t('vr on {machine}', { machine: vr.machine }) : r?.client_name;
+    // lampo's loopback port answers without a page of its own: the browser stays here, and this says where to go on
+    const name = vr ? t('lampo on {machine}', { machine: vr.machine }) : r?.client_name;
     return (
       <Frame testid="consent-done">
         <EntranceHead
@@ -802,7 +802,7 @@ export function ConsentScreen({ request }: { request: string }) {
       <EntranceHead title={t('Let it in?')}>
         {vr ? (
           <T
-            k="<0>vr</0> on <1>{machine}</1> wants to work with your reviews in {brand}, as <2>{name}</2>."
+            k="<0>lampo</0> on <1>{machine}</1> wants to work with your reviews in {brand}, as <2>{name}</2>."
             values={{ machine: vr.machine, name: me?.name ?? '', brand: BRAND_NAME }}
             tags={[bold, bold, bold]}
           />
@@ -816,18 +816,18 @@ export function ConsentScreen({ request }: { request: string }) {
       </EntranceHead>
       <ul className="consent-facts">
         {vr ? (
-          // what vr gets, named as Settings → API tokens will list it
+          // what lampo gets, named as Settings → API tokens will list it
           <li>
             <I name="key" size={14} />
             <span>
               {vr.days ? (
                 <T
-                  k="vr gets an API token named <0>{token}</0>, valid for {n} day.|vr gets an API token named <0>{token}</0>, valid for {n} days."
+                  k="lampo gets an API token named <0>{token}</0>, valid for {n} day.|lampo gets an API token named <0>{token}</0>, valid for {n} days."
                   values={{ token: vr.token, n: vr.days }}
                   tags={[code]}
                 />
               ) : (
-                <T k="vr gets an API token named <0>{token}</0>, valid until you revoke it." values={{ token: vr.token }} tags={[code]} />
+                <T k="lampo gets an API token named <0>{token}</0>, valid until you revoke it." values={{ token: vr.token }} tags={[code]} />
               )}
             </span>
           </li>
@@ -878,7 +878,7 @@ export function ConsentScreen({ request }: { request: string }) {
       </ul>
       {vr ? (
         // an API token is the account's role in this workspace, minus what only a person does in the app
-        <ul className="consent-scopes" aria-label={t('What vr may do')}>
+        <ul className="consent-scopes" aria-label={t('What lampo may do')}>
           <li>
             <b>{t('Works as you')}</b>
             <span>{t('Whatever your role ({role}) lets you do here, as you would in the app.', { role: me ? roleWord(me.role) : '—' })}</span>
@@ -913,7 +913,7 @@ export function ConsentScreen({ request }: { request: string }) {
       <Fine>
         <p>
           {vr
-            ? t('It never sees your password. Revoke the token any time under Settings → API tokens, or with vr logout.')
+            ? t('It never sees your password. Revoke the token any time under Settings → API tokens, or with lampo logout.')
             : t('It never sees your password. Disconnect it any time under Settings → API tokens.')}
         </p>
       </Fine>

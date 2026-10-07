@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { settings } from '../lib/env.ts';
 import { renderDemoMedia } from './demo/media.ts';
 import { startServer } from './demo/server.ts';
 import { populate } from './demo/store.ts';
@@ -10,14 +11,14 @@ import { populate } from './demo/store.ts';
 const dir = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'vr-demo-'));
 console.log('rendering demo footage with ffmpeg (about 20 s)…');
 const media = renderDemoMedia(path.join(dir, 'media'));
-const server = await startServer(path.join(dir, 'store'), { mediaRoot: media.root, port: Number(process.env.VR_PORT) || undefined });
+const server = await startServer(path.join(dir, 'store'), { mediaRoot: media.root, port: Number(settings.LAMPO_PORT) || undefined });
 console.log('adding notes, a re-render and a client link…');
 const demo = await populate(server.url, media);
 
 console.log(`
 demo running at ${server.url}
   client link (no account):  ${server.url}/g/${demo.shareToken}
-  the CLI on this store:     VR_DATA=${path.join(dir, 'store/data')} vr ls
+  the CLI on this store:     LAMPO_DATA=${path.join(dir, 'store/data')} lampo ls
 Ctrl+C stops the server and deletes ${dir}`);
 
 const stop = async () => {

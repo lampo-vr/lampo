@@ -1,12 +1,13 @@
 // Where the footage bench keeps what it downloads and makes: <repo>/cache/footage/ (gitignored), or
-// VR_FOOTAGE_CACHE. Nothing here is client media: CC0 photos (sources.json) turned into clips by make.ts.
+// LAMPO_FOOTAGE_CACHE. Nothing here is client media: CC0 photos (sources.json) turned into clips by make.ts.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { settings } from '../../lib/env.ts';
 
 export const BENCH = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.resolve(BENCH, '../..');
-export const FOOTAGE_CACHE = process.env.VR_FOOTAGE_CACHE || path.join(ROOT, 'cache', 'footage');
+export const FOOTAGE_CACHE = settings.LAMPO_FOOTAGE_CACHE || path.join(ROOT, 'cache', 'footage');
 export const MODELS_DIR = path.join(FOOTAGE_CACHE, 'models');
 export const IMAGES_DIR = path.join(FOOTAGE_CACHE, 'images');
 export const CLIPS_DIR = path.join(FOOTAGE_CACHE, 'clips');
@@ -22,7 +23,7 @@ export const writeJson = (file: string, v: unknown): void => {
 /** A TrueType font for burned-in test captions and contact-sheet labels (macOS, Debian/Ubuntu, Alpine). */
 export function fontFile(): string {
   const candidates = [
-    process.env.VR_FONT,
+    settings.LAMPO_FONT,
     '/System/Library/Fonts/Supplemental/Arial Bold.ttf',
     '/Library/Fonts/Arial Unicode.ttf',
     '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
@@ -30,7 +31,7 @@ export function fontFile(): string {
     '/usr/share/fonts/TTF/DejaVuSans-Bold.ttf',
   ];
   for (const c of candidates) if (c && fs.existsSync(c)) return c;
-  throw new Error('no TrueType font found: set VR_FONT to a .ttf file');
+  throw new Error('no TrueType font found: set LAMPO_FONT to a .ttf file');
 }
 
 /** Seconds → "m:ss.ff" at the clip's fps (frames, not hundredths: what an editor types). */

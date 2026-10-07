@@ -1,5 +1,5 @@
 // Elements maps (lib/elements.ts): a renderer's agent attaches where each named element of a version is, and agents on
-// another machine ask what the video's notes point at (the maps stay on the server; `vr` and MCP read the answer).
+// another machine ask what the video's notes point at (the maps stay on the server; `lampo` and MCP read the answer).
 import express, { type Router } from 'express';
 import { attachElements, pointersOf } from '../../lib/elementMaps.ts';
 import { ELEMENT_LIMITS, ElementMapError } from '../../lib/elements.ts';

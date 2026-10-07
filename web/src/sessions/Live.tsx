@@ -176,7 +176,7 @@ export function AgentNowDot({ agent, active }: { agent: string; active: boolean 
 const clock = (iso: string) => new Date(iso).toLocaleTimeString(locale(), { hour: 'numeric', minute: '2-digit' });
 
 /** An action's words with what moves on it: how far an upload is, since when a wait lasts. */
-/** How far a render or an upload is (`vr render`'s progress, else an upload's percentage), while it goes on. */
+/** How far a render or an upload is (`lampo render`'s progress, else an upload's percentage), while it goes on. */
 const howFar = (a: { kind?: string; pct?: number; progress?: AgentActivity['progress'] }): number | null => {
   const p = a.progress?.pct ?? (a.kind === 'upload' ? a.pct : undefined);
   return p != null && p < 100 && (a.kind === 'upload' || a.kind === 'render') ? p : null;

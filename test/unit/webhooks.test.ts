@@ -80,7 +80,7 @@ test('json deliveries are signed so receivers can check them, with the event and
   assert.ok(!hooks.verifySignature('wrong', body, String(headers['x-vr-signature'])));
   const json = JSON.parse(body);
   assert.equal(json.url, 'https://review.example.com/#/v/__work__Acme__spot.mp4?c=c_0a1b2c');
-  assert.match(json.text, /^Mia \(client\) left a note on spot\.mp4 v2 at 00:03:00/);
+  assert.match(json.text, /^Mia \(via review link\) left a note on spot\.mp4 V2 at 00:03:00/);
   assert.equal(json.event.by, 'guest:Mia');
 });
 
@@ -153,7 +153,7 @@ test("which events a hook wants: 'client' (default), 'all', or event types", () 
     text: 'downloaded all 6 videos of Acme/Reels (3.4 GB, originals)',
   });
   assert.equal(hooks.wants({ url }, download), true);
-  assert.equal(hooks.describe(download), 'Mia (client) downloaded all 6 videos of Acme/Reels (3.4 GB, originals)');
+  assert.equal(hooks.describe(download), 'Mia (via review link) downloaded all 6 videos of Acme/Reels (3.4 GB, originals)');
   assert.throws(() => hooks.checkHook({ url: 'ftp://x' }), /http/);
   assert.throws(() => hooks.checkHook({ url, format: 'teams' as 'json' }), /format/);
   assert.equal(hooks.envHook({ VR_WEBHOOK_URL: url, VR_WEBHOOK_FORMAT: 'slack', VR_WEBHOOK_EVENTS: 'client,approval' })?.format, 'slack');
@@ -192,7 +192,7 @@ test('Settings: hooks can be added, changed (secret kept unless replaced), teste
     rx.hits.length = 0;
     const tested = await call('POST', `/api/admin/webhooks/${made.json.id}/test`);
     assert.equal(tested.json.ok, true);
-    assert.match(JSON.parse(rx.hits[0].body).text, /Test client \(client\) left a note/);
+    assert.match(JSON.parse(rx.hits[0].body).text, /Test visitor \(via review link\) left a note/);
 
     // A client's note, written by anyone (here the store directly), reaches both hooks through the event feed.
     rx.hits.length = 0;
@@ -201,7 +201,7 @@ test('Settings: hooks can be added, changed (secret kept unless replaced), teste
     await ctx.webhooks.idle();
     assert.equal(rx.hits.length, 2);
     const slack = rx.hits.map((h) => JSON.parse(h.body)).find((b) => b.text);
-    assert.match(slack.text, /Ada \(client\) left a note on hook\.mp4 v1 at 00:00:05: “Bitte heller”/);
+    assert.match(slack.text, /Ada \(via review link\) left a note on hook\.mp4 V1 at 00:00:05: “Bitte heller”/);
     // The team's own notes don't ping the channel.
     rx.hits.length = 0;
     store.addComment(slug, { frame: 6, text: 'internal', author: 'tester' });

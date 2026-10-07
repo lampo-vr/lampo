@@ -32,8 +32,8 @@ export const waitNowLine = (cursor: string): string => `Now call wait_for_feedba
 export const nothingWaitingLine = (cursor: string): string =>
   `Nothing waiting for you: put up any version you have, then call wait_for_feedback with since "${cursor}".`;
 
-/** The same for `vr`: its own way to wait (`vr watch` follows from when it starts; it takes no cursor). */
-export const WATCH_NOW_LINE = `Now listen with vr watch (keep it running): ${ON_SEND}.`;
+/** The same for `lampo`: its own way to wait (`lampo watch` follows from when it starts; it takes no cursor). */
+export const WATCH_NOW_LINE = `Now listen with lampo watch (keep it running): ${ON_SEND}.`;
 
 /** A fix handed over while more of the video's work is open: no waiting yet. */
 export const stillOpenLine = (n: number): string => `${n} note${n === 1 ? '' : 's'} still open on this video.`;

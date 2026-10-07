@@ -73,7 +73,7 @@ const gb = (bytes: number) => (bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` :
 
 export function downloadRoutes(ctx: ServerContext): Router {
   const r = router();
-  // With the app's own media host (VR_MEDIA_ORIGIN) a zip — video, and often gigabytes — is streamed from there, never
+  // With the app's own media host (LAMPO_MEDIA_ORIGIN) a zip — video, and often gigabytes — is streamed from there, never
   // through a front of the app host that must not carry video: the route checks who asks and redirects to a signed URL.
   const mediaOrigin = ctx.hosted ? ctx.cfg.media_origin : null;
   const mediaHost = mediaHostOf(mediaOrigin);

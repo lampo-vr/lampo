@@ -33,7 +33,7 @@ likely to. The paths of each area are in `AUDITS.md`.
 - Mail:
   - header and line-break injection through names, workspace and org names;
   - HTML escaping in `lib/mail/layout.ts` and `templates.ts`;
-  - links built from `VR_PUBLIC_URL`, never from Host.
+  - links built from `LAMPO_PUBLIC_URL`, never from Host.
 - Secrets compared in constant time; tokens never in logs (`loggedPath`) or Referer.
 
 ## workspaces
@@ -71,7 +71,7 @@ likely to. The paths of each area are in `AUDITS.md`.
 ## agents
 
 - Everything people or clients write reaches agents through `oneLine` in every line format: `eventLine`,
-  `shortEventLine`, INBOX.md, review.md, `vr prompt`, `vr open`, MCP `noteLines`, the stage detail, `partLine`,
+  `shortEventLine`, INBOX.md, review.md, `lampo prompt`, `lampo open`, MCP `noteLines`, the stage detail, `partLine`,
   `textEditLine`, choices, playbook markdown, transcripts, recording drafts, references, and names of videos,
   folders, workspaces and accounts.
 - Starting agents (`lib/agentRun.ts`, `server/agentRuns.ts`, `server/wake.ts`):
@@ -87,7 +87,7 @@ likely to. The paths of each area are in `AUDITS.md`.
   - upload tickets;
   - refs pointing at local files or private URLs;
   - postMessage origins in the MCP App.
-- `vr`: token file permissions, downloads resolved inside the cache (`inCache`), server-controlled names written to
+- `lampo`: token file permissions, downloads resolved inside the cache (`inCache`), server-controlled names written to
   disk.
 - Playbooks: agents only propose (`person()` on writes). Can a reviewer or client get text into `agentMarkdown`?
 
@@ -136,7 +136,7 @@ likely to. The paths of each area are in `AUDITS.md`.
 
 ## docs
 
-- Claims against code: env vars, routes (`docs/api.md`), MCP tools (`docs/mcp.md`, `skills/lampo/SKILL.md`), `vr`
+- Claims against code: env vars, routes (`docs/api.md`), MCP tools (`docs/mcp.md`, `skills/lampo/SKILL.md`), `lampo`
   commands, data format, the security model, and the README's pictures and claims.
 - Oversharing: personal or client names, real paths, hostnames, internal session or process names, private files,
   business internals, and unfixed weaknesses described in detail.

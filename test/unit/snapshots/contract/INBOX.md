@@ -1,7 +1,7 @@
 # Video review inbox
 
 Newest human feedback across all videos, newest first. Updated 2026-10-02T09:30:00+02:00.
-Full detail per video: `vr open <video>`, or data/<slug>/review.json. Live stream: `vr watch`.
+Full detail per video: `lampo open <video>`, or data/<slug>/review.json. Live stream: `lampo watch`.
 
 ## 2026-10-02T09:30:00+02:00 · NEW SHOULD · logo · c_c0ffee → fixture-edit
 - video: /@uploads/Demo/Reels/teaser.mp4 (v2)

@@ -3,7 +3,7 @@
 //   data/<slug>/review.md     – readable summary of open items (regenerated on every change)
 //   data/<slug>/<id>_clean.png, <id>_marked.png, <id>.m4a
 //   data/events.jsonl         – append-only log of everything that happened
-//   data/events.imported.jsonl – another store's history, as `vr admin import` brought it in (never news)
+//   data/events.imported.jsonl – another store's history, as `lampo admin import` brought it in (never news)
 //   data/INBOX.md             – newest human feedback across all videos
 // Server and CLI both write here, so every mutation runs under a per-video lock and writes atomically.
 import crypto from 'node:crypto';
@@ -69,14 +69,14 @@ import type {
 
 /**
  * Workspace #1's event log and inbox (where they always were), for tests and tools that mean #1. Code that reads the
- * log for whoever runs now uses `eventsFile()` / `inboxPath()`: with VR_WORKSPACE these are another team's files.
+ * log for whoever runs now uses `eventsFile()` / `inboxPath()`: with LAMPO_WORKSPACE these are another team's files.
  */
 export const EVENTS_FILE = path.join(DATA, 'events.jsonl');
 export const INBOX_FILE = path.join(DATA, 'INBOX.md');
 /** The event log of the workspace this work runs for (lib/scope.ts). */
 export const eventsFile = (ws = currentWorkspace()): string => path.join(workspaceRoot(ws).data, 'events.jsonl');
 /**
- * Another store's history, as `vr admin import` brought it in (appendHistory): a file of its own next to the log, so
+ * Another store's history, as `lampo admin import` brought it in (appendHistory): a file of its own next to the log, so
  * no reader of the log — what agents and people are told as news — ever counts it (sweep 2 SW-1r).
  */
 export const importedEventsFile = (ws = currentWorkspace()): string => path.join(workspaceRoot(ws).data, 'events.imported.jsonl');
@@ -238,7 +238,7 @@ export function listSlugs(): string[] {
 
 // Listings (library, status, inbox, search, insights) run on every request and read every review.json: at 1,000
 // videos, re-reading and parsing them blocked the server for ~90 ms a call. A review is parsed again only when its
-// file changed (inode, size or mtime: every write is an atomic rename, from this process or `vr` in another). What a
+// file changed (inode, size or mtime: every write is an atomic rename, from this process or `lampo` in another). What a
 // listing returns is shared between callers, so it is frozen: code that changes a review loads it fresh (loadReview).
 // Keyed by the file's path: two workspaces can hold the same slug.
 const listed = new Map<string, { key: string; review: Review }>();
@@ -252,7 +252,7 @@ export function deepFreeze<T>(value: T): T {
 }
 
 // A review.json that can't be read (cut short by a crash, edited by hand) is left out of listings, said once in the log
-// and named by unreadableReviews(): one damaged file never takes the library, search, status or `vr ls` down with it.
+// and named by unreadableReviews(): one damaged file never takes the library, search, status or `lampo ls` down with it.
 // What opens that one video still fails, as it should. Keyed like `listed`: the file's path and what it was when said.
 const unreadable = new Map<string, string>();
 
@@ -325,7 +325,7 @@ export interface Resolved {
 }
 
 // Resolve what a user/agent typed: absolute or relative path, slug, or a unique substring of a reviewed path.
-// `mustExist: false` is the machine's own caller about to track a file (`vr add`, stdio MCP): only then is the disk
+// `mustExist: false` is the machine's own caller about to track a file (`lampo add`, stdio MCP): only then is the disk
 // looked at. Otherwise a name is a review's or nothing, and a path answers the same whether or not a file is there.
 export function resolveVideo(arg: string | undefined, { mustExist = true } = {}): Resolved {
   if (!arg) throw new Error('missing <video>');
@@ -478,7 +478,7 @@ interface NewVersion {
 }
 
 /**
- * Which agent run a version registered now comes from (lib/runs.ts sets it wherever it is loaded: the app, `vr`, the
+ * Which agent run a version registered now comes from (lib/runs.ts sets it wherever it is loaded: the app, `lampo`, the
  * stdio MCP server): read only, it never writes. None without it.
  */
 let versionRun: ((slug: string, by: string) => string | undefined) | null = null;
@@ -766,12 +766,12 @@ function uploadTarget(o: IngestOptions): { slug: string; video: string; folder: 
 
 const ingesting = new Map<string, Promise<unknown>>();
 
-// Uploads in this process run one after another (ingesting). Another process (a `vr push` on the server) may upload
+// Uploads in this process run one after another (ingesting). Another process (a `lampo push` on the server) may upload
 // the same video at the same moment, and version N's bytes are stored before the review's lock is taken: each upload
 // holds data/.uploads/<slug> from choosing N until N is registered. Refused at once when held (409), never waited
 // for: the lock's wait blocks the thread, an upload can take minutes. The holder touches it while it works; one left
 // by a process that died, by an earlier run of this pid, or untouched for two minutes, is taken over. An import
-// (`vr admin import`) marks the video ids it fills under the same hold (claimForImport), and holds data/.import while
+// (`lampo admin import`) marks the video ids it fills under the same hold (claimForImport), and holds data/.import while
 // it runs.
 const UPLOAD_IDLE_MS = 2 * 60_000;
 const uploadReservation = (slug: string): string => path.join(dataDir(), '.uploads', slug);
@@ -1056,7 +1056,7 @@ function assignInto(review: Review, session: SessionInput | null, by: string): v
   // no new work in an archived project: an agent is taken off it, never put on it
   if (session) checkReviewOpen(review);
   const prev = review.session?.name || null;
-  // Whatever named the session (the app, `vr`, an MCP client, a heartbeat's agent): one line, short (A12-D3).
+  // Whatever named the session (the app, `lampo`, an MCP client, a heartbeat's agent): one line, short (A12-D3).
   const name = session ? cleanAgentName(session.name) : '';
   if (session && !name) throw Object.assign(new Error('a session needs a name'), { status: 400 });
   review.session = session
@@ -1206,7 +1206,7 @@ export function addComment(slug: string, input: CommentInput): Comment {
 
 /**
  * Several notes in one write: their events land in events.jsonl together and in this order, so whoever waits for
- * feedback (wait_for_feedback, `vr watch`) gets them as one batch. Nothing is added when one of them is refused.
+ * feedback (wait_for_feedback, `lampo watch`) gets them as one batch. Nothing is added when one of them is refused.
  */
 export function addComments(slug: string, inputs: CommentInput[]): Comment[] {
   return mutate(slug, (review) => {
@@ -1461,7 +1461,7 @@ export function findReply(id: string, n: number): { slug: string; comment: Comme
 }
 
 /**
- * New words for a plain reply (its author's; the route checks who asks). Agents read the reply as it is now — `vr
+ * New words for a plain reply (its author's; the route checks who asks). Agents read the reply as it is now — `lampo
  * open`, MCP get_note — and the change as an `edit` event that carries the reply ("EDITED REPLY", lib/eventLine.ts).
  */
 export function editReply(id: string, n: number, at: string, text: string, by = USER): Comment {
@@ -1551,7 +1551,7 @@ export const unarchive = (slug: string): Review =>
     delete r.archived;
   });
 
-// ---------------------------------------------------------------- reviews from another store (`vr admin import`)
+// ---------------------------------------------------------------- reviews from another store (`lampo admin import`)
 
 /** A note's files next to its review.json: its screenshots and its voice clip. */
 export const NOTE_FILE = /^c_[a-f0-9]{4,16}(_clean\.png|_marked\.png|_range\.jpg|\.m4a)$/;
@@ -1664,9 +1664,9 @@ export async function dropUnfinishedImport(slug: string, bundle: string): Promis
  * Appends another store's history to this workspace's imported history (`importedEventsFile`) in one write, each event
  * marked `imported` with the bundle's id. It never goes into events.jsonl: the log's readers take its newest events
  * within a limit and a tail, and a long history there pushed what happened just before out of them (sweep 2 SW-1r). So
- * nothing follows it — the server's feed (the live stream, webhooks, push), `vr watch`, the MCP feed — and nothing reads
- * it as news (`wait_for_feedback`, INBOX.md, `vr inbox`); For you, a person's part opt-ins, the folders' repair and
- * `vr export` read it as what happened (`readHistory`, `historyFiles`).
+ * nothing follows it — the server's feed (the live stream, webhooks, push), `lampo watch`, the MCP feed — and nothing reads
+ * it as news (`wait_for_feedback`, INBOX.md, `lampo inbox`); For you, a person's part opt-ins, the folders' repair and
+ * `lampo export` read it as what happened (`readHistory`, `historyFiles`).
  */
 export function appendHistory(events: ReviewEvent[], bundle: string): void {
   if (!events.length) return;
@@ -1679,7 +1679,7 @@ export function appendHistory(events: ReviewEvent[], bundle: string): void {
 
 /**
  * The workspace's history files, the imported history first, then the log: for readers that go through all of it (an
- * import run again, the folders' repair, `vr export`). A store an earlier version imported into holds such history in
+ * import run again, the folders' repair, `lampo export`). A store an earlier version imported into holds such history in
  * events.jsonl itself, marked `imported`.
  */
 export const historyFiles = (): string[] => [importedEventsFile(), eventsFile()];
@@ -2125,7 +2125,7 @@ function readTail(file: string, limit: number, tailBytes: number, skipImported: 
 
 /**
  * The workspace's newest `limit` events, oldest first, within `tailBytes` of its log: what happened here, and what all
- * that agents and people are told as news is made of (wait_for_feedback, INBOX.md, `vr inbox`, GET /api/inbox). Another
+ * that agents and people are told as news is made of (wait_for_feedback, INBOX.md, `lampo inbox`, GET /api/inbox). Another
  * store's history is never among them and never counts towards the limit or the tail: it has its own file
  * (`importedEventsFile`), and the lines an earlier version wrote into the log itself are passed by.
  */
@@ -2166,7 +2166,7 @@ const tagList = (t: string[] | undefined) => (t?.length ? t.join(', ') : '–');
 // Newest human feedback first, as INBOX.md shows it (never another store's imported history: isInboxEvent).
 export const inboxEvents = (): ReviewEvent[] => readEvents({ limit: 3000 }).filter(isInboxEvent).reverse().slice(0, 150);
 
-// Every process that writes an event rewrites INBOX.md (the server, `vr`, an MCP server). Reading the events and
+// Every process that writes an event rewrites INBOX.md (the server, `lampo`, an MCP server). Reading the events and
 // writing the file under one lock keeps an older rendering from landing after a newer one.
 export function writeInbox(): void {
   withLock(path.join(dataDir(), '.inbox'), () => writeAtomic(inboxPath(), renderInbox(inboxEvents())));
@@ -2179,7 +2179,7 @@ export function renderInbox(events: ReviewEvent[]): string {
     '# Video review inbox',
     '',
     `Newest human feedback across all videos, newest first. Updated ${isoLocal()}.`,
-    'Full detail per video: `vr open <video>`, or data/<slug>/review.json. Live stream: `vr watch`.',
+    'Full detail per video: `lampo open <video>`, or data/<slug>/review.json. Live stream: `lampo watch`.',
     '',
   ];
   // A new note as its video says it now: what it points at in its version's elements map, where a part may go.
@@ -2363,7 +2363,7 @@ export function renderReviewMd(review: Review, { files = 'paths' }: { files?: Md
     oneLine(`- json: ${files === 'urls' ? `/api/review/${encodeURIComponent(slug)}` : reviewFile(slug)}`),
     '',
     'Frames are 0-based at the file fps; timecode is mm:ss:ff. Drawing coordinates are video pixels.',
-    'Mark done: `vr fix <id> --note "what changed" [--v N]` · reply: `vr reply <id> --note "…"`',
+    'Mark done: `lampo fix <id> --note "what changed" [--v N]` · reply: `lampo reply <id> --note "…"`',
     '',
     `## Open (${open.length})`,
     '',

@@ -1,4 +1,4 @@
-// Ready-to-paste MCP setups for the agents people use. `vr mcp config <client>` prints them and Settings → API tokens
+// Ready-to-paste MCP setups for the agents people use. `lampo mcp config <client>` prints them and Settings → API tokens
 // shows the same, so there is one source. Formats follow each client's documentation (October 2026). Shared with
 // the browser: no Node imports.
 
@@ -51,13 +51,19 @@ export interface McpSnippet {
   note?: string;
 }
 
+/** The variable a setup reads the API token from, unless it is given another (`--token-env`). */
+export const TOKEN_ENV = 'LAMPO_TOKEN';
+
+/** The stdio server in a checkout at `root`: what a client starts (bin/vr-mcp is the same, for configs written before). */
+export const stdioCommand = (root: string): string => `${root.replace(/\/+$/, '')}/bin/lampo-mcp`;
+
 /** wait_for_feedback may wait up to 300 s; clients that cap tool calls (Codex and Zed: 60 s) get room for that. */
 const TOOL_TIMEOUT_S = 330;
 
 export function mcpSnippet(client: McpClient, target: McpTarget, name = MCP_NAME): McpSnippet {
   const label = CLIENT_LABELS[client];
   const json = (value: unknown) => JSON.stringify(value, null, 2);
-  const envName = target.kind === 'http' ? target.tokenEnv || 'VR_TOKEN' : 'VR_TOKEN';
+  const envName = target.kind === 'http' ? target.tokenEnv || TOKEN_ENV : TOKEN_ENV;
   const secured = target.kind === 'http' && Boolean(target.token || target.tokenEnv);
   // The Authorization header in each client's own interpolation syntax (or the literal token when we have it).
   const bearer = (ref: string) => (target.kind === 'http' && target.token ? `Bearer ${target.token}` : `Bearer ${ref}`);
@@ -114,9 +120,9 @@ export function mcpSnippet(client: McpClient, target: McpTarget, name = MCP_NAME
           text: json({ servers: { [name]: { type: 'stdio', command: target.command } } }),
         };
       // VS Code's own input variable, not a JS template.
-      const input = ['$', '{input:vr-token}'].join('');
+      const input = ['$', '{input:lampo-token}'].join('');
       const server = { type: 'http', url: target.url, ...(secured ? { headers: { Authorization: bearer(input) } } : {}) };
-      const inputs = secured && !target.token ? [{ type: 'promptString', id: 'vr-token', description: 'Lampo API token', password: true }] : undefined;
+      const inputs = secured && !target.token ? [{ type: 'promptString', id: 'lampo-token', description: 'Lampo API token', password: true }] : undefined;
       return {
         client,
         label,

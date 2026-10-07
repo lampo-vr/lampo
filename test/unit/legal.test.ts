@@ -32,16 +32,16 @@ const hosted = (vars: Record<string, string>) => {
 
 test('open sign-up refuses to start without the terms and the privacy policy: one line naming what is missing', () => {
   const none = { VR_SIGNUP: 'open', VR_TERMS_URL: '', VR_PRIVACY_URL: '' };
-  const both = hosted(none).filter((p) => p.startsWith('VR_SIGNUP=open'));
+  const both = hosted(none).filter((p) => p.startsWith('LAMPO_SIGNUP=open'));
   assert.equal(both.length, 1, both.join('\n'));
-  assert.match(both[0] as string, /^VR_SIGNUP=open needs VR_TERMS_URL and VR_PRIVACY_URL: /);
+  assert.match(both[0] as string, /^LAMPO_SIGNUP=open needs LAMPO_TERMS_URL and LAMPO_PRIVACY_URL: /);
   assert.ok(!(both[0] as string).includes('\n'), 'one line');
-  assert.match(hosted({ ...none, VR_TERMS_URL: LEGAL.VR_TERMS_URL }).join('\n'), /^VR_SIGNUP=open needs VR_PRIVACY_URL: /m);
+  assert.match(hosted({ ...none, VR_TERMS_URL: LEGAL.VR_TERMS_URL }).join('\n'), /^LAMPO_SIGNUP=open needs LAMPO_PRIVACY_URL: /m);
   assert.deepEqual(hosted({ VR_SIGNUP: 'open' }), [], 'with both it starts');
   assert.deepEqual(hosted({ VR_SIGNUP: 'invite', VR_TERMS_URL: '', VR_PRIVACY_URL: '' }), [], 'invite-only sign-up needs neither');
   // the same check in mailProblems, which `vr admin` and the process share
   const mail = loadConfig({ VR_MODE: 'server', VR_PUBLIC_URL: 'https://review.example.com', ...none });
-  assert.ok(mailProblems(mail, { signupSeam: true }).some((p) => /^VR_SIGNUP=open needs VR_TERMS_URL and VR_PRIVACY_URL/.test(p)));
+  assert.ok(mailProblems(mail, { signupSeam: true }).some((p) => /^LAMPO_SIGNUP=open needs LAMPO_TERMS_URL and LAMPO_PRIVACY_URL/.test(p)));
 });
 
 test('every legal link is a web page: environment over config.json, anything but http(s) refuses to start', () => {
@@ -54,10 +54,11 @@ test('every legal link is a web page: environment over config.json, anything but
     },
   );
   assert.deepEqual(legalProblems({ imprint_url: 'javascript:alert(1)', withdrawal_url: 'mailto:x@y.z', cancel_url: 'https://ok.example/c' }), [
-    'VR_IMPRINT_URL must be an http(s) URL.',
-    'VR_WITHDRAWAL_URL must be an http(s) URL.',
+    'LAMPO_IMPRINT_URL must be an http(s) URL.',
+    'LAMPO_WITHDRAWAL_URL must be an http(s) URL.',
   ]);
-  assert.ok(hosted({ VR_CANCEL_URL: 'data:text/html,hi' }).includes('VR_CANCEL_URL must be an http(s) URL.'));
+  assert.ok(hosted({ VR_CANCEL_URL: 'data:text/html,hi' }).includes('LAMPO_CANCEL_URL must be an http(s) URL.'), 'the older spelling is read too');
+  assert.ok(hosted({ LAMPO_CANCEL_URL: 'data:text/html,hi' }).includes('LAMPO_CANCEL_URL must be an http(s) URL.'));
 });
 
 test('/api/info names every legal link, to the owner and to a visitor from elsewhere', async () => {

@@ -57,7 +57,7 @@ export async function versionBytes(review: Review, ver: Version, message = 'the 
 }
 
 /** Sign-off is people's (docs/workflow.md): with an API token — an agent, a script — nothing is approved, carried over,
- * marked final or reopened. `vr` and the MCP tools never offer it; this holds for anything calling the API directly. */
+ * marked final or reopened. `lampo` and the MCP tools never offer it; this holds for anything calling the API directly. */
 export function signOffByPerson(req: Request): void {
   if (req.auth?.via === 'token') throw fail(403, 'sign-off is done by people in the app: agents never approve, carry over or mark final');
 }
@@ -75,7 +75,7 @@ export function finalLock(req: Request, review: Review): void {
 /**
  * Whether the person asking wrote (or added) a record: by account when the record names one, so a rename keeps it
  * theirs and a new account with a deleted person's name gets none of it; by name for records without one (older ones,
- * local `vr` writes), as before.
+ * local `lampo` writes), as before.
  */
 export const isOwn = (req: Request, name: string | undefined, id: string | undefined): boolean =>
   isOwner(name, id, { id: req.auth?.user?.id, name: req.auth?.name });

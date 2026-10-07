@@ -33,9 +33,14 @@ test('no suite finds or launches Chrome, picks a port, starts a server or runs `
 test('the server helper stands in for `claude` and ignores the shell’s instance settings', async () => {
   // A specifier the type checker doesn't resolve: the harness is plain JavaScript.
   const { startServer } = await import(pathToFileURL(path.join(E2E, 'lib/server.mjs')).href);
-  const shell = { VR_PUBLIC_URL: process.env.VR_PUBLIC_URL, VR_MODE: process.env.VR_MODE, CLAUDE_PID: process.env.CLAUDE_PID };
+  const names = ['VR_PUBLIC_URL', 'VR_MODE', 'LAMPO_PUBLIC_URL', 'LAMPO_MODE', 'LAMPO_DATA', 'CLAUDE_PID'];
+  const shell = Object.fromEntries(names.map((k) => [k, process.env[k]]));
   process.env.VR_PUBLIC_URL = 'https://review.example.com';
   process.env.VR_MODE = 'server';
+  // the same in the new spelling, which would win over every VR_ setting the harness makes
+  process.env.LAMPO_PUBLIC_URL = 'https://review.example.com';
+  process.env.LAMPO_MODE = 'server';
+  process.env.LAMPO_DATA = '/somewhere/live';
   process.env.CLAUDE_PID = '1';
   const session = { name: 'e2e-session', sessionId: 's-1', pid: 4242, cwd: '/tmp/e2e', kind: 'interactive' };
   const srv = await startServer({ prefix: 'vr-harness-', sessions: [session] });
@@ -46,6 +51,10 @@ test('the server helper stands in for `claude` and ignores the shell’s instanc
   try {
     assert.equal(srv.env.VR_PUBLIC_URL, undefined);
     assert.equal(srv.env.VR_MODE, undefined, 'local mode unless the suite asks for server mode');
+    assert.equal(srv.env.LAMPO_PUBLIC_URL, undefined);
+    assert.equal(srv.env.LAMPO_MODE, undefined);
+    assert.equal(srv.env.LAMPO_DATA, undefined, 'the suite’s own store, never one the shell names');
+    assert.equal(srv.env.LAMPO_REMOTE, '0');
     assert.equal(srv.env.CLAUDE_PID, undefined);
     assert.equal(srv.env.VR_HOST, '127.0.0.1');
     const r = (await (await fetch(`${srv.base}/api/sessions?fresh=1`)).json()) as { sessions: { name: string }[] };
@@ -60,8 +69,8 @@ test('the server helper stands in for `claude` and ignores the shell’s instanc
   }
 });
 
-// The machine a suite runs on may be signed in to a hosted server: `vr login` keeps it in
-// ~/.config/video-review/credentials.json. A `vr` that a suite runs with its server's environment works on the suite's
+// The machine a suite runs on may be signed in to a hosted server: `lampo login` keeps it in
+// ~/.config/lampo/credentials.json (an older `vr login` in ~/.config/video-review/, still read). A `vr` that a suite runs with its server's environment works on the suite's
 // store, never on that server (record.mjs's `vr show` and `vr inbox` once read a real inbox that way).
 test('a `vr` run with the suite’s environment never reads the machine’s saved login', async () => {
   // The machine: its home holds a saved login to a server that writes down every request it gets.
@@ -73,9 +82,11 @@ test('a `vr` run with the suite’s environment never reads the machine’s save
   });
   await new Promise<void>((r) => signedIn.listen(0, '127.0.0.1', r));
   const home = tmpdir('vr-harness-home-');
-  const saved = path.join(home, '.config', 'video-review', 'credentials.json');
-  fs.mkdirSync(path.dirname(saved), { recursive: true });
-  fs.writeFileSync(saved, JSON.stringify({ server: `http://127.0.0.1:${(signedIn.address() as AddressInfo).port}`, token: 'vr_machine' }));
+  for (const name of ['lampo', 'video-review']) {
+    const saved = path.join(home, '.config', name, 'credentials.json');
+    fs.mkdirSync(path.dirname(saved), { recursive: true });
+    fs.writeFileSync(saved, JSON.stringify({ server: `http://127.0.0.1:${(signedIn.address() as AddressInfo).port}`, token: 'vr_machine' }));
+  }
 
   const { startServer } = await import(pathToFileURL(path.join(E2E, 'lib/server.mjs')).href);
   const shell = { HOME: process.env.HOME, XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME, XDG_CACHE_HOME: process.env.XDG_CACHE_HOME };

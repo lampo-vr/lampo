@@ -1,4 +1,4 @@
-// What kind of agent is on the other end: named once here for the server (from an MCP client's name, `vr`'s
+// What kind of agent is on the other end: named once here for the server (from an MCP client's name, `lampo`'s
 // environment) and the UI (the label and the mark next to an agent, web/src/ui/agentMarks.ts). Browser-safe: no Node
 // imports.
 import type { AgentKind, AssignedSession } from './types.ts';
@@ -32,8 +32,21 @@ export const AGENT_KIND_LABELS: Record<AgentKind, string> = {
   zed: 'Zed',
   mcp: 'MCP client',
   api: 'API',
-  cli: 'vr',
+  cli: 'lampo',
 };
+
+/**
+ * An agent's name as people read it. An MCP client over HTTP is named by its own id ("claude-code · Mia",
+ * "codex-mcp-client"): that id reads as its kind's name ("Claude Code · Mia", "Codex"). A name someone gave (a Claude
+ * Code session's, `--by agent:promo-edit`) stays as it is, and so does one whose kind is only "an MCP client".
+ */
+export function agentShown(name: string, kind?: AgentKind | null): string {
+  const [head = '', ...rest] = name.split(' · ');
+  const k = kind ?? agentKindOf(head);
+  const id = /^[a-z0-9][a-z0-9._-]*$/.test(head);
+  if (!id || ['mcp', 'cli', 'api'].includes(k) || agentKindOf(head) !== k) return name;
+  return [AGENT_KIND_LABELS[k], ...rest].join(' · ');
+}
 
 /** An MCP client's own name (`clientInfo.name`, "codex-mcp-client", "claude-ai", "Cursor", "Visual Studio Code" …) → its kind. */
 export function agentKindOf(client: string | null | undefined): AgentKind {
@@ -54,7 +67,7 @@ export function agentKindOf(client: string | null | undefined): AgentKind {
 /**
  * The kind of the agent a video is assigned to. Assignments made before kinds were stored: MCP clients have `mcp-…` ids
  * and their client's name (server/routes/mcp.ts); everything else was a Claude Code session (found on the machine, or
- * `vr watch` from inside one).
+ * `lampo watch` from inside one).
  */
 export function agentKindOfRef(ref: Pick<AssignedSession, 'name' | 'id' | 'agent'>): AgentKind {
   if (ref.agent) return ref.agent;

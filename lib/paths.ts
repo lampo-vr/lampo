@@ -1,12 +1,12 @@
 // Where everything lives. The data contract: data/<slug>/review.json, slug = abs video path with "/" → "__".
 //
 // Store location (first match wins):
-//   1. VR_DATA=<dir>                → <dir>, versions in <dir>-versions (isolated stores, e.g. tests)
+//   1. LAMPO_DATA=<dir>                → <dir>, versions in <dir>-versions (isolated stores, e.g. tests)
 //   2. config.json "data_dir"       → that dir, versions next to it (or "versions_dir")
 //   3. <app>/data exists (legacy)   → <app>/data, <app>/versions, <app>/cache  (a checkout used in place)
-//   4. fresh install (e.g. npx)     → ~/.video-review/{data,versions,cache}  (VR_HOME moves ~/.video-review, e.g. to a
-//                                     container volume: VR_HOME=/data → /data/{data,versions,cache,config.json})
-// config.json is read from VR_CONFIG, <app>/config.json or <home>/config.json (first that exists).
+//   4. fresh install (e.g. npx)     → ~/.video-review/{data,versions,cache}  (LAMPO_HOME moves ~/.video-review, e.g. to a
+//                                     container volume: LAMPO_HOME=/data → /data/{data,versions,cache,config.json})
+// config.json is read from LAMPO_CONFIG, <app>/config.json or <home>/config.json (first that exists).
 // This module reads config.json itself (instead of importing config.ts) so there is no import cycle.
 import { AsyncLocalStorage } from 'node:async_hooks';
 import crypto from 'node:crypto';
@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { setting, settings, spelledAs } from './env.ts';
 import type { WebhookConfig } from './types.ts';
 
 /** Settings in config.json. Everything is optional; see config.ts for the defaults. */
@@ -27,7 +28,7 @@ export interface ConfigFile {
   /** Speech-to-text for voice notes (see docs/speech.md). */
   stt?: Partial<SttConfig>;
   /** Footage search (docs/footage.md): "auto" (default: on for the machine, per workspace on a hosted server) or "off"
-   * (nothing is indexed, no model is downloaded); VR_FOOTAGE overrides it. */
+   * (nothing is indexed, no model is downloaded); LAMPO_FOOTAGE overrides it. */
   footage?: 'auto' | 'off';
   /** Deprecated (the Python/MLX engine is gone): read only to migrate `whisper_language` into `stt.languages`. */
   whisper_python?: string | null;
@@ -45,7 +46,7 @@ export interface ConfigFile {
   /** Where people who use this instance over the network get its source code (AGPL-3.0 §13). Default: the
    * `repository` in package.json. Point it at your fork when you run a modified copy. */
   source_url?: string | null;
-  /** The team's name (an agency, a studio) shown to clients on review links next to who shared them: org_name / VR_ORG_NAME. */
+  /** The team's name (an agency, a studio) shown to clients on review links next to who shared them: org_name / LAMPO_ORG_NAME. */
   org_name?: string | null;
   /** Which proxies may set the client's address and https (addresses, subnets, loopback/uniquelocal/linklocal).
    * `true` and hop counts are read as "loopback, uniquelocal" (lib/config.ts trustProxy). */
@@ -69,11 +70,11 @@ export interface ConfigFile {
    * of workspace #1 have no limit). Default 3.
    */
   workspace_create_limit?: number;
-  /** New accounts start with the first run (lib/onboarding.ts); default true. `false` (or VR_ONBOARDING=off) for an
+  /** New accounts start with the first run (lib/onboarding.ts); default true. `false` (or LAMPO_ONBOARDING=off) for an
    * instance whose people already know Lampo. Accounts from before stay as they are either way. */
   onboarding?: boolean;
   /** A new first run finds the sample in its library (lib/sample.ts, made in the background when an account starts in a
-   * workspace of its own); default true with `onboarding`. `false` (or VR_ONBOARDING_SAMPLE=off): only on request. */
+   * workspace of its own); default true with `onboarding`. `false` (or LAMPO_ONBOARDING_SAMPLE=off): only on request. */
   onboarding_sample?: boolean;
   /** Email (docs/email.md): the SMTP relay and the sender; without smtp_url, messages go to <cache>/outbox/. */
   mail?: { smtp_url?: string; from?: string; reply_to?: string; per_hour?: number };
@@ -157,13 +158,13 @@ export interface StorageConfig {
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const HOME = os.homedir();
-export const APP_HOME = process.env.VR_HOME ? path.resolve(process.env.VR_HOME) : path.join(HOME, '.video-review');
+export const APP_HOME = settings.LAMPO_HOME ? path.resolve(settings.LAMPO_HOME) : path.join(HOME, '.video-review');
 
 export const tildify = (p: string): string => (p.startsWith(`${HOME}/`) ? `~${p.slice(HOME.length)}` : p);
 export const untildify = (p: string): string => (p === '~' ? HOME : p.startsWith('~/') ? path.join(HOME, p.slice(2)) : p);
 
 export const CONFIG_FILE =
-  [process.env.VR_CONFIG, path.join(ROOT, 'config.json'), path.join(APP_HOME, 'config.json')].find((f): f is string => !!f && fs.existsSync(f)) ||
+  [settings.LAMPO_CONFIG, path.join(ROOT, 'config.json'), path.join(APP_HOME, 'config.json')].find((f): f is string => !!f && fs.existsSync(f)) ||
   path.join(ROOT, 'config.json');
 
 export function readConfigFile(): ConfigFile {
@@ -180,10 +181,10 @@ const cfgPath = (p: string | undefined): string | null => (p ? path.resolve(path
 type StoreMode = 'env' | 'config' | 'legacy' | 'home';
 
 function resolveStore(): { mode: StoreMode; data: string; versions: string; cache: string } {
-  const cacheOverride = process.env.VR_CACHE ? path.resolve(process.env.VR_CACHE) : cfgPath(FILE_CFG.cache_dir);
+  const cacheOverride = settings.LAMPO_CACHE ? path.resolve(settings.LAMPO_CACHE) : cfgPath(FILE_CFG.cache_dir);
   const legacy = fs.existsSync(path.join(ROOT, 'data'));
-  if (process.env.VR_DATA) {
-    const data = path.resolve(process.env.VR_DATA);
+  if (settings.LAMPO_DATA) {
+    const data = path.resolve(settings.LAMPO_DATA);
     const cache = cacheOverride || (legacy ? path.join(ROOT, 'cache') : path.join(APP_HOME, 'cache'));
     return { mode: 'env', data, versions: `${data}-versions`, cache };
   }
@@ -217,7 +218,7 @@ const STORE = resolveStore();
 export const STORE_MODE = STORE.mode;
 export const DATA = STORE.data;
 export const CACHE = STORE.cache; // regenerable: posters, waveforms, analysis, proxies
-// NOT regenerable: the bytes of every registered render. A separate store (VR_DATA) gets its own, so test stores
+// NOT regenerable: the bytes of every registered render. A separate store (LAMPO_DATA) gets its own, so test stores
 // never write into the real one.
 export const VERSIONS = STORE.versions;
 
@@ -271,12 +272,12 @@ export function inWorkspace<T>(id: string, fn: () => T): T {
 }
 
 /**
- * A process that works on the store directly (`vr`, the stdio MCP server) works in one workspace from its start:
- * VR_WORKSPACE, else workspace #1 — the machine's store, or on a hosted server the operator's own team.
+ * A process that works on the store directly (`lampo`, the stdio MCP server) works in one workspace from its start:
+ * LAMPO_WORKSPACE, else workspace #1 — the machine's store, or on a hosted server the operator's own team.
  */
 export function enterProcessWorkspace(env: NodeJS.ProcessEnv = process.env): string {
-  const id = env.VR_WORKSPACE?.trim() || DEFAULT_WORKSPACE;
-  if (!WORKSPACE_ID.test(id)) throw new Error(`VR_WORKSPACE is not a workspace id: ${JSON.stringify(id).slice(0, 40)}`);
+  const id = setting('LAMPO_WORKSPACE', env)?.trim() || DEFAULT_WORKSPACE;
+  if (!WORKSPACE_ID.test(id)) throw new Error(`${spelledAs('LAMPO_WORKSPACE', env)} is not a workspace id: ${JSON.stringify(id).slice(0, 40)}`);
   processWorkspace = id;
   als.enterWith(id);
   return id;
@@ -304,10 +305,10 @@ export const versionsDir = (): string => workspaceRoot(currentWorkspace()).versi
 // Where "Add video" starts browsing; project names are relative to it (browse_root in config.json, else home).
 export const DEV = cfgPath(FILE_CFG.browse_root) || HOME;
 
-// Author name for notes made in the UI: config.json "user" > VR_USER > the OS account name.
+// Author name for notes made in the UI: config.json "user" > LAMPO_USER > the OS account name.
 export const USER: string =
   FILE_CFG.user ||
-  process.env.VR_USER ||
+  settings.LAMPO_USER ||
   (() => {
     try {
       return os.userInfo().username;

@@ -704,5 +704,5 @@ test('hostile bundles are refused before anything is written', async () => {
 
 test('the help names both commands', () => {
   const help = vr(['help'], machine).out;
-  assert.ok(help.includes('vr export <out.tar>') && help.includes('vr admin import <tar> --workspace'));
+  assert.ok(help.includes('lampo export <out.tar>') && help.includes('lampo admin import <tar> --workspace'));
 });

@@ -4,14 +4,14 @@ What someone new sees in their first minutes, so they reach the moment Lampo is 
 picking it up, a fix checked — before anything else. It starts after the first successful sign-in (on the person's own
 machine: the first start), teaches by doing, and gets out of the way.
 
-An instance whose people know Lampo already turns it off for new accounts with `VR_ONBOARDING=off` (or
+An instance whose people know Lampo already turns it off for new accounts with `LAMPO_ONBOARDING=off` (or
 `onboarding: false` in config.json).
 
 ## Who sees it
 
 An account starts with a first run when it is made: the owner who sets up a hosted server, someone who signs up on
 their own (with a workspace of their own, [email.md](email.md#sign-up-vr_signup)), everyone who accepts an invite or is
-created by an admin (`vr admin create-user` too), and the machine's owner on its very first start (a store without a
+created by an admin (`lampo admin create-user` too), and the machine's owner on its very first start (a store without a
 video). **Accounts from before the first run existed have none and never see it**: someone who already uses Lampo is
 never greeted like a newcomer.
 
@@ -67,7 +67,7 @@ the agent, link or upload a video, make a review link, invite someone, right the
 to one line ("Next: Share a review link"), `×` puts the card away (with Undo; the sidebar's row stays, and the account
 menu's **Get started · 2 of 5** brings the card back while a step is open), and, where a billing module runs, a
 workspace that picked a plan on the website sees "You picked Team · add a card any time" (to Settings → Billing). On
-the machine it offers `vr export` for later, to take everything to a server or Lampo Cloud. Once every step is done it
+the machine it offers `lampo export` for later, to take everything to a server or Lampo Cloud. Once every step is done it
 says *You're set* and folds away for good.
 
 **At the sidebar's foot**, above the trial's line where there is one, a row says **Get started · 2 of 5** with a 2 px
@@ -109,7 +109,7 @@ each step the first time it sees it done, so deleting the video later doesn't ta
 | video | the library has a video that isn't the sample |
 | agent_video | a video (not the sample) that an agent is on: its own V1 (an agent's upload makes the new video its own) or one handed to it |
 | note | a note of the person's own (by account) on any video, the sample included |
-| agent | an agent connected for the person (over `/mcp` or `vr watch`; at the machine, any local agent), one of their API tokens or connected apps was used, or — at the machine — the live monitor saw an agent at work |
+| agent | an agent connected for the person (over `/mcp` or `lampo watch`; at the machine, any local agent), one of their API tokens or connected apps was used, or — at the machine — the live monitor saw an agent at work |
 | share | a review link they made (revoked ones count) |
 | invite | an invite they made (any state) |
 | approve | they approved a version or requested changes on one |
@@ -134,16 +134,16 @@ note on an exact frame, the agent's fix in V2, the check before and after — wi
 open sign-up's confirmation makes, the server's first workspace after its setup page, the machine's store on its first
 start — the sample is made in the background in that workspace, in the person's language (`server/firstSample.ts`).
 People invited into a workspace find its sample, if it still has one; they never make another. An instance that wants
-no sample unasked turns it off with `VR_ONBOARDING_SAMPLE=off`; it is still made on request (`POST
+no sample unasked turns it off with `LAMPO_ONBOARDING_SAMPLE=off`; it is still made on request (`POST
 /api/onboarding/sample`), once per workspace — asking again hands back the one there is.
 
 It is **clearly a sample** (its name, its project, a *Sample* chip on its card) and **a playground**: none of its
-events is logged, so no agent's feed (`vr watch`, `wait_for_feedback`), INBOX.md, webhook or push hears of it, and
-agents' listings leave it out (`vr ls`, `vr folders`, MCP `list_videos`, `list_folders`, the `vr://review` resources):
-asked for by name or id (`vr open`, `get_open_notes`, `vr show`, `get_note`), it says `SAMPLE: …` first, with no
+events is logged, so no agent's feed (`lampo watch`, `wait_for_feedback`), INBOX.md, webhook or push hears of it, and
+agents' listings leave it out (`lampo ls`, `lampo folders`, MCP `list_videos`, `list_folders`, the `lampo://review` resources):
+asked for by name or id (`lampo open`, `get_open_notes`, `lampo show`, `get_note`), it says `SAMPLE: …` first, with no
 notes to work through. Insights, the taste file and playbook suggestions leave it out, it never counts as the person's
 first video or against a plan. **It takes no versions but its own two**: an upload by its id (the player's *Upload new
-version…* is not offered on it, `vr push --to`, MCP, an upload URL, a part) is refused with `409`, and an upload
+version…* is not offered on it, `lampo push --to`, MCP, an upload URL, a part) is refused with `409`, and an upload
 named like it in its project is a video of its own. *Remove sample* in its menu deletes it for good (the review, its
 notes and screenshots, its renders in storage); a sample that holds a version someone uploaded onto it before it
 refused them stays (`409`), and that version counts like any other. Making or removing it takes the right to upload: a
@@ -168,7 +168,7 @@ and the same pixels everywhere but where the titles sit.
 
 - The first run is the account's `prefs.onboarding` ([data-format.md](data-format.md)): when it started, each step's
   first time, `hidden` (the card put away), `dismissed` (hidden for good: the card and the sidebar's row), `complete`.
-  An account without it never sees one. `VR_ONBOARDING` decides only whether new accounts get it.
+  An account without it never sees one. `LAMPO_ONBOARDING` decides only whether new accounts get it.
 - `GET /api/onboarding` finds the facts and records them; `PUT /api/onboarding {hidden, dismissed, setup, agent}` puts
   the card or everything away or brings it back, ends the setup and keeps the agent picked; `POST` and `DELETE /api/onboarding/sample` make and
   remove the sample; `GET /api/onboarding/folders` and `/agents` are the machine's finds; `GET /api/server/health` and

@@ -36,12 +36,12 @@ export function parseSmtpUrl(url: string): SmtpTarget {
   try {
     u = new URL(url);
   } catch {
-    throw new Error('VR_SMTP_URL is not a URL: write it as smtp://user:password@host:587 or smtps://user:password@host:465');
+    throw new Error('LAMPO_SMTP_URL is not a URL: write it as smtp://user:password@host:587 or smtps://user:password@host:465');
   }
   if (u.protocol !== 'smtp:' && u.protocol !== 'smtps:')
-    throw new Error('VR_SMTP_URL must start with smtp:// (STARTTLS, usually port 587) or smtps:// (TLS, port 465)');
+    throw new Error('LAMPO_SMTP_URL must start with smtp:// (STARTTLS, usually port 587) or smtps:// (TLS, port 465)');
   const host = u.hostname.replace(/^\[|\]$/g, '');
-  if (!host) throw new Error('VR_SMTP_URL names no host');
+  if (!host) throw new Error('LAMPO_SMTP_URL names no host');
   const secure = u.protocol === 'smtps:';
   const port = u.port ? Number(u.port) : secure ? 465 : 587;
   const user = u.username ? decodeURIComponent(u.username) : null;
@@ -49,7 +49,7 @@ export function parseSmtpUrl(url: string): SmtpTarget {
   return { secure, host, port, user, pass, requireTls: !secure && !LOOPBACK.has(host) };
 }
 
-/** Where a target points, for logs and `vr admin mail-test`: never the credentials. */
+/** Where a target points, for logs and `lampo admin mail-test`: never the credentials. */
 export const describeTarget = (t: SmtpTarget) => `${t.secure ? 'smtps' : 'smtp'}://${t.host}:${t.port}`;
 
 interface Reply {

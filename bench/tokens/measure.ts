@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // What talking to Lampo costs an agent, in tokens: the MCP tool list (on every turn), every tool's typical answer
-// (text and images), the `vr` CLI's outputs, and one full loop. On a throwaway store built by fixture.ts, through the
-// real stdio server (bin/vr-mcp) and the real CLI (bin/vr). Counting: count.ts (a heuristic, ±15 %).
+// (text and images), the `lampo` CLI's outputs, and one full loop. On a throwaway store built by fixture.ts, through the
+// real stdio server (bin/lampo-mcp) and the real CLI (bin/lampo). Counting: count.ts (a heuristic, ±15 %).
 //   node bench/tokens/measure.ts [--json out.json]
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -11,7 +11,10 @@ import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { FFMPEG, isolatedEnv, makeVideo, ROOT, VR } from '../../test/lib/helpers.ts';
+import { FFMPEG, isolatedEnv, makeVideo, ROOT } from '../../test/lib/helpers.ts';
+
+const LAMPO = path.join(ROOT, 'bin/lampo');
+
 import { approxTokens, type ResultCost, resultCost, toolListCost } from './count.ts';
 import { buildFixture } from './fixture.ts';
 
@@ -31,7 +34,7 @@ const stt = http.createServer((req, res) => {
 await new Promise<void>((r) => stt.listen(0, '127.0.0.1', r));
 
 const { dir, env } = isolatedEnv({
-  vars: { VR_REMOTE: '0', VR_STT: 'http', VR_STT_URL: `http://127.0.0.1:${(stt.address() as AddressInfo).port}/v1` },
+  vars: { LAMPO_REMOTE: '0', LAMPO_STT: 'http', LAMPO_STT_URL: `http://127.0.0.1:${(stt.address() as AddressInfo).port}/v1` },
 });
 const fx = await buildFixture(dir);
 // The reviewer is done before the agent reads (`since` stamps are whole seconds, inclusive: a note of the same second
@@ -42,7 +45,7 @@ const { eventLine } = await import('../../lib/eventLine.ts');
 
 const client = new Client({ name: 'token-bench', version: '1.0.0' });
 await client.connect(
-  new StdioClientTransport({ command: process.execPath, args: [path.join(ROOT, 'bin/vr-mcp')], env: env as Record<string, string>, stderr: 'ignore' }),
+  new StdioClientTransport({ command: process.execPath, args: [path.join(ROOT, 'bin/lampo-mcp')], env: env as Record<string, string>, stderr: 'ignore' }),
 );
 const call = async (name: string, args: Record<string, unknown> = {}): Promise<CallToolResult> => {
   const res = (await client.callTool({ name, arguments: args })) as CallToolResult;
@@ -69,7 +72,7 @@ try {
   // What a client hands the model: the name, the description and the input schema (titles and annotations stay out).
   const modelTools = tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema }));
   const list = toolListCost(modelTools);
-  // The lean set (VR_MCP_TOOLS=lean): the same definitions, fewer of them. Older servers have no lean set.
+  // The lean set (LAMPO_MCP_TOOLS=lean): the same definitions, fewer of them. Older servers have no lean set.
   const lean = await import('../../mcp/lean.ts').then((m) => toolListCost(modelTools.filter((t) => m.LEAN_TOOLS.includes(t.name)))).catch(() => null);
   const instructions = approxTokens(client.getInstructions() || '');
   const has = (name: string, param: string) => !!(tools.find((t) => t.name === name)?.inputSchema.properties as Record<string, unknown> | undefined)?.[param];
@@ -134,19 +137,19 @@ try {
   await measure('set_status', 'set_status', { video, text: 'rendering v2' });
 
   // ---------------------------------------------------------------- the CLI
-  const vr = (args: string[]) => execFileSync(process.execPath, [VR, ...args], { env, encoding: 'utf8' });
+  const lampo = (args: string[]) => execFileSync(process.execPath, [LAMPO, ...args], { env, encoding: 'utf8' });
   const cli: { item: string; tokens: number }[] = [];
-  cli.push({ item: 'vr prompt (12 notes)', tokens: approxTokens(vr(['prompt', video])) });
-  cli.push({ item: 'vr show <note>', tokens: approxTokens(vr(['show', fx.notes[0]])) });
-  cli.push({ item: 'vr open <video>', tokens: approxTokens(vr(['open', video])) });
-  const help = vr(['help']);
-  if (help.includes('--brief')) cli.push({ item: 'vr open <video> --brief', tokens: approxTokens(vr(['open', video, '--brief'])) });
+  cli.push({ item: 'lampo prompt (12 notes)', tokens: approxTokens(lampo(['prompt', video])) });
+  cli.push({ item: 'lampo show <note>', tokens: approxTokens(lampo(['show', fx.notes[0]])) });
+  cli.push({ item: 'lampo open <video>', tokens: approxTokens(lampo(['open', video])) });
+  const help = lampo(['help']);
+  if (help.includes('--brief')) cli.push({ item: 'lampo open <video> --brief', tokens: approxTokens(lampo(['open', video, '--brief'])) });
   const events = store.readEvents({ limit: 400 }).filter((e) => e.type === 'comment' && e.slug === fx.slug);
   const avg = (l: string[]) => Math.round(l.reduce((s, x) => s + approxTokens(x), 0) / Math.max(1, l.length));
-  cli.push({ item: `vr watch, one NEW line (avg of ${events.length})`, tokens: avg(events.map(eventLine)) });
+  cli.push({ item: `lampo watch, one NEW line (avg of ${events.length})`, tokens: avg(events.map(eventLine)) });
   const lines = await import('../../lib/eventLine.ts');
-  if ('shortEventLine' in lines) cli.push({ item: 'vr watch --brief, one NEW line (= wait_for_feedback)', tokens: avg(events.map(lines.shortEventLine)) });
-  const inbox = fs.readFileSync(path.join(env.VR_DATA as string, 'INBOX.md'), 'utf8');
+  if ('shortEventLine' in lines) cli.push({ item: 'lampo watch --brief, one NEW line (= wait_for_feedback)', tokens: avg(events.map(lines.shortEventLine)) });
+  const inbox = fs.readFileSync(path.join(env.VR_DATA as string, 'INBOX.md'), 'utf8'); // isolatedEnv's store
   const inboxNotes = (inbox.match(/^### /gm) || []).length || events.length;
   cli.push({ item: `INBOX.md per note (avg of ${inboxNotes})`, tokens: Math.round(approxTokens(inbox) / Math.max(1, inboxNotes)) });
   // what an agent's next answer ends with, once, after a person stopped its work (lib/runs.ts)
@@ -154,20 +157,21 @@ try {
   cli.push({ item: 'the stop line, appended once', tokens: approxTokens(stopLine(fx.video)) });
   const skill = fs.readFileSync(path.join(ROOT, 'skills/lampo/SKILL.md'), 'utf8');
   cli.push({ item: 'skills/lampo/SKILL.md (read into context)', tokens: approxTokens(skill) });
-  // A render as the agent's shell shows it, against the same command through `vr render` (its two lines), and one
-  // `vr render wait` while a detached render goes on. The render becomes the new reel's V2.
-  if (help.includes('vr render')) {
+  // A render as the agent's shell shows it, against the same command through `lampo render` (its two lines), and one
+  // `lampo render wait` while a detached render goes on. The render becomes the new reel's V2.
+  // (the help names the command lampo since the rename, vr before it: the bench measures either)
+  if (/(?:vr|lampo) render/.test(help)) {
     const ff = ['-y', '-i', fx.video, '-vf', 'hue=s=0', '-c:v', 'libx264', '-pix_fmt', 'yuv420p'];
     const raw = spawnSync(FFMPEG, [...ff, path.join(dir, 'raw.mp4')], { encoding: 'utf8' });
     cli.push({ item: 'a render, as its own output (ffmpeg, 6 s at 1080×1920)', tokens: approxTokens(raw.stdout + raw.stderr) });
-    const agent = { ...env, VR_BY: 'agent:bench' };
-    const two = execFileSync(process.execPath, [VR, 'render', '--to', fresh, '--out', fresh, '--', FFMPEG, ...ff, fresh], { env: agent, encoding: 'utf8' });
-    cli.push({ item: 'the same through vr render (two lines)', tokens: approxTokens(two) });
+    const agent = { ...env, LAMPO_BY: 'agent:bench' };
+    const two = execFileSync(process.execPath, [LAMPO, 'render', '--to', fresh, '--out', fresh, '--', FFMPEG, ...ff, fresh], { env: agent, encoding: 'utf8' });
+    cli.push({ item: 'the same through lampo render (two lines)', tokens: approxTokens(two) });
     const { stillLine } = await import('../../lib/render/detach.ts');
     const at = new Date().toISOString();
     const progress = { what: 'render' as const, stage: 'rendering', pct: 62, eta_s: 230, tool: 'remotion', v: 4 };
     const still = stillLine({ id: 'r_0a1b2c3d4e', state: 'running', started: at, updated: at, label: 'V4', progress });
-    cli.push({ item: 'vr render wait, still rendering', tokens: approxTokens(still) });
+    cli.push({ item: 'lampo render wait, still rendering', tokens: approxTokens(still) });
   }
 
   // ---------------------------------------------------------------- one loop
@@ -193,7 +197,7 @@ try {
   const out: string[] = [];
   out.push('| What | Text | Images | Image tokens | Total |', '|---|---:|---:|---:|---:|');
   out.push(`| **Tool list** (${tools.length} tools, every turn) | ${list.total} | | | **${list.total}** |`);
-  if (lean) out.push(`| Tool list, lean set (${lean.per.length} tools, VR_MCP_TOOLS=lean) | ${lean.total} | | | ${lean.total} |`);
+  if (lean) out.push(`| Tool list, lean set (${lean.per.length} tools, LAMPO_MCP_TOOLS=lean) | ${lean.total} | | | ${lean.total} |`);
   out.push(`| Server instructions (once) | ${instructions} | | | ${instructions} |`);
   for (const r of rows)
     out.push(

@@ -144,8 +144,8 @@ export const WORDS = {
   },
   'welcome.button': { en: 'Open {brand}', de: '{brand} öffnen' },
   'welcome.note': {
-    en: 'Agents connect with vr login {url} or as an MCP server: Settings → Connect an agent shows how.',
-    de: 'Agenten verbinden sich mit vr login {url} oder als MCP-Server: Einstellungen → Agent verbinden zeigt, wie.',
+    en: 'Agents connect with lampo login {url} or as an MCP server: Settings → Connect an agent shows how.',
+    de: 'Agenten verbinden sich mit lampo login {url} oder als MCP-Server: Einstellungen → Agent verbinden zeigt, wie.',
   },
 
   // new-sign-in (opt-in)
@@ -249,7 +249,7 @@ export const WORDS = {
     en: 'This test from {host} arrived, so invites, sign-up confirmations and password resets will reach people.',
     de: 'Dieser Test von {host} ist angekommen: Einladungen, Bestätigungen und Passwort-Links erreichen also ihre Empfänger.',
   },
-  'test.note': { en: 'Sent with vr admin mail-test on {when}.', de: 'Gesendet mit vr admin mail-test am {when}.' },
+  'test.note': { en: 'Sent with lampo admin mail-test on {when}.', de: 'Gesendet mit lampo admin mail-test am {when}.' },
 } as const satisfies Record<string, Record<MailLang, string>>;
 
 export type WordKey = keyof typeof WORDS;

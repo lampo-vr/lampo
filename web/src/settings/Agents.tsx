@@ -1,7 +1,8 @@
-// Agents connected right now: MCP clients calling /mcp (Claude Code, Codex, …) and the `vr watch` of older setups. They
+// Agents connected right now: MCP clients calling /mcp (Claude Code, Codex, …) and the `lampo watch` of older setups. They
 // are what a video can be assigned to; the server cannot see sessions on people's machines otherwise. Each says whether
 // it waits for notes: an MCP client hears them only while it waits (server/agents.ts), so one that doesn't gets the
 // sentence that starts it. Connecting one is Connect an agent's: one snippet and one sentence per agent.
+import { agentShown } from '../../../lib/agentKind.ts';
 import type { ConnectedAgent } from '../../../lib/types.ts';
 import { useAgents } from '../api/auth.ts';
 import { t } from '../i18n/index.ts';
@@ -48,7 +49,7 @@ export function Agents() {
                 <AgentMark kind={a.kind ?? 'cli'} size={16} />
                 <div className="grow" style={{ minWidth: 0 }}>
                   <div className="ellipsis">
-                    <b>{a.name}</b>
+                    <b>{agentShown(a.name, a.kind)}</b>
                     {a.user && <span className="muted"> {t('· as {user}', { user: a.user })}</span>}
                   </div>
                   <div className="set-sub ellipsis mono">{[a.host, a.cwd].filter(Boolean).join(' · ') || a.session_id}</div>

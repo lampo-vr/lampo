@@ -1,7 +1,7 @@
 // Read-only checks of a running hosted instance, from anywhere: after a deploy, after an update, from a monitor.
 //   node scripts/smoke.ts https://review.example.com [--media https://media.example.com] [--connect <ip>] [--insecure] [--json]
 // --connect talks to that address while naming the host (TLS and Host header): a new server before DNS points at it.
-// --media also checks the app's own media host (VR_MEDIA_ORIGIN): alive, its certificate, that the page's CSP lets the
+// --media also checks the app's own media host (LAMPO_MEDIA_ORIGIN): alive, its certificate, that the page's CSP lets the
 // player load it, and that it serves nothing but signed media.
 // It never signs in and never writes: health and readiness, the security headers, noindex, nothing loaded from other
 // hosts, the API closed to strangers, the build's cache headers and compression, OAuth discovery for /mcp, http → https,
@@ -169,14 +169,14 @@ export async function smoke(base: string, get: Get, { media }: { media?: string 
     add(
       'its public URL is this one',
       info.public_url === origin ? 'ok' : 'fail',
-      `VR_PUBLIC_URL is ${info.public_url ?? 'not set'}${info.public_url === origin ? '' : `, this is ${origin}`}`,
+      `LAMPO_PUBLIC_URL is ${info.public_url ?? 'not set'}${info.public_url === origin ? '' : `, this is ${origin}`}`,
     );
     add(
       'hosted mode',
       info.mode === 'server' ? 'ok' : 'fail',
       `mode ${info.mode} · version ${info.version} · storage ${(info.features as { storage?: string })?.storage}`,
     );
-    add('source offered (AGPL §13)', info.source_url ? 'ok' : 'warn', info.source_url ? String(info.source_url) : 'set VR_SOURCE_URL');
+    add('source offered (AGPL §13)', info.source_url ? 'ok' : 'warn', info.source_url ? String(info.source_url) : 'set LAMPO_SOURCE_URL');
   });
 
   await step('robots.txt', async () => {

@@ -3,7 +3,7 @@
 // the title, how to cancel on the left (at the period's end, or for an important reason with that reason), on the right
 // the contract — who, which plan, until when — and the one button, "Cancel now" / "Jetzt kündigen". Received, it says
 // when it was received and when the plan ends, and that the confirmation is on its way by email (the provider sends it
-// at once). Where there is nothing to cancel it says why. Without signing in, the operator's own page (VR_CANCEL_URL) is
+// at once). Where there is nothing to cancel it says why. Without signing in, the operator's own page (LAMPO_CANCEL_URL) is
 // the way: the sign-in's foot and Settings → About link it.
 // A consumer's yearly plan after its first year (§ 309 Nr. 9 BGB, the terms' § 6 (1)) may also end with one month's
 // notice, the time paid for after that refunded pro rata: offered only when the provider says so (`ways.notice`, asked

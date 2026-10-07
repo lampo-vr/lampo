@@ -6,12 +6,12 @@
 // a browser or a font to make the sample) and this prints the title boxes lib/sample.ts keeps (SAMPLE_TITLE).
 //
 // usage (repo root): node scripts/sample-film.ts [film.mp4]
-//   the film: the argument, else VR_SAMPLE_FILM, else site/assets/footage/film.mp4 in this checkout or the main one
-//   (the site keeps its footage out of the repository; it is Lampo's own, made with Higgsfield: site/footage.ts)
+//   the film: the argument, else LAMPO_SAMPLE_FILM (the film itself is not in the repository, only the two cuts)
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { settings } from '../lib/env.ts';
 import { ROOT } from '../lib/paths.ts';
 import { FFMPEG, FFPROBE } from '../lib/probe.ts';
 import { launch } from './shots/camera.ts';
@@ -24,15 +24,11 @@ const TITLE = 'Every mile, on the record.';
 const CHORD = '0.32*sin(2*PI*55*t)*exp(-7*mod(t,0.652))+0.08*sin(2*PI*220*t)*(0.6+0.4*sin(2*PI*0.25*t))+0.05*sin(2*PI*330*t)+0.035*sin(2*PI*440*t)';
 
 function findFilm(): string {
-  const wanted = process.argv[2] || process.env.VR_SAMPLE_FILM;
-  if (wanted) return path.resolve(wanted);
-  const roots = [ROOT];
-  try {
-    roots.push(path.dirname(execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: ROOT, encoding: 'utf8' }).trim()));
-  } catch {}
-  const found = roots.map((r) => path.join(r, 'site/assets/footage/film.mp4')).find((f) => fs.existsSync(f));
-  if (!found) throw new Error('the brand film is missing: pass its path (site/assets/footage/film.mp4) or set VR_SAMPLE_FILM');
-  return found;
+  const wanted = process.argv[2] || settings.LAMPO_SAMPLE_FILM;
+  if (!wanted) throw new Error('which film? The brand film is not in the repository: pass its path, or set LAMPO_SAMPLE_FILM');
+  const film = path.resolve(wanted);
+  if (!fs.existsSync(film)) throw new Error(`no film at ${film}`);
+  return film;
 }
 
 const probe = (file: string) => {

@@ -1,5 +1,5 @@
-// The review tools and resources every MCP transport serves: stdio (bin/vr-mcp — one agent on this machine, or a
-// hosted server behind `vr login`) and Streamable HTTP (/mcp in the app — any client with a URL). One factory builds
+// The review tools and resources every MCP transport serves: stdio (bin/lampo-mcp — one agent on this machine, or a
+// hosted server behind `lampo login`) and Streamable HTTP (/mcp in the app — any client with a URL). One factory builds
 // the server; the SDK calls it per HTTP request (2026-07-28 is stateless) or once per stdio connection.
 //   access.ts   who may call what (TOOL_ACCESS, the permission table)
 //   toolkit.ts  the options and the shared tool wrapper (access check, errors as results, authorship)
@@ -20,7 +20,7 @@ import { keepLines } from '../lib/time.ts';
 import { allowed, audienceOf, backendFor } from './access.ts';
 import { registerReviewApp } from './app.ts';
 import { registerFeedback } from './feedback.ts';
-import { markedPicture, preview, reviewUri } from './format.ts';
+import { INBOX_URI, markedPicture, OLD_INBOX_URI, preview, reviewUri } from './format.ts';
 import { instructionsFor, WATCH_PROMPT, watchPromptText, wayOf } from './loop.ts';
 import { createToolKit, type ReviewServerOptions } from './toolkit.ts';
 import { registerAskTools } from './tools/asks.ts';
@@ -32,7 +32,7 @@ import { registerReadingTools } from './tools/read.ts';
 import { registerVideoTools } from './tools/videos.ts';
 
 export { type Access, allowed, backendFor, NO_FILES, type Principal, TOOL_ACCESS } from './access.ts';
-export { reviewUri } from './format.ts';
+export { changedUris, reviewUri } from './format.ts';
 export { type AgentWay, instructionsFor, WATCH_PROMPT, watchPromptText, wayOf } from './loop.ts';
 export type { ReviewServerOptions } from './toolkit.ts';
 
@@ -98,26 +98,36 @@ export function createReviewServer(options: ReviewServerOptions): McpServer {
       activity: kit.activity,
     });
 
+  const readInbox = async (uri: URL) => {
+    // A failure reading it goes out by audience, as a review's does.
+    const text = await (o.inboxMarkdown ?? b.inboxMarkdown)().catch((e: unknown) => {
+      throw new Error(publicMessage(e, audienceOf(o.principal), { status: 500, where: 'mcp lampo://inbox' }));
+    });
+    return { contents: [{ uri: uri.href, mimeType: 'text/markdown', text: keepLines(text) }] };
+  };
+  const readReview = async (uri: URL, { slug }: { slug?: string | string[] }) => {
+    const s = decodeURIComponent(String(slug));
+    // Where the assigned agent works is for those who work with agents, as over HTTP (server/helpers.ts agentView).
+    const text = await b.reviewMarkdown(s, { agentDetails: allowed(o.principal, 'agents') }).catch((e: unknown) => {
+      throw new Error(publicMessage(e, audienceOf(o.principal), { status: 404, where: 'mcp lampo://review' }));
+    });
+    return { contents: [{ uri: uri.href, mimeType: 'text/markdown', text: keepLines(text) }] };
+  };
+
   server.registerResource(
     'inbox',
-    'vr://inbox',
+    INBOX_URI,
     {
       title: 'Review inbox',
       description: 'Newest human feedback across all videos (INBOX.md). Subscribe to hear about new feedback.',
       mimeType: 'text/markdown',
     },
-    async (uri) => {
-      // A failure reading it goes out by audience, as vr://review's does.
-      const text = await (o.inboxMarkdown ?? b.inboxMarkdown)().catch((e: unknown) => {
-        throw new Error(publicMessage(e, audienceOf(o.principal), { status: 500, where: 'mcp vr://inbox' }));
-      });
-      return { contents: [{ uri: uri.href, mimeType: 'text/markdown', text: keepLines(text) }] };
-    },
+    readInbox,
   );
 
   server.registerResource(
     'review',
-    new ResourceTemplate('vr://review/{slug}', {
+    new ResourceTemplate('lampo://review/{slug}', {
       list: async () => {
         // archived projects are put away: their videos are read by name, not listed
         const shut = await b.archivedProjects();
@@ -138,14 +148,22 @@ export function createReviewServer(options: ReviewServerOptions): McpServer {
       description: 'review.md of one video: open items, fixed-awaiting-verification, closed, versions. Subscribe to hear about changes.',
       mimeType: 'text/markdown',
     },
-    async (uri, { slug }) => {
-      const s = decodeURIComponent(String(slug));
-      // Where the assigned agent works is for those who work with agents, as over HTTP (server/helpers.ts agentView).
-      const text = await b.reviewMarkdown(s, { agentDetails: allowed(o.principal, 'agents') }).catch((e: unknown) => {
-        throw new Error(publicMessage(e, audienceOf(o.principal), { status: 404, where: 'mcp vr://review' }));
-      });
-      return { contents: [{ uri: uri.href, mimeType: 'text/markdown', text: keepLines(text) }] };
-    },
+    readReview,
+  );
+
+  // The addresses from before the command was `lampo`: a client set up then still reads them (templates without a
+  // list, so neither shows twice among the resources).
+  server.registerResource(
+    'inbox-vr',
+    new ResourceTemplate(OLD_INBOX_URI, { list: undefined }),
+    { title: 'Review inbox', mimeType: 'text/markdown' },
+    readInbox,
+  );
+  server.registerResource(
+    'review-vr',
+    new ResourceTemplate('vr://review/{slug}', { list: undefined }),
+    { title: 'Review summary', mimeType: 'text/markdown' },
+    readReview,
   );
 
   return server;

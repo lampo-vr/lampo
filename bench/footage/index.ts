@@ -8,14 +8,15 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { settings } from '../../lib/env.ts';
 import { type Analysis, analysisHeight, decodeClip, keyframesFor, probeClip, type ShotMotion, shotMotion } from './analyse.ts';
 import { CLIPS_DIR, WORK_DIR, writeJson } from './common.ts';
 import { type Dtype, type Fit, framesAt, loadEmbedder } from './embed.ts';
 import { cleanOcr, OCR_MIN_CONF, type OcrLineLite } from './find.ts';
 
 // Lampo's own pieces run against a throwaway store (never a live one)
-process.env.VR_DATA ||= path.join(WORK_DIR, 'store', 'data');
-process.env.VR_CACHE ||= path.join(WORK_DIR, 'store', 'cache');
+process.env.LAMPO_DATA = settings.LAMPO_DATA || path.join(WORK_DIR, 'store', 'data');
+process.env.LAMPO_CACHE = settings.LAMPO_CACHE || path.join(WORK_DIR, 'store', 'cache');
 const { cutsFromDiffs } = await import('../../lib/cuts.ts');
 
 const arg = (name: string, dflt: string) => {
