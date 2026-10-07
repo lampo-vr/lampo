@@ -61,10 +61,20 @@ The end of the setup (finished or skipped) is kept on the account (`setup_done`)
 
 A card above All videos: the steps on a keyframe track on the left, the selected one at work on the right — connect the
 agent, link or upload a video, make a review link, invite someone, right there (an accordion on a phone). It folds to
-one line ("Next: Share a review link"), `×` puts it away (with Undo; the account menu's **Get started · 2/5** brings it
-back while a step is open), and a workspace that picked a plan on the website sees "You picked Team · add a card any
-time" (to Settings → Billing). On the machine it offers `vr export` for later, to take everything to a server or Lampo
-Cloud. Once every step is done it says *You're set* and folds away for good.
+one line ("Next: Share a review link"), `×` puts the card away (with Undo; the sidebar's row stays, and the account
+menu's **Get started · 2 of 5** brings the card back while a step is open), and a workspace that picked a plan on the
+website sees "You picked Team · add a card any time" (to Settings → Billing). On the machine it offers `vr export` for
+later, to take everything to a server or Lampo Cloud. Once every step is done it says *You're set* and folds away for
+good.
+
+**At the sidebar's foot**, above the trial's line, a row says **Get started · 2 of 5** with a 2 px line of the steps,
+on every library page while a step is open. A click opens the same steps in a panel above it (a sheet from the drawer
+on phones and tablets) with the card's own panes: an agent connected, a review link made, a teammate invited or a file
+linked right there; the sample and an upload go where they live (the sample in check mode, the library's picker). A
+step ticks the row the moment it's done. The panel's foot has **Hide for good**: the card and the row go (with Undo),
+and only the account menu brings them back. With the sidebar on screen the account menu opens the panel where you
+are; anywhere else (the player, Settings, an empty library) it brings the card back. When the last step is done the
+row says *You're set* with the card and folds away with it.
 
 Each role gets the steps that make sense for it, in an order that follows where the app runs and who the videos are for
 (`stepsFor` in [lib/onboarding.ts](../lib/onboarding.ts)):
@@ -144,10 +154,10 @@ and the same pixels everywhere but where the titles sit.
 ## Details
 
 - The first run is the account's `prefs.onboarding` ([data-format.md](data-format.md)): when it started, each step's
-  first time, `hidden`, `complete`. An account without it never sees one. `VR_ONBOARDING` decides only whether new
-  accounts get it.
-- `GET /api/onboarding` finds the facts and records them; `PUT /api/onboarding {hidden, setup, agent}` puts it away
-  or brings it back, ends the setup and keeps the agent picked; `POST` and `DELETE /api/onboarding/sample` make and
+  first time, `hidden` (the card put away), `dismissed` (hidden for good: the card and the sidebar's row), `complete`.
+  An account without it never sees one. `VR_ONBOARDING` decides only whether new accounts get it.
+- `GET /api/onboarding` finds the facts and records them; `PUT /api/onboarding {hidden, dismissed, setup, agent}` puts
+  the card or everything away or brings it back, ends the setup and keeps the agent picked; `POST` and `DELETE /api/onboarding/sample` make and
   remove the sample; `GET /api/onboarding/folders` and `/agents` are the machine's finds; `GET /api/server/health` and
   `POST /api/server/mail-test` the health check; `PUT /api/workspaces/current/persona` who the videos are for
   ([api.md](api.md#the-first-run)).
@@ -164,3 +174,6 @@ and the same pixels everywhere but where the titles sit.
   English and German; `test/e2e/getstarted.mjs` holds the card and the library under it still to the pixel.
 - What is inside Get started's panes is styled by `web/src/styles/getstarted.css`, which comes with its code: it
   uses the app's own controls and never another chunk's stylesheet.
+- The sidebar's row is in the first paint as its face alone (`web/src/onboarding/Row.tsx`), its room held by the
+  count this browser saw last (`chromeHint.ts`); the panel, the live count and the end come with Get started's code
+  (`Panel.tsx`, `startpanel.css`). `test/e2e/getstarted-sidebar.mjs` checks it; `quality-load.mjs` holds its room.

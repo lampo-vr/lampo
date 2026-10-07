@@ -161,7 +161,9 @@ export function StartPanel({ onClose, sheet, add, upload }: StartPanelProps) {
   useKeysMoved(list);
   const steps = data?.onboarding ? data.steps : run.steps;
   const next = steps.find((s) => !s.done)?.id ?? null;
-  const [sel, setSel] = useState<OnboardingStep | null>(null);
+  // the step open stays open (a step done shows what it made: the link to copy, the agent connected); the person
+  // moves on with a click — it opens on the next one
+  const [sel, setSel] = useState<OnboardingStep | null>(next);
   const [ticked, setTicked] = useState<OnboardingStep | null>(null);
   // adding a video goes where it lives: the library's own picker (or the machine's add dialog), the panel out of its way
   const base = usePaneCtx(
@@ -176,7 +178,7 @@ export function StartPanel({ onClose, sheet, add, upload }: StartPanelProps) {
     },
     data,
   );
-  // a step that ticks pops; the selection moves on from it a moment later (as in the card)
+  // a step that ticks pops
   const doneKey = steps
     .filter((s) => s.done)
     .map((s) => s.id)
@@ -189,11 +191,7 @@ export function StartPanel({ onClose, sheet, add, upload }: StartPanelProps) {
     const fresh = steps.find((s) => s.done && !before.has(s.id));
     if (!fresh) return;
     setTicked(fresh.id);
-    const last = steps.every((s) => s.done);
-    const tm = setTimeout(() => {
-      setTicked(null);
-      if (!last) setSel((cur) => (cur === fresh.id ? null : cur));
-    }, 1100);
+    const tm = setTimeout(() => setTicked(null), 1100);
     return () => clearTimeout(tm);
   }, [doneKey, steps]);
 

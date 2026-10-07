@@ -67,6 +67,12 @@ format stays backwards compatible throughout.
   good, and it is no longer started again every time someone opens the video.
 
 ### Changed
+- **Get started is one click away on every library page.** While steps are open, the sidebar's foot says *Get started
+  · 2 of 5* with a thin line of the steps. A click opens them right there: connect your agent, make a review link,
+  invite someone or link a file without leaving the page you're on; the sample and uploading take you where they live.
+  A step ticks the moment it's done, and when the last one is, it says *You're set* and goes. Closing the big card now
+  keeps the row; *Hide for good* puts both away, with Undo, and the account menu still brings them back. On phones and
+  tablets the row sits at the foot of the menu.
 - **Several suggestions for the same part of a playbook** (the brief, the rules, one skill) stand together, the newest
   first and marked, with a line that says how they relate. Once one is accepted, or someone changed that part by hand,
   the others say so straight away and their diff shows what accepting them now would replace; *Accept anyway* does it
