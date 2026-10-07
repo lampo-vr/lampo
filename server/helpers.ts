@@ -11,7 +11,7 @@ import { isOwner } from '../lib/ownership.ts';
 import { slugify } from '../lib/paths.ts';
 import { can } from '../lib/permissions.ts';
 import { renderKey } from '../lib/renderKey.ts';
-import { briefFor } from '../lib/runs.ts';
+import { briefFor, plainHead } from '../lib/runs.ts';
 import { assignedState } from '../lib/sessions.ts';
 import { stageForReview } from '../lib/stageContext.ts';
 import * as store from '../lib/store.ts';
@@ -87,11 +87,12 @@ export const accountOf = (req: Request, who: string): string | undefined => (who
 // agents (the `agents` action), not for reviewers. Local mode is the owner.
 export const seesAgentDetails = (req: Request): boolean => can(req.auth?.role, 'agents');
 const hideCwd = <T extends { session: AssignedSession | null }>(x: T): T => (x.session?.cwd ? { ...x, session: { ...x.session, cwd: null } } : x);
-/** A card's run without the session and computer its agent runs in. */
+/** A card's run as a role without the agents right reads it: where it stands, never what it worked on in the project
+ * nor the session and computer its agent runs in (lib/runs.ts plainHead). */
 const hideRunAgent = (s: VideoSummary): VideoSummary => {
-  if (!s.run?.agent.session_id && !s.run?.agent.runner) return s;
+  if (!s.run) return s;
   const { session_id: _s, runner: _r, ...agent } = s.run.agent;
-  return { ...s, run: { ...s.run, agent } };
+  return { ...s, run: plainHead({ ...s.run, agent }) };
 };
 export const agentView = {
   review: (req: Request, r: Review): Review => (seesAgentDetails(req) ? r : hideCwd(r)),

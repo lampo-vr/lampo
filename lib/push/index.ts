@@ -11,6 +11,7 @@ import { BRAND_NAME } from '../brand.ts';
 import type { Resolver } from '../netguard.ts';
 import { currentWorkspace, DATA, inWorkspace, isoLocal } from '../paths.ts';
 import { DEFAULT_PREFS } from '../pushPrefs.ts';
+import { RateLimit } from '../rateLimit.ts';
 import { routeIn } from '../scope.ts';
 import { withLock, writeAtomic } from '../store.ts';
 import { isAgent, isQuestion } from '../time.ts';
@@ -404,6 +405,8 @@ export interface PushOptions {
   /** How push services' names are resolved (tests): every address must be public. */
   resolve?: Resolver;
   log?: (msg: string) => void;
+  /** How many notifications one device gets of a category within a minute (tests lower them). */
+  perDevice?: Partial<Record<PushCategory, number>> & { other?: number };
 }
 
 export interface Push {
@@ -420,6 +423,13 @@ export interface Push {
 
 const WINDOWS: Record<Bucket, number> = { question: 4000, release: 20_000, client: 30_000, answer: 8000, post: 2000, agent: 3000, quiet: 3000 };
 
+/**
+ * One device hears at most this many notifications of a category within a minute, however many videos and agents the
+ * news is about: a phone that buzzes every few seconds is one nobody keeps notifications on for. Agents' work least,
+ * since anyone who may post an agent's activity can make it fail.
+ */
+const PER_DEVICE: Partial<Record<PushCategory, number>> & { other: number } = { agents: 3, quiet: 3, other: 20 };
+
 export function createPush(o: PushOptions): Push {
   const log = o.log || ((m: string) => console.error(m));
   const windows = { ...WINDOWS, ...o.windows };
@@ -427,6 +437,18 @@ export function createPush(o: PushOptions): Push {
   const retryDelay = o.retryDelayMs ?? 5000;
   // Bundles per workspace (its events only, never mixed with another's video of the same name), sent in it.
   const waiting = new Map<string, { bucket: Bucket; events: ReviewEvent[]; runs: RunNotice[]; first: number; timer: NodeJS.Timeout; ws: string }>();
+  // per device and category, within a minute (keyed by the subscription's id: as many keys as devices)
+  const perDevice = { ...PER_DEVICE, ...o.perDevice };
+  const limits = new Map<string, RateLimit>();
+  const limitOf = (category: PushCategory): RateLimit => {
+    const max = perDevice[category] ?? perDevice.other;
+    let l = limits.get(category);
+    if (!l) {
+      l = new RateLimit(max, 60_000, { maxKeys: 100_000 });
+      limits.set(category, l);
+    }
+    return l;
+  };
   const inflight = new Set<Promise<unknown>>();
   const track = <T>(p: Promise<T>) => {
     inflight.add(p);
@@ -479,6 +501,7 @@ export function createPush(o: PushOptions): Push {
       // a subscription from before a category existed hears it (posts: on unless turned off)
       if (!(sub.prefs[msg.category] ?? DEFAULT_PREFS[msg.category])) continue;
       if (o.eligible && !o.eligible(sub, msg)) continue;
+      if (!limitOf(msg.category).take(id)) continue;
       track(deliver(id, sub, payload, topic, msg.category === 'questions' || msg.urgent ? 'high' : 'normal'));
     }
   }

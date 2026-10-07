@@ -12,7 +12,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { RUN_ID } from './activity.ts';
-import { words } from './activityText.ts';
+import { type ActivityKey, isActivityKey, words } from './activityText.ts';
 import { agentKindOf } from './agentKind.ts';
 import { cleanAgentName, cutChars } from './names.ts';
 import { cacheDir, dataDir, isoLocal, reviewDir, reviewFile } from './paths.ts';
@@ -40,14 +40,28 @@ import type {
 export const RUN_LIMITS = {
   /** Steps per run (progress keeps only the first and last line of a stretch). */
   steps: 200,
-  /** Runs per video: the oldest ended ones go first. */
-  runs: 1000,
+  /** Runs per video: open ones not heard from (lost) go first, then the oldest that ended. */
+  runs: 300,
   /** Runs on folders, per workspace. */
   folderRuns: 200,
   /** An ended run keeps its steps this long, then only its head. */
   stepDays: 90,
   /** The person's words that opened it. */
   requestChars: 500,
+  /** Ended runs per file that keep their steps (the newest); the others keep their head. */
+  stepRuns: 20,
+  /** A runs file's size at most, in bytes: past it, steps go first, then runs not heard from, then the oldest ended. */
+  fileBytes: 1_000_000,
+  /** Notes in one run's plan. */
+  plan: 500,
+  /** Requests people made of one run kept for their own export. */
+  asks: 20,
+  /** Open runs on one video: past it an agent's own write opens none (a person's Send still does). */
+  openPerVideo: 12,
+  /** Open runs one account's agents hold in a workspace through their own writes. */
+  openPerAccount: 40,
+  /** Runs files held in memory, in bytes all together (the least used that are written go first). */
+  heldBytes: 64_000_000,
 };
 
 /** The clock of a run (tests lower these). */
@@ -94,6 +108,13 @@ export interface RunClock {
   stopTold?: string;
   /** When the people who want it were told it went quiet (push, once). */
   quiet?: string;
+  /**
+   * The account whose agent is at it ('' = this machine's own; absent = not known yet: the first agent heard at it
+   * claims it). Activity of another account never joins it, whatever name it posts under.
+   */
+  owner?: string;
+  /** What people asked of it (Ask, a nudge, "Tell it…"), by account: their own export carries them. The newest kept. */
+  asks?: { by_id?: string; who: string; at: string; text: string }[];
 }
 
 /** A run as kept: its head, its steps (oldest first) and its clock. */
@@ -180,6 +201,8 @@ interface Held {
   slug: string | null;
   /** The file as last read or written (inode, size, mtime). */
   stat: string;
+  /** Its size as last read or written: what memory it holds, about. */
+  bytes: number;
   runs: StoredRun[];
   /** Lines this version can't read: written back as they are. */
   raw: string[];
@@ -188,9 +211,26 @@ interface Held {
   used: number;
 }
 
-/** By workspace and video ('' = the workspace's folder runs). Bounded; never forgets a change it hasn't written. */
+/** By workspace and video ('' = the workspace's folder runs). Bounded by entries and bytes; never forgets a change it
+ * hasn't written. */
 const held = new Map<string, Held>();
 const HELD_MAX = 2000;
+let heldBytes = 0;
+/** Lets go of the least used files that are written, until the files held fit (never `keep`). */
+function makeRoom(keep: string): void {
+  while (held.size > HELD_MAX || heldBytes > RUN_LIMITS.heldBytes) {
+    let oldest: string | null = null;
+    let when = Number.POSITIVE_INFINITY;
+    for (const [k, x] of held)
+      if (k !== keep && !x.dirty && x.used < when) {
+        when = x.used;
+        oldest = k;
+      }
+    if (oldest === null) return;
+    heldBytes -= (held.get(oldest) as Held).bytes;
+    held.delete(oldest);
+  }
+}
 /** Where each run is (by workspace and id): its video, or '' for a folder's. */
 const where = new Map<string, string>();
 const WHERE_MAX = 100_000;
@@ -271,18 +311,10 @@ function hold(slug: string | null): Held {
     try {
       text = fs.readFileSync(file, 'utf8');
     } catch {}
-  const fresh: Held = { ws: currentWorkspace(), slug, stat, ...parse(text), dirty: false, used: Date.now() };
-  if (!h && held.size >= HELD_MAX) {
-    let oldest: string | null = null;
-    let when = Number.POSITIVE_INFINITY;
-    for (const [k, x] of held)
-      if (!x.dirty && x.used < when) {
-        when = x.used;
-        oldest = k;
-      }
-    if (oldest !== null) held.delete(oldest);
-  }
+  const fresh: Held = { ws: currentWorkspace(), slug, stat, bytes: text.length, ...parse(text), dirty: false, used: Date.now() };
+  heldBytes += fresh.bytes - (h?.bytes ?? 0);
   held.set(key, fresh);
+  makeRoom(key);
   index(key, fresh);
   return fresh;
 }
@@ -314,19 +346,75 @@ export function flushRuns(slug: string | null, now = Date.now()): boolean {
   if (!h?.dirty) return true;
   // a video removed (or a workspace deleted) takes its runs with it: never a folder made again for them
   if (slug !== null ? !fs.existsSync(reviewFile(slug)) : !fs.existsSync(dataDir())) {
+    heldBytes -= h.bytes;
     held.delete(key);
     open.delete(key);
     return false;
   }
-  for (const r of h.runs) compact(r, now);
-  trimRuns(h.runs, slug === null ? RUN_LIMITS.folderRuns : RUN_LIMITS.runs);
-  const lines = [...h.raw, ...h.runs.map((r) => JSON.stringify(r))];
+  const lines = fitRuns(h, slug === null ? RUN_LIMITS.folderRuns : RUN_LIMITS.runs, now);
   const file = runsFile(slug);
-  withLock(lockOf(slug), () => writeAtomic(file, lines.length ? `${lines.join('\n')}\n` : ''));
+  const text = lines.length ? `${lines.join('\n')}\n` : '';
+  withLock(lockOf(slug), () => writeAtomic(file, text));
   h.stat = statOf(file);
+  heldBytes += text.length - h.bytes;
+  h.bytes = text.length;
   h.dirty = false;
   index(key, h);
+  makeRoom(key);
   return true;
+}
+
+/**
+ * What a runs file holds, at most RUN_LIMITS.fileBytes of it: every run compacted (its steps, its age), steps only on
+ * the newest ended runs, at most `max` runs. Past the bytes, in this order until it fits: the steps of the oldest
+ * ended runs, open runs nobody has heard from in a while (lost), the oldest ended runs, then half the steps of the
+ * longest open run. A write so stays bounded in time, whatever was sent. The lines to write.
+ */
+export function fitRuns(h: Pick<Held, 'runs' | 'raw'>, max: number, now = Date.now()): string[] {
+  const runs = h.runs;
+  for (const r of runs) compact(r, now);
+  const ended = runs.filter((r) => r.ended !== null).sort((a, b) => compareTime(b.ended ?? '', a.ended ?? ''));
+  for (const r of ended.slice(RUN_LIMITS.stepRuns)) r.steps = [];
+  trimRuns(runs, max);
+  const size = new Map<StoredRun, number>();
+  const measure = (r: StoredRun) => size.set(r, JSON.stringify(r).length + 1);
+  for (const r of runs) measure(r);
+  let total = h.raw.reduce((n, l) => n + l.length + 1, 0) + [...size.values()].reduce((n, x) => n + x, 0);
+  const drop = (r: StoredRun) => {
+    total -= size.get(r) ?? 0;
+    size.delete(r);
+    runs.splice(runs.indexOf(r), 1);
+  };
+  const shrink = (r: StoredRun, steps: RunStepLine[]) => {
+    total -= size.get(r) ?? 0;
+    r.steps = steps;
+    measure(r);
+    total += size.get(r) ?? 0;
+  };
+  while (total > RUN_LIMITS.fileBytes) {
+    const oldestWithSteps = runs.filter((r) => r.ended !== null && r.steps.length).sort((a, b) => compareTime(a.ended ?? '', b.ended ?? ''))[0];
+    if (oldestWithSteps) {
+      shrink(oldestWithSteps, []);
+      continue;
+    }
+    const lost = runs.filter((r) => r.ended === null && r.state === 'lost').sort((a, b) => compareTime(a.seen, b.seen))[0];
+    if (lost) {
+      drop(lost);
+      continue;
+    }
+    const oldEnded = runs.filter((r) => r.ended !== null).sort((a, b) => compareTime(a.ended ?? '', b.ended ?? ''))[0];
+    if (oldEnded) {
+      drop(oldEnded);
+      continue;
+    }
+    const long = [...runs].sort((a, b) => b.steps.length - a.steps.length)[0];
+    if (long && long.steps.length > 1) {
+      shrink(long, [long.steps[0] as RunStepLine, ...long.steps.slice(1).slice(-Math.floor(long.steps.length / 2))]);
+      continue;
+    }
+    break;
+  }
+  return [...h.raw, ...runs.map((r) => JSON.stringify(r))];
 }
 
 /** Every place (workspace, video) with runs that haven't ended, or that wait to be written. */
@@ -395,10 +483,12 @@ export function compact(r: StoredRun, now = Date.now()): void {
   while (r.steps.length > RUN_LIMITS.steps) dropStep(r);
 }
 
-/** At most `max` runs: the oldest that ended go first (one that is still going is never dropped). */
+/** At most `max` runs: open ones nobody has heard from in a while (lost) go first, then the oldest that ended; one that
+ * is still heard from is never dropped. */
 function trimRuns(runs: StoredRun[], max: number): void {
   while (runs.length > max) {
-    const i = runs.findIndex((r) => r.ended !== null);
+    let i = runs.findIndex((r) => r.ended === null && r.state === 'lost');
+    if (i < 0) i = runs.findIndex((r) => r.ended !== null);
     if (i < 0) return;
     runs.splice(i, 1);
   }
@@ -519,6 +609,8 @@ export function machineBegan(r: StoredRun, proc: string, now: number): void {
 export interface OpenRun {
   /** Its id when it must be known before (a process started for it carries it in LAMPO_RUN). */
   id?: string;
+  /** The account whose agent is at it, when known ('' = this machine's own): RunClock.owner. */
+  owner?: string;
   slug: string | null;
   folder?: string;
   agent: Run['agent'];
@@ -550,19 +642,36 @@ export function newRun(o: OpenRun, now = Date.now()): StoredRun {
     ended: null,
     seen: t,
     worked_s: 0,
-    plan: [...new Set(o.notes ?? [])].map((id) => ({ id, state: 'todo' as const, at: t })),
+    plan: [...new Set(o.notes ?? [])].slice(0, RUN_LIMITS.plan).map((id) => ({ id, state: 'todo' as const, at: t })),
     now: null,
     ...(request ? { request } : {}),
     ...(o.follows ? { follows: o.follows } : {}),
     steps: [],
-    clock: { tick: t, ...(state === 'working' || state === 'needs_you' ? { began: t } : {}) },
+    clock: { tick: t, ...(state === 'working' || state === 'needs_you' ? { began: t } : {}), ...(o.owner !== undefined ? { owner: o.owner } : {}) },
   };
+}
+
+/**
+ * Whether activity of `account` (undefined: this machine's own, no account) may join run `r`: a run its agent's account
+ * holds is that account's alone. The first agent heard at a run nobody holds yet claims it (`claim`).
+ */
+export const ownerOk = (r: Pick<StoredRun, 'clock'>, account: string | undefined): boolean => r.clock.owner === undefined || r.clock.owner === (account ?? '');
+export function claim(r: StoredRun, account: string | undefined): void {
+  if (r.clock.owner === undefined) r.clock.owner = account ?? '';
+}
+
+/** A person's request of a run, kept for their own export (the newest RUN_LIMITS.asks). */
+export function keepAsk(r: StoredRun, ask: { by_id?: string; who: string; at: string; text: string }): void {
+  const asks = r.clock.asks ?? [];
+  asks.push(ask);
+  r.clock.asks = asks.slice(-RUN_LIMITS.asks);
 }
 
 /** Notes sent to a run that is open: they join its plan ("added while it works" once it has begun). */
 export function addNotes(r: StoredRun, ids: readonly string[], now = Date.now()): string[] {
   const added: string[] = [];
   for (const id of ids) {
+    if (r.plan.length >= RUN_LIMITS.plan) break;
     if (r.plan.some((p) => p.id === id)) continue;
     r.plan.push({ id, state: 'todo', at: at(now), ...(r.state !== 'queued' ? { added: true } : {}) });
     added.push(id);
@@ -649,6 +758,11 @@ export function applySign(r: StoredRun, s: Sign): RunPhase[] {
   if (r.ended !== null) return out;
   const now = s.at;
   if (now > ms(r.seen)) r.seen = at(now);
+  // what Lampo says of the process it started (started by Lampo, finished after …): a step; its state is the process's
+  if (s.kind === 'run') {
+    keepStep(r, { ...s.words, at: at(now), type: 'action' });
+    return out;
+  }
   const type = stepTypeOf(s.kind);
   const bare = s.kind === 'wait' && !s.handed;
   if ((r.state === 'queued' && !bare) || r.state === 'starting' || r.state === 'lost') {
@@ -878,6 +992,52 @@ export function briefOf(r: StoredRun, now = Date.now()): RunBrief {
     ...(s.stop_pending ? { stop_pending: true } : {}),
     planned: s.plan.length,
     answered: s.plan.filter(isAnswered).length,
+  };
+}
+
+// ---------------------------------------------------------------- what a role without the agents right reads
+
+// Of what an agent did, someone who doesn't work with agents (a reviewer) reads what it is and where it stands — never
+// what it worked on in the project: file names, commands, search patterns, tools, a tool's last words, the agent's own
+// words, the rule a permission needs. As GET /api/agent-activity, which is the agents right's alone.
+/** Fill-ins that say nothing of the project: a note's id, a frame, a time, an exit code, a size, a platform. */
+const OPEN_VARS = new Set(['id', 'frame', 'time', 'code', 'mb', 'platform']);
+/** Lines whose fill-in is the project's, said without it. */
+const WITHOUT: Partial<Record<ActivityKey, ActivityKey>> = {
+  'Reading the skill {name}': 'Reading the playbook',
+  'Uploading {name}': 'Uploading a new version',
+  'Uploaded {name}': 'Uploading a new version',
+  'Running {command}': 'Running a command',
+  'Searching for {pattern}': 'Searching the project',
+};
+
+/** An activity line as everyone may read it: its template with only open fill-ins, no quote; null when it says nothing
+ * without what it names (an agent's own words, "Editing src/x.tsx"). */
+export function plainWords(w: ActivityWords | null | undefined): ActivityWords | null {
+  if (!w || !isActivityKey(w.key)) return null;
+  const names = [...w.key.matchAll(/\{(\w+)\}/g)].map((m) => m[1] as string);
+  // who asked is the team's own name
+  const open = (n: string) => OPEN_VARS.has(n) || (w.key === '{name} asked' && n === 'name');
+  if (!names.every(open)) {
+    const plain = WITHOUT[w.key];
+    return plain ? words(plain) : null;
+  }
+  const vars: Record<string, string | number> = {};
+  for (const n of names) if (w.vars?.[n] !== undefined) vars[n] = w.vars[n] as string | number;
+  return words(w.key, names.length ? vars : undefined);
+}
+
+/** A run's head (or its card's brief) as a role without the agents right reads it (plainWords; no summary, no rule). */
+export function plainHead<T extends Pick<Run, 'now' | 'error' | 'needs' | 'result'>>(x: T): T {
+  const now = x.now ? plainWords(x.now) : null;
+  const needsText = x.needs?.text ? plainWords(x.needs.text) : null;
+  const { summary: _summary, ...result } = x.result ?? ({} as RunResult);
+  return {
+    ...x,
+    now: now && x.now ? { ...now, type: x.now.type, at: x.now.at } : null,
+    ...(x.error ? { error: plainWords(x.error) ?? words('Stopped with an error') } : {}),
+    ...(x.needs ? { needs: { kind: x.needs.kind, ...(x.needs.note ? { note: x.needs.note } : {}), ...(needsText ? { text: needsText } : {}) } } : {}),
+    ...(x.result ? { result } : {}),
   };
 }
 

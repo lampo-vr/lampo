@@ -235,7 +235,7 @@ export function uploadRoutes(ctx: ServerContext): Router {
   };
 
   // Uploads by agents (API tokens) whose progress shows live: id → who and what (forgotten when they finish).
-  const uploaders = new Map<string, { agent: string; name: string; slug: string | null; ws: string }>();
+  const uploaders = new Map<string, { agent: string; account?: string; name: string; slug: string | null; ws: string }>();
   const datastore = new FileStore({ directory: dir, expirationPeriodInMilliseconds: 24 * 3600_000 });
   const tus = new Server({
     path: '/api/uploads',
@@ -296,7 +296,13 @@ export function uploadRoutes(ctx: ServerContext): Router {
           held.set(upload.id, { id: upload.id, kind: 'tus', ws, by, size, offset: 0, moved: Date.now(), at: Date.now() });
         });
         if (who?.via === 'token')
-          uploaders.set(upload.id, { agent: who.name, name: file ? nameOf(file.path) : (meta?.name ?? ''), slug: meta?.slug ?? null, ws });
+          uploaders.set(upload.id, {
+            agent: who.name,
+            ...(who.user?.id ? { account: who.user.id } : {}),
+            name: file ? nameOf(file.path) : (meta?.name ?? ''),
+            slug: meta?.slug ?? null,
+            ws,
+          });
       } catch (e) {
         if (ticket) ticket.used = false; // nothing was made: the ticket works again while it is valid
         throw e;
@@ -330,14 +336,17 @@ export function uploadRoutes(ctx: ServerContext): Router {
       uploaders.delete(upload.id);
       if (up)
         inWorkspace(up.ws, () =>
-          ctx.activity.record({
-            at: isoLocal(),
-            agent: up.agent,
-            slug: up.slug,
-            kind: 'upload',
-            ...words('Uploaded {name}', { name: excerpt(up.name, 40) }),
-            pct: 100,
-          }),
+          ctx.activity.record(
+            {
+              at: isoLocal(),
+              agent: up.agent,
+              slug: up.slug,
+              kind: 'upload',
+              ...words('Uploaded {name}', { name: excerpt(up.name, 40) }),
+              pct: 100,
+            },
+            { account: up.account },
+          ),
         );
       const who = nodeReq(req)?.auth;
       const by = who?.name || ctx.cfg.user;
@@ -591,14 +600,17 @@ export function uploadRoutes(ctx: ServerContext): Router {
     if (!up || !upload.size) return;
     const pct = Math.round(((upload.offset ?? 0) / upload.size) * 100);
     inWorkspace(up.ws, () =>
-      ctx.activity.record({
-        at: isoLocal(),
-        agent: up.agent,
-        slug: up.slug,
-        kind: 'upload',
-        ...words('Uploading {name}', { name: excerpt(up.name, 40) }),
-        pct,
-      }),
+      ctx.activity.record(
+        {
+          at: isoLocal(),
+          agent: up.agent,
+          slug: up.slug,
+          kind: 'upload',
+          ...words('Uploading {name}', { name: excerpt(up.name, 40) }),
+          pct,
+        },
+        { account: up.account },
+      ),
     );
   });
 

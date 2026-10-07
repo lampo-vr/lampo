@@ -24,12 +24,16 @@
 // steps only it sees (`funnel`: a trial's end, the first payment; lib/funnel.ts counts the rest where they happen),
 // and answer the operator's page (`operator`, optional): every workspace's plan, a plan set by hand and its log.
 // The shapes mirror the module's contract (framework-neutral; Express is adapted here, in one place).
+
+import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import type { Request } from 'express';
 import { filesUsage } from '../lib/files.ts';
 import { recordStep } from '../lib/funnel.ts';
 import { wellFormed } from '../lib/names.ts';
+import { slugify } from '../lib/paths.ts';
 import { RateLimit } from '../lib/rateLimit.ts';
+import { runsFile } from '../lib/runs.ts';
 import { currentWorkspace, inWorkspace } from '../lib/scope.ts';
 import * as store from '../lib/store.ts';
 import type { OperatorPlan, PlanChange, PlanLogEntry, PlanStamp } from '../lib/types.ts';
@@ -51,10 +55,12 @@ export interface Caller {
 /** What the open app counts for a workspace (the module never walks the store itself). */
 export interface Usage {
   /**
-   * Bytes the plan's storage counts: the renders kept for the workspace (not caches) and its project files' counted
-   * bytes (`files.bytes`). Renders and files share the plan's GB.
+   * Bytes the plan's storage counts: the renders kept for the workspace (not caches), its project files' counted
+   * bytes (`files.bytes`) and what its agents' runs keep (`runs`). They share the plan's GB.
    */
   bytes: number;
+  /** Bytes the agents' runs keep with the videos (data/<slug>/runs.jsonl, lib/runs.ts): each file bounded on its own. */
+  runs: number;
   /**
    * Its project files (lib/files.ts): what counts (`bytes`: live files once per workspace, pinned versions), what the
    * safety net keeps and doesn't count (`kept`: the trash and replaced versions), and how many live files.
@@ -371,6 +377,7 @@ export const NO_EXTENSION: Extension = {
 export function usageOf(workspace: string): Usage {
   return inWorkspace(workspace, () => {
     let bytes = 0;
+    let runs = 0;
     let activeVideos = 0;
     const room = { videos: 0, bytes: 0 };
     for (const r of store.listReviews()) {
@@ -383,6 +390,9 @@ export function usageOf(workspace: string): Usage {
       let size = 0;
       for (const v of r.versions) size += Number.isFinite(v.size) ? v.size : 0;
       bytes += size;
+      try {
+        runs += fs.statSync(runsFile(slugify(r.video))).size;
+      } catch {}
       if (!r.archived && !r.final) activeVideos++;
       else {
         room.videos++;
@@ -391,7 +401,8 @@ export function usageOf(workspace: string): Usage {
     }
     const f = filesUsage();
     return {
-      bytes: bytes + f.bytes,
+      bytes: bytes + f.bytes + runs,
+      runs,
       files: { bytes: f.bytes, kept: f.kept, count: f.files },
       members: workspaces.membersOf(workspace).length,
       activeVideos,

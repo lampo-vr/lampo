@@ -288,13 +288,19 @@ export function cliActivity(cmd: string, positional: string[] = [], flags: Args 
 export const agentName = (by: string | null | undefined): string | null => cleanAgentName((by || '').replace(/^agent:/, '')) || null;
 
 /**
+ * An account's name as it follows an agent's (`claude-code · Sam`): one short line, and never the separator itself — an
+ * account named "Eve · Sam" (from before such names were refused) reads "Eve - Sam", never as Sam's.
+ */
+export const accountTag = (account: string): string => cleanAgentName(account.replace(/[·•∙⋅‧・]/g, '-'), 40);
+
+/**
  * An agent's name with whose it is — `name · account`, how a connected agent of another person is listed — so what one
  * account says its agent did never shows under another's (A12 AGENT-10). A name that already ends with it stays as it
  * is; a long one is cut before the account, never the account off its end.
  */
 export function ownedAgentName(name: string | null | undefined, account: string): string | null {
   const base = agentName(name);
-  const who = cleanAgentName(account, 40);
+  const who = accountTag(account);
   if (!base || !who) return base;
   const tail = ` · ${who}`;
   if (base.endsWith(tail)) return base;

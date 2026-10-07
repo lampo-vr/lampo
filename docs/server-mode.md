@@ -452,8 +452,9 @@ People's own data is theirs to take home and to end (GDPR Art. 15, 17, 20); the 
   files and a README — the account (name, address, settings, picture), its workspaces and roles, its API tokens (names
   and dates, never the tokens), connected apps and devices, and per workspace the notes it wrote with its own replies,
   its replies on other people's notes (with that note's id, never its words), its drafts, unsent recordings with their
-  audio, its approvals and requests for changes, the review links it made (never their addresses), what it watched and
-  what it uploaded (file metadata: the videos stay the workspace's). Notes from before accounts were recorded with them
+  audio, its approvals and requests for changes, the review links it made (never their addresses), what it watched,
+  what it asked of agents (as their work on a video keeps it) and what it uploaded (file metadata: the videos stay the
+  workspace's). Notes from before accounts were recorded with them
   aren't in it. A few an hour.
 - **Delete my account** (Settings → Profile, a hosted server): its password confirms it (or a sign-in in the last ten
   minutes). Refused while it is the last owner of a workspace others work in: make someone else an owner there, or

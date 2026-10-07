@@ -333,6 +333,26 @@ test('agents: a failure and a permission it waits for ping (on by default), one 
   push.unsubscribe(b.endpoint, null);
 });
 
+test('one device hears only a few agents’ pings a minute, however many videos and agents they are about', async () => {
+  reset();
+  const b = browser('https://fcm.googleapis.com/fcm/send/device-flood');
+  push.subscribe({ endpoint: b.endpoint, keys: b.keys, user: null });
+  const svc = service();
+  const p = push.createPush({ subject: 'mailto:ops@example.com', fetchImpl: svc.fetchImpl, resolve: PUBLIC });
+  for (let i = 0; i < 12; i++) {
+    p.run({ slug: `v${i}`, video: `v${i}.mp4`, agent: `x${i}`, run: 'run_0123456789ab', kind: 'failed', words: { text: `boom ${i}` } });
+    p.flush();
+  }
+  await p.idle();
+  assert.equal(svc.got.length, 3, 'three, then quiet for the minute');
+  // the other categories are counted on their own: a question still goes out
+  p.handle(ev({ type: 'comment', kind: 'question', text: 'Is this the right logo?' }));
+  p.flush();
+  await p.idle();
+  assert.equal(svc.got.length, 4);
+  push.unsubscribe(b.endpoint, null);
+});
+
 test('agents’ pings go to people with the agents right in the workspace (never a reviewer)', () => {
   const msg = push.runMessage([{ kind: 'failed', slug: 's', video: 's.mp4', agent: 'cut', run: 'run_0123456789ab' }]);
   assert.equal(msg.category, 'agents');

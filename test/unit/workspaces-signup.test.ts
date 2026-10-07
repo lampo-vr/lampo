@@ -146,7 +146,7 @@ test('the first run’s sample is the workspace’s own, and never counts agains
   assert.ok(!(await get('/api/library', olivia)).json().videos.some((v: { slug: string }) => v.slug === made.json().slug), 'not in the team’s');
   assert.deepEqual(
     usageOf(piaWs),
-    { bytes: 0, files: { bytes: 0, kept: 0, count: 0 }, members: 1, activeVideos: 0, room: { videos: 0, bytes: 0 } },
+    { bytes: 0, runs: 0, files: { bytes: 0, kept: 0, count: 0 }, members: 1, activeVideos: 0, room: { videos: 0, bytes: 0 } },
     'the sample is Lampo’s, not theirs to pay for',
   );
   // the team's own sample is another one, made in its own workspace

@@ -19,8 +19,11 @@ const TTL = 90_000;
 export const LISTEN_TIMES = { betweenMs: 20_000, workingMs: 10 * 60_000 };
 
 export interface AgentRegistry {
-  /** `listens`: it follows new notes by itself while it is listed (`vr watch`). */
-  heartbeat(a: Omit<ConnectedAgent, 'last_seen' | 'state' | 'listened'>, o?: { listens?: boolean }): void;
+  /** `listens`: it follows new notes by itself while it is listed (`vr watch`). `account`: whose agent it is, by the
+   * account's id (never listed; agents' runs know it by it: server/runs.ts). */
+  heartbeat(a: Omit<ConnectedAgent, 'last_seen' | 'state' | 'listened'>, o?: { listens?: boolean; account?: string }): void;
+  /** The account a connected agent of this workspace is (by its session id), while it is listed. */
+  accountOf(sessionId: string): string | undefined;
   /**
    * An agent of this workspace started waiting for feedback (wait_for_feedback): the release, called when the wait
    * ends — `handed`: it returned something to work on.
@@ -42,6 +45,8 @@ export function createAgentRegistry(broadcast: Broadcast): AgentRegistry {
   // Per workspace: an agent connected with a token (or app) of one workspace is listed in that one only — its name,
   // folder and host are nobody else's business.
   const agents = new Map<string, ConnectedAgent & { at: number; ws: string; listens: boolean }>();
+  // Whose each one is, by account id (apart from the list, which is shown).
+  const accounts = new Map<string, string>();
   // Open and recent waits by agent, apart from the list: a wait outlives the heartbeats' TTL.
   const waits = new Map<string, Waits>();
   const stateOf = (key: string, listens: boolean, now: number): { state: AgentListenState; listened: string | null } => {
@@ -56,7 +61,11 @@ export function createAgentRegistry(broadcast: Broadcast): AgentRegistry {
   const live = () => {
     const now = Date.now();
     const ws = currentWorkspace();
-    for (const [id, a] of agents) if (now - a.at > TTL && !waits.get(id)?.open) agents.delete(id);
+    for (const [id, a] of agents)
+      if (now - a.at > TTL && !waits.get(id)?.open) {
+        agents.delete(id);
+        accounts.delete(id);
+      }
     for (const [id, w] of waits) if (!w.open && now - w.ended > LISTEN_TIMES.workingMs && !agents.has(id)) waits.delete(id);
     return [...agents.entries()].filter(([, a]) => a.ws === ws).map(([key, { ws: _ws, listens, ...a }]) => ({ ...a, ...stateOf(key, listens, now) }));
   };
@@ -72,7 +81,7 @@ export function createAgentRegistry(broadcast: Broadcast): AgentRegistry {
     broadcast('sessions');
   };
   return {
-    heartbeat(input, { listens = false } = {}) {
+    heartbeat(input, { listens = false, account } = {}) {
       // What an agent says of itself, over HTTP or as an MCP client: one line each, short (A12-D3).
       const a = {
         ...input,
@@ -85,8 +94,14 @@ export function createAgentRegistry(broadcast: Broadcast): AgentRegistry {
       const key = `${ws}\u0000${a.session_id}`;
       const known = agents.has(key);
       agents.set(key, { ...a, last_seen: isoLocal(), at: Date.now(), ws, listens: listens || !!agents.get(key)?.listens });
+      if (account) accounts.set(key, account);
+      else accounts.delete(key);
       if (!known) broadcast('sessions');
       tell(key);
+    },
+    accountOf(sessionId) {
+      const key = `${currentWorkspace()}\u0000${cleanAgentName(sessionId, 200) || 'agent'}`;
+      return agents.has(key) ? accounts.get(key) : undefined;
     },
     wait(sessionId) {
       const key = `${currentWorkspace()}\u0000${cleanAgentName(sessionId, 200) || 'agent'}`;

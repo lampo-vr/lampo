@@ -152,8 +152,14 @@ export function createContext({ cfg, lan = false, dev = false, token, loadSessio
   const agents = createAgentRegistry(broadcast);
   // Every activity joins its agent run (server/runs.ts); this machine's processes are runs too.
   // A run that failed, waits for a permission or went quiet: a push (the `agents` and `quiet` categories), once ctx is made.
-  const runs: Runs = createRuns({ broadcast, actor: (req) => actor(req), notify: (n) => ctx.push.run(n) });
-  const activity = createActivityStore(broadcast, { onRecord: (a) => runs.sign(a) });
+  const runs: Runs = createRuns({
+    broadcast,
+    actor: (req) => actor(req),
+    notify: (n) => ctx.push.run(n),
+    // whose a connected agent is, by account id: a run a person sends it is that account's
+    ownerOfSession: (id) => agents.accountOf(id),
+  });
+  const activity = createActivityStore(broadcast, { onRecord: (a, from) => runs.sign(a, from) });
   const agentRuns = createAgentRuns({
     broadcast,
     activity: activity.record,

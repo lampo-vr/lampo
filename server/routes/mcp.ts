@@ -12,6 +12,7 @@ import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 import { toWebRequest } from '@modelcontextprotocol/node';
 import { type AuthInfo, createMcpHandler } from '@modelcontextprotocol/server';
 import type { Request, Response, Router } from 'express';
+import { accountTag } from '../../lib/activityText.ts';
 import { agentKindOf } from '../../lib/agentKind.ts';
 import { onAccessEnded, USERS_FILE } from '../../lib/auth.ts';
 import { createLocalBackend } from '../../lib/backend/local.ts';
@@ -243,10 +244,11 @@ export function mcpRoutes(ctx: ServerContext): Router {
           tools: requestInfo ? new URL(requestInfo.url).searchParams.get('tools') : null,
           // Events with paths on this disk for the machine itself only; anyone else reads URLs (wait_for_feedback).
           publicEvent: ctx.eventFor(principal.via),
-          activity: ctx.activity.record,
+          // what it does is its account's (by id; none for the machine's own): agents' runs go by it (server/runs.ts)
+          activity: (a) => ctx.activity.record(a, principal.via !== 'local' && principal.id ? { account: principal.id } : {}),
           // agents' runs: a wait handing work over begins them; notes added meanwhile end the next answer (server/runs.ts)
-          handed: (name, slugs) => ctx.runs.handed(name, slugs),
-          news: (name, about) => ctx.runs.news(name, about),
+          handed: (name, slugs) => ctx.runs.handed(name, slugs, principal.via !== 'local' ? principal.id : undefined),
+          news: (name, about) => ctx.runs.news(name, about, principal.via !== 'local' ? principal.id : undefined),
           // New frames count per account, as `GET /api/review/:slug/frame` counts them (A13 VERIFY-2); not the machine's own.
           ...(principal.via === 'local'
             ? {}
@@ -372,15 +374,17 @@ export function mcpRoutes(ctx: ServerContext): Router {
     const agent = {
       session_id: `mcp-${crypto.createHash('sha1').update(`${caller}|${name}`).digest('hex').slice(0, 12)}`,
       // Whose it is, unless it runs on the machine itself (then it's the machine owner's, like every local agent).
-      name: who.via !== 'local' && who.name ? `${name} · ${who.name}` : name,
+      name: who.via !== 'local' && who.name ? `${name} · ${accountTag(who.name)}` : name,
       cwd: null,
       host: null,
       user: who.via !== 'local' ? who.name || null : null,
       kind: agentKindOf(name),
     };
-    ctx.agents.heartbeat(agent);
+    // whose agent it is, by account (not the machine's own): a run it is at is that account's (server/runs.ts)
+    const account = who.via !== 'local' ? who.id : undefined;
+    ctx.agents.heartbeat(agent, { account });
     // A long wait_for_feedback keeps it listed (heartbeats expire after 90 s).
-    const timer = setInterval(() => ctx.agents.heartbeat(agent), 30_000);
+    const timer = setInterval(() => ctx.agents.heartbeat(agent, { account }), 30_000);
     res.on('close', () => clearInterval(timer));
     return { session_id: agent.session_id, name: agent.name, kind: agent.kind };
   }

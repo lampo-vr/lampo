@@ -1,8 +1,8 @@
 // A person's own data as one zip (A13 PEOPLE-1: GDPR Art. 15 and 20): what the account is, where it works, how it gets
 // in, and in each of its workspaces what it wrote and made — its notes and its replies (never anyone else's words: a
 // reply on someone else's note carries only that note's id), its drafts, its unsent recordings with their audio, its
-// verdicts, the review links it made, what it watched, and the metadata of what it uploaded (never the videos: they
-// are the team's). JSON files with plain field names and a README that says what each is. The same for Settings →
+// verdicts, the review links it made, what it watched, what it asked of agents, and the metadata of what it uploaded
+// (never the videos: they are the team's). JSON files with plain field names and a README that says what each is. The same for Settings →
 // Profile → Export my data and `vr admin export-account`.
 //
 // Ownership goes by account id (author_id, by_id, added_by_id: lib/ownership.ts); only verdicts and versions, which
@@ -16,6 +16,7 @@ import { listApps } from './oauth/store.ts';
 import { slugify } from './paths.ts';
 import { listSubs } from './push/index.ts';
 import { audioFile, listRecordings, publicRecording } from './recordings.ts';
+import { readRuns } from './runs.ts';
 import { inWorkspace } from './scope.ts';
 import { listShares } from './shares.ts';
 import { rootStorage } from './storage/index.ts';
@@ -68,6 +69,7 @@ workspaces/<id>/
   verdicts.json      the versions you approved or asked changes for
   links.json         the review links you made (never their addresses)
   watching.json      which videos you watched, and how much
+  agent-requests.json what you asked of agents (Ask, a nudge, "Tell it…") as their work on a video keeps it
   uploads.json       what you uploaded: file names, sizes, dates (the videos themselves are the workspace's)
 
 Notes and replies made before accounts were recorded with them, and anything other people wrote, are not in here.
@@ -147,6 +149,7 @@ export async function accountExport(userId: string): Promise<ExportFile[]> {
       const verdicts: unknown[] = [];
       const watching: unknown[] = [];
       const uploads: unknown[] = [];
+      const requests: unknown[] = [];
       for (const r of listReviews()) {
         if (r.onboarding_sample) continue;
         const slug = slugify(r.video);
@@ -166,6 +169,8 @@ export async function accountExport(userId: string): Promise<ExportFile[]> {
           if (fs.existsSync(file)) audio.push({ name: `${dir}/recordings/${rec.id}.m4a`, data: fs.readFileSync(file) });
         }
         for (const a of r.approvals ?? []) if (a.party === 'team' && a.by === name) verdicts.push({ video, v: a.v, status: a.status, at: a.at, note: a.note });
+        for (const run of readRuns(slug))
+          for (const a of run.clock.asks ?? []) if (byMe(a.by_id)) requests.push({ video, agent: run.agent.name, at: a.at, text: a.text });
         const w = readViews(slug).viewers[userId];
         if (w) watching.push({ video, v: w.v, seconds: w.secs, plays: w.plays ?? null, last: w.last });
         const added = r.added_by_id === userId;
@@ -195,7 +200,7 @@ export async function accountExport(userId: string): Promise<ExportFile[]> {
           kind: s.folder ? 'folder' : 'video',
           ...(s.folder ? { folder: s.folder } : {}),
         }));
-      return { notes, replies, drafts, recordings, audio, verdicts, watching, uploads, links };
+      return { notes, replies, drafts, recordings, audio, verdicts, watching, uploads, links, requests };
     });
     files.push(
       json(`${dir}/notes.json`, parts.notes),
@@ -206,6 +211,7 @@ export async function accountExport(userId: string): Promise<ExportFile[]> {
       json(`${dir}/verdicts.json`, parts.verdicts),
       json(`${dir}/links.json`, parts.links),
       json(`${dir}/watching.json`, parts.watching),
+      json(`${dir}/agent-requests.json`, parts.requests),
       json(`${dir}/uploads.json`, parts.uploads),
     );
   }

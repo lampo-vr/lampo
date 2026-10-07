@@ -95,6 +95,17 @@ format stays backwards compatible throughout.
   once. Files uploaded and not yet committed count toward the plan until they are. Bringing a file back from the trash
   or an older version is checked against the plan like an upload.
 - **A file keeps a bounded number of older versions**, and bringing back the bytes it already has makes no new version.
+- An agent's work kept with a video now stays small whatever an agent sends: a video and each person's agents hold only
+  so many pieces of work at once, and what is kept of finished work is bounded, so the server stays quick.
+- An agent's work is its account's: another person's agent can no longer take over, join or be stopped in place of it
+  by naming itself like it, and an account's name can no longer contain "·".
+- Reviewers see where an agent's work stands, but no longer what it touched in the project: its steps, commands and the
+  last lines of a failed render are for people who work with agents.
+- Stopping an agent this computer started is done from this computer itself, as before for its own agent controls.
+- Your data export now includes what you asked of agents.
+- A phone hears fewer agent pings in a row: work that fails again and again is said once for a while, and a device gets
+  only a few pings a minute.
+- A failed render's last lines leave out more kinds of keys and passwords before they reach Lampo.
 - The operator's Accounts page shows when each person was last active, not only their last sign-in, which accounts
   signed in before it was recorded never had.
 - The app no longer opens on a blank page when the browser can't keep a copy of its code (its storage full or busy, a

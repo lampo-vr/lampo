@@ -655,9 +655,13 @@ One JSON object per line, one line per run, oldest first: the run as `GET /api/r
 ([api.md](api.md#agent-runs)), plus `steps` (what it did, oldest first) and `clock` (the server's own counters). The
 app rewrites the file under the video's lock (`.lock`), atomically, about a second after a change; nothing else
 writes it, and `vr` only reads it to name a version's run. It is compacted as it is written: at most 200 steps per
-run (a stretch of render progress keeps its first and last line; the first step, questions and errors stay), a run
-that ended more than 90 days ago keeps no steps, and past 1,000 runs on a video the oldest ended ones go. Lines it
-can't read are kept as they are. A store without the file has no runs; nothing else changes.
+run (a stretch of render progress keeps its first and last line; the first step, questions and errors stay), steps
+only on the 20 newest runs that ended, none on a run that ended more than 90 days ago, and past 300 runs on a video
+open runs nobody has heard from go first, then the oldest ended ones. Each file holds at most about 1 MB: past it, the
+steps of the oldest ended runs go first, then open runs nobody has heard from, then the oldest ended runs. Lines it
+can't read are kept as they are. A store without the file has no runs; nothing else changes. The files count toward
+a workspace's storage. `clock` also keeps whose agent is at the run (an account id) and the requests people made of
+it (for their own export).
 
 Runs on a question asked on a folder before any render (`asks.json`) live in the workspace's own `runs.jsonl`, with
 `slug: null` and `folder` (at most 200 of them).

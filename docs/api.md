@@ -1061,16 +1061,26 @@ nudges, answers its question or tries again (or by the agent's own first write),
 
 Details:
 
-- **Who.** Reading needs the view action (reviewers too); nothing of a run is reachable through a review link. Which
-  session and computer an agent runs in (`agent.session_id`, `agent.runner`) shows only to roles with the agents
-  action. Stop, retry and nudge need the agents action and a person: an API token gets `403`. The log answers only on
-  a person's own machine, from the machine itself (like `/api/agent-runs/:id/log`), and names no path.
+- **Who.** Reading needs the view action (reviewers too); nothing of a run is reachable through a review link. Roles
+  without the agents action read where a run stands and never what it worked on, as `/api/agent-activity` is closed to
+  them: `/api/runs/:id` gives them no `steps`; `now`, `error` and `needs.text` only as templates whose fill-ins name
+  nothing of the project (a note, a frame, an exit code; "Running a command" for a command, nothing for a file), never
+  a `quote`; no `result.summary` or `needs.allow`; no `agent.session_id` or `agent.runner`. The same holds for each
+  video's `run` in the library. Stop, retry and nudge need the agents action and a person: an API token gets `403`;
+  stopping a run whose process this machine runs needs the machine itself (like `/api/agent-runs/:id/stop`). The log
+  answers only on a person's own machine, from the machine itself (like `/api/agent-runs/:id/log`), and names no path.
+- **Whose.** A run is its agent's account's (by its id, kept with the run, never shown): the first agent heard at it
+  claims it, and a run a person sends to a connected agent is that agent's account's from the start. Activity of
+  another account never joins, takes or hears it, whatever name it posts under. An account's name can't contain "·",
+  which separates an agent's name from whose it is (`claude-code · Sam`).
 - **Opening.** Send (`POST …/drafts/send`, a recording's send), a request (`nudge: true` for a nudge), an answer to
   the agent's question (`PATCH /api/comments/:id` to `verified` with words, `POST /api/asks/:id/answer`) and retry
   open a run for the video's assigned agent, or add their notes to the one it has open (`added: true` once it began):
   only for a person whose role has the agents action, never a reviewer, a review link visitor or an API token. Their
   notes and requests go out all the same. An agent's own write (a note, a fix, a reply, a question, an upload, a
-  status) with no run open opens one (`opened_by.how: "agent"`, working); reads and waits never do.
+  status) with no run open opens one (`opened_by.how: "agent"`, working); reads and waits never do. Those are bounded:
+  a video holds a dozen open runs, one account's agents a few dozen in a workspace, opened so often; past that the
+  activity still shows live and opens nothing (a person's Send always opens its run).
 - **A `Run`** (`lib/types.ts`): `id`, `slug` (or `null` and `folder`), `agent {name, kind, session_id?, runner?}`,
   `opened_by {who, id?, how}`, `delivery` (`listening`, or `machine` for one this machine started), `state`
   (`queued` → `starting` → `working` ⇄ `needs_you` → `done` · `failed` · `stopped` · `lost`), `started`, `ended`,

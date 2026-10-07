@@ -389,6 +389,8 @@ export function checkName(name: string): string {
   if (!n || n.length > 80) throw new Error('name must be 1–80 characters');
   // Authors starting with agent:/guest: mean something else throughout the store (look-alike letters included).
   if (looksReserved(n)) throw new Error('name cannot start with "agent:" or "guest:"');
+  // "·" separates an agent's name from whose it is (`claude-code · Sam`): a name with one could pass for another's.
+  if (/[·•∙⋅‧・]/.test(n)) throw new Error('name cannot contain "·"');
   return n;
 }
 

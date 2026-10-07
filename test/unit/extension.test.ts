@@ -107,7 +107,7 @@ test('the module hears workspaces made and member counts changed, and counts usa
   assert.equal(hook.status, 200, hook.text);
   assert.equal(hook.json().bytes, 14);
   const usage = ext.usageOf(open);
-  assert.deepEqual(usage, { bytes: 0, files: { bytes: 0, kept: 0, count: 0 }, members: 1, activeVideos: 0, room: { videos: 0, bytes: 0 } });
+  assert.deepEqual(usage, { bytes: 0, runs: 0, files: { bytes: 0, kept: 0, count: 0 }, members: 1, activeVideos: 0, room: { videos: 0, bytes: 0 } });
 });
 
 test('a read-only workspace: no new uploads, videos, members or review links — with the module’s sentence', async () => {

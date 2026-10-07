@@ -11,6 +11,7 @@ import { agentName, words } from '../lib/activityText.ts';
 import { agentKindOfRef } from '../lib/agentKind.ts';
 import { can } from '../lib/permissions.ts';
 import type { RunNotice } from '../lib/push/index.ts';
+import { RateLimit, Recent } from '../lib/rateLimit.ts';
 import * as lib from '../lib/runs.ts';
 import { boundToWorkspace, currentWorkspace, inWorkspace, wsKey } from '../lib/scope.ts';
 import * as store from '../lib/store.ts';
@@ -39,6 +40,11 @@ const FLUSH_MS = 1000;
 const SWEEP_MS = 30_000;
 /** Stops not heard yet kept in memory for calls that name no video (the oldest go first). */
 const UNHEARD_MAX = 10_000;
+/** One account's agents open at most this many runs by their own writes within OPENED_WINDOW_MS, in a workspace. */
+const OPENED_MAX = 30;
+const OPENED_WINDOW_MS = 10 * 60_000;
+/** A ping that an agent's work failed: at most one per agent and video within this long. */
+export const FAILED_PING_MS = 10 * 60_000;
 
 /** What an agent's own write is: these open a run when none is open (reads and waits never do). */
 const WRITES = new Set<AgentActivityKind>(['note', 'fix', 'reply', 'ask', 'upload', 'render', 'error', 'status']);
@@ -48,6 +54,8 @@ export const mayOpenRun = (req: Request): boolean => !!req.auth && req.auth.via 
 
 export interface PersonOpen {
   how: RunOpenedHow;
+  /** The account whose agent it is, when known (an earlier run's, for Try again and an answer's follow-up). */
+  owner?: string;
   /** The notes it is about: Send's batch (Nudge takes the video's open notes, Ask none). */
   notes?: readonly string[];
   /** The person's words (Ask, Nudge). */
@@ -65,9 +73,10 @@ export interface Runs {
    * One recorded activity (server/activity.ts, any source): joins its run, or opens one for a write. When the person
    * stopped this agent's work and it hasn't heard yet, this call is its next step: the line it is told (once), else null.
    */
-  sign(a: AgentActivity): string | null;
-  /** A wait of `agent` handed over what waited on these videos: their queued runs begin. */
-  handed(agent: string, slugs: readonly string[]): void;
+  sign(a: AgentActivity, from?: { account?: string }): string | null;
+  /** A wait of `agent` (of `account`; none: this machine's own) handed over what waited on these videos: their queued
+   * runs begin. */
+  handed(agent: string, slugs: readonly string[], account?: string): void;
   /** One line of a workspace's event log (the server's feed): versions, statuses, questions and answers. */
   event(e: ReviewEvent): void;
   /** A person answered the agent's question `note` on the video: its run works again, or (with the right, and words:
@@ -96,7 +105,7 @@ export interface Runs {
    * The new-notes line for `agent`'s next answer (notes added to its run while it worked), once per batch. `about`: what
    * the call named (a video, a note); `read`: it read the video's open notes (they are told by that, no line).
    */
-  news(agent: string, about?: { video?: string | null; note?: string | null; read?: boolean }): string | null;
+  news(agent: string, about?: { video?: string | null; note?: string | null; read?: boolean }, account?: string): string | null;
   /** The clock: quiet runs go lost, an hour lost closes them; what changed is written. */
   sweep(now?: number): void;
   /** Writes everything not written yet (the process is stopping). */
@@ -113,6 +122,8 @@ export interface RunsOptions {
   actor: (req: Request) => string;
   /** A run failed, waits for a permission, or has gone quiet for QUIET_MS: push (server/context.ts). In its workspace. */
   notify?: (n: RunNotice) => void;
+  /** The account a connected agent is, by its session id (server/agents.ts): whose a run a person sends it is. */
+  ownerOfSession?: (sessionId: string) => string | undefined;
 }
 
 /** No word from an agent at work this long: a ping for whoever asked for one (Settings → Notifications). */
@@ -139,12 +150,16 @@ const openNotes = (review: Review | null): string[] =>
 
 const ms = (iso: string | null | undefined) => (iso ? Date.parse(iso) || 0 : 0);
 
-export function createRuns({ broadcast, actor, notify }: RunsOptions): Runs {
+export function createRuns({ broadcast, actor, notify, ownerOfSession }: RunsOptions): Runs {
+  // runs opened by an account's agents' own writes, per workspace and account (a member's token can't flood a store)
+  const opened = new RateLimit(OPENED_MAX, OPENED_WINDOW_MS, { maxKeys: 10_000 });
+  // when each agent's work on a video last pinged that it failed (by workspace, video and agent)
+  const failedPinged = new Recent<number>(10_000);
   const pendingEvent = new Map<string, NodeJS.Timeout>();
   const pendingFlush = new Map<string, { timer: NodeJS.Timeout; soon: boolean }>();
   // Runs the person stopped whose agent hasn't heard yet (by workspace and run id), for its next call that names no
   // video. The runs files keep `stop_pending` too: a call about the video finds it there after a restart.
-  const unheard = new Map<string, { ws: string; slug: string; agent: string; id: string }>();
+  const unheard = new Map<string, { ws: string; slug: string; agent: string; owner?: string; id: string }>();
   // The inbox shows runs that failed, wait for a permission or went quiet: it is told when a run's state moves.
   const forYouSoon = new Map<string, NodeJS.Timeout>();
   const tellForYou = () => {
@@ -238,6 +253,13 @@ export function createRuns({ broadcast, actor, notify }: RunsOptions): Runs {
   function tell(slug: string, r: lib.StoredRun, kind: RunNotice['kind'], minutes?: number) {
     if (!notify) return;
     try {
+      if (kind === 'failed') {
+        // one ping per agent and video for a while: work that fails again and again says it once
+        const k = wsKey(`${slug}\u0000${r.clock.owner ?? ''}\u0000${lib.agentBase(r.agent.name)}`);
+        const last = failedPinged.get(k) ?? 0;
+        if (Date.now() - last < FAILED_PING_MS) return;
+        failedPinged.set(k, Date.now());
+      }
       const review = store.loadReview(slug);
       if (!review) return;
       const said = kind === 'failed' ? r.error : kind === 'permission' ? r.needs?.text : undefined;
@@ -280,15 +302,26 @@ export function createRuns({ broadcast, actor, notify }: RunsOptions): Runs {
     return r;
   }
 
-  /** The open runs of `agent` in this workspace, wherever they are. */
-  function openOf(agent: string): { slug: string | null; run: lib.StoredRun }[] {
+  /** The open runs of `agent` (of `account`) in this workspace, wherever they are. */
+  function openOf(agent: string, account: string | undefined): { slug: string | null; run: lib.StoredRun }[] {
     const ws = currentWorkspace();
     const out: { slug: string | null; run: lib.StoredRun }[] = [];
     for (const p of lib.openPlaces()) {
       if (p.ws !== ws) continue;
-      for (const run of lib.readRuns(p.slug)) if (run.ended === null && run.agent.name === agent) out.push({ slug: p.slug, run });
+      for (const run of lib.readRuns(p.slug)) if (run.ended === null && run.agent.name === agent && lib.ownerOk(run, account)) out.push({ slug: p.slug, run });
     }
     return out;
+  }
+
+  /** How many open runs `account`'s agents hold in this workspace. */
+  function openOfAccount(account: string): number {
+    const ws = currentWorkspace();
+    let n = 0;
+    for (const p of lib.openPlaces()) {
+      if (p.ws !== ws) continue;
+      for (const run of lib.readRuns(p.slug)) if (run.ended === null && run.clock.owner === account) n++;
+    }
+    return n;
   }
 
   /** Time's moves on a video's runs, written and told (before a read answers). */
@@ -311,6 +344,11 @@ export function createRuns({ broadcast, actor, notify }: RunsOptions): Runs {
     if (!review || review.onboarding_sample) return null;
     const agent = o.agent ?? assigned(review);
     if (!agent) return null;
+    // whose agent it is: an earlier run's, else the connected agent's account (never the name it is listed under)
+    const owner = o.agent ? o.owner : review.session?.id ? ownerOfSession?.(review.session.id) : undefined;
+    const ask = (x: lib.StoredRun, at: number) => {
+      if (o.request) lib.keepAsk(x, { ...(who.id ? { by_id: who.id } : {}), who: who.who, at: new Date(at).toISOString(), text: lib.requestText(o.request) });
+    };
     // What the person does now outweighs a stop its agent hasn't heard yet: it hears this instead.
     for (const r of lib.readRuns(slug))
       if (r.stop_pending && r.agent.name === agent.name)
@@ -328,6 +366,7 @@ export function createRuns({ broadcast, actor, notify }: RunsOptions): Runs {
         if (o.request) {
           x.request = lib.requestText(o.request);
           lib.keepStep(x, { ...words('{name} asked', { name: who.who }, x.request), at: new Date(now).toISOString(), type: 'action' });
+          ask(x, now);
         }
         return added.length > 0 || !!o.request;
       });
@@ -342,10 +381,16 @@ export function createRuns({ broadcast, actor, notify }: RunsOptions): Runs {
         notes,
         request: o.request,
         ...(o.follows ? { follows: o.follows } : {}),
+        ...(owner !== undefined ? { owner } : {}),
       },
       who.who,
     );
-    return lib.shownRun(r);
+    if (o.request)
+      change(slug, r.id, (x) => {
+        ask(x, Date.now());
+        return false;
+      });
+    return lib.shownRun(lib.readRuns(slug).find((x) => x.id === r.id) ?? r);
   }
 
   /** The newest open question of the run's agent on the video, asked in the last minute: what its question is about. */
@@ -373,9 +418,11 @@ export function createRuns({ broadcast, actor, notify }: RunsOptions): Runs {
   }
 
   /** Applies a sign to a video's run, with what the video itself says (the frame's notes, the question's id). */
-  function applyTo(slug: string, id: string, s: lib.Sign, agent: string) {
+  function applyTo(slug: string, id: string, s: lib.Sign, agent: string, account: string | undefined) {
     const q = lib.stepTypeOf(s.kind) === 'elicitation' ? questionOf(slug, agent, s.at) : null;
     change(slug, id, (r) => {
+      // the first agent heard at a run nobody holds yet: its account's from now on
+      lib.claim(r, account);
       const sign: lib.Sign = {
         ...s,
         ...(s.words.key === 'Looking at frame {frame}' ? { atFrame: atFrame(slug, r, s.words.vars?.frame) } : {}),
@@ -391,7 +438,7 @@ export function createRuns({ broadcast, actor, notify }: RunsOptions): Runs {
    * moment after (calls it made before it read the line). A wait hears nothing: it went back to waiting, and the work
    * is over either way. Undefined when the call has nothing to do with a stop.
    */
-  function stopHeard(a: AgentActivity, s: lib.Sign): string | null | undefined {
+  function stopHeard(a: AgentActivity, s: lib.Sign, account: string | undefined): string | null | undefined {
     const name = a.agent;
     const ws = currentWorkspace();
     const at = new Date(s.at).toISOString();
@@ -400,14 +447,19 @@ export function createRuns({ broadcast, actor, notify }: RunsOptions): Runs {
     };
     const places: { slug: string; id: string }[] = [];
     if (a.slug) {
-      for (const r of lib.readRuns(a.slug)) if (r.stop_pending && r.agent.name === name) places.push({ slug: a.slug, id: r.id });
-    } else for (const u of unheard.values()) if (u.ws === ws && u.agent === name) places.push({ slug: u.slug, id: u.id });
+      for (const r of lib.readRuns(a.slug)) if (r.stop_pending && r.agent.name === name && lib.ownerOk(r, account)) places.push({ slug: a.slug, id: r.id });
+    } else
+      for (const u of unheard.values())
+        if (u.ws === ws && u.agent === name && (u.owner === undefined || u.owner === (account ?? ''))) places.push({ slug: u.slug, id: u.id });
     if (!places.length) {
       // a write in the moment after it heard: kept with the stopped work, nothing opened
       if (!a.slug || !WRITES.has(a.kind)) return undefined;
       const runs = lib.readRuns(a.slug);
-      if (runs.some((r) => r.ended === null && r.agent.name === name)) return undefined;
-      const just = runs.find((r) => r.agent.name === name && r.state === 'stopped' && !!r.clock.stopTold && s.at - ms(r.clock.stopTold) <= lib.RUN_TIMES.late);
+      if (runs.some((r) => r.ended === null && r.agent.name === name && lib.ownerOk(r, account))) return undefined;
+      const just = runs.find(
+        (r) =>
+          r.agent.name === name && lib.ownerOk(r, account) && r.state === 'stopped' && !!r.clock.stopTold && s.at - ms(r.clock.stopTold) <= lib.RUN_TIMES.late,
+      );
       if (!just) return undefined;
       change(a.slug, just.id, (r) => {
         keep(r);
@@ -430,23 +482,23 @@ export function createRuns({ broadcast, actor, notify }: RunsOptions): Runs {
     return lines.length ? lines.join('\n') : null;
   }
 
-  function sign(a: AgentActivity): string | null {
+  function sign(a: AgentActivity, account: string | undefined): string | null {
     const now = ms(a.at) || Date.now();
     const s = signOf(a, now);
-    const stop = stopHeard(a, s);
+    const stop = stopHeard(a, s, account);
     // about the stopped video: that is all this call is; about none: its other work hears it too
     if (stop !== undefined && a.slug) return stop;
-    signRest(a, s, now);
+    signRest(a, s, now, account);
     return stop ?? null;
   }
 
-  function signRest(a: AgentActivity, s: lib.Sign, now: number) {
+  function signRest(a: AgentActivity, s: lib.Sign, now: number, account: string | undefined) {
     const name = a.agent;
     // Its run, named (LAMPO_RUN): a hint, taken only for the same agent (and account), the same video, in this workspace.
     if (a.run) {
       const hit = lib.findRun(a.run);
-      if (hit && hit.slug !== null && hit.run.agent.name === name && (!a.slug || a.slug === hit.slug)) {
-        if (hit.run.ended === null) return applyTo(hit.slug, hit.run.id, s, name);
+      if (hit && hit.slug !== null && hit.run.agent.name === name && lib.ownerOk(hit.run, account) && (!a.slug || a.slug === hit.slug)) {
+        if (hit.run.ended === null) return applyTo(hit.slug, hit.run.id, s, name, account);
         // its last lines arrive after its process ended: kept, nothing opened
         if (now - ms(hit.run.ended) <= lib.RUN_TIMES.late) {
           change(hit.slug, hit.run.id, (r) => {
@@ -460,14 +512,14 @@ export function createRuns({ broadcast, actor, notify }: RunsOptions): Runs {
     if (a.slug) {
       const slug = a.slug;
       const runs = lib.readRuns(slug);
-      let run = runs.find((r) => r.ended === null && r.agent.name === name);
+      let run = runs.find((r) => r.ended === null && r.agent.name === name && lib.ownerOk(r, account));
       const bare = a.kind === 'wait';
       if (!run && !bare) {
         // Sent to the video's agent and begun by nobody yet: the agent that turns up takes it, under its own name — the
-        // same person's agent only.
+        // same person's agent only (by the account when the run knows it; names are one per workspace otherwise).
         const queued = runs.filter((r) => r.ended === null && r.state === 'queued');
         const q = queued[0];
-        if (queued.length === 1 && q && sameOwner(q.agent.name, name)) {
+        if (queued.length === 1 && q && takes(q, name, account)) {
           change(slug, q.id, (r) => {
             r.agent = lib.runAgent(name);
             return true;
@@ -476,15 +528,25 @@ export function createRuns({ broadcast, actor, notify }: RunsOptions): Runs {
         }
       }
       if (!run && !name.includes(' · ')) {
-        // Named by a person's account (an upload with their API token): the run of that account's agent on the video.
-        const theirs = runs.filter((r) => r.ended === null && r.state !== 'queued' && ownerOfName(r.agent.name) === name);
+        // Named by a person's account (an upload with their API token): the run of that account's agent on the video —
+        // by its id where the run knows it.
+        const theirs = runs.filter(
+          (r) =>
+            r.ended === null &&
+            r.state !== 'queued' &&
+            (r.clock.owner !== undefined ? account !== undefined && r.clock.owner === account : ownerOfName(r.agent.name) === name),
+        );
         if (theirs.length === 1) run = theirs[0];
       }
-      if (run) return applyTo(slug, run.id, s, name);
+      if (run) return applyTo(slug, run.id, s, name, account);
       // a write opens a run; how far an upload got (Lampo's own observation) doesn't
       if (!WRITES.has(a.kind) || (a.kind === 'upload' && (a.pct !== undefined || a.progress))) return;
       const review = store.loadReview(slug);
       if (!review || review.onboarding_sample) return;
+      // Bounded: a video holds so many open runs, an account's agents so many, opened so often; past that the activity
+      // still shows live, it opens nothing (a person's Send always does).
+      if (runs.filter((r) => r.ended === null).length >= lib.RUN_LIMITS.openPerVideo) return;
+      if (account !== undefined && (openOfAccount(account) >= lib.RUN_LIMITS.openPerAccount || !opened.take(wsKey(account)))) return;
       // The agent's own write with no run open: an implicit run (an agent that puts up V1 on its own, fixes unasked).
       const r = openRun(
         {
@@ -493,34 +555,36 @@ export function createRuns({ broadcast, actor, notify }: RunsOptions): Runs {
           opened_by: { who: name, how: 'agent' },
           notes: openNotes(review),
           state: 'working',
+          owner: account ?? '',
         },
         `agent:${name}`,
       );
-      return applyTo(slug, r.id, s, name);
+      return applyTo(slug, r.id, s, name, account);
     }
     // No video: a wait is for every run of the agent (it waits again after handing back), anything else joins its one
     // open run, or only says it is alive.
-    const mine = openOf(name);
+    const mine = openOf(name, account);
     if (a.kind === 'wait' || mine.length === 1) {
       for (const { slug, run } of mine) {
         if (slug === null) change(slug, run.id, (r) => lib.applySign(r, s));
-        else applyTo(slug, run.id, s, name);
+        else applyTo(slug, run.id, s, name, account);
       }
       return;
     }
     for (const { slug, run } of mine) change(slug, run.id, (r) => lib.alive(r, now));
   }
 
-  function handed(agent: string, slugs: readonly string[]) {
+  function handed(agent: string, slugs: readonly string[], account: string | undefined) {
     const now = Date.now();
     for (const slug of new Set(slugs)) {
       if (!slug || !store.loadReview(slug)) continue;
       const runs = lib.readRuns(slug);
-      const own = runs.find((r) => r.ended === null && r.agent.name === agent);
+      const own = runs.find((r) => r.ended === null && r.agent.name === agent && lib.ownerOk(r, account));
       const queued = runs.filter((r) => r.ended === null && r.state === 'queued');
-      const run = own ?? (queued.length === 1 && queued[0] && sameOwner(queued[0].agent.name, agent) ? queued[0] : null);
+      const run = own ?? (queued.length === 1 && queued[0] && takes(queued[0], agent, account) ? queued[0] : null);
       if (!run) continue;
       change(slug, run.id, (r) => {
+        lib.claim(r, account);
         if (r.agent.name !== agent) r.agent = lib.runAgent(agent);
         // what it was handed was told of too: no new-notes line for it
         r.clock.told = r.plan.length;
@@ -631,7 +695,16 @@ export function createRuns({ broadcast, actor, notify }: RunsOptions): Runs {
     const prev = runs.find((r) => r.needs?.note === note || r.clock.qs?.includes(note)) ?? runs.find((r) => lib.sameAgent(r.agent.name, q.author)) ?? null;
     const agent = prev?.agent ?? assigned(review) ?? lib.runAgent(agentName(q.author) ?? 'agent');
     if (runs.some((r) => r.ended === null && r.agent.name === agent.name)) return;
-    open(slug, { how: 'answer', agent, notes: prev ? carried(prev, review) : [], ...(prev ? { follows: prev.id } : {}) }, whoOf(req));
+    open(
+      slug,
+      {
+        how: 'answer',
+        agent,
+        notes: prev ? carried(prev, review) : [],
+        ...(prev ? { follows: prev.id, ...(prev.clock.owner !== undefined ? { owner: prev.clock.owner } : {}) } : {}),
+      },
+      whoOf(req),
+    );
   }
 
   const whoOf = (req: Request) => ({ who: actor(req), ...(req.auth?.user?.id ? { id: req.auth.user.id } : {}) });
@@ -639,22 +712,30 @@ export function createRuns({ broadcast, actor, notify }: RunsOptions): Runs {
   function machineStarted(info: AgentRunInfo, run: string | undefined): string {
     const now = Date.now();
     const slug = info.slug;
-    const known = run ? lib.readRuns(slug).find((r) => r.id === run && r.ended === null) : undefined;
+    const agent = lib.runAgent(info.name, 'claude-code', info.session_id);
+    // the run it was started for, else the one its agent has open on the video: one open run per agent × video
+    const runs = lib.readRuns(slug);
+    const known =
+      (run ? runs.find((r) => r.id === run && r.ended === null) : undefined) ??
+      runs.find((r) => r.ended === null && r.agent.name === agent.name && lib.ownerOk(r, undefined));
     if (known) {
       change(slug, known.id, (r) => {
+        lib.claim(r, undefined);
         lib.machineBegan(r, info.id, now);
         return true;
       });
       return known.id;
     }
+    // its process's id when no run has it yet (the log and the run read the same); this machine's own
     const r = openRun(
       {
-        ...(run ? { id: run } : {}),
+        ...(run && !lib.findRun(run) ? { id: run } : {}),
         slug,
-        agent: lib.runAgent(info.name, 'claude-code', info.session_id),
+        agent,
         opened_by: { who: info.by, how: 'request' },
         delivery: 'machine',
         state: 'starting',
+        owner: '',
       },
       info.by,
     );
@@ -702,9 +783,9 @@ export function createRuns({ broadcast, actor, notify }: RunsOptions): Runs {
     }
   }
 
-  function news(agent: string, about: { video?: string | null; note?: string | null; read?: boolean } = {}): string | null {
+  function news(agent: string, about: { video?: string | null; note?: string | null; read?: boolean } = {}, account?: string): string | null {
     const lines: string[] = [];
-    const mine = openOf(agent).filter((x) => x.slug !== null && lib.untold(x.run));
+    const mine = openOf(agent, account).filter((x) => x.slug !== null && lib.untold(x.run));
     if (!mine.length) return null;
     const named = about.video || about.note ? slugNamed(about) : null;
     for (const { slug: s, run } of mine) {
@@ -767,17 +848,17 @@ export function createRuns({ broadcast, actor, notify }: RunsOptions): Runs {
       if (!mayOpenRun(req)) return null;
       return open(slug, o, whoOf(req));
     },
-    sign(a) {
+    sign(a, from) {
       try {
-        return sign(a);
+        return sign(a, from?.account);
       } catch (e) {
         console.error('runs: an activity was not bound:', (e as Error).message);
         return null;
       }
     },
-    handed(agent, slugs) {
+    handed(agent, slugs, account) {
       try {
-        handed(agent, slugs);
+        handed(agent, slugs, account);
       } catch (e) {
         console.error('runs: a hand-over was not told:', (e as Error).message);
       }
@@ -854,7 +935,13 @@ export function createRuns({ broadcast, actor, notify }: RunsOptions): Runs {
       if (r.stop_pending && hit.slug !== null) {
         // bounded: an agent that never calls again leaves its entry (the runs file still says it)
         if (unheard.size >= UNHEARD_MAX) unheard.delete(unheard.keys().next().value as string);
-        unheard.set(wsKey(r.id), { ws: currentWorkspace(), slug: hit.slug, agent: r.agent.name, id: r.id });
+        unheard.set(wsKey(r.id), {
+          ws: currentWorkspace(),
+          slug: hit.slug,
+          agent: r.agent.name,
+          ...(r.clock.owner !== undefined ? { owner: r.clock.owner } : {}),
+          id: r.id,
+        });
       }
       const proc = r.delivery === 'machine' ? (r.clock.proc ?? r.id) : null;
       return { run: lib.shownRun(r), proc };
@@ -869,7 +956,11 @@ export function createRuns({ broadcast, actor, notify }: RunsOptions): Runs {
       if (lib.readRuns(hit.slug).some((x) => x.ended === null && x.agent.name === r.agent.name)) throw fail(409, 'that agent is at this video already');
       const still = new Set(openNotes(review));
       const notes = r.plan.filter((p) => still.has(p.id)).map((p) => p.id);
-      const run = open(hit.slug, { how: 'retry', agent: r.agent, notes, follows: r.id, request: r.request ?? null }, whoOf(req));
+      const run = open(
+        hit.slug,
+        { how: 'retry', agent: r.agent, notes, follows: r.id, request: r.request ?? null, ...(r.clock.owner !== undefined ? { owner: r.clock.owner } : {}) },
+        whoOf(req),
+      );
       if (!run) throw fail(409, 'no agent to try again with');
       return run;
     },
@@ -897,3 +988,8 @@ const ownerOfName = (n: string) => / · ([^·]*)$/.exec(n)?.[1]?.trim() ?? '';
 
 /** Two agents of the same person (or of this machine): one may take a run sent to the other. */
 const sameOwner = (a: string, b: string): boolean => ownerOfName(a) === ownerOfName(b);
+
+/** Whether the agent `name` (of `account`) may take a queued run sent to another agent: the same account's, by its id
+ * when the run knows it, else by the name it is listed under (one per workspace). */
+const takes = (q: lib.StoredRun, name: string, account: string | undefined): boolean =>
+  q.clock.owner !== undefined ? q.clock.owner === (account ?? '') : sameOwner(q.agent.name, name);

@@ -128,7 +128,7 @@ export function sessionRoutes(ctx: ServerContext): Router {
         user: req.auth?.via === 'local' ? null : req.auth?.user?.name || null,
         kind: b.kind ?? 'cli',
       },
-      { listens: true },
+      { listens: true, ...(req.auth?.via !== 'local' && req.auth?.user?.id ? { account: req.auth.user.id } : {}) },
     );
     res.json({ ok: true });
   });
@@ -151,11 +151,13 @@ export function sessionRoutes(ctx: ServerContext): Router {
   r.post('/api/agents/activity', express.json({ limit: '64kb' }), (req, res) => {
     const b = body(ActivityBatch, req);
     const account = req.auth?.via !== 'local' ? req.auth?.user?.name : null;
+    // the account it is by id: what agents' runs go by, never the name (server/runs.ts)
+    const from = req.auth?.via !== 'local' && req.auth?.user?.id ? { account: req.auth.user.id } : {};
     const lines: string[] = [];
     for (const e of b.entries) {
       const agent = account ? ownedAgentName(e.agent, account) : e.agent;
       if (!agent) continue;
-      const line = ctx.activity.record({ ...e, agent, at: postedAt(e.at), target: e.target ?? null, video: e.video ?? null, slug: null });
+      const line = ctx.activity.record({ ...e, agent, at: postedAt(e.at), target: e.target ?? null, video: e.video ?? null, slug: null }, from);
       if (line && lines.length < 2) lines.push(line);
     }
     res.json({ ok: true, ...(lines.length ? { lines } : {}) });

@@ -20,13 +20,30 @@ const RULES: [RegExp, (...m: string[]) => string][] = [
   // credentials in a URL: scheme://user:password@host
   [/\b([a-z][a-z0-9+.-]*:\/\/)[^\s/@:]+:[^\s/@]*@/gi, (_m, scheme) => `${scheme}${CUT}@`],
   // name=value, name: value, "name": "value", ?name=value&
-  [new RegExp(String.raw`(["']?\b${SECRET_NAME}\b["']?\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;&"'})\]]+)`, 'gi'), (_m, head) => `${head}${CUT}`],
+  [new RegExp(String.raw`(["']?\b${SECRET_NAME}\b["']?\s*[:=]\s*)(?!\[redacted\])(?:"[^"]*"|'[^']*'|[^\s,;&"'})\]]+)`, 'gi'), (_m, head) => `${head}${CUT}`],
   // --name value
   [new RegExp(String.raw`(--?${SECRET_NAME}\s+)(?!-)\S+`, 'gi'), (_m, head) => `${head}${CUT}`],
+  // a name ending in "key" after a separator — OPENAI_KEY=…, stripe.key: …, x-signing-key=… (never keyint= or colorkey=)
+  [/(["']?\b(?:[A-Za-z0-9]+[_.-])+key\b["']?\s*[:=]\s*)(?!\[redacted\])(?:"[^"]*"|'[^']*'|[^\s,;&"'})\]]+)/gi, (_m, head) => `${head}${CUT}`],
+  // a user and password given to a command: curl -u user:password, --user user:password, --proxy-user …
+  [/((?:^|\s)(?:-u|--user|--proxy-user|-U)(?:\s+|=))([^\s:@]+):(?!\/\/)\S+/g, (_m, head, user) => `${head}${user}:${CUT}`],
+  // webhook addresses are their own credential (Slack, Discord)
+  [/\b(https?:\/\/hooks\.slack\.com\/)(?:services|workflows|triggers)\/[A-Za-z0-9/_-]+/gi, (_m, host) => `${host}${CUT}`],
+  [/\b(https?:\/\/(?:www\.)?discord(?:app)?\.com\/api\/webhooks\/)\d+\/[A-Za-z0-9_-]+/gi, (_m, host) => `${host}${CUT}`],
   // well-known token shapes
   [/\b(?:sk|pk|rk)[-_](?:live[-_]|test[-_]|proj[-_]|ant[-_])?[A-Za-z0-9_-]{16,}/g, () => CUT],
   [/\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github[_]pat[_][A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{16,}|xox[abprs]-[A-Za-z0-9-]{10,})/g, () => CUT],
   [/\b(?:AK|AS)IA[0-9A-Z]{16}\b/g, () => CUT],
+  // SendGrid, Hugging Face and npm tokens
+  [/\bS[G]\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}/g, () => CUT],
+  [/\bh[f]_[A-Za-z0-9]{20,}/g, () => CUT],
+  [/\bnp[m]_[A-Za-z0-9]{30,}/g, () => CUT],
+  // an AWS secret access key: 40 letters, digits, "+" and "/" on its own (a path has dots, dashes or underscores, or
+  // starts with "/"), with digits and both cases
+  [
+    /(?<![A-Za-z0-9/+=._-])[A-Za-z0-9+][A-Za-z0-9/+]{39}(?![A-Za-z0-9/+=._-])/g,
+    (m) => (/\d/.test(m) && /[a-z]/.test(m) && /[A-Z]/.test(m) && m.includes('/') ? CUT : m),
+  ],
   [/\bAIza[0-9A-Za-z_-]{30,}/g, () => CUT],
   [/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g, () => CUT],
   // Lampo's own tokens
@@ -37,7 +54,7 @@ const RULES: [RegExp, (...m: string[]) => string][] = [
   [/[A-Za-z0-9+]{32,}={0,2}/g, (m) => (/\d/.test(m) && /[a-z]/.test(m) && /[A-Z]/.test(m) ? CUT : m)],
 ];
 
-/** Text with anything that looks like a secret replaced by "[redacted]". */
+/** Text with anything that looks like a secret replaced by "[redacted]" (again on text redacted before: the same). */
 export function redact(text: string): string {
   let out = text;
   for (const [re, by] of RULES) out = out.replace(re, by);

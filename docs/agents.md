@@ -785,7 +785,8 @@ V4 rendered in 3m12s and put up for review (900 frames). Now mark each note fixe
   next (mark the notes fixed, or listen with `vr watch`). Without `--to` it only reports and renders.
 - **On failure** it exits with the tool's code and prints one line, `Render failed (exit 1): <what went wrong>. The
   person sees it in Lampo.` Lampo gets the tool's last meaningful lines, at most 300 characters, with anything that
-  looks like a token, key or password taken out.
+  looks like a token, key, password, a user's password given to a command or a webhook address taken out (the server
+  takes them out again, whatever sent the lines). Reviewers never read those lines.
 - **Quiet** is the default; `--verbose` shows the tool's own output on stderr.
 - **Who it reports as:** like every `vr` command, your Claude Code session, `VR_BY=agent:<name>`, or the run Lampo
   started you for (`LAMPO_RUN`). Progress goes to Lampo at most every 500 ms on the machine and every 2 s to a server.
@@ -829,6 +830,7 @@ joins it. Its plan is the notes they sent; its result is the version you put up.
 - **If you go quiet** for 20 minutes (5 for a run Lampo started, 10 more while `vr render` reports), it shows as not
   heard from; your next call picks it up again. After another hour it closes without blame.
 - **Your own write opens one** when none is open (an upload, a fix, a note): a person's reads and your reads never do.
+  A video holds only so many open runs, and so does one account's agents; past that your work still shows live.
 - **One run per agent and video**: notes sent while you work join it. Your next Lampo answer then ends with one line,
   once: `2 new notes on launch.mp4 since you started: get_open_notes since "2026-10-07T10:00:00Z".` Read them
   and fold them into the same version.

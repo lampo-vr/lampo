@@ -10,7 +10,7 @@ import { ACTIVITY_FILE, type ActivityRecord } from '../lib/activity.ts';
 import { agentName, isActivityKey } from '../lib/activityText.ts';
 import { cutChars } from '../lib/names.ts';
 import { currentWorkspace, isoLocal, slugify } from '../lib/paths.ts';
-import { ERROR_MAX } from '../lib/render/redact.ts';
+import { ERROR_MAX, redact } from '../lib/render/redact.ts';
 import { cleanProgress, RUN_ID } from '../lib/runs.ts';
 import * as store from '../lib/store.ts';
 import { compareTime, oneLine } from '../lib/time.ts';
@@ -57,7 +57,13 @@ interface Pair {
 export interface ActivityOptions {
   /** Each activity as recorded, its video found: the runs it joins (server/runs.ts). What it returns is a line for the
    * agent (the person stopped its work: lib/runs.ts stopLine), handed back by `record`. */
-  onRecord?: (a: AgentActivity) => string | null | undefined;
+  onRecord?: (a: AgentActivity, from?: ActivityFrom) => string | null | undefined;
+}
+
+/** Who sent an activity, beyond the name it is listed under: the account (by id) whose token, app or session it came
+ * with; none for this machine's own (`vr`, the stdio MCP server, a run Lampo started here). Never shown. */
+export interface ActivityFrom {
+  account?: string;
 }
 
 export interface ActivityStore {
@@ -65,7 +71,7 @@ export interface ActivityStore {
    * Records one activity; `video` (a slug, name or path) or a note id in `target` finds the video when `slug` isn't
    * given. Returns a line the agent's answer to this call ends with (the person stopped its work), once; else null.
    */
-  record(a: ActivityRecord): string | null;
+  record(a: ActivityRecord, from?: ActivityFrom): string | null;
   /** One video's agents — with what they did that named no video (a wait, the library), so the video's own agent
    * reads as one story; `agents` adds agents to include even before they touched the video. Without a slug, every
    * agent's latest, one each. */
@@ -109,14 +115,16 @@ export function cleanActivity(a: ActivityRecord): (AgentActivity & { video?: str
   const agent = agentName(a.agent);
   if (!agent || !KINDS.has(a.kind)) return null;
   const failure = a.kind === 'error';
-  const text = line(a.text, failure ? ERROR_MAX : 160);
+  // a failure's words are a tool's last lines: what looks like a secret goes here too, whatever sent them
+  const scrub = (x: unknown) => (failure && typeof x === 'string' ? redact(x) : x);
+  const text = line(scrub(a.text), failure ? ERROR_MAX : 160);
   if (!text) return null;
   const target = typeof a.target === 'string' ? cutChars(a.target, 40) : null;
   const at = typeof a.at === 'string' && !Number.isNaN(Date.parse(a.at)) ? a.at : isoLocal();
   const pct = typeof a.pct === 'number' && Number.isFinite(a.pct) ? Math.max(0, Math.min(100, Math.round(a.pct))) : undefined;
   const key = isActivityKey(a.key) ? a.key : undefined;
   const vars = key ? cleanVars(a.vars) : undefined;
-  const quote = key && typeof a.quote === 'string' ? line(a.quote, failure ? ERROR_MAX : 60) : '';
+  const quote = key && typeof a.quote === 'string' ? line(scrub(a.quote), failure ? ERROR_MAX : 60) : '';
   const progress = cleanProgress(a.progress);
   return {
     at,
@@ -154,7 +162,7 @@ export function createActivityStore(broadcast: Broadcast, { onRecord }: Activity
     );
   };
 
-  function record(input: ActivityRecord): string | null {
+  function record(input: ActivityRecord, from?: ActivityFrom): string | null {
     const a = cleanActivity(input);
     if (!a) return null;
     let slug = a.slug;
@@ -199,7 +207,7 @@ export function createActivityStore(broadcast: Broadcast, { onRecord }: Activity
     }
     p.updated = now;
     announce(p);
-    return onRecord?.(entry) ?? null;
+    return onRecord?.(entry, from) ?? null;
   }
 
   function live(slug?: string | null, agents: string[] = []): AgentLive[] {

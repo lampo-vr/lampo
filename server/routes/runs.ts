@@ -12,7 +12,7 @@ import path from 'node:path';
 import express, { type Request, type Router } from 'express';
 import { z } from 'zod';
 import { checkReviewOpen } from '../../lib/folderIds.ts';
-import { RUN_ID } from '../../lib/runs.ts';
+import { plainHead, RUN_ID } from '../../lib/runs.ts';
 import * as store from '../../lib/store.ts';
 import type { Run, RunDetail, RunsResponse, RunWriteResponse } from '../../lib/types.ts';
 import type { ServerContext } from '../context.ts';
@@ -26,13 +26,17 @@ const NudgeBody = z.object({ text: z.string().max(2000).optional(), start: z.boo
 /** The most of a run's log the UI gets (its end: that's where it says what it did). */
 const LOG_TAIL = 256 * 1024;
 
-/** A run as this reader sees it: which session and computer an agent runs in is for those who work with agents. */
+/**
+ * A run as this reader sees it. Who works with agents (the agents right) reads all of it; anyone else (a reviewer) reads
+ * what it is and where it stands, never what it worked on in the project (lib/runs.ts plainHead) nor which session and
+ * computer its agent runs in — as GET /api/agent-activity, which is the agents right's alone.
+ */
 export const runFor =
   (req: Request) =>
   (r: Run): Run => {
-    if (seesAgentDetails(req) || (!r.agent.session_id && !r.agent.runner)) return r;
+    if (seesAgentDetails(req)) return r;
     const { session_id: _s, runner: _r, ...agent } = r.agent;
-    return { ...r, agent };
+    return plainHead({ ...r, agent });
   };
 
 export function runRoutes(ctx: ServerContext): Router {
@@ -61,7 +65,8 @@ export function runRoutes(ctx: ServerContext): Router {
   r.get('/api/runs/:id', (req, res) => {
     const hit = ctx.runs.detail(idOf(req));
     if (!hit) throw fail(404, 'no such run');
-    const out: RunDetail = { run: runFor(req)(hit.detail.run), steps: hit.detail.steps };
+    // its steps (files, commands, a tool's last words, its own words) are for who works with agents
+    const out: RunDetail = { run: runFor(req)(hit.detail.run), steps: seesAgentDetails(req) ? hit.detail.steps : [] };
     res.json(out);
   });
 
@@ -86,6 +91,10 @@ export function runRoutes(ctx: ServerContext): Router {
   r.post('/api/runs/:id/stop', (req, res) => {
     const id = idOf(req);
     const who = ctx.actor(req);
+    // A process this machine runs for it is stopped from the machine itself only, as at /api/agent-runs/:id/stop:
+    // checked before anything changes.
+    const before = ctx.runs.find(id);
+    if (before?.proc && ctx.agentRuns.get(before.proc)?.state === 'running') requireMachine(req, ctx);
     const done = ctx.runs.stop(id, who);
     if (!done) throw fail(404, 'no such run');
     // the process this machine started for it ends with it (a listening agent hears it at its next call: later)

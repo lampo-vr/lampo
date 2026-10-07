@@ -325,6 +325,52 @@ test('redaction: tokens, keys and passwords go, the rest of the line stays', () 
     assert.equal(redact(text), text);
 });
 
+test('redaction: keys named *_KEY, a user’s password given to a command, webhook addresses, more token shapes', () => {
+  const cases: [string, string[], string[]][] = [
+    [
+      `upload failed for ${joined('https://hooks.slack.com/', 'services/', 'T0AAAAAAA/', 'B0BBBBBBB/', 'abcdefghijklmnopqrstuvwx')}`,
+      ['abcdefghijklmnop', 'B0BBBBBBB'],
+      ['upload failed for', 'hooks.slack.com'],
+    ],
+    [
+      `notify ${joined('https://discord.com/api/', 'webhooks/', '123456789012345678/', 'AbCdEfGhIjKlMnOpQrStUv_-wx')}`,
+      ['AbCdEfGhIjKl'],
+      ['notify', 'discord.com'],
+    ],
+    [joined('OPENAI', '_KEY=', 'abcdef0123456789abcdefXYZ'), ['abcdef0123456789'], ['OPENAI_KEY=']],
+    [joined('MAILGUN', '_KEY=', 'key-', '0123456789abcdef0123456789ab'), ['0123456789abcdef'], ['MAILGUN_KEY=']],
+    [`"stripe.key": "${joined('rk', '-', 'abcdefghijkl')}"`, ['abcdefghijkl'], ['"stripe.key"']],
+    ['curl -u admin:hunter2 https://api.example.com/x', ['hunter2'], ['curl -u admin:', 'https://api.example.com/x']],
+    ['wget --user=render --password-file x --proxy-user ops:s3cret-pw', ['s3cret-pw'], ['--proxy-user ops:']],
+    [
+      `Error: AWS secret ${joined('wJalrXUtnFEMI', '/K7MDENG', '/bPxRfiCYEXAMPLEKEY')} rejected`,
+      ['wJalrXUtnFEMI', 'bPxRfiCY'],
+      ['Error: AWS secret', 'rejected'],
+    ],
+    [joined('S', 'G.', 'abcdefghijklmnopqrstuv', '.', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_abcde'), ['abcdefghijklmnop', 'ABCDEFGHIJKLMNOP'], []],
+    [`error: ${joined('h', 'f_', 'abcdefghijklmnopqrstuvwxyzABCDEFGH')} invalid`, ['abcdefghijklmnop'], ['error:', 'invalid']],
+    [`npm token ${joined('np', 'm_', 'abcdefghijklmnopqrstuvwxyz0123456789')} is invalid`, ['abcdefghijklmnop'], ['npm token', 'is invalid']],
+  ];
+  for (const [text, gone, kept] of cases) {
+    const out = redact(text);
+    for (const g of gone) assert.ok(!out.includes(g), `${g} is gone from: ${out}`);
+    for (const k of kept) assert.ok(out.includes(k), `${k} stays in: ${out}`);
+    assert.match(out, /\[redacted\]/);
+    // the server redacts what `vr render` sent once more: nothing changes then
+    assert.equal(redact(out), out);
+  }
+  assert.equal(redact('(api_key=[redacted])'), '(api_key=[redacted])');
+  // render settings and paths that look a little like them stay word for word
+  for (const text of [
+    'x264 [info]: keyint=250 keyint_min=25 scenecut=40',
+    'Parsed_colorkey_0: colorkey=0x00ff00:0.3:0.2',
+    "Error: ENOENT: no such file or directory, open '/Users/you/Projects/Acme2026/LaunchFilm/export/Main_V12.mp4'",
+    'Could not resolve src/components/Logo/AnimatedEntryFrames.tsx',
+    'git -u origin main',
+  ])
+    assert.equal(redact(text), text);
+});
+
 test('a failure’s words: the last lines that say what went wrong, redacted, at most 300 characters', () => {
   // Remotion: its error, a stack, its own progress before it
   const remotion = [
