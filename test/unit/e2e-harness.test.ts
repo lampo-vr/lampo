@@ -2,11 +2,14 @@
 // starts there with a stand-in for the `claude` CLI. Nothing else in test/e2e does either — a suite that started its
 // own server or asked the real `claude agents` could put the maintainer's Claude Code sessions into screenshots.
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import fs from 'node:fs';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
-import { ROOT } from '../lib/helpers.ts';
+import { ROOT, tmpdir, VR } from '../lib/helpers.ts';
 
 const E2E = path.join(ROOT, 'test/e2e');
 const withoutComments = (src: string) => src.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
@@ -54,5 +57,56 @@ test('the server helper stands in for `claude` and ignores the shell’s instanc
   } finally {
     await srv.stop();
     fs.rmSync(srv.dir, { recursive: true, force: true });
+  }
+});
+
+// The machine a suite runs on may be signed in to a hosted server: `vr login` keeps it in
+// ~/.config/video-review/credentials.json. A `vr` that a suite runs with its server's environment works on the suite's
+// store, never on that server (record.mjs's `vr show` and `vr inbox` once read a real inbox that way).
+test('a `vr` run with the suite’s environment never reads the machine’s saved login', async () => {
+  // The machine: its home holds a saved login to a server that writes down every request it gets.
+  const asked: string[] = [];
+  const signedIn = http.createServer((req, res) => {
+    asked.push(`${req.method} ${req.url}`);
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ user: { name: 'Machine', email: 'machine@example.com', role: 'owner' }, name: 'Machine', role: 'owner' }));
+  });
+  await new Promise<void>((r) => signedIn.listen(0, '127.0.0.1', r));
+  const home = tmpdir('vr-harness-home-');
+  const saved = path.join(home, '.config', 'video-review', 'credentials.json');
+  fs.mkdirSync(path.dirname(saved), { recursive: true });
+  fs.writeFileSync(saved, JSON.stringify({ server: `http://127.0.0.1:${(signedIn.address() as AddressInfo).port}`, token: 'vr_machine' }));
+
+  const { startServer } = await import(pathToFileURL(path.join(E2E, 'lib/server.mjs')).href);
+  const shell = { HOME: process.env.HOME, XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME, XDG_CACHE_HOME: process.env.XDG_CACHE_HOME };
+  process.env.HOME = home;
+  delete process.env.XDG_CONFIG_HOME;
+  delete process.env.XDG_CACHE_HOME;
+  let srv: Awaited<ReturnType<typeof startServer>>;
+  try {
+    srv = await startServer({ prefix: 'vr-harness-login-' });
+  } finally {
+    for (const [k, v] of Object.entries(shell)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  }
+  try {
+    // Asynchronous: the signed-in server answers from this process.
+    const run = await new Promise<{ code: number; out: string; err: string }>((resolve) =>
+      execFile(process.execPath, [VR, 'whoami', '--json'], { env: srv.env, encoding: 'utf8', timeout: 30_000 }, (e, out, err) =>
+        resolve({ code: e ? 1 : 0, out, err }),
+      ),
+    );
+    assert.equal(run.code, 0, run.err);
+    assert.deepEqual(asked, [], 'nothing reaches the server this machine is signed in to');
+    const me = JSON.parse(run.out) as { kind: string; data?: string };
+    assert.equal(me.kind, 'local', run.out);
+    assert.equal(me.data, srv.env.VR_DATA, 'the suite’s own store');
+  } finally {
+    await srv.stop();
+    signedIn.close();
+    fs.rmSync(srv.dir, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
   }
 });
