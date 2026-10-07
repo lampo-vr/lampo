@@ -1,0 +1,192 @@
+/* ---------------------------------------------------------------- Get started's panel (onboarding/Panel.tsx)
+   Comes with the panel's code. Above the sidebar's row (a popover wider than the sidebar: the panes need a measure), or
+   in a sheet from a phone's or tablet's drawer: the head, the steps as a quiet list, the selected step's pane in one cell
+   under it (every pane stands there, the panel is as tall as the tallest), the foot. The panes are the card's
+   (getstarted.css), set smaller here and without their pictures. */
+.popover.ob-sp-pop {
+  width: min(380px, calc(100vw - 16px));
+  min-width: 0;
+  max-width: none;
+  max-height: min(calc(100vh - 16px), var(--radix-popover-content-available-height, 100vh));
+  padding: 0;
+  gap: 0;
+}
+.ob-sp {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  outline: none;
+}
+.ob-sp :is(h2, ol) {
+  margin: 0;
+}
+.ob-sp-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-2) var(--sp-1) var(--sp-4);
+}
+.ob-sp-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  font: var(--fw-strong) var(--fs-lg) / 1.2 var(--display);
+  font-stretch: 87.5%;
+  white-space: nowrap;
+}
+.ob-sp-title small {
+  font: var(--fw-ui) var(--fs-sm) / 1 var(--ui);
+  font-stretch: 100%;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+/* the steps: a quiet list, the selected one a flat fill (never raised, never ringed by a pointer) */
+.ob-sp-list {
+  display: grid;
+  gap: 1px;
+  padding: 0 var(--sp-2);
+  list-style: none;
+}
+.ob-sp-row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  min-height: var(--h);
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--fg-2);
+  font: var(--fw-ui) var(--fs-md) / var(--lh-ui) var(--ui);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast),
+    color var(--dur-fast);
+}
+.ob-sp-row > span:nth-child(2) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ob-sp-row:hover {
+  background: var(--sel);
+}
+.ob-sp-row[aria-current='step'] {
+  background: var(--sel-on);
+  color: var(--fg);
+}
+.ob-sp-row:focus-visible {
+  outline: none;
+}
+.ob-sp-list[data-keys] .ob-sp-row:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+.ob-sp-row .kg {
+  --kg-size: 11px;
+  justify-self: center;
+  color: var(--line-4);
+}
+.ob-sp-row.ob-done {
+  color: var(--muted);
+}
+.ob-sp-row.ob-done .kg {
+  color: var(--fg-2);
+}
+.ob-sp-row[aria-current='step'].ob-done {
+  color: var(--fg-2);
+}
+.ob-sp-row .ob-when {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ob-sp-row.ob-ticked .kg {
+  animation: ob-kg-pop 620ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  color: var(--ok);
+}
+/* the pane: every step's in one cell, the selected one shown */
+.ob-sp-pane {
+  display: grid;
+  margin: var(--sp-2) var(--sp-2) 0;
+  padding: var(--sp-4);
+  border-radius: var(--r);
+  background: var(--ink-1);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.ob-sp-pane .ob-gs-do {
+  grid-template-columns: minmax(0, 1fr);
+}
+/* the selected row right above is the pane's headline: the pane starts with what it says */
+.ob-sp-pane .ob-gs-h {
+  display: none;
+}
+.ob-sp-pane .ob-gs-invite {
+  flex-wrap: wrap;
+}
+.ob-sp-pane .ob-gs-invite .ob-gs-email {
+  flex-basis: 100%;
+}
+.ob-sp-pane .ob-gs-invite .input.select {
+  flex: 1;
+}
+.ob-sp-foot {
+  display: flex;
+  align-items: center;
+  min-height: var(--h-lg);
+  padding: 0 var(--sp-4);
+}
+.ob-sp-foot .ob-lk {
+  font-size: var(--fs-sm);
+}
+/* in a sheet: the sheet's head names it, counts and closes it, its body is the gutter */
+.ob-sp-sheet-count {
+  margin-right: var(--sp-2);
+  font: var(--fw-ui) var(--fs-sm) / 1 var(--ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ob-sp-sheet .ob-sp-list {
+  padding: 0;
+}
+.ob-sp-sheet .ob-sp-pane {
+  margin: var(--sp-3) 0 0;
+}
+.ob-sp-sheet .ob-sp-foot {
+  padding: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ob-sp-row.ob-ticked .kg {
+    animation: none;
+  }
+}
+/* a finger needs 44 × 44 px: the rows are that tall on touch; compact buttons get an invisible tap area around them */
+@media (hover: none) and (pointer: coarse) {
+  .ob-sp-row {
+    min-height: var(--h-touch);
+  }
+  .ob-sp .ob-btn,
+  .ob-sp .ob-copy,
+  .ob-sp .ob-lk,
+  .ob-sp .ob-ibtn {
+    position: relative;
+  }
+  .ob-sp .ob-ibtn::after,
+  .ob-sp .ob-btn::after,
+  .ob-sp .ob-copy::after,
+  .ob-sp .ob-lk::after {
+    content: '';
+    position: absolute;
+    inset: min(0px, calc(50% - 22px));
+  }
+  .ob-sp-pane .ob-gs-invite .ob-btn,
+  .ob-sp-pane .ob-gs-invite .input.select {
+    height: var(--h-touch);
+  }
+}

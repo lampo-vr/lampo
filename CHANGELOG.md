@@ -95,6 +95,12 @@ format stays backwards compatible throughout.
   good, and it is no longer started again every time someone opens the video.
 
 ### Changed
+- **Get started is one click away on every library page.** While steps are open, the sidebar's foot says *Get started
+  · 2 of 5* with a thin line of the steps. A click opens them right there: connect your agent, make a review link,
+  invite someone or link a file without leaving the page you're on; the sample and uploading take you where they live.
+  A step ticks the moment it's done, and when the last one is, it says *You're set* and goes. Closing the big card now
+  keeps the row; *Hide for good* puts both away, with Undo, and the account menu still brings them back. On phones and
+  tablets the row sits at the foot of the menu.
 - A Claude Code run Lampo starts on your machine now stops after 30 minutes without a sign of the agent (its output,
   or a call to Lampo), and after 3 hours at most, instead of after 30 minutes whatever it was doing: a long render
   no longer cuts it off.
