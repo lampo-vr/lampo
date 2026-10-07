@@ -5,7 +5,9 @@
 //   vertical presets → 1080×1920 (a 9:16 screen; 4:5 or 1:1 video sits centred in it, as the apps show it)
 //   landscape presets → 1920×1080
 //   "any" presets → the video's own pixel grid
-// Zones: {type:'unsafe', x,y,w,h, label} (hatched), {type:'guide', …} (dashed outline).
+// Zones: {type:'unsafe', x,y,w,h, label} (hatched red: the app's interface covers or crops the picture there, so no
+// text or logos), {type:'guide', …} (dashed outline: a margin to keep within, as title / action safe). Every app
+// preset draws its interface the same way, whatever Auto-check measures in it.
 
 /** What Auto-check calls a zone it flags text under (QaItem.zone, a token agents read: never renamed). */
 export type ZoneCheck = 'ig-topbar' | 'ig-icons' | 'ig-caption' | 'ig-crop';
@@ -38,9 +40,9 @@ export const ZONE_SHAPES: Record<string, ZoneShape[]> = {
   'ig-reels': [
     { type: 'unsafe', x: 0, y: 0, w: 52, h: 1920, check: 'ig-crop' },
     { type: 'unsafe', x: 1028, y: 0, w: 52, h: 1920, label: 'crop', check: 'ig-crop' },
-    { type: 'guide', x: 0, y: 0, w: 1080, h: 269, label: 'top bar', check: 'ig-topbar' },
-    { type: 'guide', x: 890, y: 1100, w: 138, h: 800, label: 'icons', check: 'ig-icons' },
-    { type: 'guide', x: 52, y: 1590, w: 828, h: 330, label: 'caption', check: 'ig-caption' },
+    { type: 'unsafe', x: 0, y: 0, w: 1080, h: 269, label: 'top bar', check: 'ig-topbar' },
+    { type: 'unsafe', x: 890, y: 1100, w: 138, h: 800, label: 'icons', check: 'ig-icons' },
+    { type: 'unsafe', x: 52, y: 1590, w: 828, h: 330, label: 'caption', check: 'ig-caption' },
   ],
   // TikTok. Top: the status bar and the Following | For You row end 238 px down on an iPhone 15/16 (the old 160 px was
   // the status bar alone). The rail — the poster's avatar and its +, heart, comments, bookmark, share, the record — is
