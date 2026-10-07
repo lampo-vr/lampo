@@ -295,7 +295,7 @@ test('a newest-only link serves no screenshot of an older version’s note, and 
 // answers on one of its notes (through a link that shows every note) stays with that other link. The team's replies
 // reach every link.
 test('a visitor’s reply through another link never reaches a link that shows only its own visitors', async () => {
-  track('Clients/Acme/Replies/export/reply.mp4', 'Acme/Replies');
+  const video = track('Clients/Acme/Replies/export/reply.mp4', 'Acme/Replies');
   const make = async (body: object) => JSON.parse((await request('POST', '/api/folder-shares', { folder: 'Acme/Replies', ...body })).text).token as string;
   const own = await make({ label: 'Client A' });
   const all = await make({ notes: 'all', label: 'Agency' });
@@ -329,6 +329,22 @@ test('a visitor’s reply through another link never reaches a link that shows o
   assert.deepEqual(await refsOn(own, gOwn), [], 'not on the note’s own link');
   assert.equal((await refsOn(all, gAll)).length, 1, 'on the link it came through');
   assert.ok(!(await guest('GET', `/api/g/${own}/review/${gOwn}`)).text.includes('agency-board'), 'nothing of it on the own link');
+  // a picture and a moment with words, through the other link: their files are that link's too, never the note's own
+  const png = path.join(dir, 'agency-board.png');
+  execFileSync(FFMPEG, ['-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=64x64', '-frames:v', '1', '-y', png]);
+  for (const ref of [
+    { kind: 'image', caption: 'our frame', data: fs.readFileSync(png).toString('base64') },
+    { kind: 'frame', video: gAll, frame: 4, caption: 'like here' },
+  ]) {
+    const r = await guest('POST', `/api/g/${all}/comments/${id}/refs`, { name: 'Ben', note: 'see ours', ...ref });
+    assert.equal(r.status, 200, r.text);
+  }
+  const files = (store.loadReview(video.slug)?.comments.find((c) => c.id === id)?.refs ?? []).flatMap((r) => store.refFiles(r));
+  assert.ok(files.length >= 2, `the picture and the moment's still are kept: ${files}`);
+  for (const f of files) {
+    assert.equal((await guest('GET', `/api/g/${own}/refs/${gOwn}/${f}`)).status, 404, `${f}: not through the note’s own link`);
+    assert.equal((await guest('GET', `/api/g/${all}/refs/${gAll}/${f}`)).status, 200, `${f}: through the link it came through`);
+  }
 });
 
 /** Bytes to a one-time upload URL, as the review page sends a file: a fresh request, no cookie, no address of the visit. */

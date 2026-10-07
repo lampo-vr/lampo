@@ -750,6 +750,10 @@ export function noteMoved(r: StoredRun, id: string, to: RunPlanItem['state'], no
   return true;
 }
 
+/** Whether sign `s` begins queued run `r` (it goes to work): any sign of the agent but a wait that hands nothing over. */
+export const begins = (r: Pick<StoredRun, 'ended' | 'state'>, s: Pick<Sign, 'kind' | 'handed'>): boolean =>
+  r.ended === null && r.state === 'queued' && s.kind !== 'run' && !(s.kind === 'wait' && !s.handed);
+
 /**
  * One sign of the agent: it is seen; queued, starting or lost become working (a wait that hands nothing over leaves a
  * queued run queued); its words become `now` and a step; the plan moves; a question needs the person, an error fails
@@ -767,7 +771,7 @@ export function applySign(r: StoredRun, s: Sign): RunPhase[] {
   }
   const type = stepTypeOf(s.kind);
   const bare = s.kind === 'wait' && !s.handed;
-  if ((r.state === 'queued' && !bare) || r.state === 'starting' || r.state === 'lost') {
+  if (begins(r, s) || r.state === 'starting' || r.state === 'lost') {
     setState(r, 'working', now);
     delete r.clock.lost;
     if (!r.clock.began) {

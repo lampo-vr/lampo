@@ -240,6 +240,15 @@ Findings of audit A13 (2026-10-05, `AUDITS.md`) and its verification rounds that
   hunter2"), and the rule for a bare AWS secret key also takes a relative path of exactly 40 characters that has digits,
   both cases and a "/" (it says less, never more). Prose needs a different approach than shapes; the path is a cosmetic
   loss.
+- **A13 RENDER-1f** (info): the redaction rules for a secret's name (`token=`, `…_KEY=`, `…_PASS=`) take time that
+  grows with the square of a long run of short words joined by "-", "." or "_" (`a-ua-u…`: about 1 s at 16,000
+  characters). What reaches them is cut first (2,000 characters a line on the agent's machine, 300 on the server: about
+  15 ms and under 1 ms), so it costs nothing today. Make their leading group read each word once (an atomic group
+  through a lookahead and a backreference). The MySQL rule is linear, measured by doubling adversarial and random lines.
+- **A13 RUNS-FIT-2c** (info): a run the queued bound stops tells whoever sent it nothing (it ends `stopped`, credited to
+  the person whose new run made room), and a store from before the bound stops its surplus all at once on the next
+  send, with as many stop events in that person's name. Tell the sender (a step on the run, or the Inbox) and credit
+  the bound itself.
 - **A13 RUNS-FIT-4** (info): the first write of a runs file that holds thousands of open runs with steps takes a while
   (seconds at 20,000), as each pass of `fitRuns` sorts every run again; only a file written before the bounds gets
   there, never the API. Sort each kind once and walk it (or a heap for the longest open run).

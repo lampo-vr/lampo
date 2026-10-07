@@ -356,6 +356,23 @@ test('redaction: keys named *_KEY, a user’s password given to a command, webho
     ['mysql -u root -h db -phunter2 mydb', ['hunter2'], ['mysql -u root -h db -p', 'mydb']],
     ['mysqlsh -u root -phunter2 --sql', ['hunter2'], ['mysqlsh -u root -p']],
     ['mysqlimport -u root -phunter2 shop items.txt', ['hunter2'], ['mysqlimport -u root -p', 'shop items.txt']],
+    // -P is the port; an option may take a quoted value or none; a database name may come first
+    ['mysql -h db -P 3306 -u root -phunter2', ['hunter2'], ['mysql -h db -P 3306 -u root -p']],
+    ['mysqldump -h db -P 3306 -u root -phunter2 shop', ['hunter2'], ['mysqldump -h db -P 3306 -u root -p', 'shop']],
+    ['mysql -u root -e "select 1" -phunter2', ['hunter2'], ['mysql -u root -e "select 1" -p']],
+    ['mysql -u root -e "select 1; select 2" -phunter2', ['hunter2'], ['-e "select 1; select 2" -p']],
+    ['mysqldump shop -u root -phunter2', ['hunter2'], ['mysqldump shop -u root -p']],
+    ["mysql -u root -p'hunter2 x' shop", ['hunter2', ' x'], ['mysql -u root -p', 'shop']],
+    // run from a bin folder, from a shell, after another command
+    ['/usr/bin/mysql -u root -phunter2', ['hunter2'], ['/usr/bin/mysql -u root -p']],
+    ["sh -c 'mysql -u root -phunter2 shop'", ['hunter2'], ["sh -c 'mysql -u root -p"]],
+    ['cd /srv && mysql -u root -phunter2', ['hunter2'], ['cd /srv && mysql -u root -p']],
+    // as a list (Python's error for a command that failed)
+    [
+      "Command '['mysql', '-u', 'root', '-phunter2', 'shop']' returned non-zero exit status 1.",
+      ['hunter2'],
+      ["Command '['mysql', '-u', 'root', '-p", 'returned non-zero exit status 1.'],
+    ],
     ['cache down: redis://:hunter2@cache.internal:6379/0', ['hunter2'], ['cache down: redis://', '@cache.internal:6379/0']],
   ];
   for (const [text, gone, kept] of cases) {
@@ -378,8 +395,29 @@ test('redaction: keys named *_KEY, a user’s password given to a command, webho
     'ffmpeg -i mysql.mov -pix_fmt yuv420p out.mp4',
     'Error: mysql -u root failed; then ffmpeg -pix_fmt yuv420p',
     'see http://example.com:8080/path for more',
+    // a port glued to -P; a file or folder named like the client; another command after a separator or a line
+    'mysql -h db -P3306 -u root shop',
+    'mysqldump -P3306 shop',
+    'ffmpeg -i /tmp/mysql -pix_fmt yuv420p out.mp4',
+    'ffmpeg -i in.mov /tmp/mysql -pix_fmt yuv420p',
+    'mysql -u root failed && ffmpeg -pix_fmt yuv420p out.mp4',
+    'mysql -u root failed · ffmpeg -i x -pix_fmt yuv420p out.mp4',
+    'mysql: [Warning] Using a password on the command line interface can be insecure.',
+    "['mysql', '-P', '3306', 'shop']",
   ])
     assert.equal(redact(text), text);
+});
+
+test('redaction takes time in step with the line, whatever MySQL clients and quotes it holds', () => {
+  // a client's words end where another could begin, so no word is read twice: 128,000 characters of each shape take
+  // milliseconds (a rule that reads on to the end of the line from every client takes seconds)
+  for (const unit of ['mysql -u ', '"mysql ', 'mysql "', '(mysql ', "' '/usr/bin/mysql ", 'mysql "x mysql \'y ', "'mysql', '-u', "]) {
+    const text = unit.repeat(Math.ceil(128_000 / unit.length));
+    const t = performance.now();
+    redact(text);
+    const ms = performance.now() - t;
+    assert.ok(ms < 1000, `${JSON.stringify(unit)}: ${ms.toFixed(0)} ms`);
+  }
 });
 
 test('a failure’s words: the last lines that say what went wrong, redacted, at most 300 characters', () => {

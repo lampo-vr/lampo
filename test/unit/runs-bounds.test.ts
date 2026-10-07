@@ -53,12 +53,12 @@ before(async () => {
     as[key] = { Cookie: cookieFrom(login), Origin: PUBLIC };
     as[`${key}Token`] = { Authorization: `Bearer ${auth.createToken(u.id, 'agent').token}` };
   }
-  for (const name of ['spot', 'flood', 'flood-2', 'budget', 'retries']) {
+  for (const name of ['spot', 'flood', 'flood-2', 'budget', 'retries', 'begun']) {
     const file = makeVideo(path.join(dir, `renders/${name}.mp4`), { w: 160, h: 90, fps: 25, dur: 1 });
     videos.push(slugify((await store.ingestUpload(file, { name: `${name}.mp4`, folder: 'Acme', by: 'Mia', keep: true })).review.video));
   }
 });
-const [spot, flood, flood2, budget, retries] = [0, 1, 2, 3, 4].map((i) => () => videos[i] as string);
+const [spot, flood, flood2, budget, retries, begun] = [0, 1, 2, 3, 4, 5].map((i) => () => videos[i] as string);
 
 const post = (who: Record<string, string>, entries: object[]) => request('POST', '/api/agents/activity', { body: { entries }, headers: who });
 const runs = async (slug: string, who = as.mia) => ((await request('GET', `/api/runs?slug=${enc(slug)}`, { headers: who })).json() as RunsResponse).runs;
@@ -290,6 +290,44 @@ test('runs people sent that nobody picked up are bounded per video: the one wait
     const waiting = (await runs(retries())).filter((r) => r.ended === null && r.state === 'queued');
     assert.equal(waiting.length, 3, 'no more than the video holds');
     assert.deepEqual(waiting.map((r) => r.agent.name).sort(), ['q3 · Mia', 'q4 · Mia', 'q5 · Mia'], 'the newest stay');
+  } finally {
+    Object.assign(lib.RUN_LIMITS, keep);
+  }
+});
+
+test('a run a person sent counts once its agent begins it: past the video’s or the account’s bounds it waits', async () => {
+  // a member of her own, so her account holds nothing yet
+  const noor = await auth.createUser({ email: 'noor@example.com', name: 'Noor', password: 'noors password 1', role: 'member' });
+  const token = { Authorization: `Bearer ${auth.createToken(noor.id, 'agent').token}` };
+  const status = (names: string[]) =>
+    post(
+      token,
+      names.map((agent) => ({ agent, kind: 'status', text: 'Working on it', video: begun() })),
+    );
+  const state = async () => Object.fromEntries((await runs(begun())).filter((r) => r.ended === null).map((r) => [r.agent.name, r.state]));
+  const keep = { ...lib.RUN_LIMITS };
+  try {
+    // four of Noor's agents worked on the video and were stopped; Mia sends each its work again: four waiting
+    assert.equal((await status(['n0', 'n1', 'n2', 'n3'])).status, 200);
+    const first = (await runs(begun())).filter((r) => r.ended === null).sort((a, b) => a.agent.name.localeCompare(b.agent.name));
+    assert.equal(first.length, 4);
+    for (const r of first) assert.equal((await request('POST', `/api/runs/${r.id}/stop`, { body: {}, headers: as.mia })).status, 200);
+    for (const r of first) assert.equal((await request('POST', `/api/runs/${r.id}/retry`, { body: {}, headers: as.mia })).status, 200, r.agent.name);
+    const waiting = { 'n0 · Noor': 'queued', 'n1 · Noor': 'queued', 'n2 · Noor': 'queued', 'n3 · Noor': 'queued' };
+    assert.deepEqual(await state(), waiting);
+    // the video holds two at work: the first two agents heard begin theirs, the others' stay waiting
+    Object.assign(lib.RUN_LIMITS, { openPerVideo: 2 });
+    for (const n of ['n0', 'n1', 'n2', 'n3']) assert.equal((await status([n])).status, 200);
+    const two = { 'n0 · Noor': 'working', 'n1 · Noor': 'working', 'n2 · Noor': 'queued', 'n3 · Noor': 'queued' };
+    assert.deepEqual(await state(), two);
+    // room on the video, none for the account (three other open runs of hers): still waiting
+    Object.assign(lib.RUN_LIMITS, { openPerVideo: keep.openPerVideo, openPerAccount: 3 });
+    for (const n of ['n2', 'n3']) assert.equal((await status([n])).status, 200);
+    assert.deepEqual(await state(), two);
+    // room again: the next word from each begins its run
+    Object.assign(lib.RUN_LIMITS, keep);
+    for (const n of ['n2', 'n3']) assert.equal((await status([n])).status, 200);
+    assert.deepEqual(await state(), { 'n0 · Noor': 'working', 'n1 · Noor': 'working', 'n2 · Noor': 'working', 'n3 · Noor': 'working' });
   } finally {
     Object.assign(lib.RUN_LIMITS, keep);
   }

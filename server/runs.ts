@@ -313,15 +313,25 @@ export function createRuns({ broadcast, actor, notify, ownerOfSession }: RunsOpt
     return out;
   }
 
-  /** How many open runs `account`'s agents hold in this workspace. */
-  function openOfAccount(account: string): number {
+  /** How many open runs `account`'s agents hold in this workspace (but run `except`). */
+  function openOfAccount(account: string, except?: string): number {
     const ws = currentWorkspace();
     let n = 0;
     for (const p of lib.openPlaces()) {
       if (p.ws !== ws) continue;
-      for (const run of lib.readRuns(p.slug)) if (run.ended === null && run.clock.owner === account) n++;
+      for (const run of lib.readRuns(p.slug)) if (run.ended === null && run.clock.owner === account && run.id !== except) n++;
     }
     return n;
+  }
+
+  /**
+   * Whether a run a person sent may begin now. At work it counts like one an agent's own write opens, so past the same
+   * bounds (runs at work on the video, the account's open runs) it stays waiting until one ends; the queued ones have
+   * their own bound.
+   */
+  function roomToBegin(slug: string, r: lib.StoredRun, account: string | undefined): boolean {
+    if (lib.readRuns(slug).filter((x) => x.ended === null && x.state !== 'queued').length >= lib.RUN_LIMITS.openPerVideo) return false;
+    return account === undefined || openOfAccount(account, r.id) < lib.RUN_LIMITS.openPerAccount;
   }
 
   /** Time's moves on a video's runs, written and told (before a read answers). */
@@ -435,6 +445,8 @@ export function createRuns({ broadcast, actor, notify, ownerOfSession }: RunsOpt
 
   /** Applies a sign to a video's run, with what the video itself says (the frame's notes, the question's id). */
   function applyTo(slug: string, id: string, s: lib.Sign, agent: string, account: string | undefined) {
+    const was = lib.readRuns(slug).find((x) => x.id === id);
+    if (was && lib.begins(was, s) && !roomToBegin(slug, was, account)) return;
     const q = lib.stepTypeOf(s.kind) === 'elicitation' ? questionOf(slug, agent, s.at) : null;
     change(slug, id, (r) => {
       // the first agent heard at a run nobody holds yet: its account's from now on
@@ -535,7 +547,7 @@ export function createRuns({ broadcast, actor, notify, ownerOfSession }: RunsOpt
         // same person's agent only (by the account when the run knows it; names are one per workspace otherwise).
         const queued = runs.filter((r) => r.ended === null && r.state === 'queued');
         const q = queued[0];
-        if (queued.length === 1 && q && takes(q, name, account)) {
+        if (queued.length === 1 && q && takes(q, name, account) && roomToBegin(slug, q, account)) {
           change(slug, q.id, (r) => {
             r.agent = lib.runAgent(name);
             return true;
@@ -598,7 +610,7 @@ export function createRuns({ broadcast, actor, notify, ownerOfSession }: RunsOpt
       const own = runs.find((r) => r.ended === null && r.agent.name === agent && lib.ownerOk(r, account));
       const queued = runs.filter((r) => r.ended === null && r.state === 'queued');
       const run = own ?? (queued.length === 1 && queued[0] && takes(queued[0], agent, account) ? queued[0] : null);
-      if (!run) continue;
+      if (!run || (run.state === 'queued' && !roomToBegin(slug, run, account))) continue;
       change(slug, run.id, (r) => {
         lib.claim(r, account);
         if (r.agent.name !== agent) r.agent = lib.runAgent(agent);

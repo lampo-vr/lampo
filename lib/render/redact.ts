@@ -12,6 +12,21 @@ const CUT = '[redacted]';
 // `X-Amz-Signature`, `client-secret`, `Authorization` (never `design` or `signal`).
 const SECRET_NAME =
   '(?:[A-Za-z0-9]+[_.-])*(?:token|secret|password|passwd|passphrase|pwd|apikey|api[_-]key|access[_-]?key|private[_-]?key|credentials?|auth|authorization|cookie|signature|sig|session[_-]?id|sessionid)(?:[_.-][A-Za-z0-9]+)*';
+// A MySQL or MariaDB client and the words it was given, as a shell runs them (or as a list: Python's
+// "Command '['mysql', '-u', …]'"). The client is a word of its own (after a space, a quote, "(" or a shell separator),
+// or run from a bin folder (/usr/bin/mysql; never another path that ends in its name, /tmp/mysql). Its words, quoted
+// ones too, reach up to a shell separator (; & | a backquote, and " · " between lines) or the next client, and its
+// password is the word glued to a lower-case -p (-P is the port), so a later -p… of another command (ffmpeg -pix_fmt)
+// is never one. Linear in the line: no word holds a place where a client could begin (each such place inside one is
+// checked), so no word is read for two clients, and each place reads one way only.
+const SQL_CLIENT = String.raw`(?:(?:[^\s;&|\x60()"']*[/\\])?s?bin[/\\])?(?:[Mm][Yy][Ss][Qq][Ll](?:dump|admin|import|sh|check|pump|slap)?|[Mm][Aa][Rr][Ii][Aa][Dd][Bb](?:-[a-z]+)?)(?:\.[Ee][Xx][Ee])?["']?,?(?=[ \t])`;
+/** The rest of a quoted word after its opening `q`, up to its closing one on the line, with no client begun inside. */
+const quotedRest = (q: string, other: string) => String.raw`(?:[^${q}\s;&|\x60${other}(]|(?!\n)[\s;&|\x60${other}(](?!${SQL_CLIENT}))*${q}(?!${SQL_CLIENT})`;
+const SHELL_WORD = String.raw`(?:"(?!${SQL_CLIENT})(?:${quotedRest('"', "'")}|(?!${quotedRest('"', "'")}))|'(?!${SQL_CLIENT})(?:${quotedRest("'", '"')}|(?!${quotedRest("'", '"')}))|\((?!${SQL_CLIENT})|[^\s;&|\x60·"'(])+`;
+const MYSQL_PASSWORD = new RegExp(
+  String.raw`((?<![^\s;&|\x60("'])${SQL_CLIENT}(?:[ \t]+(?!${SQL_CLIENT})${SHELL_WORD})*?[ \t]+["']?-p)(?!\[redacted\])(?:"[^"\n]*"\S*|'[^'\n]*'\S*|\S+)`,
+  'g',
+);
 const RULES: [RegExp, (...m: string[]) => string][] = [
   // a private key block, whole (the patterns here are written so that no line of this file looks like a key itself)
   [/-{5}BEGIN [A-Z ]*PRIVATE[ ]KEY-{5}[\s\S]*?(?:-{5}END [A-Z ]*PRIVATE[ ]KEY-{5}|$)/g, () => CUT],
@@ -31,12 +46,8 @@ const RULES: [RegExp, (...m: string[]) => string][] = [
     (_m, head) => `${head}${CUT}`,
   ],
   [/(["']?\b(?:[A-Za-z0-9]+[_.-])+pass\b["']?\s*[:=]\s*)(?!\[redacted\])(?:"[^"]*"|'[^']*'|[^\s,;&"'})\]]+)/gi, (_m, head) => `${head}${CUT}`],
-  // a MySQL or MariaDB client's password glued to -p, among that command's own options (mysql -u root -psecret), never
-  // a later -p… elsewhere on the line (ffmpeg -pix_fmt)
-  [
-    /(\b(?:mysql(?:dump|admin|import|sh|check|pump|slap)?|mariadb(?:-[a-z]+)?)(?:\s+(?!-p)-\S+(?:\s+(?!-)[^\s-]\S*)?)*\s+-p)(?!\[redacted\])\S+/gi,
-    (_m, head) => `${head}${CUT}`,
-  ],
+  // a MySQL or MariaDB client's password glued to -p (mysql -u root -psecret)
+  [MYSQL_PASSWORD, (_m, head) => `${head}${CUT}`],
   // a user and password given to a command: curl -u user:password, --user user:password, --proxy-user …
   [/((?:^|\s)(?:-u|--user|--proxy-user|-U)(?:\s+|=))([^\s:@]+):(?!\/\/)\S+/g, (_m, head, user) => `${head}${user}:${CUT}`],
   // webhook addresses are their own credential (Slack, Discord)
