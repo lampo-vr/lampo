@@ -9,6 +9,9 @@
 // (library/moves.ts, library/moving.tsx). While a card is dragged, the lanes it can't go to dim and the one under it
 // lights up with the card's place in it — the board's own order, never a manual one —; under the carried card a label
 // says what dropping does.
+//
+// A chunk of its own (Library.tsx): asked for with the library's when the board is the layout, right after the first
+// paint otherwise; the lanes' frame while it comes is BoardFrame.tsx.
 
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -23,7 +26,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { LANES } from '../../../lib/stage.ts';
 import type { NextStep, StageInfo } from '../../../lib/types.ts';
 import { cancelPrefetch, prefetchVideo } from '../api/prefetch.ts';
 import { spriteUrl } from '../api/sprite.ts';
@@ -41,7 +43,7 @@ import { laneLabel, nextLabel } from '../status/stageText.ts';
 import { LANE_SHAPE } from '../ui/glyphs.ts';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { ContextMenu, IconButton, Menu } from '../ui/primitives.tsx';
-import { SkLine } from '../ui/Skeleton.tsx';
+import { Lane } from './BoardFrame.tsx';
 import type { DragHost, Press } from './boardDrag.ts';
 import { ShareState } from './marks.tsx';
 import { type LaneId, laneOf, lanes } from './model.ts';
@@ -440,45 +442,6 @@ export function Board({ videos, where, home, folders }: BoardProps) {
   );
 }
 
-/** A lane: its head, then its cards in a box of their own that scrolls under it (a soft edge where there is more).
- * While a card is dragged, `drop` says what the lane is to it: `from` its own, `lit` the one that would take it, `ok`
- * one that could, `no` one it can't go to. */
-function Lane({
-  id,
-  label,
-  count,
-  note,
-  drop,
-  children,
-}: {
-  id: string;
-  label?: string;
-  count: ReactNode;
-  /** A quiet word beside the count ("2 agents working"). */
-  note?: string | null;
-  drop?: string;
-  children: ReactNode;
-}) {
-  const [scrollRef, edges] = useScrollEdges<HTMLDivElement>('y');
-  return (
-    <section className="lane" data-lane={id} data-drop={drop} aria-label={label}>
-      <h2 className="lane-head">
-        <KeyGlyph shape={LANE_SHAPE[id] ?? 'outline'} />
-        {laneLabel(id)}
-        {note && (
-          <span className="lane-note" data-testid="lane-note">
-            {note}
-          </span>
-        )}
-        <span className="lane-count">{count}</span>
-      </h2>
-      <div ref={scrollRef} className={`lane-scroll ${edges}`} data-testid="lane-scroll">
-        {children}
-      </div>
-    </section>
-  );
-}
-
 const smooth = () => !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /** Where the dragged card would land in the lit lane: its place with the lane's keyframe on a track (an empty lane's
@@ -607,33 +570,6 @@ function LaneCards({
   return (
     <div ref={ref} className="lane-cards" style={w.on ? { paddingTop: w.before, paddingBottom: w.after } : undefined}>
       {items}
-    </div>
-  );
-}
-
-/** The board while the library loads: the four lanes with their real heads, a couple of cards of the cards' shape. */
-export function BoardPending() {
-  return (
-    <div className="board" aria-hidden="true">
-      {LANES.map((l) => (
-        <Lane key={l.id} id={l.id} count={<SkLine w="1.2em" />}>
-          <div className="lane-cards">
-            {['80%', '64%'].map((w) => (
-              <div key={w} className="bcard pending">
-                <div className="sk bthumb" style={{ aspectRatio: 16 / 10 }} />
-                <div className="bcard-row">
-                  <b className="bcard-name">
-                    <SkLine w={w} />
-                  </b>
-                </div>
-                <div className="bcard-line">
-                  <SkLine w="50%" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </Lane>
-      ))}
     </div>
   );
 }
