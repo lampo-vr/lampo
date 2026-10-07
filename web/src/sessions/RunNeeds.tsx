@@ -2,9 +2,11 @@
 // preview and the player's Agent view: the permission it lacks — what for, the exact rule to copy and where it goes
 // (Lampo never allows anything itself) — and why it failed: its error in words, then the last lines the tool printed,
 // in the code face. Rides with the chunks that show it (the inbox, the Agent view), never the first paint.
+import { useState } from 'react';
 import type { ActivityWords, Run, RunStepLine } from '../api/types.ts';
 import { locale, t } from '../i18n/index.ts';
-import { Code } from '../settings/parts.tsx';
+import { copyText, toast } from '../lib/toast.ts';
+import { I } from '../ui/icons.tsx';
 import { phrase } from './activityWords.ts';
 import '../styles/runneeds.css';
 
@@ -15,12 +17,28 @@ export const printedLines = (w: ActivityWords | null | undefined): string[] =>
     .map((l) => l.trim())
     .filter(Boolean);
 
-/** The rule that allows it, to copy (a card has room for no more). */
+/**
+ * The rule that allows it, to copy (a card has room for no more): Settings' snippet box in look (settings/parts.tsx
+ * Code), the rule on one line, never broken inside, sideways when it doesn't fit. Its own, not Code itself: Code rides
+ * with Settings and the review links' card, and sharing it with the inbox and the player would split it into a chunk of
+ * its own, which every start would list (the first paint's budget).
+ */
 export function RuleToCopy({ allow }: { allow: string }) {
+  const [done, setDone] = useState(false);
+  const label = t('Permission rule');
+  const copy = async () => {
+    if (!(await copyText(allow))) return toast(t('Could not copy'), 'error');
+    setDone(true);
+    setTimeout(() => setDone(false), 1400);
+  };
   return (
-    <Code label={t('Permission rule')} testid="run-allow">
-      {allow}
-    </Code>
+    <div className="rn-code" data-testid="run-allow">
+      <div className="rn-code-label">{label}</div>
+      <button type="button" className="btn sm ghost rn-copy" onClick={copy} aria-label={t('Copy {label}', { label })} data-testid="run-allow-copy">
+        <I name={done ? 'check' : 'copy'} size={14} /> {done ? t('Copied') : t('Copy')}
+      </button>
+      <pre className="mono">{allow}</pre>
+    </div>
   );
 }
 

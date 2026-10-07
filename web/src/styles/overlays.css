@@ -127,7 +127,7 @@
   content: attr(data-keys) / '';
 }
 /* Two buttons that trade which one is raised (the composer's Save and Send): the quiet one keeps the room of the key
-   cap it doesn't show, so neither moves when they trade. */
+   cap it doesn't show, so neither grows or shrinks when they trade. */
 .btn[data-keys-room]::after {
   content: attr(data-keys-room) / '';
   visibility: hidden;

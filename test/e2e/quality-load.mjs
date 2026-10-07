@@ -309,6 +309,21 @@ try {
         ],
       },
       {
+        // Get started at the sidebar's foot (onboarding/Row.tsx): its room stands from the first paint where the row ends
+        // up, by what this browser saw last; the inbox has no card above it to move it.
+        name: 'get started row',
+        base: q.firstStrip.base,
+        url: '/#/inbox',
+        chrome: { start: true },
+        ready: ready.inbox,
+        marks: [
+          ...top,
+          ...nav,
+          { name: 'get started row', sel: '.nav [data-testid=ob-row-wrap]', every: true },
+          { name: 'settings link', sel: '.nav .nav-settings', every: true },
+        ],
+      },
+      {
         name: 'settings',
         url: '/#/settings',
         ready: '.set-nav a',
@@ -417,14 +432,15 @@ try {
       await page.evaluateOnNewDocument(watchMoves);
       // …but one that saw the library before (lib/chromeHint.ts): its loading state knows a sidebar is coming
       await page.evaluateOnNewDocument(
-        (layout, hint) => {
+        (layout, hint, more) => {
           try {
             localStorage.setItem('vr.library', JSON.stringify(layout ? { layout } : {}));
-            if (hint) localStorage.setItem('vr.chrome', JSON.stringify({ role: 'owner', library: 'full' }));
+            if (hint) localStorage.setItem('vr.chrome', JSON.stringify({ role: 'owner', library: 'full', ...more }));
           } catch {}
         },
         c.layout || null,
         c.hint !== false,
+        c.chrome ?? {},
       );
       // The app's service worker (installed by an earlier page) would fetch past the interception below.
       await page.setBypassServiceWorker(true);

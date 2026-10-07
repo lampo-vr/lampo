@@ -74,6 +74,8 @@ const SECONDS = {
   onboarding: 23,
   'onboarding-setup': 26,
   getstarted: 20,
+  // Get started at the sidebar's foot: the row, its panel, hiding, the account menu, phone and tablet, the end
+  'getstarted-sidebar': 45,
   webkit: 17,
   playbook: 15,
   styleguide: 15,

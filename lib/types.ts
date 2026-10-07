@@ -3793,8 +3793,13 @@ export interface OnboardingPrefs {
   since: string;
   /** Each step the server saw done, and when (from real state, never from a click on the list); kept once seen. */
   done?: Partial<Record<OnboardingStep, string>>;
-  /** Put away by the person; the account menu brings it back. */
+  /** The card put away by the person (its ×): the sidebar's row stays; the account menu brings the card back. */
   hidden?: string;
+  /**
+   * Hidden for good by the person ("Hide for good"): the card and the sidebar's row both; the account menu still brings
+   * it back. Absent on accounts from before it.
+   */
+  dismissed?: string;
   /** Every step of the account's role was done. */
   complete?: string;
   /**
@@ -3816,6 +3821,8 @@ export type Persona = 'agency' | 'inhouse' | 'creator' | 'other';
 /** PUT /api/onboarding: put away / bring back, the setup finished or skipped, the agent picked. */
 export interface OnboardingUpdate {
   hidden?: boolean;
+  /** Hidden for good (true) or brought back (false): the card and the sidebar's row. */
+  dismissed?: boolean;
   /** The setup is over (finished or skipped): it doesn't show again. */
   setup?: 'done';
   agent?: SetupAgent;

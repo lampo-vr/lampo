@@ -329,11 +329,23 @@ try {
     await a.waitForSelector('.lib-content .film', { timeout: 15000 });
     await sleep(500);
     assert(!(await a.$('[data-testid=ob-gs]')), 'still away after a reload');
+    // the sidebar's row stays (getstarted-sidebar.mjs has the rest of it)
+    await a.waitForSelector('[data-testid=ob-row-count]', { timeout: 10000 });
+    assert((await a.$eval('[data-testid=ob-row-count]', (e) => e.textContent)) === '3 of 4', 'the sidebar’s row stays');
     const items = await menuItems(a);
-    assert(items.find((i) => i.startsWith('Get started'))?.includes('3/4'), `account menu: ${items}`);
+    assert(items.find((i) => i.startsWith('Get started'))?.includes('3 of 4'), `account menu: ${items}`);
+    // at a desk the sidebar is on screen: the menu opens the steps at its foot, the card stays put away
+    await clickText(a, '.menu[data-state=open] [role=menuitem]', 'Get started');
+    await a.waitForSelector('[data-testid=ob-sp]', { timeout: 10000 });
+    assert(!(await a.$('[data-testid=ob-gs]')), 'the card stays put away');
+    await a.keyboard.press('Escape');
+    // Settings has no sidebar: there the menu brings the card back above All videos
+    await a.goto(`${BASE}/#/settings`, { waitUntil: 'domcontentloaded' });
+    await a.waitForSelector('.set-nav a', { timeout: 15000 });
+    await menuItems(a);
     await clickText(a, '.menu[data-state=open] [role=menuitem]', 'Get started');
     await a.waitForSelector('[data-testid=ob-gs] [data-testid=ob-step]', { timeout: 10000 });
-    assert(!(await api('/api/onboarding')).onboarding.hidden, 'back on the account');
+    await until(async () => !(await api('/api/onboarding')).onboarding.hidden, 'back on the account');
   });
 
   await check('the last step makes a review link right there; then “You’re set”, and it folds away for good', async () => {

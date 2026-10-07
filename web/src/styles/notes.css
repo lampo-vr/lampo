@@ -1127,8 +1127,8 @@ button.c-tc:hover {
   font-size: var(--fs-xs);
   color: var(--muted);
 }
-/* one quiet toolbar: severity, tags, the paperclip, voice — then Save on the right (it wraps to its own line only when
-   the words are long and the panel narrow) */
+/* one quiet toolbar: severity, tags, the paperclip, voice — then Save and Send on the right (they wrap to their own
+   line only when the words are long and the panel narrow) */
 .composer-foot {
   display: flex;
   flex-wrap: wrap;
@@ -1156,9 +1156,10 @@ button.c-tc:hover {
 .composer-send .btn.ghost:hover {
   color: var(--fg);
 }
-/* Save and Send keep their places whichever is raised: each is as wide as its raised self — its words in the strong
+/* Save and Send keep their widths whichever is raised: each is as wide as its raised self — its words in the strong
    weight (::before, unseen) beside the key cap (::after; the quiet one keeps only its room, data-keys-room) — and the
-   quiet one's words sit in the middle of that room. A spinner takes the words' place while it saves. */
+   quiet one's words sit in the middle of that room. The raised one comes last (Composer.tsx), so an agent assigned
+   while a note is written swaps them in the same room. A spinner takes the words' place while it saves. */
 .composer-act {
   display: inline-grid;
   grid-template-columns: auto auto;

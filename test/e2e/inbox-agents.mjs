@@ -211,8 +211,8 @@ try {
     assert(!(await page.$('[data-testid="inbox-preview"] .inbox-pv-act button[data-testid="inbox-row-done"]')), 'no Got it');
     // ended waiting: Send again, not Stop
     assert(await page.$('[data-testid="inbox-run-again"]'), 'Send again once it ended');
-    await page.click('[data-testid="run-allow"] .set-copy');
-    await until(async () => (await page.$eval('[data-testid="run-allow"] .set-copy', (e) => e.textContent)).includes('Copied'), 'Copied');
+    await page.click('[data-testid="run-allow-copy"]');
+    await until(async () => (await page.$eval('[data-testid="run-allow-copy"]', (e) => e.textContent)).includes('Copied'), 'Copied');
     const copied = await page.evaluate(() => navigator.clipboard.readText());
     assert(copied === ALLOW, `on the clipboard: ${copied}`);
     await shot(page, '02-permission-1440');

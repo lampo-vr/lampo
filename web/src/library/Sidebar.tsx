@@ -23,6 +23,8 @@ import { crumbs, goView, type LibraryView, leaf, within } from '../lib/nav.ts';
 import { posterUrl } from '../lib/posterUrl.ts';
 import { forgetGone, RECENT_SHOWN, useRecent } from '../lib/recent.ts';
 import { toast, toastError, toastUndo } from '../lib/toast.ts';
+import type { GetStartedProps } from '../onboarding/GetStarted.tsx';
+import { StartRow } from '../onboarding/Row.tsx';
 import { cardRun, LOOK, mostUrgent, phaseOf, type RunLike, shortLine } from '../sessions/runState.ts';
 import { SessionHover } from '../sessions/Sessions.tsx';
 import { LazyShareModal } from '../share/LazyShareModal.tsx';
@@ -236,6 +238,8 @@ interface SidebarProps {
   onMoveVideo: (slug: string, folder: string | null) => void;
   /** In the phone drawer: the library opens the share sheet itself (the drawer closes first). */
   onShareFolder?: (folder: string) => void;
+  /** Adding a video the library's way, for Get started's steps at the foot (onboarding/Row.tsx). */
+  start: GetStartedProps;
 }
 
 const NONE: never[] = [];
@@ -273,7 +277,7 @@ function whatMovesUp(videos: number, subfolders: number, target: string | null):
   return t('Only the folder goes: {what} moves up to {target}.|Only the folder goes: {what} move up to {target}.', { n: videos + subfolders, what, target });
 }
 
-export function Sidebar({ videos: loaded, folders: all = NONE, archived = NO_ARCHIVE, view, onMoveVideo, onShareFolder }: SidebarProps) {
+export function Sidebar({ videos: loaded, folders: all = NONE, archived = NO_ARCHIVE, view, onMoveVideo, onShareFolder, start }: SidebarProps) {
   const pending = !loaded;
   const videos = loaded ?? NONE;
   // An archived project leaves the tree (it and its folders), and its videos the counts: the Archived row holds them.
@@ -628,6 +632,8 @@ export function Sidebar({ videos: loaded, folders: all = NONE, archived = NO_ARC
         </div>
       </ScrollArea>
 
+      {/* Get started while the first run has steps open, above the trial (onboarding/Row.tsx) */}
+      <StartRow {...start} />
       {/* Settings and the theme — in the phone drawer too, where the account chip isn't. The language lives in Settings. */}
       {/* Settings: the one way in on a phone (the account chip isn't there) and a visible one at a desk (the account menu
           and ⌘, are the others). The theme is a setting (Appearance), with a quick row in the account menu. */}

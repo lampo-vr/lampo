@@ -1,7 +1,8 @@
 // Who this browser was signed in as last time, for the first paint before the server has answered: the chrome that
 // depends on the role (Add video in the top bar, the list of settings sections) is there from the start instead of
 // popping in a moment later and pushing things aside — and whether the first run's strip showed, so its room above
-// the library's toolbar is there too. Per browser; wrong at worst once, for someone whose role changed.
+// the library's toolbar is there too, and whether the sidebar's Get started row did. Per browser; wrong at worst
+// once, for someone whose role changed.
 import type { Role } from '../api/types.ts';
 
 const KEY = 'vr.chrome';
@@ -11,6 +12,8 @@ interface Hint {
   firstRun?: boolean;
   /** What the library held last time: an empty one has no sidebar, so its loading state has none either. */
   library?: 'empty' | 'full';
+  /** The sidebar's Get started row showed (onboarding/Row.tsx). */
+  start?: boolean;
 }
 const read = (): Hint => {
   try {
@@ -44,10 +47,15 @@ function remember(hint: Hint) {
   } catch {}
 }
 
+// (what isn't so is left out: JSON leaves undefined out)
 export function rememberRole(role: Role, firstRun = false) {
-  const { library } = read();
-  remember({ role, ...(firstRun ? { firstRun } : {}), ...(library ? { library } : {}) });
+  remember({ ...read(), role, firstRun: firstRun || undefined });
 }
+
+/** The sidebar's Get started row showed here last time (onboarding/Row.tsx). */
+export const chromeStart = (): boolean => read().start === true;
+
+export const rememberStart = (start: boolean) => remember({ ...read(), start: start || undefined });
 
 export function rememberLibrary(empty: boolean) {
   remember({ ...read(), library: empty ? 'empty' : 'full' });

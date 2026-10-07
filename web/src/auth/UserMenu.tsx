@@ -1,7 +1,8 @@
 // The signed-in account in the top bar: the workspaces to switch between and making a new one (on a hosted server, for
 // someone with more than one or who may make one: auth/Workspaces.tsx), Settings (⌘,), the operator pages for whoever
-// runs the server, "Get started" while the first run has steps open (it brings a put-away one back), the connected
-// agents, sign out, and a quick theme row.
+// runs the server, "Get started · 2 of 5" while the first run has steps open (it opens the steps at the sidebar's foot,
+// or brings the card back where there is no sidebar; hidden or not), the connected agents, sign out, and a quick theme
+// row.
 // Everything else (profile, tokens, users) is a section of Settings. Signed in at the machine itself there is nobody to
 // sign out as. The chip is the avatar alone (the name is its tooltip and the menu's label): one
 // size before and after the server says who you are, so the top bar never shifts when it does.
@@ -47,15 +48,12 @@ export function UserMenu() {
   const B = useLoaded(billingCode, usePainted(!!billing));
   const run = useFirstRun();
   const done = run.steps.filter((x) => x.done).length;
-  // back where it lives: above All videos
-  const getStarted = () => {
-    location.hash = '#/';
-    if (run.o?.hidden)
-      getStartedCode
-        .load()
-        .then((m) => m.setHidden(qc, false))
-        .catch(toastError);
-  };
+  // the steps at the sidebar's foot where it shows, else the card back above All videos (onboarding/Panel.tsx fromMenu)
+  const getStarted = () =>
+    getStartedCode
+      .load()
+      .then((m) => m.fromMenu(qc))
+      .catch(toastError);
   // Not known yet: the same chip, idle (signed out, there is no top bar to put it in).
   if (!status)
     return (
@@ -93,7 +91,7 @@ export function UserMenu() {
           resumable(run.o) && {
             label: t('Get started'),
             mark: <KeyGlyph shape="outline" size={10} />,
-            shortcut: `${done}/${run.steps.length}`,
+            shortcut: t('{done} of {n}', { done, n: run.steps.length }),
             onClick: getStarted,
           },
           allowed('agents') && { label: t('Connected agents'), icon: 'terminal', onClick: () => open('agents') },

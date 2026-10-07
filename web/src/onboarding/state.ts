@@ -3,10 +3,10 @@
 // its data (data.ts), and the setup a new account sees first (Setup.tsx: Welcome and a few skippable steps). Steps tick
 // from what the server finds done (lib/onboarding.ts).
 import type { CSSProperties } from 'react';
-import { nextOf, type SetupVariant, type StepState, setupDue, setupVariant, showsOnboarding, stateOf, stepsFor } from '../../../lib/onboarding.ts';
+import { inSidebar, nextOf, type SetupVariant, type StepState, setupDue, setupVariant, showsOnboarding, stateOf, stepsFor } from '../../../lib/onboarding.ts';
 import type { AuthStatus, OnboardingPrefs, Persona } from '../../../lib/types.ts';
 import { useAuthStatus } from '../api/auth.ts';
-import { chromeFirstRun } from '../lib/chromeHint.ts';
+import { chromeFirstRun, chromeStart } from '../lib/chromeHint.ts';
 import { loader } from '../lib/lazy.ts';
 
 /** Get started, its panes and their data: loaded when the first run shows (or is asked for). */
@@ -40,6 +40,11 @@ export interface FirstRun {
   o: OnboardingPrefs | null;
   /** It shows: there is one and it isn't put away. */
   shown: boolean;
+  /**
+   * The sidebar's row shows (lib/onboarding.ts inSidebar: steps open, not hidden for good, the setup over) — before the
+   * server has answered: it showed in this browser last time (its room from the first paint, lib/chromeHint.ts).
+   */
+  side: boolean;
   steps: StepState[];
   next: StepState['id'] | null;
   /** The setup is due: a new account that hasn't finished or skipped it (it shows instead of the library). */
@@ -77,12 +82,14 @@ export function useFirstRun(): FirstRun {
   const personas = status?.workspace?.personas ?? [];
   // the role in the workspace this session works in (/api/auth/status says it), and whether that one was made at sign-up
   const steps = user && o ? stateOf(o, stepsFor(user.role, { machine: status?.via === 'local', signupWorkspace: !!status?.workspace?.signup, personas })) : [];
+  const setup = !!user && setupDue(o) && !setupEndedHere.has(user.id);
   return {
     o,
     shown: status ? showsOnboarding(o) : chromeFirstRun(),
+    side: status ? inSidebar(o) && !setup : chromeStart(),
     steps,
     next: nextOf(steps),
-    setup: !!user && setupDue(o) && !setupEndedHere.has(user.id),
+    setup,
     variant: variantOf(status),
     personas,
   };

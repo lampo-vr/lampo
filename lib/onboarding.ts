@@ -121,9 +121,15 @@ export const progressOf = (steps: readonly StepState[]): { done: number; of: num
 });
 
 /** Shown: an account with a first run it hasn't put away. A finished one shows once more, to say so, until closed. */
-export const showsOnboarding = (o: OnboardingPrefs | null | undefined): o is OnboardingPrefs => !!o && !o.hidden;
+export const showsOnboarding = (o: OnboardingPrefs | null | undefined): o is OnboardingPrefs => !!o && !o.hidden && !o.dismissed;
 
-/** The account menu offers it (again) while a step is open. */
+/**
+ * The sidebar's row ("Get started · 2 of 5"): while a step is open, unless hidden for good. The card's × leaves it (the
+ * row is how the card comes back to mind without the card).
+ */
+export const inSidebar = (o: OnboardingPrefs | null | undefined): o is OnboardingPrefs => !!o && !o.complete && !o.dismissed;
+
+/** The account menu offers it (again) while a step is open, even hidden for good: the one quiet way back. */
 export const resumable = (o: OnboardingPrefs | null | undefined): o is OnboardingPrefs => !!o && !o.complete;
 
 /** The first run's sample video (Review.onboarding_sample): never a real video for the steps, billing or limits. */
