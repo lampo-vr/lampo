@@ -18,13 +18,6 @@ export function StartRow(props: GetStartedProps) {
   }, [known, side]);
   const Ob = useLoaded(getStartedCode, usePainted(side) && side);
   if (Ob) return <Ob.SideRow {...props} />;
-  return side ? <StartRoom /> : null;
+  // its room: the row's box, empty (Panel.tsx draws the same while it waits for the account)
+  return side ? <div className="ob-side ob-side-room" aria-hidden="true" data-testid="ob-row-wrap" /> : null;
 }
-
-/** The row's room: its own box, empty (Panel.tsx draws the same while it waits for the account; never imported from
- * here, so this module stays the library's alone and adds no chunk to the first paint). */
-const StartRoom = () => (
-  <div className="ob-side" aria-hidden="true" data-testid="ob-row-wrap">
-    <span className="ob-side-row ob-side-room" />
-  </div>
-);

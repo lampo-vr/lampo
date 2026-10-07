@@ -239,7 +239,7 @@ interface SidebarProps {
   /** In the phone drawer: the library opens the share sheet itself (the drawer closes first). */
   onShareFolder?: (folder: string) => void;
   /** Adding a video the library's way, for Get started's steps at the foot (onboarding/Row.tsx). */
-  start?: GetStartedProps;
+  start: GetStartedProps;
 }
 
 const NONE: never[] = [];
@@ -633,7 +633,7 @@ export function Sidebar({ videos: loaded, folders: all = NONE, archived = NO_ARC
       </ScrollArea>
 
       {/* Get started while the first run has steps open, above the trial (onboarding/Row.tsx) */}
-      <StartRow add={start?.add ?? null} upload={start?.upload ?? true} />
+      <StartRow {...start} />
       {/* Settings and the theme — in the phone drawer too, where the account chip isn't. The language lives in Settings. */}
       {/* Settings: the one way in on a phone (the account chip isn't there) and a visible one at a desk (the account menu
           and ⌘, are the others). The theme is a setting (Appearance), with a quick row in the account menu. */}

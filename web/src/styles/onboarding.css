@@ -504,9 +504,9 @@
   outline: 2px solid var(--fg-2);
   outline-offset: -2px;
 }
-/* its room while the row's code arrives: the same box, empty and inert */
-.ob-side-row.ob-side-room {
-  pointer-events: none;
+/* its room while the row's code arrives: the same box, empty */
+.ob-side.ob-side-room {
+  height: calc(var(--sp-2) + var(--h-lg));
 }
 .ob-side-row .ob-side-kg {
   --kg-size: 10px;
@@ -550,5 +550,8 @@
 @media (hover: none) and (pointer: coarse) {
   .ob-side-row {
     height: var(--h-touch);
+  }
+  .ob-side.ob-side-room {
+    height: calc(var(--sp-2) + var(--h-touch));
   }
 }

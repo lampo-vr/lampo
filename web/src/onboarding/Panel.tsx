@@ -139,12 +139,7 @@ export function SideRow(props: GetStartedProps) {
 
   if (!show) return null;
   // the account not heard yet (the room held from what this browser saw last): the row's box, empty
-  if (!count)
-    return (
-      <div className="ob-side" aria-hidden="true" data-testid="ob-row-wrap">
-        <span className="ob-side-row ob-side-room" />
-      </div>
-    );
+  if (!count) return <div className="ob-side ob-side-room" aria-hidden="true" data-testid="ob-row-wrap" />;
   const close = () => setOpen(null);
   const title = all ? t('You’re set') : t('Get started');
   const panel = (inSheet: boolean) => <StartPanel {...props} sheet={inSheet} onClose={close} />;
@@ -169,15 +164,17 @@ export function SideRow(props: GetStartedProps) {
             }}
           />
         }
-        side="top"
+        // it opens upward: the row stands at the window's foot, and there is never room for it below (the popover's own
+        // flip; the shared popover stays as it is, the first paint has no room for more)
         align="start"
         sideOffset={6}
         className="ob-sp-pop"
-        label={title}
         onOpenAutoFocus={(e) => {
-          // the panel speaks first (its words, then Tab to its steps), not its ×
+          // named by its headline; the panel speaks first (its words, then Tab to its steps), not its ×
           e.preventDefault();
-          (e.currentTarget as HTMLElement | null)?.querySelector<HTMLElement>('.ob-sp')?.focus();
+          const box = e.currentTarget as HTMLElement | null;
+          box?.setAttribute('aria-labelledby', 'ob-sp-title');
+          box?.querySelector<HTMLElement>('.ob-sp')?.focus();
         }}
       >
         {open === 'pop' && panel(false)}
@@ -270,7 +267,7 @@ export function StartPanel({ onClose, sheet, add, upload }: StartPanelProps) {
     <div className={`ob-sp ${sheet ? 'ob-sp-sheet' : ''}`} data-testid="ob-sp" tabIndex={-1}>
       {!sheet && (
         <div className="ob-sp-head">
-          <h2 className="ob-sp-title">
+          <h2 className="ob-sp-title" id="ob-sp-title">
             {all ? t('You’re set') : t('Get started')}
             <small data-testid="ob-sp-count">{t('{done} of {n}', { done: doneN, n: steps.length })}</small>
           </h2>

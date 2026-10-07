@@ -1,7 +1,7 @@
 // Who this browser was signed in as last time, for the first paint before the server has answered: the chrome that
 // depends on the role (Add video in the top bar, the list of settings sections) is there from the start instead of
 // popping in a moment later and pushing things aside — and whether the first run's strip showed, so its room above
-// the library's toolbar is there too, and the sidebar's Get started row with its count. Per browser; wrong at worst
+// the library's toolbar is there too, and whether the sidebar's Get started row did. Per browser; wrong at worst
 // once, for someone whose role changed.
 import type { Role } from '../api/types.ts';
 
@@ -47,18 +47,15 @@ function remember(hint: Hint) {
   } catch {}
 }
 
+// (what isn't so is left out: JSON leaves undefined out)
 export function rememberRole(role: Role, firstRun = false) {
-  const { library, start } = read();
-  remember({ role, ...(firstRun ? { firstRun } : {}), ...(library ? { library } : {}), ...(start ? { start } : {}) });
+  remember({ ...read(), role, firstRun: firstRun || undefined });
 }
 
 /** The sidebar's Get started row showed here last time (onboarding/Row.tsx). */
 export const chromeStart = (): boolean => read().start === true;
 
-export function rememberStart(start: boolean) {
-  const { start: _, ...rest } = read();
-  remember(start ? { ...rest, start } : rest);
-}
+export const rememberStart = (start: boolean) => remember({ ...read(), start: start || undefined });
 
 export function rememberLibrary(empty: boolean) {
   remember({ ...read(), library: empty ? 'empty' : 'full' });

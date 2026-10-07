@@ -86,7 +86,7 @@ export function useFirstRun(): FirstRun {
   return {
     o,
     shown: status ? showsOnboarding(o) : chromeFirstRun(),
-    side: status ? !!user && inSidebar(o) && !setup && steps.length > 0 : chromeStart(),
+    side: status ? inSidebar(o) && !setup : chromeStart(),
     steps,
     next: nextOf(steps),
     setup,
