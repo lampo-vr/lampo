@@ -36,6 +36,7 @@ import { body, fail, failFrom, HttpError, router } from '../http.ts';
 import { SUSPENDED_ERROR } from '../permissions.ts';
 import { freeBytes } from '../ready.ts';
 import { issuerOf, type Outcome, TicketInput, teamGuard, type UploadMeta, uploadMeta } from '../uploadTickets.ts';
+import { keepSafetyNet } from './files.ts';
 
 const UPLOAD_ID = /^[a-f0-9]{32}$/;
 
@@ -150,7 +151,11 @@ export function uploadRoutes(ctx: ServerContext): Router {
   async function ingestProjectFile(file: string, target: FileTarget): Promise<FileUploadResult> {
     try {
       const out = await ingestFile(file, target);
-      if (out.commit) ctx.broadcast('files', { area: out.commit.folder, rev: out.commit.rev }, 'files');
+      if (out.commit) {
+        // a new version replaced one: the safety net is held to its cap now, not at the next hourly purge
+        await keepSafetyNet(ctx, currentWorkspace());
+        ctx.broadcast('files', { area: out.commit.folder, rev: out.commit.rev }, 'files');
+      }
       return out;
     } finally {
       fs.rmSync(file, { force: true });

@@ -173,8 +173,13 @@ function liveRef(id: string): AreaRef {
 export const blobKey = (hash: string): string => `files/sha256/${hash.slice(0, 2)}/${hash}`;
 
 /**
- * What the index says of a blob: its size, its type (from its bytes), when it was stored or last asked for, and whether
- * its bytes are in (`stored`; without, an upload is putting them there now) or are being removed (`gone`).
+ * What the index says of a blob: its size, its type (from its bytes), when it was stored, whether its bytes are in
+ * (`stored`; without, an upload is putting them there now) or are being removed (`gone`), whether a file ever named it
+ * (`named`: committed once) and when a push last asked for it while a file named it (`touched`).
+ *
+ * Bytes no file names count toward the plan while they wait for their commit (`pending`, a day at most); bytes a file
+ * named once and no longer does (purged, dropped) are neither counted nor kept: the next purge removes them, unless a
+ * push asked for them within the hour (it commits them next).
  */
 interface Blob {
   size: number;
@@ -182,6 +187,8 @@ interface Blob {
   at: string;
   stored?: true;
   gone?: true;
+  named?: true;
+  touched?: string;
 }
 type Shard = Record<string, Blob>;
 
@@ -213,6 +220,37 @@ function writeShard(hash: string, shard: Shard): void {
   fs.renameSync(tmp, shardFile(hash));
 }
 
+// Parsed shards, by file (one per workspace and prefix), again only when the file changed: what usage and the purge read
+// (never change what it returns). Bounded: the least recently read go first.
+const shardsRead = new Map<string, { key: string; shard: Shard }>();
+
+/** Every blob the workspace's index holds (never change what it returns). */
+function allBlobs(): Map<string, Blob> {
+  const out = new Map<string, Blob>();
+  let names: string[] = [];
+  try {
+    names = fs.readdirSync(blobsDir()).filter((n) => /^[0-9a-f]{2}\.json$/.test(n));
+  } catch {}
+  for (const n of names) {
+    const file = path.join(blobsDir(), n);
+    let key: string;
+    try {
+      const st = fs.statSync(file);
+      key = `${st.ino}:${st.size}:${st.mtimeMs}`;
+    } catch {
+      continue;
+    }
+    let hit = shardsRead.get(file);
+    if (hit?.key !== key) {
+      hit = { key, shard: readShard(n.slice(0, 2)) };
+      shardsRead.set(file, hit);
+      if (shardsRead.size > 4096) shardsRead.delete(shardsRead.keys().next().value as string);
+    }
+    for (const [h, b] of Object.entries(hit.shard)) out.set(h, b);
+  }
+  return out;
+}
+
 /** The blob, when its bytes are in the workspace (stored, not being removed). */
 function storedBlob(hash: string): Blob | null {
   const b = readShard(hash)[hash];
@@ -234,31 +272,64 @@ export function missingBlobs(hashes: string[]): string[] {
   });
 }
 
+/** The blobs of `hashes` the workspace holds now, with their sizes (what isn't held is left out). Reads only. */
+export function heldBlobs(hashes: string[]): Map<string, { size: number }> {
+  const out = new Map<string, { size: number }>();
+  const shards = new Map<string, Shard>();
+  for (const h of new Set(hashes)) {
+    let shard = shards.get(h.slice(0, 2));
+    if (!shard) {
+      shard = readShard(h);
+      shards.set(h.slice(0, 2), shard);
+    }
+    const b = shard[h];
+    if (b?.stored && !b.gone) out.set(h, { size: b.size });
+  }
+  return out;
+}
+
 /**
- * The blobs of `hashes` the workspace holds, made fresh for the purge (asked for now: a push commits them next), with
- * their sizes. What isn't held is left out.
+ * Marks the blobs of `hashes` that a file names now as asked for (a push that passed the plan commits them next): the
+ * purge keeps them for an hour even if what named them goes meanwhile. Bytes no file names are never made fresh: an
+ * upload waiting for its commit keeps its first day, whatever asks for it.
  */
-export function touchBlobs(hashes: string[]): Map<string, Blob> {
-  const out = new Map<string, Blob>();
-  if (!hashes.length) return out;
+export function touchBlobs(hashes: string[]): void {
+  if (!hashes.length) return;
   withFilesLock(() => {
+    const named = namedHashes(listAreas());
     const at = isoLocal();
     const byShard = new Map<string, string[]>();
-    for (const h of new Set(hashes)) byShard.set(h.slice(0, 2), [...(byShard.get(h.slice(0, 2)) ?? []), h]);
+    for (const h of new Set(hashes)) if (named.has(h)) byShard.set(h.slice(0, 2), [...(byShard.get(h.slice(0, 2)) ?? []), h]);
     for (const list of byShard.values()) {
       const shard = readShard(list[0] as string);
       let changed = false;
       for (const h of list) {
         const b = shard[h];
         if (!b?.stored || b.gone) continue;
-        b.at = at;
+        b.touched = at;
         changed = true;
-        out.set(h, b);
       }
       if (changed) writeShard(list[0] as string, shard);
     }
   });
-  return out;
+}
+
+/** Marks blobs as named by a file (a commit): from now on they are a file's, counted or kept by what names them. */
+function markNamed(hashes: Iterable<string>): void {
+  const byShard = new Map<string, string[]>();
+  for (const h of new Set(hashes)) byShard.set(h.slice(0, 2), [...(byShard.get(h.slice(0, 2)) ?? []), h]);
+  for (const list of byShard.values()) {
+    const shard = readShard(list[0] as string);
+    let changed = false;
+    for (const h of list) {
+      const b = shard[h];
+      if (b && !b.named) {
+        b.named = true;
+        changed = true;
+      }
+    }
+    if (changed) writeShard(list[0] as string, shard);
+  }
 }
 
 /** sha256 and size of a file on this disk, read once. */
@@ -356,8 +427,11 @@ export async function storeBlob(file: string, expect: { size?: number; sha256?: 
       if (b?.gone) throw Object.assign(new FileError(503, 'the files are being tidied up right now: try again in a moment'), { retryAfter: 2 });
       const now = isoLocal();
       if (b?.stored) {
-        b.at = now;
-        writeShard(hash, shard);
+        // bytes it holds already: a file's are asked for again (the commit follows); an upload's keeps its first day
+        if (b.named) {
+          b.touched = now;
+          writeShard(hash, shard);
+        }
         return b;
       }
       shard[hash] = { size, type, at: now };
@@ -381,7 +455,7 @@ export async function storeBlob(file: string, expect: { size?: number; sha256?: 
     }
     withFilesLock(() => {
       const shard = readShard(hash);
-      shard[hash] = { size, type, at: isoLocal(), stored: true };
+      shard[hash] = { ...shard[hash], size, type, at: shard[hash]?.at ?? isoLocal(), stored: true };
       writeShard(hash, shard);
     });
     return { hash, size, type };
@@ -450,6 +524,16 @@ function asOlder(e: FileEntry, replaced: string): FileVersion {
     ...(e.pinned?.length ? { pinned: e.pinned } : {}),
     replaced,
   };
+}
+
+/**
+ * A file's older versions held to FILE_LIMITS.versions besides the pinned ones: past it the oldest unpinned go early
+ * (each is a line of the catalog every change reads and writes whole).
+ */
+function trimOlder(e: FileEntry): void {
+  let unpinned = 0;
+  e.older = (e.older ?? []).filter((x) => !!x.pinned?.length || ++unpinned <= FILE_LIMITS.versions);
+  if (!e.older.length) delete e.older;
 }
 
 const conflictOf = (e: FileEntry, base: number | null): FileConflict => ({
@@ -580,6 +664,7 @@ export function commitFiles(areaId: string, items: CommitItem[], o: { conflict?:
       if (p.state === 'version' && p.e) {
         const e = p.e;
         e.older = [asOlder(e, at), ...(e.older ?? [])];
+        trimOlder(e);
         setCurrent(e, { ...version, v: e.v + 1 }, blob.type);
         changes.push({ rev: a.rev, at, op: 'version', id: e.id, path: e.path, v: e.v, hash: e.hash, size: e.size, ...whoOf(o.stamp) });
         continue;
@@ -602,6 +687,7 @@ export function commitFiles(areaId: string, items: CommitItem[], o: { conflict?:
       changes.push({ rev: a.rev, at, op: 'add', id: e.id, path: e.path, v: 1, hash: e.hash, size: e.size, ...whoOf(o.stamp) });
     }
     saveArea(a, changes);
+    markNamed(plan.filter((p) => p.state !== 'same').map((p) => p.it.sha256));
     return answerOf(a, plan);
   });
 }
@@ -643,13 +729,39 @@ export function pushConflicts(folder: string, items: { path: string; sha256?: st
   return out;
 }
 
-/** The bytes the commit of `items` would add to what counts toward the plan (blobs not counted now): what a plan checks. */
+/**
+ * The bytes the commit of `items` would add to what counts toward the plan (bytes neither counted nor waiting for a
+ * commit now): what a plan checks before a push, a commit or a restore.
+ */
 export function bytesToCount(items: { sha256: string; size: number }[]): number {
-  const counted = countedHashes();
+  const areas = listAreas();
+  const counted = countedHashes(areas);
+  const pending = pendingBlobs(areas);
   const sizes = new Map(items.map((i) => [i.sha256, i.size]));
   let n = 0;
-  for (const [h, size] of sizes) if (!counted.has(h)) n += size;
+  for (const [h, size] of sizes) if (!counted.has(h) && !pending.has(h)) n += size;
   return n;
+}
+
+/**
+ * What bringing a file back would start counting toward the plan: a trashed file's bytes, an older version's, a trashed
+ * folder's files' (0 when they count already). Throws 404 for nothing of that id.
+ */
+export function bytesToRestore(id: string, v?: number): number {
+  if (DIR_ID.test(id)) {
+    const found = findDir(id);
+    if (!found) throw notFound();
+    if (!found.trashed) return 0;
+    const t = found.dir as TrashedDir;
+    const { files } = trashedGroup(found.area, t.with_dir ?? t.id);
+    return bytesToCount(files.map((f) => ({ sha256: f.hash, size: f.size })));
+  }
+  const found = findFile(id);
+  if (!found) throw notFound();
+  const e = found.entry;
+  if (found.trashed) return bytesToCount([{ sha256: e.hash, size: e.size }]);
+  const old = v === undefined ? null : e.older?.find((x) => x.v === v);
+  return old ? bytesToCount([{ sha256: old.hash, size: old.size }]) : 0;
 }
 
 // ---------------------------------------------------------------- folders inside an area
@@ -969,7 +1081,10 @@ export function restoreFile(id: string, v: number | undefined, stamp: FileStampI
     const old = e.older?.find((x) => x.v === v);
     const blob = old ? storedBlob(old.hash) : null;
     if (!old || !blob) throw new FileError(404, `V${v} of this file isn’t kept any more`);
+    // its bytes are the file's now already: nothing to bring back, no version made
+    if (old.hash === e.hash) return { file: fileInfo(e, scope), state: 'same' };
     e.older = [asOlder(e, at), ...(e.older ?? [])];
+    trimOlder(e);
     setCurrent(e, { v: e.v + 1, hash: old.hash, size: old.size, ...stamped(stamp, at) }, blob.type);
     a.rev++;
     saveArea(a, [{ rev: a.rev, at, op: 'revert', id, path: e.path, v: e.v, hash: e.hash, size: e.size, ...whoOf(stamp) }]);
@@ -1273,6 +1388,28 @@ function countedHashes(areas = listAreas()): Map<string, number> {
   return counted;
 }
 
+/** Every hash a catalog names: live files, their older versions, the trash and its older versions. */
+function namedHashes(areas: FileArea[]): Set<string> {
+  const named = new Set<string>();
+  for (const a of areas)
+    for (const e of [...a.files, ...a.trash]) {
+      named.add(e.hash);
+      for (const x of e.older ?? []) named.add(x.hash);
+    }
+  return named;
+}
+
+/**
+ * Bytes stored and waiting for their commit, by hash: an upload no file names yet and none ever did (`commit: false`, a
+ * push cut short). They count toward the plan until committed, or until the purge takes them after a day.
+ */
+function pendingBlobs(areas: FileArea[], blobs = allBlobs()): Map<string, number> {
+  const named = namedHashes(areas);
+  const out = new Map<string, number>();
+  for (const [h, b] of blobs) if (b.stored && !b.gone && !b.named && !named.has(h)) out.set(h, b.size);
+  return out;
+}
+
 /** The safety net, by hash: the trash and replaced versions, minus what counts anyway. */
 function keptHashes(areas: FileArea[], counted: Map<string, number>): { kept: Map<string, number>; items: number } {
   const kept = new Map<string, number>();
@@ -1300,14 +1437,46 @@ function keptHashes(areas: FileArea[], counted: Map<string, number>): { kept: Ma
 const total = (m: Map<string, number>) => [...m.values()].reduce((n, x) => n + x, 0);
 
 /**
- * What the workspace's files hold: counted (live files once per workspace, pinned versions) and kept (the trash and
- * replaced versions, not counted). `cap`: the most the safety net may hold (a quarter of the plan), when known.
+ * What the workspace's files hold: counted (live files once per workspace, pinned versions, and uploads waiting for
+ * their commit: `pending`) and kept (the trash and replaced versions, not counted). `cap`: the most the safety net may
+ * hold (`keptCap`).
  */
 export function filesUsage(cap: number | null = null): FilesUsage {
   const areas = listAreas();
   const counted = countedHashes(areas);
+  const pending = total(pendingBlobs(areas));
   const { kept, items } = keptHashes(areas, counted);
-  return { files: liveCount(areas), bytes: total(counted), kept: total(kept), kept_files: items, kept_cap: cap };
+  return { files: liveCount(areas), bytes: total(counted) + pending, pending, kept: total(kept), kept_files: items, kept_cap: cap };
+}
+
+/**
+ * The most the safety net (the trash and replaced versions, not counted) may hold. With a plan that says how much
+ * storage it has: a quarter of it. Always, plan or none: no more than what the workspace's files count, and never less
+ * than FILE_LIMITS.keptFloor — bounded whatever a plan (or a missing one) says.
+ */
+export function keptCap(plan: number | null, counted: number): number {
+  const ceiling = Math.max(FILE_LIMITS.keptFloor, counted);
+  return plan === null ? ceiling : Math.min(Math.floor(plan * FILE_LIMITS.keptShare), ceiling);
+}
+
+/** Whether a purge is due now: the safety net holds more than `cap`, or bytes nothing names may go. */
+export function safetyNetDue(cap: number, now = Date.now()): boolean {
+  const areas = listAreas();
+  const counted = countedHashes(areas);
+  if (total(keptHashes(areas, counted).kept) > cap) return true;
+  const named = namedHashes(areas);
+  for (const [h, b] of allBlobs()) if (!named.has(h) && sweepable(b, now)) return true;
+  return false;
+}
+
+/**
+ * Whether the purge removes a blob no file names: one being removed already; one a file named once (purged, dropped)
+ * unless a push asked for it within the hour; an upload never committed (or cut short) once its day is over.
+ */
+function sweepable(b: Blob, now: number): boolean {
+  if (b.gone) return true;
+  if (b.named) return !b.touched || now - Date.parse(b.touched) > FILE_LIMITS.touchHours * 3600_000;
+  return now - Date.parse(b.at) > FILE_LIMITS.graceHours * 3600_000;
 }
 
 /** What the purge did. */
@@ -1328,8 +1497,8 @@ interface KeptItem {
 /**
  * The purge, in the workspace running now: what was trashed or replaced 30 days ago goes (pinned versions stay), then,
  * when the safety net still holds more than `cap` bytes, the oldest of it, early; then every blob nothing names any more
- * and that is older than a day (FILE_LIMITS.graceHours) is removed from the storage. A catalog that can't be read stops
- * it before anything is removed (FilesUnreadableError).
+ * that may go (`sweepable`: what a file stopped naming, an upload past its day) is removed from the storage. A catalog
+ * that can't be read stops it before anything is removed (FilesUnreadableError).
  */
 export async function purgeFiles({ now = Date.now(), cap = null }: { now?: number; cap?: number | null } = {}): Promise<Purged> {
   const out: Purged = { trash: 0, versions: 0, blobs: 0 };
@@ -1416,14 +1585,8 @@ export async function purgeFiles({ now = Date.now(), cap = null }: { now?: numbe
       }
     }
     for (const [a, changes] of lines) saveArea(a, changes);
-    // the sweep: blobs no catalog names (live, older, trashed), past the grace; marked gone before their bytes go
-    const named = new Set<string>();
-    for (const a of areas)
-      for (const e of [...a.files, ...a.trash]) {
-        named.add(e.hash);
-        for (const x of e.older ?? []) named.add(x.hash);
-      }
-    const grace = FILE_LIMITS.graceHours * 3600_000;
+    // the sweep: blobs no catalog names (live, older, trashed) that may go (`sweepable`); marked gone before their bytes go
+    const named = namedHashes(areas);
     const doomed: string[] = [];
     let shards: string[] = [];
     try {
@@ -1434,8 +1597,7 @@ export async function purgeFiles({ now = Date.now(), cap = null }: { now?: numbe
       const shard = readShard(first);
       let marked = false;
       for (const [h, b] of Object.entries(shard)) {
-        if (named.has(h)) continue;
-        if (!b.gone && now - Date.parse(b.at) <= grace) continue;
+        if (named.has(h) || !sweepable(b, now)) continue;
         b.gone = true;
         marked = true;
         doomed.push(h);

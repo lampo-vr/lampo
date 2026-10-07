@@ -945,7 +945,7 @@ are `fl_…` (a file) or `fd_…` (a folder inside an area); another workspace's
 | `GET /api/files?folder=&path=&deep=&own=&kind=&q=&limit=&cursor=` | `FilesListing`: the chain's areas (deepest first: `area`, `rev`, `files`, `bytes`, `trash`, `trash_bytes`), the folders directly under `path` (`dirs`: `id`, `area`, `path`, `files`, `bytes`; empty ones too), and a page of files (`FileInfo`): directly in `path`, or every one under it with `deep=1` (and with `q`, a part of the path, or `kind`). A deeper area's path hides the same path above. `own=1`: the folder's own area only. `limit` ≤ 1000 (default 200); `cursor` from the last page |
 | `GET /api/files/summary?folder=` | `FilesSummary`: per area of the chain, its top-level folders and files with counts, bytes and kinds |
 | `GET /api/files/trash?folder=` | `FilesTrash`: the area's trash, newest first (`purge_at` on each), and folders trashed whole (`dirs`) |
-| `GET /api/files/usage` | `FilesUsage`: live files, the bytes that count, the bytes kept and not counted (trash, replaced versions), the safety net's cap |
+| `GET /api/files/usage` | `FilesUsage`: live files, the bytes that count (`pending` of them: uploads waiting for their commit), the bytes kept and not counted (trash, replaced versions), the safety net's cap (`kept_cap`, always set) |
 | `GET /api/files/:id` | `FileInfo` (`TrashedFileInfo` in the trash; `FileDirInfo` for a folder's id) |
 | `GET /api/files/:id/history` | `FileHistory`: its versions (newest first; `kept_until` on older ones) and its journal (`changes`) |
 | `GET /api/files/:id/download?v=&inline=` | the version's bytes: a `302` to a short-lived signed URL on the media host, else streamed. An attachment (`application/octet-stream`, `nosniff`, `sandbox`) with ranges; `inline=1` shows pictures, video, sound, PDF and text as themselves, never SVG or HTML. `410` when the bytes are gone |
@@ -956,7 +956,7 @@ are `fl_…` (a file) or `fd_…` (a folder inside an area); another workspace's
 | `POST /api/files/dirs` | `{folder?, path}` → `FileDirInfo`: an empty folder inside the area (one there already answers as it is) |
 | `PATCH /api/files/:id` | `{path?, folder?}`: rename, move inside the area, or move to another area (`folder`, `''` the House) → `FileInfo`; a folder's id moves everything under it → `FileDirInfo`. `409` when the place is taken |
 | `DELETE /api/files/:id` | to the trash → `TrashedFileInfo` (a folder's id: with everything under it → `TrashedDirInfo`). Members trash what they added (`403` otherwise) |
-| `POST /api/files/:id/restore` | `{}`: out of the trash (beside its old path as `name (restored)` when that is taken) · `{v}`: an older version back as the newest → `FileInfo` (a folder's id: `FileDirInfo`) |
+| `POST /api/files/:id/restore` | `{}`: out of the trash (beside its old path as `name (restored)` when that is taken) · `{v}`: an older version back as the newest (its bytes the file's already: nothing changes) → `FileInfo` (a folder's id: `FileDirInfo`). `402` with the plan's refusal when what comes back doesn't fit |
 
 Details:
 

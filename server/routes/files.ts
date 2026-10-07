@@ -18,6 +18,7 @@ import {
   areaRefOf,
   blobKey,
   bytesToCount,
+  bytesToRestore,
   commitFiles,
   DIR_ID,
   dirInfoOf,
@@ -30,7 +31,9 @@ import {
   filesUsage,
   findFile,
   heldBlob,
+  heldBlobs,
   historyOf,
+  keptCap,
   listFiles,
   makeDir,
   missingBlobs,
@@ -42,6 +45,7 @@ import {
   readAreaRev,
   restoreDir,
   restoreFile,
+  safetyNetDue,
   touchBlobs,
   trashDir,
   trashedInfo,
@@ -285,9 +289,9 @@ export function fileRoutes(ctx: ServerContext): Router {
 
   r.get('/api/files/usage', (req, res) =>
     run(async () => {
-      const plan = await ctx.extension.storageBytes(req.auth?.workspace ?? currentWorkspace());
+      const cap = await capFor(ctx, req.auth?.workspace ?? currentWorkspace());
       res.setHeader('Cache-Control', 'no-store');
-      res.json(filesUsage(plan === null ? null : Math.floor(plan * FILE_LIMITS.keptShare)));
+      res.json(filesUsage(cap));
     }),
   );
 
@@ -392,8 +396,8 @@ export function fileRoutes(ctx: ServerContext): Router {
         const conflicts = pushConflicts(area.scope, items);
         if (conflicts.length) throw new FileConflictError(conflicts);
       }
-      // bytes the workspace holds already: nothing to send (made fresh, so the purge leaves them while this push commits)
-      const held = touchBlobs(items.flatMap((i) => (i.sha256 ? [i.sha256] : [])));
+      // bytes the workspace holds already: nothing to send
+      const held = heldBlobs(items.flatMap((i) => (i.sha256 ? [i.sha256] : [])));
       const stored = (i: (typeof items)[number]) => !!i.sha256 && held.get(i.sha256)?.size === i.size;
       const sending = items.filter((i) => !stored(i));
       const bytes = sending.reduce((n, i) => n + i.size, 0);
@@ -401,6 +405,8 @@ export function fileRoutes(ctx: ServerContext): Router {
       if (bytes && free !== null && bytes > free - (ctx.cfg.min_free_bytes ?? 0)) throw fail(507, 'not enough disk space on the server for these files');
       const counted = bytes + bytesToCount(items.filter(stored).map((i) => ({ sha256: i.sha256 as string, size: i.size })));
       if (counted) await ctx.extension.check(req.auth?.workspace ?? currentWorkspace(), 'upload', counted);
+      // only a push the plan took: what a file names now is kept for its commit (an upload's bytes keep their first day)
+      touchBlobs(items.filter(stored).map((i) => i.sha256 as string));
       const stamp = stampOf(req, b);
       const issuer = issuerOf(req);
       const team = teamGuard(issuer, 'files-write');
@@ -453,6 +459,7 @@ export function fileRoutes(ctx: ServerContext): Router {
       const counted = bytesToCount(b.add);
       if (counted) await ctx.extension.check(req.auth?.workspace ?? currentWorkspace(), 'upload', counted);
       const out = commitFiles(area.id, b.add, { conflict: b.conflict ?? 'refuse', stamp: stampOf(req, b) });
+      await keepSafetyNet(ctx, req.auth?.workspace ?? currentWorkspace());
       told(out.folder);
       res.json(out);
     }),
@@ -486,22 +493,27 @@ export function fileRoutes(ctx: ServerContext): Router {
   );
 
   r.delete('/api/files/:id', (req, res) =>
-    run(() => {
+    run(async () => {
       const id = idOf(req);
       const stamp = stampOf(req, {});
       const mayAny = can(req.auth?.role, 'remove');
       const out = DIR_ID.test(id) ? trashDir(id, stamp, { mayAny }) : trashFile(id, stamp, { mayAny });
+      await keepSafetyNet(ctx, req.auth?.workspace ?? currentWorkspace());
       told(out.area);
       res.json(out);
     }),
   );
 
+  // What comes back counts again: the plan says whether it fits (402 with the limit sheet's numbers, as for a push).
   r.post('/api/files/:id/restore', express.json(), (req, res) =>
-    run(() => {
+    run(async () => {
       const id = idOf(req);
       const b = body(RestoreBody, req);
       const stamp = stampOf(req, b);
+      const counted = bytesToRestore(id, b.v);
+      if (counted) await ctx.extension.check(req.auth?.workspace ?? currentWorkspace(), 'upload', counted);
       const out = DIR_ID.test(id) ? restoreDir(id, stamp) : restoreFile(id, b.v, stamp).file;
+      await keepSafetyNet(ctx, req.auth?.workspace ?? currentWorkspace());
       told(out.area ?? '');
       res.json(out);
     }),
@@ -554,8 +566,31 @@ export function fileRoutes(ctx: ServerContext): Router {
 }
 
 /**
- * The purge for every workspace (lib/files.ts purgeFiles): the safety net after 30 days, or past a quarter of the plan,
- * and bytes nothing names. Each in its own workspace; one that fails is logged and the next goes on.
+ * The most a workspace's safety net (the trash, replaced versions) may hold (lib/files.ts keptCap): a quarter of its
+ * plan when the plan says, and never more than what its files count (or the floor), plan or none.
+ */
+export async function capFor(ctx: ServerContext, ws: string): Promise<number> {
+  const plan = await ctx.extension.storageBytes(ws);
+  return inWorkspace(ws, () => keptCap(plan, filesUsage().bytes));
+}
+
+/**
+ * After a change that adds to the safety net (a trash, a new version, a revert, a folder deleted): when it holds more
+ * than its cap, or bytes nothing names may go, the purge runs now — the oldest kept goes early, and its bytes with it.
+ * Never fails the change it follows (logged; the hourly purge tries again).
+ */
+export async function keepSafetyNet(ctx: ServerContext, ws: string): Promise<void> {
+  try {
+    const cap = await capFor(ctx, ws);
+    if (inWorkspace(ws, () => safetyNetDue(cap))) await inWorkspace(ws, () => purgeFiles({ cap }));
+  } catch (e) {
+    console.error(`files: the safety net of ${ws} wasn’t tidied (${(e as Error).message})`);
+  }
+}
+
+/**
+ * The purge for every workspace (lib/files.ts purgeFiles): the safety net after 30 days, or past its cap, and bytes
+ * nothing names. Each in its own workspace; one that fails is logged and the next goes on.
  */
 export async function purgeEveryWorkspace(ctx: ServerContext): Promise<void> {
   let ids: string[];
@@ -567,8 +602,7 @@ export async function purgeEveryWorkspace(ctx: ServerContext): Promise<void> {
   }
   for (const ws of ids) {
     try {
-      const plan = await ctx.extension.storageBytes(ws);
-      const cap = plan === null ? null : Math.floor(plan * FILE_LIMITS.keptShare);
+      const cap = await capFor(ctx, ws);
       const out = await inWorkspace(ws, () => purgeFiles({ cap }));
       if (out.trash || out.versions || out.blobs)
         console.log(`files: purged ${out.trash} trashed, ${out.versions} older versions, ${out.blobs} unused blobs in ${ws}`);

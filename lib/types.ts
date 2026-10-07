@@ -2324,10 +2324,16 @@ export interface FileHistory {
  */
 export interface FilesUsage {
   files: number;
+  /** Bytes that count: live files once per workspace, pinned versions, and `pending`. */
   bytes: number;
+  /** Of `bytes`: uploads waiting for their commit (stored, no file names them yet), counted until committed or purged. */
+  pending?: number;
   kept: number;
   kept_files: number;
-  /** The most the safety net holds (a quarter of the plan's storage); null: no plan says. */
+  /**
+   * The most the safety net holds: a quarter of the plan's storage, and never more than what the files count (or a
+   * floor), so it is bounded with no plan too. Past it the oldest goes early.
+   */
   kept_cap: number | null;
 }
 

@@ -27,6 +27,19 @@ export const FILE_LIMITS = {
   keptDays: 30,
   /** The share of the plan's storage the safety net (trash and replaced versions) may hold before the oldest go early. */
   keptShare: 0.25,
+  /**
+   * Without a plan that says (a server without plans, or one whose plan doesn't): the safety net holds at most as much as
+   * the workspace's files count, and never less than this — so it is bounded whatever a plan says.
+   */
+  keptFloor: 5e9,
+  /**
+   * Older versions one file keeps besides the ones pinned: a day of an agent pushing a new version every hour or two,
+   * a week of a person's saves. Past it the oldest goes early; each kept version is a line in its area's catalog,
+   * read and written whole on every change.
+   */
+  versions: 10,
+  /** Hours bytes a file stopped naming (purged, its last version dropped) are kept when a push just asked for them. */
+  touchHours: 1,
   /** Hours bytes nothing names yet are kept (an upload committing now is never swept). */
   graceHours: 24,
   /** Changes of a file's journal its history shows. */

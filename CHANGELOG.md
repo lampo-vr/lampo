@@ -84,6 +84,11 @@ format stays backwards compatible throughout.
   command runs on the agent's own machine, never on a server ([docs/agents.md](docs/agents.md)).
 
 ### Fixed
+- **Project files' trash and older versions are bounded on every server.** What the trash and replaced versions keep is
+  held to its share of the plan, and to what the workspace's files count when no plan says; past it the oldest goes at
+  once. Files uploaded and not yet committed count toward the plan until they are. Bringing a file back from the trash
+  or an older version is checked against the plan like an upload.
+- **A file keeps a bounded number of older versions**, and bringing back the bytes it already has makes no new version.
 - The operator's Accounts page shows when each person was last active, not only their last sign-in, which accounts
   signed in before it was recorded never had.
 - The app no longer opens on a blank page when the browser can't keep a copy of its code (its storage full or busy, a

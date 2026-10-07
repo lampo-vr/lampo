@@ -20,6 +20,7 @@ import {
 } from '../../lib/folders.ts';
 import { DEV, HOME, ROOT, reviewFile, slugify, untildify, VIDEO_EXT } from '../../lib/paths.ts';
 import { can } from '../../lib/permissions.ts';
+import { currentWorkspace } from '../../lib/scope.ts';
 import { search } from '../../lib/search.ts';
 import { revokeVideoLinks } from '../../lib/shares.ts';
 import * as store from '../../lib/store.ts';
@@ -29,6 +30,7 @@ import { countStep } from '../funnel.ts';
 import { accountOf, agentView, getReview, isOwn, summary } from '../helpers.ts';
 import { body, fail, query, router } from '../http.ts';
 import { PERSON_ONLY_ERROR } from '../permissions.ts';
+import { keepSafetyNet } from './files.ts';
 
 const ALL_EXT = [...VIDEO_EXT, '.webm', '.mkv'];
 
@@ -249,12 +251,15 @@ export function libraryRoutes(ctx: ServerContext): Router {
     foldersChanged(res, { folder: renameFolder(from, to, ctx.actor(req)) });
   });
 
-  r.delete('/api/folders', (req, res) => {
+  r.delete('/api/folders', async (req, res) => {
     // Which folder: a missing or empty name is the caller's mistake (400), not the server's. One from before the limits
     // on folders made now is deleted like any other.
     const p = folderName(query(FolderQuery, req).path || '');
     if (!p) throw fail(400, 'which folder? (?path=)');
-    foldersChanged(res, { parent: deleteFolder(p, ctx.actor(req)) });
+    const parent = deleteFolder(p, ctx.actor(req));
+    // its project files went to the trash above it: the safety net is held to its cap now
+    await keepSafetyNet(ctx, currentWorkspace());
+    foldersChanged(res, { parent });
   });
 
   // One click for "Unsorted": file each unsorted video where suggestFolder() says it belongs (files on disk only).
