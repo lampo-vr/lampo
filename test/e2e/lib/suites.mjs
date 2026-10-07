@@ -33,6 +33,9 @@ const SECONDS = {
   'quality-load': 83,
   mobile: 111,
   inbox: 104,
+  // an agent's work that needs you in the inbox: two servers, the matrix at six widths, both themes and German (measured
+  // in a full --changed run, 2026-10-07: 19 s)
+  'inbox-agents': 20,
   perf: 87,
   player: 70,
   account: 62,

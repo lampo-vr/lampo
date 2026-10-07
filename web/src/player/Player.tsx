@@ -920,12 +920,15 @@ function PlayerView({
   const runs = runsQ.runs;
   const newest: RunLike | null = runs?.[0] ?? brief ?? null;
   const asOf = runs ? runsQ.at : briefAt;
-  // what the strip speaks of: work going on, or work that ended in the past day — badly (failed, stopped), or done while
-  // its fixes wait to be checked (as the card does, lib/runs.ts cardRun)
+  // what the strip speaks of: work going on, or work that ended in the past day — badly (failed, stopped), waiting for
+  // the person (a permission it lacks, a question: its process ended asking), or done while its fixes wait to be
+  // checked (as the card does, lib/runs.ts cardRun)
   const recent = !!newest && Date.now() - Date.parse(newest.ended ?? newest.started) < DAY_MS;
   const stripRun =
     newest &&
-    (isOpen(newest) || (recent && (newest.state === 'failed' || newest.state === 'stopped')) || (recent && newest.state === 'done' && verify.queue.length > 0))
+    (isOpen(newest) ||
+      (recent && (newest.state === 'failed' || newest.state === 'stopped' || newest.state === 'needs_you')) ||
+      (recent && newest.state === 'done' && verify.queue.length > 0))
       ? newest
       : null;
   // the slot is there from the first paint wherever the video has an agent (assigned, or at work on it)
@@ -1202,9 +1205,12 @@ function PlayerView({
   // the Agent view's writes, here so its own chunk carries none of their code
   const runActs = useRunActions(slug);
   const tellRequest = useRequest(slug);
+  // Try again (Send again) of work Lampo started on this machine starts it again here, unless the person only sends
+  const again = (id: string) =>
+    runActs.retry.mutateAsync({ id, start: wake.here && wake.pref !== 'send' && runs?.find((r) => r.id === id)?.delivery === 'machine' });
   const stripActs = {
     stop: (id: string) => runActs.stop.mutateAsync(id),
-    retry: (id: string) => runActs.retry.mutateAsync(id),
+    retry: again,
     nudge: (id: string) => runActs.nudge.mutateAsync(id),
     busy: runActs.stop.isPending || runActs.retry.isPending || runActs.nudge.isPending,
   };
@@ -1213,7 +1219,7 @@ function PlayerView({
   const detail = useRunDetail(shownId, view === 'agent');
   const agentActs = {
     stop: (id: string) => runActs.stop.mutateAsync(id),
-    retry: (id: string) => runActs.retry.mutateAsync(id),
+    retry: again,
     tell: async (text: string) => {
       await tellRequest.mutateAsync(text);
       toast(t('Sent to {name}', { name: stripRun?.agent.name ?? review.session?.name ?? t('the agent') }), 'ok');

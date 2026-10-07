@@ -9,6 +9,7 @@ import type { PlacedComment, Run, RunDetail, RunPlanItem, RunStepLine, SessionRe
 import { locale, t } from '../i18n/index.ts';
 import { pct, secsWords } from '../lib/format.ts';
 import { toastError } from '../lib/toast.ts';
+import { PermissionNeeds, PrintedLines } from '../sessions/RunNeeds.tsx';
 import { clock, isOpen, madeBy, phaseOf, planCounts, type RunLike, type Say, workedNow } from '../sessions/runWords.ts';
 import { I } from '../ui/icons.tsx';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
@@ -215,7 +216,7 @@ function Shown({
       <section className="av-head" aria-label={run.agent.name}>
         <p className="av-meta">{[startedLine(whole ?? run, p.me), clock(worked), where].filter(Boolean).join(' · ')}</p>
         {/* the strip above says Stop while it works; while it asks you, Answer is the strip's and Stop is here */}
-        {run.state === 'needs_you' && p.canSteer && (
+        {run.state === 'needs_you' && run.ended == null && p.canSteer && (
           <button type="button" className="btn sm" onClick={onStop} disabled={busy} data-testid="agent-stop">
             <I name="stop" size={14} /> {t('Stop')}
           </button>
@@ -287,9 +288,8 @@ function Shown({
               {p.say({ ...thought, quote: undefined })}
             </q>
           )}
-          {run.needs?.kind === 'permission' && run.needs.text && (
-            <p className="av-needs">{t('{name} needs permission · {what}', { name: run.agent.name, what: p.say(run.needs.text) })}</p>
-          )}
+          {/* a permission it was refused: the exact rule to copy and where it goes ("How to allow it" opens this) */}
+          {run.needs?.kind === 'permission' && <PermissionNeeds run={run} bare={!!action} />}
         </section>
       ) : (
         <Ended run={run} props={p} onRetry={onRetry} busy={busy} />
@@ -344,6 +344,28 @@ function Ended({ run, props: p, onRetry, busy }: { run: RunLike; props: AgentVie
         )}
       </section>
     );
+  // it ended waiting for you: a permission it lacks (the rule, then Send again), or a question your answer sends on
+  if (run.state === 'needs_you')
+    return (
+      <section className="av-sec av-end" aria-label={t('Needs you')} data-testid="agent-ended">
+        <div className="av-label">{t('Needs you')}</div>
+        {run.needs?.kind === 'permission' ? (
+          <PermissionNeeds run={run} />
+        ) : (
+          <div className="av-line">
+            <KeyGlyph shape="diamond" className="nav-kg run-kg ask" />
+            <span>{t('It asked you · your answer sends it on')}</span>
+          </div>
+        )}
+        {p.canSteer && run.needs?.kind === 'permission' && (
+          <div className="av-acts">
+            <button type="button" className="btn sm" onClick={onRetry} disabled={busy} data-testid="agent-retry">
+              {t('Send again')}
+            </button>
+          </div>
+        )}
+      </section>
+    );
   const failed = run.state === 'failed';
   return (
     <section className="av-sec av-end" aria-label={failed ? t('Failed') : t('Stopped')} data-testid="agent-ended">
@@ -351,9 +373,17 @@ function Ended({ run, props: p, onRetry, busy }: { run: RunLike; props: AgentVie
       <div className={`av-line${failed ? ' err' : ''}`}>
         <KeyGlyph shape="hold" className={`nav-kg run-kg ${failed ? 'err' : 'quiet'}`} />
         <span>
-          {failed ? (run.error ? p.say(run.error) : t('it stopped with an error')) : t('Stopped after {time}', { time: secsWords(Math.max(1, run.worked_s)) })}
+          {failed
+            ? run.error
+              ? p.say({ ...run.error, quote: undefined })
+              : t('it stopped with an error')
+            : run.stop_pending
+              ? t('Stopped · it will notice at its next step')
+              : t('Stopped after {time}', { time: secsWords(Math.max(1, run.worked_s)) })}
         </span>
       </div>
+      {/* what the tool printed last, where it says what went wrong */}
+      {failed && <PrintedLines words={run.error} />}
       {p.canSteer && (
         <div className="av-acts">
           <button type="button" className="btn sm" onClick={onRetry} disabled={busy} data-testid="agent-retry">

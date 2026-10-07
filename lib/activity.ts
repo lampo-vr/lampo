@@ -9,6 +9,7 @@ import { createApi } from './backend/remote.ts';
 import { cleanAgentName } from './names.ts';
 import { CACHE, isoLocal } from './paths.ts';
 import { currentSession } from './sessions.ts';
+import { oneLine } from './time.ts';
 import type { AgentActivity } from './types.ts';
 
 /** The rolling file the app tails. */
@@ -21,8 +22,12 @@ export type ActivityRecord = Omit<AgentActivity, 'slug'> & { slug?: string | nul
 
 export interface ActivitySink {
   record(a: ActivityRecord): void;
-  /** Sends what is still queued (a CLI waits for it, briefly, before it exits). */
-  flush(): Promise<void>;
+  /** Sends what is still queued (a CLI waits for it, briefly, before it exits). Resolves with what the server had for
+   * the agent: lines its answer ends with (the person stopped its work), once. */
+  flush(): Promise<string[]>;
+  /** Lines the server sent back with an earlier batch, not told yet (a long-lived process adds them to its next
+   * answer). Taken once. */
+  heard(): string[];
 }
 
 /** Appends one JSON line per activity to the rolling file (this machine). Never throws: activity is a courtesy. */
@@ -41,15 +46,29 @@ export function fileSink(file = ACTIVITY_FILE): ActivitySink {
         fs.appendFileSync(file, `${JSON.stringify(a)}\n`, { mode: 0o600 });
       } catch {}
     },
-    flush: async () => {},
+    flush: async () => [],
+    heard: () => [],
   };
 }
+
+/** What a hosted server answers a batch with: the lines for its agent (server/routes/sessions.ts), a few short ones. */
+const linesOf = (answer: unknown): string[] => {
+  const lines = (answer as { lines?: unknown } | null)?.lines;
+  return Array.isArray(lines)
+    ? lines
+        .filter((l): l is string => typeof l === 'string')
+        .map((l) => oneLine(l).slice(0, 500))
+        .slice(0, 2)
+    : [];
+};
 
 /** Batches activity to a hosted server (one POST at most every 2 s, at most 20 entries). */
 export function remoteSink(post: (entries: ActivityRecord[]) => Promise<unknown>): ActivitySink {
   let queue: ActivityRecord[] = [];
   let timer: NodeJS.Timeout | null = null;
   let sending: Promise<void> = Promise.resolve();
+  // what the server answered with and nobody was told yet
+  let heard: string[] = [];
   const send = () => {
     timer = null;
     const batch = queue.slice(-20);
@@ -57,11 +76,18 @@ export function remoteSink(post: (entries: ActivityRecord[]) => Promise<unknown>
     if (!batch.length) return sending;
     sending = sending.then(() =>
       post(batch).then(
-        () => {},
+        (answer) => {
+          heard = [...heard, ...linesOf(answer)].slice(-2);
+        },
         () => {},
       ),
     );
     return sending;
+  };
+  const take = () => {
+    const out = heard;
+    heard = [];
+    return out;
   };
   return {
     record(a) {
@@ -75,7 +101,9 @@ export function remoteSink(post: (entries: ActivityRecord[]) => Promise<unknown>
     async flush() {
       if (timer) clearTimeout(timer);
       await Promise.race([send(), new Promise((r) => setTimeout(r, 800))]);
+      return take();
     },
+    heard: take,
   };
 }
 
@@ -97,7 +125,7 @@ export const lampoRun = (env: NodeJS.ProcessEnv = process.env): string | undefin
 /** Every activity of a process Lampo started for a run names that run: a hint the server checks (server/runs.ts). */
 export function taggedWithRun(sink: ActivitySink, run = lampoRun()): ActivitySink {
   if (!run) return sink;
-  return { record: (a) => sink.record({ ...a, run: a.run ?? run }), flush: () => sink.flush() };
+  return { record: (a) => sink.record({ ...a, run: a.run ?? run }), flush: () => sink.flush(), heard: () => sink.heard() };
 }
 
 /** The agent this process works for, by the name the UI shows: the Claude Code session, else VR_BY's agent name.

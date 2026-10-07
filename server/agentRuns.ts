@@ -2,7 +2,8 @@
 // wasn't running (lib/agentRun.ts decides the arguments and the prompt). One run per session at a time, stopped after
 // 30 minutes without a sign of it (its output, or a call it makes through Lampo) and after 3 hours in all, the output
 // in cache/agent-runs/<id>.log, an `agent_run` event when it starts and when it ends, and Stop ends the whole process
-// group. Each is an agent run (server/runs.ts) with delivery `machine`: its process carries the run's id in LAMPO_RUN,
+// group (SIGINT first: Claude Code ends its turn cleanly; SIGTERM 5 s later, SIGKILL 5 s after that). A permission the
+// run is denied (its own output says so) makes it need the person, with the settings rule that would allow it. Each is an agent run (server/runs.ts) with delivery `machine`: its process carries the run's id in LAMPO_RUN,
 // so what it does through `vr` and the stdio MCP server joins that run. Runs belong to this process: when the app
 // stops, its runs stop with it (nobody would be left to time them out).
 import { type ChildProcess, spawn } from 'node:child_process';
@@ -21,7 +22,7 @@ import { boundToWorkspace } from '../lib/scope.ts';
 import { findClaude } from '../lib/sessions.ts';
 import * as store from '../lib/store.ts';
 import { compareTime } from '../lib/time.ts';
-import type { AgentRunInfo, AgentRunPhase, ClaudeSession } from '../lib/types.ts';
+import type { ActivityWords, AgentRunInfo, AgentRunPhase, ClaudeSession } from '../lib/types.ts';
 import type { Broadcast } from './events.ts';
 import { fail } from './http.ts';
 
@@ -42,7 +43,7 @@ export function runTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
 const KEEP_DONE = 20;
 /** Log files kept in cache/agent-runs. */
 const KEEP_LOGS = 50;
-/** After SIGTERM, a run gets this long before SIGKILL. */
+/** Stop: SIGINT, then SIGTERM this long after, then SIGKILL as long after that. */
 const GRACE_MS = 5000;
 /** How often a running run's log is read for its live step and tokens (and the UI told, when something changed). */
 const LIVE_MS = 500;
@@ -81,6 +82,8 @@ export interface MachineRuns {
   /** A process started for run `run` (or for none): the run's id. */
   started(info: AgentRunInfo, run: string | undefined): string;
   ended(info: AgentRunInfo, run: string, exit: Exit): void;
+  /** Its output says it was denied a permission: what it needs, and the rule that would allow it. */
+  blocked?(info: AgentRunInfo, run: string, denied: { words: ActivityWords; allow: string }): void;
   /** When the run was last heard from (its calls through Lampo), in ms. */
   seen(run: string): number | null;
 }
@@ -113,6 +116,8 @@ export interface AgentRunOptions {
   activity?: (a: ActivityRecord) => void;
   /** The agent runs (server/runs.ts). */
   runs?: MachineRuns;
+  /** Stop's steps: SIGINT, SIGTERM this long after, SIGKILL as long after that (tests shorten it). */
+  graceMs?: number;
 }
 
 export function createAgentRuns({
@@ -123,6 +128,7 @@ export function createAgentRuns({
   dir = path.join(CACHE, 'agent-runs'),
   activity,
   runs: agentRunsOf,
+  graceMs = GRACE_MS,
 }: AgentRunOptions): AgentRuns {
   const runs = new Map<string, Run>();
   const starts = new RateLimit(RUN_RATE_MAX, RUN_RATE_WINDOW_MS, { maxKeys: 1000 });
@@ -169,11 +175,14 @@ export function createAgentRuns({
     }
   };
 
+  // Stop asks first: Claude Code ends its turn cleanly on SIGINT. Whatever is still there (it, or something it started
+  // that ignores SIGINT) gets SIGTERM, then SIGKILL — always the whole group.
   const end = (r: Run, phase: AgentRunPhase) => {
     if (r.info.state !== 'running' || r.ending) return;
     r.ending = phase;
-    killGroup(r, 'SIGTERM');
-    setTimeout(() => r.info.state === 'running' && killGroup(r, 'SIGKILL'), GRACE_MS).unref();
+    killGroup(r, 'SIGINT');
+    setTimeout(() => r.info.state === 'running' && killGroup(r, 'SIGTERM'), graceMs).unref();
+    setTimeout(() => r.info.state === 'running' && killGroup(r, 'SIGKILL'), 2 * graceMs).unref();
   };
 
   // What the run printed since the last look, into its live step and tokens; each new step is activity too.
@@ -197,8 +206,11 @@ export function createAgentRuns({
       fs.closeSync(fd);
     }
     l.offset += len;
-    for (const { kind, ...step } of l.reader.feed(l.text.write(buf)))
-      if (kind !== 'run') activity?.({ at: isoLocal(), agent: r.info.name, slug: r.info.slug, kind, ...step, run: r.run });
+    for (const { kind, allow, ...step } of l.reader.feed(l.text.write(buf))) {
+      // a permission it was denied: only this reading of its own output says so (never what anyone posts)
+      if (kind === 'denied') agentRunsOf?.blocked?.({ ...r.info }, r.run, { words: step, allow: allow ?? '' });
+      else if (kind !== 'run') activity?.({ at: isoLocal(), agent: r.info.name, slug: r.info.slug, kind, ...step, run: r.run });
+    }
     const st = l.reader.state();
     r.info.live = { step: st.step, tokens: st.tokens, cost_usd: st.cost_usd, turns: st.turns, updated: isoLocal() };
     const sig = JSON.stringify([st.step, st.tokens, st.cost_usd]);

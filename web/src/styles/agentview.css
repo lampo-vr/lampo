@@ -178,12 +178,6 @@
   font: var(--fw-text) var(--fs-sm) / var(--lh-body) var(--ui);
   color: var(--muted);
 }
-.av-needs {
-  margin: 0;
-  padding: 0 var(--sp-2);
-  font-size: var(--fs-sm);
-  color: var(--claude-2);
-}
 .av-use {
   margin: 0;
   padding: 0 var(--sp-2);

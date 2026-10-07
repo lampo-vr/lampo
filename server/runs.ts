@@ -10,6 +10,7 @@ import type { Request } from 'express';
 import { agentName, words } from '../lib/activityText.ts';
 import { agentKindOfRef } from '../lib/agentKind.ts';
 import { can } from '../lib/permissions.ts';
+import type { RunNotice } from '../lib/push/index.ts';
 import * as lib from '../lib/runs.ts';
 import { boundToWorkspace, currentWorkspace, inWorkspace, wsKey } from '../lib/scope.ts';
 import * as store from '../lib/store.ts';
@@ -36,6 +37,8 @@ const EVENT_MS = 300;
 const FLUSH_MS = 1000;
 /** How often the clock looks at open runs. */
 const SWEEP_MS = 30_000;
+/** Stops not heard yet kept in memory for calls that name no video (the oldest go first). */
+const UNHEARD_MAX = 10_000;
 
 /** What an agent's own write is: these open a run when none is open (reads and waits never do). */
 const WRITES = new Set<AgentActivityKind>(['note', 'fix', 'reply', 'ask', 'upload', 'render', 'error', 'status']);
@@ -58,8 +61,11 @@ export interface Runs {
   /** A person did something that opens a run for the video's agent, or adds to the one it has open (one per agent ×
    * video). Null when they may not (`mayOpenRun`) or the video has no agent. */
   fromPerson(req: Request, slug: string, o: PersonOpen): Run | null;
-  /** One recorded activity (server/activity.ts, any source): joins its run, or opens one for a write. */
-  sign(a: AgentActivity): void;
+  /**
+   * One recorded activity (server/activity.ts, any source): joins its run, or opens one for a write. When the person
+   * stopped this agent's work and it hasn't heard yet, this call is its next step: the line it is told (once), else null.
+   */
+  sign(a: AgentActivity): string | null;
   /** A wait of `agent` handed over what waited on these videos: their queued runs begin. */
   handed(agent: string, slugs: readonly string[]): void;
   /** One line of a workspace's event log (the server's feed): versions, statuses, questions and answers. */
@@ -72,6 +78,9 @@ export interface Runs {
   /** This machine started an agent process for run `run` (or for none: it opens one). The run's id. */
   machineStarted(info: AgentRunInfo, run: string | undefined): string;
   machineEnded(info: AgentRunInfo, run: string, exit: lib.Exit): void;
+  /** A run this machine started was denied a permission (its own output says so): it needs the person, with the rule
+   * that would allow it to copy. Only Lampo's reading of the run's output says this, never what anyone posts. */
+  machineBlocked(info: AgentRunInfo, run: string, denied: { words: ActivityWords; allow: string }): void;
   /** When run `id` was last heard from (ms), for its process's clock. */
   seen(id: string): number | null;
   /** A video's runs (null: the folder runs, of `folder` when given), newest first. */
@@ -95,11 +104,19 @@ export interface Runs {
   close(): void;
 }
 
+/** What people may want a ping about (lib/push/index.ts): a run failed, waits for a permission, or went quiet. */
+export type { RunNotice };
+
 export interface RunsOptions {
   broadcast: Broadcast;
   /** The author for a write of this request (ctx.actor). */
   actor: (req: Request) => string;
+  /** A run failed, waits for a permission, or has gone quiet for QUIET_MS: push (server/context.ts). In its workspace. */
+  notify?: (n: RunNotice) => void;
 }
+
+/** No word from an agent at work this long: a ping for whoever asked for one (Settings → Notifications). */
+export const QUIET_MS = 30 * 60_000;
 
 const wordsOf = (a: ActivityWords): ActivityWords => ({
   text: a.text,
@@ -122,9 +139,27 @@ const openNotes = (review: Review | null): string[] =>
 
 const ms = (iso: string | null | undefined) => (iso ? Date.parse(iso) || 0 : 0);
 
-export function createRuns({ broadcast, actor }: RunsOptions): Runs {
+export function createRuns({ broadcast, actor, notify }: RunsOptions): Runs {
   const pendingEvent = new Map<string, NodeJS.Timeout>();
   const pendingFlush = new Map<string, { timer: NodeJS.Timeout; soon: boolean }>();
+  // Runs the person stopped whose agent hasn't heard yet (by workspace and run id), for its next call that names no
+  // video. The runs files keep `stop_pending` too: a call about the video finds it there after a restart.
+  const unheard = new Map<string, { ws: string; slug: string; agent: string; id: string }>();
+  // The inbox shows runs that failed, wait for a permission or went quiet: it is told when a run's state moves.
+  const forYouSoon = new Map<string, NodeJS.Timeout>();
+  const tellForYou = () => {
+    const ws = currentWorkspace();
+    if (forYouSoon.has(ws)) return;
+    const t = setTimeout(
+      boundToWorkspace(() => {
+        forYouSoon.delete(ws);
+        broadcast('for-you');
+      }),
+      EVENT_MS,
+    );
+    t.unref?.();
+    forYouSoon.set(ws, t);
+  };
 
   /** Tells the app run `id` changed (coalesced). */
   const announce = (slug: string | null, id: string) => {
@@ -167,24 +202,58 @@ export function createRuns({ broadcast, actor }: RunsOptions): Runs {
     pendingFlush.set(k, { timer, soon });
   };
 
-  /** A change to one run, then what it means: events for its phases, the SSE, the write. */
+  /** A change to one run, then what it means: events for its phases, the SSE, the write, the inbox and a push. */
   function change(slug: string | null, id: string, fn: (r: lib.StoredRun) => RunPhase[] | boolean | undefined, by?: string): lib.StoredRun | null {
     let phases: RunPhase[] = [];
     let moved = false;
+    let stateMoved = false;
+    let wasFailed = false;
+    let wasBlocked = false;
     const run = lib.changeRuns(slug, (runs) => {
       const r = runs.find((x) => x.id === id);
       if (!r) return null;
       const before = `${r.state}|${r.ended}`;
+      wasFailed = r.state === 'failed';
+      wasBlocked = r.state === 'needs_you' && r.needs?.kind === 'permission';
       const out = fn(r);
       if (Array.isArray(out)) phases = out;
-      moved = phases.length > 0 || before !== `${r.state}|${r.ended}` || out === true;
+      stateMoved = before !== `${r.state}|${r.ended}`;
+      moved = phases.length > 0 || stateMoved || out === true;
       return r;
     });
     if (!run) return null;
     for (const p of phases) logPhase(slug, run, p, by);
     announce(slug, run.id);
     schedule(slug, moved);
+    const blocked = run.state === 'needs_you' && run.needs?.kind === 'permission';
+    if ((stateMoved || blocked !== wasBlocked) && slug !== null) {
+      tellForYou();
+      if (run.state === 'failed' && !wasFailed) tell(slug, run, 'failed');
+      else if (blocked && !wasBlocked) tell(slug, run, 'permission');
+    }
     return run;
+  }
+
+  /** A push for what people may want to hear of (lib/push): never one that breaks a change. */
+  function tell(slug: string, r: lib.StoredRun, kind: RunNotice['kind'], minutes?: number) {
+    if (!notify) return;
+    try {
+      const review = store.loadReview(slug);
+      if (!review) return;
+      const said = kind === 'failed' ? r.error : kind === 'permission' ? r.needs?.text : undefined;
+      notify({
+        kind,
+        slug,
+        video: path.basename(review.video),
+        agent: r.agent.name,
+        run: r.id,
+        ...(said ? { words: said } : {}),
+        ...(kind === 'permission' && r.needs?.allow ? { allow: r.needs.allow } : {}),
+        ...(minutes ? { minutes } : {}),
+      });
+    } catch (e) {
+      console.error('runs: a ping was not sent:', (e as Error).message);
+    }
   }
 
   /** A `run` event in the video's log (folder runs have no video: their questions' own events say it). */
@@ -192,7 +261,8 @@ export function createRuns({ broadcast, actor }: RunsOptions): Runs {
     if (slug === null) return;
     const review = store.loadReview(slug);
     if (!review) return;
-    const text = phase === 'ended' ? r.state : phase === 'opened' ? r.opened_by.how : undefined;
+    // what it needs, for a needs_you (a question, options, a permission): webhooks read it there
+    const text = phase === 'ended' ? r.state : phase === 'opened' ? r.opened_by.how : phase === 'needs_you' ? r.needs?.kind : undefined;
     store.logEvent({ type: 'run', by: by ?? `agent:${r.agent.name}`, review, v: review.versions.at(-1)?.v, run: r.id, phase, ...(text ? { text } : {}) });
   }
 
@@ -241,11 +311,24 @@ export function createRuns({ broadcast, actor }: RunsOptions): Runs {
     if (!review || review.onboarding_sample) return null;
     const agent = o.agent ?? assigned(review);
     if (!agent) return null;
+    // What the person does now outweighs a stop its agent hasn't heard yet: it hears this instead.
+    for (const r of lib.readRuns(slug))
+      if (r.stop_pending && r.agent.name === agent.name)
+        change(slug, r.id, (x) => {
+          delete x.stop_pending;
+          unheard.delete(wsKey(x.id));
+          return true;
+        });
     const going = lib.readRuns(slug).find((r) => r.ended === null && r.agent.name === agent.name);
     if (going) {
+      // "Tell it…" (an Ask, a nudge) while it works joins that work: its words are the request, and a step of its own
+      const now = Date.now();
       const r = change(slug, going.id, (x) => {
-        const added = o.notes?.length ? lib.addNotes(x, o.notes) : [];
-        if (o.request) x.request = lib.requestText(o.request);
+        const added = o.notes?.length ? lib.addNotes(x, o.notes, now) : [];
+        if (o.request) {
+          x.request = lib.requestText(o.request);
+          lib.keepStep(x, { ...words('{name} asked', { name: who.who }, x.request), at: new Date(now).toISOString(), type: 'action' });
+        }
         return added.length > 0 || !!o.request;
       });
       return r && lib.shownRun(r);
@@ -302,10 +385,63 @@ export function createRuns({ broadcast, actor }: RunsOptions): Runs {
     });
   }
 
-  function sign(a: AgentActivity) {
-    const now = ms(a.at) || Date.now();
+  /**
+   * The person stopped this agent's work and it hasn't heard yet: this call is its next step. It hears it now (the line,
+   * once: `claimStop`), the step is kept with the stopped work, and nothing new opens for it — nor for a write in the
+   * moment after (calls it made before it read the line). A wait hears nothing: it went back to waiting, and the work
+   * is over either way. Undefined when the call has nothing to do with a stop.
+   */
+  function stopHeard(a: AgentActivity, s: lib.Sign): string | null | undefined {
     const name = a.agent;
+    const ws = currentWorkspace();
+    const at = new Date(s.at).toISOString();
+    const keep = (r: lib.StoredRun) => {
+      if (!s.quiet && s.words.key !== 'Thinking' && a.kind !== 'wait') lib.keepStep(r, { ...s.words, at, type: lib.stepTypeOf(s.kind) });
+    };
+    const places: { slug: string; id: string }[] = [];
+    if (a.slug) {
+      for (const r of lib.readRuns(a.slug)) if (r.stop_pending && r.agent.name === name) places.push({ slug: a.slug, id: r.id });
+    } else for (const u of unheard.values()) if (u.ws === ws && u.agent === name) places.push({ slug: u.slug, id: u.id });
+    if (!places.length) {
+      // a write in the moment after it heard: kept with the stopped work, nothing opened
+      if (!a.slug || !WRITES.has(a.kind)) return undefined;
+      const runs = lib.readRuns(a.slug);
+      if (runs.some((r) => r.ended === null && r.agent.name === name)) return undefined;
+      const just = runs.find((r) => r.agent.name === name && r.state === 'stopped' && !!r.clock.stopTold && s.at - ms(r.clock.stopTold) <= lib.RUN_TIMES.late);
+      if (!just) return undefined;
+      change(a.slug, just.id, (r) => {
+        keep(r);
+        return false;
+      });
+      return null;
+    }
+    const lines: string[] = [];
+    for (const p of places) {
+      const r = change(p.slug, p.id, (x) => {
+        keep(x);
+        lib.heardStop(x, s.at);
+        return true;
+      });
+      unheard.delete(wsKey(p.id));
+      if (!r || a.kind === 'wait' || !lib.claimStop(r.id)) continue;
+      const review = store.loadReview(p.slug);
+      if (review && lines.length < 2) lines.push(lib.stopLine(review.video));
+    }
+    return lines.length ? lines.join('\n') : null;
+  }
+
+  function sign(a: AgentActivity): string | null {
+    const now = ms(a.at) || Date.now();
     const s = signOf(a, now);
+    const stop = stopHeard(a, s);
+    // about the stopped video: that is all this call is; about none: its other work hears it too
+    if (stop !== undefined && a.slug) return stop;
+    signRest(a, s, now);
+    return stop ?? null;
+  }
+
+  function signRest(a: AgentActivity, s: lib.Sign, now: number) {
+    const name = a.agent;
     // Its run, named (LAMPO_RUN): a hint, taken only for the same agent (and account), the same video, in this workspace.
     if (a.run) {
       const hit = lib.findRun(a.run);
@@ -535,6 +671,19 @@ export function createRuns({ broadcast, actor }: RunsOptions): Runs {
     if (r) change(slug, r.id, (x) => lib.processEnded(x, exit, Date.now()));
   }
 
+  function machineBlocked(info: AgentRunInfo, run: string, denied: { words: ActivityWords; allow: string }) {
+    const slug = info.slug;
+    const r = lib.readRuns(slug).find((x) => x.id === run || x.clock.proc === info.id);
+    if (!r || r.ended !== null) return;
+    const now = Date.now();
+    change(slug, r.id, (x) => {
+      const at = new Date(now).toISOString();
+      lib.keepStep(x, { ...denied.words, at, type: 'elicitation' });
+      x.now = { ...denied.words, type: 'elicitation', at };
+      return lib.needsPermission(x, now, { text: denied.words, allow: denied.allow }) ? ['needs_you'] : true;
+    });
+  }
+
   function find(id: string) {
     const hit = lib.findRun(id);
     if (!hit) return null;
@@ -583,11 +732,25 @@ export function createRuns({ broadcast, actor }: RunsOptions): Runs {
     return lines.length ? lines.join('\n') : null;
   }
 
+  /** Lost runs without a word for QUIET_MS: a ping for whoever asked for one, once per run. */
+  function quietAt(slug: string | null, now: number) {
+    if (slug === null || !notify) return;
+    for (const r of lib.readRuns(slug))
+      if (r.ended === null && r.state === 'lost' && !r.clock.quiet && now - ms(r.seen) >= QUIET_MS) {
+        const run = change(slug, r.id, (x) => {
+          x.clock.quiet = new Date(now).toISOString();
+          return false;
+        });
+        if (run) tell(slug, run, 'quiet', Math.floor((now - ms(run.seen)) / 60_000));
+      }
+  }
+
   function sweep(now = Date.now()) {
     for (const p of lib.openPlaces()) {
       try {
         inWorkspace(p.ws, () => {
           settleAt(p.slug, now);
+          quietAt(p.slug, now);
           if (lib.isDirty(p.slug) && !pendingFlush.has(wsKey(p.slug ?? ''))) flush(p.slug);
         });
       } catch (e) {
@@ -606,9 +769,10 @@ export function createRuns({ broadcast, actor }: RunsOptions): Runs {
     },
     sign(a) {
       try {
-        sign(a);
+        return sign(a);
       } catch (e) {
         console.error('runs: an activity was not bound:', (e as Error).message);
+        return null;
       }
     },
     handed(agent, slugs) {
@@ -640,6 +804,13 @@ export function createRuns({ broadcast, actor }: RunsOptions): Runs {
       }
     },
     machineStarted,
+    machineBlocked(info, run, denied) {
+      try {
+        machineBlocked(info, run, denied);
+      } catch (e) {
+        console.error('runs: a permission it lacks was not told:', (e as Error).message);
+      }
+    },
     machineEnded(info, run, exit) {
       try {
         machineEnded(info, run, exit);
@@ -673,12 +844,18 @@ export function createRuns({ broadcast, actor }: RunsOptions): Runs {
         id,
         (x) => {
           if (x.ended !== null) return false;
-          lib.endRun(x, 'stopped', Date.now());
+          // stopped at once; an agent that listens hears it with its next call (`stop_pending`)
+          lib.stoppedByPerson(x, Date.now());
           return ['ended'];
         },
         who,
       );
       if (!r) return null;
+      if (r.stop_pending && hit.slug !== null) {
+        // bounded: an agent that never calls again leaves its entry (the runs file still says it)
+        if (unheard.size >= UNHEARD_MAX) unheard.delete(unheard.keys().next().value as string);
+        unheard.set(wsKey(r.id), { ws: currentWorkspace(), slug: hit.slug, agent: r.agent.name, id: r.id });
+      }
       const proc = r.delivery === 'machine' ? (r.clock.proc ?? r.id) : null;
       return { run: lib.shownRun(r), proc };
     },

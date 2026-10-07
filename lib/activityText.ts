@@ -77,6 +77,12 @@ export const ACTIVITY_KEYS = [
   'Stopped after {time}',
   'Stopped at the time limit',
   'Couldn’t start',
+  // a permission a run Lampo started was denied (lib/runStream.ts): it needs the person
+  'Needs permission to run {command}',
+  'Needs permission to use {tool}',
+  'Needs permission to edit files',
+  // a person's words to the agent while it works ("Tell it…"), kept with its work (server/runs.ts)
+  '{name} asked',
 ] as const;
 export type ActivityKey = (typeof ACTIVITY_KEYS)[number];
 const KEYS = new Set<string>(ACTIVITY_KEYS);

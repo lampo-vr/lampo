@@ -89,6 +89,15 @@ function nowWords(r: RunLike, o: SayOptions, now: number): string | null {
   return since(n.at, now) > 90 ? t('last: {step} · {ago}', { step: words, ago: ago(n.at, now) }) : words;
 }
 
+/** What a permission it was refused is for, after the agent's name: "needs permission to run npx remotion render". */
+function permissionWords(w: ActivityWords | undefined, say?: Say): string {
+  const v = (k: string) => w?.vars?.[k] ?? '';
+  if (w?.key === 'Needs permission to run {command}') return t('needs permission to run {command}', { command: v('command') });
+  if (w?.key === 'Needs permission to use {tool}') return t('needs permission to use {tool}', { tool: v('tool') });
+  if (w?.key === 'Needs permission to edit files') return t('needs permission to edit files');
+  return w && say ? t('needs permission · {what}', { what: say(w) }) : t('needs permission');
+}
+
 /** What one run says, for the strip and the cards. */
 export function runSaid(r: RunLike, o: SayOptions = {}): RunSaid {
   const now = o.now ?? Date.now();
@@ -149,9 +158,7 @@ export function runSaid(r: RunLike, o: SayOptions = {}): RunSaid {
         k === 'options'
           ? t('needs you · options to pick')
           : k === 'permission'
-            ? r.needs?.text && o.say
-              ? t('needs permission · {what}', { what: o.say(r.needs.text) })
-              : t('needs permission')
+            ? permissionWords(r.needs?.text, o.say)
             : k === 'sign_in'
               ? t('needs you to sign in')
               : t('needs you · a question');
@@ -179,7 +186,8 @@ export function runSaid(r: RunLike, o: SayOptions = {}): RunSaid {
     case 'stopped':
       return line({
         name: null,
-        words: t('Stopped after {time}', { time: secsWords(Math.max(1, r.worked_s)) }),
+        // an agent that listens hears it with its next call to Lampo, not before: said so until then
+        words: r.stop_pending ? t('Stopped · it will notice at its next step') : t('Stopped after {time}', { time: secsWords(Math.max(1, r.worked_s)) }),
         actions: ['again'],
       });
     case 'lost':

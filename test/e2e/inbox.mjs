@@ -808,7 +808,7 @@ try {
       await page.waitForSelector(ON, { timeout: 20000 });
       const text = await page.$eval('[data-testid="push-settings"]', (e) => e.textContent);
       assert(text.includes('Notifications are on') && text.includes('Test Mac'), `the device: ${text}`);
-      assert((await page.$$('[data-testid="push-settings"] [role="switch"]')).length === 6, 'a switch for each kind');
+      assert((await page.$$('[data-testid="push-settings"] [role="switch"]')).length === 8, 'a switch for each kind');
       assert(text.includes('Send a test') && text.includes('Turn off here'), 'test and turn off');
       await page.click('#fy-pref-versions');
       await until(async () => (await api(`/api/push?endpoint=${encodeURIComponent(EP)}`)).subscription?.prefs.versions === true, 'the choice is saved');

@@ -1073,7 +1073,14 @@ export interface Run {
   result?: RunResult;
   /** Why it failed, or what it needs (needs_you: a question, options, a permission). */
   error?: ActivityWords;
-  needs?: { kind: 'question' | 'options' | 'permission' | 'sign_in'; note?: string; text?: ActivityWords };
+  needs?: {
+    kind: 'question' | 'options' | 'permission' | 'sign_in';
+    note?: string;
+    text?: ActivityWords;
+    /** A permission it was denied (a run Lampo started and reads): the rule in Claude Code's settings syntax that would
+     * allow it (`Bash(npx remotion render:*)`, `mcp__lampo`), for the person to copy. Lampo never allows anything itself. */
+    allow?: string;
+  };
   /** The person's words that opened it (Ask, Tell it…), one line. */
   request?: string;
   /** The run this one continues (an answer, Try again). */
@@ -1081,6 +1088,12 @@ export interface Run {
   /** A raw log exists (a run Lampo started: this machine or a runner), served at GET /api/runs/:id/log to whoever may
    * read it there. */
   log?: boolean;
+  /**
+   * The person stopped it while its agent listens (not a process Lampo runs, which is ended by signal): the agent hears
+   * it with its next Lampo answer (one appended line), and this is cleared then. Until then the UI says "Stopped · it
+   * will notice at its next step".
+   */
+  stop_pending?: boolean;
 }
 
 /** POST /api/runs/:id/stop, /retry and /nudge (a person with the agents right; never an API token). Retry opens the
@@ -1099,7 +1112,10 @@ export interface RunStepLine extends ActivityWords {
 
 /** What the library's cards, the sidebar and the board need of a video's run: the open one, else the last that ended
  * in the past 24 hours. */
-export type RunBrief = Pick<Run, 'id' | 'agent' | 'state' | 'started' | 'ended' | 'worked_s' | 'now' | 'progress' | 'result' | 'error' | 'needs'> & {
+export type RunBrief = Pick<
+  Run,
+  'id' | 'agent' | 'state' | 'started' | 'ended' | 'worked_s' | 'now' | 'progress' | 'result' | 'error' | 'needs' | 'stop_pending'
+> & {
   /** Plan counts: notes in the plan, and how many are fixed, asked, left or answered. */
   planned: number;
   answered: number;
@@ -3429,8 +3445,49 @@ export interface InfoFeatures {
 
 // ---------------------------------------------------------------- "For you" and push notifications
 
-/** `post`: a post of a final video that failed — for people who may publish (lib/publish/posts.ts failedPosts). */
-export type ForYouKind = 'question' | 'verify' | 'review' | 'client' | 'approval' | 'answer' | 'version' | 'playbook' | 'stalled' | 'post';
+/**
+ * `post`: a post of a final video that failed — for people who may publish (lib/publish/posts.ts failedPosts).
+ * `blocked`: an agent's run waits for a permission it was denied; `failed`: an agent's run failed (its error, Log, Try
+ * again) — both for people with the agents right, from the runs (lib/runs.ts). An agent gone quiet is `stalled`.
+ */
+export type ForYouKind =
+  | 'question'
+  | 'verify'
+  | 'review'
+  | 'client'
+  | 'approval'
+  | 'answer'
+  | 'version'
+  | 'playbook'
+  | 'stalled'
+  | 'post'
+  | 'blocked'
+  | 'failed';
+
+/** The agent's run an inbox item is about (kinds `blocked`, `failed`; `stalled` with reason `lost` or `queued`). */
+export interface ForYouRun {
+  id: string;
+  /** The agent as the UI shows it. */
+  agent: string;
+  kind?: AgentKind;
+  state: RunState;
+  delivery: RunDelivery;
+  started: string;
+  ended: string | null;
+  /** The last sign of the agent ("no word from it for 40 min" counts from here). */
+  seen: string;
+  /** failed: why, in words (Run.error). */
+  error?: ActivityWords;
+  /** blocked: what it needs and the rule that allows it (Run.needs). */
+  needs?: Run['needs'];
+  /** The last thing it did (Run.now). */
+  now?: ActivityWords | null;
+  /** A raw log at GET /api/runs/:id/log (a run this machine started; only the machine itself reads it). */
+  log?: boolean;
+  /** Notes in its plan, and how many it answered. */
+  planned: number;
+  answered: number;
+}
 
 /** One thing that waits for a person (lib/foryou.ts). */
 export interface ForYouItem {
@@ -3471,9 +3528,10 @@ export interface ForYouItem {
   proposal?: string;
   /** Playbook suggestions: what it changes ("rules", "skill:export-reels"). */
   section?: string;
-  /** Stalled videos: whom it waits for (you: nobody is on it), why it is listed, and how long nothing happened. */
+  /** Stalled videos: whom it waits for (you: nobody is on it), why it is listed, and how long nothing happened. An
+   * agent's run gone quiet (`lost`) or sent and not picked up (`queued`) is a stalled video too, with its `run`. */
   waitingOn?: InsightsWaitingOn;
-  reason?: StalledReason;
+  reason?: StalledReason | 'lost' | 'queued';
   /** Fixes that came back and aren't settled (reopened), the newest render (rounds). */
   count?: number;
   /** Hours since anything happened on the video (a note, a reply, a render, a verdict). */
@@ -3491,7 +3549,10 @@ export interface ForYouItem {
     /** The platform holds it (it went out before): Retry asks the platform again, it doesn't send. */
     remote?: boolean;
   };
-  /** Leaves with "Got it" (others leave when answered or verified). */
+  /** Agents' runs (kinds `blocked`, `failed`, and `stalled` with reason `lost` or `queued`): the run it is about. */
+  run?: ForYouRun;
+  /** Leaves with "Got it" (others leave when answered or verified). A failed run is dismissible without a "Got it": it
+   * leaves once the person opened it, or with Try again. */
   dismissible: boolean;
   /** Put aside with "Later" until then (only on items in `ForYouResponse.later`). */
   snoozed?: string;
@@ -3535,6 +3596,10 @@ export interface PushPrefs {
   answers: boolean;
   /** A post of a final video went out or failed (absent on older subscriptions: on). */
   posts?: boolean;
+  /** An agent stopped (its run failed) or waits for your OK to do something (absent on older subscriptions: on). */
+  agents?: boolean;
+  /** No word from an agent at work for 30 min (absent: off). */
+  quiet?: boolean;
 }
 
 /** GET /api/push?endpoint=… */

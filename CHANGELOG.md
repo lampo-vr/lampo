@@ -25,6 +25,20 @@ format stays backwards compatible throughout.
   Pressing it opens the new **Agent** view beside Notes and Transcript: your notes as the plan (next, on it, fixed,
   asked you), what it is doing now with what it said to you, quoted, the steps it took, how it ended and what came
   before, and *Tell it…* to send it a few words. Stop is at once. Reviewers see all of it, without the controls.
+- **When an agent needs you, the Inbox says so, and so does your phone.** Right after agents' questions, the Inbox
+  now lists work that failed — in its own words, with the last lines the tool printed and **Try again** — and work that
+  waits for a permission it doesn't have, with the exact rule to add to the agent's settings, **Copy** and **Send
+  again** (Lampo never allows anything itself). An agent you haven't heard from in a while, or notes sent and never
+  picked up, appear under Stalled with **Nudge** and **Stop**. None of it needs a "Got it": a failure leaves once you
+  opened it or tried again, a permission once the agent goes on or is stopped. In the player, "How to allow it" opens
+  the same rule. Only team members who may work with agents see these. Notifications gain **Agents that stop or wait**
+  (on): "Claude Code stopped — the render of promo.mp4 failed", "Claude Code is waiting for your OK to render
+  promo.mp4"; and **Agents gone quiet** (off until you turn it on), after 30 minutes without a word. Starting,
+  rendering and progress never ping you, and the app's badge counts what needs you.
+- **Stop reaches agents that listen.** When you stop an agent that works through Lampo's tools, its next call to Lampo
+  tells it to stop, once — "The person stopped this work on promo.mp4: stop now, render nothing, mark nothing, and
+  say you stopped." — and until then the line says "Stopped · it will notice at its next step". An agent Lampo started
+  on your machine is asked to finish its turn first (as Ctrl-C would), then stopped for good if it doesn't.
 - **Your notes say where the agent is with them**: a quiet line under each note it was sent — "on it", "fixed · in
   V4", "asked you" — and the timeline shows the note in hand as an hourglass.
 - **Who made each version**: the version picker says "Claude Code · 12 min · 5 fixed · 1 asked", from which of your
@@ -101,6 +115,8 @@ format stays backwards compatible throughout.
   A step ticks the moment it's done, and when the last one is, it says *You're set* and goes. Closing the big card now
   keeps the row; *Hide for good* puts both away, with Undo, and the account menu still brings them back. On phones and
   tablets the row sits at the foot of the menu.
+- **Telling an agent something while it works joins what it is doing**: your words become part of that work, beside
+  the notes it is working through, instead of starting something new. It hears them as before.
 - A Claude Code run Lampo starts on your machine now stops after 30 minutes without a sign of the agent (its output,
   or a call to Lampo), and after 3 hours at most, instead of after 30 minutes whatever it was doing: a long render
   no longer cuts it off.

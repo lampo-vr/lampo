@@ -3,6 +3,7 @@
 // in view: it leaves the list when the preview moves on or closes,
 // like mail that is read — no "Got it" needed. Skimming past with the keys sees nothing, and work (a question, a fix to
 // check, a version to review) only leaves when it is done. A stalled video asks for a nudge, so it isn't "seen" either.
+// An agent's failure is both: it leaves with Try again, or once it was open like an update (it was seen, and opened).
 import { useEffect, useRef } from 'react';
 import type { ForYouItem } from '../api/types.ts';
 import { doneOf } from './group.ts';
@@ -10,7 +11,7 @@ import { doneOf } from './group.ts';
 /** How long an update stays open before it counts as seen. */
 export const SEEN_MS = 1500;
 
-export const informs = (i: ForYouItem): boolean => doneOf(i) === 'dismiss' && i.kind !== 'stalled';
+export const informs = (i: ForYouItem): boolean => (doneOf(i) === 'dismiss' && i.kind !== 'stalled') || i.kind === 'failed';
 
 /** Calls `seen(item)` when the open item changes (or the preview closes) after an update was open for SEEN_MS. */
 export function useSeenWhenRead(open: ForYouItem | null, seen: (i: ForYouItem) => void): void {

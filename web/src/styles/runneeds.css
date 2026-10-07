@@ -1,0 +1,107 @@
+/* ---------------------------------------------------------------- what an agent's work needs (sessions/RunNeeds.tsx)
+   The inbox's preview and the Agent view: a permission it lacks (the rule to copy, where it goes) and why it failed
+   (its error, the tool's last lines in the code face, the steps before). Words at a reading width; nothing raised. */
+.rn-perm,
+.rn-fail {
+  display: grid;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.rn-what {
+  margin: 0;
+  font-size: var(--fs-lg);
+  line-height: var(--lh-body);
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+.rn-what.err {
+  color: var(--must-2);
+}
+.rn-how {
+  margin: 0;
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+}
+/* the rule to copy: Settings' snippet box (code.css .set-code) in look — the label and its one Copy on top, the rule on
+   one line below, never broken inside (a rule is a token), sideways with a thin bar when it doesn't fit */
+.rn-code {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--sp-2);
+  border-radius: var(--r);
+  background: var(--ink-0);
+  box-shadow: 0 0 0 1px var(--line-2);
+}
+.rn-code-label {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  padding: var(--sp-1) 0 0 var(--sp-3);
+  overflow: hidden;
+  font: var(--fw-ui) var(--fs-xs) var(--ui);
+  color: var(--muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.rn-copy {
+  grid-column: 2;
+  grid-row: 1;
+  margin: var(--sp-1) var(--sp-1) 0 0;
+}
+.rn-code pre {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  margin: 0;
+  padding: var(--sp-1) var(--sp-3) var(--sp-3);
+  overflow-x: auto;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  white-space: pre;
+  color: var(--fg);
+  scrollbar-width: thin;
+}
+/* what the tool printed last: its own lines, to read (not to copy) — a long one wraps, on a phone too */
+.rn-log {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r);
+  background: var(--ink-0);
+  box-shadow: 0 0 0 1px var(--line-2);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.rn-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-1);
+  font-size: var(--fs-md);
+  color: var(--fg-2);
+}
+.rn-steps li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--sp-3);
+}
+.rn-steps time {
+  min-width: 4.8em;
+  white-space: nowrap;
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  font-stretch: 87.5%;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.rn-steps span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

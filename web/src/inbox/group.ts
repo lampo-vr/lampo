@@ -6,8 +6,22 @@ import type { ForYouItem, ForYouKind, ForYouResponse } from '../../../lib/types.
 
 export type InboxMode = 'video' | 'kind';
 
-/** Most urgent first: what someone waits on (questions, fixes, renders), then what informs, stalled last. */
-export const KIND_ORDER: ForYouKind[] = ['question', 'verify', 'review', 'post', 'client', 'playbook', 'approval', 'answer', 'version', 'stalled'];
+/** Most urgent first: what someone waits on (questions, an agent's work that needs you, fixes, renders), then what
+ * informs, stalled last. */
+export const KIND_ORDER: ForYouKind[] = [
+  'question',
+  'blocked',
+  'failed',
+  'verify',
+  'review',
+  'post',
+  'client',
+  'playbook',
+  'approval',
+  'answer',
+  'version',
+  'stalled',
+];
 
 export interface InboxGroup {
   /** `kind:<kind>` or `video:<slug>` (a playbook suggestion: `playbook:<scope>`). */
@@ -85,9 +99,11 @@ export function tallyOf(items: ForYouItem[]): { kind: ForYouKind; n: number; v?:
   });
 }
 
-/** What "Done" does to an item, if anything: a question closes (no answer), what informs is waved through ("Got it"). */
+/** What "Done" does to an item, if anything: a question closes (no answer), what informs is waved through ("Got it").
+ * An agent's failure has none: it leaves with Try again, or once it was opened (inbox/seen.ts). */
 export type DoneKind = 'close' | 'dismiss' | null;
-export const doneOf = (i: Pick<ForYouItem, 'kind' | 'dismissible'>): DoneKind => (i.kind === 'question' ? 'close' : i.dismissible ? 'dismiss' : null);
+export const doneOf = (i: Pick<ForYouItem, 'kind' | 'dismissible'>): DoneKind =>
+  i.kind === 'question' ? 'close' : i.dismissible && i.kind !== 'failed' ? 'dismiss' : null;
 
 /** Tomorrow 9:00 in the browser's own day ("Later"), as an ISO time. */
 export function laterUntil(now = new Date()): string {

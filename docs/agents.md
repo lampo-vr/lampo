@@ -795,6 +795,16 @@ joins it. Its plan is the notes they sent; its result is the version you put up.
 - **The version you put up** while you're at the video names the run (`run` in review.json's versions).
 - `vr watch --all` prints the runs too (`AGENT RUN OPENED`, `WORKING`, `NEEDS YOU`, `ENDED <state>`), beside the
   `AGENT RUN STARTED|FINISHED` lines of a run Lampo started; INBOX.md and `wait_for_feedback` never carry them.
+- **If the person stops your work**, it ends at once on their side. You hear it with your next Lampo answer — any
+  MCP tool, or any `vr` command about that video (its last line) — once: `The person stopped this work on
+  launch.mp4: stop now, render nothing, mark nothing, and say you stopped.` Stop then: don't render, don't mark notes fixed, say in a sentence that you stopped. A call you made just before
+  you read it still lands, and nothing new opens for it. A wait (`wait_for_feedback`, `vr watch`) hears nothing of
+  it: you went back to waiting, so the work is over either way. If the person sends you notes again before you heard
+  it, you hear those instead. A run Lampo started for you is ended instead: Ctrl-C first (SIGINT, your turn ends
+  cleanly), then SIGTERM after 5 seconds and SIGKILL 5 seconds after that, to everything it started.
+- **A permission you were refused** in a run Lampo started (your settings didn't allow a command, a tool or an edit)
+  shows the person the rule that would allow it, in your settings' own syntax (`Bash(npx remotion render:*)`,
+  `mcp__lampo`, `Edit`), to add or not. Lampo never allows anything, and never starts you with a permission flag.
 
 Only a team member with the agents right opens a run (owners, admins, members): never a reviewer, a review link or an
 API token. A run's history is kept in `data/<slug>/runs.jsonl` ([data-format.md](data-format.md#agent-runs)) and read
@@ -848,7 +858,8 @@ The prompt is one line, for example:
   MCP server, its tools: `mcp__lampo` allows them all, or name them (`mcp__lampo__get_open_notes`, …). A server
   added under the older key is `mcp__video-review__…`.
 - **Limits:** one run per session at a time, stopped after 30 minutes without a sign of it (no output, no call to Lampo:
-  `VR_AGENT_RUN_TIMEOUT`, in seconds) and after 3 hours in all; five starts per ten minutes. It carries
+  `VR_AGENT_RUN_TIMEOUT`, in seconds) and after 3 hours in all; five starts per ten minutes. Stop asks first (SIGINT,
+  as Ctrl-C does), then SIGTERM after 5 seconds, then SIGKILL, always to the run's whole process group. It carries
   `LAMPO_RUN=<run id>` in its environment, and `vr` and the stdio MCP server name that run with what they report. The person sees the run working in the agent menu, with **Stop** (it ends the run and everything it
   started) and **Log** (`cache/agent-runs/<run>.log`: the run's whole transcript, so readable by you only). A run ends
   when the app quits.

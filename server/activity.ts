@@ -55,13 +55,17 @@ interface Pair {
 }
 
 export interface ActivityOptions {
-  /** Each activity as recorded, its video found: the runs it joins (server/runs.ts). */
-  onRecord?: (a: AgentActivity) => void;
+  /** Each activity as recorded, its video found: the runs it joins (server/runs.ts). What it returns is a line for the
+   * agent (the person stopped its work: lib/runs.ts stopLine), handed back by `record`. */
+  onRecord?: (a: AgentActivity) => string | null | undefined;
 }
 
 export interface ActivityStore {
-  /** Records one activity; `video` (a slug, name or path) or a note id in `target` finds the video when `slug` isn't given. */
-  record(a: ActivityRecord): void;
+  /**
+   * Records one activity; `video` (a slug, name or path) or a note id in `target` finds the video when `slug` isn't
+   * given. Returns a line the agent's answer to this call ends with (the person stopped its work), once; else null.
+   */
+  record(a: ActivityRecord): string | null;
   /** One video's agents — with what they did that named no video (a wait, the library), so the video's own agent
    * reads as one story; `agents` adds agents to include even before they touched the video. Without a slug, every
    * agent's latest, one each. */
@@ -150,9 +154,9 @@ export function createActivityStore(broadcast: Broadcast, { onRecord }: Activity
     );
   };
 
-  function record(input: ActivityRecord) {
+  function record(input: ActivityRecord): string | null {
     const a = cleanActivity(input);
-    if (!a) return;
+    if (!a) return null;
     let slug = a.slug;
     if (!slug && a.video) slug = slugFor(a.video);
     if (!slug && a.target && /^c_[0-9a-f]+$/i.test(a.target)) slug = store.findComment(a.target)?.slug ?? null;
@@ -195,7 +199,7 @@ export function createActivityStore(broadcast: Broadcast, { onRecord }: Activity
     }
     p.updated = now;
     announce(p);
-    onRecord?.(entry);
+    return onRecord?.(entry) ?? null;
   }
 
   function live(slug?: string | null, agents: string[] = []): AgentLive[] {
