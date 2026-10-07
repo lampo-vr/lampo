@@ -8,6 +8,18 @@ format stays backwards compatible throughout.
 ## [Unreleased]
 
 ### Added
+- **See what your agent is doing, while it does it.** Wherever a video has an agent, one line under the notes panel's
+  head (above the controls on a phone) says what is happening: "Claude Code · fixing 3 of 6 · editing Logo.tsx",
+  "rendering V4 · 42 % · about 1 min left" with a thin edge that fills, "needs you · a question" with **Answer**,
+  "V4 is ready · 5 fixed · 1 asked · 12 min" with **Check fixes**, a failure in its own words with Log and Try again,
+  "No word from Claude Code for 22 min" with Nudge. It keeps its place in every state, so nothing on the page moves.
+  Pressing it opens the new **Agent** view beside Notes and Transcript: your notes as the plan (next, on it, fixed,
+  asked you), what it is doing now with what it said to you, quoted, the steps it took, how it ended and what came
+  before, and *Tell it…* to send it a few words. Stop is at once. Reviewers see all of it, without the controls.
+- **Your notes say where the agent is with them**: a quiet line under each note it was sent — "on it", "fixed · in
+  V4", "asked you" — and the timeline shows the note in hand as an hourglass.
+- **Who made each version**: the version picker says "Claude Code · 12 min · 5 fixed · 1 asked", from which of your
+  notes, and *Steps* opens what it did; a version still rendering shows there as "V4 · rendering 42 %" until it lands.
 - **Archive a project.** A project that is done can be put away from its ⋯ menu (owners and admins), with Undo: it
   leaves the sidebar, All videos, the board, Recent, the Inbox and Insights' lists of what waits now, and the
   sidebar's *Archived* row (with how many) opens the archived projects; ⌘K finds them under *Archived*. Opened, an
@@ -67,6 +79,11 @@ format stays backwards compatible throughout.
   good, and it is no longer started again every time someone opens the video.
 
 ### Changed
+- **The library says what agents are doing in one line.** A card on the board, in the grid or in the list says the
+  agent's work in the same words as the player — rendering with its percentage and a thin edge along the poster's foot,
+  failed, needs you with **Answer** where the next step stands — instead of the status chip with its spinner; the
+  sidebar's agents say where they stand in a word or two, and *Being fixed* counts the agents at work. Servers without
+  this keep their line, in the same keyframe glyphs.
 - **Several suggestions for the same part of a playbook** (the brief, the rules, one skill) stand together, the newest
   first and marked, with a line that says how they relate. Once one is accepted, or someone changed that part by hand,
   the others say so straight away and their diff shows what accepting them now would replace; *Accept anyway* does it
