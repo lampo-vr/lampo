@@ -203,7 +203,8 @@ export function StartPanel({ onClose, sheet, add, upload }: StartPanelProps) {
     onClose();
     hideForGood(qc, menuShown());
     // the row goes: the keyboard stays at the sidebar's foot
-    requestAnimationFrame(() => document.querySelector<HTMLElement>('.nav-foot .nav-settings')?.focus());
+    // (the one on screen: a desk's sidebar, or the drawer's on a phone or tablet)
+    requestAnimationFrame(() => [...document.querySelectorAll<HTMLElement>('.nav-foot .nav-settings')].find((e) => e.getClientRects().length)?.focus());
   };
   return (
     <div className={`ob-sp ${sheet ? 'ob-sp-sheet' : ''}`} data-testid="ob-sp" tabIndex={-1}>

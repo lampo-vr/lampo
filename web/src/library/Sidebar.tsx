@@ -618,11 +618,11 @@ export function Sidebar({ videos: loaded, folders: all = NONE, archived = NO_ARC
         </div>
       </ScrollArea>
 
+      {/* Get started while the first run has steps open, above the trial (onboarding/Row.tsx) */}
+      <StartRow add={start?.add ?? null} upload={start?.upload ?? true} />
       {/* Settings and the theme — in the phone drawer too, where the account chip isn't. The language lives in Settings. */}
       {/* Settings: the one way in on a phone (the account chip isn't there) and a visible one at a desk (the account menu
           and ⌘, are the others). The theme is a setting (Appearance), with a quick row in the account menu. */}
-      {/* Get started while the first run has steps open, above the trial (onboarding/Row.tsx) */}
-      <StartRow add={start?.add ?? null} upload={start?.upload ?? true} />
       {trialLineDue(billing) && (
         <div className="nav-trial-wrap">{Trial && billing ? <Trial billing={billing} /> : <span className="nav-trial" aria-hidden="true" />}</div>
       )}

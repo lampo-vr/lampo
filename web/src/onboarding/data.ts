@@ -1,8 +1,8 @@
 // The first run's data, shared by Get started (GetStarted.tsx) and the setup (Setup.tsx), never by the first paint
 // (what only the setup writes, like the personas, is in steps.tsx: Get started never loads the workspaces' code):
 // where it stands now, putting it away (the card, or everything for good) and bringing it back, the setup finished, the
-// agent picked, the workspace's
-// personas, the sample, a self-hosted server's health check and test mail, the machine's folders with videos.
+// agent picked, the workspace's personas, the sample, a self-hosted server's health check and test mail, the machine's
+// folders with videos.
 import { type QueryClient, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AuthStatus, MailTestResult, OnboardingPrefs, OnboardingResponse, OnboardingUpdate, ServerHealth, SetupAgent } from '../../../lib/types.ts';
 import { authKeys } from '../api/auth.ts';
