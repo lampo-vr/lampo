@@ -4600,7 +4600,7 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Its last steps': 'Seine letzten Schritte',
   'Lampo never allows anything itself. Add this rule to "allow" under "permissions" in the project’s .claude/settings.json (or with /permissions in Claude Code), then send it again.':
     'Lampo erlaubt selbst nie etwas. Füge diese Regel in der .claude/settings.json des Projekts unter "permissions" → "allow" hinzu (oder mit /permissions in Claude Code) und sende es dann erneut.',
-  'Last: {step}': 'Zuletzt: {step}',
+  '{n} of {total} notes done': '{n} von {total} Notizen erledigt',
   'Needs a permission it doesn’t have': 'Braucht eine Erlaubnis, die er nicht hat',
   'Needs permission to edit files': 'Braucht die Erlaubnis, Dateien zu bearbeiten',
   'Needs permission to run {command}': 'Braucht die Erlaubnis, {command} auszuführen',

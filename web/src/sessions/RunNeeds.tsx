@@ -15,8 +15,14 @@ export const printedLines = (w: ActivityWords | null | undefined): string[] =>
     .map((l) => l.trim())
     .filter(Boolean);
 
-/** The last line of it: where a tool says what went wrong. */
-export const lastPrinted = (w: ActivityWords | null | undefined): string => printedLines(w).at(-1) ?? '';
+/** The rule that allows it, to copy (a card has room for no more). */
+export function RuleToCopy({ allow }: { allow: string }) {
+  return (
+    <Code label={t('Permission rule')} testid="run-allow">
+      {allow}
+    </Code>
+  );
+}
 
 /** A permission it lacks: what for, and the rule that allows it, with where it goes. */
 export function PermissionNeeds({ run }: { run: { needs?: Run['needs'] } }) {
@@ -31,9 +37,7 @@ export function PermissionNeeds({ run }: { run: { needs?: Run['needs'] } }) {
               'Lampo never allows anything itself. Add this rule to "allow" under "permissions" in the project’s .claude/settings.json (or with /permissions in Claude Code), then send it again.',
             )}
           </p>
-          <Code label={t('Permission rule')} testid="run-allow">
-            {needs.allow}
-          </Code>
+          <RuleToCopy allow={needs.allow} />
         </>
       ) : (
         <p className="rn-how">{t('Allow it in the agent’s own settings, then send it again.')}</p>

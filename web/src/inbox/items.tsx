@@ -7,17 +7,15 @@ import { useAuthStatus, useCan } from '../api/auth.ts';
 import { api, enc } from '../api/client.ts';
 import { playbookHref } from '../api/playbooks.ts';
 import { keys, useInfo, useLibrary } from '../api/queries.ts';
-import type { ForYouItem, ForYouKind, ForYouResponse } from '../api/types.ts';
+import type { ActivityWords, ForYouItem, ForYouKind, ForYouResponse } from '../api/types.ts';
 import { locale, perLang, t } from '../i18n/index.ts';
 import { hoursWords, secsWords } from '../lib/format.ts';
+import { loader, useLoaded } from '../lib/lazy.ts';
 import { later as afterUndo, toast, toastError, toastUndo } from '../lib/toast.ts';
 import { OptionsAsk } from '../options/OptionsAsk.tsx';
 import { sectionWords } from '../playbook/PlaybookShell.tsx';
 import { PLATFORM_LABEL } from '../publish/words.ts';
-import { phrase } from '../sessions/activityWords.ts';
-import { lastPrinted, PrintedLines } from '../sessions/RunNeeds.tsx';
 import { useWakeChoice, WakeAsk } from '../sessions/Wake.tsx';
-import { Code } from '../settings/parts.tsx';
 import { LazyShareModal } from '../share/LazyShareModal.tsx';
 import { Choices } from '../ui/Choices.tsx';
 import { I } from '../ui/icons.tsx';
@@ -199,19 +197,43 @@ export const stalledWhy = (i: ForYouItem): string =>
       ? t('V{n} and not approved yet', { n: i.count ?? 0 })
       : t('Quiet for {d}', { d: hoursWords(i.waitingHours) });
 
-/** An agent's work in a line under what happened: what it needs, why it stopped (with the tool's last words), what it
- * did last, or since when it waits to be picked up. */
+// What a permission and a failure say, from the few templates they are made of (lib/runStream.ts, server/agentRuns.ts,
+// `vr render`): said here, so the list carries none of the activity words' code (the preview has them all).
+const v = (w: ActivityWords, k: string) => w.vars?.[k] ?? '';
+function permissionText(w: ActivityWords | undefined): string {
+  if (w?.key === 'Needs permission to run {command}') return t('Needs permission to run {command}', { command: v(w, 'command') });
+  if (w?.key === 'Needs permission to use {tool}') return t('Needs permission to use {tool}', { tool: v(w, 'tool') });
+  if (w?.key === 'Needs permission to edit files') return t('Needs permission to edit files');
+  return w?.text || t('Needs a permission it doesn’t have');
+}
+function failureText(w: ActivityWords | undefined): string {
+  if (w?.key === 'The render failed (exit {code})') return t('Rendering failed (exit {code})', { code: v(w, 'code') });
+  if (w?.key === 'Stopped at the time limit') return t('Stopped at the time limit');
+  if (w?.key === 'Couldn’t start') return t('Couldn’t start');
+  if (w?.key === 'Stopped with an error' || !w) return t('It stopped with an error');
+  return w.text;
+}
+/** The last line a tool printed (one line kept by the server, its breaks as ↵): where it says what went wrong. */
+const lastPrinted = (w: ActivityWords | undefined): string =>
+  (w?.quote ?? '')
+    .split(' ↵ ')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .at(-1) ?? '';
+
+/** An agent's work in a line under what happened: what it needs, why it stopped (with the tool's last words), how far
+ * it got before it went quiet, or since when it waits to be picked up. */
 function runText(i: ForYouItem): string | undefined {
   const r = i.run;
   if (!r) return undefined;
-  if (i.kind === 'blocked') return r.needs?.text ? phrase(r.needs.text) : t('Needs a permission it doesn’t have');
+  if (i.kind === 'blocked') return permissionText(r.needs?.text);
   if (i.kind === 'failed') {
-    const why = r.error ? phrase(r.error) : t('It stopped with an error');
+    const why = failureText(r.error);
     const last = lastPrinted(r.error);
     return last ? `${why}: ${last}` : why;
   }
   if (i.reason === 'queued') return t('Sent {time} ago', { time: sinceWords(r.started) });
-  return r.now ? t('Last: {step}', { step: phrase(r.now) }) : t('Nothing heard since it began');
+  return r.planned ? t('{n} of {total} notes done', { n: r.answered, total: r.planned }) : t('Nothing heard since it began');
 }
 
 /** The line under what happened: what was said, or why a stalled video is listed. A render to review has none: the
@@ -624,15 +646,15 @@ export const When = ({ at }: { at: string }) => (
   </time>
 );
 
-/** A permission's rule to copy, on a card (the preview says where it goes, at length). */
-function PermissionRule({ item: i }: { item: ForYouItem }) {
-  const allow = i.run?.needs?.allow;
-  if (!allow) return null;
-  return (
-    <Code label={t('Permission rule')} testid="run-allow">
-      {allow}
-    </Code>
-  );
+/** What a card shows of an agent's work (the rule to copy, the tool's last lines): its code comes when one is listed. */
+export const runNeedsCode = loader(() => import('../sessions/RunNeeds.tsx'));
+
+/** A permission's rule to copy, or the last lines a failure printed, on a card (the preview says it at length). */
+function RunCardFacts({ item: i }: { item: ForYouItem }) {
+  const code = useLoaded(runNeedsCode, !!i.run);
+  if (!i.run) return null;
+  if (i.kind === 'blocked') return i.run.needs?.allow ? <div className="fy-run">{code && <code.RuleToCopy allow={i.run.needs.allow} />}</div> : null;
+  return lastPrinted(i.run.error) ? <div className="fy-run">{code && <code.PrintedLines words={i.run.error} />}</div> : null;
 }
 
 /** "Later" on a card: back tomorrow at 9:00, or once the video moves. */
@@ -735,15 +757,7 @@ export function ItemCard({ item: i, actions, inVideo = false }: { item: ForYouIt
         ) : i.kind === 'blocked' || i.kind === 'failed' ? (
           <>
             {/* what it lacks (the rule to copy) or why it stopped (the tool's last lines): the card is all there is here */}
-            {i.kind === 'blocked' ? (
-              <div className="fy-run">
-                <PermissionRule item={i} />
-              </div>
-            ) : (
-              <div className="fy-run">
-                <PrintedLines words={i.run?.error} />
-              </div>
-            )}
+            <RunCardFacts item={i} />
             <div className="fy-actions">
               <LaterButton item={i} actions={actions} />
               <a className="btn ghost sm" href={href}>
