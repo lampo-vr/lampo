@@ -142,7 +142,9 @@ test('a run: the stand-in is called with the arguments, in the session’s folde
 });
 
 test('one run per session at a time; while it goes the session counts as running; Stop ends the whole group', async () => {
-  const runs = createAgentRuns({ broadcast: () => {}, dir: path.join(dir, 'runs-b') });
+  // Stop's ladder shortened (SIGINT, then SIGTERM 300 ms later): the stand-in shell needn't end its turn on SIGINT
+  // as Claude Code does, and a loaded runner would otherwise wait out the real 5 s before SIGTERM reaches the group.
+  const runs = createAgentRuns({ broadcast: () => {}, dir: path.join(dir, 'runs-b'), graceMs: 300 });
   control('sleep', '30');
   const prompt = wakePrompt({ who: 'tester', video: 'spot.mp4', slug, v: 1, text: 'go' });
   const run = runs.start({ slug, name: 'spot-edit', sessionId: ID, cwd: project, by: 'tester', prompt });
