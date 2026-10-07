@@ -2,7 +2,7 @@
 // frames on a timeline, today the playhead, the end a keyframe), a meter of what the workspace uses (dashed where the
 // plan sets no limit, so three meters always read as three), the workspace against Free resource by resource, and a
 // card's brand mark. Decorative parts are aria-hidden: the words beside them say the same.
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { BillingInfo } from '../../../lib/types.ts';
 import { t } from '../i18n/index.ts';
 import type { Shape } from '../ui/glyphs.ts';
@@ -61,7 +61,7 @@ export function RulerTicks({ day, of, start, end }: { day: number; of: number; s
 }
 
 /** One thing the workspace uses: the label and the number above, the bar below (`share` null: no limit, dashed). */
-export function Meter({ label, value, share, testid }: { label: string; value: string; share: number | null; testid?: string }) {
+export function Meter({ label, value, share, testid, note }: { label: string; value: string; share: number | null; testid?: string; note?: ReactNode }) {
   const over = share !== null && share > 1;
   return (
     <div className="bill-meter" data-testid={testid}>
@@ -72,6 +72,7 @@ export function Meter({ label, value, share, testid }: { label: string; value: s
       <div className={`bill-bar ${share === null ? 'none' : over ? 'over' : ''}`} aria-hidden="true">
         {share !== null && <span style={{ inlineSize: `${Math.max(2, Math.min(100, share * 100)).toFixed(1)}%` }} />}
       </div>
+      {note && <div className="bill-meter-note">{note}</div>}
     </div>
   );
 }

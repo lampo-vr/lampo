@@ -300,7 +300,7 @@ export function Sidebar({ videos: loaded, folders: all = NONE, archived = NO_ARC
   // kept says one runs, its words and ruler once their code is here (the library asks for the plan; this reads it)
   const billing = useBilling(false).data;
   const Trial = useLoaded(billingCode, usePainted(!!billing))?.TrialLine;
-  const viewFolder = view.kind === 'folder' || view.kind === 'playbook' ? view.id : null;
+  const viewFolder = view.kind === 'folder' || view.kind === 'playbook' || view.kind === 'files' ? view.id : null;
   // on an archived project's page, the Archived row is where you are
   const inArchive = view.kind === 'archived' || (!!viewFolder && !!archivedIn(viewFolder, archived));
 

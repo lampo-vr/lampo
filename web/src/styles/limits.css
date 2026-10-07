@@ -95,6 +95,17 @@
   text-wrap: pretty;
 }
 /* the room the workspace has, with what was asked for hanging over its end */
+/* what fills the plan's storage: videos and project files, and the files' safety net beside it (not counted) */
+.lim-split {
+  max-width: 560px;
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-2);
+}
+.lim-split-kept {
+  color: var(--muted);
+}
 .lim-cap {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

@@ -181,6 +181,17 @@ function Sheet({
                 </Dialog.Title>
                 <p className="lim-lede">{ledeOf(reason, ask, b, workspace, fit)}</p>
                 {reason === 'storage' && typeof ask.needed === 'number' && <Meter b={b} needed={ask.needed} fit={fit} />}
+                {reason === 'storage' && b.usage.files && (
+                  // what fills it: the videos and the project files, and what the files' safety net keeps outside it
+                  <p className="lim-split" data-testid="limit-files">
+                    {t('Videos {videos} · files {files}', { videos: size(Math.max(0, b.usage.bytes - b.usage.files.bytes)), files: size(b.usage.files.bytes) })}
+                    {b.usage.files.kept > 0 && (
+                      <span className="lim-split-kept">
+                        {t(' · trash and older versions {size}, kept up to 30 days, not counted', { size: size(b.usage.files.kept) })}
+                      </span>
+                    )}
+                  </p>
+                )}
               </header>
               <div className="lim-body">
                 <section className="lim-fit" aria-label={t('What fits')}>

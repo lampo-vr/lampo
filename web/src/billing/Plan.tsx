@@ -310,11 +310,42 @@ function Loaded({ b, ws, picker, onPicker, onFix }: { b: BillingInfo; ws: string
       )}
       <div className="bill-usage" data-testid="billing-usage">
         <Meter label={t('Members')} value={members.value} share={members.share} testid="billing-members" />
-        <Meter label={t('Storage')} value={storage.value} share={storage.share} testid="billing-storage" />
+        <Meter label={t('Storage')} value={storage.value} share={storage.share} testid="billing-storage" note={<StorageNote b={b} share={storage.share} />} />
         <Meter label={t('Videos under review')} value={videos.value} share={videos.share} testid="billing-videos" />
       </div>
       <Actions b={b} kind={kind} ws={ws} picker={picker} onPicker={onPicker} onFix={onFix} canPay={canPay} busy={cancel.isPending} onKeep={keep} />
     </section>
+  );
+}
+
+/**
+ * Under the storage meter: what fills it — videos and project files (`usage.files`, when the provider says it) — and
+ * what the files' safety net keeps beside it, not counted; near or past the plan's end, what that means in words.
+ */
+function StorageNote({ b, share }: { b: BillingInfo; share: number | null }) {
+  const files = b.usage.files;
+  const full = share !== null && share >= 1;
+  const near = share !== null && share >= 0.8;
+  if (!files && !near) return null;
+  return (
+    <>
+      {files && (
+        <span data-testid="billing-files">
+          {t('Videos {videos} · files {files}', { videos: size(Math.max(0, b.usage.bytes - files.bytes)), files: size(files.bytes) })}
+        </span>
+      )}
+      {files && files.kept > 0 && (
+        <span className="bill-meter-quiet">{t('Trash and older versions {size}, kept up to 30 days, not counted', { size: size(files.kept) })}</span>
+      )}
+      {near && (
+        <span className="bill-meter-warn" data-testid="billing-storage-near">
+          <KeyGlyph shape={full ? 'diamond' : 'half'} size={9} />
+          {full
+            ? t('Full: new videos and files wait until there is room. Remove what you no longer need, or add storage.')
+            : t('Nearly full: what doesn’t fit waits until there is room.')}
+        </span>
+      )}
+    </>
   );
 }
 

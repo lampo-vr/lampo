@@ -21,6 +21,7 @@ import { Agents } from './Agents.tsx';
 import { Appearance } from './Appearance.tsx';
 import { Billing } from './Billing.tsx';
 import { Checks } from './Checks.tsx';
+import { HouseFiles } from './Files.tsx';
 import { Links } from './Links.tsx';
 import { Mcp } from './Mcp.tsx';
 import { Notifications } from './Notifications.tsx';
@@ -58,6 +59,7 @@ const SECTIONS = perLang((): Section[] => [
   { id: 'users', label: t('Users'), icon: 'shield', need: 'admin' },
   { id: 'notifications', label: t('Notifications'), icon: 'bell', need: 'view' },
   { id: 'playbook', label: t('Playbook'), icon: 'playbook', need: 'view' },
+  { id: 'files', label: t('Files'), icon: 'files', need: 'files' },
   { id: 'speech', label: t('Voice notes'), icon: 'mic', need: 'comment' },
   { id: 'checks', label: t('Auto-check'), icon: 'autoCheck', need: 'admin' },
   { id: 'about', label: t('About'), icon: 'info' },
@@ -95,6 +97,7 @@ const PAGES: Record<SettingsSection, ComponentType> = {
   billing: Billing,
   notifications: Notifications,
   playbook: HousePlaybook,
+  files: HouseFiles,
   appearance: Appearance,
   speech: Speech,
   checks: Checks,
@@ -205,7 +208,7 @@ function Sections({ section }: { section: SettingsSection | null }) {
           )}
         </nav>
         <main className="set-main">
-          <div className={`set-inner ${current === 'playbook' ? 'wide' : current === 'billing' ? 'bill-col' : ''}`} key={current}>
+          <div className={`set-inner ${current === 'playbook' || current === 'files' ? 'wide' : current === 'billing' ? 'bill-col' : ''}`} key={current}>
             {info && user && Page ? (
               <Page />
             ) : (

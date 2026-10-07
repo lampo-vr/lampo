@@ -1,0 +1,1357 @@
+/* The Files tab (files/FilesPage.tsx) and what opens from it: a calm list, not a file manager. One line of numbers
+   with search and Add files (the one primary), the place in the area with its kinds and order, then rows of one height
+   whatever they are doing (40 px; 56 on a phone, two lines). Selection is a flat fill, never raised and never the
+   orange; status is a keyframe glyph. The drop target is an overlay (nothing moves), a file opens in a sheet at the
+   window's right edge over the list's end (a phone: the bottom sheet every dialog is). Loaded with its code. */
+
+.pf {
+  /* the page and, beside it on a wide one, the file opened (the list's own steps follow .pf-main's room) */
+  container: pf-root / inline-size;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-6);
+  min-width: 0;
+  padding-bottom: var(--sp-8);
+}
+.pf-main {
+  container: pf / inline-size;
+  margin-top: var(--sp-4);
+  flex: 1 1 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  min-width: 0;
+  /* the list's columns: what it is · name · kind · size · who · when · actions. The name takes what is left; what
+     is said about a file stays together at the row's end, however wide the page */
+  --pf-cols: var(--sp-6) minmax(200px, 1fr) minmax(0, 200px) 80px minmax(0, 160px) 96px 64px;
+  --pf-row: var(--h-lg);
+}
+
+/* ---------------------------------------------------------------- the head: numbers, search, Add files */
+
+.pf-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+  min-height: var(--h);
+}
+.pf-count {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-md);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.pf-count b {
+  font-weight: var(--fw-ui);
+  color: var(--fg);
+}
+.pf-count-up a {
+  color: var(--muted);
+  text-decoration: none;
+}
+.pf-count-up a b {
+  color: var(--fg-2);
+}
+.pf-count-up a:hover,
+.pf-count-up a:focus-visible {
+  color: var(--fg);
+  text-decoration: underline;
+  text-decoration-color: var(--line-4);
+  text-underline-offset: 2px;
+}
+/* near the plan's end: a quiet pill in the head, to Settings → Billing */
+.pf-quota {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: var(--h-sm);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-full);
+  box-shadow: 0 0 0 1px var(--line-2);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.pf-quota .kg {
+  color: var(--should);
+}
+.pf-quota:hover {
+  background: var(--sel);
+}
+.pf-search {
+  position: relative;
+  flex: 0 1 240px;
+  min-width: 150px;
+  display: flex;
+  align-items: center;
+}
+.pf-search > .icon {
+  position: absolute;
+  left: var(--sp-3);
+  color: var(--faint);
+  pointer-events: none;
+}
+.pf-search .input {
+  width: 100%;
+  height: var(--h);
+  padding: 0 var(--sp-8);
+}
+.pf-search > .kbd,
+.pf-search-clear {
+  position: absolute;
+  right: var(--sp-2);
+}
+.pf-search-clear {
+  display: grid;
+  place-items: center;
+  width: var(--h-xs);
+  height: var(--h-xs);
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: var(--ink-3);
+  color: var(--muted);
+  cursor: pointer;
+}
+.pf-search-clear:hover {
+  color: var(--fg);
+}
+/* Add files, and its other ways (a folder, a new folder) behind the chevron: one control in the brand's colour */
+.pf-add {
+  flex: none;
+  display: flex;
+}
+.pf-add > .btn.primary:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.pf-add-more.btn {
+  width: var(--h-sm);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 1px solid color-mix(in srgb, var(--on-brand) 24%, transparent);
+}
+
+/* ---------------------------------------------------------------- where in the area, its kinds, the order */
+
+.pf-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+  min-height: var(--h);
+  margin: var(--sp-3) 0 var(--sp-2);
+}
+.pf-crumbs {
+  flex: 0 1 auto;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+}
+.pf-crumb-step {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.pf-crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  height: var(--h-sm);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-md);
+  color: var(--muted);
+  text-decoration: none;
+}
+a.pf-crumb:hover,
+a.pf-crumb:focus-visible {
+  background: var(--sel);
+  color: var(--fg);
+}
+.pf-crumb.here {
+  font-weight: var(--fw-ui);
+  color: var(--fg);
+}
+.pf-crumb .icon {
+  flex: none;
+}
+.pf-crumb-sep {
+  flex: none;
+  color: var(--faint);
+}
+/* the kinds take what the row has left and scroll sideways in it (a soft edge says there is more) */
+.pf-kinds {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.pf-kinds::-webkit-scrollbar {
+  display: none;
+}
+.seg.pf-kind-chips {
+  padding: 0;
+  gap: var(--sp-1);
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+.seg.pf-kind-chips button {
+  height: var(--h-sm);
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-full);
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.seg.pf-kind-chips button:hover {
+  background: var(--sel);
+  color: var(--fg);
+}
+.seg.pf-kind-chips button.on {
+  background: var(--raise-sheen), var(--ink-3);
+  border-color: var(--line-2);
+  color: var(--fg);
+  box-shadow: var(--raise);
+}
+.pf-sort.btn {
+  flex: none;
+  color: var(--muted);
+}
+.pf-sort.btn:hover {
+  color: var(--fg);
+}
+
+/* ---------------------------------------------------------------- the list */
+
+.pf-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  border-radius: var(--r);
+}
+.pf-list:focus {
+  outline: none;
+}
+.pf-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--pf-cols);
+  align-items: center;
+  gap: 0 var(--sp-3);
+  height: var(--pf-row);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r);
+  color: var(--fg);
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+}
+/* one quiet system: under the pointer or the keys a faint fill; opened beside the list and picked for the bar a step
+   deeper; the keys' row a hairline ring while the list has the keys */
+.pf-row:hover,
+.pf-row.menu-open,
+.pf-row.active {
+  background: var(--sel);
+}
+.pf-row.picked,
+.pf-row.checked {
+  background: var(--sel-on);
+}
+.pf-list:focus-visible .pf-row.active {
+  box-shadow: inset 0 0 0 1.5px var(--line-3);
+}
+.pf-row.pending,
+.pf-row.going {
+  cursor: default;
+}
+.pf-row.pending {
+  pointer-events: none;
+}
+.pf-row.going:hover {
+  background: transparent;
+}
+.pf-c {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pf-c-lead {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--sp-6);
+  height: var(--sp-6);
+  overflow: visible;
+}
+.pf-glyph {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+.pf-row.dir .pf-glyph {
+  color: var(--fg-2);
+}
+/* ticking: a box in the glyph's place under the pointer, on a picked row, and on every row while some are picked */
+.pf-tick {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  display: grid;
+  place-items: center;
+  width: var(--ic);
+  height: var(--ic);
+  padding: 0;
+  border: 1px solid var(--line-4);
+  border-radius: var(--r-sm);
+  background: var(--ink-1);
+  color: transparent;
+  cursor: pointer;
+  opacity: 0;
+}
+.pf-row:hover .pf-tick,
+.pf-list.picking .pf-tick,
+.pf-tick.on {
+  opacity: 1;
+}
+.pf-row:hover .pf-c-lead:has(.pf-tick) .pf-glyph,
+.pf-list.picking .pf-c-lead:has(.pf-tick) .pf-glyph,
+.pf-row.checked .pf-glyph {
+  visibility: hidden;
+}
+/* touch: no pointer to hover with; a row is picked from its ⋯ or the bar */
+@media (hover: none) and (pointer: coarse) {
+  /* (the last row tapped keeps :hover: a ticked one keeps its box, and while picking every row shows one) */
+  .pf-list:not(.picking) .pf-row:hover:not(.checked) .pf-tick:not(.on) {
+    opacity: 0;
+  }
+  .pf-list:not(.picking) .pf-row:hover:not(.checked) .pf-c-lead:has(.pf-tick) .pf-glyph {
+    visibility: visible;
+  }
+}
+.pf-tick.on {
+  border-color: var(--fg);
+  background: var(--fg);
+  color: var(--on-fg);
+}
+.pf-c-name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+.pf-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-ui);
+}
+.pf-name-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: var(--fw-ui);
+  text-align: left;
+  cursor: pointer;
+}
+.pf-name-btn:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--line-4);
+  text-underline-offset: 2px;
+}
+/* in a search: where in the area it sits */
+.pf-dir {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.pf-c-kind {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.pf-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* which version: a quiet tag, figures that don't dance */
+.pf-v {
+  flex: none;
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-sm);
+  box-shadow: 0 0 0 1px var(--line-2);
+  font: var(--fw-ui) var(--fs-xs) / var(--lh-ui) var(--ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-2);
+}
+.pf-c-size,
+.pf-c-when {
+  text-align: right;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.pf-c-size {
+  color: var(--fg-2);
+}
+.pf-who {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  max-width: 100%;
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  vertical-align: middle;
+}
+.pf-who-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* an agent: its mark in a small rounded tile, the size of a picture */
+.pf-who-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: calc(var(--sp-4) + var(--sp-0_5));
+  height: calc(var(--sp-4) + var(--sp-0_5));
+  border-radius: var(--r-sm);
+  background: var(--ink-4);
+  color: var(--fg);
+}
+.pf-c-sub {
+  display: none;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+/* the row's actions at its end: their room is always there; shown under the pointer, the keys, an open menu, on touch */
+.pf-c-acts {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-0_5);
+  overflow: visible;
+}
+.pf-c-acts .btn {
+  visibility: hidden;
+  color: var(--muted);
+}
+.pf-c-acts .btn:hover {
+  color: var(--fg);
+}
+.pf-row:hover .pf-c-acts .btn,
+.pf-row.active .pf-c-acts .btn,
+.pf-row.menu-open .pf-c-acts .btn,
+.pf-row:focus-within .pf-c-acts .btn,
+.pf-c-acts.trash .btn {
+  visibility: visible;
+}
+@media (hover: none) and (pointer: coarse) {
+  .pf-c-acts .btn {
+    visibility: visible;
+  }
+  .pf-c-acts .pf-dl {
+    display: none;
+  }
+}
+.pf-c-acts.trash .btn {
+  color: var(--fg);
+}
+.pf-row.dir .pf-c-acts > .icon {
+  color: var(--faint);
+}
+/* a file on its way: how far it got where its kind says what it is, a 3 px line under it; the row keeps its height */
+.pf-going {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  gap: var(--sp-1);
+  overflow: hidden;
+}
+.pf-going .kg {
+  color: var(--muted);
+}
+.pf-going.conflict .kg,
+.pf-going.room .kg {
+  color: var(--should);
+}
+.pf-going.failed {
+  color: var(--must-2);
+}
+.pf-up-bar.progress {
+  height: 3px;
+}
+.pf-row.going .pf-name {
+  color: var(--fg-2);
+}
+/* the columns' names over the list (wide screens) */
+.pf-row.pf-cols {
+  height: var(--h);
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  margin-bottom: var(--sp-1);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-ui);
+  color: var(--muted);
+  cursor: default;
+}
+.pf-row.pf-cols:hover {
+  background: transparent;
+}
+.pf-wait {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.pf-more-rows {
+  height: var(--h-lg);
+  margin-top: var(--sp-1);
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  font: var(--fw-ui) var(--fs-sm) / var(--lh-ui) var(--ui);
+  color: var(--muted);
+  cursor: pointer;
+}
+.pf-more-rows:hover {
+  background: var(--sel);
+  color: var(--fg);
+}
+.pf-list > .empty-state {
+  margin-top: var(--sp-2);
+}
+
+/* ---------------------------------------------------------------- what it inherits, folded */
+
+.pf-inh {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin-top: var(--sp-2);
+  border-top: 1px solid var(--line);
+}
+.pf-list + .pf-inh,
+.pf-empty + .pf-inh {
+  margin-top: var(--sp-4);
+}
+.pf-inh + .pf-inh {
+  margin-top: 0;
+}
+.pf-inh-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  height: var(--h-lg);
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  font: var(--fw-text) var(--fs-md) / var(--lh-ui) var(--ui);
+  color: var(--muted);
+  text-align: left;
+  cursor: pointer;
+}
+.pf-inh-head:hover {
+  background: var(--sel);
+}
+.pf-inh-head .kg {
+  flex: none;
+  color: var(--muted);
+}
+.pf-inh-from {
+  flex: none;
+  font-weight: var(--fw-ui);
+  color: var(--fg);
+}
+.pf-inh-facts {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+.pf-inh-note {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  font-size: var(--fs-sm);
+}
+.pf-inh-chev {
+  flex: none;
+  color: var(--faint);
+  transition: transform var(--dur) var(--ease-out);
+}
+.pf-inh-chev.up {
+  transform: rotate(180deg);
+}
+.pf-inh-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  padding-bottom: var(--sp-2);
+  border-radius: var(--r);
+}
+.pf-inh-list:focus {
+  outline: none;
+}
+.pf-inh-list:focus-visible .pf-row.active {
+  box-shadow: inset 0 0 0 1.5px var(--line-3);
+}
+/* inherited rows step back: they are read here, changed where they live */
+.pf-inh-list .pf-name {
+  font-weight: var(--fw-text);
+  color: var(--fg-2);
+}
+.pf-inh-all {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin: 0 0 var(--sp-2) var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  text-decoration: none;
+}
+.pf-inh-all:hover {
+  color: var(--fg);
+}
+
+/* ---------------------------------------------------------------- the foot: the trash, what the plan holds */
+
+.pf-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2) var(--sp-4);
+  min-height: var(--h);
+  margin-top: var(--sp-4);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.pf-foot-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: var(--h-sm);
+  margin-left: calc(-1 * var(--sp-2));
+  padding: 0 var(--sp-2);
+  border-radius: var(--r);
+  color: var(--muted);
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+}
+.pf-foot-link:hover,
+.pf-foot-link:focus-visible {
+  background: var(--sel);
+  color: var(--fg);
+}
+.pf-usage {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.pf-usage.near {
+  color: var(--fg-2);
+}
+.pf-usage-kept {
+  color: var(--muted);
+}
+.pf-trash-note {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- empty */
+
+.pf-empty {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-4);
+}
+.pf-empty-cli {
+  justify-self: center;
+  width: min(100%, 560px);
+}
+.pf-empty-cli > p,
+.pf-ck-cli > p {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- picked rows: the bar that floats over the list's end */
+
+.pf-selbar {
+  position: sticky;
+  bottom: var(--sp-3);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-0_5);
+  justify-self: center;
+  width: fit-content;
+  max-width: calc(100% - 2 * var(--sp-2));
+  margin-top: var(--sp-3);
+  padding: var(--sp-1);
+  border: 1px solid var(--float-line);
+  border-radius: var(--r-lg);
+  background: var(--float-bg);
+  box-shadow: var(--shadow-float);
+  --float-y: var(--sp-2);
+  animation: float-in var(--dur) var(--ease-out);
+}
+.pf-selbar-n {
+  flex: none;
+  margin-right: var(--sp-1);
+  padding: 0 var(--sp-3) 0 var(--sp-2);
+  border-right: 1px solid var(--line);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-ui);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.pf-selbar-size {
+  font-weight: var(--fw-text);
+  color: var(--muted);
+}
+.pf-selbar > .btn {
+  flex: none;
+}
+.pf-selbar .btn.ghost:hover {
+  background: var(--float-sel);
+}
+.pf-selbar-x.btn {
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- dropping: an outline over the tab, one line */
+
+.pf-drop {
+  position: absolute;
+  inset: calc(-1 * var(--sp-2));
+  z-index: 3;
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
+  box-shadow: inset 0 0 0 1px var(--line-4);
+  pointer-events: none;
+  animation: pf-fade var(--dur) var(--ease-out) both;
+}
+.pf-drop-line {
+  position: fixed;
+  left: 50%;
+  bottom: var(--sp-8);
+  z-index: var(--z-float);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: calc(100vw - 2 * var(--sp-4));
+  margin: 0;
+  padding: var(--sp-2) var(--sp-4);
+  border: 1px solid var(--float-line);
+  border-radius: var(--r-full);
+  background: var(--float-bg);
+  box-shadow: var(--shadow-float);
+  transform: translateX(-50%);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-ui);
+}
+@keyframes pf-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ---------------------------------------------------------------- a file, opened: the sheet at the right edge */
+
+.pf-sheet {
+  position: fixed;
+  top: calc(54px + var(--safe-top));
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-sheet);
+  display: flex;
+  flex-direction: column;
+  width: min(420px, calc(100vw - var(--sp-12)));
+  border-left: 1px solid var(--float-line);
+  background: var(--float-bg);
+  box-shadow: var(--shadow-float);
+  animation: pf-sheet-in var(--dur-slow) var(--ease-out) both;
+}
+.pf-sheet:focus {
+  outline: none;
+}
+/* a wide page: the file stands beside the list (the list makes room), in view while the list scrolls */
+@container pf-root (min-width: 1000px) {
+  .pf-sheet {
+    position: sticky;
+    top: var(--sp-4);
+    right: auto;
+    bottom: auto;
+    z-index: 1;
+    flex: none;
+    width: 380px;
+    max-height: calc(100dvh - 54px - var(--sp-8));
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-lg);
+    box-shadow: none;
+    overflow: hidden;
+    animation: pf-fade var(--dur) var(--ease-out) both;
+  }
+}
+@keyframes pf-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateX(var(--sp-6));
+  }
+}
+.pf-sh-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: calc(var(--h-lg) + var(--sp-4));
+  padding: 0 var(--sp-2) 0 var(--sp-4);
+  border-bottom: 1px solid var(--line);
+}
+.pf-sh-glyph {
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--fg-2);
+}
+.pf-sh-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--fw-strong) semi-condensed var(--fs-lg) / var(--lh-tight) var(--display);
+  letter-spacing: var(--track-title);
+}
+.pf-sh-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+}
+.modal-body > .pf-sh-body {
+  padding: 0;
+  overflow: visible;
+}
+.pf-sh-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4) calc(var(--sp-3) + var(--safe-bottom));
+  border-top: 1px solid var(--line);
+}
+.pf-sh-more.btn {
+  margin-left: auto;
+}
+/* the look: what the browser can show, on a dark ground (a picture's colours read as they are) */
+.pf-pv {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 10;
+  border-radius: var(--r);
+  background: var(--ink-0);
+  overflow: hidden;
+}
+.pf-pv img,
+.pf-pv video {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.pf-pv video {
+  width: 100%;
+}
+.pf-pv.pdf {
+  aspect-ratio: 3 / 4;
+  background: var(--ink-2);
+}
+.pf-pv iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.pf-pv.text {
+  place-items: stretch;
+  background: var(--ink-2);
+}
+.pf-pv-text {
+  min-height: 0;
+  overflow: auto;
+  padding: var(--sp-3);
+}
+.pf-pv-text pre {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: var(--fw-text) var(--fs-xs) / var(--lh-body) var(--mono);
+  color: var(--fg-2);
+}
+.pf-pv-cut {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.pf-pv.audio,
+.pf-pv.none {
+  aspect-ratio: auto;
+  min-height: 140px;
+  background: var(--ink-2);
+}
+.pf-pv-audio {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: var(--sp-4);
+  color: var(--muted);
+}
+.pf-pv-audio audio {
+  width: 100%;
+}
+.pf-pv-none {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-6) var(--sp-4);
+  text-align: center;
+  color: var(--fg-2);
+}
+.pf-pv-none > .icon {
+  margin-bottom: var(--sp-2);
+  color: var(--muted);
+}
+.pf-pv-why {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.pf-sh-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--sp-1) var(--sp-4);
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.pf-sh-facts > div {
+  display: contents;
+}
+.pf-sh-facts dt {
+  color: var(--muted);
+}
+.pf-sh-facts dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg);
+}
+.pf-sha {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: var(--fs-xs);
+  color: var(--fg-2);
+  cursor: copy;
+}
+.pf-sha:hover {
+  color: var(--fg);
+}
+.pf-sh-sec {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-1);
+}
+.pf-sh-label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-1);
+  font: var(--fw-strong) var(--fs-md) / var(--lh-tight) var(--ui);
+}
+.pf-sh-n {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-text);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.pf-sh-note {
+  margin: var(--sp-1) 0 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.pf-vers {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pf-ver {
+  display: grid;
+  grid-template-columns: var(--sp-8) minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--h-lg);
+  padding: var(--sp-1) 0;
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-sm);
+}
+.pf-ver-v {
+  font-weight: var(--fw-ui);
+  font-variant-numeric: tabular-nums;
+}
+.pf-ver-who {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.pf-ver-via {
+  flex: none;
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-sm);
+  box-shadow: 0 0 0 1px var(--line-2);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.pf-ver-when {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.pf-ver-size {
+  display: none;
+}
+.pf-ver-acts {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-0_5);
+}
+.pf-ver-now {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.pf-ver.pending .pf-ver-acts {
+  display: none;
+}
+
+/* ---------------------------------------------------------------- the check before an upload, the small dialogs */
+
+.pf-ck {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pf-ck-line {
+  display: grid;
+  grid-template-columns: var(--sp-4) minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--sp-3);
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+}
+.pf-ck-glyph {
+  display: grid;
+  place-items: center;
+  align-self: start;
+  height: 1.5em;
+  color: var(--muted);
+}
+.pf-ck-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.pf-ck-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-ui);
+  white-space: nowrap;
+}
+.pf-ck-short {
+  font-weight: var(--fw-ui);
+  color: var(--fg);
+}
+.pf-ck-foot {
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.pf-ck-cli {
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--line);
+}
+.pf-dlg-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-1);
+}
+.pf-dlg-field .input {
+  width: 100%;
+}
+.pf-dlg-label {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-ui);
+  color: var(--fg-2);
+}
+.pf-dlg-note {
+  min-height: 1.3em;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.pf-dlg-note.bad {
+  color: var(--must-2);
+}
+.pf-dlg-move {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-4);
+}
+.pf-dlg-dirs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  max-height: 240px;
+  margin: 0 0 var(--sp-2);
+  padding: var(--sp-1);
+  overflow: auto;
+  list-style: none;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+}
+.pf-dlg-dir {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  min-width: 0;
+  height: var(--h);
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  font: var(--fw-text) var(--fs-md) / var(--lh-ui) var(--ui);
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+}
+.pf-dlg-dir .icon {
+  flex: none;
+  color: var(--muted);
+}
+.pf-dlg-dir:hover:not(:disabled) {
+  background: var(--float-sel);
+}
+.pf-dlg-dir.on {
+  background: var(--sel-on);
+}
+.pf-dlg-dir:disabled {
+  cursor: default;
+  color: var(--muted);
+}
+.pf-dlg-here {
+  margin-left: auto;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- narrower rooms */
+
+/* a tablet's room: who changed it goes (the sheet says it) */
+/* (a query styles what is inside its container, never the container: the columns are set on its children) */
+@container pf (max-width: 900px) {
+  .pf-main > * {
+    --pf-cols: var(--sp-6) minmax(160px, 1fr) minmax(0, 180px) 72px 80px 64px;
+  }
+  .pf-c-who {
+    display: none;
+  }
+}
+/* the picked rows' bar: where its words would run into each other (German's are longer), the glyphs stay; on a phone
+   (finger-sized buttons) it takes the list's width, and how many is enough: their size goes */
+@container pf (max-width: 600px) {
+  .pf-selbar-l,
+  .pf-selbar-size {
+    display: none;
+  }
+  .pf-selbar {
+    max-width: 100%;
+  }
+  .pf-selbar-n {
+    flex: 0 1 auto;
+    min-width: 0;
+    margin-right: 0;
+    padding-right: var(--sp-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+@container pf (max-width: 720px) {
+  :lang(de) .pf-selbar-l {
+    display: none;
+  }
+}
+/* a phone's room: two lines — the name, then what it is, its size and when; the actions behind ⋯ */
+@container pf (max-width: 600px) {
+  .pf-main > * {
+    --pf-row: 56px;
+  }
+  .pf-row {
+    grid-template-columns: var(--sp-6) minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    align-content: center;
+    gap: var(--sp-0_5) var(--sp-3);
+  }
+  .pf-c-lead {
+    grid-row: 1 / span 2;
+  }
+  .pf-c-name {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .pf-c-sub {
+    display: block;
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .pf-c-kind,
+  .pf-c-size,
+  .pf-c-who,
+  .pf-c-when {
+    display: none;
+  }
+  .pf-c-acts {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+  .pf-row.going .pf-c-kind {
+    display: grid;
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .pf-row.going .pf-c-sub {
+    display: none;
+  }
+  .pf-row.pf-cols {
+    display: none;
+  }
+  .pf-dl {
+    display: none;
+  }
+  .pf-inh-note {
+    display: none;
+  }
+  .pf-usage {
+    margin-left: 0;
+    text-align: left;
+  }
+}
+/* the head on a phone: the numbers over the field and the button */
+@container pf (max-width: 520px) {
+  .pf-head {
+    flex-wrap: wrap;
+  }
+  .pf-count {
+    flex-basis: 100%;
+  }
+  .pf-search {
+    flex: 1 1 auto;
+  }
+  /* Add files beside the field: its glyph says it (its name stays its accessible name) */
+  .pf-add-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .pf-bar {
+    flex-wrap: wrap;
+    row-gap: var(--sp-2);
+  }
+  .pf-kinds {
+    order: 3;
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+  .pf-sort {
+    margin-left: auto;
+  }
+  .pf-sort-label {
+    display: none;
+  }
+}
+/* a phone's crumbs are finger-sized: the bar is that tall already (its sort button) */
+@media (max-width: 639px), (hover: none) and (pointer: coarse) {
+  .pf-crumb {
+    height: var(--h-touch);
+  }
+}
+@media (hover: none) and (pointer: coarse) {
+  .pf-search .input {
+    height: var(--h-touch);
+    font-size: var(--fs-touch);
+  }
+  .pf-add .btn {
+    height: var(--h-touch);
+  }
+  .pf-add-more.btn {
+    width: var(--h-touch);
+  }
+  .pf-search > .kbd {
+    display: none;
+  }
+}

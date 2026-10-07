@@ -270,6 +270,25 @@ try {
         ],
       },
       {
+        // A project's files: the numbers line with search and Add files, the place and the kinds, the columns and the
+        // first row stand where they will while the files and the page's code arrive.
+        name: 'folder files',
+        url: SCREENS['folder files'],
+        ready: ready['folder files'],
+        marks: [
+          ...top,
+          ...nav,
+          ...hero,
+          { name: 'folder tabs', sel: '.hero .hero-tabs', every: true },
+          { name: 'files head', sel: '[data-testid=files] .pf-head', every: true },
+          { name: 'files search', sel: '[data-testid=files-search]', every: true },
+          { name: 'add files', sel: '[data-testid=files-add]', every: true },
+          { name: 'files place', sel: '[data-testid=files] .pf-bar', every: true },
+          { name: 'columns', sel: '[data-testid=files] .pf-cols', every: true, wide: true },
+          { name: 'first row', sel: '[data-testid=files-list] .pf-row:not(.pf-cols)', every: true },
+        ],
+      },
+      {
         name: 'insights',
         url: '/#/insights',
         ready: '[data-testid=insights]',

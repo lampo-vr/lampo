@@ -8,6 +8,7 @@ import { settle } from '../layout.mjs';
 import { jsonApi } from './api.mjs';
 import { launch } from './browser.mjs';
 import { assert } from './checks.mjs';
+import { push } from './filesStore.mjs';
 import { startServer } from './server.mjs';
 
 /** The three servers, started before a suite's try as any suite starts its own: `servers` for crashed/finish; `browser`
@@ -42,6 +43,12 @@ export async function qualityScreens(q) {
   const locked = await api(`/api/review/${encodeURIComponent(a)}/shares`, 'POST', { label: 'Board cut', password: 'letmein' });
   // an empty folder inside the project: a folder page's crumb, its Videos · Playbook tabs and Share, and an empty state
   await api('/api/folders', 'POST', { path: 'Acme/Archive' });
+  // a project's files: a folder of brand files and a brief (the Files tab's rows)
+  await push(BASE, 'Acme', {
+    'Brand/Logo primary.svg': Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'),
+    'Brand/Acme Sans.otf': Buffer.alloc(4096, 7),
+    'Brief v3.txt': Buffer.from('Spring sale, 30 s and 15 s cuts.\n'),
+  });
   const stripFilm = makeVideo(path.join(firstStrip.dir, 'Acme/export/spot.mp4'), { dur: 1 });
   age(stripFilm);
   const added = await fetch(`${firstStrip.base}/api/library`, {
@@ -69,6 +76,8 @@ export async function qualityScreens(q) {
     'empty folder': `/#/folder/${encodeURIComponent('Acme/Archive')}`,
     // a folder's playbook: the document beside what agents read
     'folder playbook': `/#/playbook/${encodeURIComponent('Acme')}`,
+    // a project's files: the numbers line, the place and kinds, the rows
+    'folder files': `/#/files/${encodeURIComponent('Acme')}`,
     // on their own servers (whole addresses)
     'first run': `${first.base}/#/welcome`,
     'get started': `${firstStrip.base}/#/`,
@@ -84,6 +93,7 @@ export async function qualityScreens(q) {
     'empty view': '.lib-scroll .empty-state',
     'empty folder': '.lib-scroll .empty-state',
     'folder playbook': '[data-testid=playbook][aria-busy=false] .pb-sheet',
+    'folder files': '[data-testid=files][aria-busy=false] [data-testid=dir-row]',
     'first run': '[data-testid=ob-setup] h1',
     'get started': '[data-testid=ob-gs] [data-testid=ob-step]',
   };

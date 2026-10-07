@@ -343,6 +343,27 @@
 .bill-bar.over > span {
   background: var(--must);
 }
+/* under the storage meter: videos and project files, the files' safety net (not counted), and near the end, in words */
+.bill-meter-note {
+  display: grid;
+  gap: var(--sp-0_5);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-2);
+}
+.bill-meter-quiet {
+  color: var(--muted);
+}
+.bill-meter-warn {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-1);
+  color: var(--fg);
+}
+.bill-meter-warn .kg {
+  flex: none;
+  color: var(--should);
+}
 
 /* the days as a ruler: frames on a timeline, today the playhead, the end a keyframe */
 .bill-ruler {

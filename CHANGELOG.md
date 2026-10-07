@@ -8,7 +8,23 @@ format stays backwards compatible throughout.
 ## [Unreleased]
 
 ### Added
-- **Project files, in the API** (the app's Files tab and the agents' tools come next). Footage, music, fonts and project
+- **Files for every project, folder and the House.** A **Files** tab beside a project's or folder's Videos and
+  Playbook (the House's in Settings → Files) holds the material the work is made from: footage, music, fonts, logos,
+  After Effects, Cinema 4D and Photoshop files, LUTs, briefs. Drop files *and folders* anywhere on the tab, or use
+  **Add files**: before a byte moves, one sheet says what will happen — how much, what is already in Lampo (nothing to
+  upload for it), which files become a new version of one already there, what is left out (`.DS_Store`, `._` files,
+  `.git/`, `node_modules/` …), and whether it fits the plan, with the ways out when it doesn't. Uploads go on in the
+  upload tray, grouped by folder, resumable, and a file someone changed while yours was on its way never overwrites
+  theirs: the tray says who changed it and when, and offers **Keep both** or **Replace**; a file you made a day's
+  versions of already says when it takes the next, and offers **Save as a copy**. Every file keeps its versions — who
+  made each, an agent's marked as such — and any of them comes back with **Restore**; trashed files wait up to 30 days
+  in the trash (each says when it goes) and don't count toward the plan, nor do older versions. Open a file to look at it (pictures, video, sound,
+  PDF and text right in the browser), download it, rename or move it (into another project's files too), or **Copy for
+  an agent**: the one `lampo files pull` line that fetches exactly those files. A folder shows what it inherits from its
+  project and the House, folded. Search, the kinds and the order narrow the list in place; ↑↓, ↵, Space and ⌫ (with
+  Undo) work on it. Settings → Billing and the plan's sheet say how much of the storage is videos and how much files.
+  Reviewers and review links never see files.
+- **Project files, in the API** (the agents' tools come next). Footage, music, fonts and project
   files kept per House, project and folder, so a team and its agents work from the same material on any machine: a
   folder sees its own files and everything above it, paths stay as uploaded, each workspace keeps the same bytes once.
   Every change is a version with who made it (and which agent); a push that would replace a version it didn't see is

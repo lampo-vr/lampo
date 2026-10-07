@@ -1,5 +1,5 @@
 // Hash routes:  #/v/<slug>?c=&f=&v=  player · #/print/<slug> · #/ #/inbox #/unsorted #/insights #/archived
-// #/folder/<path> #/playbook/<path>[?tab=…] #/session/<name>  library views (old addresses: #/for-you and #/verify open
+// #/folder/<path> #/playbook/<path>[?tab=…] #/files/<path>[?path=&trash=&open=] #/session/<name>  library views (old addresses: #/for-you and #/verify open
 // #/inbox, #/open opens All videos on the Being fixed lane) · #/status (where every video stands) · #/settings[/<section>] · #/invite/<token> ·
 // #/signup · #/forgot · #/reset/<token> · #/verify/<token> (what emailed links open, server mode) · #/oauth/<request> and
 // #/oauth/error?error=…  (an app asking to connect, server mode) · #/welcome[/<step>] (a new account's setup) ·
@@ -23,6 +23,7 @@ export const SETTINGS_SECTIONS = [
   'users',
   'notifications',
   'playbook',
+  'files',
   'appearance',
   'speech',
   'checks',
@@ -113,8 +114,8 @@ export function parseRoute(hash: string, pathname: string): Route {
   }
   const f = /^#\/folder\/(.+)$/.exec(hash);
   if (f) return { name: 'library', view: { kind: 'folder', id: decoded(f[1]) } };
-  const pb = /^#\/playbook\/([^?]+)(?:\?.*)?$/.exec(hash);
-  if (pb) return { name: 'library', view: { kind: 'playbook', id: decoded(pb[1]) } };
+  const pb = /^#\/(playbook|files)\/([^?]+)(?:\?.*)?$/.exec(hash);
+  if (pb) return { name: 'library', view: { kind: pb[1] as 'playbook' | 'files', id: decoded(pb[2]) } };
   const s = /^#\/session\/(.+)$/.exec(hash);
   if (s) return { name: 'library', view: { kind: 'session', id: decoded(s[1]) } };
   const k = /^#\/(inbox|unsorted|insights|archived)$/.exec(hash);
@@ -152,8 +153,8 @@ export const go = (slug: string | null, query?: string) => {
 export const viewHash = (v: LibraryView) =>
   v.kind === 'folder'
     ? `#/folder/${enc(v.id)}`
-    : v.kind === 'playbook'
-      ? `#/playbook/${enc(v.id)}`
+    : v.kind === 'playbook' || v.kind === 'files'
+      ? `#/${v.kind}/${enc(v.id)}`
       : v.kind === 'session'
         ? `#/session/${enc(v.id)}`
         : v.kind === 'all'

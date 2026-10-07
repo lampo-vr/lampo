@@ -92,6 +92,9 @@ const SECONDS = {
   // an agent's work in every state: the strip, the Agent view, cards, phone, its own long sentence, 390–1920 both
   // themes and German
   'agents-at-work': 150,
+  // a project's files: the tab, a folder and loose files through the check into the tray, both 409 answers, versions,
+  // trash, picking by touch, the plan, phone, keys, loading, and the matrix at six widths in both themes and German
+  files: 85,
   wake: 9,
   phone: 8,
   run: 8,

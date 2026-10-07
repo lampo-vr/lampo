@@ -34,6 +34,7 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  Files,
   Film,
   Folder,
   FolderInput,
@@ -215,6 +216,8 @@ const P = {
   notes: { icon: MessageSquareText },
   inbox: { icon: Inbox },
   playbook: { icon: BookOpenText },
+  // a project's material (the Files tab: footage, music, fonts, project files)
+  files: { icon: Files },
   history: { icon: History },
   bell: { icon: Bell },
   chart: { icon: ChartColumn },

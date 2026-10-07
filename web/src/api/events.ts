@@ -28,6 +28,7 @@ const TYPES = [
   'asks',
   'posts',
   'connections',
+  'files',
   'moment',
 ] as const;
 export type EventType = (typeof TYPES)[number];

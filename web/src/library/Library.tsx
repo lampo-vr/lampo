@@ -12,6 +12,7 @@ import { compareTime } from '../../../lib/time.ts';
 import type { AgentKind } from '../../../lib/types.ts';
 import { useAgents, useAuthStatus, useCan, useLikelyRole } from '../api/auth.ts';
 import { useSettle, useVideoActions } from '../api/mutations.ts';
+import { keptFromBefore } from '../api/persist.ts';
 import { usePlaybooks } from '../api/playbooks.ts';
 import { useBilling, useFolderSuggestion, useInfo, useLibrary } from '../api/queries.ts';
 import type { VideoSummary } from '../api/types.ts';
@@ -25,7 +26,7 @@ import { chromeLibrary, rememberLibrary } from '../lib/chromeHint.ts';
 import { isProject } from '../lib/folders.ts';
 import { fileName } from '../lib/format.ts';
 import { loader, screen, useLoaded, usePainted } from '../lib/lazy.ts';
-import { crumbs, goView, type LibraryView, leaf } from '../lib/nav.ts';
+import { crumbs, goView, type LibraryView, leaf, viewHash } from '../lib/nav.ts';
 import { readPrefs, usePrefs } from '../lib/prefs.ts';
 import { copyText, toast, toastError, toastUndo } from '../lib/toast.ts';
 import { WINDOW_FROM } from '../lib/windowing.ts';
@@ -93,7 +94,14 @@ const Insights = screen(insightsCode);
 // The board is a chunk of its own (Board.tsx): asked for with the library's when it is the layout — the first render
 // waits for both (App.tsx) —, right after the first paint otherwise; its lanes stand meanwhile (BoardFrame.tsx).
 const boardCode = loader(() => import('./Board.tsx'));
-export const boardFirst: Promise<unknown> = readPrefs(LIBRARY_PREFS, LIBRARY_PER_TAB).layout === 'board' ? boardCode.load().catch(() => {}) : Promise.resolve();
+// A folder's files (files/FilesPage.tsx, with its styles): the same, when the page opens on them; on a folder's other
+// tabs it comes after the first paint, so the tab opens at once.
+const filesCode = loader(() => import('../files/FilesPage.tsx'));
+const FilesPage = screen(filesCode);
+export const firstChunks: Promise<unknown> = Promise.all([
+  readPrefs(LIBRARY_PREFS, LIBRARY_PER_TAB).layout === 'board' && boardCode.load().catch(() => {}),
+  /^#\/files\//.test(location.hash) && filesCode.load().catch(() => {}),
+]);
 // Add video opens on a click or a drop, never in the first paint: its code (and the folder picker's) comes right after.
 const addVideoCode = loader(() => import('./AddVideo.tsx'));
 // The Archived page comes at once when the page opens on it.
@@ -211,9 +219,9 @@ interface Page {
   inbox?: boolean;
   /** The archived projects instead of videos (the Archived view). */
   archive?: boolean;
-  /** A folder's playbook instead of its videos (the folder's second tab). */
-  playbook?: boolean;
-  /** The folder a page is about: its header has the Videos · Playbook tabs. */
+  /** A folder's playbook or files instead of its videos (the folder's other tabs). */
+  tab?: 'playbook' | 'files';
+  /** The folder a page is about: its header has the Videos · Files · Playbook tabs. */
   folder?: string;
   empty: Empty;
 }
@@ -240,7 +248,8 @@ function pageOf(view: LibraryView): Page {
         empty: { art: 'agents', title: t('No videos from this agent'), body: t('The videos it puts up show up here.') },
       };
     case 'folder':
-    case 'playbook': {
+    case 'playbook':
+    case 'files': {
       // a crumb only inside a project: where the folder sits ("Northwind / Social"); a project is its own top
       const parts = view.id.split('/');
       return {
@@ -248,7 +257,7 @@ function pageOf(view: LibraryView): Page {
         crumbPaths: parts.slice(0, -1).map((_, i) => parts.slice(0, i + 1).join('/')),
         title: leaf(view.id),
         folder: view.id,
-        playbook: view.kind === 'playbook',
+        tab: view.kind === 'folder' ? undefined : view.kind,
         empty: {
           art: 'folder',
           title: isProject(view.id) ? t('This project is empty') : t('This folder is empty'),
@@ -283,10 +292,12 @@ interface Totals {
 
 /** Where you are, the title, and the tally (null: on its way). The title comes from the route, so it is there at once. */
 /**
- * A folder's two sides: its videos (how many is beside the title), and its playbook, with the suggestions waiting on
- * it and on the playbooks of folders inside it (its page points to those).
+ * A folder's sides: its videos (how many is beside the title), its files (the team's; reviewers don't see them), and
+ * its playbook, with the suggestions waiting on it and on the playbooks of folders inside it (its page points to those).
  */
-function FolderTabs({ folder, playbook, pending }: { folder: string; playbook: boolean; pending: boolean }) {
+function FolderTabs({ folder, tab, pending }: { folder: string; tab: Page['tab']; pending: boolean }) {
+  const playbook = tab === 'playbook';
+  const role = useLikelyRole();
   const books = usePlaybooks(!pending).data?.playbooks ?? [];
   const own = books.find((p) => p.scope === folder)?.pending || 0;
   const waiting = books.filter((p) => p.scope === folder || p.scope.startsWith(`${folder}/`)).reduce((n, p) => n + p.pending, 0);
@@ -296,14 +307,27 @@ function FolderTabs({ folder, playbook, pending }: { folder: string; playbook: b
         <button
           type="button"
           role="tab"
-          aria-selected={!playbook}
-          className={playbook ? '' : 'on'}
+          aria-selected={!tab}
+          className={tab ? '' : 'on'}
           onClick={() => goView({ kind: 'folder', id: folder })}
           data-testid="folder-tab-videos"
         >
           <I name="film" size={14} />
           {t('Videos')}
         </button>
+        {!!role && roleCan(role, 'files') && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'files'}
+            className={tab === 'files' ? 'on' : ''}
+            onClick={() => goView({ kind: 'files', id: folder })}
+            data-testid="folder-tab-files"
+          >
+            <I name="files" size={14} />
+            {t('Files')}
+          </button>
+        )}
         <button
           type="button"
           role="tab"
@@ -442,7 +466,7 @@ function Hero({
           />
         )}
       </div>
-      {page.folder && <FolderTabs folder={page.folder} playbook={!!page.playbook} pending={pending} />}
+      {page.folder && <FolderTabs folder={page.folder} tab={page.tab} pending={pending} />}
     </div>
   );
 }
@@ -537,7 +561,9 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
   // where a video can go or be uploaded to: no archived project, nor a folder in one
   const openFolders = useMemo(() => folders.filter((f) => !archivedIn(f, archivedProjects)), [folders, archivedProjects]);
   // the project this page is about is archived: read only, with a banner (and Restore for its owners and admins)
-  const shutHere = (view.kind === 'folder' || view.kind === 'playbook') && data ? archivedIn(view.id, archivedProjects) : null;
+  // the folder a page is about (its videos, files or playbook)
+  const folderPage = view.kind === 'folder' || view.kind === 'playbook' || view.kind === 'files' ? view.id : null;
+  const shutHere = folderPage !== null && data ? archivedIn(folderPage, archivedProjects) : null;
   const qc = useQueryClient();
   const [prefs, setPref] = usePrefs(LIBRARY_PREFS, LIBRARY_PER_TAB);
   const [adding, setAdding] = useState(false);
@@ -561,7 +587,8 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
   const billing = useBilling(!pending && !!info?.billing).data;
   const bannerRoom = !Billing && bannerDue(billing);
   // the server's operator suspended this workspace (A13 CLOUD-5): it says so above everything, and why nothing changes
-  const status = useAuthStatus().data;
+  const statusQ = useAuthStatus();
+  const status = statusQ.data;
   const suspended = status?.workspace?.suspended ? status.workspace.name : null;
   // read-only (the plan, or the suspension): Add video is locked and explains itself instead of failing later (audit B-M8)
   const locked = billing?.state === 'read-only' || !!suspended;
@@ -577,18 +604,26 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
   // A folder's Share button stands from the first paint (the role this browser saw last), not once the videos arrive
   const likelyRole = useLikelyRole();
   const mayShareLikely = !!likelyRole && roleCan(likelyRole, 'share');
+  // reviewers don't see project files: a link to a folder's Files tab opens its videos for them — once the server has
+  // said who this is now: the role this browser saw last (its chrome hint, or the answer kept from an earlier visit) may
+  // be another workspace's or out of date
+  const role = status && !keptFromBefore(statusQ.dataUpdatedAt) ? (status.user?.role ?? null) : null;
+  const noFiles = view.kind === 'files' && role && !roleCan(role, 'files') ? view.id : null;
+  useLayoutEffect(() => {
+    if (noFiles !== null) location.replace(viewHash({ kind: 'folder', id: noFiles }));
+  }, [noFiles]);
   // A project's page has its own ⋯ for its owners and admins (from the first paint: the role this browser saw last), as
   // its row in the sidebar has: download it, archive it (with Undo; the page then says so).
   const me = status?.user?.name ?? null;
   const projectMenu: MenuEntry[] | null =
-    (view.kind === 'folder' || view.kind === 'playbook') && isProject(view.id) && likelyRole && roleCan(likelyRole, 'archive')
+    folderPage !== null && isProject(folderPage) && likelyRole && roleCan(likelyRole, 'archive')
       ? [
-          roleCan(likelyRole, 'download') && { label: t('Download project'), icon: 'download', onClick: () => void downloadFolder(view.id) },
+          roleCan(likelyRole, 'download') && { label: t('Download project'), icon: 'download', onClick: () => void downloadFolder(folderPage) },
           'sep',
           {
             label: t('Archive project'),
             icon: 'archive',
-            onClick: () => void archivedCode.load().then((m) => m.archiveProject(qc, view.id, me), toastError),
+            onClick: () => void archivedCode.load().then((m) => m.archiveProject(qc, folderPage, me), toastError),
           },
         ]
       : null;
@@ -602,7 +637,8 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
         ? setRoPop(true)
         : picker.current?.click();
   const add = () => (!mayUpload ? undefined : linkHere && !locked ? setAdding(true) : upload());
-  const dragging = useFileDrop(mayUpload, (files) => {
+  // (the Files tab takes what is dropped on it as files: files/FilesPage.tsx)
+  const dragging = useFileDrop(mayUpload && view.kind !== 'files', (files) => {
     // dropped on "Add video" too: the upload takes over from the dialog
     setAdding(false);
     setDropped(files);
@@ -636,6 +672,8 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
   const moveTo = useMoves(can, useSettle());
   const onBoard = layout === 'board';
   const BoardCode = useLoaded(boardCode, onBoard || painted);
+  // a folder's Files tab opens at once: its code comes after the folder's first paint (for whoever sees files)
+  useLoaded(filesCode, painted && folderPage !== null && !!likelyRole && roleCan(likelyRole, 'files'));
   const kit = useMemo<CardKit>(() => ({ can, actions: actionsRef, move: moveTo, board: onBoard }), [can, moveTo, onBoard]);
   const group = pick<GroupBy>(prefs.group, ['folder', 'stage', 'none'], 'folder');
   const sort = pick<SortBy>(prefs.sort, ['recent', 'name', 'stage', 'open'], 'recent');
@@ -654,10 +692,12 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
 
   // Keys: A / N add a video (linked at the machine, uploaded elsewhere), U uploads, 1–4 switch the layout, / filters,
   // F opens the filter chips.
-  const keys = useRef({ add, upload, setPref, mayUpload, filter: () => setFilterOpen(true) });
-  keys.current = { add, upload, setPref, mayUpload, filter: () => setFilterOpen(true) };
+  const keys = useRef({ add, upload, setPref, mayUpload, filter: () => setFilterOpen(true), off: false });
+  // the Files tab has keys of its own
+  keys.current = { add, upload, setPref, mayUpload, filter: () => setFilterOpen(true), off: view.kind === 'files' };
   useEffect(() => {
     const f = (e: KeyboardEvent) => {
+      if (keys.current.off) return;
       if ((e.target as Element | null)?.closest?.('input, textarea, select, [role=dialog], [role=menu]') || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === 'a' || e.key === 'n') {
         e.preventDefault();
@@ -1014,7 +1054,7 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
                     page={page}
                     pending={pending}
                     totals={videos ? totals : null}
-                    onShare={(view.kind === 'folder' || view.kind === 'playbook') && mayShareLikely ? () => setSharingFolder(view.id) : undefined}
+                    onShare={folderPage !== null && mayShareLikely ? () => setSharingFolder(folderPage) : undefined}
                     archived={shutHere ? { onRestore: restoreHere } : null}
                     menu={projectMenu}
                     projects={page.archive ? (data ? Object.keys(archivedProjects).length : null) : undefined}
@@ -1031,9 +1071,14 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
                     <div className="lib-content" data-testid="library-content">
                       {Arch && videos ? <Arch.ArchivedView videos={videos} archived={archivedProjects} /> : <ArchivedPending />}
                     </div>
-                  ) : page.playbook && view.kind === 'playbook' ? (
+                  ) : view.kind === 'playbook' ? (
                     <Suspense fallback={<PlaybookPending scope={view.id} />}>
                       <PlaybookPage scope={view.id} pending={pending} />
+                    </Suspense>
+                  ) : view.kind === 'files' && noFiles === null ? (
+                    // (its code is here before the first render, or came after the folder's first paint)
+                    <Suspense fallback={null}>
+                      <FilesPage area={view.id} pending={pending} readOnly={!!shutHere} />
                     </Suspense>
                   ) : (
                     <>

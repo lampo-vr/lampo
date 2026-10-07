@@ -184,6 +184,7 @@ export function scope(videos: VideoSummary[], view: LibraryView): VideoSummary[]
       return videos.filter((v) => v.session?.name === view.id && !v.project_archived);
     case 'folder':
     case 'playbook':
+    case 'files':
       return videos.filter((v) => within(v.folder, view.id));
     case 'archived':
       return videos.filter((v) => !!v.project_archived);

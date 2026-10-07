@@ -60,6 +60,11 @@ website's clips.
 
 ## Next
 
+- **Project files, next** (the server, `docs/files.md`, and the app's Files tab are built): the agents' way in
+  (`lampo files ls/push/pull/status`, MCP `list_files`, `get_file`, `add_file`, the discovery line); in the app, a
+  folder downloaded as one zip, *Delete for good* in the trash for owners and admins, posters for pictures and video
+  in the rows; then phase 2 — the Handover link, editing leases, 720p proxies, what a final version was made from.
+
 - First run, next: a short guided pass through the sample in the player (point at the fix to check, then the agent's
   question) for people who open it and don't know where to look; the agent step showing the client the person picked
   in Connect an agent while it waits; measuring where people stop (the steps' times are on the account:

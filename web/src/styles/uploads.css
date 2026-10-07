@@ -216,6 +216,105 @@
   margin: var(--sp-0_5) 0;
 }
 
+/* project files on their way (files/FileTray.tsx): per batch where it goes, then a row per top folder of what was
+   dropped, what needed nothing sent, and files someone changed meanwhile with the two ways on */
+.up-fb {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  border-top: 1px solid var(--line);
+}
+.up-list > .up-fb:first-child {
+  border-top: 0;
+}
+.up-fb-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: var(--sp-2) var(--sp-1) 0 var(--sp-3);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.up-fb-head > .icon {
+  flex: none;
+}
+.up-fb .up-row + .up-row {
+  border-top: 0;
+}
+.up-fb-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0 var(--sp-3) var(--sp-3);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.up-fb-foot .kg {
+  color: var(--ok);
+}
+.up-fb > .up-sub.up-room {
+  padding: 0 var(--sp-3) var(--sp-3);
+}
+.up-fb-conflict {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-2);
+  margin: 0 var(--sp-3) var(--sp-3);
+  padding: var(--sp-3);
+  border-radius: var(--r);
+  background: var(--should-bg);
+}
+.up-fb-conflict-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-ui);
+}
+.up-fb-conflict-head .kg {
+  color: var(--should);
+}
+.up-fb-conflict-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-0_5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+}
+.up-fb-conflict-list li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.up-fb-conflict-list b {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-weight: var(--fw-ui);
+}
+.up-fb-conflict-who {
+  flex: none;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.up-fb-more {
+  color: var(--muted);
+}
+.up-fb-conflict-acts {
+  display: flex;
+  gap: var(--sp-2);
+}
+/* why a file waits for its day's versions, in one quiet line over its two ways on */
+.up-fb-later-why {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
 /* phones: across the bottom, clear of the home indicator */
 @media (max-width: 639px) {
   .up-tray {

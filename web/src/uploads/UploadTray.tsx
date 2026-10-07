@@ -1,10 +1,12 @@
 // Upload progress, bottom left, on every screen: one float in the app's float material — a head with the whole
 // upload's progress as a ring and its share in numbers (a click folds it), then a row per video with a progress line,
 // what is sent of what at which speed, what happens after the last byte (the server checks the file and prepares a
-// smooth-scrub copy), and a way in.
+// smooth-scrub copy), and a way in. Project files on their way follow, per batch (files/FileTray.tsx).
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useReview } from '../api/queries.ts';
+import { FileTrayRows, useFileTally } from '../files/FileTray.tsx';
+import { bindFileUploads, clearFileUploads } from '../files/uploadStore.ts';
 import { bytes } from '../lib/format.ts';
 import { crumbs, go } from '../lib/nav.ts';
 import { Progress } from '../ui/controls.tsx';
@@ -183,44 +185,61 @@ export default function UploadTray() {
   const list = useUploads();
   const leftovers = useInterrupted();
   const [open, setOpen] = useState(true);
+  const files = useFileTally();
   useEffect(() => {
     bindUploads(qc);
+    bindFileUploads(qc);
     void loadInterrupted();
   }, [qc]);
-  // A new upload opens the tray again.
-  const count = list.length;
+  // A new upload opens the tray again (and a file that waits for a decision).
+  const count = list.length + files.going + (files.waiting ? 1 : 0);
   useEffect(() => {
     if (count) setOpen(true);
   }, [count]);
   // Once everything is through, the tray gets out of the way: folded to its header after a few seconds, finished
   // rows gone after a minute (the videos are in the library by then). Failures stay until dismissed.
   const active = list.filter((x) => x.state === 'uploading' || x.state === 'processing');
-  const idle = list.length > 0 && !active.length;
-  const failed = list.some((x) => x.state === 'failed');
+  const idle = (list.length > 0 || files.any) && !active.length && !files.going && !files.waiting;
+  const failed = list.some((x) => x.state === 'failed') || files.failed;
   useEffect(() => {
     if (!idle) return;
     const fold = setTimeout(() => setOpen(false), 5000);
-    const clear = failed ? undefined : setTimeout(clearFinished, 60_000);
+    const clear = failed
+      ? undefined
+      : setTimeout(() => {
+          clearFinished();
+          clearFileUploads();
+        }, 60_000);
     return () => {
       clearTimeout(fold);
       clearTimeout(clear);
     };
   }, [idle, failed]);
-  if (!list.length && !leftovers.length) return null;
+  if (!list.length && !leftovers.length && !files.any) return null;
   const sending = active.filter((x) => x.state === 'uploading');
   const sent = sending.reduce((s, x) => s + x.sent, 0);
   const total = sending.reduce((s, x) => s + x.size, 0);
-  const pct = sending.length && total ? Math.floor((sent / total) * 100) : null;
+  // the videos' share, else the files'
+  const pct = sending.length && total ? Math.floor((sent / total) * 100) : files.pct;
   const done = list.filter((x) => x.state === 'done').length;
+  const going = active.length + files.going;
   const title = active.length
     ? sending.length
-      ? t('Uploading {n} video|Uploading {n} videos', { n: active.length })
+      ? files.going
+        ? t('Uploading {n} video and files|Uploading {n} videos and files', { n: active.length })
+        : t('Uploading {n} video|Uploading {n} videos', { n: active.length })
       : t('Checking {n} video|Checking {n} videos', { n: active.length })
-    : leftovers.length && !list.length
-      ? t('Unfinished uploads')
-      : done && !failed
-        ? t('Uploaded {n} video|Uploaded {n} videos', { n: done })
-        : t('Uploads');
+    : files.going
+      ? t('Uploading {n} file|Uploading {n} files', { n: files.going })
+      : files.waiting
+        ? t('Uploads waiting for you')
+        : leftovers.length && !list.length && !files.any
+          ? t('Unfinished uploads')
+          : done && !failed && !files.any
+            ? t('Uploaded {n} video|Uploaded {n} videos', { n: done })
+            : files.done && !failed && !list.length
+              ? t('Uploaded {n} file|Uploaded {n} files', { n: files.done })
+              : t('Uploads');
   return (
     <section className={`up-tray ${open ? 'open' : ''}`} aria-label={t('Uploads')} data-testid="upload-tray">
       <header className="up-head">
@@ -233,16 +252,24 @@ export default function UploadTray() {
           aria-expanded={open}
           data-testid="upload-tray-head"
         >
-          <span className={`up-state ${active.length ? '' : failed ? 'err' : done ? 'ok' : ''}`}>
-            {active.length ? <Ring pct={pct} /> : <I name={failed ? 'x' : done ? 'check' : 'upload'} size={14} />}
+          <span className={`up-state ${going ? '' : failed ? 'err' : done || files.done ? 'ok' : ''}`}>
+            {going ? <Ring pct={pct} /> : <I name={failed ? 'x' : done || files.done ? 'check' : 'upload'} size={14} />}
           </span>
           <span className="grow ellipsis">{title}</span>
-          {/* the share in numbers where no row says it: folded, or for several videos together */}
-          {pct !== null && (!open || sending.length > 1) && <span className="up-pct">{pct}%</span>}
+          {/* the share in numbers where no row says it: folded, or for several videos or files together */}
+          {pct !== null && (!open || sending.length > 1 || files.going > 1) && <span className="up-pct">{pct}%</span>}
           <I name="down" size={14} className={`up-chev ${open ? '' : 'up-flip'}`} />
         </button>
-        {!active.length && list.length > 0 && (
-          <button type="button" className="btn ghost sm up-clear" onMouseDown={(e) => e.preventDefault()} onClick={clearFinished}>
+        {!going && !files.waiting && (list.length > 0 || files.any) && (
+          <button
+            type="button"
+            className="btn ghost sm up-clear"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              clearFinished();
+              clearFileUploads();
+            }}
+          >
             {t('Clear')}
           </button>
         )}
@@ -255,6 +282,7 @@ export default function UploadTray() {
           {leftovers.map((x) => (
             <Leftover key={x.key} x={x} />
           ))}
+          <FileTrayRows />
         </div>
       )}
     </section>

@@ -33,7 +33,8 @@ test('icon-only buttons are IconButtons (a name and a tooltip, always), outside 
 });
 
 test('icons come from ui/icons.tsx only (one set, one stroke rule)', () => {
-  const offenders = files(WEB).filter((f) => rel(f) !== 'ui/icons.tsx' && source(f).includes("from 'lucide-react'"));
+  // ui/kindIcons.tsx: the project files' kinds, drawn by the same rule, kept out of the start (only the Files screens use them)
+  const offenders = files(WEB).filter((f) => !['ui/icons.tsx', 'ui/kindIcons.tsx'].includes(rel(f)) && source(f).includes("from 'lucide-react'"));
   assert.deepEqual(offenders.map(rel), [], 'add a name to ui/icons.tsx instead');
 });
 

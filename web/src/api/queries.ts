@@ -136,7 +136,7 @@ export function prefetchScreen(qc: QueryClient, hash: string): void {
       slug = decodeURIComponent(player[1] as string);
     } catch {}
     if (slug) void qc.prefetchQuery(reviewQuery(slug));
-  } else if (/^(#\/?)?$|^#\/(\?|inbox|open|verify|unsorted|insights|folder\/|session\/)/.test(hash)) void qc.prefetchQuery(libraryQuery);
+  } else if (/^(#\/?)?$|^#\/(\?|inbox|open|verify|unsorted|insights|folder\/|files\/|session\/)/.test(hash)) void qc.prefetchQuery(libraryQuery);
   void qc.prefetchQuery(infoQuery);
   void qc.prefetchQuery(forYouQuery);
 }

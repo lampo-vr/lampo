@@ -7,6 +7,8 @@ export type LibraryView =
   | { kind: 'folder'; id: string }
   /** A folder's playbook, beside its videos (#/playbook/<folder>). */
   | { kind: 'playbook'; id: string }
+  /** A folder's project files, beside its videos (#/files/<folder>[?path=…]): the page reads the rest of the address. */
+  | { kind: 'files'; id: string }
   | { kind: 'session'; id: string };
 
 export const leaf = (folder: string | null | undefined) => (folder ? folder.split('/').at(-1) || folder : t('No project'));
