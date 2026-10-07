@@ -45,6 +45,8 @@ player.
 | Group | What it is | It leaves when |
 |---|---|---|
 | Questions from agents | an agent's open question about a frame | you answer it, or close it with *Done* |
+| Waiting for your OK | an agent's work stopped short of a permission its settings don't give it (a run Lampo started on your machine): what it needs, and the exact rule to add — *Copy*, then *Send again* | it goes on, you stop it (*Stop*), or you send it again |
+| Agents that stopped | an agent's work failed (a render that failed, an error, the time limit): why, with the last lines the tool printed, and *Try again* (*Log* opens the whole output of a run on this machine) | you try again, or once you opened it |
 | Fixes to check | a note an agent marked fixed | *Looks right*, or *Still wrong* with what is still wrong |
 | To review | a version nobody has decided on yet: a new video's V1 or any new version (from the last 30 days; a partial render reads "New version V8 · part") | someone approves it, requests changes or leaves notes that need fixing |
 | From review links | an open note from a review link | the note is dealt with, or you wave it through (*Seen*, *Got it*) |
@@ -53,6 +55,7 @@ player.
 | Replies to your notes | an agent replied to one of your notes (the last 14 days) | *Got it* |
 | New versions | a new version that carries open notes over to be checked again (the last 7 days) | *Got it* |
 | Stalled | a video that waits too long: fixes keep coming back, four full renders and still no approval, or nothing happened for two days. It offers *Nudge agent* (a request to the video's agent) or *Review link* | its video moves on, or *Got it* (it comes back if it stalls again) |
+| Stalled (an agent) | no word from an agent at work for a while, or notes sent that no agent picked up in 10 minutes: *Nudge* and *Stop* (*Cancel*) | the agent is heard from again, or you stop it |
 
 **Work leaves when it is done.** Questions, fixes, versions to review and playbook suggestions have no *Got it*: they
 leave when they are answered, checked or decided. Only what informs can be waved through, and it also leaves by itself
@@ -60,7 +63,8 @@ once you have read it in the preview (it stayed open for a moment, and you moved
 
 *Got it* changes nothing in the review; it only takes the item off your own list. Each person sees what their role
 allows: questions need the right to write notes, fixes the right to check them, versions to review and stalled videos
-the right to approve, playbook suggestions the right to edit playbooks. Stalled videos come last and aren't counted in
+the right to approve, playbook suggestions the right to edit playbooks, and an agent's work (waiting for your OK,
+stopped, gone quiet) the right to work with agents — never a reviewer. Stalled videos come last and aren't counted in
 the bell's number. Notes someone saved but hasn't sent never show up in anyone's inbox.
 
 **By video or by kind.** *By video* (the default) groups everything per video, the most urgent video first: its name,
@@ -141,9 +145,12 @@ set up on its own.
 | Replies | on | an agent replied on a note; a few seconds per video |
 | Every new version | off | also versions that come without fixes |
 | Posts | on | a post of a final version went out, was scheduled or failed; a couple of seconds: "spot.mp4 is on YouTube" |
+| Agents that stop or wait | on | an agent's work failed or waits for your OK; a few seconds per video: "Claude Code stopped — the render of promo.mp4 failed", "Claude Code is waiting for your OK to render promo.mp4" |
+| Agents gone quiet | off | no word from an agent at work for 30 minutes, once: "No word from Claude Code on spring.mp4 for 30 min" |
 
 A bundle waits until its video has been quiet for that long (two minutes at most), so an agent's batch of fixes
-arrives as one notification, and a newer notification about the same video replaces the older one. Nobody is told
+arrives as one notification, and a newer notification about the same video replaces the older one. An agent starting,
+rendering or getting on never pings you: the app shows it. Nobody is told
 about their own actions. Tapping a notification opens the exact note, or check mode at the fix; when the app is
 already open, it goes there instead of opening a second window. On a server with several workspaces it opens in the
 workspace the note is from (the app switches there first). Where the platform supports it (installed apps on iOS,

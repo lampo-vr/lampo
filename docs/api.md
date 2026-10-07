@@ -906,13 +906,13 @@ Details:
 | `POST /api/review/:slug/request` | ask the assigned agent: `{text?, start?, part?, nudge?}` (it arrives as a `REQUEST` in `vr watch`) → `{ok, run}` |
 | `POST /api/review/:slug/wake` | start the assigned agent without a request of its own (its question was answered): `{text?}` → `{run}` |
 | `GET /api/agent-runs?slug=` | runs Lampo started on this machine, newest first: `{runs}` (below) |
-| `POST /api/agent-runs/:id/stop` | end a run and everything it started (SIGTERM, then SIGKILL after 5 s) |
+| `POST /api/agent-runs/:id/stop` | end a run and everything it started (SIGINT, SIGTERM after 5 s, then SIGKILL after 5 s more) |
 | `GET /api/agent-runs/:id/log` | the end of a run's output (256 KB at most, text) |
 | `PUT /api/review/:slug/agent-status` | an agent's status on the video's card: `{text, eta_seconds?, by?}`; empty text clears it |
 | `POST /api/agents/heartbeat` | an agent checking in: `{session_id, name, cwd?, host?, kind?}` (below) |
 | `GET /api/agents` | the agents that checked in within the last 90 s |
 | `GET /api/agent-activity?slug=&agent=` | what agents are doing (below) |
-| `POST /api/agents/activity` | what `vr` and the stdio MCP server report to a hosted server (below) |
+| `POST /api/agents/activity` | what `vr` and the stdio MCP server report to a hosted server (below); answers `{ok, lines?}`, `lines` being what the agent is told now (the person stopped its work) |
 | `GET /api/inbox?since=&limit=&all=` · `GET /api/inbox.md` | the newest feedback from people, as events or as INBOX.md |
 
 Details:
@@ -971,7 +971,7 @@ nudges, answers its question or tries again (or by the agent's own first write),
 |---|---|
 | `GET /api/runs?slug=` · `?folder=` | a video's runs, newest first: `{runs: Run[]}`; `folder` for runs on a folder's question before any render |
 | `GET /api/runs/:id` | one run and its kept steps, newest first: `{run, steps: RunStepLine[]}` |
-| `POST /api/runs/:id/stop` | stops it at once: `stopped`; a run this machine started ends its process too → `{run}` |
+| `POST /api/runs/:id/stop` | stops it at once: `stopped`; a run this machine started ends its process too (SIGINT, SIGTERM, SIGKILL); an agent that listens gets `stop_pending` until its next call tells it → `{run}` |
 | `POST /api/runs/:id/retry` | Try again: `{start?}` opens the follow-up run on the notes still open (`follows`, `opened_by.how: "retry"`), told to the agent as a `REQUEST` → `{run}` |
 | `POST /api/runs/:id/nudge` | `{text?, start?}`: a `REQUEST` to the same agent about the same run (a run not heard from works again at its next sign) → `{run}` |
 | `GET /api/runs/:id/log` | the end of the raw log of a run this machine started (256 KB at most, text) |
@@ -994,7 +994,16 @@ Details:
   `seen` (its last sign), `worked_s` (as of the answer; never the time it waited for a person), `plan` (`[{id, state:
   todo | doing | fixed | asked | wontfix | replied, at, v?, added?}]`), `now` (the newest step or what the agent said,
   with its `type` and `at`), `progress` (a render or upload under way), `result {v?, fixed, asked, wontfix, summary?,
-  tokens?, cost_usd?}`, `error`, `needs`, `request`, `follows`, `log`.
+  tokens?, cost_usd?}`, `error`, `needs` (`{kind, note?, text?, allow?}`: `allow` is the settings rule a permission it
+  was refused needs), `request`, `follows`, `log`, `stop_pending` (stopped by a person, its agent not told yet).
+- **Stop and the agent.** A run that isn't a process Lampo runs (`delivery` other than `machine`) and had begun gets
+  `stop_pending`; the agent's next Lampo call (an MCP tool, a `vr` command about the video, a batch to
+  `POST /api/agents/activity`, which then answers `lines`) ends with one line, once: `The person stopped this work on
+  <file>: stop now, render nothing, mark nothing, and say you stopped.` A wait clears it without the line; a new
+  Send, request or nudge to the same agent clears it too. A request (Tell it…) while a run is open joins that run: its
+  `request` and a step `{name} asked`.
+- **Permissions.** A run this machine started that is refused a tool call (its stream-json says so) turns `needs_you`
+  with `needs.kind: "permission"`, its words and `allow`; it stays so when its process ends (`ended` set).
 - **States.** A run begins at its agent's first sign (a wait that hands the notes over included). `needs_you` comes
   with the agent's question or options and goes with the answer. `failed` with an error (`vr render`) or a non-zero
   exit. No sign for 20 minutes (5 for a run this machine started, 10 more while a render reports) reads as `lost`; any
@@ -1249,14 +1258,18 @@ What they are for: [mobile.md](mobile.md).
 | `POST /api/for-you/unsnooze` | `{keys}`: bring items you put aside back at once |
 | `GET /api/push?endpoint=` | `PushState`: the server's VAPID public key, your `subscription` on that endpoint (`id`, `name`, `prefs`, `created`, `last_ok`) and how many devices you have |
 | `POST /api/push/subscribe` | `{subscription: {endpoint, keys: {p256dh, auth}}, name?, prefs?}` → `PushState`; a person's, in the app (`403` with an API token). Any new password (Profile, an admin, a reset) ends the account's subscriptions |
-| `PATCH /api/push/prefs` | `{endpoint, prefs: {questions?, fixes?, versions?, clients?, answers?}}` → `PushState`; `404` for an unknown device |
+| `PATCH /api/push/prefs` | `{endpoint, prefs: {questions?, fixes?, versions?, clients?, answers?, posts?, agents?, quiet?}}` → `PushState`; `404` for an unknown device |
 | `POST /api/push/unsubscribe` · `POST /api/push/test` | `{endpoint}`; the test answers `404` when the device isn't subscribed, `502` when its push service refuses |
 
 Details:
 
-- **The inbox** has `items` (kind `question`, `verify`, `review`, `client`, `playbook`, `approval`, `answer`, `version`
-  or `stalled`, each with the video, frame, timecode, text and marked screenshot) and `counts` per kind plus `total`,
-  for whoever asks. `?limit=n` returns at most n items of each kind, with `truncated: true`; the counts stay complete.
+- **The inbox** has `items` (kind `question`, `blocked`, `failed`, `verify`, `review`, `client`, `playbook`, `approval`,
+  `answer`, `version`, `post` or `stalled`, each with the video, frame, timecode, text and marked screenshot) and
+  `counts` per kind plus `total`, for whoever asks. `blocked` (an agent's run waits for a permission it was refused)
+  and `failed` (its run failed), and `stalled` with `reason: lost` (no word from it) or `queued` (sent, picked up by
+  nobody in 10 minutes), carry `run` (`ForYouRun`: agent, state, delivery, times, `error`, `needs` with `allow`, the
+  rule to copy, `now`, `log`, plan counts) and are listed only for roles with the agents right. A `failed` item is
+  dismissed once it was opened; a `blocked` one leaves when its run goes on, is stopped or sent again. `?limit=n` returns at most n items of each kind, with `truncated: true`; the counts stay complete.
 - **Dismissing** (1–500 keys) hides only items that inform: `client`, `approval`, `answer`, `version` and `stalled`.
   Work (a question, a fix to check, a version to review, a playbook suggestion) stays until it is done. Dismissing and
   bringing back answer your `ForYouResponse`.
