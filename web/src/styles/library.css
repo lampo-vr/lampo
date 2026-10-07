@@ -1228,11 +1228,20 @@ button.shead-title:hover {
 .lane[data-lane='final'] .kg {
   color: var(--fg-2);
 }
+.lane-note {
+  margin-left: auto;
+  font: var(--fw-text) var(--fs-xs) / var(--lh-ui) var(--ui);
+  color: var(--muted);
+  white-space: nowrap;
+}
 .lane-count {
   margin-left: auto;
   font: var(--fw-ui) var(--fs-xs) var(--mono);
   font-variant-numeric: tabular-nums;
   color: var(--muted);
+}
+.lane-note + .lane-count {
+  margin-left: var(--sp-2);
 }
 .lane-cards {
   display: grid;

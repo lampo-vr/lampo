@@ -33,7 +33,10 @@ import { useLang } from '../i18n/T.tsx';
 import { cardClick, onActivate } from '../lib/a11y.ts';
 import { useScrollEdges } from '../lib/hooks.ts';
 import { loader, useLoaded, usePainted } from '../lib/lazy.ts';
+import { go } from '../lib/nav.ts';
 import { useWindowed, WINDOW_FROM } from '../lib/windowing.ts';
+import { cardRun, RunEdge, RunLine } from '../sessions/RunLine.tsx';
+import { isOpen } from '../sessions/runState.ts';
 import { laneLabel, nextLabel } from '../status/stageText.ts';
 import { LANE_SHAPE } from '../ui/glyphs.ts';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
@@ -139,6 +142,9 @@ const BoardCard = memo(function BoardCard({ v, where, home, folders, lifted, lan
   // an agent at work on the video: who, and what it is doing now (the live monitor, loaded after the first paint)
   const working = v.stage.stage === 'in_progress';
   const Now = useLoaded(agentNow, usePainted());
+  // the agent's work on it, when the server keeps it (lib/types.ts Run): its line, its edge, and Answer when it asks
+  const run = cardRun(v);
+  const asks = run?.state === 'needs_you' && run.needs?.note ? run.needs.note : null;
   const line = <span className="bcard-text">{yours ? happened(v.stage) : boardLine(v.stage)}</span>;
   const share = v.stage.share && (v.stage.stage === 'team_approved' || v.stage.stage === 'with_client');
   const menu = (open: boolean) => {
@@ -174,7 +180,9 @@ const BoardCard = memo(function BoardCard({ v, where, home, folders, lifted, lan
           height={v.height}
           frame={16 / 10}
           className="bthumb"
-        />
+        >
+          <RunEdge run={run} />
+        </Poster>
         <div className="bcard-row">
           <b className="bcard-name" title={v.name}>
             {v.name}
@@ -195,7 +203,9 @@ const BoardCard = memo(function BoardCard({ v, where, home, folders, lifted, lan
           </span>
         )}
         <div className="bcard-line" data-testid="status-pill" data-stage={v.stage.stage}>
-          {share ? (
+          {run ? (
+            <RunLine run={run} say={Now?.sayWords} />
+          ) : share ? (
             <ShareState stage={v.stage} />
           ) : Now ? (
             <Now.CardAgentLine slug={v.slug} agent={v.session?.name ?? null} working={working} watch={working || v.stage.stage === 'changes'}>
@@ -209,6 +219,10 @@ const BoardCard = memo(function BoardCard({ v, where, home, folders, lifted, lan
         </div>
         {ask && moveCode.ready ? (
           <moveCode.ready.MoveNote a={ask} />
+        ) : asks ? (
+          <button type="button" className="btn sm bcard-next" onClick={() => go(v.slug, `c=${encodeURIComponent(asks)}`)} data-testid="bcard-answer">
+            {t('Answer')}
+          </button>
         ) : (
           yours && (
             <button type="button" className="btn sm bcard-next" onClick={() => openVideo(v.slug)}>
@@ -393,8 +407,21 @@ export function Board({ videos, where, home, folders }: BoardProps) {
             ask={ask?.slug === v.slug && ask.kind === 'note' && ask.inPlace ? ask : null}
           />
         );
+        // Being fixed says, quietly, how many agents are at it now (needs-you and gone-quiet ones aren't working)
+        const agents = new Set(
+          l.id === 'fixing'
+            ? l.videos.flatMap((x) => (x.run && isOpen(x.run) && x.run.state !== 'needs_you' && x.run.state !== 'lost' ? [x.run.agent.name] : []))
+            : [],
+        ).size;
         return (
-          <Lane key={l.id} id={l.id} label={`${laneLabel(l.id)}: ${l.videos.length}`} count={l.videos.length} drop={state}>
+          <Lane
+            key={l.id}
+            id={l.id}
+            label={`${laneLabel(l.id)}: ${l.videos.length}`}
+            count={l.videos.length}
+            note={agents ? t('{n} agent working|{n} agents working', { n: agents }) : null}
+            drop={state}
+          >
             {l.videos.length ? (
               <LaneCards videos={l.videos} long={long} beside={beside} slot={slot} card={card} />
             ) : (
@@ -410,13 +437,33 @@ export function Board({ videos, where, home, folders }: BoardProps) {
 /** A lane: its head, then its cards in a box of their own that scrolls under it (a soft edge where there is more).
  * While a card is dragged, `drop` says what the lane is to it: `from` its own, `lit` the one that would take it, `ok`
  * one that could, `no` one it can't go to. */
-function Lane({ id, label, count, drop, children }: { id: string; label?: string; count: ReactNode; drop?: string; children: ReactNode }) {
+function Lane({
+  id,
+  label,
+  count,
+  note,
+  drop,
+  children,
+}: {
+  id: string;
+  label?: string;
+  count: ReactNode;
+  /** A quiet word beside the count ("2 agents working"). */
+  note?: string | null;
+  drop?: string;
+  children: ReactNode;
+}) {
   const [scrollRef, edges] = useScrollEdges<HTMLDivElement>('y');
   return (
     <section className="lane" data-lane={id} data-drop={drop} aria-label={label}>
       <h2 className="lane-head">
         <KeyGlyph shape={LANE_SHAPE[id] ?? 'outline'} />
         {laneLabel(id)}
+        {note && (
+          <span className="lane-note" data-testid="lane-note">
+            {note}
+          </span>
+        )}
         <span className="lane-count">{count}</span>
       </h2>
       <div ref={scrollRef} className={`lane-scroll ${edges}`} data-testid="lane-scroll">

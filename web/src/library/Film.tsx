@@ -11,8 +11,10 @@ import { useLang } from '../i18n/T.tsx';
 import { cardClick, onActivate } from '../lib/a11y.ts';
 import { ago } from '../lib/format.ts';
 import { go } from '../lib/nav.ts';
+import { cardRun, RunEdge, RunLine } from '../sessions/RunLine.tsx';
 import { SessionChip } from '../sessions/Sessions.tsx';
 import { StatusPill } from '../status/StatusPill.tsx';
+import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { ContextMenu, IconButton, Menu } from '../ui/primitives.tsx';
 import { Skeleton, SkLine } from '../ui/Skeleton.tsx';
 import { DRAG_VIDEO, dragChip } from './drag.ts';
@@ -38,6 +40,7 @@ export const Film = memo(function Film({ v, home, folders, where, compact, prior
   const [dragging, setDragging] = useState(false);
   const qc = useQueryClient();
   const { items, dialogs, assign, organize } = useVideoMenu(v, { home, folders });
+  const run = cardRun(v);
   return (
     <ContextMenu items={items} onOpenChange={setMenuOpen}>
       {/* biome-ignore lint/a11y/useSemanticElements: the card holds its own buttons, which an <a> or <button> cannot contain */}
@@ -72,7 +75,9 @@ export const Film = memo(function Film({ v, home, folders, where, compact, prior
             height={v.height}
             frame={CARD_FRAME}
             priority={priority}
-          />
+          >
+            <RunEdge run={run} />
+          </Poster>
           <div className="film-over top">
             <span className="vchip">V{v.v}</span>
             {v.sample && <span className="vchip sample-chip">{t('Sample')}</span>}
@@ -83,10 +88,16 @@ export const Film = memo(function Film({ v, home, folders, where, compact, prior
           </div>
           {!compact && (
             <div className="film-over bottom">
-              {v.agent_status && (
-                <span className="vchip agent ellipsis" title={`${v.agent_status.by} · ${v.agent_status.text}`}>
-                  <span className="spinner" /> {v.agent_status.text}
-                </span>
+              {/* the agent's work on it; an older server's free-text status (no runs there) in the same keyframe language */}
+              {run ? (
+                <RunLine run={run} chip />
+              ) : (
+                v.run === undefined &&
+                v.agent_status && (
+                  <span className="vchip agent ellipsis" title={`${v.agent_status.by} · ${v.agent_status.text}`}>
+                    <KeyGlyph shape="ease" className="nav-kg live" /> {v.agent_status.text}
+                  </span>
+                )
               )}
               <span className="grow" />
               <span className="vchip">{fmtDuration(v.duration)}</span>

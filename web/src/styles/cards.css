@@ -158,11 +158,6 @@
   font-weight: var(--fw-ui);
   letter-spacing: 0;
 }
-.vchip .spinner {
-  width: 9px;
-  height: 9px;
-  flex: none;
-}
 /* notes of yours not sent yet (library/unsent.tsx): a dashed edge and a hollow keyframe — a reminder, not an alarm */
 .vchip.unsent-chip {
   font-family: var(--ui);

@@ -16,15 +16,16 @@ import { api, enc } from '../api/client.ts';
 import { useSSE } from '../api/events.ts';
 import { type NewComment, useCommentActions } from '../api/mutations.ts';
 import { keys, useAnalysis, useAudience, useInfo, useLibrary, useReview, useTracks, useWaveform } from '../api/queries.ts';
+import { useRuns } from '../api/runs.ts';
 import { spriteUrl, useSprite } from '../api/sprite.ts';
-import type { DraftsSent, FrameRange, LibraryResponse, PlacedComment, QaItem, ReviewResponse, Shape, Tool } from '../api/types.ts';
+import type { ActivityWords, DraftsSent, FrameRange, LibraryResponse, PlacedComment, QaItem, ReviewResponse, Shape, Tool } from '../api/types.ts';
 import { billingCode } from '../billing/code.ts';
 import { t } from '../i18n/index.ts';
 import { useLang } from '../i18n/T.tsx';
 import { clamp, fileName } from '../lib/format.ts';
 import { useHiddenNotes } from '../lib/hidden.ts';
 import { useStableCallback } from '../lib/hooks.ts';
-import { loader, useLoaded } from '../lib/lazy.ts';
+import { loader, useLoaded, usePainted } from '../lib/lazy.ts';
 import { usePhone } from '../lib/media.ts';
 import { backToLibrary } from '../lib/nav.ts';
 import { usePrefs } from '../lib/prefs.ts';
@@ -32,7 +33,9 @@ import { errorMessage, toast, toastError } from '../lib/toast.ts';
 import { archivedCode, useHeldArchive } from '../library/archiving.ts';
 import { inlineBody, sendRef } from '../refs/api.ts';
 import { GOTO_FRAME, type GotoFrame } from '../refs/model.ts';
+import { say } from '../sessions/activityWords.ts';
 import { useListening, useListenNudge } from '../sessions/listening.tsx';
+import { isOpen, type RunLike } from '../sessions/runWords.ts';
 import { useWakeChoice } from '../sessions/Wake.tsx';
 import { ShareModal } from '../share/ShareModal.tsx';
 import { I } from '../ui/icons.tsx';
@@ -59,6 +62,7 @@ import { deviceById } from './phone/devices.ts';
 import type { PhoneView } from './phone/view.ts';
 import { pendingPreview, previewSource, previewUrl } from './previews.ts';
 import { ReviewHud } from './ReviewHud.tsx';
+import { RunStrip } from './RunStrip.tsx';
 import { RecordButton } from './record/RecordButton.tsx';
 import { recordUi, useRecordFeedback } from './record/useRecordFeedback.ts';
 import Stage, { type Pane } from './Stage.tsx';
@@ -75,6 +79,10 @@ import { VerifyPanel } from './VerifyPanel.tsx';
 import { WalkieHud } from './WalkieHud.tsx';
 import { orientOf, presetById, presetsFor } from './zones.ts';
 
+/** The side panel's Agent view: loaded when it is first opened (or the strip is pointed at). */
+const agentViewCode = loader(() => import('./AgentView.tsx'));
+/** A day: how long work that ended badly (failed, stopped) stays on the strip. */
+const DAY_MS = 24 * 3600_000;
 /** "Not sent yet" in the notes panel: loaded once there is something to show in it. */
 const unsentUi = loader(() => import('./drafts/Unsent.tsx'));
 /** Publishing a final version (publish/Publishing.tsx): loaded when "Publish…" is chosen or the address asks for it. */
@@ -124,7 +132,10 @@ export default function Player({ slug, focus, startFrame, startV = null, verifyA
         </EmptyState>
       </div>
     );
-  if (!data) return <PlayerLoading slug={slug} phone={phone} ar={known?.width ? known.height / known.width : undefined} />;
+  if (!data)
+    return (
+      <PlayerLoading slug={slug} phone={phone} ar={known?.width ? known.height / known.width : undefined} agent={!!known && (!!known.session || !!known.run)} />
+    );
   return <PlayerView data={data} slug={slug} focus={focus} startFrame={startFrame} startV={startV} verifyAt={verifyAt} />;
 }
 
@@ -477,6 +488,7 @@ function PlayerView({
     if (frozen) return;
     pb.pause();
     setComposer((c) => c || { shapes: [], tool: 'box' });
+    if (view === 'agent') setView('notes');
     if (phone) setSheet((x) => (x === 'peek' ? 'half' : x));
   };
   const range = pb.inPt != null && pb.outPt != null ? { in: Math.min(pb.inPt, pb.outPt), out: Math.max(pb.inPt, pb.outPt) } : null;
@@ -895,6 +907,41 @@ function PlayerView({
   const batch = !!review.session && data.summary.stage.stage !== 'final';
   // The agent waits for notes right now (wait_for_feedback): one quiet line says it gets them when they're sent.
   const waiting = batch && listen === 'listening' ? (review.session?.name ?? null) : null;
+
+  // ---------------------------------------------------------------- the agent's work (runs)
+  // The review's summary carries the brief the strip starts from (undefined: an older server, no runs there); the
+  // whole runs — the plan for the note rows, the version picker's who-made-it — come after the first paint, at once
+  // while work goes on (the rows' plan lines). SSE `run` keeps them current (api/live.ts).
+  const brief = data.summary.run;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: when the review's answer came (the brief is as of then)
+  const briefAt = useMemo(() => Date.now(), [data]);
+  const painted = usePainted();
+  const runsQ = useRuns(slug, brief !== undefined && (painted || (!!brief && isOpen(brief))));
+  const runs = runsQ.runs;
+  const newest: RunLike | null = runs?.[0] ?? brief ?? null;
+  const asOf = runs ? runsQ.at : briefAt;
+  // what the strip speaks of: work going on, work that ended badly today, or work done while its fixes wait
+  const stripRun =
+    newest &&
+    (isOpen(newest) ||
+      ((newest.state === 'failed' || newest.state === 'stopped') && Date.now() - Date.parse(newest.ended ?? newest.started) < DAY_MS) ||
+      (newest.state === 'done' && verify.queue.length > 0))
+      ? newest
+      : null;
+  // the slot is there from the first paint wherever the video has an agent (assigned, or at work on it)
+  const hasAgent = !!review.session || !!brief;
+  const reachable = listen === 'listening' || listen === 'working' || (listen === null && !!data.summary.sessionActive);
+  const noteAtId = useCallback((id: string) => review.comments.find((c) => c.id === id)?.timecode ?? null, [review.comments]);
+  const sayRun = useCallback((w: ActivityWords) => say(w, noteAtId), [noteAtId]);
+  // the plan's lines on the note rows, while the work goes on; before the runs arrive, open notes keep their room
+  const planRun = runs?.[0] && isOpen(runs[0]) ? runs[0] : null;
+  const plans = useMemo(() => new Map((planRun?.plan ?? []).map((x) => [x.id, x])), [planRun]);
+  const planPending = !runs && !!brief && isOpen(brief);
+  const inHand = planRun?.plan.find((x) => x.state === 'doing')?.id ?? null;
+  // the Agent view: its code when it is first opened, or as soon as the strip is pointed at
+  const [warm, setWarm] = useState(false);
+  const AgentUI = useLoaded(agentViewCode, view === 'agent' || warm);
+  const [pickRun, setPickRun] = useState<string | null>(null);
   const draftsSent = useStableCallback((out: DraftsSent) => {
     setDraftFocus(null);
     setFilter((f) => (f === 'active' || f === 'mine' || f === 'all' ? f : 'active'));
@@ -1115,6 +1162,88 @@ function PlayerView({
     }
   }, []);
 
+  // ---------------------------------------------------------------- the strip and the Agent view
+  const canSteer = allowed('agents');
+  const canCheck = allowed('verify');
+  const openAgent = useStableCallback(() => {
+    if (phone) {
+      setView('agent');
+      setSheet((x) => (x === 'peek' ? 'half' : x));
+      return;
+    }
+    setView(view === 'agent' ? 'notes' : 'agent');
+  });
+  // Answer: the question's note, open on its frame (its choices, or Compare and pick, one click away)
+  const answer = useStableCallback((note: string | null) => {
+    const c = note ? placed.find((x) => x.id === note) : null;
+    setView('notes');
+    if (c) {
+      setFilter((f) => (c.status !== 'open' ? 'all' : f === 'questions' || f === 'active' || f === 'all' ? f : 'active'));
+      selectComment(c);
+    } else setFilter(counts.questions ? 'questions' : 'active');
+    if (phone) setSheet((x) => (x === 'peek' ? 'half' : x));
+  });
+  // a plan's note: there on the timeline, picked in the list, the Agent view stays
+  const showNote = useStableCallback((id: string) => {
+    const c = placed.find((x) => x.id === id);
+    if (c) selectComment(c);
+  });
+  const showSteps = useStableCallback((id: string) => {
+    setPickRun(id);
+    setView('agent');
+    if (phone) setSheet((x) => (x === 'peek' ? 'half' : x));
+  });
+  const warmAgent = useCallback(() => setWarm(true), []);
+  // a final video ships: its agent's idle line goes with the agent button (work still going on stays)
+  const final = data.summary.stage.stage === 'final';
+  const showStrip = hasAgent && (!final || !!stripRun);
+  // the strip's raised button (Answer, Check fixes) is the panel's one: + Note steps down while it shows
+  const stripPrimary =
+    !!stripRun &&
+    ((stripRun.state === 'needs_you' && stripRun.needs?.kind !== 'permission' && stripRun.needs?.kind !== 'sign_in') ||
+      (stripRun.state === 'done' && verify.queue.length > 0 && canCheck));
+  const strip = showStrip ? (
+    <RunStrip
+      slug={slug}
+      run={stripRun}
+      asOf={asOf}
+      session={review.session}
+      reachable={reachable}
+      copyable={listen !== null}
+      toCheck={verify.queue.length}
+      nextV={latestV + 1}
+      canSteer={canSteer}
+      canCheck={canCheck}
+      say={sayRun}
+      onOpen={openAgent}
+      onAnswer={answer}
+      onCheck={verify.start}
+      phone={phone}
+      open={view === 'agent'}
+      onWarm={warmAgent}
+    />
+  ) : null;
+  const agentView =
+    view === 'agent' && AgentUI ? (
+      <AgentUI.AgentView
+        slug={slug}
+        runs={runs}
+        current={stripRun}
+        pick={pickRun}
+        onPick={setPickRun}
+        asOf={asOf}
+        session={review.session}
+        me={me?.name ?? null}
+        notes={placed}
+        latestV={latestV}
+        canSteer={canSteer}
+        reachable={reachable || (!!stripRun && isOpen(stripRun) && stripRun.state !== 'lost')}
+        say={sayRun}
+        onNote={showNote}
+        onAnswer={answer}
+      />
+    ) : null;
+
   const verifyPanel = verify.active && verify.item && (
     <VerifyPanel
       item={verify.item}
@@ -1157,6 +1286,9 @@ function PlayerView({
           onVerify={verify.start}
           onPublish={allowed('post') ? onPublish : undefined}
           frameNow={pb.live.get}
+          runs={runs}
+          run={stripRun}
+          onSteps={showSteps}
           archived={
             frozen
               ? {
@@ -1217,6 +1349,8 @@ function PlayerView({
           )}
         </div>
 
+        {/* a phone: the strip above the dock, in a slot of its own (the sheet stays the notes' and the Agent view's) */}
+        {phone && strip && <div className="run-slot">{strip}</div>}
         <div className="dock grain">
           {phone ? (
             <PhoneTransport pb={pb} fps={fps} N={N} />
@@ -1249,6 +1383,7 @@ function PlayerView({
             peaks={wave?.peaks}
             rms={wave?.rms}
             comments={byStatus.all.filter((c) => c.scope !== 'video')}
+            inHand={inHand}
             freezes={freezeMarks}
             words={phone ? null : words}
             segments={phone ? null : segments}
@@ -1327,7 +1462,14 @@ function PlayerView({
           rangeLoop={pb.rangeLoop}
           canCompose={!composer && !!m?.ready && !recorder.active}
           readOnly={frozen}
-          quietNew={unsentShown && unsent.count > 0}
+          quietNew={(unsentShown && unsent.count > 0) || stripPrimary}
+          strip={phone ? null : strip}
+          agentTab={showStrip || runs?.length ? { live: !!stripRun && isOpen(stripRun) && stripRun.state !== 'needs_you' && stripRun.state !== 'lost' } : null}
+          agentView={agentView}
+          plans={plans}
+          planName={planRun?.agent.name ?? brief?.agent.name ?? review.session?.name ?? ''}
+          planPending={planPending}
+          verifyInStrip={stripRun?.state === 'done' && verify.queue.length > 0 && canCheck && showStrip}
           onCompose={openComposer}
           verifyCount={frozen ? 0 : verify.queue.length}
           verifying={verify.active}

@@ -87,6 +87,7 @@
     .nav-act,
     .playbtn,
     .p-strip .btn,
+    .run-act,
     .side-views button,
     button.tr-tc,
     .crumb button,
@@ -115,6 +116,7 @@
     .nav-act,
     .playbtn,
     .p-strip .btn,
+    .run-act,
     .side-views button,
     button.tr-tc,
     .crumb button,
@@ -564,9 +566,21 @@
     height: 100dvh;
     min-height: 0;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
-    grid-template-areas: 'top' 'strip' 'stage' 'dock' 'side';
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
+    grid-template-areas: 'top' 'strip' 'stage' 'run' 'dock' 'side';
     overflow: hidden;
+  }
+  /* the run strip above the dock (RunStrip.tsx): a thumb's height, the edge on its foot; tapping it opens the Agent
+     view in the sheet */
+  .run-slot {
+    grid-area: run;
+    min-width: 0;
+  }
+  .run-strip.phone {
+    height: var(--h-touch);
+    margin: 0;
+    padding: 0 max(var(--sp-2), env(safe-area-inset-right)) 0 max(var(--sp-3), env(safe-area-inset-left));
+    border-bottom: 0;
   }
   .p-bar {
     gap: var(--sp-1);

@@ -23,6 +23,7 @@ const TYPES = [
   'recording',
   'agent-runs',
   'agent-activity',
+  'run',
   'drafts',
   'asks',
   'posts',

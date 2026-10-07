@@ -13,6 +13,9 @@ import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { type NoteAt, phrase, say } from './activityWords.ts';
 import { RunLine } from './Wake.tsx';
 
+/** An agent's own words in the UI's language, for the cards' run lines once this module is here (RunLine.tsx). */
+export const sayWords = (w: ActivityWords): string => say(w);
+
 /** How long the latest action counts as "now". A wait is re-asked every few minutes while it lasts. */
 const FRESH_MS = 90_000;
 const WAIT_FRESH_MS = 15 * 60_000;
@@ -116,10 +119,15 @@ export function AgentOnIt({ agent, step }: { agent: string | null; step: string 
 }
 
 /** An Agents row's words while the agent works (the sidebar): what it is doing, after its name; the full line in its
- * title. */
-export function AgentNowText({ agent }: { agent: string }) {
+ * title. `idle`: what it says while the agent does nothing ("ready"). */
+export function AgentNowText({ agent, idle = null }: { agent: string; idle?: string | null }) {
   const now = useAgentsNow(true).get(agent);
-  if (!now) return null;
+  if (!now)
+    return idle ? (
+      <span className="nav-now" data-testid="agent-now-row" data-phase="ready">
+        {idle}
+      </span>
+    ) : null;
   return (
     <span className="nav-now" data-testid="agent-now-row" title={`${agent} · ${stepLine(now)}`}>
       {stepLine(now)}
