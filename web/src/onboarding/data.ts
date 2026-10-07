@@ -1,13 +1,15 @@
 // The first run's data, shared by Get started (GetStarted.tsx) and the setup (Setup.tsx), never by the first paint
 // (what only the setup writes, like the personas, is in steps.tsx: Get started never loads the workspaces' code):
-// where it stands now, putting it away and bringing it back, the setup finished, the agent picked, the workspace's
+// where it stands now, putting it away (the card, or everything for good) and bringing it back, the setup finished, the
+// agent picked, the workspace's
 // personas, the sample, a self-hosted server's health check and test mail, the machine's folders with videos.
 import { type QueryClient, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AuthStatus, MailTestResult, OnboardingPrefs, OnboardingResponse, OnboardingUpdate, ServerHealth, SetupAgent } from '../../../lib/types.ts';
 import { authKeys } from '../api/auth.ts';
 import { api } from '../api/client.ts';
 import { keys } from '../api/queries.ts';
-import { currentLang } from '../i18n/index.ts';
+import { currentLang, t } from '../i18n/index.ts';
+import { later } from '../lib/toast.ts';
 import { endSetupHere } from './state.ts';
 
 export const onboardingKey = ['onboarding'] as const;
@@ -67,9 +69,48 @@ async function update(qc: QueryClient, change: OnboardingUpdate, guess?: (o: Onb
   }
 }
 
-/** Puts the first run away or brings it back (the account menu's "Get started"). */
+/** Puts the card away (its ×: the sidebar's row stays) or brings it back (the account menu's "Get started"). */
 export async function setHidden(qc: QueryClient, hidden: boolean): Promise<void> {
   await update(qc, { hidden });
+}
+
+const firstRunOf = (qc: QueryClient) => qc.getQueryData<AuthStatus>(authKeys.status)?.user?.prefs?.onboarding ?? null;
+
+/**
+ * "Hide for good": the card and the sidebar's row go at once, with Undo; the account hears it once the toast is gone
+ * (lib/toast.ts later: sent on leaving the page too). Until then an answer read meanwhile is shown with it on top. Where
+ * the account menu shows (a desk, a tablet, an empty library on a phone) it still brings Get started back.
+ */
+export function hideForGood(qc: QueryClient, menu: boolean): void {
+  const before = firstRunOf(qc);
+  if (!before || before.dismissed) return;
+  const at = new Date().toISOString();
+  const guess = (o: OnboardingPrefs): OnboardingPrefs => (o.dismissed ? o : { ...o, dismissed: at });
+  later({
+    message: menu ? t('Get started is hidden. Your account menu still has it.') : t('Get started is hidden.'),
+    apply: () => {
+      onTheWay.add(guess);
+      const o = firstRunOf(qc);
+      if (o) keepFirstRun(qc, guess(o));
+    },
+    revert: () => {
+      onTheWay.delete(guess);
+      const o = firstRunOf(qc);
+      if (!o?.dismissed) return;
+      const { dismissed: _, ...rest } = o;
+      keepFirstRun(qc, rest);
+    },
+    commit: () => update(qc, { dismissed: true }).finally(() => onTheWay.delete(guess)),
+  });
+}
+
+/** Back from the account menu: the sidebar's row (hidden for good no longer), and the card too when `card`. */
+export async function comeBack(qc: QueryClient, card: boolean): Promise<void> {
+  const o = firstRunOf(qc);
+  if (!o?.dismissed && !(card && o?.hidden)) return;
+  await update(qc, card ? { hidden: false, dismissed: false } : { dismissed: false }, ({ dismissed: _, hidden, ...rest }) =>
+    card || !hidden ? rest : { ...rest, hidden },
+  );
 }
 
 /** The setup is over (finished or skipped): it doesn't show again. Get started then asks where things stand (what the

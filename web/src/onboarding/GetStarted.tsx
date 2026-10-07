@@ -1,15 +1,16 @@
 // Get started, its own chunk (onboarding/state.ts decides when it loads): a compact card above All videos — the steps
 // on a keyframe track on the left, the selected step at work on the right (an accordion on a phone). Steps tick from
 // what the server finds done (lib/onboarding.ts, GET /api/onboarding), never from a click here, and the card follows
-// as it happens (the library, notes, agents connecting). Fold it to one line; × puts it away with Undo (the account
-// menu's "Get started n/m" brings it back). Everything done: "You're set", a light sweeps the track once, it folds away.
+// as it happens (the library, notes, agents connecting). Fold it to one line; × puts it away with Undo (the sidebar's
+// row stays, onboarding/Row.tsx; the account menu's "Get started" brings the card back). Everything done: "You're set",
+// a light sweeps the track once, it folds away. The sidebar's panel (Panel.tsx, this chunk too) shows the same panes.
 //
 // Nothing below the card moves while it's used: every step's pane is built the same way (its words, at most a measure
 // wide, beside the step's picture) and all of them stand in one grid cell, only the selected one visible, so the pane
 // is as tall as the tallest step at any width or language — and the room the card keeps while this chunk arrives
 // (onboarding.css, .ob-pending) is that height by design. Its controls are the app's own (.input, ui/select.tsx) and
 // its styles come with it (styles/getstarted.css): it never leans on another chunk's stylesheet.
-import { useQueryClient } from '@tanstack/react-query';
+import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { compareTime } from '../../../lib/time.ts';
 import type { OnboardingResponse, OnboardingStep, Role, SetupAgent, ShareInfo } from '../../../lib/types.ts';
@@ -24,14 +25,15 @@ import { posterUrl } from '../lib/posterUrl.ts';
 import { toast, toastError } from '../lib/toast.ts';
 import { I } from '../ui/icons.tsx';
 import { AGENTS, agentLabel, ConnectBlock, Mark, PickIcon, seenLine, useConnected, useWhere } from './connect.tsx';
-import { linkVideos, makeSample, onboardingKey, pickAgent, removeSample, setHidden, useFolders, useOnboarding } from './data.ts';
+import { comeBack, linkVideos, makeSample, onboardingKey, pickAgent, removeSample, setHidden, useFolders, useOnboarding } from './data.ts';
+import { SideRow, StartPanel } from './Panel.tsx';
 import { Cmd, CopyButton, isEmail, KG, Live, OIcon, SampleKeys, Track } from './parts.tsx';
 import { StepPic } from './pictures.tsx';
 import { connecting, type FirstRun, FOLD, readFold, useFirstRun } from './state.ts';
 import '../styles/getstarted.css';
 
-// for the account menu and the video menu, which load this chunk when they're used
-export { removeSample, setHidden };
+// for the account menu and the video menu, which load this chunk when they're used; the sidebar's row and its panel
+export { comeBack, removeSample, SideRow, StartPanel, setHidden };
 
 export interface GetStartedProps {
   /** Adds a video the way the library does (the add dialog at the machine, else the file picker); null: may not. */
@@ -42,30 +44,42 @@ export interface GetStartedProps {
 
 type Named = OnboardingResponse['sample'];
 
-/** The card follows what happens elsewhere: a video added, a note, an agent connecting, a return to the tab. */
-function useLive() {
+/** The card and the sidebar's row follow what happens elsewhere: a video added, a note, an agent connecting, a return to
+ * the tab. Listened to once, however many of them are on screen. */
+let following = 0;
+let unfollow: (() => void) | null = null;
+export function useLive() {
   const qc = useQueryClient();
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const soon = () => {
-      if (timer) return;
-      timer = setTimeout(() => {
-        timer = null;
-        void qc.invalidateQueries({ queryKey: onboardingKey });
-      }, 600);
-    };
-    const offs = [on('library', soon), on('review', soon), on('sessions', soon)];
-    const back = () => document.visibilityState === 'visible' && soon();
-    document.addEventListener('visibilitychange', back);
+    if (following++ === 0) unfollow = follow(qc);
     return () => {
-      for (const off of offs) off();
-      document.removeEventListener('visibilitychange', back);
-      if (timer) {
-        clearTimeout(timer);
-        void qc.invalidateQueries({ queryKey: onboardingKey });
-      }
+      if (--following > 0) return;
+      unfollow?.();
+      unfollow = null;
     };
   }, [qc]);
+}
+
+function follow(qc: QueryClient): () => void {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const soon = () => {
+    if (timer) return;
+    timer = setTimeout(() => {
+      timer = null;
+      void qc.invalidateQueries({ queryKey: onboardingKey });
+    }, 600);
+  };
+  const offs = [on('library', soon), on('review', soon), on('sessions', soon)];
+  const back = () => document.visibilityState === 'visible' && soon();
+  document.addEventListener('visibilitychange', back);
+  return () => {
+    for (const off of offs) off();
+    document.removeEventListener('visibilitychange', back);
+    if (timer) {
+      clearTimeout(timer);
+      void qc.invalidateQueries({ queryKey: onboardingKey });
+    }
+  };
 }
 
 /**
@@ -73,7 +87,7 @@ function useLive() {
  * screenshot) as keyboard use and rings the row the pointer picked; the ring belongs to moving through the steps by
  * keys, so it shows only once Tab or an arrow key moved focus (the list's data-keys).
  */
-function useKeysMoved(list: React.RefObject<HTMLOListElement | null>) {
+export function useKeysMoved(list: React.RefObject<HTMLOListElement | null>) {
   useEffect(() => {
     const el = list.current;
     if (!el) return;
@@ -98,7 +112,7 @@ const keepFold = (v: boolean) => {
 };
 
 /** A step's title, named after the agent picked when there is one. */
-function titleOf(id: OnboardingStep, agent: SetupAgent | null | undefined, upload: boolean): string {
+export function titleOf(id: OnboardingStep, agent: SetupAgent | null | undefined, upload: boolean): string {
   switch (id) {
     case 'sample':
       return t('Try the sample');
@@ -157,12 +171,38 @@ function foldAway(el: HTMLElement | null): Promise<void> {
   );
 }
 
+/** What the panes read, in the card and in the sidebar's panel alike: the sample and the newest real video (from the
+ * library the page already has, the server's answer before it), the agent picked, what this account may do. */
+export function usePaneCtx(props: GetStartedProps, data: OnboardingResponse | undefined): Omit<PaneCtx, 'where' | 'done'> {
+  const run = useFirstRun();
+  const can = useCan();
+  const videos = useLibrary().data?.videos;
+  const named = (v: { slug: string; name: string } | undefined) => (v ? { slug: v.slug, name: v.name } : null);
+  const sampleV = videos?.find((v) => v.sample);
+  const real = videos?.filter((v) => !v.sample && !v.archived).sort((a, b) => compareTime(b.added, a.added))[0];
+  return {
+    ...props,
+    sample: data?.sample ?? (sampleV ? named(sampleV) : null),
+    video: named(real),
+    poster: real?.hash ? posterUrl(real) : null,
+    badge: real ? `V${real.v}` : 'V1',
+    agent: run.o?.agent ?? null,
+    canSample: can('upload'),
+    data: data ?? null,
+  };
+}
+
+/** Where the sidebar's Get started row is, for what the card's × says: at a desk's sidebar foot, in the drawer's
+ * (phones, tablets), or nowhere (an empty library has no sidebar: the account menu brings the card back). */
+const rowPlace = (): 'sidebar' | 'menu' | null => {
+  const nav = document.querySelector('.lib > .nav');
+  return !nav ? null : nav.getClientRects().length ? 'sidebar' : 'menu';
+};
+
 export function GetStarted(props: GetStartedProps) {
   const qc = useQueryClient();
   const run: FirstRun = useFirstRun();
   const { data } = useOnboarding(run.shown);
-  const can = useCan();
-  const videos = useLibrary().data?.videos;
   useLive();
   const card = useRef<HTMLElement>(null);
   const list = useRef<HTMLOListElement>(null);
@@ -174,12 +214,8 @@ export function GetStarted(props: GetStartedProps) {
   const [fold, setFold] = useState(readFold);
   const [ticked, setTicked] = useState<OnboardingStep | null>(null);
   const [paneIn, setPaneIn] = useState(false);
-  const agent = run.o?.agent ?? null;
-  // the sample and the newest real video, from the library the page already has (the server's answer before it)
-  const named = (v: { slug: string; name: string } | undefined) => (v ? { slug: v.slug, name: v.name } : null);
-  const sampleV = videos?.find((v) => v.sample);
-  const sample: Named = data?.sample ?? (sampleV ? named(sampleV) : null);
-  const real = videos?.filter((v) => !v.sample && !v.archived).sort((a, b) => compareTime(b.added, a.added))[0];
+  const base = usePaneCtx(props, data);
+  const agent = base.agent;
   // a step that ticks pops; the selection moves on to the next a moment later
   const doneKey = steps
     .filter((s) => s.done)
@@ -228,9 +264,17 @@ export function GetStarted(props: GetStartedProps) {
   const doneN = steps.filter((s) => s.done).length;
   const folded = fold && !all;
   const hide = async () => {
+    const place = rowPlace();
     try {
       await setHidden(qc, true);
-      toast(t('Get started is put away: your account menu brings it back.'), 'ok', {
+      // the sidebar's row stays (onboarding/Row.tsx): said where it is; without a sidebar the account menu has it
+      const said =
+        place === 'sidebar'
+          ? t('Get started is put away. It stays at the foot of the sidebar.')
+          : place === 'menu'
+            ? t('Get started is put away. It stays at the foot of the menu.')
+            : t('Get started is put away: your account menu brings it back.');
+      toast(said, 'ok', {
         label: t('Undo'),
         undo: true,
         onClick: () => void setHidden(qc, false).catch(toastError),
@@ -244,17 +288,7 @@ export function GetStarted(props: GetStartedProps) {
     setSel(id);
     setPaneIn(true);
   };
-  const ctx: Omit<PaneCtx, 'where'> = {
-    ...props,
-    done: false,
-    sample,
-    video: named(real) ?? null,
-    poster: real?.hash ? posterUrl(real) : null,
-    badge: real ? `V${real.v}` : 'V1',
-    agent,
-    canSample: can('upload'),
-    data: data ?? null,
-  };
+  const ctx: Omit<PaneCtx, 'where'> = { ...base, done: false };
   // every step's pane in one cell, the selected one shown: the cell is as tall as the tallest (onboarding.css)
   const panes = (where: string) =>
     steps.map((s) => {
@@ -352,7 +386,7 @@ export function GetStarted(props: GetStartedProps) {
   );
 }
 
-interface PaneCtx extends GetStartedProps {
+export interface PaneCtx extends GetStartedProps {
   done: boolean;
   sample: Named;
   video: { slug: string; name: string } | null;
@@ -418,7 +452,7 @@ const DoneNote = ({ children }: { children: ReactNode }) => (
 /** Where the sample opens: check mode on its fix. */
 export const sampleHref = (s: NonNullable<Named>) => `#/v/${encodeURIComponent(s.slug)}${s.check ? `?verify=${encodeURIComponent(s.check)}` : ''}`;
 
-function Pane({ id, ctx }: { id: OnboardingStep; ctx: PaneCtx }) {
+export function Pane({ id, ctx }: { id: OnboardingStep; ctx: PaneCtx }) {
   switch (id) {
     case 'sample':
       return <SamplePane ctx={ctx} />;
@@ -648,6 +682,7 @@ function LinkPane({ ctx }: { ctx: PaneCtx }) {
 }
 
 function SharePane({ ctx }: { ctx: PaneCtx }) {
+  const qc = useQueryClient();
   const info = useInfo();
   const ws = useAuthStatus().data?.workspace;
   const [link, setLink] = useState<string | null>(null);
@@ -660,6 +695,8 @@ function SharePane({ ctx }: { ctx: PaneCtx }) {
     try {
       const s = await api<ShareInfo>(`/api/review/${enc(target.slug)}/shares`, { method: 'POST', body: {} });
       setLink(`${base}/g/${s.token}`);
+      // the step ticks at once, here and in the sidebar's row
+      void qc.invalidateQueries({ queryKey: onboardingKey });
     } catch (e) {
       toastError(e);
     } finally {
@@ -738,6 +775,7 @@ const ROLES = (): { value: Role; label: string }[] => [
 ];
 
 function InvitePane({ ctx }: { ctx: PaneCtx }) {
+  const qc = useQueryClient();
   const run = useFirstRun();
   const me = useAuthStatus().data?.user?.name ?? '';
   const [email, setEmail] = useState('');
@@ -764,6 +802,7 @@ function InvitePane({ ctx }: { ctx: PaneCtx }) {
       await api('/api/admin/invites', { method: 'POST', body: { role, email: v, ...(mailless ? {} : { send: true, lang: pageLang() }) } });
       toast(mailless ? t('Invite made for {email}: Settings → Users has its link', { email: v }) : t('Invite sent to {email}', { email: v }), 'ok');
       setEmail('');
+      void qc.invalidateQueries({ queryKey: onboardingKey });
     } catch (er) {
       toastError(er);
     } finally {

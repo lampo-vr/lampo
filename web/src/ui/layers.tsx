@@ -487,6 +487,8 @@ export function PopoverLayer({
   children,
   className,
   sideOffset,
+  side,
+  label,
   align,
   onEscapeKeyDown,
   onOpenAutoFocus,
@@ -500,7 +502,8 @@ export function PopoverLayer({
         <PopoverPrimitive.Content
           id={`${id}c`}
           className={`popover ${className}`}
-          side="bottom"
+          aria-label={label}
+          side={side}
           align={align}
           sideOffset={sideOffset}
           collisionPadding={8}

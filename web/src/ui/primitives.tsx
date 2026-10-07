@@ -311,6 +311,10 @@ export interface PopoverProps {
   children: ReactNode;
   className?: string;
   sideOffset?: number;
+  /** Where it opens from its trigger (below it unless said: the sidebar's foot opens upward). */
+  side?: 'top' | 'bottom' | 'left' | 'right';
+  /** Its name for a screen reader (a dialog without a heading of its own says what it is). */
+  label?: string;
   align?: 'start' | 'center' | 'end';
   /** Escape inside it; `preventDefault()` keeps it open (a step back in a multi-step popover instead of closing). */
   onEscapeKeyDown?: (e: KeyboardEvent) => void;
@@ -325,6 +329,8 @@ export function Popover({
   children,
   className = '',
   sideOffset = 4,
+  side = 'bottom',
+  label,
   align = 'end',
   onEscapeKeyDown,
   onOpenAutoFocus,
@@ -353,6 +359,8 @@ export function Popover({
           onOpenChange={onOpenChange}
           className={className}
           sideOffset={sideOffset}
+          side={side}
+          label={label}
           align={align}
           onEscapeKeyDown={onEscapeKeyDown}
           onOpenAutoFocus={onOpenAutoFocus}

@@ -2,15 +2,39 @@
 // own, so the library's first paint knows), and the way to the rest — Get started's own chunk (GetStarted.tsx) with
 // its data (data.ts), and the setup a new account sees first (Setup.tsx: Welcome and a few skippable steps). Steps tick
 // from what the server finds done (lib/onboarding.ts).
-import type { CSSProperties } from 'react';
-import { nextOf, type SetupVariant, type StepState, setupDue, setupVariant, showsOnboarding, stateOf, stepsFor } from '../../../lib/onboarding.ts';
+import { type CSSProperties, useSyncExternalStore } from 'react';
+import { inSidebar, nextOf, type SetupVariant, type StepState, setupDue, setupVariant, showsOnboarding, stateOf, stepsFor } from '../../../lib/onboarding.ts';
 import type { AuthStatus, OnboardingPrefs, Persona } from '../../../lib/types.ts';
 import { useAuthStatus } from '../api/auth.ts';
-import { chromeFirstRun } from '../lib/chromeHint.ts';
+import { chromeFirstRun, chromeStart } from '../lib/chromeHint.ts';
 import { loader } from '../lib/lazy.ts';
 
 /** Get started, its panes and their data: loaded when the first run shows (or is asked for). */
 export const getStartedCode = loader(() => import('./GetStarted.tsx'));
+
+// The steps asked for at the sidebar's foot (its row clicked before its code arrived, the account menu): the row on
+// screen opens them (Row.tsx, Panel.tsx SideRow).
+let asked = false;
+const askers = new Set<() => void>();
+export const askSteps = (v: boolean) => {
+  asked = v;
+  for (const f of askers) f();
+};
+export const useStepsAsked = () =>
+  useSyncExternalStore(
+    (f) => {
+      askers.add(f);
+      return () => askers.delete(f);
+    },
+    () => asked,
+  );
+/** Opens the steps at the sidebar's foot (once its row shows: the account menu may have just brought it back). */
+export const openGetStarted = () => {
+  askSteps(true);
+  void getStartedCode.load().catch(() => {});
+};
+/** A desk's sidebar is on screen (not an empty library's page, not a phone's or tablet's drawer, not the player). */
+export const sidebarShown = () => !!document.querySelector('.lib > .nav')?.getClientRects().length;
 
 /** Get started folded to one line, in this browser (GetStarted.tsx keeps it): the card and its room agree. */
 export const FOLD = 'vr.gs.fold';
@@ -40,6 +64,13 @@ export interface FirstRun {
   o: OnboardingPrefs | null;
   /** It shows: there is one and it isn't put away. */
   shown: boolean;
+  /**
+   * The sidebar's row shows (lib/onboarding.ts inSidebar: steps open, not hidden for good, the setup over) — before the
+   * server has answered: it showed in this browser last time (its room from the first paint, lib/chromeHint.ts).
+   */
+  side: boolean;
+  /** Steps done of all, for the row and the account menu (before the server has answered: as seen here last time). */
+  count: { done: number; of: number } | null;
   steps: StepState[];
   next: StepState['id'] | null;
   /** The setup is due: a new account that hasn't finished or skipped it (it shows instead of the library). */
@@ -77,12 +108,16 @@ export function useFirstRun(): FirstRun {
   const personas = status?.workspace?.personas ?? [];
   // the role in the workspace this session works in (/api/auth/status says it), and whether that one was made at sign-up
   const steps = user && o ? stateOf(o, stepsFor(user.role, { machine: status?.via === 'local', signupWorkspace: !!status?.workspace?.signup, personas })) : [];
+  const setup = !!user && setupDue(o) && !setupEndedHere.has(user.id);
+  const hint = status ? null : chromeStart();
   return {
     o,
     shown: status ? showsOnboarding(o) : chromeFirstRun(),
+    side: status ? !!user && inSidebar(o) && !setup && steps.length > 0 : !!hint,
+    count: steps.length ? { done: steps.filter((x) => x.done).length, of: steps.length } : hint ? { done: hint[0], of: hint[1] } : null,
     steps,
     next: nextOf(steps),
-    setup: !!user && setupDue(o) && !setupEndedHere.has(user.id),
+    setup,
     variant: variantOf(status),
     personas,
   };

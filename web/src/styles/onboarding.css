@@ -462,3 +462,89 @@
     inset: min(0px, calc(50% - 22px));
   }
 }
+
+/* ---------------------------------------------------------------- Get started at the sidebar's foot (onboarding/Row.tsx)
+   Above the trial's line, under the foot's one top line: the keyframe of where it stands beside its words, the steps as a
+   2 px line of frames under them (the done ones lit, never the orange). A fixed box: the room the first paint holds for
+   it is what it takes. Its panel's styles come with the panel's code (startpanel.css). */
+.ob-side {
+  padding: var(--sp-2) var(--sp-2) 0;
+  border-top: 1px solid var(--line);
+  overflow: hidden;
+}
+.ob-side + .nav-trial-wrap,
+.ob-side + .nav-foot {
+  border-top-color: transparent;
+}
+.ob-side-row {
+  display: grid;
+  grid-template-columns: 15px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-content: center;
+  align-items: center;
+  column-gap: var(--sp-2);
+  row-gap: calc(var(--sp-1) + var(--sp-0_5));
+  width: 100%;
+  height: var(--h-lg);
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--fg-2);
+  font: var(--fw-ui) var(--fs-sm) / 1.2 var(--ui);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast);
+}
+.ob-side-row:hover,
+.ob-side-row[aria-expanded='true'] {
+  background: var(--sel);
+}
+.ob-side-row:focus-visible {
+  outline: 2px solid var(--fg-2);
+  outline-offset: -2px;
+}
+.ob-side-row .ob-side-kg {
+  --kg-size: 10px;
+  grid-row: 1 / 3;
+  justify-self: center;
+  color: var(--fg-2);
+}
+.ob-side-row.ob-all .ob-side-kg {
+  color: var(--ok);
+}
+.ob-side-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ob-side-count {
+  font: var(--fw-ui) var(--fs-xs) / 1 var(--ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  white-space: nowrap;
+}
+/* the steps as frames on a line: a cell each, the frame line between two the last 2 px of each, left clear */
+.ob-side-line {
+  grid-column: 2 / -1;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  height: 2px;
+}
+.ob-side-line i {
+  border-radius: 1px;
+  background: linear-gradient(to right, var(--line-2) calc(100% - 2px), transparent 0);
+}
+.ob-side-line i.ob-on {
+  background: linear-gradient(to right, var(--fg-2) calc(100% - 2px), transparent 0);
+}
+.ob-side-row.ob-all .ob-side-line i {
+  background: linear-gradient(to right, var(--ok) calc(100% - 2px), transparent 0);
+}
+@media (hover: none) and (pointer: coarse) {
+  .ob-side-row {
+    height: var(--h-touch);
+  }
+}

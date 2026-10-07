@@ -1,7 +1,8 @@
 // The signed-in account in the top bar: the workspaces to switch between and making a new one (on a hosted server, for
 // someone with more than one or who may make one: auth/Workspaces.tsx), Settings (⌘,), the operator pages for whoever
-// runs the server, "Get started" while the first run has steps open (it brings a put-away one back), the connected
-// agents, sign out, and a quick theme row.
+// runs the server, "Get started · 2 of 5" while the first run has steps open (it opens the steps at the sidebar's foot,
+// or brings the card back where there is no sidebar; hidden or not), the connected agents, sign out, and a quick theme
+// row.
 // Everything else (profile, tokens, users) is a section of Settings. Signed in at the machine itself there is nobody to
 // sign out as. The chip is the avatar alone (the name is its tooltip and the menu's label): one
 // size before and after the server says who you are, so the top bar never shifts when it does.
@@ -13,7 +14,7 @@ import { billingCode } from '../billing/code.ts';
 import { useLoaded, usePainted } from '../lib/lazy.ts';
 import type { SettingsSection } from '../lib/nav.ts';
 import { toastError } from '../lib/toast.ts';
-import { getStartedCode, useFirstRun } from '../onboarding/state.ts';
+import { getStartedCode, openGetStarted, sidebarShown, useFirstRun } from '../onboarding/state.ts';
 import { I } from '../ui/icons.tsx';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { Avatar } from '../ui/plain.tsx';
@@ -46,14 +47,17 @@ export function UserMenu() {
   const billing = useBilling(false).data;
   const B = useLoaded(billingCode, usePainted(!!billing));
   const run = useFirstRun();
-  const done = run.steps.filter((x) => x.done).length;
-  // back where it lives: above All videos
+  // A desk's sidebar on screen: the steps open at its foot, where they live from now on, and you stay where you are
+  // (the inbox, a project). Anywhere else (the player, Settings, a tablet, an empty library) the card comes back above
+  // All videos. Either way what was hidden for good shows again.
   const getStarted = () => {
-    location.hash = '#/';
-    if (run.o?.hidden)
+    const here = sidebarShown();
+    if (here) setTimeout(openGetStarted);
+    else location.hash = '#/';
+    if (run.o?.dismissed || (!here && run.o?.hidden))
       getStartedCode
         .load()
-        .then((m) => m.setHidden(qc, false))
+        .then((m) => m.comeBack(qc, !here))
         .catch(toastError);
   };
   // Not known yet: the same chip, idle (signed out, there is no top bar to put it in).
@@ -93,7 +97,7 @@ export function UserMenu() {
           resumable(run.o) && {
             label: t('Get started'),
             mark: <KeyGlyph shape="outline" size={10} />,
-            shortcut: `${done}/${run.steps.length}`,
+            shortcut: run.count ? t('{done} of {n}', { done: run.count.done, n: run.count.of }) : undefined,
             onClick: getStarted,
           },
           allowed('agents') && { label: t('Connected agents'), icon: 'terminal', onClick: () => open('agents') },

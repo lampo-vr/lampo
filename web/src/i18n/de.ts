@@ -3521,6 +3521,12 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'From an account named “{name}”, for a workspace named': 'Von einem Konto namens „{name}“, für einen Workspace namens',
   'Get started is done. Everything it set up is in Settings.': 'Erste Schritte erledigt. Alles, was eingerichtet wurde, findest du in den Einstellungen.',
   'Get started is put away: your account menu brings it back.': 'Erste Schritte sind weggeräumt: Dein Kontomenü holt sie zurück.',
+  // the sidebar's Get started row (onboarding/Row.tsx) and its panel (Panel.tsx)
+  'Get started is put away. It stays at the foot of the sidebar.': 'Erste Schritte sind weggeräumt. Sie bleiben unten in der Seitenleiste.',
+  'Get started is put away. It stays at the foot of the menu.': 'Erste Schritte sind weggeräumt. Sie bleiben unten im Menü.',
+  'Get started is hidden.': 'Erste Schritte sind ausgeblendet.',
+  'Get started is hidden. Your account menu still has it.': 'Erste Schritte sind ausgeblendet. Dein Kontomenü hat sie noch.',
+  'Hide for good': 'Endgültig ausblenden',
   'Getting {model} ready ({device})…': '{model} wird vorbereitet ({device}) …',
   'Go to my library': 'Zu meiner Bibliothek',
   'Go to the library': 'Zur Bibliothek',

@@ -922,7 +922,9 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
           <div className="lib grain bare" role="status" aria-busy="true" aria-label={t('Loading the library')} data-testid="skeleton" />
         ) : (
           <div className={`lib grain ${bare ? 'bare' : ''}`}>
-            {!bare && <Sidebar videos={videos ?? undefined} folders={data?.folders} archived={archivedProjects} view={view} onMoveVideo={moveVideo} />}
+            {!bare && (
+              <Sidebar videos={videos ?? undefined} folders={data?.folders} archived={archivedProjects} view={view} onMoveVideo={moveVideo} start={obProps} />
+            )}
             {videos && !bare && navOpen && (
               <Drawer open={navOpen} onOpenChange={setNavOpen} title={t('Menu')}>
                 <Sidebar
@@ -931,6 +933,7 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
                   archived={archivedProjects}
                   view={view}
                   onMoveVideo={moveVideo}
+                  start={obProps}
                   onShareFolder={(f) => {
                     setNavOpen(false);
                     setSharingFolder(f);
