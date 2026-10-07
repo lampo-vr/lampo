@@ -81,6 +81,7 @@ export async function ingestPart(file: string, o: store.IngestOptions & PartPush
   const review = store.loadReview(o.slug);
   if (!review) throw refuse('no such video', 404);
   checkReviewOpen(review);
+  store.checkNotSample(review);
   const { part } = await planPart(review, file, o);
   const seam = await checkSeam(review, part, file);
   return store.ingestUpload(file, { ...o, part: { ...part, ...(seam ? { seam } : {}) } });

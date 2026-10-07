@@ -244,6 +244,16 @@ try {
     }
   });
 
+  await check('the sample takes no one’s versions: its More menu offers no “Upload new version…”', async () => {
+    const menu = '.menu:not(.menu-subs)[data-state=open]';
+    await a.click('.p-top [aria-label="More"]');
+    await a.waitForSelector(menu, { timeout: 10000 });
+    const items = await a.$$eval(`${menu} [role^=menuitem]`, (els) => els.map((e) => e.textContent.trim()));
+    await a.keyboard.press('Escape');
+    assert(items.includes('Export notes (PDF)'), `the menu is open: ${JSON.stringify(items)}`);
+    assert(!items.some((x) => x.startsWith('Upload new version')), `offered on the sample: ${JSON.stringify(items)}`);
+  });
+
   await check('Looks right, then an answer to the agent’s question: “That’s the loop”, naming the agent picked', async () => {
     await a.goto(`${BASE}/#/v/${encodeURIComponent(sample.slug)}?verify=${encodeURIComponent(sample.check)}`, { waitUntil: 'domcontentloaded' });
     await a.waitForSelector('[data-testid=check-decision] button', { timeout: 15000 });

@@ -159,7 +159,8 @@ export const PlayerTopbar = memo(function PlayerTopbar({
         sideOffset={6}
         trigger={<IconButton className="btn sm icon-only ghost" label={t('More')} icon="more" side="bottom" />}
         items={[
-          uploaded && allowed('upload') && { label: t('Upload new version…'), icon: 'upload', onClick: () => picker.current?.click() },
+          // the sample takes no versions but its own (the server refuses them)
+          uploaded && !summary.sample && allowed('upload') && { label: t('Upload new version…'), icon: 'upload', onClick: () => picker.current?.click() },
           // desktop has its Share button; the phone's strip has no room for it
           phone && allowed('share') && { label: t('Share…'), icon: 'link', onClick: onShare },
           'sep',

@@ -688,12 +688,31 @@ export interface IngestResult {
   duplicate: boolean;
 }
 
+/**
+ * The first run's sample takes no versions but its own two: one put there would be counted against no plan, reach no
+ * agent, and go for good with "Remove the sample" (409).
+ */
+export function checkNotSample(review: Pick<Review, 'onboarding_sample'> | null | undefined): void {
+  if (review?.onboarding_sample)
+    throw Object.assign(new Error('the sample video takes no new versions: upload your render as a video of its own'), { status: 409 });
+}
+
+/** The sample's own versions: V1 and V2, both put there as it is made. */
+const SAMPLE_VERSIONS = 2;
+/** Versions someone put on the sample before it refused them: the team's renders, not Lampo's. */
+export const versionsOnSample = (r: Review): Version[] => (r.onboarding_sample ? r.versions.filter((v) => v.v > SAMPLE_VERSIONS) : []);
+
+/** An upload review that a new upload of this name in this folder becomes the next version of (never the sample). */
+const sameUpload = (name: string, folder: string | null): Review | undefined =>
+  listReviews().find((r) => isUpload(r) && !r.archived && !r.onboarding_sample && r.source?.name === name && (r.folder || null) === folder);
+
 /** Whether an upload would make a new video rather than the next version of one (what a plan may limit). */
 export function uploadMakesVideo(o: Pick<IngestOptions, 'name' | 'folder' | 'slug'>): boolean {
-  if (o.slug) return false;
-  const name = uploadName(o.name);
-  const folder = uploadFolder(o.folder);
-  return !listReviews().some((r) => isUpload(r) && !r.archived && r.source?.name === name && (r.folder || null) === folder);
+  if (o.slug) {
+    checkNotSample(loadReview(o.slug));
+    return false;
+  }
+  return !sameUpload(uploadName(o.name), uploadFolder(o.folder));
 }
 
 // The review an upload belongs to: explicit slug, else an existing upload with the same name in the same folder
@@ -702,14 +721,17 @@ function uploadTarget(o: IngestOptions): { slug: string; video: string; folder: 
   if (o.slug) {
     const r = loadReview(o.slug);
     if (!r) throw new Error('no such video');
+    // only the sample's own making adds its second version
+    if (!o.sample) checkNotSample(r);
     // A part is never the render on disk: it is kept like an upload, whichever way the video arrived.
     if (!isUpload(r) && !o.part) throw new Error('that video is tracked from a file on disk; re-render it to its path instead');
     return { slug: o.slug, video: r.video, folder: r.folder };
   }
   const name = uploadName(o.name);
   const folder = uploadFolder(o.folder);
-  // A sample is always a video of its own, never the next version of someone's upload that happens to share its name.
-  const same = !o.sample && listReviews().find((r) => isUpload(r) && !r.archived && r.source?.name === name && (r.folder || null) === folder);
+  // A sample is always a video of its own, never the next version of someone's upload that happens to share its name;
+  // and someone's upload named like the sample is a video of its own too.
+  const same = !o.sample && sameUpload(name, folder);
   if (same) return { slug: slugify(same.video), video: same.video, folder };
   // A new video. When its path's id is taken already — a video moved or archived away from here, a "__" in a name
   // (the id writes "/" as "__"), a folder that differs only in case on a case-insensitive disk — it gets a path of its
@@ -1476,6 +1498,9 @@ export function removeSample(slug: string): Review | null {
     const review = loadReview(slug);
     if (!review) return null;
     if (!review.onboarding_sample) throw Object.assign(new Error('that video is not a sample'), { status: 409 });
+    // versions/ can't be made again: renders someone put on the sample keep it where it is
+    if (versionsOnSample(review).length)
+      throw Object.assign(new Error('versions were uploaded onto the sample, so it stays: they would be lost with it'), { status: 409 });
     fs.rmSync(reviewDir(slug), { recursive: true, force: true });
     fs.rmSync(path.join(versionsDir(), slug), { recursive: true, force: true });
     // remote storage keeps renders, fix previews and references under the video's own prefixes

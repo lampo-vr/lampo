@@ -142,9 +142,12 @@ events is logged, so no agent's feed (`vr watch`, `wait_for_feedback`), INBOX.md
 agents' listings leave it out (`vr ls`, `vr folders`, MCP `list_videos`, `list_folders`, the `vr://review` resources):
 asked for by name or id (`vr open`, `get_open_notes`, `vr show`, `get_note`), it says `SAMPLE: …` first, with no
 notes to work through. Insights, the taste file and playbook suggestions leave it out, it never counts as the person's
-first video or against a plan. *Remove sample* in its menu deletes it for good (the review, its notes and
-screenshots, its renders in storage). Making or removing it takes the right to upload: a few times per workspace in
-ten minutes (then `429`), never past a hosted server's full job queue.
+first video or against a plan. **It takes no versions but its own two**: an upload by its id (the player's *Upload new
+version…* is not offered on it, `vr push --to`, MCP, an upload URL, a part) is refused with `409`, and an upload
+named like it in its project is a video of its own. *Remove sample* in its menu deletes it for good (the review, its
+notes and screenshots, its renders in storage); a sample that holds a version someone uploaded onto it before it
+refused them stays (`409`), and that version counts like any other. Making or removing it takes the right to upload: a
+few times per workspace in ten minutes (then `429`), never past a hosted server's full job queue.
 
 **Where it comes from.** The two versions are committed in [lib/sample-film/](../lib/sample-film/) (about 320 KB each:
 960 × 412, 24 fps, 121 frames, H.264 with a soft chord as sound) and uploaded like any render — copied first, through

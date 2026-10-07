@@ -697,7 +697,8 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
   const uploaded = useMemo(() => {
     const m = new Map<string | null, Set<string>>();
     for (const v of videos || []) {
-      if (!v.video.startsWith('/@uploads/') || v.archived) continue;
+      // the sample is never the next version's video: an upload of its name becomes a video of its own
+      if (!v.video.startsWith('/@uploads/') || v.archived || v.sample) continue;
       const k = v.folder || null;
       m.set(k, (m.get(k) || new Set()).add(fileName(v.video)));
     }

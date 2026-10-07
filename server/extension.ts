@@ -374,8 +374,12 @@ export function usageOf(workspace: string): Usage {
     let activeVideos = 0;
     const room = { videos: 0, bytes: 0 };
     for (const r of store.listReviews()) {
-      // the first run's sample (lib/sample.ts) is Lampo's, not the team's: never counted against a plan
-      if (r.onboarding_sample) continue;
+      // the first run's sample (lib/sample.ts) is Lampo's, not the team's: never counted against a plan — but renders
+      // someone put on it before it refused them are the team's
+      if (r.onboarding_sample) {
+        for (const v of store.versionsOnSample(r)) bytes += Number.isFinite(v.size) ? v.size : 0;
+        continue;
+      }
       let size = 0;
       for (const v of r.versions) size += Number.isFinite(v.size) ? v.size : 0;
       bytes += size;

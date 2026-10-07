@@ -184,7 +184,7 @@ async function make({ by, byId, lang }: { by: string; byId?: string; lang: Sampl
     const first = await store.ingestUpload(v1 as string, { name: s.name, folder: s.folder, by, byId, sample: mark });
     const slug = slugify(first.review.video);
     try {
-      return await notes(slug, plan, v2 as string);
+      return await notes(slug, plan, v2 as string, mark);
     } catch (e) {
       // half a sample is no sample: take it away again
       store.removeSample(slug);
@@ -195,7 +195,7 @@ async function make({ by, byId, lang }: { by: string; byId?: string; lang: Sampl
   }
 }
 
-async function notes(slug: string, plan: ReturnType<typeof samplePlan>, v2: string): Promise<Review> {
+async function notes(slug: string, plan: ReturnType<typeof samplePlan>, v2: string, mark: SampleMark): Promise<Review> {
   const s = plan.script;
   // V1: the reviewer's note on the title and an idea
   const titleShots = await shotsFor(slug, 1, plan.title.frame, plan.title.drawing);
@@ -222,7 +222,8 @@ async function notes(slug: string, plan: ReturnType<typeof samplePlan>, v2: stri
     },
   ]) as [Comment, Comment];
   // V2 from the agent, with the title moved onto the hill; the idea answered (nothing to recheck on V2)
-  await store.ingestUpload(v2, { name: s.name, slug, by: s.agent });
+  // (the sample's own making: anyone else's upload onto the sample is refused)
+  await store.ingestUpload(v2, { name: s.name, slug, by: s.agent, sample: mark });
   store.updateComment(title.id, { status: 'fixed', note: s.title.fix, fixed_in_v: 2, by: s.agent });
   store.updateComment(idea.id, { note: s.idea.reply, ack: true, by: s.agent });
   // and its question on V2, with two answers to pick
