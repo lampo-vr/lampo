@@ -79,8 +79,8 @@ export interface RunClock {
   lost?: string;
   /** When it first began working (its `started` event). */
   began?: string;
-  /** Notes added while it worked, told to the agent up to here (the new-notes line). */
-  told?: string;
+  /** How many of its plan's notes its agent was told of (handed over, or the new-notes line): the rest are new to it. */
+  told?: number;
   /** The agent's questions during the run, by note id. */
   qs?: string[];
   /** Questions asked without an id Lampo heard. */
@@ -809,18 +809,15 @@ export const runAgent = (name: string, kind?: AgentKind | null, sessionId?: stri
 export function newNotesLine(o: { video: string; timecodes: readonly string[]; since: string }): string {
   const n = o.timecodes.length;
   const tc = o.timecodes.slice(0, 3).join(', ') + (n > 3 ? ', …' : '');
-  return oneLine(
-    `${n} new note${n === 1 ? '' : 's'} on ${path.basename(o.video)} since you started (${tc}): read ${n === 1 ? 'it' : 'them'} with get_open_notes since "${o.since}".`,
-  );
+  return oneLine(`${n} new note${n === 1 ? '' : 's'} on ${path.basename(o.video)} since you started (${tc}): get_open_notes since "${o.since}".`);
 }
 
-/** Notes added to a run that its agent wasn't told of yet: their ids and when the first came. */
+/** Notes added to a run that its agent wasn't told of yet: their ids and when the first came (whole seconds). */
 export function untold(r: Run & { clock?: RunClock }): { ids: string[]; since: string } | null {
-  const after = ms(r.clock?.told);
-  const fresh = r.plan.filter((p) => p.added && p.state === 'todo' && ms(p.at) > after);
+  const fresh = r.plan.slice(r.clock?.told ?? 0).filter((p) => p.added && p.state === 'todo');
   if (!fresh.length) return null;
   const first = Math.min(...fresh.map((p) => ms(p.at)));
-  return { ids: fresh.map((p) => p.id), since: new Date(Math.floor(first / 1000) * 1000).toISOString() };
+  return { ids: fresh.map((p) => p.id), since: new Date(Math.floor(first / 1000) * 1000).toISOString().replace('.000Z', 'Z') };
 }
 
 /**

@@ -381,7 +381,7 @@ export function createRuns({ broadcast, actor }: RunsOptions): Runs {
       change(slug, run.id, (r) => {
         if (r.agent.name !== agent) r.agent = lib.runAgent(agent);
         // what it was handed was told of too: no new-notes line for it
-        r.clock.told = new Date(now).toISOString();
+        r.clock.told = r.plan.length;
         return lib.applySign(r, { at: now, kind: 'wait', words: words('Waiting for your answer'), handed: true, quiet: true });
       });
     }
@@ -545,7 +545,7 @@ export function createRuns({ broadcast, actor }: RunsOptions): Runs {
       if (!u) continue;
       const told = () =>
         change(s, run.id, (r) => {
-          r.clock.told = new Date().toISOString();
+          r.clock.told = r.plan.length;
           return false;
         });
       // it just read the video's open notes: the new ones among them
