@@ -125,3 +125,18 @@ test('the start the install precached answers from the cache with the network go
   const plane = worker('v1', offline as never, ['/offline.html', '/assets/index-aaa.js']);
   assert.equal(await (await plane.wait('fetch', get('/assets/index-aaa.js')))?.text(), 'entry');
 });
+
+test("a cache that can't take a copy (storage full) or can't be read still answers with what the network sent", async () => {
+  const w = world({ '/assets/boot-aaa.js': 'boot code' });
+  const open = w.caches.open;
+  const full = {
+    ...w,
+    caches: { ...w.caches, open: async (name: string) => ({ ...(await open(name)), put: async () => Promise.reject(new Error('QuotaExceededError')) }) },
+  };
+  const sw = worker('v1', full as never);
+  await sw.wait('activate');
+  assert.equal(await (await sw.wait('fetch', get('/assets/boot-aaa.js')))?.text(), 'boot code', 'storage full: what the network sent');
+  const unreadable = { ...w, caches: { ...w.caches, match: async () => Promise.reject(new Error('the cache is gone')) } };
+  const again = worker('v1', unreadable as never);
+  assert.equal(await (await again.wait('fetch', get('/assets/boot-aaa.js')))?.text(), 'boot code', 'unreadable: what the network sent');
+});

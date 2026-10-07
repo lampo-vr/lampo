@@ -598,14 +598,15 @@
   margin-top: var(--sp-3);
 }
 
-/* a command to copy, like the app's Code but light: a tinted line, never a black block */
+/* a command to copy, like the app's Code but light: a tinted line, never a black block. One line where it fits; on a
+   phone too narrow for it the line breaks at a space (never inside a word, .ent-cmd-w) and the box grows with it */
 .ent-cmd {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
   min-width: 0;
-  height: var(--h);
-  padding: 0 calc(var(--sp-0_5) + 1px) 0 var(--sp-3);
+  min-height: var(--h);
+  padding: var(--sp-1) calc(var(--sp-0_5) + 1px) var(--sp-1) var(--sp-3);
   border-radius: var(--r);
   background: var(--sel);
   box-shadow: inset 0 0 0 1px var(--line);
@@ -613,8 +614,8 @@
 .ent-cmd code {
   flex: 1;
   min-width: 0;
+  /* only a single word wider than the box (a long address) scrolls */
   overflow-x: auto;
-  white-space: nowrap;
   font: var(--fw-ui) var(--fs-xs) / 1.6 var(--mono);
   font-stretch: 87.5%;
   color: var(--fg-2);
@@ -626,6 +627,9 @@
 .ent-cmd code b {
   font-weight: var(--fw-ui);
   color: var(--fg);
+}
+.ent-cmd-w {
+  white-space: nowrap;
 }
 .ent-copy {
   flex: none;
@@ -811,6 +815,6 @@
     width: 100%;
   }
   .ent-cmd {
-    height: 36px;
+    min-height: 36px;
   }
 }

@@ -42,18 +42,30 @@ self.addEventListener('fetch', (e) => {
   // when they change (a new mark): the cached one answers at once and a fresh copy replaces it for next time.
   const hashed = url.pathname.startsWith('/assets/');
   if (hashed || url.pathname.startsWith('/icons/')) {
+    // The copy goes into the cache behind the answer, never in front of it: a cache that can't take it (storage full or
+    // busy, a private window) must not turn a file that arrived into a failed load ("Failed to fetch dynamically imported
+    // module": a blank page).
     const refresh = async () => {
       const res = await fetch(req);
       if (res.ok) {
         const copy = res.clone();
-        await (await caches.open(ASSETS)).put(req, copy);
+        e.waitUntil(
+          caches
+            .open(ASSETS)
+            .then((c) => c.put(req, copy))
+            .catch(() => {}),
+        );
       }
       return res;
     };
     e.respondWith(
       (async () => {
-        // what this version fetched since, else what its install kept for the start (the entry script, an icon)
-        const hit = (await caches.match(req, { cacheName: ASSETS })) || (await caches.match(req, { cacheName: SHELL }));
+        // what this version fetched since, else what its install kept for the start (the entry script, an icon); a cache
+        // that can't be read is a miss
+        const hit = await caches
+          .match(req, { cacheName: ASSETS })
+          .then((r) => r || caches.match(req, { cacheName: SHELL }))
+          .catch(() => undefined);
         if (!hit) return refresh();
         if (!hashed) e.waitUntil(refresh().catch(() => {}));
         return hit;

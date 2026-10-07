@@ -97,11 +97,13 @@ try {
     for (let i = 0; i < tries; i++) min = Math.min(min, await fn(i));
     return min;
   };
-  const load = async ({ page, net }) => {
+  // `shown`: called as soon as the cards are on screen (before the network is idle).
+  const load = async ({ page, net }, shown) => {
     await page.goto('about:blank');
     net.take();
     await page.goto(`${BASE}/#/`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => window.__perf?.seen.library, { timeout: 60000 });
+    shown?.();
     await net.idle(600);
     return { shown: await seen(page, 'library'), reqs: net.take() };
   };
@@ -114,6 +116,26 @@ try {
     });
   };
 
+  // Answers held back until `release()` (or for `ms` at most once the first is asked for): until a state, not for a
+  // time. `by()` says which let them go: the state ('release') or the time ('time').
+  const holdUntil = async (page, pattern, ms) => {
+    const held = [];
+    let by = null;
+    let timer = null;
+    const free = (why) => {
+      by ??= why;
+      clearTimeout(timer);
+      for (const r of held.splice(0)) r.continue().catch(() => {});
+    };
+    await page.setRequestInterception(true);
+    page.on('request', (r) => {
+      if (by || !pattern.test(new URL(r.url()).pathname)) return void r.continue().catch(() => {});
+      held.push(r);
+      timer ??= setTimeout(() => free('time'), ms);
+    });
+    return { release: () => free('release'), by: () => by };
+  };
+
   await check('the first paint asks the API one round trip deep (two on a first visit)', async () => {
     const f = await fresh();
     const first = await load(f);
@@ -121,10 +143,13 @@ try {
     const cold = apiWaterfall(first.reqs, doc ? doc.start + first.shown : undefined);
     console.log(`      first visit: ${cold.calls.join(' ')}`);
     assert(cold.depth <= 2, `first visit: ${cold.depth} round trips before the cards (${cold.calls.join(' ')})`);
-    // Next visit: who is signed in is held back 1.5 s; the library's data must not wait for that answer.
+    // Next visit: who is signed in is held back until the cards are on screen (10 s at most); neither the library's data
+    // nor the cards may wait for that answer. Held until the cards show, not for a fixed time: a busy runner paints late,
+    // and a hold shorter than its first paint failed it (CI: cards at 6.2 s behind 1.5 s); cards that need the answer
+    // still come only after it.
     await sleep(1000);
-    await hold(f.page, /^\/api\/auth\/status$/, 1500);
-    const again = await load(f);
+    const whoHeld = await holdUntil(f.page, /^\/api\/auth\/status$/, 10_000);
+    const again = await load(f, whoHeld.release);
     const auth = again.reqs.find((r) => /\/api\/auth\/status$/.test(r.url));
     const library = again.reqs.find((r) => isApi(r) && /\/api\/library$/.test(new URL(r.url).pathname));
     assert(auth && library, 'both asked for');
@@ -133,7 +158,7 @@ try {
       `      next visit: library asked at ${(library.start - doc2.start).toFixed(0)} ms, auth answered at ${(auth.end - doc2.start).toFixed(0)} ms, cards at ${again.shown.toFixed(0)} ms`,
     );
     assert(library.start < auth.end, 'the library waited for /api/auth/status');
-    assert(doc2.start + again.shown < auth.end, 'the cards waited for /api/auth/status');
+    assert(whoHeld.by() === 'release', 'the cards waited for /api/auth/status');
     await f.ctx.close();
   });
 

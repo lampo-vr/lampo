@@ -449,9 +449,22 @@ export function Qm({ children, side = 'end' }: { children: ReactNode; side?: 'st
   );
 }
 
+/** Each run of non-spaces unbroken (the browser would break after a `-`): a command breaks at its spaces only. */
+const unbroken = (s: string) =>
+  s.split(/(\s+)/).map((w, i) =>
+    i % 2 || !w ? (
+      w
+    ) : (
+      // biome-ignore lint/suspicious/noArrayIndexKey: the words of one command, in order
+      <span key={i} className="ent-cmd-w">
+        {w}
+      </span>
+    ),
+  );
+
 /**
  * A command to copy, light (a tinted line, never a black block): the command's name in the strong weight, then its
- * arguments, one line that scrolls sideways when it doesn't fit, and Copy.
+ * arguments, and Copy. One line where it fits; a phone too narrow for it breaks it at its spaces, never inside a word.
  */
 export function Cmd({ name, args, label }: { name: string; args: string; label: string }) {
   const [done, setDone] = useState(false);
@@ -473,7 +486,7 @@ export function Cmd({ name, args, label }: { name: string; args: string; label: 
   return (
     <div className="ent-cmd" title={label}>
       <code ref={code}>
-        <b>{name}</b> {args}
+        <b>{unbroken(name)}</b> {unbroken(args)}
       </code>
       <button type="button" className={`ent-copy${done ? ' done' : ''}`} onClick={copy} aria-label={t('Copy {label}', { label })}>
         <I name={done ? 'check' : 'copy'} size={13} />

@@ -77,6 +77,10 @@ format stays backwards compatible throughout.
   command runs on the agent's own machine, never on a server ([docs/agents.md](docs/agents.md)).
 
 ### Fixed
+- The app no longer opens on a blank page when the browser can't keep a copy of its code (its storage full or busy, a
+  private window): what arrived from the server is used either way, and the copy is kept when it can be.
+- Setting up a server from a phone: the command that creates the owner (and the one that sets a new password) breaks
+  at a space when the screen is too narrow for it, instead of running past the edge of its box.
 - Checking a video or a download without fetching it (what browsers and download managers ask before they start) no
   longer makes the server read the whole file first: the player, downloads, review links, embeds, the publishing kit
   and your data export answer with the details alone.
