@@ -123,6 +123,7 @@ version, the video, the agent it is assigned to (after `→`) and the text.
 | `APPROVED v3 (client: Mia)`, `CHANGES REQUESTED v3 (team)`, `FINAL v3`, `REOPENED v3 (was final)` | a decision about a version |
 | `PREVIEW CONFIRMED`, `CHECK AGAIN` | a new render matched, or didn't match, a fix preview ([below](#fixing-in-the-project-without-rendering-after-effects-premiere-resolve-)) |
 | `AGENT RUN` | a run Lampo started for you began or ended ([below](#when-youre-not-running-the-machine-can-start-you)) |
+| `AGENT RUN OPENED`, `WORKING`, `NEEDS YOU`, `ENDED` | with `--all` only: an agent's run on a video opened, began, waits for the person, or ended ([below](#your-work-as-the-person-sees-it-runs)) |
 
 Good to know:
 
@@ -199,6 +200,8 @@ or the environment variable `VR_BY=agent:<name>` changes that.
 | `vr assign <video> (--me \| --session <name> \| --none)` | change which agent the video is assigned to |
 | `vr move <video> "A/B"` | file a video into a project or folder (created if new; at most 12 levels and 400 characters, as for `--folder` everywhere); `--none` takes it out |
 | `vr sync <video>` | register a re-render now (`vr fix` and the running app pick it up by themselves) |
+| `vr render [--to <video> --out <file>] [--detach] [--verbose] -- <command> [args…]` | run your render command with its progress shown in Lampo, then put `--out` up as the next version of `--to`; two lines back instead of the render's output ([below](#rendering-through-vr-render-the-person-sees-the-progress)) |
+| `vr render wait <id>` | wait (9 minutes at most) for a render started with `--detach`: how far it is, or how it ended |
 
 **Options of `vr add`**
 
@@ -679,8 +682,9 @@ in the sidebar's **Agents** list. Lampo builds it from what it sees anyway:
   324", "Fixed “caption moved to y 1392”" (what your `mark_fixed` note says). People see a note by its moment or its
   words, never its id. A wait (`vr watch`, `wait_for_feedback`) shows as one line: "Waiting for your answer · since
   14:02".
-- **Uploads and renders**: an upload's progress (`vr push`, upload URLs), and a render file still growing next to its
-  video ("Rendering… 340 MB, still growing").
+- **Uploads and renders**: a render through [`vr render`](#rendering-through-vr-render-the-person-sees-the-progress)
+  (its stage, percent and time left), an upload's progress (`vr push`, upload URLs), and a render file still growing
+  next to its video ("Rendering… 340 MB, still growing").
 - **A run Lampo started for you** ([below](#when-youre-not-running-the-machine-can-start-you)): the step it's on
   ("Editing src/Logo.tsx", "Running npm run render"), and the tokens and cost only when Claude Code reports them,
   never estimated. Files show relative to the session's folder; their contents never do.
@@ -688,7 +692,7 @@ in the sidebar's **Agents** list. Lampo builds it from what it sees anyway:
 ![The agent menu while the agent works: Live, with what it is doing now and its last actions with their times](assets/agent-menu-live.webp)
 
 None of it costs you a token or asks anything of you, and none of it is written into the review: it lives in the app's
-memory and a small rolling file in the cache. So `vr status` and `set_status` are optional: use them for what Lampo
+memory and a small rolling file in the cache, and the spine of it is kept with the video as a run (below). So `vr status` and `set_status` are optional: use them for what Lampo
 can't see ("waiting for the client's logo file", an estimate for a long render), not to narrate your steps.
 
 How you're named there: by your Claude Code session, else by `VR_BY=agent:<name>`; an MCP client over HTTP by its name,
@@ -701,6 +705,95 @@ Details: on the machine, `vr` and the stdio MCP server append a line per call to
 most every 2 s (`POST /api/agents/activity`). A hosted server shows what an account sends as that account's
 (`<name> · <account>`, like an MCP client connected with it) and at about the time it arrived, so nobody can make their
 agent's lines look like someone else's.
+
+## Rendering through `vr render`: the person sees the progress
+
+Run your render command through `vr render`, and the person watches it in Lampo as it goes: "rendering V4 · 42 % ·
+about 1 min left", then V4 itself. You read two lines instead of the render's output.
+
+```sh
+vr render --to launch.mp4 --out out/v4.mp4 -- npx remotion render src/index.ts Main out/v4.mp4
+vr render --to launch.mp4 --out out/v4.mp4 -- ffmpeg -y -i edit.mov -c:v libx264 out/v4.mp4
+vr render --to spot.mp4 --out spot.mov -- aerender -project spot.aep -comp Main -output spot.mov
+```
+
+```
+V4 rendered in 3m12s and put up for review (900 frames). Now mark each note fixed.
+3 notes still open on this video.
+```
+
+- **What runs:** your command, as an argument list after `--`, on your machine: never through a shell, never on a
+  server. It runs in a process group of its own with stdin closed, so Ctrl-C (or a stop) reaches everything it
+  started; a second Ctrl-C kills it.
+- **What it reads:** Remotion (`npx remotion render`, `remotion render`): bundling, rendering and encoding, from the
+  lines it prints when its output isn't a terminal. ffmpeg: `vr render` adds `-progress pipe:3 -nostats` (progress
+  flags only; a command that names its own `-progress` keeps it) and measures against the length your arguments give
+  (`-frames:v`, `-t`, `-to`) or, without one, the first input's (ffprobe). aerender: its `PROGRESS:` lines against the
+  comp's duration. Blender: the frame it is on, against `-s`/`-e`/`-j` with `-a`, or `-f`. Any other command: the
+  size of `--out` as it grows (a folder of frames counts all its files), with no percentage.
+- **Stages:** bundling → rendering → encoding → uploading → checking; the percentage starts again at each. The time
+  left comes from the rate over the last ten seconds, and is left out for the first 5 % of a stage and while the rate
+  swings by more than half.
+- **On success** with `--to`, `--out` becomes the next version: a video linked to its file on this machine is
+  registered where it is (render to that file: another `--out` is refused before anything runs), anything else goes up
+  as `vr push --to` does, against a server with the upload's progress. Then one line, and the line that says what to do
+  next (mark the notes fixed, or listen with `vr watch`). Without `--to` it only reports and renders.
+- **On failure** it exits with the tool's code and prints one line, `Render failed (exit 1): <what went wrong>. The
+  person sees it in Lampo.` Lampo gets the tool's last meaningful lines, at most 300 characters, with anything that
+  looks like a token, key or password taken out.
+- **Quiet** is the default; `--verbose` shows the tool's own output on stderr.
+- **Who it reports as:** like every `vr` command, your Claude Code session, `VR_BY=agent:<name>`, or the run Lampo
+  started you for (`LAMPO_RUN`). Progress goes to Lampo at most every 500 ms on the machine and every 2 s to a server.
+  A person running `vr render` by hand records nothing.
+
+### Renders longer than about 8 minutes: `--detach` and `vr render wait`
+
+A shell command an agent runs may have a time limit (Claude Code's Bash tool stops one after 10 minutes at most, and
+`claude -p` ends background shells soon after its answer). For a render that takes longer, detach it:
+
+```sh
+vr render --detach --to launch.mp4 --out out/v4.mp4 -- npx remotion render src/index.ts Main \
+  out/v4.mp4
+# Rendering V4 (render r_3f9a0c1b2d): run vr render wait r_3f9a0c1b2d now.
+vr render wait r_3f9a0c1b2d
+# Still rendering V4: 62 %, about 4 min left. Run vr render wait r_3f9a0c1b2d again now.
+```
+
+`--detach` hands the render to a small `vr` process in a session of its own, which outlives your shell, and returns
+at once. `vr render wait` blocks for 9 minutes at most and prints one line: still rendering (with the percent and the
+time left), or the same lines a foreground render ends with, and its exit code. Ask again until it ends. Its state
+lives in the cache (`<cache>/renders/`, readable only by you), never with the reviews; finished ones are cleared after a
+week. Render in the foreground when it takes less than about 8 minutes.
+
+## Your work as the person sees it: runs
+
+The person doesn't see calls, they see work: when a team member sends notes to the video's agent (Send, Ask, a nudge,
+an answer to your question, Try again), Lampo opens a **run** for that agent on that video, and everything you do there
+joins it. Its plan is the notes they sent; its result is the version you put up. The app shows it as one line ("fixing
+3 of 6 · editing Logo.tsx", "V4 is ready · 5 fixed · 1 asked · worked 9 min"). It asks nothing of you:
+
+- **It begins** with your first call about the video, or the wait that hands you the notes (`wait_for_feedback`;
+  with `vr watch`, your next command).
+- **The plan moves** with what you do anyway: reading a note or looking at its frame puts it "in hand"; `mark_fixed`
+  / `vr fix`, `wont_fix`, `reply` and a question (`add_note` kind question, `ask_options`) answer it. Nothing is
+  guessed from time.
+- **A question** (yours) makes it wait for the person; their answer sends it on. Time waiting for them isn't counted
+  as your work.
+- **It ends** when you hand back: you wait again after putting up the version or answering every note, or the version
+  arrives with every note answered. A run Lampo started for you ends with your process.
+- **If you go quiet** for 20 minutes (5 for a run Lampo started, 10 more while `vr render` reports), it shows as not
+  heard from; your next call picks it up again. After another hour it closes without blame.
+- **Your own write opens one** when none is open (an upload, a fix, a note): a person's reads and your reads never do.
+- **One run per agent and video**: notes sent while you work join it. Your next Lampo answer then ends with one line,
+  once: `2 new notes on launch.mp4 since you started: get_open_notes since "2026-10-07T10:00:00Z".` Read them
+  and fold them into the same version.
+- **The version you put up** while you're at the video names the run (`run` in review.json's versions).
+- `vr watch --all` prints the runs too (`AGENT RUN OPENED`, `WORKING`, `NEEDS YOU`, `ENDED <state>`), beside the
+  `AGENT RUN STARTED|FINISHED` lines of a run Lampo started; INBOX.md and `wait_for_feedback` never carry them.
+
+Only a team member with the agents right opens a run (owners, admins, members): never a reviewer, a review link or an
+API token. A run's history is kept in `data/<slug>/runs.jsonl` ([data-format.md](data-format.md#agent-runs)) and read
+through `GET /api/runs` ([api.md](api.md#agent-runs)).
 
 ## Working against a hosted server
 
@@ -749,8 +842,9 @@ The prompt is one line, for example:
   keep the tools the loop needs (`vr`, your render command) allowed for that project, and, if the session uses the
   MCP server, its tools: `mcp__lampo` allows them all, or name them (`mcp__lampo__get_open_notes`, …). A server
   added under the older key is `mcp__video-review__…`.
-- **Limits:** one run per session at a time, 30 minutes at most (`VR_AGENT_RUN_TIMEOUT`, in seconds), five starts per
-  ten minutes. The person sees the run working in the agent menu, with **Stop** (it ends the run and everything it
+- **Limits:** one run per session at a time, stopped after 30 minutes without a sign of it (no output, no call to Lampo:
+  `VR_AGENT_RUN_TIMEOUT`, in seconds) and after 3 hours in all; five starts per ten minutes. It carries
+  `LAMPO_RUN=<run id>` in its environment, and `vr` and the stdio MCP server name that run with what they report. The person sees the run working in the agent menu, with **Stop** (it ends the run and everything it
   started) and **Log** (`cache/agent-runs/<run>.log`: the run's whole transcript, so readable by you only). A run ends
   when the app quits.
 - **The request is still a `REQUEST` line**, as always: do the work the usual way and finish with the next render (or

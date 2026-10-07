@@ -8,6 +8,15 @@ format stays backwards compatible throughout.
 ## [Unreleased]
 
 ### Added
+- **An agent's work on a video is kept, from start to end.** When you send notes to the video's agent (Send, Ask,
+  a nudge, your answer to its question, Try again), Lampo keeps what it does with them as one piece of work: the notes
+  you sent as its plan (which it is on, which it fixed, asked about or left), what it is doing now, how long it worked
+  (not counting the time it waited for you), whether it needs you, and the version it handed back. It costs the agent
+  nothing: it comes from the calls it makes anyway. A version an agent made says so, notes you send while it works
+  join the same work (the agent hears of them with its next answer), and an agent that goes quiet shows as not heard
+  from instead of quietly reading as idle. Only team members who may work with agents start one; reviewers' notes and
+  review links never do. For tools: `GET /api/runs?slug=`, `GET /api/runs/:id`, each video's `run` in the library,
+  the live event `run`, and `AGENT RUN …` lines in `vr watch --all` (docs/api.md, docs/agents.md).
 - **Archive a project.** A project that is done can be put away from its ⋯ menu (owners and admins), with Undo: it
   leaves the sidebar, All videos, the board, Recent, the Inbox and Insights' lists of what waits now, and the
   sidebar's *Archived* row (with how many) opens the archived projects; ⌘K finds them under *Archived*. Opened, an
@@ -32,6 +41,14 @@ format stays backwards compatible throughout.
   Sites that embed from an address find it through oEmbed (on your own machine through its public tunnel too), with
   the poster as a thumbnail they may show. A link is an embed from when it is made: an existing link doesn't become
   one, nor an embed another kind of link.
+- **See a render's progress while an agent renders.** An agent that renders through
+  `vr render --to <video> --out <file> -- <its render command>` shows the person how far it is, as it goes: the stage
+  (bundling, rendering, encoding, uploading, checking), the percent and frames, and the time left once it can be
+  estimated honestly. Remotion, ffmpeg, After Effects (aerender) and Blender are read; any other command by its output
+  growing. When it is done, the file becomes the next version, and the agent reads two lines instead of the render's
+  output. A failed render reaches Lampo with the tool's last words, anything that looks like a secret taken out. Long
+  renders run detached (`--detach`, then `vr render wait`), so an agent's shell time limit doesn't end them. The
+  command runs on the agent's own machine, never on a server ([docs/agents.md](docs/agents.md)).
 
 ### Fixed
 - Checking a video or a download without fetching it (what browsers and download managers ask before they start) no
@@ -73,6 +90,9 @@ format stays backwards compatible throughout.
   A step ticks the moment it's done, and when the last one is, it says *You're set* and goes. Closing the big card now
   keeps the row; *Hide for good* puts both away, with Undo, and the account menu still brings them back. On phones and
   tablets the row sits at the foot of the menu.
+- A Claude Code run Lampo starts on your machine now stops after 30 minutes without a sign of the agent (its output,
+  or a call to Lampo), and after 3 hours at most, instead of after 30 minutes whatever it was doing: a long render
+  no longer cuts it off.
 - **Several suggestions for the same part of a playbook** (the brief, the rules, one skill) stand together, the newest
   first and marked, with a line that says how they relate. Once one is accepted, or someone changed that part by hand,
   the others say so straight away and their diff shows what accepting them now would replace; *Accept anyway* does it

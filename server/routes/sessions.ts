@@ -7,13 +7,16 @@ import { ownedAgentName } from '../../lib/activityText.ts';
 import { AGENT_KINDS } from '../../lib/agentKind.ts';
 import { isInboxEvent } from '../../lib/eventLine.ts';
 import { isoLocal } from '../../lib/paths.ts';
+import { ERROR_MAX } from '../../lib/render/redact.ts';
+import { RENDER_STAGES, RENDER_TOOLS } from '../../lib/render/tools.ts';
+import { PROGRESS_ETA_MAX, RUN_ID } from '../../lib/runs.ts';
 import { rankSessions } from '../../lib/sessions.ts';
 import * as store from '../../lib/store.ts';
 import type { AgentActivityResponse, AgentKind, SessionsResponse } from '../../lib/types.ts';
 import type { ServerContext } from '../context.ts';
 import { agentView, getReview } from '../helpers.ts';
 import { body, fail, query, router } from '../http.ts';
-import { requireMachine, startAgent } from '../wake.ts';
+import { checkWake, requireMachine, startAgent } from '../wake.ts';
 
 const SessionsQuery = z.object({ fresh: z.string().optional(), video: z.string().optional() });
 // `{}` (or no name) unassigns; extra fields the UI sends along (pid, kind, score …) are ignored.
@@ -34,27 +37,44 @@ const Heartbeat = z.object({
 });
 const RunsQuery = z.object({ slug: z.string().max(1000).optional() });
 const ActivityQuery = z.object({ slug: z.string().max(1000).optional(), agent: z.string().max(200).optional() });
+// A render or upload under way, as `vr render` posts it: only the contract's words and sane numbers (cleanProgress in
+// lib/runs.ts keeps to the same rules for what comes in any other way).
+const Progress = z
+  .object({
+    what: z.enum(['render', 'upload', 'check']),
+    stage: z.enum(RENDER_STAGES),
+    pct: z.number().min(0).max(100).nullable(),
+    frames: z.tuple([z.number().int().min(0).max(1e8), z.number().int().min(0).max(1e8)]).optional(),
+    eta_s: z.number().min(0).max(PROGRESS_ETA_MAX).optional(),
+    tool: z.enum(RENDER_TOOLS).optional(),
+    v: z.number().int().min(1).max(1e6).optional(),
+  })
+  .strict();
 // What an agent of a hosted server did (lib/activity.ts remoteSink batches it): plain words, small, at most 20. Only
-// the kinds an agent's own `vr` / MCP calls make: what Lampo saw itself (a run, a render on disk) isn't for posting.
+// the kinds an agent's own `vr` / MCP calls make (`vr render`'s progress and failure among them): what Lampo saw
+// itself (a run, a render growing on disk) isn't for posting.
 const ActivityBatch = z.object({
   entries: z
     .array(
       z.object({
         at: z.string().max(40).optional(),
         agent: z.string().min(1).max(200),
-        kind: z.enum(['read', 'note', 'fix', 'reply', 'ask', 'upload', 'wait', 'playbook', 'status', 'tool']),
+        kind: z.enum(['read', 'note', 'fix', 'reply', 'ask', 'upload', 'render', 'error', 'wait', 'playbook', 'status', 'tool']),
         text: z.string().min(1).max(300),
         key: z.string().max(80).optional(),
         vars: z.record(z.string().max(20), z.union([z.string().max(200), z.number()])).optional(),
-        quote: z.string().max(200).optional(),
+        quote: z.string().max(ERROR_MAX).optional(),
         target: z.string().max(80).nullish(),
         video: z.string().max(1000).nullish(),
         pct: z.number().min(0).max(100).optional(),
+        progress: Progress.optional(),
+        // the run Lampo started it for (LAMPO_RUN): a hint, bound only to the poster's own agent's run (server/runs.ts)
+        run: z.string().regex(RUN_ID).optional(),
       }),
     )
     .max(20),
 });
-const RunId = z.string().regex(/^run_[0-9a-f]{12}$/);
+const RunId = z.string().regex(RUN_ID);
 // A nudge without a request of its own (after answering the agent's question): what to tell it, optional.
 const WakeBody = z.object({ text: z.string().max(2000).optional() });
 /** The most of a run's log the UI gets (its end: that's where it says what it did). */
@@ -172,7 +192,11 @@ export function sessionRoutes(ctx: ServerContext): Router {
   r.post('/api/review/:slug/wake', express.json(), async (req, res) => {
     const review = getReview(req.params.slug);
     const text = (body(WakeBody, req).text || '').trim() || 'Your question was answered; read the answer and go on.';
-    res.json({ run: await startAgent(req, ctx, req.params.slug, review, text) });
+    // checked first: a start that can't happen opens nothing
+    checkWake(req, ctx, review);
+    // the run it starts for: the agent's open one (an answer opened it), else a nudge's
+    const opened = ctx.runs.fromPerson(req, req.params.slug, { how: 'nudge' });
+    res.json({ run: await startAgent(req, ctx, req.params.slug, review, text, opened?.id) });
   });
 
   r.get('/api/agents', (req, res) => {

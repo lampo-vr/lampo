@@ -11,11 +11,23 @@ import { isOwner } from '../lib/ownership.ts';
 import { slugify } from '../lib/paths.ts';
 import { can } from '../lib/permissions.ts';
 import { renderKey } from '../lib/renderKey.ts';
+import { briefFor } from '../lib/runs.ts';
 import { assignedState } from '../lib/sessions.ts';
 import { stageForReview } from '../lib/stageContext.ts';
 import * as store from '../lib/store.ts';
 import { compareTime, oneLine } from '../lib/time.ts';
-import type { ArchivedProject, AssignedSession, ClaudeSession, ConnectedAgent, FrameMeta, Review, Shape, Version, VideoSummary } from '../lib/types.ts';
+import type {
+  ArchivedProject,
+  AssignedSession,
+  ClaudeSession,
+  ConnectedAgent,
+  FrameMeta,
+  Review,
+  RunBrief,
+  Shape,
+  Version,
+  VideoSummary,
+} from '../lib/types.ts';
 import type { Started } from './background.ts';
 import { fail, sendInternal } from './http.ts';
 
@@ -75,9 +87,15 @@ export const accountOf = (req: Request, who: string): string | undefined => (who
 // agents (the `agents` action), not for reviewers. Local mode is the owner.
 export const seesAgentDetails = (req: Request): boolean => can(req.auth?.role, 'agents');
 const hideCwd = <T extends { session: AssignedSession | null }>(x: T): T => (x.session?.cwd ? { ...x, session: { ...x.session, cwd: null } } : x);
+/** A card's run without the session and computer its agent runs in. */
+const hideRunAgent = (s: VideoSummary): VideoSummary => {
+  if (!s.run?.agent.session_id && !s.run?.agent.runner) return s;
+  const { session_id: _s, runner: _r, ...agent } = s.run.agent;
+  return { ...s, run: { ...s.run, agent } };
+};
 export const agentView = {
   review: (req: Request, r: Review): Review => (seesAgentDetails(req) ? r : hideCwd(r)),
-  summary: (req: Request, s: VideoSummary): VideoSummary => (seesAgentDetails(req) ? s : hideCwd(s)),
+  summary: (req: Request, s: VideoSummary): VideoSummary => (seesAgentDetails(req) ? s : hideRunAgent(hideCwd(s))),
   session: <T extends ClaudeSession>(req: Request, s: T): T => (seesAgentDetails(req) ? s : { ...s, cwd: null }),
   agent: (req: Request, a: ConnectedAgent): ConnectedAgent => (seesAgentDetails(req) ? a : { ...a, cwd: null, host: null }),
 };
@@ -102,6 +120,15 @@ export const metaOf = (review: Review, ver: Version): FrameMeta => ({
   height: ver.height,
   frames: ver.frames,
 });
+
+/** A video's run for its card; a runs file that can't be read costs the line, never the library. */
+function runBrief(slug: string): RunBrief | null {
+  try {
+    return briefFor(slug);
+  } catch {
+    return null;
+  }
+}
 
 /** `archived`: the archived projects (lib/folderIds.ts), read once by a caller that sums up many videos. */
 export function summary(review: Review, sessions: ClaudeSession[], archived: Readonly<Record<string, ArchivedProject>> = archivedNow()): VideoSummary {
@@ -145,6 +172,8 @@ export function summary(review: Review, sessions: ClaudeSession[], archived: Rea
     added: review.added,
     updated: review.updated,
     lastComment: review.comments.reduce((a, c) => (compareTime(c.created, a) > 0 ? c.created : a), ''),
+    // its agent's run: the open one, else the last that ended in the past day (lib/runs.ts)
+    run: review.onboarding_sample ? null : runBrief(slug),
     ...(review.onboarding_sample ? { sample: true as const } : {}),
   };
 }

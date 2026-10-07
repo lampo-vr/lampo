@@ -91,6 +91,7 @@ The server:
 | `server/respond.ts` | compressed JSON with ETags, the pre-compressed UI |
 | `server/ready.ts`, `server/shutdown.ts` | `/readyz`, and finishing work before stopping |
 | `server/agentRuns.ts`, `server/activity.ts` | runs started on the machine; what agents are doing, live |
+| `lib/runs.ts`, `server/runs.ts`, `server/routes/runs.ts` | agents' runs: one stretch of an agent's work on a video (`data/<slug>/runs.jsonl`), its plan, state and result; what opens and moves them; the runs API |
 
 The UI lives in `web/src/`: `api/` (TanStack Query and live updates), `library/`, `player/`, `inbox/`, `guest/` and
 `share/` (review links), `playbook/`, `auth/` (sign-in, accounts, workspaces), `onboarding/` (the first run),
@@ -139,6 +140,11 @@ uploads, the store format, notes and screenshots, versions and diffs, Auto-check
    `INBOX.md`, under its own lock (`data/.inbox`), so two processes writing at once can't leave an older version
    behind. A change that fails writes no event. Live updates tell open browsers what to fetch again, and `vr watch`
    follows the same events: from the file on the machine, over the event stream elsewhere.
+6. **Runs.** Notes a team member sends to the video's agent open its run (`data/<slug>/runs.jsonl`); every activity
+   the agent's calls make joins it, and the events above (a version, a fix, its question, the answer) move its plan
+   and state. Only the app writes the file, under the video's lock, about a second after a change; the version a run
+   produced names it (`Version.run`, set when it is registered, by whichever process registers it). A clock looks at
+   open runs every 30 s for the ones that went quiet.
 
 <!-- picture: render-flow — a render's path in five steps: registered (hash, versions/), warm-up jobs, playback (original or scrub copy), a note (clean and marked screenshots), the event (events.jsonl, live update, vr watch) -->
 

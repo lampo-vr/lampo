@@ -25,13 +25,15 @@ interface FeedOptions {
  * The feed as the server process runs it: public events to browsers and agents, raw ones to webhooks and push. A new
  * render registered by another process (`vr push`, `vr sync`) is compared with the fix previews of its notes.
  */
-export function startServerFeed(ctx: Pick<ServerContext, 'broadcast' | 'publicEvent' | 'webhooks' | 'push' | 'background'>, interval?: number): Feed {
+export function startServerFeed(ctx: Pick<ServerContext, 'broadcast' | 'publicEvent' | 'webhooks' | 'push' | 'background' | 'runs'>, interval?: number): Feed {
   return startFeed(ctx.broadcast, {
     interval,
     publicEvent: ctx.publicEvent,
     onEvent: (e) => {
       ctx.webhooks.handle(e);
       ctx.push.handle(e);
+      // versions, statuses, questions and answers from every process move agents' runs (server/runs.ts)
+      ctx.runs.event(e);
       if (e.type === 'version' && e.slug) {
         const review = store.loadReview(e.slug);
         if (review) ctx.background.checkPreviews(review);

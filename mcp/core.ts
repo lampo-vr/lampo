@@ -85,6 +85,7 @@ export function createReviewServer(options: ReviewServerOptions): McpServer {
       audience: audienceOf(o.principal),
       publicEvent: o.publicEvent,
       activity: (args, ctx) => kit.activity('wait_for_feedback', args, ctx),
+      ...(o.handed ? { handed: (slugs: string[], ctx: Parameters<typeof kit.agentName>[0]) => kit.handed(slugs, ctx) } : {}),
       me: kit.me,
       told: o.told,
       quiet: o.quiet,

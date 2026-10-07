@@ -197,6 +197,12 @@ export function askRoutes(ctx: ServerContext): Router {
       throw failFrom(400, e);
     }
     told(hit?.slug ?? null);
+    // the agent that asked goes on (its run works again), or the answer opens its follow-up (server/runs.ts)
+    if (hit) ctx.runs.answered(req, hit.slug, qid, true);
+    else {
+      const ask = findAsk(qid);
+      if (ask) ctx.runs.answeredFolder(ask.folder, qid);
+    }
     res.json(askView(qid));
   });
 

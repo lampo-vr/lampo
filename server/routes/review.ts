@@ -18,7 +18,7 @@ import { followShots, shotsOrLater } from '../../lib/shots.ts';
 import { approvalsOf } from '../../lib/stage.ts';
 import { stageForReview } from '../../lib/stageContext.ts';
 import * as store from '../../lib/store.ts';
-import { NOTE_KINDS, SEVERITIES, STATUSES } from '../../lib/time.ts';
+import { isAgent, NOTE_KINDS, SEVERITIES, STATUSES } from '../../lib/time.ts';
 import { TEXT_EDIT_MAX } from '../../lib/transcript.ts';
 import type { Comment, FrameRange, MediaInfo, NoteRecording, PartRequest, PartSuggestion, ReviewResponse, Version, VoiceNote } from '../../lib/types.ts';
 import type { ServerContext } from '../context.ts';
@@ -101,8 +101,14 @@ const ApprovalBody = z.object({
   v: z.number().int().min(1).nullish(),
 });
 
-// `start`: also start the assigned agent when it isn't running (on this machine only; server/wake.ts).
-const RequestBody = z.object({ text: z.string().max(5000).optional(), start: z.boolean().optional(), part: PartBody.optional() });
+// `start`: also start the assigned agent when it isn't running (on this machine only; server/wake.ts). `nudge`: it is a
+// nudge (a stalled video's agent asked to pick it up), not a request of its own — its run is about the open notes.
+const RequestBody = z.object({
+  text: z.string().max(5000).optional(),
+  start: z.boolean().optional(),
+  part: PartBody.optional(),
+  nudge: z.boolean().optional(),
+});
 const StatusBody = z.object({ text: statusText.nullish(), eta_seconds: z.number().min(0).max(86400).nullish(), by });
 
 /** A stretch the person picked, on the render's shots when they are known (the suggestion came from them). */
@@ -347,6 +353,9 @@ export function reviewRoutes(ctx: ServerContext): Router {
       by_id: accountOf(req, who),
     });
     changed(store.findComment(id)?.slug);
+    // An agent's question answered: its run goes on, or (a person with the agents right) the answer opens its follow-up.
+    if (b.status === 'verified' && hit.comment.kind === 'question' && hit.comment.status === 'open' && isAgent(hit.comment.author))
+      ctx.runs.answered(req, hit.slug, id, !!b.note?.trim());
     // a fix checked "Looks right" on a video of the workspace's own (not the sample): the funnel's step the first time,
     // and the loop's moment for the first person of the workspace to check one (web/src/conversion/)
     const person = req.auth?.via !== 'token' ? req.auth?.user?.id : undefined;
@@ -420,7 +429,9 @@ export function reviewRoutes(ctx: ServerContext): Router {
     if (b.start) checkWake(req, ctx, review);
     const latest = review.versions.at(-1);
     const words = store.addRequest(req.params.slug, text, ctx.actor(req), b.part && latest ? snapPart(latest, b.part) : null);
-    const run = b.start ? await startAgent(req, ctx, req.params.slug, review, words) : null;
+    // Ask (or Nudge) opens the agent's run, or joins the one it has open (a person with the agents right: server/runs.ts).
+    const opened = ctx.runs.fromPerson(req, req.params.slug, { how: b.nudge ? 'nudge' : 'request', request: text || null });
+    const run = b.start ? await startAgent(req, ctx, req.params.slug, review, words, opened?.id) : null;
     res.json({ ok: true, ...(b.start ? { run } : {}) });
   });
 

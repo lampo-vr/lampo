@@ -79,12 +79,25 @@ export function remoteSink(post: (entries: ActivityRecord[]) => Promise<unknown>
   };
 }
 
-/** The sink for this process: the hosted server it is logged in to, else the file on this machine. */
-export function openActivitySink(): ActivitySink {
+/** The sink for this process: the hosted server it is logged in to, else the file on this machine. Every line names the
+ * run this process works for, when Lampo started it for one (`LAMPO_RUN`). */
+export function openActivitySink(env: NodeJS.ProcessEnv = process.env): ActivitySink {
   const c = readCredentials();
-  if (!c) return fileSink();
-  const api = createApi(c);
-  return remoteSink((entries) => api.call('POST', '/api/agents/activity', { entries }));
+  const sink = c ? remoteSink((entries) => createApi(c).call('POST', '/api/agents/activity', { entries })) : fileSink();
+  return taggedWithRun(sink, lampoRun(env));
+}
+
+/** A run's id as the server makes them (lib/runs.ts `newRunId`): the one pattern every reader of a run id checks. */
+export const RUN_ID = /^run_[0-9a-f]{12}$/;
+
+/** The run Lampo started this process for (`LAMPO_RUN`), when it names one. Only a hint: the server binds a line to
+ * that run only when it is the same agent's, on the same video, in the same workspace (server/runs.ts). */
+export const lampoRun = (env: NodeJS.ProcessEnv = process.env): string | undefined => (RUN_ID.test(env.LAMPO_RUN ?? '') ? env.LAMPO_RUN : undefined);
+
+/** Every activity of a process Lampo started for a run names that run: a hint the server checks (server/runs.ts). */
+export function taggedWithRun(sink: ActivitySink, run = lampoRun()): ActivitySink {
+  if (!run) return sink;
+  return { record: (a) => sink.record({ ...a, run: a.run ?? run }), flush: () => sink.flush() };
 }
 
 /** The agent this process works for, by the name the UI shows: the Claude Code session, else VR_BY's agent name.
@@ -95,6 +108,12 @@ export function processAgent(env: NodeJS.ProcessEnv = process.env): string | nul
   if (own) return own;
   const by = env.VR_BY?.match(/^agent:([\s\S]+)$/)?.[1];
   return (by && cleanAgentName(by)) || null;
+}
+
+/** Who a `vr` command records as: the agent (processAgent), else, in a run Lampo started that names no agent, "agent".
+ * Null for a person's own `vr`. */
+export function cliAgent(env: NodeJS.ProcessEnv = process.env): string | null {
+  return processAgent(env) ?? (lampoRun(env) ? 'agent' : null);
 }
 
 export const stamp = (): string => isoLocal();

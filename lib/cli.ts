@@ -3,7 +3,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { openActivitySink, processAgent } from './activity.ts';
+import { cliAgent, openActivitySink } from './activity.ts';
 import { cliActivity } from './activityText.ts';
 import { archivedIn, archivedWords } from './archived.ts';
 import { readCredentials } from './backend/credentials.ts';
@@ -12,6 +12,7 @@ import type { PlaybookWhere, RefInput } from './backend/types.ts';
 import { CHOICE_MAX, CHOICES_MAX, CHOICES_MIN, cleanChoices } from './choices.ts';
 import { admin, login, logout, whoami } from './cliAccount.ts';
 import { mcpCommand } from './cliMcp.ts';
+import { render } from './cliRender.ts';
 import { describeShape } from './drawing.ts';
 import { ELEMENT_LIMITS, legendLine, NO_POINTERS, onWords, pointerFields, pointerIn, readElementMap } from './elements.ts';
 import { eventLine, isInboxEvent, shortEventLine, tags, WATCH_TYPES } from './eventLine.ts';
@@ -113,6 +114,9 @@ Acting
   vr move <video> <folder> | --none     file a video into a project/folder (created if new)
   vr assign <video> (--me | --session <name> | --none)
   vr sync <video>                       register a re-render now (otherwise automatic)
+  vr render [--to <video> --out <file>] [--detach] -- <command>   render with its progress in Lampo, then put
+                                        <file> up as the next version; two lines back (docs/agents.md)
+  vr render wait <id>                   a --detach render (past ~8 min): waits ≤ 9 min, says how far it is
   vr diff <video> [--v N]               what changed from v(N-1) to vN: changed ranges (with screen region), audio, retimes
   vr taste <video|folder>               the reviewer's taste for that project: read it before you render
   vr playbook [<video|folder>]          the team's playbook for it (brief, rules, skills; House without an argument):
@@ -185,6 +189,8 @@ type Opts = Record<string, OptValue | undefined>;
 interface Args {
   pos: string[];
   opt: Opts;
+  /** `vr render`: everything after `--`, the command as given. */
+  cmd?: string[];
 }
 
 const MULTI = new Set(['box', 'arrow', 'choice']);
@@ -1364,6 +1370,7 @@ const commands: Record<string, Command> = {
   whoami: ({ opt }) => whoami({ opt }, author(opt)),
   admin: ({ pos, opt }) => admin({ pos, opt }),
   mcp: ({ pos, opt }) => mcpCommand({ pos, opt }),
+  render: ({ pos, opt, cmd = [] }, b) => render({ pos, opt, cmd }, b, { out, fail: die, by: author(opt) }),
 };
 
 async function setStatus(b: Backend, id: string | undefined, status: Comment['status'], opt: Opts): Promise<void> {
@@ -1416,7 +1423,10 @@ export async function main(argv: string[]): Promise<void> {
     process.exitCode = 2;
     return;
   }
-  const args = parseArgs(rest, new Set([...MULTI, ...(MULTI_OF[name] ?? [])]));
+  // `vr render … -- <command>`: what follows `--` is the agent's command, never vr's options.
+  const split = name === 'render' ? rest.indexOf('--') : -1;
+  const args: Args =
+    split >= 0 ? { ...parseArgs(rest.slice(0, split)), cmd: rest.slice(split + 1) } : parseArgs(rest, new Set([...MULTI, ...(MULTI_OF[name] ?? [])]));
   // `vr push --help`: the command's own lines of the help, on stdout (tools read what a command takes from it).
   if (args.opt.help === true && name !== 'help') {
     out(usageOf(name, help(openBackend().where)));
@@ -1424,7 +1434,7 @@ export async function main(argv: string[]): Promise<void> {
   }
   // What an agent does with `vr` shows live in the app (lib/activity.ts): the command it ran anyway, no extra tokens.
   // A person running `vr` by hand records nothing.
-  const agent = processAgent();
+  const agent = cliAgent();
   const guess = agent ? cliActivity(name, args.pos, args.opt) : null;
   const sink = guess ? openActivitySink() : null;
   const record = () => {
