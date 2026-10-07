@@ -9,10 +9,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { after, test } from 'node:test';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
+import { Client as StdioClient } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ForYouResponse, LibraryResponse, Run } from '../../lib/types.ts';
 import { startApp } from '../lib/app.ts';
-import { age, isolatedEnv, makeVideo, until, vr } from '../lib/helpers.ts';
+import { age, isolatedEnv, makeVideo, ROOT, until, vr } from '../lib/helpers.ts';
 
 const { dir, env } = isolatedEnv({ vars: { VR_REMOTE: '0' } });
 // The stand-in: prints ./stream.jsonl (its stream-json) when there is one, waits while ./hold exists, then exits.
@@ -163,6 +165,32 @@ test('vr: the line after the command’s own output, once; the app clears it fro
   assert.doesNotMatch(twice.out, /The person stopped/, 'told once');
   await until(() => ctx.runs.find(run.id)?.run.stop_pending === undefined, 'the app hears the call and clears it');
   assert.equal(openOf(C.slug, 'cut-cli'), undefined, 'and opens nothing for it');
+});
+
+test('the stdio MCP server on this machine: its next answer about the video ends with the line, once', async () => {
+  const n = note(A.slug, 'Slower fade');
+  store.assignSession(A.slug, { name: 'stdio-cut', sessionId: 'cli-3123456789ab' }, 'tester');
+  act({ agent: 'stdio-cut', kind: 'fix', w: words('Fixed {id}', { id: n.id }), target: n.id });
+  const run = await until(() => openOf(A.slug, 'stdio-cut'), 'its run');
+  assert.equal((await call('POST', `/api/runs/${run.id}/stop`, {})).status, 200);
+  await until(() => fs.readFileSync(lib.runsFile(A.slug), 'utf8').includes('"stop_pending":true'), 'the stop written');
+  const c = new StdioClient({ name: 'stdio-stop', version: '1.0.0' });
+  await c.connect(
+    new StdioClientTransport({
+      command: process.execPath,
+      args: [path.join(ROOT, 'bin/vr-mcp')],
+      env: { ...env, VR_BY: 'agent:stdio-cut' } as Record<string, string>,
+      stderr: 'ignore',
+    }),
+  );
+  clients.push(c);
+  const text = async () =>
+    ((await c.callTool({ name: 'get_open_notes', arguments: { video: A.file } })) as CallToolResult).content
+      .filter((x) => x.type === 'text')
+      .map((x) => (x as { text: string }).text);
+  assert.match((await text()).at(-1) as string, STOP);
+  assert.doesNotMatch((await text()).join('\n'), /The person stopped/, 'told once');
+  await until(() => ctx.runs.find(run.id)?.run.stop_pending === undefined, 'the app hears the call and clears it');
 });
 
 test('a new Send to the same agent outweighs a stop it hasn’t heard: it hears the new work instead', async () => {
