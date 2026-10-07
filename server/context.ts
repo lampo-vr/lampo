@@ -31,6 +31,7 @@ import { type Extension, NO_EXTENSION } from './extension.ts';
 import { sampleForFirstRun } from './firstSample.ts';
 import { createPlayback, type Playback } from './playback.ts';
 import { createReadiness, type Readiness } from './ready.ts';
+import { createRuns, type Runs } from './runs.ts';
 import { createSessionCache, type SessionCache } from './sessionCache.ts';
 import { createInFlight, type InFlight } from './shutdown.ts';
 import { onSignup as defaultOnSignup, type OnSignup } from './signup.ts';
@@ -64,6 +65,8 @@ export interface ServerContext {
   agentRuns: AgentRuns;
   /** What agents are doing, live (server/activity.ts); the process starts tailing the machine's rolling file. */
   activity: ActivityStore;
+  /** Agents' runs: one stretch of an agent's work on a video, kept per video (server/runs.ts, lib/runs.ts). */
+  runs: Runs;
   playback: Playback;
   background: Background;
   tunnel: Tunnel;
@@ -147,8 +150,14 @@ export function createContext({ cfg, lan = false, dev = false, token, loadSessio
   const broadcast = hub.broadcast;
   const playback = createPlayback(broadcast);
   const agents = createAgentRegistry(broadcast);
-  const activity = createActivityStore(broadcast);
-  const agentRuns = createAgentRuns({ broadcast, activity: activity.record });
+  // Every activity joins its agent run (server/runs.ts); this machine's processes are runs too.
+  const runs: Runs = createRuns({ broadcast, actor: (req) => actor(req) });
+  const activity = createActivityStore(broadcast, { onRecord: (a) => runs.sign(a) });
+  const agentRuns = createAgentRuns({
+    broadcast,
+    activity: activity.record,
+    runs: { started: (i, r) => runs.machineStarted(i, r), ended: (i, r, e) => runs.machineEnded(i, r, e), seen: (r) => runs.seen(r) },
+  });
   // Server mode lists the agents that connected (in memory, always current); locally `claude agents` plus those, plus
   // the sessions Lampo itself started for a request (running from the moment they start, not the next refresh).
   const sessions = createSessionCache(broadcast, loadSessions);
@@ -214,6 +223,7 @@ export function createContext({ cfg, lan = false, dev = false, token, loadSessio
     agents,
     agentRuns,
     activity,
+    runs,
     playback,
     background: createBackground(broadcast, playback, { projectFiles: !server, stt: () => cfg.stt }),
     tunnel: createTunnel(cfg.port, broadcast),

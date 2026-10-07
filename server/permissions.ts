@@ -170,6 +170,14 @@ export const ROUTE_ACTIONS: [string, string, Rule][] = [
   ['GET', '/api/agent-runs/:id/log', 'agents'],
   ['PUT', '/api/review/:slug/agent-status', 'agents'],
   ['POST', '/api/agents/heartbeat', 'agents'],
+  // Agents' runs (server/routes/runs.ts): read by whoever may read the video; stopped, tried again and nudged by a person
+  // with the agents right (never an API token: PERSON_ONLY); the raw log only on this machine, from the machine itself.
+  ['GET', '/api/runs', 'view'],
+  ['GET', '/api/runs/:id', 'view'],
+  ['GET', '/api/runs/:id/log', 'agents'],
+  ['POST', '/api/runs/:id/stop', 'agents'],
+  ['POST', '/api/runs/:id/retry', 'agents'],
+  ['POST', '/api/runs/:id/nudge', 'agents'],
 
   // Playbooks: the team edits and decides on suggestions; anyone who may comment suggests (agents above all).
   ['PUT', '/api/playbook/text', 'playbook'],
@@ -299,6 +307,10 @@ export const PERSON_ONLY: [string, string][] = [
   ['POST', '/api/posts/:id/publish'],
   ['POST', '/api/posts/:id/cancel'],
   ['POST', '/api/posts/:id/retry'],
+  // An agent's run is started, stopped and tried again by people: an agent never starts (or stops) another.
+  ['POST', '/api/runs/:id/stop'],
+  ['POST', '/api/runs/:id/retry'],
+  ['POST', '/api/runs/:id/nudge'],
 ];
 export const PERSON_ONLY_ERROR = 'only a person signed in in the app can do this, not an API token';
 

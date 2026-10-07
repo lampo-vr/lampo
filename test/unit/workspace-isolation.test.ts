@@ -447,6 +447,15 @@ before(async () => {
   ).json();
   const askBFile = ok(await request('GET', `/api/asks/${askB.id}`, { headers: asBob }), 'B question').json().options[0].items[0].ref.file as string;
   owned(askB.id, askBFile);
+  // An agent's run (lib/runs.ts: data/<slug>/runs.jsonl) on the video both workspaces hold: Bob's request to its agent.
+  ok(
+    await request('PUT', `/api/review/${enc(ids.slugIntro)}/session`, { body: { name: 'BRAVO agent', sessionId: 'mcp-b0b0b0b0b0b0' }, headers: asBob }),
+    'B agent',
+  );
+  ok(await request('POST', `/api/review/${enc(ids.slugIntro)}/request`, { body: { text: 'BRAVO run request' }, headers: asBob }), 'B run');
+  const runB = ok(await request('GET', `/api/runs?slug=${enc(ids.slugIntro)}`, { headers: asBob }), 'B runs').json().runs[0]?.id as string;
+  assert.match(runB, /^run_[0-9a-f]{12}$/, 'B’s request opened its agent’s run');
+  owned(runB);
   const recording = ok(
     await request('POST', `/api/review/${enc(ids.slugB2)}/recordings`, { body: { v: 1, duration: 1, events: [{ t: 0, k: 'frame', f: 2 }] }, headers: asBob }),
     'B recording',
@@ -567,6 +576,7 @@ before(async () => {
     { ...base, what: 'question on a folder', id: askB.id, file: askBFile },
     { ...base, what: 'footage shot', id: shotB, query: `?ids=${shotB}&q=bravo` },
     { ...base, what: 'elements map', id: 'bravoLogo' },
+    { ...base, what: 'agent run', id: runB, query: `?slug=${enc(ids.slugIntro)}` },
   ].map((x) => ({ ...x, control: madeUp(x) }));
   // one of each, named: the walks below look for every one of them
   assert.ok([ref.id, ref.file, pbRef.id, recording.id, fix.id, fix.file, picture.avatar].every(Boolean), JSON.stringify(ids.ownedB));
@@ -653,6 +663,15 @@ before(async () => {
   ).json();
   const askAFile = ok(await request('GET', `/api/asks/${askA.id}`, { headers: asAlice }), 'A question').json().options[0].items[0].ref.file as string;
   ownA(askA.id, askAFile);
+  // A's own run on the video both hold (the same slug as B's)
+  ok(
+    await request('PUT', `/api/review/${enc(ids.slugIntro)}/session`, { body: { name: 'ALPHA agent', sessionId: 'mcp-a0a0a0a0a0a0' }, headers: asAlice }),
+    'A agent',
+  );
+  ok(await request('POST', `/api/review/${enc(ids.slugIntro)}/request`, { body: { text: 'ALPHA run request' }, headers: asAlice }), 'A run');
+  const runA = ok(await request('GET', `/api/runs?slug=${enc(ids.slugIntro)}`, { headers: asAlice }), 'A runs').json().runs[0]?.id as string;
+  assert.match(runA, /^run_[0-9a-f]{12}$/, 'A’s request opened its agent’s run');
+  ownA(runA);
   // Carol's, so that Carol — in both — asking from B would be served it if a read fell back to A's tree
   const recA = ok(
     await request('POST', `/api/review/${enc(ids.slugIntro)}/recordings`, {
@@ -782,6 +801,7 @@ before(async () => {
     { ...baseA, what: 'question on a folder in A', id: askA.id, file: askAFile },
     { ...baseA, what: 'footage shot in A', id: shotA, query: `?ids=${shotA}&q=alpha` },
     { ...baseA, what: 'elements map in A', id: 'alphaLogo' },
+    { ...baseA, what: 'agent run in A', id: runA, query: `?slug=${enc(ids.slugIntro)}` },
   ].map((x) => ({ ...x, control: madeUp(x) }));
 
   // What each workspace's people read of their own files: the walks look for what must not show; these are what must.

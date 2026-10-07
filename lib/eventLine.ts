@@ -12,7 +12,8 @@ export const FEEDBACK_TYPES: EventType[] = ['comment', 'reply', 'status', 'edit'
 export const INBOX_TYPES: EventType[] = [...FEEDBACK_TYPES, 'added'];
 /** Everything `vr watch` follows (`preview`: a newer render compared with a fix preview the reviewer verified on; `ref`:
  * an image, clip, link or moment of a render added to a note; `agent_run`: Lampo started the assigned agent on the
- * machine for a request, or that run ended). */
+ * machine for a request, or that run ended). An agent's run opening, working, needing the person or ending (`run`)
+ * shows with `--all` only. */
 export const WATCH_TYPES: EventType[] = [
   'comment',
   'reply',
@@ -130,6 +131,13 @@ function line(e: ReviewEvent, paths: boolean): string {
       return e.phase === 'started'
         ? `[${t}] AGENT RUN STARTED ${e.session || '-'} ${name} v${e.v} by ${e.by} · run ${e.run}${vid}`
         : `[${t}] AGENT RUN ${(e.phase || 'finished').toUpperCase()} ${e.session || '-'} exit ${e.exit ?? '-'} ${name} · run ${e.run}${vid}`;
+    // An agent's run (lib/runs.ts), for `vr watch --all`: tokens of their own beside AGENT RUN STARTED|FINISHED.
+    case 'run':
+      if (e.phase === 'opened')
+        return `[${t}] AGENT RUN OPENED ${e.session || '-'} ${name} v${e.v ?? '-'} by ${e.by} (${e.text || 'send'}) · run ${e.run}${vid}`;
+      if (e.phase === 'needs_you') return `[${t}] AGENT RUN NEEDS YOU ${e.session || '-'} ${name} · run ${e.run}${vid}`;
+      if (e.phase === 'ended') return `[${t}] AGENT RUN ENDED ${(e.text || 'done').toUpperCase()} ${e.session || '-'} ${name} · run ${e.run}${vid}`;
+      return `[${t}] AGENT RUN WORKING ${e.session || '-'} ${name} · run ${e.run}${vid}`;
     default:
       return `[${t}] ${e.type.toUpperCase()} ${name}${to}${e.text ? ` — ${e.text}` : ''}${vid}`;
   }

@@ -23,14 +23,15 @@ export function checkWake(req: Request, ctx: ServerContext, review: Review): voi
 
 /**
  * Starts the video's assigned Claude Code session with `text` as the request, unless it is running already (then it
- * gets the request the usual way and nothing is started: `null`).
+ * gets the request the usual way and nothing is started: `null`). `run`: the agent run it starts for (server/runs.ts);
+ * without one, a run is opened for it.
  */
-export async function startAgent(req: Request, ctx: ServerContext, slug: string, review: Review, text: string): Promise<AgentRunInfo | null> {
+export async function startAgent(req: Request, ctx: ServerContext, slug: string, review: Review, text: string, run?: string): Promise<AgentRunInfo | null> {
   checkWake(req, ctx, review);
   const session = review.session;
   if (!session?.id || !session.cwd) throw fail(409, 'this agent can’t be started from Lampo');
   if ((await ctx.sessions.get()).some((s) => matchesSession(session, s))) return null;
   const who = ctx.actor(req);
   const prompt = wakePrompt({ who, video: path.basename(review.video), slug, v: review.versions.at(-1)?.v, text });
-  return ctx.agentRuns.start({ slug, name: session.name, sessionId: session.id, cwd: session.cwd, by: who, prompt });
+  return ctx.agentRuns.start({ slug, name: session.name, sessionId: session.id, cwd: session.cwd, by: who, prompt, ...(run ? { run } : {}) });
 }

@@ -22,6 +22,8 @@ import { cachedQa, runQa } from '../qa.ts';
 import { frameInRange, normalizeRange } from '../range.ts';
 import { attachRefFile, frameRef, linkRef, saveRefs } from '../refs.ts';
 import { renderKey } from '../renderKey.ts';
+// a version `vr` registers here names the agent run it came from (Version.run): lib/runs.ts tells the store which
+import '../runs.ts';
 import { listSessions } from '../sessions.ts';
 import { dropShots, followShots, grabFrame, shotsOrLater } from '../shots.ts';
 import { stageForReview } from '../stageContext.ts';
