@@ -611,12 +611,15 @@ try {
     await videoReady();
   };
 
-  // Save and Send as they stand: each one's box, in the order they come, and which is raised.
+  // Save and Send as they stand in the composer: each one's box (from the composer's corner: an agent assigned to the
+  // video brings its line under the panel's head, which moves the whole panel, not the buttons in it), in the order
+  // they come, and which is raised.
   const footButtons = () =>
     page.$$eval('.composer-send .btn', (bs) =>
       bs.map((b) => {
         const r = b.getBoundingClientRect();
-        return { id: b.dataset.testid, x: r.x, y: r.y, w: r.width, h: r.height, raised: b.classList.contains('primary') };
+        const c = b.closest('.composer')?.getBoundingClientRect() ?? { x: 0, y: 0 };
+        return { id: b.dataset.testid, x: r.x - c.x, y: r.y - c.y, w: r.width, h: r.height, raised: b.classList.contains('primary') };
       }),
     );
   const raisedIs = (id) =>
