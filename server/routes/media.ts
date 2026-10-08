@@ -66,6 +66,11 @@ export function mediaRoutes(ctx: ServerContext): Router {
   r.get('/media/:slug/v:v', async (req, res) => {
     const review = getReview(req.params.slug);
     const ver = getVersion(review, req.params.v);
+    if (playback.wantsPhone(req)) {
+      const copy = playback.phone(review, ver, true);
+      if (!copy) throw fail(404, 'no phone copy of this version yet');
+      return sendMedia(req, res, copy, { immutable: true });
+    }
     const p = playback.playable(review, ver, { build: true });
     if (!p.ready) throw fail(p.preparing ? 425 : 410, p.error || 'preparing a browser-playable proxy');
     const src = playback.served(p, req);

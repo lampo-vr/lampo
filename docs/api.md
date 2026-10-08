@@ -819,7 +819,11 @@ kept in `data/<slug>/views.json` for the signed-in account. With an API token th
 
 Details:
 
-- **Playback.** `?s=1` serves the scrub copy. With Bunny (a pull zone) or S3 storage (unless `presign: false`), or a
+- **Playback.** `?s=1` serves the scrub copy. `?p=1` serves a phone's copy (at most 1280 px on the long side, frame-exact
+  like the scrub copy, light enough for a phone's connection): a phone's User-Agent finds its URL as `media[v].phone`
+  in `GET /api/review/:slug` (a review link's page: `phoneMedia`) once it exists; asking makes it for the newest version
+  (a link: the version shown) when the version is 1000 px or more on its long side; until then `?p=1` answers `404`.
+  With Bunny (a pull zone) or S3 storage (unless `presign: false`), or a
   media host of its own (`LAMPO_MEDIA_ORIGIN`, [below](#the-media-host)), the answer is a `302` to a signed URL that
   works for 6 hours; a review link's (`/media/g/…`) works for 5 minutes, and the player asks for a fresh one when one
   stops working and plays on from the same frame. `425` while a copy the browser can play is being made, `410` when

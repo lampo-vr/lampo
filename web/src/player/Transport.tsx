@@ -37,9 +37,39 @@ interface TransportProps {
 export const phoneViewName = (phone: PhoneView) =>
   phone.device ? t('Phone view: {view} · {device}', { view: phone.app?.name ?? t('Full height'), device: phone.device.label }) : null;
 
+/** The timecode: the one part of the transport that follows playback frame by frame (the row rendered with it). */
+function TransportTimecode({ pb, fps, N, srcMap, srcFile }: Pick<TransportProps, 'pb' | 'fps' | 'N' | 'srcMap' | 'srcFile'>) {
+  const { playing, revSpeed, rate } = pb;
+  const frame = useFrame(pb.live);
+  return (
+    <div className="tc">
+      <Tip
+        content={srcMap ? (srcFile ? t('Source clip {clip} (from {file})', { clip: srcMap, file: srcFile }) : t('Source clip {clip}', { clip: srcMap })) : null}
+      >
+        <span className="main">{timecode(frame, fps)}</span>
+      </Tip>
+      <span className="sub">
+        <span>
+          F <b>{String(frame).padStart(4, '0')}</b> / {N - 1}
+        </span>
+        <span>
+          <b>{Math.round(fps * 1000) / 1000}</b> {t('FPS')}
+          {revSpeed ? ` · ◀ ${revSpeed}×` : rate !== 1 && playing ? ` · ${rate}×` : ''}
+        </span>
+      </span>
+      {pb.drift && (
+        <Tip content={t('The browser reports a different presented frame than requested')}>
+          <span className="badge warn">{t('shown f{shown}', { shown: pb.shown })}</span>
+        </Tip>
+      )}
+    </div>
+  );
+}
+
 export function Transport({ pb, fps, N, srcMap, srcFile, presets, preset, onPreset, phone, onIn, onOut, zoomSlot }: TransportProps) {
   const { playing, revSpeed, rate, inPt, outPt, loop, muted } = pb;
-  const frame = useFrame(pb.live);
+  // the frame on screen when a button is pressed: only the timecode follows playback frame by frame
+  const frame = () => pb.live.get();
   const running = playing || !!revSpeed;
   const phoneName = phoneViewName(phone);
   const phoneWord = phone.device ? (phone.app?.name ?? t('Full height')) : t('Phone');
@@ -57,7 +87,7 @@ export function Transport({ pb, fps, N, srcMap, srcFile, presets, preset, onPres
           tip={t('Previous frame (⇧ 10 back)')}
           shortcut="←"
           icon="stepBack"
-          onClick={() => pb.seek(frame - 1)}
+          onClick={() => pb.seek(frame() - 1)}
         />
         <IconButton
           className={`playbtn ${running ? 'playing' : ''}`}
@@ -74,32 +104,10 @@ export function Transport({ pb, fps, N, srcMap, srcFile, presets, preset, onPres
           tip={t('Next frame (⇧ 10 ahead)')}
           shortcut="→"
           icon="stepFwd"
-          onClick={() => pb.seek(frame + 1)}
+          onClick={() => pb.seek(frame() + 1)}
         />
         <IconButton className="btn sm icon-only ghost tr-edge" label={t('Last frame')} shortcut="End" icon="last" onClick={() => pb.seek(N - 1)} />
-        <div className="tc">
-          <Tip
-            content={
-              srcMap ? (srcFile ? t('Source clip {clip} (from {file})', { clip: srcMap, file: srcFile }) : t('Source clip {clip}', { clip: srcMap })) : null
-            }
-          >
-            <span className="main">{timecode(frame, fps)}</span>
-          </Tip>
-          <span className="sub">
-            <span>
-              F <b>{String(frame).padStart(4, '0')}</b> / {N - 1}
-            </span>
-            <span>
-              <b>{Math.round(fps * 1000) / 1000}</b> {t('FPS')}
-              {revSpeed ? ` · ◀ ${revSpeed}×` : rate !== 1 && playing ? ` · ${rate}×` : ''}
-            </span>
-          </span>
-          {pb.drift && (
-            <Tip content={t('The browser reports a different presented frame than requested')}>
-              <span className="badge warn">{t('shown f{shown}', { shown: pb.shown })}</span>
-            </Tip>
-          )}
-        </div>
+        <TransportTimecode pb={pb} fps={fps} N={N} srcMap={srcMap} srcFile={srcFile} />
         <div className="vsep" />
         {/* The section's start and end: quiet until set, then on (the section itself, its times and what to do with it,
             is the chip on the timeline) — so the row never grows or wraps when one is marked. */}
@@ -107,7 +115,7 @@ export function Transport({ pb, fps, N, srcMap, srcFile, presets, preset, onPres
           <button
             type="button"
             className={`btn sm ghost tr-mark ${inPt != null ? 'on' : ''}`}
-            onClick={() => (onIn ? onIn(frame) : pb.setIn(frame))}
+            onClick={() => (onIn ? onIn(frame()) : pb.setIn(frame()))}
             aria-label={t('Set in')}
             aria-pressed={inPt != null}
             data-testid="mark-in"
@@ -119,7 +127,7 @@ export function Transport({ pb, fps, N, srcMap, srcFile, presets, preset, onPres
           <button
             type="button"
             className={`btn sm ghost tr-mark ${outPt != null ? 'on' : ''}`}
-            onClick={() => (onOut ? onOut(frame) : pb.setOut(frame))}
+            onClick={() => (onOut ? onOut(frame()) : pb.setOut(frame()))}
             aria-label={t('Set out')}
             aria-pressed={outPt != null}
             data-testid="mark-out"

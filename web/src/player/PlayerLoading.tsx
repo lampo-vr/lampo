@@ -62,9 +62,11 @@ interface Props {
   ar?: number;
   /** The library said the video has an agent: the run strip's slot is there already (RunStrip.tsx). */
   agent?: boolean;
+  /** How many versions the library said it has: a phone's dock has its foot only from a second one (DockFoot.tsx). */
+  versions?: number;
 }
 
-export function PlayerLoading({ slug, phone, ar, agent = false }: Props) {
+export function PlayerLoading({ slug, phone, ar, agent = false, versions = 1 }: Props) {
   // the tab you worked in last, the safe zones and the phone view as the loaded player will show them: for the video's
   // shape when the library said (the buttons' words, and so their widths, come from its presets), else a landscape one
   const [prefs] = usePlayerPrefs();
@@ -156,7 +158,7 @@ export function PlayerLoading({ slug, phone, ar, agent = false }: Props) {
         )}
         <Timeline frames={1} fps={25} frame={0} onSeek={noop} selected={null} onSelect={noop} zoomAt={phone ? undefined : zoomSlot} />
         {phone && <PhoneTools pb={IDLE} fps={25} presets={presets} preset={preset} onPreset={noop} phone={phoneView} />}
-        <div className="dock-foot" />
+        {(!phone || versions > 1) && <div className="dock-foot" />}
       </div>
       <NotesPanel
         slug=""

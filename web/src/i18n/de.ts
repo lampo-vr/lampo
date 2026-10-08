@@ -388,6 +388,7 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   '{n} minor finding|{n} minor findings': '{n} kleinerer Fund|{n} kleinere Funde',
   '{n} note open on V{v}|{n} notes open on V{v}': '{n} Notiz offen in V{v}|{n} Notizen offen in V{v}',
   '{n} note|{n} notes': '{n} Notiz|{n} Notizen',
+  '{n} open': '{n} offen',
   '{n} open invite|{n} open invites': '{n} offene Einladung|{n} offene Einladungen',
   '{n} open note|{n} open notes': '{n} offene Notiz|{n} offene Notizen',
   '{n} question from agents, waiting for your answer|{n} questions from agents, waiting for your answer':
@@ -508,6 +509,7 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
     'Fragen von Agenten, zu prüfende Korrekturen und Feedback aus Review-Links – auf diesem Gerät, auch wenn die App geschlossen ist.',
   'AGPL-3.0': 'AGPL-3.0',
   'AGPL-3.0 · source': 'AGPL-3.0 · Quellcode',
+  agent: 'Agent',
   All: 'Alle',
   'all caught up': 'alles erledigt',
   'All keyboard shortcuts': 'Alle Tastenkürzel',

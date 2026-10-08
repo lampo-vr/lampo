@@ -797,44 +797,64 @@ try {
     await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: SHOTS ? 2 : 1 });
   });
 
-  await check('a phone’s bar stays at the top, clear of the status bar and the notch; the foot clears the home indicator', async () => {
-    const ctx = await browser.createBrowserContext();
-    const p = await ctx.newPage();
-    p.on('pageerror', (e) => errors.push(e.message));
-    try {
-      await p.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
-      // an iPhone with a Dynamic Island: env(safe-area-inset-*) as Safari reports it with viewport-fit=cover
-      const cdp = await p.createCDPSession();
-      await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { top: 47, bottom: 34, left: 0, right: 0 } });
-      await p.goto(`${BASE}/g/${room.token}#${encodeURIComponent(teaser.slug)}`, { waitUntil: 'domcontentloaded' });
-      await p.waitForFunction(() => document.querySelector('.vbox video')?.readyState >= 2, { polling: 100, timeout: 20000 });
-      assert((await phoneLayout(p)).barPad >= 47, 'the bar makes room for the status bar');
-      // scrolled to the notes, as in the screenshot from Safari that showed "Notes" under the clock
-      await p.evaluate(() => window.scrollTo(0, document.querySelector('.g-side-head').getBoundingClientRect().top + scrollY - 10));
-      await p.waitForFunction(() => scrollY > 100);
-      const top = await p.evaluate(() => {
-        const bar = document.querySelector('.g-top').getBoundingClientRect();
-        const under = document.elementFromPoint(innerWidth / 2, 20);
-        return {
-          bar: bar.top,
-          bottom: bar.bottom,
-          title: document.querySelector('.g-top h1').getBoundingClientRect().top,
-          clock: !!under?.closest('.g-top'),
-          head: document.querySelector('.g-side-head').getBoundingClientRect().top,
-        };
-      });
-      assert(Math.abs(top.bar) < 1 && top.clock, `the bar is pinned and nothing else sits under the clock: ${JSON.stringify(top)}`);
-      assert(top.title >= 47, `the title starts below the status bar: ${JSON.stringify(top)}`);
-      await p.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-      await p.waitForFunction(() => Math.abs(innerHeight + scrollY - document.documentElement.scrollHeight) < 2);
-      const foot = await p.$eval('[data-testid=powered-by]', (e) => innerHeight - e.getBoundingClientRect().bottom);
-      assert(foot >= 34, `the foot clears the home indicator (${foot}px from the bottom)`);
-      await sleep(300);
-      if (SHOTS) await p.screenshot({ path: path.join(SHOTS, '07b-phone-inset-end.png') });
-    } finally {
-      await ctx.close();
-    }
-  });
+  await check(
+    'a phone’s bar stays at the top, clear of the status bar and the notch; the foot clears the home indicator; the room’s title starts under its bar; held sideways the notes clear the notch',
+    async () => {
+      const ctx = await browser.createBrowserContext();
+      const p = await ctx.newPage();
+      p.on('pageerror', (e) => errors.push(e.message));
+      try {
+        await p.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+        // an iPhone with a Dynamic Island: env(safe-area-inset-*) as Safari reports it with viewport-fit=cover
+        const cdp = await p.createCDPSession();
+        await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { top: 47, bottom: 34, left: 0, right: 0 } });
+        await p.goto(`${BASE}/g/${room.token}#${encodeURIComponent(teaser.slug)}`, { waitUntil: 'domcontentloaded' });
+        await p.waitForFunction(() => document.querySelector('.vbox video')?.readyState >= 2, { polling: 100, timeout: 20000 });
+        assert((await phoneLayout(p)).barPad >= 47, 'the bar makes room for the status bar');
+        // scrolled to the notes, as in the screenshot from Safari that showed "Notes" under the clock
+        await p.evaluate(() => window.scrollTo(0, document.querySelector('.g-side-head').getBoundingClientRect().top + scrollY - 10));
+        await p.waitForFunction(() => scrollY > 100);
+        const top = await p.evaluate(() => {
+          const bar = document.querySelector('.g-top').getBoundingClientRect();
+          const under = document.elementFromPoint(innerWidth / 2, 20);
+          return {
+            bar: bar.top,
+            bottom: bar.bottom,
+            title: document.querySelector('.g-top h1').getBoundingClientRect().top,
+            clock: !!under?.closest('.g-top'),
+            head: document.querySelector('.g-side-head').getBoundingClientRect().top,
+          };
+        });
+        assert(Math.abs(top.bar) < 1 && top.clock, `the bar is pinned and nothing else sits under the clock: ${JSON.stringify(top)}`);
+        assert(top.title >= 47, `the title starts below the status bar: ${JSON.stringify(top)}`);
+        await p.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+        await p.waitForFunction(() => Math.abs(innerHeight + scrollY - document.documentElement.scrollHeight) < 2);
+        const foot = await p.$eval('[data-testid=powered-by]', (e) => innerHeight - e.getBoundingClientRect().bottom);
+        assert(foot >= 34, `the foot clears the home indicator (${foot}px from the bottom)`);
+        await sleep(300);
+        if (SHOTS) await p.screenshot({ path: path.join(SHOTS, '07b-phone-inset-end.png') });
+        // the room's title under its bar, not behind it: the bar grows by the status bar's inset (its row was 54 px, and
+        // the bar covered the top of "Acme marketing")
+        await p.goto(`${BASE}/g/${room.token}`, { waitUntil: 'domcontentloaded' });
+        await p.waitForSelector('.room .film');
+        const head = await p.evaluate(() => ({
+          bar: Math.round(document.querySelector('.room-top').getBoundingClientRect().bottom),
+          title: Math.round(document.querySelector('.room-head h1').getBoundingClientRect().top),
+        }));
+        assert(head.title >= head.bar, `the room's title starts under its bar: ${JSON.stringify(head)}`);
+        // held sideways: the notes and the composer keep clear of the notch and the rounded corners
+        await p.setViewport({ width: 844, height: 390, deviceScaleFactor: 2, isMobile: true, hasTouch: true, isLandscape: true });
+        await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { top: 0, bottom: 21, left: 47, right: 47 } });
+        await p.goto(`${BASE}/g/${room.token}#${encodeURIComponent(teaser.slug)}`, { waitUntil: 'domcontentloaded' });
+        await p.waitForSelector('.g-player .composer textarea');
+        await settle(p);
+        const side = await p.$eval('.g-player .composer', (e) => ((r) => [Math.round(r.left), Math.round(innerWidth - r.right)])(e.getBoundingClientRect()));
+        assert(side[0] >= 47 && side[1] >= 47, `held sideways, the composer clears the notch: ${side.join(' / ')} px from the edges`);
+      } finally {
+        await ctx.close();
+      }
+    },
+  );
 
   await check('a visitor without a name who taps Approve is asked in a sheet, then approved under that name', async () => {
     const link = await api(`/api/review/${encodeURIComponent(teaser.slug)}/shares`, 'POST', { label: 'Phone review' });

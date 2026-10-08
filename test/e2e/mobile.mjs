@@ -2,14 +2,17 @@
 // covers: web/src/styles/mobile.css web/src/styles/phone.css web/src/player/phone/ web/src/player/PhoneDock.tsx
 // covers: web/src/player/Transport.tsx web/src/styles/dock.css
 // covers: web/src/player/DrawBar.tsx web/src/player/Timeline.tsx web/src/player/VerifyPanel.tsx web/src/share/
-// covers: web/src/library/Sidebar.tsx
+// covers: web/src/library/Sidebar.tsx web/src/player/phoneSheet.ts web/src/player/NotesPanel.tsx web/src/player/DockFoot.tsx
+// covers: web/src/guest/GuestPlayer.tsx
 // Browser end-to-end test of the phone layout: a real server (temp store, free port) + headless Chrome emulating an
 // iPhone (touch, 390×844). A finger opens the folder drawer, shares a folder through the system share sheet (with an
 // expiry from its switch and the calendar sheet; on a desktop its quick choices and the calendar by keyboard), scrubs
 // the timeline to an exact frame (checked against ffmpeg's decode), draws an arrow, saves a note, moves the notes
 // sheet, and verifies a fix by swiping between before and after. The play button's glyph stands in its middle on the
 // phone and on the desk. Then no main screen may scroll sideways, hide a control off-screen, clip a glyph or put grain
-// on a scroller, at three phone and tablet sizes and on a desktop.
+// on a scroller, at three phone and tablet sizes and on a desktop. The phone player keeps its picture with the notes
+// open, a note written and the keyboard up; its notes are one tap away and say how many are open; while a video plays
+// on a phone neither player nor review link renders more than what shows the frame.
 // VR_SHOTS=<dir> keeps screenshots (and one of the page for each failed check).
 import path from 'node:path';
 import { age, makeVideo, sleep, until } from '../lib/helpers.ts';
@@ -554,6 +557,349 @@ try {
     }
     await api(`/api/review/${encodeURIComponent(slug)}/session`, { method: 'PUT', body: '{}' });
     await page.emulate(IPHONE);
+  });
+
+  // The phone player's one screen, shared by the picture, the dock and the notes sheet — on a tall iPhone and in the
+  // room Safari leaves under its bars (390 × 664), with an agent (its line above the dock), with motion on. Before: the
+  // half-open sheet left the picture 62 px (8 px in Safari), the drawing tools covered all of it, the keyboard covered
+  // the note's text and Send, opening the sheet made the picture jump up and then shrink, and a drag shrank it to 1 px.
+  await check(
+    'a phone keeps its picture: the notes half open, a note being written (its tools under the picture, never on it), the keyboard up; the sheet moves, the picture only one way (844, Safari’s 664)',
+    async () => {
+      const vbox = () => page.$eval('.vbox', (e) => Math.round(e.getBoundingClientRect().height));
+      // the picture's height every frame while `act` plays out, until the sheet's motion is over and the picture holds still
+      const film = async (act) => {
+        await page.evaluate(() => {
+          window.__film = [];
+          window.__filming = true;
+          const step = () => {
+            const h = (q) => Math.round(document.querySelector(q)?.getBoundingClientRect().height ?? 0);
+            window.__film.push([h('.vbox'), h('.stage')]);
+            if (window.__filming) requestAnimationFrame(step);
+          };
+          requestAnimationFrame(step);
+        });
+        await act();
+        await page.waitForFunction(
+          () => {
+            const f = window.__film.map(String);
+            return !document.querySelector('.nsheet')?.getAnimations().length && f.length > 12 && f.slice(-8).every((x) => x === f.at(-1));
+          },
+          { polling: 'raf', timeout: 10000 },
+        );
+        return page.evaluate(() => {
+          window.__filming = false;
+          return window.__film;
+        });
+      };
+      // a picture (or the stage around it) that grows and then shrinks, or the other way, in one move: a flash
+      const turns = (film, keys = [0, 1]) => {
+        let n = 0;
+        for (const k of keys) {
+          const hs = film.map((x) => x[k]);
+          let dir = 0;
+          for (let i = 1; i < hs.length; i++) {
+            const d = Math.sign(hs[i] - hs[i - 1]);
+            if (d && dir && d !== dir) n++;
+            if (d) dir = d;
+          }
+        }
+        return n;
+      };
+      const shown = (film) => film.map((x) => x.join('/')).join(' ');
+      const visible = (sel, top, bottom) =>
+        page.$eval(
+          sel,
+          (e, top, bottom) => {
+            const r = e.getBoundingClientRect();
+            return r.height > 0 && r.top >= top - 1 && r.bottom <= bottom + 1 ? true : `${Math.round(r.top)}–${Math.round(r.bottom)} outside ${top}–${bottom}`;
+          },
+          top,
+          bottom,
+        );
+      // Save and Send, side by side at the composer's foot
+      const sendButton = '.nsheet .composer-send';
+      await api(`/api/review/${encodeURIComponent(slug)}/session`, {
+        method: 'PUT',
+        body: JSON.stringify({ name: 'launch-edit-agent', agent: 'claude-code' }),
+      });
+      // a stand-in for the visual viewport: a keyboard shrinks it (and the browser pans it to the field) while the page's
+      // layout stays, as in Safari and Chrome on a phone; until one is "up" it answers as the real one
+      await page.evaluateOnNewDocument(() => {
+        const real = window.visualViewport;
+        if (!real) return;
+        const fake = new EventTarget();
+        let h = null;
+        let top = 0;
+        for (const k of ['width', 'pageLeft', 'pageTop', 'offsetLeft', 'scale']) Object.defineProperty(fake, k, { get: () => real[k] });
+        Object.defineProperty(fake, 'height', { get: () => h ?? real.height });
+        Object.defineProperty(fake, 'offsetTop', { get: () => (h === null ? real.offsetTop : top) });
+        for (const ev of ['resize', 'scroll']) real.addEventListener(ev, () => fake.dispatchEvent(new Event(ev)));
+        Object.defineProperty(window, 'visualViewport', { value: fake, configurable: true });
+        window.__keyboard = (height, offset = 0) => {
+          h = height;
+          top = offset;
+          fake.dispatchEvent(new Event('resize'));
+        };
+      });
+      const problems = [];
+      try {
+        for (const height of [844, 664]) {
+          const at = `@390×${height}`;
+          await page.emulate({ viewport: { width: 390, height, deviceScaleFactor: 2, isMobile: true, hasTouch: true }, userAgent: IPHONE.userAgent });
+          await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
+          await page.goto('about:blank');
+          await page.goto(`${BASE}/#/v/${encodeURIComponent(slug)}`, { waitUntil: 'domcontentloaded' });
+          await page.waitForSelector('.run-slot .run-strip');
+          await page.waitForSelector('.nsheet-handle');
+          await settled();
+          await settle(page);
+          const rest = await vbox();
+          // at rest the picture has the room the bars leave (Safari's 664: the zoom's own row steps aside, 105 px before)
+          if (rest < height * 0.22) problems.push(`${at} the picture at rest is ${rest} px`);
+          // the sheet half open: the picture shrinks once, smoothly, and keeps about a fifth of the screen
+          let hs = await film(() => tap('.nsheet-handle'));
+          await page.waitForSelector('.nsheet-half');
+          if (turns(hs)) problems.push(`${at} opening the sheet moved the picture both ways: ${shown(hs)}`);
+          const half = await vbox();
+          if (half < height * 0.18) problems.push(`${at} the picture with the notes half open is ${half} px`);
+          const list = await page.$eval('.nsheet .side-scroll', (e) => e.clientHeight);
+          if (list < 88) problems.push(`${at} the notes' list is ${list} px tall`);
+          const tabs = await page.$$eval('.nsheet .note-tabs [role=tab]', (els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
+          if (tabs.some((x) => x < 40)) problems.push(`${at} the filters are ${tabs.join('/')} px tall`);
+          await shot(`09-half-${height}`);
+          // a note: the drawing tools in their own strip under the picture, the text and Send on the screen
+          hs = await film(() => tap('[data-testid=new-note]'));
+          await page.waitForSelector('.nsheet .composer textarea');
+          // the tools' strip comes under the picture at once: the stage may grow by it first, the picture never moves back
+          if (turns(hs, [0])) problems.push(`${at} opening the composer moved the picture both ways: ${shown(hs)}`);
+          const tools = await page.evaluate(() => {
+            const bar = document.querySelector('[data-testid=draw-bar]')?.getBoundingClientRect();
+            const pic = document.querySelector('.vbox').getBoundingClientRect();
+            const stage = document.querySelector('.stage').getBoundingClientRect();
+            return bar && { gap: Math.round(bar.top - pic.bottom), inStage: bar.bottom <= stage.bottom + 1, pic: Math.round(pic.height) };
+          });
+          if (!tools || tools.gap < 0 || !tools.inStage) problems.push(`${at} the drawing tools sit on the picture: ${JSON.stringify(tools)}`);
+          if (tools && tools.pic < height * 0.14) problems.push(`${at} the picture while a note is written is ${tools.pic} px`);
+          for (const sel of ['.nsheet .composer textarea', sendButton]) {
+            const ok = await visible(sel, 0, height);
+            if (ok !== true) problems.push(`${at} ${sel}: ${ok}`);
+          }
+          const covered = await page.evaluate(() => {
+            const text = document.querySelector('.nsheet .composer textarea').getBoundingClientRect();
+            const foot = document.querySelector('.nsheet .composer-foot').getBoundingClientRect();
+            return text.top + 20 > foot.top;
+          });
+          if (covered) problems.push(`${at} the composer's foot covers its text`);
+          await shot(`09-compose-${height}`);
+          // the keyboard up (40 %, the page panned 120 px to the field): the note's text and Send are above it
+          await tap('.nsheet .composer textarea');
+          const kb = Math.round(height * 0.6);
+          // (the room changes once the keyboard is up: a state to wait for, given a few seconds before it counts as missing)
+          const fits = (top, bottom) =>
+            page
+              .waitForFunction(
+                (top, bottom) => {
+                  const r = document.querySelector('.nsheet .composer-send')?.getBoundingClientRect();
+                  return r && r.top >= top && r.bottom <= bottom;
+                },
+                { polling: 'raf', timeout: 5000 },
+                top,
+                bottom,
+              )
+              .catch(() => {});
+          await page.evaluate((kb) => window.__keyboard(kb, 120), kb);
+          await fits(120, 120 + kb);
+          await settle(page);
+          for (const sel of ['.nsheet .composer textarea', sendButton]) {
+            const ok = await visible(sel, 120, 120 + kb);
+            if (ok !== true) problems.push(`${at} keyboard up: ${sel}: ${ok}`);
+          }
+          const kbPic = await vbox();
+          if (kbPic < kb * 0.2) problems.push(`${at} keyboard up: the picture is ${kbPic} px`);
+          await shot(`09-keyboard-${height}`);
+          await page.evaluate(() => window.__keyboard(null));
+          await settle(page);
+          // where the browser shrinks the page instead (Firefox on Android): the same room
+          await page.setViewport({ width: 390, height: kb, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+          await fits(0, kb);
+          await settle(page);
+          for (const sel of ['.nsheet .composer textarea', sendButton]) {
+            const ok = await visible(sel, 0, kb);
+            if (ok !== true) problems.push(`${at} a shorter page: ${sel}: ${ok}`);
+          }
+          await page.setViewport({ width: 390, height, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+          await settle(page);
+          await page.evaluate(() => document.activeElement?.blur());
+          await tap('.nsheet .composer-close');
+          await page.waitForFunction(() => !document.querySelector('.composer'));
+          await settle(page);
+          // dragged up to full: the picture never shrinks below where it ends
+          const h = await center('.nsheet-handle');
+          hs = await film(() => drag({ x: h.x, y: h.y }, { x: h.x, y: 60 }, 16));
+          await page.waitForSelector('.nsheet-full');
+          const least = Math.min(...hs.map((x) => x[0]));
+          const full = await vbox();
+          if (least < full - 1) problems.push(`${at} dragging the sheet shrank the picture to ${least} px (it ends at ${full})`);
+          hs = await film(() => tap('.nsheet-handle'));
+          await page.waitForSelector('.nsheet-peek');
+          if (turns(hs)) problems.push(`${at} closing the sheet moved the picture both ways: ${shown(hs)}`);
+        }
+      } catch (e) {
+        // what was found before the walk stopped is reported with it
+        problems.push(`stopped: ${e.message}`);
+      } finally {
+        await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+        await api(`/api/review/${encodeURIComponent(slug)}/session`, { method: 'PUT', body: '{}' });
+        await page.emulate(IPHONE);
+      }
+      assert(!problems.length, problems.join('\n'));
+    },
+  );
+
+  await check(
+    'a phone held sideways: the player takes the width with an agent’s line too, the notes clear the notch; a finger’s taps never zoom or pull the page',
+    async () => {
+      await api(`/api/review/${encodeURIComponent(slug)}/session`, {
+        method: 'PUT',
+        body: JSON.stringify({ name: 'launch-edit-agent', agent: 'claude-code' }),
+      });
+      try {
+        await page.emulate({
+          viewport: { width: 844, height: 390, deviceScaleFactor: 2, isMobile: true, hasTouch: true, isLandscape: true },
+          userAgent: IPHONE.userAgent,
+        });
+        const cdp = await page.createCDPSession();
+        await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { top: 0, bottom: 21, left: 47, right: 47 } });
+        await page.goto('about:blank');
+        await page.goto(`${BASE}/#/v/${encodeURIComponent(slug)}`, { waitUntil: 'domcontentloaded' });
+        await page.waitForSelector('.run-slot .run-strip');
+        await page.waitForSelector('.nr');
+        await settle(page);
+        const m = await page.evaluate(() => {
+          const r = (q) => document.querySelector(q).getBoundingClientRect();
+          return {
+            vw: innerWidth,
+            stage: Math.round(r('.stage').width),
+            order: ['.p-strip', '.run-slot', '.dock'].map((q) => Math.round(r(q).top)),
+            row: Math.round(r('.nsheet .nr').left),
+            rowEnd: Math.round(r('.nsheet .nr').right),
+          };
+        });
+        // before: the agent's line had no area in the sideways layout, got a column of its own, and the player took 511 of 844 px
+        assert(m.stage >= m.vw - 1, `the picture spans the screen: ${JSON.stringify(m)}`);
+        assert(m.order[0] < m.order[1] && m.order[1] < m.order[2], `the agent's line between the strip and the dock: ${JSON.stringify(m)}`);
+        assert(m.row >= 47 && m.rowEnd <= m.vw - 47, `the notes clear the notch and the rounded corners: ${JSON.stringify(m)}`);
+        await shot('10-sideways-agent');
+        await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { top: 0, bottom: 0, left: 0, right: 0 } });
+        await page.emulate(IPHONE);
+        await page.goto('about:blank');
+        await page.goto(`${BASE}/#/v/${encodeURIComponent(slug)}`, { waitUntil: 'domcontentloaded' });
+        await page.waitForSelector('.pbtns button');
+        const touch = await page.evaluate(() => ({
+          step: getComputedStyle(document.querySelector('.pbtns button[aria-label="Next frame"]')).touchAction,
+          stage: getComputedStyle(document.querySelector('.stage')).touchAction,
+          handle: getComputedStyle(document.querySelector('.nsheet-handle')).touchAction,
+          timeline: getComputedStyle(document.querySelector('.timeline canvas')).touchAction,
+          root: getComputedStyle(document.documentElement).overscrollBehaviorY,
+          list: getComputedStyle(document.querySelector('.nsheet .side-scroll')).overscrollBehaviorY,
+        }));
+        // two quick taps on a step are two steps, not a zoom; the drags keep theirs; a pull past the top never reloads the page
+        assert(touch.step === 'manipulation' && touch.stage === 'manipulation', `no double-tap zoom: ${JSON.stringify(touch)}`);
+        assert(touch.handle === 'none' && touch.timeline === 'none', `the drags keep their own: ${JSON.stringify(touch)}`);
+        assert(touch.root === 'none' && touch.list === 'contain', `no pull to refresh, no bounce of the whole app: ${JSON.stringify(touch)}`);
+      } finally {
+        await api(`/api/review/${encodeURIComponent(slug)}/session`, { method: 'PUT', body: '{}' });
+        await page.emulate(IPHONE);
+      }
+    },
+  );
+
+  // Valentino: "I can't go to the comments, it's unclear, small". The sheet at rest was the handle (22 px) and a row of
+  // tabs and icons without a count; now the row is the way in: what it holds, how many are open, a tap anywhere on it.
+  await check('a phone’s notes are one tap away: the row at rest says how many are open and opens them; + Note beside it, nothing else', async () => {
+    await page.emulate(IPHONE);
+    await page.goto('about:blank');
+    await page.goto(`${BASE}/#/v/${encodeURIComponent(slug)}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.nsheet-peek [data-testid=notes-open]');
+    await settle(page);
+    const { review } = await api(`/api/review/${encodeURIComponent(slug)}`);
+    const open = review.comments.filter((c) => c.status === 'open' || c.status === 'fixed').length;
+    const row = await page.evaluate(() => {
+      const b = document.querySelector('[data-testid=notes-open]');
+      const r = b.getBoundingClientRect();
+      const shown = (e) => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
+      return {
+        text: b.textContent.trim(),
+        w: Math.round(r.width),
+        h: Math.round(r.height),
+        others: [...document.querySelectorAll('.nsheet .side-title button')].filter(shown).map((e) => e.getAttribute('aria-label') || e.textContent.trim()),
+        size: parseFloat(getComputedStyle(b.querySelector('.nsheet-open-word')).fontSize),
+      };
+    });
+    assert(row.h >= 44 && row.w >= 200, `the row is a big target: ${JSON.stringify(row)}`);
+    assert(row.text.includes(`${open} open`), `it says how many notes are open (${open}): ${JSON.stringify(row)}`);
+    assert(row.size >= 15, `"Notes" reads as the sheet's title: ${row.size} px`);
+    assert(
+      row.others.length === 2 && row.others.includes('Note'),
+      `at rest only the way in and + Note (no tools nobody can read): ${JSON.stringify(row.others)}`,
+    );
+    await tap('[data-testid=notes-open]');
+    await page.waitForSelector('.nsheet-half .nr');
+    assert(await page.$('.nsheet-half [data-testid=panel-notes]'), 'open, the views are back');
+    await shot('11-notes-open');
+    await tap('.nsheet-handle');
+    await page.waitForSelector('.nsheet-peek');
+  });
+
+  // Valentino: "the play in itself is laggy". While a video plays only what shows the frame may render per frame: the
+  // timecode, the playhead, a note's "here" mark, a section chip's "→". Before: the review link rendered the whole page
+  // 25 times a second (usePlayback without `quiet`), and the phone's tools row and transport rendered with the timecode.
+  await check('while a video plays on a phone, the player and the review link render only what shows the frame', async () => {
+    const share = await api(`/api/review/${encodeURIComponent(slug)}/shares`, { method: 'POST', body: JSON.stringify({ label: 'Playback', comment: true }) });
+    const problems = [];
+    for (const [where, url, play] of [
+      ['player', `${BASE}/#/v/${encodeURIComponent(slug)}`, '.pbtns .playbtn'],
+      ['review link', `${BASE}/g/${share.token}`, '.g-transport .playbtn'],
+    ]) {
+      await page.goto('about:blank');
+      await page.goto(url, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector(`${play}:not([disabled])`);
+      await settled();
+      await settle(page);
+      await page.evaluate(() => {
+        const v = document.querySelector('.vbox video');
+        v.loop = true;
+        window.__changed = new Map();
+        const what = (n) => {
+          const e = n.nodeType === 1 ? n : n.parentElement;
+          return e?.closest('.tc, .ptc, .tl-playhead, .nr, .note, .range-more, [data-testid=range-add]')
+            ? null
+            : `${e?.tagName.toLowerCase()}.${String(e?.className).split(' ')[0]}`;
+        };
+        window.__watch = new MutationObserver((list) => {
+          for (const m of list) {
+            const k = what(m.target);
+            if (k) window.__changed.set(k, (window.__changed.get(k) || 0) + 1);
+          }
+        });
+      });
+      await page.$eval(play, (b) => b.click());
+      await page.waitForSelector(`${play}.playing`);
+      // from a frame into playback: what changes over the next 30 frames played
+      const from = await page.evaluate(() => {
+        window.__watch.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+        return document.querySelector('.vbox video').currentTime;
+      });
+      await page.waitForFunction((t0) => Math.abs(document.querySelector('.vbox video').currentTime - t0) >= 1, { polling: 50, timeout: 15000 }, from);
+      const changed = await page.evaluate(() => {
+        window.__watch.disconnect();
+        return [...window.__changed].filter(([, n]) => n >= 10);
+      });
+      await page.$eval(play, (b) => b.click());
+      if (changed.length) problems.push(`${where}: renders per frame beyond the frame's own display: ${JSON.stringify(changed)}`);
+    }
+    assert(!problems.length, problems.join('\n'));
   });
 
   await check('the play button’s glyph stands in its middle, the triangle with its nudge: the phone’s transport and the desk’s', async () => {

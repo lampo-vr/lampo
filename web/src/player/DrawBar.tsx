@@ -23,12 +23,14 @@ interface DrawBarProps {
   undoLabel: string;
   /** Something else sits at the top of the picture (the compare bar): the tools go below it. */
   under?: boolean;
+  /** A phone: flat in a strip of its own under the picture (the stage keeps the room), never over it. */
+  flat?: boolean;
 }
 
-export function DrawBar({ tools, tool, onTool, onUndo, canUndo, label, undoLabel, under }: DrawBarProps) {
+export function DrawBar({ tools, tool, onTool, onUndo, canUndo, label, undoLabel, under, flat }: DrawBarProps) {
   return (
     <div className="draw-layer">
-      <div className={`draw-bar${under ? ' under' : ''}`} role="toolbar" aria-label={label} data-testid="draw-bar">
+      <div className={`draw-bar${under ? ' under' : ''}${flat ? ' flat' : ''}`} role="toolbar" aria-label={label} data-testid="draw-bar">
         {tools.map((x) => (
           <IconButton
             key={x.id}

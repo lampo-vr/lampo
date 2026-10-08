@@ -29,6 +29,9 @@ interface DockFootProps {
   onBand?: () => void;
   /** An archived project's video: no note is written here, so the keys don't offer one. */
   readOnly?: boolean;
+  /** A phone: only what changed since the version before (a first version has no row at all). Loudness, freezes and
+   * who watched are a desk's checks; on a phone they were a row of small technical chips under the timeline. */
+  phone?: boolean;
 }
 
 export function DockFoot({
@@ -47,10 +50,12 @@ export function DockFoot({
   band = false,
   onBand,
   readOnly = false,
+  phone = false,
 }: DockFootProps) {
   const loud = analysis?.loudness;
   // a phone scrolls this row sideways: a soft edge where there is more, never a chip cut off at the screen's edge
   const [edgesRef, edges] = useScrollEdges<HTMLDivElement>();
+  if (phone && v < 2) return null;
   return (
     <div ref={edgesRef} className={`dock-foot ${edges}`}>
       {/* what changed since the version before first: the analysis' chips settle last (a freeze's verdict waits for
@@ -87,7 +92,7 @@ export function DockFoot({
             {v - 1}…
           </span>
         ) : null)}
-      {loud ? (
+      {phone ? null : loud ? (
         <Tip content={loud.lra != null ? `${t('Integrated loudness (EBU R128)')} · LRA ${loud.lra} LU` : t('Integrated loudness (EBU R128)')}>
           <span className={`badge ${(loud.true_peak ?? -99) > -1 ? 'danger' : ''}`}>
             <I name="wave" size={13} /> {loud.lufs?.toFixed(1)} {t('LUFS · TP')} {loud.true_peak?.toFixed(1)} {t('dBTP')}
@@ -100,8 +105,8 @@ export function DockFoot({
       ) : wave && !wave.audio ? (
         <span className="badge">{t('no audio')}</span>
       ) : null}
-      {analysis?.freezes && <FreezeChip freezes={freezes} flagged={flaggedFreezes} v={v} onNext={onNextFreeze} />}
-      {audience && onBand && <ViewersChip audience={audience} v={v} band={band} onBand={onBand} />}
+      {!phone && analysis?.freezes && <FreezeChip freezes={freezes} flagged={flaggedFreezes} v={v} onNext={onNextFreeze} />}
+      {!phone && audience && onBand && <ViewersChip audience={audience} v={v} band={band} onBand={onBand} />}
       <span className="grow" />
       <Tip content={t('All keyboard shortcuts')} shortcut="?">
         <button type="button" className="hint muted hide-sm" onClick={onHelp}>

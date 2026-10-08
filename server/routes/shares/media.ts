@@ -35,6 +35,11 @@ export function guestMediaRoutes(ctx: ServerContext): Router {
     const share = open(req);
     const review = target(share, id);
     const ver = version(share, review, v);
+    if (playback.wantsPhone(req)) {
+      const copy = playback.phone(review, ver, true);
+      if (!copy) throw fail(404, 'no phone copy of this version yet');
+      return sendMedia(req, res, copy, { immutable: true });
+    }
     const originals = settingsOf(share).download === 'original';
     const p = originals ? playback.playable(review, ver, { build: true }) : playback.preview(review, ver);
     if (!p.ready || !p.main) throw notYet(p);

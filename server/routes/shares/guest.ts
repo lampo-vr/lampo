@@ -58,7 +58,7 @@ import { getWorkspace, workspaceNamed } from '../../../lib/workspaces.ts';
 import type { ServerContext } from '../../context.ts';
 import { countStep, noticeMoment, onSample } from '../../funnel.ts';
 import { metaOf, sanitizeDrawing, versionBytes } from '../../helpers.ts';
-import { body, commentId, fail, failFrom, parse, query, router, VersionQuery } from '../../http.ts';
+import { body, commentId, fail, failFrom, fromPhone, parse, query, router, VersionQuery } from '../../http.ts';
 import { freeBytes } from '../../ready.ts';
 import { addInlineRef, attachInline, refOfFile, sendRefFile } from '../refs.ts';
 import { shotsToFollow } from '../review.ts';
@@ -541,13 +541,15 @@ export function guestRoutes(ctx: ServerContext): Router {
     };
   }
 
-  function guestReview(share: ShareWithToken, review: Review, ver: Version): GuestReviewResponse {
+  function guestReview(share: ShareWithToken, review: Review, ver: Version, phone = false): GuestReviewResponse {
     const id = guestId(share, slugify(review.video));
     const latest = review.versions.at(-1) as Version;
     const p = perms(share);
     const dl = (kind: string) => `/api/g/${share.token}/download/${id}/v${ver.v}?kind=${kind}`;
     // What the player plays (see ./media.ts): a copy unless the link offers the original; none while it's being made.
     const play = p.download === 'original' ? playback.playable(review, ver) : playback.preview(review, ver);
+    // a phone plays its own copy once it is there (server/playback.ts), asked for by opening the version on one
+    const phoneCopy = phone && play.ready ? playback.phone(review, ver, true) : null;
     return {
       ...whose(share),
       slug: id,
@@ -560,6 +562,7 @@ export function guestRoutes(ctx: ServerContext): Router {
       frames: ver.frames,
       duration: ver.duration,
       media: play.ready ? `/media/g/${share.token}/${id}/v${ver.v}${playback.mediaQuery(ver, play)}` : null,
+      ...(phoneCopy ? { phoneMedia: `/media/g/${share.token}/${id}/v${ver.v}${playback.phoneQuery(ver)}` } : {}),
       ...(play.preparing ? { preparing: true } : {}),
       ...(play.busy ? { busy: true } : {}),
       waveform: `/api/g/${share.token}/waveform/${id}?v=${ver.v}`,
@@ -584,7 +587,7 @@ export function guestRoutes(ctx: ServerContext): Router {
     const review = target(share, req.params.slug);
     const ver = version(share, review, query(VersionQuery, req).v);
     res.setHeader('Cache-Control', 'no-store');
-    res.json(guestReview(share, review, ver));
+    res.json(guestReview(share, review, ver, fromPhone(req)));
     // Which videos the client actually looked at, and which version (lib/stageContext.ts: shared is not seen).
     viewed(share, req, review, ver);
   });

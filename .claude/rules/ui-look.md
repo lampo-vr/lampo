@@ -22,3 +22,6 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - A lazy screen's styles come with its own code; never lean on a class only another chunk's stylesheet defines.
 - A bare `stop`, `close`, `open`, `print`, `find`, `status` or `name` is the window's (`stop()` aborts every request in flight): Biome refuses them, so a lost local helper of that name can't fall through to it.
 - A new component's stylesheet is imported by the component, not added to `styles/index.css`: index.css is under every screen, so `test:e2e -- --changed` would run all suites.
+- Every grid template names every area its items use (the phone's sideways one too): an item in an unnamed area gets an implicit column, and the layout shrinks beside it.
+- A tap that moves the layout acts on `click`, not the release: a touch's click is aimed after the release re-rendered, at whatever moved under the finger (the notes sheet's handle opened the Agent view).
+- On a phone the keyboard shrinks the visual viewport, not the layout: a one-screen layout fits itself to it (`player/phoneSheet.ts` `useKeyboard`), or its field and buttons sit under the keyboard.

@@ -37,6 +37,33 @@ function proxyArgs(src: string, out: string, meta: MediaMeta = {}): string[] {
   ];
 }
 
+/**
+ * A phone's copy (lib/types.ts MediaInfo `phone`): the scrub copy is made for judging a picture on a big screen —
+ * full size at CRF 14, a keyframe every 10 frames — which is 30 to 130 Mbit/s for a grainy 1080p render, more than a
+ * phone's connection carries (its play stalled). A phone shows the picture at most 1170 pixels wide: its copy is at most
+ * PHONE_SIDE on the long side at CRF 23 (2–12 Mbit/s for the same render), with the same keyframes, no B-frames and
+ * every frame at its own time, so stepping and seeking stay frame-exact. Made for versions bigger than PHONE_FROM;
+ * smaller ones play as they are.
+ */
+export const PHONE_SIDE = 1280;
+const PHONE_FROM = 1000;
+
+/** A phone copy's frame size: the version's, scaled to fit PHONE_SIDE, in even pixels (H.264's chroma). */
+export function phoneSize(w: number, h: number): [number, number] {
+  const k = Math.min(1, PHONE_SIDE / Math.max(w, h, 1));
+  const even = (x: number) => Math.max(2, Math.round((x * k) / 2) * 2);
+  return [even(w), even(h)];
+}
+
+function phoneArgs(src: string, out: string, meta: MediaMeta = {}, size: [number, number] = [PHONE_SIDE, PHONE_SIDE]): string[] {
+  const color = meta.color_space ? ['-colorspace', meta.color_space, ...(meta.color_range ? ['-color_range', meta.color_range] : [])] : [];
+  return [
+    ...['-v', 'error', '-i', src, '-map', '0:v:0', '-map', '0:a:0?', '-vf', `scale=${size[0]}:${size[1]}`],
+    ...['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-g', String(SCRUB_GOP), '-keyint_min', String(SCRUB_GOP), '-sc_threshold', '0', '-bf', '0'],
+    ...['-pix_fmt', 'yuv420p', ...color, '-fps_mode', 'passthrough', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', '-y', out],
+  ];
+}
+
 // Keep the proxy cache bounded: oldest first until under the cap.
 const pruneProxies = (dir: string) => pruneDir(dir, 8e9, (f) => f.endsWith('.mp4'));
 
@@ -70,7 +97,18 @@ export interface Playback {
   /** One URL, one set of bytes (the browser caches ranges per URL): the scrub proxy only behind ?s=1. */
   served(p: Playable, req: Request): Source;
   mediaQuery(ver: Version, p: Playable): string;
-  mediaInfo(slug: string, ver: Version, p: Playable): MediaInfo;
+  /** `phone`: the version's phone copy when a phone asked and it is there (its URL is the media URL with `p=1`). */
+  mediaInfo(slug: string, ver: Version, p: Playable, phone?: Source | null): MediaInfo;
+  /**
+   * A phone's copy of a version bigger than a phone shows: its bytes once they exist, else null — and with `build`
+   * (a phone asked for the version), made as the scrub copy is. Never for a partial render (it plays as the whole it
+   * makes) or a version smaller than PHONE_FROM on its long side.
+   */
+  phone(review: Review, ver: Version, build: boolean): Source | null;
+  /** The phone copy's query: its own URL, so its bytes never mix with another copy's ranges in a browser's cache. */
+  phoneQuery(ver: Version): string;
+  /** Whether a media request asks for the phone copy (`p=1`). */
+  wantsPhone(req: Request): boolean;
 }
 
 // The longest keyframe gap is a property of the bytes, so it is kept on disk by hash: after a restart a render with
@@ -141,10 +179,15 @@ export function createPlayback(broadcast: Broadcast): Playback {
   const waitsForRoom = (key: string): boolean => waitingRoom.has(wsKey(key));
 
   // Built on this disk, then handed to storage (remote stores upload it; locally it simply stays in cache/).
-  function buildProxy(review: Review, ver: Version, key: string, { onlyIfLongGop }: { onlyIfLongGop: boolean }): boolean {
+  function buildProxy(
+    review: Review,
+    ver: Version,
+    key: string,
+    { onlyIfLongGop, args = proxyArgs }: { onlyIfLongGop: boolean; args?: (src: string, out: string, meta?: MediaMeta) => string[] },
+  ): boolean {
     if (proxyJobs.has(wsKey(key))) return true;
     if (proxyFailed.has(wsKey(key))) return false;
-    if (!roomFor(key, () => buildProxy(review, ver, key, { onlyIfLongGop }), slugify(review.video))) return false;
+    if (!roomFor(key, () => buildProxy(review, ver, key, { onlyIfLongGop, args }), slugify(review.video))) return false;
     proxyJobs.add(wsKey(key));
     const out = storage().localPath(key);
     heavy(
@@ -154,7 +197,7 @@ export function createPlayback(broadcast: Broadcast): Playback {
         if (onlyIfLongGop && (await maxGop(file, renderKey(ver))) <= 15) return;
         fs.mkdirSync(path.dirname(out), { recursive: true });
         // A scrub copy of a long render legitimately takes a while: 3 s of wall clock per second of video at least.
-        await run(FFMPEG, proxyArgs(file, `${out}.tmp.mp4`, review.meta), { nice: 5, timeout: Math.max(MEDIA_TIMEOUT_MS, review.duration * 3000) });
+        await run(FFMPEG, args(file, `${out}.tmp.mp4`, review.meta), { nice: 5, timeout: Math.max(MEDIA_TIMEOUT_MS, review.duration * 3000) });
         fs.renameSync(`${out}.tmp.mp4`, out);
         await storage().commit(key, 'video/mp4');
         pruneProxies(path.dirname(out));
@@ -254,17 +297,30 @@ export function createPlayback(broadcast: Broadcast): Playback {
     return notYet(key);
   }
 
+  function phone(review: Review, ver: Version, build: boolean): Source | null {
+    if (ver.part || Math.max(ver.width || 0, ver.height || 0) < PHONE_FROM || !store.versionAvailable(review, ver.v)) return null;
+    const key = `phone/${renderKey(ver)}.mp4`;
+    if (storage().has(key)) return copy(key);
+    const size = phoneSize(ver.width, ver.height);
+    if (build) buildProxy(review, ver, key, { onlyIfLongGop: false, args: (src, out, meta) => phoneArgs(src, out, meta, size) });
+    return null;
+  }
+
   // `?s=1`: the player asks for the scrub copy (mediaQuery below); anything else, the original when there is one
-  const ScrubQuery = z.object({ s: z.string().max(4).optional() });
+  const ScrubQuery = z.object({ s: z.string().max(4).optional(), p: z.string().max(4).optional() });
   const served = (p: Playable, req: Request): Source => (p.orig && queryOr(ScrubQuery, req)?.s !== '1' ? p.orig : (p.main as Source));
   const mediaQuery = (ver: Version, p: Playable): string => `?h=${renderKey(ver).slice(0, 10)}${p.scrub === 'ready' ? '&s=1' : ''}`;
+  const phoneQuery = (ver: Version): string => `?h=${renderKey(ver).slice(0, 10)}&p=1`;
 
   return {
     playable,
     preview,
     served,
     mediaQuery,
-    mediaInfo: (slug, ver, p) => ({
+    phone,
+    phoneQuery,
+    wantsPhone: (req) => queryOr(ScrubQuery, req)?.p === '1',
+    mediaInfo: (slug, ver, p, phoneCopy) => ({
       url: p.ready ? `/media/${encodeURIComponent(slug)}/v${ver.v}${mediaQuery(ver, p)}` : null,
       ready: p.ready,
       preparing: !!p.preparing,
@@ -272,6 +328,7 @@ export function createPlayback(broadcast: Broadcast): Playback {
       proxy: !!p.proxy,
       scrub: p.scrub || null,
       error: p.error || null,
+      ...(phoneCopy ? { phone: `/media/${encodeURIComponent(slug)}/v${ver.v}${phoneQuery(ver)}` } : {}),
     }),
   };
 }

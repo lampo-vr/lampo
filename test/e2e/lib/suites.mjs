@@ -82,7 +82,8 @@ const SECONDS = {
   // an agent seen the moment it connects: the sidebar at 390 and 1440, both themes and German, the empty project, Settings
   'agent-start': 26,
   'agents-connected': 21,
-  webkit: 17,
+  // frame-exact in WebKit on an iPhone, the review link at 390 and 430, a big version's phone copy (made, then played)
+  webkit: 45,
   playbook: 15,
   styleguide: 15,
   zoom: 14,

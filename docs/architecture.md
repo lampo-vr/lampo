@@ -143,7 +143,9 @@ links.
    Auto-check, a check of fix previews, a transcript when the version before had one, a scrub copy when the
    render's keyframes are far apart, and footage search's index where it is on.
 3. **Playback.** The browser plays the original when it can decode it, or a playback proxy (ProRes and similar). Once
-   the scrub copy is ready, the player switches to it while paused. A partial render plays as the whole video: the
+   the scrub copy is ready, the player switches to it while paused. A phone plays a copy made for it the first time
+   one asks (at most 1280 px, CRF 23, the scrub copy's keyframes: the scrub copy's bytes stalled a phone's play),
+   switched to the same way. A partial render plays as the whole video: the
    version it patches with the part's frames in their place, spliced once into the scrub copy's place, every frame
    keeping its number.
 4. **Review.** A note records the frame, drawing, tags and severity. The server grabs the exact frame with ffmpeg from

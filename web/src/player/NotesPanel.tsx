@@ -48,6 +48,9 @@ const SHEET_ORDER: SheetState[] = ['peek', 'half', 'full'];
 /** open = feedback to act on (ideas and questions are not work items); the rest are the lengths of the lists. */
 type Counts = { open: number; fixed: number; active: number; mine: number; closed: number; all: number; questions: number };
 
+/** What a phone's peeking sheet says it holds: the open notes, else how many there are, else that there are none. */
+const peekCount = (n: Counts): string => (n.active ? t('{n} open', { n: n.active }) : n.all ? t('{n} note|{n} notes', { n: n.all }) : t('No notes yet'));
+
 const FILTERS = perLang((): { id: Filter; label: string; count: keyof Counts; title?: string }[] => [
   { id: 'active', label: t('Open'), count: 'active', title: t('Open notes and fixes waiting to be checked') },
   { id: 'questions', label: t('Questions'), count: 'questions', title: t('Questions from agents, waiting for your answer') },
@@ -135,26 +138,42 @@ interface NotesPanelProps {
   transcript: Pick<TranscriptViewProps, 'base' | 'onSeek' | 'onPlay' | 'onChangeWords' | 'onRerun' | 'edits'>;
 }
 
-// Drag the handle to resize the sheet; on release it snaps to the nearest position (a flick moves one step).
+// Drag the handle to resize the sheet; on release it snaps to the nearest position (a flick moves one step). The
+// positions are mobile.css's: half 44 % of the screen, full all but 190 px and the top inset. While it moves, the
+// picture keeps its minimum (mobile.css: the sheet is held to its grid row), as it does with the sheet half open.
 function useSheetDrag(sheet: SheetProps | undefined) {
   const drag = useRef<{ y: number; h: number; id: number; lastY: number; lastT: number; v: number } | null>(null);
   const [live, setLive] = useState<number | null>(null);
-  const snaps = () => {
-    const vh = window.innerHeight;
-    return { peek: 0, half: vh * 0.5, full: vh * 0.82 } as Record<SheetState, number>;
+  const full = () => {
+    const bar = document.querySelector('.phone-player > .topbar');
+    return window.innerHeight - 190 - (bar ? Number.parseFloat(getComputedStyle(bar).paddingTop) || 0 : 0);
   };
+  const snaps = () => ({ peek: 0, half: window.innerHeight * 0.44, full: full() }) as Record<SheetState, number>;
+  // a drag ends with its release; the click that may follow it is not a tap
+  const dragged = useRef(false);
   if (!sheet) return { live: null, handle: {} };
   const handle = {
+    // A tap opens from peek, otherwise closes — on the click, not the release: the sheet's move puts something else under
+    // the finger (the agent's line, the dock), and a touch's click is aimed where the finger was once the release has
+    // changed the page, so it opened the Agent view as the sheet closed. The keyboard's Enter and Space come this way too.
+    onClick: () => {
+      if (dragged.current) {
+        dragged.current = false;
+        return;
+      }
+      sheet.setState(sheet.state === 'peek' ? 'half' : 'peek');
+    },
     onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => {
       const el = e.currentTarget.parentElement;
       if (!el) return;
+      dragged.current = false;
       e.currentTarget.setPointerCapture(e.pointerId);
       drag.current = { y: e.clientY, h: el.getBoundingClientRect().height, id: e.pointerId, lastY: e.clientY, lastT: performance.now(), v: 0 };
     },
     onPointerMove: (e: ReactPointerEvent<HTMLButtonElement>) => {
       const d = drag.current;
       if (!d || d.id !== e.pointerId) return;
-      const h = Math.max(56, Math.min(window.innerHeight * 0.9, d.h + (d.y - e.clientY)));
+      const h = Math.max(56, Math.min(full(), d.h + (d.y - e.clientY)));
       if (Math.abs(d.y - e.clientY) > 4) setLive(h);
       // velocity of the last movement (px per ms, up = positive): a flick, not the whole drag
       const now = performance.now();
@@ -168,11 +187,9 @@ function useSheetDrag(sheet: SheetProps | undefined) {
       if (!d) return;
       const moved = d.y - e.clientY;
       setLive(null);
-      if (Math.abs(moved) < 6) {
-        // a tap on the handle: open from peek, otherwise close
-        sheet.setState(sheet.state === 'peek' ? 'half' : 'peek');
-        return;
-      }
+      // a tap: its click does it
+      if (Math.abs(moved) < 6) return;
+      dragged.current = true;
       const v = performance.now() - d.lastT < 80 ? d.v : 0;
       const i = SHEET_ORDER.indexOf(sheet.state);
       if (Math.abs(v) > 0.6) return sheet.setState(SHEET_ORDER[Math.max(0, Math.min(2, i + (v > 0 ? 1 : -1)))]);
@@ -333,7 +350,9 @@ export function NotesPanel(p: NotesPanelProps) {
     <Tabs.Root asChild value={filter} onValueChange={(f) => p.setFilter(f as Filter)}>
       <div
         className={
-          sheet ? `side grain nsheet nsheet-${sheet.state}${p.composer ? ' composing' : ''}${words ? ' words' : ''}` : `side grain${words ? ' words' : ''}`
+          sheet
+            ? `side grain nsheet nsheet-${sheet.state}${p.composer ? ' composing' : ''}${words ? ' words' : ''}${live !== null ? ' dragging' : ''}`
+            : `side grain${words ? ' words' : ''}`
         }
         style={style}
       >
@@ -344,6 +363,22 @@ export function NotesPanel(p: NotesPanelProps) {
         )}
         <div className="side-head">
           <div className="side-title">
+            {/* A phone's sheet at rest says what is in it and opens with a tap anywhere on its row (mobile.css: shown in
+                place of the views and their tools while it peeks); the handle alone, 22 px, was the way in and the
+                notes' count sat on tabs the peek hid. */}
+            {sheet && (
+              <button
+                type="button"
+                className="nsheet-open"
+                onClick={() => sheet.setState('half')}
+                data-testid="notes-open"
+                aria-label={p.view === 'notes' && n ? `${t('Show notes')} · ${peekCount(n)}` : t('Show notes')}
+              >
+                <span className="nsheet-open-word">{VIEWS().find((x) => x.id === p.view)?.label ?? t('Notes')}</span>
+                {p.view === 'notes' && <span className="nsheet-open-n">{n ? peekCount(n) : <SkLine w="4em" />}</span>}
+                <I name="down" size={16} className="nsheet-open-chev" />
+              </button>
+            )}
             <div className={`side-views${agentTab ? ' three' : ''}`} role="tablist" aria-label={t('Notes or transcript')}>
               {VIEWS()
                 .filter((x) => x.id !== 'agent' || agentTab)
@@ -370,7 +405,8 @@ export function NotesPanel(p: NotesPanelProps) {
             )}
             <span className="grow" />
             {!words && !agent && !sheet && p.autoCheck}
-            {!words && !agent && n && n.active > 1 && (
+            {/* review mode walks the notes over the picture with the keyboard's N: a phone's list is that walk (a tap a note) */}
+            {!words && !agent && !sheet && n && n.active > 1 && (
               <IconButton
                 className={`btn sm ghost icon-only ${p.reviewing ? 'on' : ''}`}
                 label={p.reviewing ? t('Leave review mode') : t('Go through the open notes')}
@@ -387,7 +423,7 @@ export function NotesPanel(p: NotesPanelProps) {
               <Tip content={t('New note')} shortcut="C">
                 <button
                   type="button"
-                  className={p.quietNew ? 'btn sm' : 'btn sm primary'}
+                  className={p.quietNew ? 'btn sm new-note' : 'btn sm primary new-note'}
                   onClick={p.onCompose}
                   disabled={!p.canCompose}
                   data-testid="new-note"

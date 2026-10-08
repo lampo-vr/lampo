@@ -66,6 +66,25 @@
     height: var(--h-touch);
   }
 }
+/* A phone's picture is too small to carry the island: the tools lie flat on the stage's dark ground in the strip the
+   stage keeps free under the picture (Stage's reserveBottom), as on a review link (guest.css). In the owner's player the
+   layer sits in the stage's overlay, which it covers, so the strip is measured from the stage's foot. */
+.stage-overlay > .draw-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.draw-bar.flat {
+  top: auto;
+  bottom: var(--sp-1);
+  gap: var(--sp-3);
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  animation: none;
+}
 @media (prefers-reduced-motion: reduce) {
   .draw-bar {
     animation: none;

@@ -19,6 +19,7 @@ import { useMedia, usePhone, useTouch } from '../lib/media.ts';
 import { toast, toastError } from '../lib/toast.ts';
 import { CompareBar } from '../player/CompareBar.tsx';
 import { DrawBar } from '../player/DrawBar.tsx';
+import { type FrameStore, useFrame, useFrameValue } from '../player/frameStore.ts';
 import { groupStarts, noteAt } from '../player/noteRows.ts';
 import Stage, { type Pane } from '../player/Stage.tsx';
 import Timeline from '../player/Timeline.tsx';
@@ -97,7 +98,11 @@ export function GuestPlayer({
         : { ...compare, key: `v:${defaultB(d, name)}` }
       : null;
   const other = useCompareSide(token, d, cmp);
-  const pb = usePlayback({ ver, url: d.media, startFrame: startFrame === null ? null : String(startFrame), b: other.b });
+  // `quiet`: while it plays, only what shows the frame renders per frame (the timecode, the playhead, the note at the
+  // playhead: frameStore.ts), as in the team's player — the whole page did, 25 times a second (a phone's play stuttered)
+  // …and a phone plays the copy made for it once it exists (lib/types.ts GuestReview `phoneMedia`)
+  const pb = usePlayback({ ver, url: d.phoneMedia ?? d.media, startFrame: startFrame === null ? null : String(startFrame), b: other.b, quiet: true });
+  // the frame the page last rendered: where playback stopped or a seek landed (the frame on screen is `pb.live`)
   const { frame } = pb;
   // How far this visitor watches, for the link's owner (coarse).
   useWatchReport({ token, slug: d.slug, v: d.v, video: pb.videoRef, playing: pb.playing, name });
@@ -177,8 +182,8 @@ export function GuestPlayer({
         name: who,
         slug: d.slug,
         v: d.v,
-        // a range without a mark on the picture: the note sits on its first frame
-        frame: range && !shapes.length ? range.in : frame,
+        // a range without a mark on the picture: the note sits on its first frame; else the frame on screen
+        frame: range && !shapes.length ? range.in : pb.frameRef.current,
         ...(range ? { range } : {}),
         text,
         drawing: shapes,
@@ -303,7 +308,8 @@ export function GuestPlayer({
   // the list as the app's: a group header where the writer or the sitting changes, the note at the playhead marked
   // (held a second past its frame while playing)
   const starts = useMemo(() => groupStarts(notes), [notes]);
-  const here = noteAt(notes, frame, pb.playing ? Math.round(fps) : 0);
+  const hold = pb.playing ? Math.round(fps) : 0;
+  const here = useFrameValue(pb.live, (f) => noteAt(notes, f, hold) ?? null);
   const select = (id: string) => {
     const c = notes.find((x) => x.id === id);
     if (!c) return;
@@ -601,7 +607,7 @@ export function GuestPlayer({
               tip={t('client::Previous frame (⇧ 10 back)')}
               shortcut="←"
               icon="stepBack"
-              onClick={() => pb.seek(frame - 1)}
+              onClick={() => pb.seek(pb.frameRef.current - 1)}
             />
             <IconButton
               className={`playbtn ${pb.playing ? 'playing' : ''}`}
@@ -617,19 +623,9 @@ export function GuestPlayer({
               tip={t('client::Next frame (⇧ 10 ahead)')}
               shortcut="→"
               icon="stepFwd"
-              onClick={() => pb.seek(frame + 1)}
+              onClick={() => pb.seek(pb.frameRef.current + 1)}
             />
-            <div className="tc">
-              <span className="main">{timecode(frame, fps)}</span>
-              <span className="sub g-hide-sm">
-                <span>
-                  F <b>{String(frame).padStart(4, '0')}</b> / {N - 1}
-                </span>
-                <span>
-                  {Math.round(fps * 100) / 100} {t('client::FPS')}
-                </span>
-              </span>
-            </div>
+            <GuestTimecode live={pb.live} fps={fps} last={N - 1} />
           </div>
           <div className="group right">
             <Select
@@ -659,6 +655,7 @@ export function GuestPlayer({
           frames={N}
           fps={fps}
           frame={frame}
+          live={pb.live}
           onSeek={pb.seek}
           peaks={wave?.peaks}
           rms={wave?.rms}
@@ -810,5 +807,23 @@ export function GuestPlayer({
         </div>
       )}
     </main>
+  );
+}
+
+/** The transport's timecode: the one part of the review page that follows playback frame by frame. */
+function GuestTimecode({ live, fps, last }: { live: FrameStore; fps: number; last: number }) {
+  const frame = useFrame(live);
+  return (
+    <div className="tc">
+      <span className="main">{timecode(frame, fps)}</span>
+      <span className="sub g-hide-sm">
+        <span>
+          F <b>{String(frame).padStart(4, '0')}</b> / {last}
+        </span>
+        <span>
+          {Math.round(fps * 100) / 100} {t('client::FPS')}
+        </span>
+      </span>
+    </div>
   );
 }

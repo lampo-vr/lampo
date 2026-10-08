@@ -56,7 +56,9 @@ export const showSampleAgentAs = (name: string | null) => {
   sampleAgentAs = name;
 };
 export const displayName = (by: string) => (sampleAgentAs && isSampleAgent(by) ? sampleAgentAs : by.replace(/^(guest|agent):/, ''));
-const roleOf = (by: string) => (isAgent(by) ? 'agent' : by.startsWith('guest:') ? 'client' : null);
+// beside a writer's name: an agent, or someone writing through a review link (never "client": the vocabulary's word is
+// the link; the bare words weren't translated either)
+const roleOf = (by: string) => (isAgent(by) ? t('agent') : by.startsWith('guest:') ? t('via review link') : null);
 
 // What a note is, as one calm label: feedback shows its severity, other notes their kind.
 const KIND = perLang(

@@ -98,7 +98,8 @@
     .topbar.bare .user-chip,
     .ac-chip,
     .tagf,
-    .arch-banner-act
+    .arch-banner-act,
+    button.c-tc
   ) {
     position: relative;
   }
@@ -128,11 +129,17 @@
     .topbar.bare .user-chip,
     .ac-chip,
     .tagf,
-    .arch-banner-act
+    .arch-banner-act,
+    button.c-tc
   )::after {
     content: '';
     position: absolute;
     inset: min(0px, calc(50% - 22px));
+  }
+  /* A native screen: two quick taps on the frame steps (or anything tapped in a row) step twice, never zoom the page;
+     a pinch still does. No specificity, so what a finger drags (the timeline, the sheet's handle: none) keeps its own. */
+  :where(button, [role='button'], [role='tab'], a, label, summary, .stage, .vbox) {
+    touch-action: manipulation;
   }
   /* the crumb cuts long paths sideways only: its buttons' tap areas reach above and below the line */
   .crumb {
@@ -564,13 +571,67 @@
   }
 
   /* ---------------------------------------------------------------- player */
+  /* One screen shared by the picture, the dock and the notes sheet. The sheet's row is as tall as the sheet (peek, half,
+     full) but never takes the picture below --stage-min: with the sheet open (or moving) the picture keeps about a
+     quarter of the screen, as tall as it needs across the width when that is less, and the sheet gets what is left up
+     to its own height. At rest and full the picture has no minimum (full is the notes' turn; at rest it is big anyway,
+     and a small phone's rows would not fit). */
   .player.phone-player {
+    --stage-min: 0px;
     height: 100dvh;
     min-height: 0;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
+    grid-template-rows: auto auto minmax(var(--stage-min), 1fr) auto auto minmax(calc(84px + env(safe-area-inset-bottom)), auto);
     grid-template-areas: 'top' 'strip' 'stage' 'run' 'dock' 'side';
     overflow: hidden;
+  }
+  .phone-player.ps-half,
+  .phone-player:has(.nsheet.dragging) {
+    --stage-min: min(calc(100vw * var(--ar, 0.5625) + 2 * var(--sp-2)), 24dvh);
+  }
+  /* writing a note: the drawing tools' strip under the picture comes on top (Player.tsx PHONE_TOOLS), the picture a
+     step smaller so the note keeps its room on a small phone (the transport's timecode line steps aside below: the
+     composer's head names the frame) */
+  .phone-player.ps-half.composing {
+    --stage-min: calc(min(calc(100vw * var(--ar, 0.5625) + 2 * var(--sp-2)), 22dvh) + var(--h-touch) + var(--sp-1));
+  }
+  /* The keyboard is up (phoneSheet.ts useKeyboard): the player is the room above it — the visible area, where the
+     browser has panned it — the sheet takes all of it but a third for the picture, the dock and the strips step aside
+     until it goes down. Typing a note, the sheet is the note: no handle, no head. */
+  .player.phone-player.kb {
+    --stage-min: calc(var(--vv-h, 100dvh) * 0.3);
+    position: fixed;
+    top: var(--vv-top, 0px);
+    left: 0;
+    right: 0;
+    height: var(--vv-h, 100dvh);
+  }
+  .phone-player.kb :is(.p-strip, .run-slot, .dock),
+  .phone-player.kb.composing .nsheet :is(.nsheet-handle, .side-title) {
+    display: none;
+  }
+  .phone-player.kb .side.nsheet {
+    height: 100dvh;
+    padding-bottom: 0;
+  }
+  /* A short screen — an iPhone in Safari keeps about 660 px under its bars — can't hold the whole dock and a picture
+     worth looking at (it got 105 px). At rest the zoom's own row steps aside while the timeline is fitted (a pinch
+     zooms, More has the buttons; zoomed, the row is back with zoom out) and the play button is a step smaller; with the
+     notes open the timecode's line and the tags' line step aside too (each note says its time; the tags are in the full
+     sheet), and writing a note the picture keeps a little less. */
+  @media (max-height: 760px) {
+    .phone-player .tl-head:has(.zoomctl[data-level='fit']),
+    .phone-player.ps-half .ptc,
+    .phone-player.ps-half .nsheet .note-tagf {
+      display: none;
+    }
+    .phone-player .pbtns .playbtn {
+      width: calc(var(--h-touch) + var(--sp-1));
+      height: calc(var(--h-touch) + var(--sp-1));
+    }
+    .phone-player.ps-half.composing {
+      --stage-min: calc(min(calc(100vw * var(--ar, 0.5625) + 2 * var(--sp-2)), 18dvh) + var(--h-touch) + var(--sp-1));
+    }
   }
   /* the run strip above the dock (RunStrip.tsx): a thumb's height, the edge on its foot; tapping it opens the Agent
      view in the sheet */
@@ -819,9 +880,10 @@
     border: 0;
   }
 
-  /* notes: a bottom sheet (peek → half → full) */
+  /* notes: a bottom sheet (peek → half → full), held to its grid row (the picture's minimum above) */
   .side.nsheet {
     grid-area: side;
+    max-height: 100%;
     position: relative;
     border-left: 0;
     border-top: 1px solid var(--line-2);
@@ -881,8 +943,23 @@
     overflow-x: auto;
     scrollbar-width: none;
   }
+  /* the filters a finger's height: 40 px tabs, each hit across the track's 44 (its padding box, which clips) */
+  .nsheet .note-tabs button {
+    height: var(--h-lg);
+  }
+  .nsheet .note-tabs button::after {
+    content: '';
+    position: absolute;
+    inset: calc(-1 * var(--sp-0_5)) 0;
+  }
   .nsheet .side-scroll {
     padding-bottom: var(--sp-6);
+    overscroll-behavior: contain;
+  }
+  /* the player is one screen: a drag past an end never pulls the page along (Chrome reloaded it, pull to refresh; iOS
+     bounced the whole app) */
+  html:has(.phone-player) {
+    overscroll-behavior: none;
   }
   /* the transcript's bar stays at the sheet's bottom edge; its field is as tall as the buttons beside it */
   .nsheet .tr-scroll.side-scroll {
@@ -916,6 +993,26 @@
     top: var(--sp-1);
     right: var(--sp-1);
   }
+  /* the toolbar stays one row on a phone: the severity says itself by its mark and chevron (its name is the button's
+     label and the menu's words), where its word pushed Save and Send onto a row of their own ("Send 3" at 390, any
+     word at 360); on the smallest phones the chevron gives way too */
+  @container composer (max-width: 400px) {
+    .nsheet .sev-word {
+      display: none;
+    }
+  }
+  /* writing a note, its own voice button is the microphone: the walkie's in the head would be a second one */
+  .nsheet.composing .side-title .mic {
+    display: none;
+  }
+  @container composer (max-width: 330px) {
+    .nsheet .sev-chev {
+      display: none;
+    }
+    .nsheet .composer-foot .btn.sev-pick {
+      padding: 0 var(--sp-2);
+    }
+  }
   .nsheet .composer-foot {
     position: sticky;
     /* pinned flush with the sheet's bottom: down by the list's own padding (.nsheet .side-scroll), or the note shows
@@ -942,10 +1039,15 @@
     -webkit-touch-callout: none;
   }
 
-  /* the sheet takes room from the picture, never covers it: half hides the secondary rows, full the whole dock */
+  /* the sheet takes room from the picture, never covers it: half hides the secondary rows (the strip, the tools, the
+     dock's foot, the timeline's zoom row: pinch zooms), full the whole dock; writing a note, the agent's line steps
+     aside too. The sheet starts each move where the picture stays put (phoneSheet.ts useStillPicture). */
   .phone-player.ps-half .p-strip,
   .phone-player.ps-half .ptools,
   .phone-player.ps-half .dock-foot,
+  .phone-player.ps-half .tl-head,
+  .phone-player.ps-half.composing .run-slot,
+  .phone-player.ps-half.composing .ptc,
   .phone-player.ps-full .p-strip,
   .phone-player.ps-full .dock {
     display: none;
@@ -975,6 +1077,68 @@
   }
 }
 
+/* ---------------------------------------------------------------- an upright phone's notes, at rest
+   The sheet at rest is one row that says what it holds — "Notes  30 open ⌃" — and opens with a tap anywhere on it
+   (NotesPanel.tsx `.nsheet-open`; the 22 px handle was the only way in, the count sat on tabs the peek hid). Beside it
+   only + Note, the one thing to do from here; the views (Notes · Transcript) and the walkie come with the open sheet.
+   Held sideways the notes are a panel of the page, with nothing to open. */
+.nsheet-open {
+  display: none;
+}
+@media (max-width: 639px) {
+  .nsheet-peek .side-title > :not(.nsheet-open, .new-note) {
+    display: none;
+  }
+  .nsheet-peek .nsheet-open {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    height: var(--h-touch);
+    padding: 0 var(--sp-2) 0 0;
+    border: 0;
+    border-radius: var(--r);
+    background: transparent;
+    color: var(--fg);
+    cursor: pointer;
+  }
+  .nsheet-open:active {
+    background: var(--sel);
+  }
+  .nsheet-open-word {
+    font: var(--fw-strong) semi-condensed var(--fs-lg) / var(--lh-tight) var(--display);
+  }
+  .nsheet-open-n {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--fs-md);
+    font-variant-numeric: tabular-nums;
+    color: var(--fg-2);
+  }
+  .nsheet-open-chev {
+    flex: none;
+    margin-left: auto;
+    color: var(--muted);
+    transform: rotate(180deg);
+  }
+  /* a line people read, not a footnote: the frame and the rate under the timecode at the UI's reading size */
+  .ptc .sub {
+    font-size: var(--fs-sm);
+  }
+}
+/* A phone is read at arm's length: in the player and on a review link the two smallest steps of the type scale are a
+   step up (11 → 12, 12 → 13: the scale's own next steps), so a stage word, a tab, a tag, a note's time and its author
+   read like the phone's own small print, not a desk's footnotes. */
+@media (max-width: 639px), (max-height: 480px) and (hover: none) and (pointer: coarse) {
+  :is(.phone-player, .g-player, .room) {
+    --fs-xs: 12px;
+    --fs-sm: 13px;
+  }
+}
+
 /* ---------------------------------------------------------------- the smallest phones (360 px) */
 @media (max-width: 379px) {
   /* the player's strip: the agent button's chevron gives way, so the next step keeps its word */
@@ -988,18 +1152,24 @@
   body {
     overflow: auto;
   }
+  /* every area the upright layout names, the agent's line too: an item in an area the template doesn't have gets a
+     column of its own, and the player shrank to the left of it */
   .player.phone-player {
     height: auto;
     overflow: visible;
-    grid-template-rows: auto calc(100dvh - 58px) auto auto auto;
-    grid-template-areas: 'top' 'stage' 'strip' 'dock' 'side';
+    grid-template-rows: auto calc(100dvh - 58px) auto auto auto auto;
+    grid-template-areas: 'top' 'stage' 'strip' 'run' 'dock' 'side';
   }
+  /* the notes keep clear of the notch and the rounded corners, as the bars do */
   .phone-player .side.nsheet,
   .phone-player .side.nsheet.nsheet-peek {
     height: auto;
+    max-height: none;
     border-radius: 0;
     box-shadow: none;
     overflow: visible;
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
   .phone-player .nsheet-handle {
     display: none;
@@ -1029,14 +1199,17 @@
   .g-player .side {
     border-left: 0;
     border-top: 1px solid var(--line);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
   .g-player .side-scroll {
     overflow: visible;
   }
 }
 
-/* ---------------------------------------------------------------- touch tablets: bigger targets in the desktop layout */
-@media (min-width: 640px) and (hover: none) and (pointer: coarse) {
+/* ---------------------------------------------------------------- touch tablets: bigger targets in the desktop layout
+   (not a phone held sideways, which is wider than 640 too: it has the phone's 44 px) */
+@media (min-width: 640px) and (min-height: 481px) and (hover: none) and (pointer: coarse) {
   .transport .btn.sm {
     min-height: 40px;
   }
@@ -1048,6 +1221,12 @@
   }
   .tabs button {
     min-height: 40px;
+  }
+  /* the notes' head (+ Note, Record, review mode), the composer's foot (both players') and Check now */
+  .side-title .btn.sm,
+  .composer-foot .btn.sm,
+  .verify-cta .btn.sm {
+    min-height: var(--h-lg);
   }
 }
 

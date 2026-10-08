@@ -25,6 +25,10 @@ format stays backwards compatible throughout.
   drafting posts), no longer the project files' scopes, which no tool uses yet; an app may still ask for them.
 - The review card loads its frame itself, so `show_review`'s answer stays small for the model (one downscaled frame),
   and the card declares that it loads nothing from anywhere.
+- **On a phone, the notes are one tap away.** The notes sheet at rest is one row that says what it holds — "Notes  12
+  open" — and opens with a tap anywhere on it, with + Note beside it; the handle still drags. Reading a phone at arm's
+  length, the player's and the review link's smallest type is a step bigger, and what is a desk's check (loudness,
+  freezes, who watched, review mode, an unavailable Record) no longer crowds the phone's screen.
 
 ### Added
 - **Start with your agent in one paste.** An empty library, project or folder leads with **Copy prompt for your
@@ -34,6 +38,10 @@ format stays backwards compatible throughout.
   right under the button follows it live: waiting for your agent, then your agent connected and what it does, until
   its V1 arrives. Connect your agent (the setup by hand) comes next, adding a video yourself last; Get started and
   Settings → Connect an agent lead with the same prompt.
+- **Playback that keeps up on a phone.** A phone plays a copy made for it the first time one opens a version (at most
+  1280 px and a few Mbit/s, where the full-size copy a desk plays can need tens), as frame-exact as the rest; review
+  links too. While a video plays, the review link no longer redraws its whole page 25 times a second, and the phone's
+  transport only its timecode.
 - `LAMPO_OPENAI_APPS_CHALLENGE`: the token ChatGPT's app directory checks at `/.well-known/openai-apps-challenge` when
   you list your server's MCP connector there.
 
@@ -45,6 +53,24 @@ format stays backwards compatible throughout.
   token methods) is no longer refused because it prefers another one.
 - Send all on a busy connection no longer makes the notes not sent yet vanish for a moment before they leave: they
   stay where they are, sending, until they go with their motion (and so does a draft sent on its own).
+- **The player on a phone keeps its picture.** With the notes open, while you write a note and in check mode the
+  picture keeps about a quarter of the screen (on an iPhone it was a strip 62 px tall, in Safari almost nothing), and
+  the notes take the rest. Writing a note, the drawing tools sit in their own strip under the picture instead of
+  covering it. On an iPhone in Safari the picture at rest is half as big again: the timeline's zoom row steps aside
+  while the timeline is fitted (pinch, or More, zooms it) and the play button is a step smaller.
+- On a phone, the keyboard no longer covers the note you are typing or its Send: the player fits the room above the
+  keyboard while it is up.
+- On a phone, opening, closing or dragging the notes sheet moves the picture once and smoothly: it no longer grows
+  first and then shrinks, and a drag no longer squeezes it to nothing on the way. Tapping the sheet's handle to close
+  it no longer opens the Agent view that moved under your finger.
+- A phone held sideways shows the player across the whole screen when the video has an agent (it shrank to the left,
+  with the agent's line at the end of the page), and the notes keep clear of the notch and the rounded corners, on
+  review links too.
+- Quick taps on the frame steps no longer zoom the page on an iPhone, and pulling down on the player no longer reloads
+  it on Android.
+- The note filters in a phone's notes sheet are a finger's height, and at 360 px the composer's toolbar stays one row.
+- A folder's review link on a phone no longer hides the top of its title under the bar.
+- On touch tablets, + Note, Record, the composer's buttons and Check now are easier to hit.
 
 ## [0.2.0] - 2026-10-08
 

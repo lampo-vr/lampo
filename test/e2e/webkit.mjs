@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // covers: web/src/player/Stage.tsx web/src/player/Timeline.tsx web/src/player/Transport.tsx
 // covers: web/src/player/usePlayback.ts web/src/player/PhoneDock.tsx web/src/lib/seek.ts web/src/guest/GuestPlayer.tsx
-// covers: web/src/styles/guest.css
+// covers: web/src/styles/guest.css server/playback.ts
 // Frame exactness in WebKit, Safari's engine, on an emulated iPhone: Playwright's WebKit build plays an H.264 clip in
 // the phone player, and a finger on the timeline, a scrub across it, the step buttons and a ?f= link must each show
 // the frame ffmpeg decodes, with the transport naming that frame and no "shown fN" drift. A client's review link opens
-// as one app screen on a 390 and a 430 pt iPhone (one bar row, the tools under the picture, one transport row).
+// as one app screen on a 390 and a 430 pt iPhone (one bar row, the tools under the picture, one transport row). A big
+// version plays the phone's own copy (1280 px), frame-exact too.
 // WebKit is a separate download (about 80 MB, into cache/playwright, gitignored): `npm run webkit:install`. Without it
 // the suite fails (prereq.mjs); on a WebKit build that can't decode H.264 (Playwright's Linux WebKit) it says so and
 // skips. VR_SHOTS=<dir> keeps screenshots (and one of the page for each failed check).
@@ -62,7 +63,6 @@ try {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
 
-  const ff = (n) => ffFrame(video, n);
   const settled = () =>
     page.waitForFunction(
       () => {
@@ -90,13 +90,13 @@ try {
       },
       { SW, SH },
     );
-  const expectFrame = async (target, how) => {
+  const expectFrame = async (target, how, file = video, frames = N) => {
     await settled();
     // Long enough for the player's one-time recovery when WebKit presents a stale frame (usePlayback: ~400 ms). A loaded
     // machine can take longer: only then look again, up to 8 s, for the picture to be the frame asked for (grabbing it
     // over and over while all is well sets off WebKit's ResizeObserver loop warning, a page error here).
     await sleep(800);
-    const right = (g) => g.frame === target && !g.drift && closestFrame(video, g.out, target, N).k === target;
+    const right = (g) => g.frame === target && !g.drift && closestFrame(file, g.out, target, frames).k === target;
     let got = await shown();
     const t = Date.now();
     while (!right(got) && Date.now() - t < 8000) {
@@ -106,10 +106,10 @@ try {
     if (Date.now() - t > 100) console.log(`      (${how}: the picture was looked at again for ${Date.now() - t} ms)`);
     assert(got.frame === target, `${how}: the transport says f${got.frame}, expected f${target}`);
     const mae = (ref) => ref.reduce((s, b, i) => s + Math.abs(b - got.out[i]), 0) / ref.length;
-    const cands = [target - 1, target, target + 1].filter((k) => k >= 0 && k < N).map((k) => ({ k, e: mae(ff(k)) }));
+    const cands = [target - 1, target, target + 1].filter((k) => k >= 0 && k < frames).map((k) => ({ k, e: mae(ffFrame(file, k)) }));
     const best = cands.reduce((a, b) => (b.e < a.e ? b : a));
     if (best.k !== target) {
-      const all = Array.from({ length: N }, (_, k) => ({ k, e: mae(ff(k)) })).reduce((a, b) => (b.e < a.e ? b : a));
+      const all = Array.from({ length: frames }, (_, k) => ({ k, e: mae(ffFrame(file, k)) })).reduce((a, b) => (b.e < a.e ? b : a));
       assert(
         false,
         `${how}: the picture is closest to ffmpeg's f${best.k} (${cands.map((c) => `${c.k}:${c.e.toFixed(2)}`).join(' ')}; over the clip f${all.k}:${all.e.toFixed(2)})`,
@@ -225,6 +225,28 @@ try {
           await ctx.close();
         }
       }
+    });
+
+    // A phone plays a copy made for it (server/playback.ts: at most 1280 px, CRF 23; the scrub copy's full-size bytes
+    // stalled a phone's play): made when the phone first asks, switched to while paused, and as frame-exact.
+    await check('a big version plays its phone copy on an iPhone, frame-exact like the rest', async () => {
+      const bigFile = makeVideo(path.join(dir, 'clip/big.mp4'), { w: 1600, h: 900, fps: 25, dur: 2, pattern: 'testsrc2', gop: 10 });
+      const BN = 50;
+      const { video: big } = await api('/api/library', { method: 'POST', body: JSON.stringify({ path: bigFile }) });
+      await page.goto('about:blank');
+      await page.goto(`${BASE}/#/v/${encodeURIComponent(big.slug)}`);
+      await page.waitForSelector('.phone-player .ptransport');
+      await page.waitForFunction(() => /[?&]p=1(&|$)/.test(document.querySelector('.vbox video')?.currentSrc || ''), null, { timeout: 60000 });
+      const tl = await box('.timeline canvas');
+      const xOf = (f) => tl.x + ((f + 0.5) * tl.width) / BN;
+      for (const target of [13, 37]) {
+        await page.touchscreen.tap(xOf(target), tl.y + tl.height - 12);
+        await expectFrame(target, `phone copy, tap on f${target}`, bigFile, BN);
+      }
+      await page.locator('.pbtns button[aria-label="Next frame"]').tap();
+      await expectFrame(38, 'phone copy, +1', bigFile, BN);
+      const size = await page.evaluate(() => [document.querySelector('.vbox video').videoWidth, document.querySelector('.vbox video').videoHeight]);
+      assert(size[0] === 1280 && size[1] === 720, `the phone's copy is 1280 × 720, not the version's 1600 × 900: ${size.join(' × ')}`);
     });
 
     await check('no page errors along the way', async () => {

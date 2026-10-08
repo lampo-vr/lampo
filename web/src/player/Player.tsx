@@ -59,6 +59,7 @@ import { PlayerTopbar } from './PlayerTopbar.tsx';
 import { patchOf } from './partWords.ts';
 import { deviceById } from './phone/devices.ts';
 import type { PhoneView } from './phone/view.ts';
+import { useKeyboard, useSideways, useStillPicture } from './phoneSheet.ts';
 import { pendingPreview, previewSource, previewUrl } from './previews.ts';
 import { ReviewHud } from './ReviewHud.tsx';
 import { RunStrip } from './RunStrip.tsx';
@@ -83,6 +84,9 @@ import { orientOf, presetById, presetsFor } from './zones.ts';
 const agentViewCode = loader(() => import('./AgentView.tsx'));
 /** A day: how long work that ended badly (failed, stopped) stays on the strip. */
 const DAY_MS = 24 * 3600_000;
+/** A phone's drawing tools have a strip of their own under the picture (mobile.css: --h-touch + --sp-1, and so in
+ * --stage-min while a note is written), as on a review link. */
+const PHONE_TOOLS = 48;
 /** "Not sent yet" in the notes panel: loaded once there is something to show in it. */
 const unsentUi = loader(() => import('./drafts/Unsent.tsx'));
 /** Publishing a final version (publish/Publishing.tsx): loaded when "Publish…" is chosen or the address asks for it. */
@@ -136,7 +140,13 @@ export default function Player({ slug, focus, startFrame, startV = null, verifyA
     );
   if (!data)
     return (
-      <PlayerLoading slug={slug} phone={phone} ar={known?.width ? known.height / known.width : undefined} agent={!!known && (!!known.session || !!known.run)} />
+      <PlayerLoading
+        slug={slug}
+        phone={phone}
+        ar={known?.width ? known.height / known.width : undefined}
+        agent={!!known && (!!known.session || !!known.run)}
+        versions={known?.versions}
+      />
     );
   return <PlayerView data={data} slug={slug} focus={focus} startFrame={startFrame} startV={startV} verifyAt={verifyAt} atAgent={atAgent} />;
 }
@@ -282,7 +292,9 @@ function PlayerView({
   const clipRef = useRef<HTMLVideoElement | null>(null);
   const b = useBSource(ab, data);
   // Quiet: while playing, only what shows the frame renders per frame (frameStore.ts), not the whole player.
-  const pb = usePlayback({ ver, url: m?.url, startFrame, b, quiet: true });
+  // a phone plays the copy made for it once it exists (lib/types.ts MediaInfo `phone`: the scrub copy's full-size
+  // bytes stalled a phone's play); the server names one only to a phone
+  const pb = usePlayback({ ver, url: m?.phone ?? m?.url, startFrame, b, quiet: true });
   const { frame, frameRef, seek } = pb;
   // what the person watching plays, for Insights and the viewers chip (lib/views.ts); who watched, for the chip
   useTeamWatch(slug, ver.v, pb.videoRef, pb.playing);
@@ -318,6 +330,16 @@ function PlayerView({
   const phone = usePhone();
   // opened for the agent's work (a board card's line): the Agent view, in a sheet that shows it
   const [sheet, setSheet] = useState<SheetState>(atAgent && phone ? 'half' : 'peek');
+  // …and the on-screen keyboard: while it is up the player fits the room above it (phoneSheet.ts; held sideways the
+  // player is a page that scrolls, which the browser scrolls to the field itself)
+  const sideways = useSideways();
+  const upright = phone && !sideways;
+  const keyboard = useKeyboard(upright);
+  // a note on the picture being written: its drawing tools (on a phone in their strip under the picture)
+  const drawing = composer && composer.words == null && !composer.whole;
+  const drawStrip = phone && !!drawing && !keyboard;
+  const mainRef = useRef<HTMLElement>(null);
+  useStillPicture(mainRef, `${sheet} ${composer ? 'composing' : ''} ${keyboard ? 'kb' : ''}`, upright, drawStrip ? PHONE_TOOLS : 0);
   // where the timeline's zoom goes: the transport row's slot (a phone: the timeline's own row above the ruler)
   const [zoomSlot, setZoomSlot] = useState<HTMLDivElement | null>(null);
   const [showB, setShowB] = useState(false);
@@ -1313,7 +1335,11 @@ function PlayerView({
   return (
     // everything inside reads it: an archived project's video takes nothing new (api/auth.ts useCan)
     <ReadOnlyScope value={frozen}>
-      <main className={phone ? `player phone-player ps-${sheet}` : 'player'} style={{ '--ar': H / W } as CSSProperties}>
+      <main
+        ref={mainRef}
+        className={phone ? `player phone-player ps-${sheet}${composer ? ' composing' : ''}${keyboard ? ' kb' : ''}` : 'player'}
+        style={{ '--ar': H / W } as CSSProperties}
+      >
         <PlayerTopbar
           phone={phone}
           data={data}
@@ -1350,7 +1376,7 @@ function PlayerView({
           phone={device}
           app={phoneView.app?.app ?? null}
           message={message}
-          reserveBottom={verify.active && !phone ? 190 : 0}
+          reserveBottom={verify.active && !phone ? 190 : drawStrip ? PHONE_TOOLS : 0}
           reserveTop={ab && !verifying && !phone ? 52 : 0}
           pad={phone ? 10 : undefined}
           stack={stack}
@@ -1358,17 +1384,23 @@ function PlayerView({
         <div className="stage-overlay">
           <WalkieHud state={walkie.state} level={walkie.level} timecodeOf={(f) => timecode(f, fps)} />
           {/* the drawing tools sit on the picture while a note is written (not for the transcript's words, not about the
-            whole video, not while it plays: a note's marks are on the paused frame) */}
-          {composer && composer.words == null && !composer.whole && !pb.playing && !walkie.state && (
+            whole video, not while it plays: a note's marks are on the paused frame). A phone's picture is too small to
+            carry them: there they lie flat in a strip of their own under it, there while the note is written (a tool
+            picked while it plays pauses it), and away while the keyboard is up, when nothing is drawn. */}
+          {drawing && (phone ? drawStrip : !pb.playing) && !walkie.state && (
             <DrawBar
               tools={COMPOSER_TOOLS()}
               tool={composer.tool}
-              onTool={(tool) => setComposer((c) => (c ? { ...c, tool } : c))}
+              onTool={(tool) => {
+                if (pb.playing) pb.pause();
+                setComposer((c) => (c ? { ...c, tool } : c));
+              }}
               onUndo={() => setComposer((c) => (c ? { ...c, shapes: c.shapes.slice(0, -1) } : c))}
               canUndo={composer.shapes.length > 0}
               label={t('Drawing tool')}
               undoLabel={t('Undo last shape')}
               under={!!ab && !verifying && !phone}
+              flat={phone}
             />
           )}
           {(recorder.active || recorder.phase === 'saving') && RecordUI && <RecordUI.RecordBar rec={recorder} />}
@@ -1480,6 +1512,7 @@ function PlayerView({
             band={prefs.views === true}
             onBand={() => setPref('views', prefs.views !== true)}
             readOnly={frozen}
+            phone={phone}
           />
         </div>
 
@@ -1561,7 +1594,8 @@ function PlayerView({
               onRerun={allowed('qa') ? qa.rerun : undefined}
             />
           }
-          record={frozen ? null : <RecordButton rec={recorder} speech={speech} ready={!!m?.ready && !composer} compact />}
+          // a phone without speech-to-text can't record feedback: no grey dot that does nothing in the sheet's head
+          record={frozen || (phone && !speech) ? null : <RecordButton rec={recorder} speech={speech} ready={!!m?.ready && !composer} compact />}
           recording={
             UnsentUI && unsentShown ? (
               <UnsentUI.Unsent

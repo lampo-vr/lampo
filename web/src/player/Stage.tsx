@@ -28,15 +28,27 @@ interface Rect {
 
 const fit = (aspect: number, w: number, h: number) => (w / h > aspect ? { w: h * aspect, h } : { w, h: w / aspect });
 
+// The stage's box (it has no padding or border: its border box is its content box, measured one way everywhere).
+type Size = { w: number; h: number };
+const sizeOf = (el: HTMLElement) => (s: Size) => {
+  const r = el.getBoundingClientRect();
+  return s.w === r.width && s.h === r.height ? s : { w: r.width, h: r.height };
+};
 function useSize(ref: RefObject<HTMLElement | null>) {
-  const [size, setSize] = useState({ w: 0, h: 0 });
+  const [size, setSize] = useState<Size>({ w: 0, h: 0 });
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const ro = new ResizeObserver(([e]) => setSize({ w: e.contentRect.width, h: e.contentRect.height }));
+    const ro = new ResizeObserver(() => setSize(sizeOf(el)));
     ro.observe(el);
     return () => ro.disconnect();
   }, [ref]);
+  // A change made in the same render as the stage's own (a phone's sheet opening, its drawing strip kept free) is
+  // measured before it paints: the observer's answer comes a frame later, and that frame showed the picture at the
+  // old size in the new room.
+  useLayoutEffect(() => {
+    if (ref.current) setSize(sizeOf(ref.current));
+  });
   return size;
 }
 

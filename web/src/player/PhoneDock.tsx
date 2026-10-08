@@ -14,21 +14,31 @@ import { type PhoneView, viewChoice } from './phone/view.ts';
 import { type Playback, RATES } from './usePlayback.ts';
 import type { Preset } from './zones.ts';
 
-export function PhoneTransport({ pb, fps, N }: { pb: Playback; fps: number; N: number }) {
+/** The timecode line: the one part of the phone's transport that follows playback frame by frame (the buttons beside
+ * it rendered 25 times a second with it). */
+function PhoneTimecode({ pb, fps, N }: { pb: Playback; fps: number; N: number }) {
   const { playing, revSpeed, rate } = pb;
   const frame = useFrame(pb.live);
+  return (
+    <div className="ptc">
+      <span className="main">{timecode(frame, fps)}</span>
+      <span className="sub">
+        F <b>{String(frame).padStart(4, '0')}</b> / {N - 1} · {Math.round(fps * 1000) / 1000} {t('fps')}
+        {revSpeed ? ` · ◀ ${revSpeed}×` : rate !== 1 && playing ? ` · ${rate}×` : ''}
+      </span>
+      {pb.drift && <span className="badge warn">{t('shown f{shown}', { shown: pb.shown })}</span>}
+    </div>
+  );
+}
+
+export function PhoneTransport({ pb, fps, N }: { pb: Playback; fps: number; N: number }) {
+  const { playing, revSpeed } = pb;
   const running = playing || !!revSpeed;
-  const step = (n: number) => pb.seek(Math.max(0, Math.min(N - 1, frame + n)));
+  // from the frame on screen when tapped (the transport doesn't render per frame)
+  const step = (n: number) => pb.seek(Math.max(0, Math.min(N - 1, pb.live.get() + n)));
   return (
     <div className="ptransport">
-      <div className="ptc">
-        <span className="main">{timecode(frame, fps)}</span>
-        <span className="sub">
-          F <b>{String(frame).padStart(4, '0')}</b> / {N - 1} · {Math.round(fps * 1000) / 1000} {t('fps')}
-          {revSpeed ? ` · ◀ ${revSpeed}×` : rate !== 1 && playing ? ` · ${rate}×` : ''}
-        </span>
-        {pb.drift && <span className="badge warn">{t('shown f{shown}', { shown: pb.shown })}</span>}
-      </div>
+      <PhoneTimecode pb={pb} fps={fps} N={N} />
       <div className="pbtns">
         <button type="button" className="btn ghost pstep" onClick={() => step(-10)} aria-label={t('Back 10 frames')}>
           −10
@@ -67,17 +77,18 @@ const zoom = (detail: 'in' | 'out' | 'fit') => window.dispatchEvent(new CustomEv
  * of ten boxes that scrolled off the screen's edge. */
 export function PhoneTools({ pb, fps, presets, preset, onPreset, phone }: PhoneToolsProps) {
   const { inPt, outPt, loop, muted, rate } = pb;
-  const frame = useFrame(pb.live);
+  // In and Out take the frame on screen when tapped: the row doesn't render per frame for it
+  const frame = () => pb.live.get();
   const [more, setMore] = useState(false);
   const marked = inPt != null || outPt != null;
   // something behind More is switched on: the button says so, like a filter count
   const busy = marked || preset.id !== 'none' || !!phone.device;
   return (
     <div className="ptools" role="toolbar" aria-label={t('Playback tools')}>
-      <button type="button" className={`btn ghost ${inPt != null ? 'on' : ''}`} onClick={() => pb.setIn(frame)} aria-label={t('Set in point')}>
+      <button type="button" className={`btn ghost ${inPt != null ? 'on' : ''}`} onClick={() => pb.setIn(frame())} aria-label={t('Set in point')}>
         {t('In')}
       </button>
-      <button type="button" className={`btn ghost ${outPt != null ? 'on' : ''}`} onClick={() => pb.setOut(frame)} aria-label={t('Set out point')}>
+      <button type="button" className={`btn ghost ${outPt != null ? 'on' : ''}`} onClick={() => pb.setOut(frame())} aria-label={t('Set out point')}>
         {t('Out')}
       </button>
       <IconButton

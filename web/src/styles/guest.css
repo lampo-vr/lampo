@@ -29,11 +29,12 @@
   }
 }
 
-/* the review room of a folder link */
+/* the review room of a folder link; the bar's row as tall as the bar (a phone's grows by the status bar's inset: a
+   54 px row let it cover the room's title) */
 .room {
   height: 100%;
   display: grid;
-  grid-template-rows: 54px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
 }
 /* one row at every width: the wordmark, the visitor's name, the theme */
 .room .room-top {

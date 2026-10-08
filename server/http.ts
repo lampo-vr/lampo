@@ -92,6 +92,10 @@ export const query = <S extends z.ZodType>(schema: S, req: Request): z.output<S>
  * nothing — an array or an object where a string belongs is no value at all. */
 export const queryOr = <S extends z.ZodType>(schema: S, req: Request): z.output<S> | undefined => schema.safeParse(req.query).data;
 
+/** A phone asks (its User-Agent: an iPhone, an Android phone — a tablet says it is a computer, or leaves out "Mobile"):
+ * it plays a version's phone copy (server/playback.ts). A hint for what to make, never a permission. */
+export const fromPhone = (req: Request): boolean => /\b(iPhone|iPod|Windows Phone)\b|\bAndroid\b.*\bMobile\b/.test(req.headers['user-agent'] ?? '');
+
 /** `?v=`: a version by its number; absent or empty is the newest. Not a positive whole number: 400. */
 export const VersionQuery = z.object({ v: z.preprocess((x) => (x === '' ? undefined : x), z.coerce.number().int().positive().optional()) });
 /** `?t=`: the LAN link's token, as a phone first opens it (server/guard.ts sets its cookie, server/auth.ts reads it). */

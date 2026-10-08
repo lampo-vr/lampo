@@ -24,7 +24,7 @@ import type { Comment, FrameRange, MediaInfo, NoteRecording, PartRequest, PartSu
 import type { ServerContext } from '../context.ts';
 import { countStep, noticeMoment } from '../funnel.ts';
 import { accountOf, agentView, finalLock, getReview, getVersion, isOwn, metaOf, sanitizeDrawing, signOffByPerson, summary, versionBytes } from '../helpers.ts';
-import { body, commentId, fail, failFrom, parse, query, router } from '../http.ts';
+import { body, commentId, fail, failFrom, fromPhone, parse, query, router } from '../http.ts';
 import { checkWake, startAgent } from '../wake.ts';
 import { archivedList } from './library.ts';
 import { InlineRefInput } from './refs.ts';
@@ -245,7 +245,11 @@ export function reviewRoutes(ctx: ServerContext): Router {
     // A full render after approved partial ones is compared with them (cheap when there is nothing to do).
     ctx.background.checkParts(review);
     const media: Record<number, MediaInfo> = {};
-    for (const ver of review.versions) media[ver.v] = playback.mediaInfo(slug, ver, playback.playable(review, ver));
+    // a phone plays a copy its screen and connection can take: the newest version's is made when a phone first asks
+    const phone = fromPhone(req);
+    const newest = review.versions.at(-1)?.v;
+    for (const ver of review.versions)
+      media[ver.v] = playback.mediaInfo(slug, ver, playback.playable(review, ver), phone ? playback.phone(review, ver, ver.v === newest) : null);
     const out: ReviewResponse = {
       slug,
       review: agentView.review(req, review),

@@ -3125,6 +3125,10 @@ export interface MediaInfo {
   proxy: boolean;
   scrub: 'ready' | 'native' | 'building' | null;
   error: string | null;
+  /** A phone asked (its User-Agent): the URL of the version's phone copy once it exists — at most 1280 px on the long
+   * side, light enough for a phone's connection, frame-exact like the scrub copy. Absent until then, and for versions
+   * a phone plays as they are (server/playback.ts). */
+  phone?: string;
 }
 
 export interface ReviewResponse {
@@ -3307,6 +3311,8 @@ export interface GuestReviewResponse {
   duration: number;
   /** What the player plays: null while its copy is being made (then `preparing`, and the page asks again soon). */
   media: string | null;
+  /** A phone asked: what it plays instead once it exists (MediaInfo `phone`: a copy sized and weighted for a phone). */
+  phoneMedia?: string;
   preparing?: boolean;
   /** The copy waits for room in a busy server's job queue: ask again less often (the server asks for it by itself). */
   busy?: boolean;
