@@ -7,6 +7,8 @@ format stays backwards compatible throughout.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-08
+
 ### Added
 - **Files for every project, folder and the House.** A **Files** tab beside a project's or folder's Videos and
   Playbook (the House's in Settings → Files) holds the material the work is made from: footage, music, fonts, logos,

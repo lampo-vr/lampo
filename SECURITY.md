@@ -17,8 +17,8 @@ the problem publicly.
 
 ## Supported versions
 
-Lampo is before 1.0; its first public release is 0.1.0. Security fixes go into the `main` branch and the next
-release, not into older releases: run the latest release or `main`.
+Lampo is before 1.0; its first public release was 0.1.0, and the latest is 0.2.0. Security fixes go into the
+`main` branch and the next release, not into older releases: run the latest release or `main`.
 
 ## Scope
 
