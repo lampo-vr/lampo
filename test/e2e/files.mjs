@@ -109,6 +109,8 @@ let role = null;
 let hosted = false;
 // the next upload request is refused for room (the plan's sheet)
 let refuseNext = false;
+/** The brand fonts held back (the system's sans then, wider on Linux and Windows than the Mac's). */
+let blockFonts = false;
 /** A file id no store has (an address that outlived its file). */
 const NO_SUCH_FILE = 'fl_000000000000';
 let dayFull = false;
@@ -120,6 +122,8 @@ async function intercept(p) {
   p.on('request', async (req) => {
     const url = new URL(req.url());
     const at = url.pathname;
+    // Linux-like metrics on any machine: the brand fonts never arrive
+    if (blockFonts && /\.woff2?$/.test(at)) return req.abort().catch(() => {});
     try {
       if (!at.startsWith('/api/') || req.method() !== 'GET') {
         if (at === '/api/files/uploads' && req.method() === 'POST') asked.push(JSON.parse(req.postData() || '{}').conflict ?? 'refuse');
@@ -682,19 +686,33 @@ try {
         }),
       );
     const out = [];
-    for (const lang of ['en', 'de']) {
+    // Linux's and Windows' faces are wider than the Mac's: at 360 with the brand fonts blocked and a wide face forced,
+    // the first row's ⋯ sits where its menu opens over it, as on CI (the tap's click then landed on the menu's frame)
+    for (const { lang, w, wide } of [
+      { lang: 'en', w: 390, wide: false },
+      { lang: 'de', w: 390, wide: false },
+      { lang: 'en', w: 360, wide: true },
+    ]) {
       const p = await browser.newPage();
       const english = page;
       page = p;
       page.on('pageerror', (x) => errors.push(x.message));
       try {
         await intercept(page);
+        blockFonts = wide;
+        if (wide) {
+          await page.evaluateOnNewDocument(() => {
+            const face = document.createElement('style');
+            face.textContent = '*, *::before, *::after { font-family: Verdana, "DejaVu Sans", sans-serif !important; }';
+            document.addEventListener('DOMContentLoaded', () => document.head.append(face));
+          });
+        }
         await page.evaluateOnNewDocument((l) => {
           try {
             localStorage.setItem('vr.lang', l);
           } catch {}
         }, lang);
-        await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+        await page.setViewport({ width: w, height: 844, isMobile: true, hasTouch: true });
         await open(campaign(`?path=${e('Footage/Day 1')}`));
         // a finger has no pointer to bring a box out with: none until picking starts
         assert(
@@ -703,6 +721,8 @@ try {
         );
         await page.tap('[data-testid=file-row] .pf-more');
         await page.waitForSelector('[role=menuitem]');
+        // ⋯ opens its menu, never the file under it, wherever the menu opens
+        assert(!(await page.$('[data-testid=file-sheet]')), `@${w}${wide ? ' (wide face)' : ''}: the tap on ⋯ opened the file too`);
         const picked = await page.evaluate(
           (word) => {
             const item = [...document.querySelectorAll('[role=menuitem]')].find((x) => x.textContent.trim() === word);
@@ -744,8 +764,9 @@ try {
           throw new Error(`ticked rows: ${await boxes()}`);
         });
         await settle(page, { quiet: 300 });
-        for (const x of await barFits()) out.push(`${lang} @390: ${x}`);
-        await shot(`files-picked-390-${lang}`);
+        for (const x of await barFits()) out.push(`${lang} @${w}: ${x}`);
+        await shot(`files-picked-${w}-${lang}${wide ? '-wide' : ''}`);
+        if (wide) continue;
         // a tablet and a small laptop, with a pointer (the phone's layout is another page: picked afresh)
         for (const w of [768, 1024]) {
           await page.setViewport({ width: w, height: 900 });
@@ -760,6 +781,7 @@ try {
           for (const x of await barFits()) out.push(`${lang} @${w}: ${x}`);
         }
       } finally {
+        blockFonts = false;
         page = english;
         await p.close();
       }

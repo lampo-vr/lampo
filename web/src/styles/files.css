@@ -347,6 +347,12 @@ a.pf-crumb:focus-visible {
   .pf-list:not(.picking) .pf-row:hover:not(.checked) .pf-c-lead:has(.pf-tick) .pf-glyph {
     visibility: visible;
   }
+  /* a finger-sized place to tap, centred on the box (the box stays the glyph's size) */
+  .pf-tick::after {
+    content: '';
+    position: absolute;
+    inset: calc((var(--ic) - var(--h-touch)) / 2);
+  }
 }
 .pf-tick.on {
   border-color: var(--fg);

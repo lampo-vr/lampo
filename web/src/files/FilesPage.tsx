@@ -173,6 +173,13 @@ function Crumbs({ area, path, trash }: { area: string; path: string; trash: bool
 
 // ---------------------------------------------------------------- the page
 
+/**
+ * A click that presses a row: on the row itself, not on its ⋯ (which opens its menu), and not from a layer that ⋯ opened.
+ * A click in its menu (a portal) still bubbles up React's tree to the row: a tap on ⋯ whose menu opens over it (a row
+ * near a phone's foot, a wider face on Linux or Windows) landed on the menu's frame and opened the file as well.
+ */
+const onRowItself = (e: MouseEvent): boolean => (e.currentTarget as Element).contains(e.target as Node) && !(e.target as Element).closest('.pf-c-acts');
+
 export default function FilesPage({ area, pending = false, readOnly = false }: { area: string; pending?: boolean; readOnly?: boolean }) {
   useLang();
   const qc = useQueryClient();
@@ -331,7 +338,7 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
       return next;
     });
   const press = (r: Row, e: MouseEvent) => {
-    if ((e.target as Element).closest('.pf-c-acts, .pf-tick, a')) return;
+    if (!onRowItself(e) || (e.target as Element).closest('.pf-tick, a')) return;
     if (r.kind === 'going') return;
     if (e.metaKey || e.ctrlKey) {
       toggle(r.key);
@@ -1134,7 +1141,7 @@ function Inherited({ info, here, onOpen }: { info: FileAreaInfo; here: string | 
                     active={active === i}
                     picked={false}
                     checked={false}
-                    onPress={x.go}
+                    onPress={(e) => onRowItself(e) && x.go()}
                     menu={[{ label: t('Open'), icon: 'folderOpen', onClick: x.go }]}
                     testid="inherited-dir-row"
                   />
@@ -1146,7 +1153,7 @@ function Inherited({ info, here, onOpen }: { info: FileAreaInfo; here: string | 
                     active={active === i}
                     picked={false}
                     checked={false}
-                    onPress={(e) => !(e.target as Element).closest('.pf-c-acts') && x.go()}
+                    onPress={(e) => onRowItself(e) && x.go()}
                     menu={fileActs(x.f)}
                     testid="inherited-file-row"
                   />
