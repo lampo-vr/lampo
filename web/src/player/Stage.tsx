@@ -1,13 +1,13 @@
 // The picture: one or two panes (A/B side by side, or one above the other), each with the video fitted into a canvas
-// box, overlays in the right coordinate system, the drawing layer (video pixels) and an optional phone frame at real
-// CSS size.
+// box, the safe zones in the right coordinate system, the drawing layer (video pixels) and an optional phone frame at
+// real CSS size, with an app's interface around the picture. The zones and the app are two choices, drawn apart.
 import { type CSSProperties, type ReactNode, type PointerEvent as ReactPointerEvent, type Ref, type RefObject, useLayoutEffect, useRef, useState } from 'react';
 import { drawingMarkup, shapeMarkup, simplifyPoints, strokeFor } from '../../../lib/drawing.ts';
 import type { Shape, Tool } from '../api/types.ts';
 import { t } from '../i18n/index.ts';
 import { loader, useLoaded } from '../lib/lazy.ts';
 import Overlay from './overlays.tsx';
-import { bodyOf, cover, type Device, videoArea } from './phone/devices.ts';
+import { type AppId, bodyOf, cover, type Device, videoArea } from './phone/devices.ts';
 import { type Preset, presetCanvas } from './zones.ts';
 
 export { DEVICES, type Device } from './phone/devices.ts';
@@ -224,11 +224,12 @@ export interface Pane {
 
 interface StageProps {
   panes: Pane[];
+  /** The safe zones drawn over the picture (none: null), in the phone view too, on the picture as the phone shows it. */
   preset: Preset | null;
-  /** The phone view: the phone the video is shown on, at its real size (an app's preset draws that app around it). */
+  /** The phone view: the phone the video is shown on, at its real size. */
   phone: Device | null;
-  /** The phone view with an app: draw the preset's zones over the app's interface too. */
-  zones?: boolean;
+  /** The app whose interface the phone view draws around a vertical or square picture; null = Full height. */
+  app?: AppId | null;
   message?: string | null;
   // px kept free at the bottom (e.g. for the verify panel) so it never covers the picture.
   reserveBottom?: number;
@@ -254,7 +255,7 @@ interface PhonePlace {
   top: number;
   body: ReturnType<typeof bodyOf>;
   area: Rect & { r: number };
-  app: Preset['app'] | null;
+  app: AppId | null;
   note: string;
 }
 
@@ -264,7 +265,7 @@ export default function Stage({
   panes,
   preset,
   phone,
-  zones = false,
+  app: phoneApp = null,
   message,
   reserveBottom = 0,
   reserveTop = 0,
@@ -314,7 +315,7 @@ export default function Stage({
             const room = size.h - reserveBottom - reserveTop - pad * 2 - noteRoom;
             // the side buttons stand 3 pt off the body
             const scale = Math.min(1, (paneW - pad * 2) / (body.w + 8), room / (body.h + 8));
-            const app = !landscape && preset?.app ? preset.app : null;
+            const app = landscape ? null : phoneApp;
             const area = landscape ? { x: 0, y: 0, w: body.screen.w, h: body.screen.h, r: 0 } : videoArea(app, phone);
             if (landscape) box = place(area.w, area.h, p.W, p.H, canvasSize);
             else {
@@ -348,7 +349,8 @@ export default function Stage({
             box.canvas.y += pad + reserveTop;
           }
           const { canvas, video } = box;
-          // An app on the phone is its interface, not the preset's drawing; its zones go over the interface on request.
+          // The zones lie on the picture; with an app on the phone they go over its interface instead (below), where
+          // they can be read against its buttons.
           const overlay = !ph?.app;
           const content = (
             <div className="canvas" style={at(canvas)}>
@@ -423,10 +425,18 @@ export default function Stage({
                     {content}
                   </div>
                   {ph?.app && Art ? <Art.AppUI app={ph.app} device={ph.device} /> : null}
-                  {ph?.app && area && zones ? (
+                  {ph?.app && area && preset ? (
                     <div className="phone-area phone-zones" style={{ ...at(area), borderRadius: area.r }}>
                       <div className="canvas" style={at(canvas)}>
-                        <Overlay preset={preset} size={canvasSize ?? [1080, 1920]} />
+                        {/* in the frame's coordinates, as Auto-check's are (the rule of thirds in the picture's own); the
+                            stripes only: the interface under them says what each zone is for */}
+                        {canvasSize ? (
+                          <Overlay preset={preset} size={canvasSize} labels={false} />
+                        ) : (
+                          <div className="phone-zones-v" style={at(video)}>
+                            <Overlay preset={preset} size={[p.W, p.H]} labels={false} />
+                          </div>
+                        )}
                       </div>
                     </div>
                   ) : null}

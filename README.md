@@ -73,7 +73,7 @@ the exact frame and what's on it. Lampo turns review into data an agent can act 
   easing to a rest or an end card — or like a problem: motion that stops dead or jumps ahead while the sound goes on. **Ask the agent** turns it into a note;
   **That's intended** puts it away on that video, in later versions too.
 - **Safe zones, phone view, compare.** Overlays for Reels, TikTok, Shorts, Stories and title/action safe. A real-size
-  phone (iPhone, SE, Pixel) showing the video full height or inside each app's interface. Compare any two versions (<kbd>B</kbd>) side by side, with a wipe, or one over the other as a
+  phone (iPhone, SE, Pixel) showing the video full height or inside each app's interface, with or without the zones over it. Compare any two versions (<kbd>B</kbd>) side by side, with a wipe, or one over the other as a
   difference or onion skin, locked to the frame.
 - **Review mode** (<kbd>N</kbd>) steps through the open notes, each on its exact frame, for going through a cut with
   someone watching. Notes read as threads: replies with their authors, status changes as one line each.

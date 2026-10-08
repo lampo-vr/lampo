@@ -3498,7 +3498,6 @@ export const EN = [
   'Show more · {n} in all',
   'Show notes',
   'Show on the timeline how much of V{v} was watched',
-  'Show safe zones',
   'Show the approved ones…',
   'Show the fix',
   "Show the note's marks",

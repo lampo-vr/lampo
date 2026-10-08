@@ -113,7 +113,7 @@ export const DEVICES: Device[] = [
 
 export const deviceById = (id: unknown): Device => DEVICES.find((d) => d.id === id) || DEVICES[0];
 
-/** The apps the phone view can show around the picture: each one is a safe-zone preset (overlays.tsx `app`). */
+/** The apps the phone view can show around the picture: each has its safe-zone preset (zones.ts `app`). */
 export type AppId = 'reels' | 'tiktok' | 'shorts' | 'stories';
 
 export interface Box {

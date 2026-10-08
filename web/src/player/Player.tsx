@@ -28,7 +28,6 @@ import { useStableCallback } from '../lib/hooks.ts';
 import { loader, useLoaded, usePainted } from '../lib/lazy.ts';
 import { usePhone } from '../lib/media.ts';
 import { backToLibrary } from '../lib/nav.ts';
-import { usePrefs } from '../lib/prefs.ts';
 import { errorMessage, toast, toastError } from '../lib/toast.ts';
 import { archivedCode, useHeldArchive } from '../library/archiving.ts';
 import { inlineBody, sendRef } from '../refs/api.ts';
@@ -70,6 +69,7 @@ import Timeline from './Timeline.tsx';
 import { Transport } from './Transport.tsx';
 import { useDiff } from './useDiff.ts';
 import { type BSource, RATES, usePlayback } from './usePlayback.ts';
+import { usePlayerPrefs } from './usePlayerPrefs.ts';
 import { useQa } from './useQa.ts';
 import { useShortcuts } from './useShortcuts.ts';
 import { useTeamWatch } from './useTeamWatch.ts';
@@ -248,32 +248,31 @@ function PlayerView({
   const { fps, width: W, height: H, frames: N } = ver;
   const m = media[ver.v];
 
-  const [prefs, setPref] = usePrefs('vr.player');
+  const [prefs, setPref] = usePlayerPrefs();
   const orient = orientOf(W, H);
   const presetList = presetsFor(W, H);
   const presetKey = `preset.${orient}`;
+  // Two choices, each drawing one thing (playerPrefs.ts): the safe zones over the picture (per orientation, G), and the
+  // phone view (V) — Off, Full height or an app's interface around the picture — on the phone picked last.
   const preset = presetById(presetList.some((p) => p.id === prefs[presetKey]) ? prefs[presetKey] : 'none');
-  // The phone view: one choice — Off, Full height or an app, the app being the safe-zone preset (one pref, so the phone
-  // and the safe zones never disagree) — on the phone picked last; V brings it back as it was.
   const model = deviceById(prefs.device);
   const device = prefs.phone ? model : null;
+  const apps = presetList.filter((p) => p.app);
   const phoneView: PhoneView = {
     device,
     model,
-    app: preset.app ? preset : null,
-    apps: presetList.filter((p) => p.app),
-    zones: prefs.zones === true,
+    app: apps.find((p) => p.id === prefs.phoneApp) ?? null,
+    apps,
     onView: (choice) => {
       if (choice === 'off') return setPref('phone', false);
+      // a landscape video has no app to show: its Full height leaves the app vertical videos are shown in alone
+      if (apps.length) setPref('phoneApp', choice);
       if (!prefs.phone) setPref('phone', true);
-      if (choice !== 'full') setPref(presetKey, choice);
-      else if (preset.app) setPref(presetKey, 'none');
     },
     onDevice: (id) => {
       setPref('device', id);
       if (!prefs.phone) setPref('phone', true);
     },
-    onZones: () => setPref('zones', prefs.zones !== true),
   };
 
   const [ab, setAb] = useState<AbState>(null);
@@ -1349,7 +1348,7 @@ function PlayerView({
           panes={panes}
           preset={preset.id === 'none' ? null : preset}
           phone={device}
-          zones={phoneView.zones}
+          app={phoneView.app?.app ?? null}
           message={message}
           reserveBottom={verify.active && !phone ? 190 : 0}
           reserveTop={ab && !verifying && !phone ? 52 : 0}

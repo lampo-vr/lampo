@@ -1033,7 +1033,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   // the phone view: Full height or an app around the picture, and the apps' own words as their German versions say them
   'Full height': 'Volle Höhe',
   'Phone view: {view} · {device}': 'Smartphone-Ansicht: {view} · {device}',
-  'Show safe zones': 'Safe Zones zeigen',
   TikTok: 'TikTok',
   'YouTube Shorts': 'YouTube Shorts',
   caption: 'Beschreibung',

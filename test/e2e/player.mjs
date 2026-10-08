@@ -755,41 +755,105 @@ try {
     await page.setViewport({ width: 1440, height: 900 });
   });
 
-  await check('the phone view: one menu (Off · Full height · the apps · the phones), each app around the picture inside its safe zones, V and G', async () => {
+  // The safe zones and the phone view are two choices, each drawing one thing (web/src/player/playerPrefs.ts): the
+  // zones' menu (left) draws only the zones, the phone's (right) only the phone and an app's interface; both together
+  // draw both, and each button names its own choice.
+  const menuOf = async (testid) => {
+    await page.waitForFunction(() => !document.querySelector('.menu'));
+    await page.click(`.transport [data-testid=${testid}]`);
+    await page.waitForSelector('.menu [role=menuitemcheckbox]');
+    return page.$$eval('.menu [role=menuitemcheckbox], .menu .menu-label', (els) =>
+      els.map((e) =>
+        e.classList.contains('menu-label') ? `# ${e.textContent?.trim()}` : `${e.getAttribute('aria-checked') === 'true' ? '✓ ' : ''}${e.textContent?.trim()}`,
+      ),
+    );
+  };
+  const pickIn = async (testid, label) => {
+    const items = await menuOf(testid);
+    assert(
+      items.some((i) => i.replace('✓ ', '') === label),
+      `${label} in the ${testid} menu: ${items}`,
+    );
+    await page.evaluate(
+      (label) => [...document.querySelectorAll('.menu [role=menuitemcheckbox]')].find((e) => e.textContent?.trim() === label)?.click(),
+      label,
+    );
+    await page.waitForFunction(() => !document.querySelector('.menu'));
+  };
+  // what each button says: its name (aria-label, the tooltip's words) and the word its label shows where the row has room
+  const buttons = () =>
+    page.evaluate(() => {
+      const of = (id) => {
+        const b = document.querySelector(`.transport [data-testid=${id}]`);
+        return { name: b?.getAttribute('aria-label'), word: b?.querySelector('.tr-stack > span:not(.ghost)')?.textContent?.trim() };
+      };
+      return { zones: of('safe-zones'), phone: of('device') };
+    });
+  // what the stage draws: the zones (which preset, where), the app's interface (which app), the phone (which view)
+  const drawn = () =>
+    page.evaluate(() => {
+      const box = (el) => {
+        const r = el?.getBoundingClientRect();
+        return r && { l: r.left, t: r.top, w: r.width, h: r.height };
+      };
+      const zones = document.querySelector('.stage .ig-layer');
+      return {
+        zones: zones?.getAttribute('data-preset') ?? null,
+        overApp: !!zones?.closest('.phone-zones'),
+        // the zones' words ("icons", "caption"…): on the picture, never over an app's interface (it shows what is there)
+        labels: zones ? zones.querySelectorAll('text').length : 0,
+        ui: document.querySelector('.stage [data-app-ui]')?.getAttribute('data-app-ui') ?? null,
+        view: document.querySelector('.stage .phone')?.getAttribute('data-app') ?? null,
+        zonesBox: box(zones),
+        picture: box(document.querySelector('.stage .vbox')),
+      };
+    });
+  const same = (a, b) => !!a && !!b && ['l', 't', 'w', 'h'].every((k) => Math.abs(a[k] - b[k]) <= 1);
+
+  await check('prefs kept while the safe zones and the phone were one choice: each person sees what they saw', async () => {
+    await page.setViewport({ width: 1440, height: 900 });
+    // the phone on with TikTok, its zones never shown: TikTok's interface without the stripes
+    await page.evaluate(() => localStorage.setItem('vr.player', JSON.stringify({ phone: true, device: 'pixel', 'preset.vertical': 'tiktok' })));
+    await openPlayer(reel.slug);
+    await page.waitForSelector('.phone[data-device=pixel][data-art=ready] [data-app-ui=tiktok]');
+    let d = await drawn();
+    assert(d.ui === 'tiktok' && d.zones === null, `the app without its zones: ${JSON.stringify(d)}`);
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('vr.player') || '{}').phoneApp === 'tiktok');
+    const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('vr.player') || '{}'));
+    assert(kept['preset.vertical'] === 'none' && !('zones' in kept), `written as the two choices: ${JSON.stringify(kept)}`);
+    // the same with its zones shown over it: both
+    await page.evaluate(() => localStorage.setItem('vr.player', JSON.stringify({ phone: true, 'preset.vertical': 'yt-shorts', zones: true })));
+    await openPlayer(reel.slug);
+    await page.waitForSelector('.phone[data-art=ready] [data-app-ui=shorts]');
+    await page.waitForSelector('.phone-zones .ig-layer[data-preset=yt-shorts]');
+    d = await drawn();
+    assert(d.ui === 'shorts' && d.zones === 'yt-shorts' && d.overApp && d.labels === 0, `the app and its zones (no words): ${JSON.stringify(d)}`);
+    // the phone off: the zones as they were, nothing else
+    await page.evaluate(() => localStorage.setItem('vr.player', JSON.stringify({ phone: false, 'preset.vertical': 'stories' })));
+    await openPlayer(reel.slug);
+    await page.waitForSelector('.stage .ig-layer[data-preset=stories]');
+    d = await drawn();
+    assert(d.view === null && d.ui === null, `no phone, the zones: ${JSON.stringify(d)}`);
+    await page.evaluate(() => localStorage.removeItem('vr.player'));
+  });
+
+  await check('safe zones and the phone view: two menus, each drawing one thing — the zones, or an app’s interface — both together, V and G', async () => {
     await page.setViewport({ width: 1440, height: 900 });
     await page.evaluate(() => localStorage.removeItem('vr.player'));
     await openPlayer(reel.slug);
     await page.evaluate(() => document.activeElement?.blur());
-    const menu = async () => {
-      await page.waitForFunction(() => !document.querySelector('.menu'));
-      await page.click('.transport [data-testid=device]');
-      await page.waitForSelector('.menu [role=menuitemcheckbox]');
-      return page.$$eval('.menu [role=menuitemcheckbox], .menu .menu-label', (els) =>
-        els.map((e) =>
-          e.classList.contains('menu-label')
-            ? `# ${e.textContent?.trim()}`
-            : `${e.getAttribute('aria-checked') === 'true' ? '✓ ' : ''}${e.textContent?.trim()}`,
-        ),
-      );
-    };
-    const pick = async (label) => {
-      const items = await menu();
-      assert(
-        items.some((i) => i.replace('✓ ', '') === label),
-        `${label} in the menu: ${items}`,
-      );
-      await page.evaluate(
-        (label) => [...document.querySelectorAll('.menu [role=menuitemcheckbox]')].find((e) => e.textContent?.trim() === label)?.click(),
-        label,
-      );
-      await page.waitForFunction(() => !document.querySelector('.menu'));
-    };
-    // the order: what the phone shows, then which phone; the view is off
-    const items = await menu();
+    // the menus: each headed by what it is, neither with the other's choice in it
+    const phoneMenu = await menuOf('device');
     assert(
-      items.join(' | ') ===
-        '✓ Off | Full height | Instagram Reels | TikTok | YouTube Shorts | Stories (IG / FB) | # Phone | ✓ iPhone 15 / 16 | iPhone 16 Pro | iPhone 16 Pro Max | iPhone SE | Pixel 8',
-      `the menu: ${items.join(' | ')}`,
+      phoneMenu.join(' | ') ===
+        '# Phone view | ✓ Off | Full height | Instagram Reels | TikTok | YouTube Shorts | Stories (IG / FB) | # Phone | ✓ iPhone 15 / 16 | iPhone 16 Pro | iPhone 16 Pro Max | iPhone SE | Pixel 8',
+      `the phone's menu: ${phoneMenu.join(' | ')}`,
+    );
+    await page.keyboard.press('Escape');
+    const zonesMenu = await menuOf('safe-zones');
+    assert(
+      zonesMenu.join(' | ') === '# Safe zones | ✓ Off | Rule of thirds | Instagram Reels | TikTok | YouTube Shorts | Stories (IG / FB)',
+      `the zones' menu: ${zonesMenu.join(' | ')}`,
     );
     await page.keyboard.press('Escape');
     // Full height: the picture on the whole screen, top to bottom, under the status bar and the home indicator only
@@ -797,7 +861,7 @@ try {
       const v = document.querySelector('.vbox video');
       if (v) v.dataset.kept = '1';
     });
-    await pick('Full height');
+    await pickIn('device', 'Full height');
     await page.waitForSelector('.phone[data-app=full][data-art=ready] .phone-status');
     const full = await page.evaluate(() => {
       const r = (s) => {
@@ -814,8 +878,44 @@ try {
     );
     assert(full.vbox.top <= full.screen.top + 1 && full.vbox.bottom >= full.screen.bottom - 1, `the picture fills it top to bottom: ${JSON.stringify(full)}`);
     assert(full.kept === '1', 'turning the phone view on keeps the same video element');
-    // each app: its interface on the frame (data-app), the safe-zone preset with it (one pref), its rail and caption — or
-    // Stories' header — inside that preset's zones once they are shown over it
+    // an app on the right: its interface, no stripes; the left still says off
+    await pickIn('device', 'Instagram Reels');
+    await page.waitForSelector('.phone[data-app=reels] [data-app-ui=reels]');
+    let d = await drawn();
+    assert(d.ui === 'reels' && d.zones === null, `the phone's app draws its interface and no zones: ${JSON.stringify(d)}`);
+    let b = await buttons();
+    assert(
+      b.phone.name === 'Phone view: Instagram Reels · iPhone 15 / 16' &&
+        b.phone.word === 'Instagram Reels' &&
+        b.zones.name === 'Safe zones: off' &&
+        b.zones.word === 'Safe zones: off',
+      `each button names its own choice: ${JSON.stringify(b)}`,
+    );
+    // zones on the left, the phone off: the stripes on the picture, no interface
+    await pickIn('device', 'Off');
+    await page.waitForFunction(() => !document.querySelector('.pane .phone'));
+    await pickIn('safe-zones', 'TikTok');
+    await page.waitForSelector('.stage .ig-layer[data-preset=tiktok] [data-zone]');
+    d = await drawn();
+    assert(d.zones === 'tiktok' && d.ui === null && d.view === null, `the zones draw only the zones: ${JSON.stringify(d)}`);
+    assert(d.labels >= 3, `the zones alone say what each is: ${JSON.stringify(d)}`);
+    b = await buttons();
+    assert(
+      b.zones.name === 'Safe zones: TikTok' && b.zones.word === 'TikTok' && b.phone.name === 'Phone view' && b.phone.word === 'Phone',
+      `each button names its own choice: ${JSON.stringify(b)}`,
+    );
+    // V: the phone back with its app, and the zones over it — both, each where it belongs
+    await page.keyboard.press('v');
+    await page.waitForSelector('.phone[data-app=reels] [data-app-ui=reels]');
+    await page.waitForSelector('.phone-zones .ig-layer[data-preset=tiktok]');
+    d = await drawn();
+    assert(d.ui === 'reels' && d.zones === 'tiktok' && d.overApp, `both: ${JSON.stringify(d)}`);
+    assert(d.labels === 0, `over the app's interface the zones are stripes only, no words on its buttons: ${JSON.stringify(d)}`);
+    assert(same(d.zonesBox, d.picture), `the zones lie on the picture as the phone shows it: ${JSON.stringify(d)}`);
+    b = await buttons();
+    assert(b.zones.name === 'Safe zones: TikTok' && b.phone.name === 'Phone view: Instagram Reels · iPhone 15 / 16', `both named: ${JSON.stringify(b)}`);
+    await shot('phone-reels-tiktok-zones');
+    // each app with its own zones over it: its rail and caption — or Stories' header — inside them
     const inside = () =>
       page.evaluate(() => {
         const zones = [...document.querySelectorAll('.phone-zones [data-zone]')].map((z) => z.getBoundingClientRect());
@@ -840,39 +940,37 @@ try {
         return { zones: zones.length, n, out };
       });
     for (const [label, app, preset] of [
-      ['Instagram Reels', 'reels', 'Instagram Reels'],
-      ['TikTok', 'tiktok', 'TikTok'],
-      ['YouTube Shorts', 'shorts', 'YouTube Shorts'],
-      ['Stories (IG / FB)', 'stories', 'Stories (IG / FB)'],
+      ['Instagram Reels', 'reels', 'ig-reels'],
+      ['TikTok', 'tiktok', 'tiktok'],
+      ['YouTube Shorts', 'shorts', 'yt-shorts'],
+      ['Stories (IG / FB)', 'stories', 'stories'],
     ]) {
-      await pick(label);
+      await pickIn('device', label);
+      await pickIn('safe-zones', label);
       await page.waitForSelector(`.phone[data-app=${app}] [data-app-ui=${app}]`);
-      assert(
-        (await page.$eval('.transport [data-testid=safe-zones]', (b) => b.getAttribute('aria-label'))) === `Safe zones: ${preset}`,
-        `${app}: the safe zones name the same preset`,
-      );
-      if (app === 'reels') {
-        assert((await page.$$('.phone-zones')).length === 0, 'no zones over the app until asked');
-        const withApp = await menu();
-        assert(withApp.at(-1) === 'Show safe zones' && withApp.includes('✓ Instagram Reels'), `Show safe zones at the end: ${withApp}`);
-        await page.keyboard.press('Escape');
-        await pick('Show safe zones');
-      }
-      await page.waitForSelector('.phone-zones [data-zone]');
+      await page.waitForSelector(`.phone-zones .ig-layer[data-preset=${preset}] [data-zone]`);
       const r = await inside();
       assert(r.zones >= 2 && r.n >= (app === 'stories' ? 4 : 12), `${app}: zones and parts measured ${JSON.stringify(r)}`);
       assert(!r.out.length, `${app}: outside its preset's zones: ${r.out.join('; ')}`);
       await shot(`phone-${app}`);
     }
-    await pick('Show safe zones');
-    await page.waitForFunction(() => !document.querySelector('.phone-zones'));
+    // Full height with zones: on the picture, which fills the screen (its sides cropped, as the phone shows it)
+    await pickIn('device', 'Full height');
+    await page.waitForSelector('.phone[data-app=full] .phone-area .canvas .ig-layer[data-preset=stories]');
+    d = await drawn();
+    assert(
+      d.ui === null && d.zones === 'stories' && !d.overApp && same(d.zonesBox, d.picture) && d.labels >= 2,
+      `full height, the zones on the picture, with their words: ${JSON.stringify(d)}`,
+    );
+    await pickIn('device', 'Stories (IG / FB)');
+    await page.waitForSelector('.phone[data-app=stories] [data-app-ui=stories]');
     // V: off and back to the last choice, the same video element, nothing in the row moving (at 1024 the words fold to
-    // icons; at 1920 the phone button keeps the room of its longest word)
+    // icons; at 1920 both buttons keep the room of their longest word); G at 1920 moves nothing either
+    const row = () => page.$$eval('.transport button', (bs) => bs.map((b) => Math.round(b.getBoundingClientRect().left * 2) / 2).join(','));
     for (const width of [1024, 1920]) {
       await page.setViewport({ width, height: 900 });
       await page.waitForFunction((w) => innerWidth === w, {}, width);
       await page.evaluate(() => document.activeElement?.blur());
-      const row = () => page.$$eval('.transport button', (bs) => bs.map((b) => Math.round(b.getBoundingClientRect().left * 2) / 2).join(','));
       const before = await row();
       await page.keyboard.press('v');
       await page.waitForFunction(() => !document.querySelector('.pane .phone') && !!document.querySelector('.vbox video'));
@@ -883,15 +981,27 @@ try {
       assert(before === off && off === on, `@${width}: the row stays put: ${before} / ${off} / ${on}`);
       assert((await page.$eval('.vbox video', (v) => v.dataset.kept)) === '1', `@${width}: V keeps the same video element`);
     }
-    // G cycles the presets as before: after Stories comes Off, and the phone shows the video at full height
+    // G cycles the zones alone: after Stories comes Off, the phone keeps its app; then the rule of thirds over it, on the
+    // picture's own box (the row at 1920 not moving)
+    const before = await row();
     await page.keyboard.press('g');
-    await page.waitForSelector('.phone[data-app=full]');
-    assert(!(await page.$('[data-app-ui]')), 'G: Full height, no app');
+    await page.waitForFunction(() => !document.querySelector('.stage .ig-layer'));
+    d = await drawn();
+    assert(d.ui === 'stories' && d.view === 'stories', `G: the zones off, the app stays: ${JSON.stringify(d)}`);
+    await page.keyboard.press('g');
+    await page.waitForSelector('.phone-zones .ig-layer[data-preset=thirds]');
+    d = await drawn();
+    assert(d.ui === 'stories' && same(d.zonesBox, d.picture), `G: the rule of thirds over the app, on the picture: ${JSON.stringify(d)}`);
+    assert((await row()) === before, 'G never moves the row');
+    b = await buttons();
+    assert(b.zones.word === 'Rule of thirds' && b.phone.word === 'Stories (IG / FB)', `the words at 1920: ${JSON.stringify(b)}`);
+    await shot('transport-two-choices-1920');
     await page.keyboard.press('v');
+    await page.evaluate(() => localStorage.removeItem('vr.player'));
     await page.setViewport({ width: 1440, height: 900 });
   });
 
-  await check('the phone view on a phone: More has the same choice (Phone view, the phone, Show safe zones)', async () => {
+  await check('the phone view on a phone: More has the same two choices, in the same words (Safe zones, Phone view, the phone)', async () => {
     await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
     // back to the desktop and no phone view whatever happens: the layout check after this one starts from there (left
     // on the phone, it opened compare at 390 and failed on that instead, as on CI)
@@ -916,14 +1026,18 @@ try {
       const options = await choose('Phone view', 'TikTok');
       assert(options.join(' | ') === 'Off | Full height | Instagram Reels | TikTok | YouTube Shorts | Stories (IG / FB)', `the phone's Phone view: ${options}`);
       await page.waitForSelector('.phone[data-app=tiktok] [data-app-ui=tiktok]');
+      assert((await drawn()).zones === null, 'the app, no zones');
       const phones = await choose('Phone', 'Pixel 8');
       assert(phones.length === 5, `the phones: ${phones}`);
       await page.waitForSelector('.phone[data-device=pixel][data-app=tiktok]');
+      const zones = await choose('Safe zones', 'TikTok');
+      assert(zones.join(' | ') === 'Off | Rule of thirds | Instagram Reels | TikTok | YouTube Shorts | Stories (IG / FB)', `the phone's Safe zones: ${zones}`);
+      await page.waitForSelector('.phone-zones .ig-layer[data-preset=tiktok] [data-zone]');
+      assert((await drawn()).labels === 0, 'over the app, the zones without their words');
       await menuGone();
-      await page.waitForSelector('.ptools-pop [data-testid=phone-zones][aria-pressed=false]');
-      await page.click('.ptools-pop [data-testid=phone-zones]');
-      await page.waitForSelector('.ptools-pop [data-testid=phone-zones][aria-pressed=true]', { timeout: 5000 });
-      await page.waitForSelector('.phone-zones [data-zone]');
+      // the rows: the two choices and the phone, nothing else of theirs
+      const rows = await page.$$eval('.ptools-pop .pt-row > span:first-child', (els) => els.map((e) => e.textContent?.trim()));
+      assert(rows.join(' | ') === 'Timeline | Safe zones | Phone view | Phone', `More's rows: ${rows.join(' | ')}`);
       await shot('phone-dock-390');
       await page.keyboard.press('Escape');
     } finally {
@@ -952,7 +1066,7 @@ try {
         await page.keyboard.press('Enter');
         await page.waitForSelector('.composer [data-testid=tag-chip]');
       },
-      // a vertical video on a phone, in an app, with its zones over it
+      // a vertical video on a phone, in an app, with its zones over it (prefs as kept before the two choices: upgraded)
       phone: async () => {
         await page.evaluate(() =>
           localStorage.setItem('vr.player', JSON.stringify({ phone: true, device: 'iphone-pro', 'preset.vertical': 'tiktok', zones: true })),

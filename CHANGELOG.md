@@ -8,6 +8,9 @@ format stays backwards compatible throughout.
 ## [Unreleased]
 
 ### Changed
+- Safe zones and the phone view are two separate choices. The safe-zones button (G) draws only the zones, the phone
+  view (V) only the phone and an app's interface around the picture, and each button names its own choice; pick both
+  to see an app's buttons and caption inside its zones. What you had set keeps showing as it did.
 - MCP tools now say which of them change things: reading tools are marked read-only, so clients can let them run
   without asking, and the three that replace or move what is there (filing a video elsewhere, saying a version's source
   anew, drafting over a post) are marked destructive, so clients ask before each one. Every tool has a title.

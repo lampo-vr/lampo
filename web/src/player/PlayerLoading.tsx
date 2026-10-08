@@ -5,7 +5,6 @@ import { type CSSProperties, useState } from 'react';
 import { t } from '../i18n/index.ts';
 import { InboxBell } from '../inbox/InboxBell.tsx';
 import { backToLibrary } from '../lib/nav.ts';
-import { usePrefs } from '../lib/prefs.ts';
 import { I } from '../ui/icons.tsx';
 import { IconButton } from '../ui/primitives.tsx';
 import { SkLine } from '../ui/Skeleton.tsx';
@@ -18,7 +17,8 @@ import { RunStripPending } from './RunStrip.tsx';
 import Timeline from './Timeline.tsx';
 import { Transport } from './Transport.tsx';
 import type { Playback } from './usePlayback.ts';
-import { presetById, presetsFor } from './zones.ts';
+import { usePlayerPrefs } from './usePlayerPrefs.ts';
+import { orientOf, presetById, presetsFor } from './zones.ts';
 
 const noop = () => {};
 const NO_TRANSCRIPT = { base: null, onSeek: noop, onPlay: noop, edits: [] };
@@ -65,24 +65,23 @@ interface Props {
 }
 
 export function PlayerLoading({ slug, phone, ar, agent = false }: Props) {
-  const presets = presetsFor(1920, 1080);
-  // the tab you worked in last, as the loaded player will show it
-  const [prefs] = usePrefs('vr.player');
-  const preset = presetById('none');
+  // the tab you worked in last, the safe zones and the phone view as the loaded player will show them: for the video's
+  // shape when the library said (the buttons' words, and so their widths, come from its presets), else a landscape one
+  const [prefs] = usePlayerPrefs();
+  const [w, h] = ar ? [1000, Math.round(1000 * ar)] : [1920, 1080];
+  const presets = presetsFor(w, h);
+  const kept = prefs[`preset.${orientOf(w, h)}`];
+  const preset = presetById(presets.some((p) => p.id === kept) ? kept : 'none');
   // the timeline's zoom in the transport row, as in the loaded player
   const [zoomSlot, setZoomSlot] = useState<HTMLDivElement | null>(null);
-  // the phone view as the loaded player will name it (its app is the preset of the video's shape, when the library said)
-  const tall = ar != null && ar > 1.05;
-  const app = presetById(tall ? prefs['preset.vertical'] : undefined);
+  const apps = presets.filter((p) => p.app);
   const phoneView: PhoneView = {
     device: prefs.phone ? deviceById(prefs.device) : null,
     model: deviceById(prefs.device),
-    app: app.app ? app : null,
-    apps: [],
-    zones: false,
+    app: apps.find((p) => p.id === prefs.phoneApp) ?? null,
+    apps,
     onView: noop,
     onDevice: noop,
-    onZones: noop,
   };
   const back = <IconButton className="btn ghost sm icon-only" label={t('Back to the library')} icon="back" size={17} onClick={backToLibrary} side="bottom" />;
   const more = <IconButton className="btn sm icon-only ghost" label={t('More')} icon="more" side="bottom" aria-disabled />;

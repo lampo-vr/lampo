@@ -395,6 +395,10 @@
 .phone-zones {
   pointer-events: none;
 }
+/* the rule of thirds over an app: in the picture's own box, not the 9:16 frame's */
+.phone-zones-v {
+  position: absolute;
+}
 .phone-note {
   position: absolute;
   bottom: 12px;

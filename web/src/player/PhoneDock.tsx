@@ -148,6 +148,8 @@ export function PhoneTools({ pb, fps, presets, preset, onPreset, phone }: PhoneT
               </button>
             </fieldset>
           </div>
+          {/* the two choices as on the desktop, in its words: the safe zones (only the zones, over the picture), then the
+              phone view (Off, Full height or an app's interface around the picture) and, while it is on, the phone */}
           <div className="pt-row">
             <span>{t('Safe zones')}</span>
             <Select
@@ -157,8 +159,6 @@ export function PhoneTools({ pb, fps, presets, preset, onPreset, phone }: PhoneT
               options={presets.map((p) => ({ value: p.id, label: p.id === 'none' ? t('Off') : p.label }))}
             />
           </div>
-          {/* the phone view as on the desktop: Off, Full height or an app (the app is the safe-zone preset above), then
-              the phone, and with an app its zones */}
           <div className="pt-row">
             <span>{t('Phone view')}</span>
             <Select
@@ -176,14 +176,6 @@ export function PhoneTools({ pb, fps, presets, preset, onPreset, phone }: PhoneT
             <div className="pt-row">
               <span>{t('Phone')}</span>
               <Select label={t('Phone')} value={phone.device.id} onChange={phone.onDevice} options={DEVICES.map((d) => ({ value: d.id, label: d.label }))} />
-            </div>
-          )}
-          {phone.device && phone.app && (
-            <div className="pt-row">
-              <span>{t('Show safe zones')}</span>
-              <button type="button" className={`btn ${phone.zones ? 'on' : ''}`} onClick={phone.onZones} aria-pressed={phone.zones} data-testid="phone-zones">
-                <I name="safeZone" size={15} /> {phone.zones ? t('On') : t('Off')}
-              </button>
             </div>
           )}
         </div>

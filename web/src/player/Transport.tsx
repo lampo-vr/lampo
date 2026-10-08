@@ -1,6 +1,7 @@
 // Transport row: step/play, timecode (hover: source clip), in/out, loop, speed, mute; the timeline's zoom; safe zones,
-// phone view. One row at desktop widths: the marked section shows on the timeline, not here, and labels fold to their
-// icons (the zoom's level too, where the row is short).
+// phone view — two choices, each drawing one thing: the zones over the picture, the phone and an app's interface around
+// it. One row at desktop widths: the marked section shows on the timeline, not here, and labels fold to their icons
+// (the zoom's level too, where the row is short).
 
 import type { Ref } from 'react';
 import { timecode } from '../../../lib/time.ts';
@@ -43,8 +44,9 @@ export function Transport({ pb, fps, N, srcMap, srcFile, presets, preset, onPres
   const phoneName = phoneViewName(phone);
   const phoneWord = phone.device ? (phone.app?.name ?? t('Full height')) : t('Phone');
   const phoneWords = [t('Phone'), t('Full height'), ...phone.apps.map((p) => p.name ?? p.label)];
-  // an app on the phone: its zones can be drawn over it, from either menu
-  const onApp = !!phone.device && !!phone.app;
+  const zonesName = preset.id === 'none' ? t('Safe zones: off') : t('Safe zones: {preset}', { preset: preset.label });
+  const zonesWord = preset.id === 'none' ? t('Safe zones: off') : preset.label;
+  const zonesWords = presets.map((p) => (p.id === 'none' ? t('Safe zones: off') : p.label));
   return (
     <div className="transport">
       <div className="group">
@@ -161,33 +163,27 @@ export function Transport({ pb, fps, N, srcMap, srcFile, presets, preset, onPres
         </div>
       )}
       <div className="group right">
-        {/* the safe zones: a menu behind one button, its words folding to the icon where the row is short. In the phone
-            view an app's preset is the app on the phone, so this menu and the phone's name the same one. */}
+        {/* the safe zones: a menu behind one button, its words folding to the icon where the row is short. It draws only
+            the zones (the stripes, the guides), with the phone view on or off — there on the picture as the phone shows
+            it; an app's interface is the phone view's own choice, beside it. */}
         <Menu
           align="end"
           trigger={
-            <Tip content={preset.id === 'none' ? t('Safe zones: off') : t('Safe zones: {preset}', { preset: preset.label })} shortcut="G">
-              <button
-                type="button"
-                className={`btn sm ghost tr-safe ${preset.id !== 'none' ? 'on' : ''}`}
-                aria-label={preset.id === 'none' ? t('Safe zones: off') : t('Safe zones: {preset}', { preset: preset.label })}
-                data-testid="safe-zones"
-              >
+            <Tip content={zonesName} shortcut="G">
+              <button type="button" className={`btn sm ghost tr-safe ${preset.id !== 'none' ? 'on' : ''}`} aria-label={zonesName} data-testid="safe-zones">
                 <I name="safeZone" size={15} />
-                <span className="lbl">{preset.id === 'none' ? t('Safe zones: off') : preset.label}</span>
+                {/* as wide as its longest word: G and the menu never move the buttons around it */}
+                <Stack words={zonesWords} word={zonesWord} />
                 <I name="down" size={12} className="tr-chev" />
               </button>
             </Tip>
           }
-          items={[
-            ...presets.map((p) => ({ label: p.id === 'none' ? t('Off') : p.label, checked: p.id === preset.id, onClick: () => onPreset(p.id) })),
-            onApp && 'sep',
-            onApp && { label: t('Show safe zones'), checked: phone.zones, onClick: phone.onZones },
-          ]}
+          items={zoneItems(presets, preset, onPreset)}
         />
-        {/* the phone view: one menu — Off, Full height (the video on the whole screen) or an app's interface around it,
-            then the phone to show it on (V turns the last choice on and off). Picking anything turns the view on, so
-            nothing appears beside the button and the row never moves. */}
+        {/* the phone view: one menu — Off, Full height (the video on the whole screen) or an app's interface around it
+            (its icons, buttons, caption and tab bar; no zones: those are the menu beside it), then the phone to show it
+            on (V turns the last choice on and off). Picking anything turns the view on, so nothing appears beside the
+            button and the row never moves. */}
         <Menu
           align="end"
           onOpenChange={(open) => open && phoneArt.load()}
@@ -201,13 +197,7 @@ export function Transport({ pb, fps, N, srcMap, srcFile, presets, preset, onPres
               >
                 <I name="phone" size={15} />
                 {/* as wide as its longest word: switching the view (V, the menu) never moves the button beside it */}
-                <span className="lbl tr-stack">
-                  {phoneWords.map((w) => (
-                    <span key={w} className={w === phoneWord ? undefined : 'ghost'} aria-hidden={w === phoneWord ? undefined : true}>
-                      {w}
-                    </span>
-                  ))}
-                </span>
+                <Stack words={phoneWords} word={phoneWord} />
                 <I name="down" size={12} className="tr-chev" />
               </button>
             </Tip>
@@ -219,17 +209,37 @@ export function Transport({ pb, fps, N, srcMap, srcFile, presets, preset, onPres
   );
 }
 
-/** The phone view's menu: what the phone shows, then which phone; with an app, its zones on request. */
+/** A label as wide as its longest word: the others lie hidden in the same cell, so a new choice never moves the row. */
+function Stack({ words, word }: { words: string[]; word: string }) {
+  return (
+    <span className="lbl tr-stack">
+      {[...new Set(words)].map((w) => (
+        <span key={w} className={w === word ? undefined : 'ghost'} aria-hidden={w === word ? undefined : true}>
+          {w}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** The safe zones' menu: Off, then the presets this video's shape has. Headed like the phone's, so the two read apart. */
+function zoneItems(presets: Preset[], preset: Preset, onPreset: (id: string) => void): MenuEntry[] {
+  return [
+    { heading: t('Safe zones') },
+    ...presets.map((p) => ({ label: p.id === 'none' ? t('Off') : p.label, checked: p.id === preset.id, onClick: () => onPreset(p.id) })),
+  ];
+}
+
+/** The phone view's menu: what the phone shows (Off, Full height or an app's interface), then which phone. */
 export function phoneItems(phone: PhoneView): MenuEntry[] {
   const on = !!phone.device;
   return [
+    { heading: t('Phone view') },
     { label: t('Off'), checked: !on, onClick: () => phone.onView('off') },
     { label: t('Full height'), checked: on && !phone.app, onClick: () => phone.onView('full') },
     ...phone.apps.map((p) => ({ label: p.name ?? p.label, checked: on && phone.app?.id === p.id, onClick: () => phone.onView(p.id) })),
     'sep',
     { heading: t('Phone') },
     ...DEVICES.map((d) => ({ label: d.label, checked: d.id === phone.model.id, onClick: () => phone.onDevice(d.id) })),
-    on && phone.app && 'sep',
-    on && phone.app && { label: t('Show safe zones'), checked: phone.zones, onClick: phone.onZones },
   ];
 }

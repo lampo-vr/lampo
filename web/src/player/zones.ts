@@ -1,7 +1,8 @@
 // The safe-zone presets (overlays.tsx draws them; test/unit/phone-layout.test.ts checks them against the apps'
 // interfaces as the phone view draws them, phone/layout.ts). Their numbers live in lib/zones.ts, shared with Auto-check,
-// with the coordinate systems they are in. A vertical preset that is an app (`app`) is also what the phone view shows
-// around the picture: one choice, one pref.
+// with the coordinate systems they are in. A vertical preset made for an app names it (`app`): the phone view lists those
+// apps, a choice of its own (vr.player `phoneApp`, playerPrefs.ts) — the zones and the app's interface are drawn apart,
+// each on request.
 import { ZONE_SHAPES } from '../../../lib/zones.ts';
 import { perLang, t } from '../i18n/index.ts';
 import type { AppId } from './phone/devices.ts';
@@ -11,9 +12,9 @@ export interface Preset {
   id: string;
   label: string;
   orient: Orient;
-  /** The app whose interface the phone view draws for this preset. */
+  /** The app these zones are made for: the phone view can draw its interface (a choice of its own). */
   app?: AppId;
-  /** The app's name in the phone view's menu. */
+  /** The app's name in the phone view's menu and on its button. */
   name?: string;
 }
 export interface Zone {
