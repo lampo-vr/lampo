@@ -7,6 +7,10 @@ format stays backwards compatible throughout.
 
 ## [Unreleased]
 
+### Fixed
+- Send all on a busy connection no longer makes the notes not sent yet vanish for a moment before they leave: they
+  stay where they are, sending, until they go with their motion (and so does a draft sent on its own).
+
 ## [0.2.0] - 2026-10-08
 
 ### Added

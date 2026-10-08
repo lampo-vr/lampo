@@ -1,9 +1,10 @@
 // A draft that was sent leaves "Not sent yet" with a motion, however soon the list drops it (the server's answer, the
 // drafts event): web/src/player/drafts/leaving.ts puts the leaving ones back where they stood until the motion ends —
-// one sent alone, several at once, one of a recording's drafts, a recording whose drafts all went.
+// one sent alone, several at once, one of a recording's drafts, a recording whose drafts all went — and the ones a send
+// took, while it is out, when the drafts event drops them before the send's answer.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { recordingsLeaving, withLeaving } from '../../web/src/player/drafts/leaving.ts';
+import { inPlace, recordingsLeaving, withLeaving } from '../../web/src/player/drafts/leaving.ts';
 
 const ids = (xs: { id: string }[]) => xs.map((x) => x.id).join(' ');
 const of = (s: string) => s.split(' ').map((id) => ({ id }));
@@ -60,4 +61,30 @@ test("recordings: a draft sent alone keeps its place in its recording; a recordi
   );
   const now3 = [{ id: 'r1', drafts: of('d1 d2 d3') }];
   assert.equal(recordingsLeaving(before, now3, new Set()), now3);
+});
+
+test('being sent: the drafts event dropping them before the answer takes none off the screen, nor a recording', () => {
+  const none = new Set<string>();
+  assert.equal(inPlace(none, null), none, 'nothing out: the leaving ones alone (the same set)');
+  assert.equal(inPlace(none, new Set()), none);
+  const all = inPlace(none, new Set(['a', 'b', 'c']));
+  assert.equal(ids(withLeaving(of('a b c'), [], all)), 'a b c', 'Send all: every card where it stood');
+  assert.equal(ids(withLeaving(of('a b c'), of('a c'), inPlace(none, new Set(['b'])))), 'a b c', 'one sent alone');
+  assert.equal(ids(withLeaving(of('x a b'), [], inPlace(new Set(['x']), new Set(['a', 'b'])))), 'x a b', 'one still leaving from before, too');
+  // the answer: leaving now, from the same places
+  assert.equal(ids(withLeaving(of('a b c'), [], inPlace(new Set(['a', 'b', 'c']), null))), 'a b c');
+  const now = of('a b c');
+  assert.equal(withLeaving(of('a b c'), now, inPlace(none, null)), now, 'a failed send: the list as it is, nothing kept back');
+  const recs = [
+    { id: 'r1', drafts: of('d1 d2') },
+    { id: 'r2', drafts: of('d3') },
+  ];
+  assert.deepEqual(
+    recordingsLeaving(recs, [], inPlace(none, new Set(['d1', 'd2', 'd3']))).map((r) => [r.id, ids(r.drafts)]),
+    [
+      ['r1', 'd1 d2'],
+      ['r2', 'd3'],
+    ],
+    "what the recordings said, the recordings' event first: kept too",
+  );
 });

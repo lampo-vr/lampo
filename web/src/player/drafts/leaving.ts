@@ -1,9 +1,17 @@
 // Drafts that were just sent leave the holding area with a motion (record.css `draft-leave`), however soon the server's
-// answer or the drafts event takes them off the list: what is shown is the list now, with the leaving ones put back
-// where they stood until their motion has ended. Pure, so the order is tested (test/unit/drafts-leaving.test.ts).
+// answer or the drafts event takes them off the list: what is shown is the list now, with the leaving ones (and the ones
+// a send took, until its answer) put back where they stood until their motion has ended. Pure, so the order is tested
+// (test/unit/drafts-leaving.test.ts).
 
 /** How long a sent draft keeps its place while it leaves: the motion's length (`--dur`), a little over. */
 export const LEAVE_MS = 200;
+
+/**
+ * What keeps its place: the drafts leaving, and while a send is out the ones it took. The server tells the drafts event
+ * before it answers a send, so the list can drop them first: they stay on screen, being sent, until they leave.
+ */
+export const inPlace = (leaving: ReadonlySet<string>, sending?: ReadonlySet<string> | null): ReadonlySet<string> =>
+  sending?.size ? new Set([...leaving, ...sending]) : leaving;
 
 /** `now`, with the items of `before` that are `leaving` (and gone from `now`) back after the item they followed. */
 export function withLeaving<T extends { id: string }>(before: readonly T[], now: readonly T[], leaving: ReadonlySet<string>): T[] {

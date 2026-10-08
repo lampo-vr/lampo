@@ -9,13 +9,14 @@
 // when the video opens again. With 18 drafts: Send all is the composer's Send (class and computed style, its key cap;
 // it steps down while a note is written), the head stays pinned while they scroll (768–1920 and the phone’s sheet),
 // a draft's own Send — click, or ⌘↵ in it — sends exactly that one as one batch (asked first like Send all when the
-// agent could be started), and Send all (⇧⌘↵) sends the rest in one. Screenshots (VR_SHOTS) at 1440 and 390, dark and
-// light. On a video with an agent the composer keeps notes by default (⌘↵ saves, Send is the quiet way to send now):
-// three stay drafts the waiting agent never hears, "Send 3 to <agent>" brings them in one answer, the line under it
-// says the agent is waiting, the toast that it got them; a reply still reaches it at once. The raised one of Save and
-// Send is always the last: Save · Send without an agent, Send · Save with one; an agent assigned, waiting or unassigned
-// while a note is written swaps them in the same room, each as wide as before (1440, and 390 with a note long enough
-// to pin the foot).
+// agent could be started), and Send all (⇧⌘↵) sends the rest in one, every card keeping its place while the list
+// without them comes before the send's answer (held back), then leaving. Screenshots (VR_SHOTS) at 1440 and 390, dark
+// and light. On a video with an agent the composer keeps notes by default (⌘↵ saves, Send is the quiet way to send
+// now): three stay drafts the waiting agent never hears, "Send 3 to <agent>" brings them in one answer, the line under
+// it says the agent is waiting, the toast that it got them; a reply still reaches it at once. The raised one of Save
+// and Send is always the last: Save · Send without an agent, Send · Save with one; an agent assigned, waiting or
+// unassigned while a note is written swaps them in the same room, each as wide as before (1440, and 390 with a note
+// long enough to pin the foot).
 import fs from 'node:fs';
 import path from 'node:path';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
@@ -344,6 +345,49 @@ try {
       }).observe(document.querySelector('[data-testid=unsent]'), { attributes: true, attributeFilter: ['data-going'], subtree: true });
     });
   const wentBy = () => page.evaluate(() => window.__going);
+  // The order a busy machine can give: the server tells the drafts event before it answers a send, so the list fetched
+  // for the event (the sent ones gone) can be on screen before the send's answer. The page's answer to the next send is
+  // held (`__held`: 'held' once it is here) until `__letSend()`; `__listIn` once a list without `ids` has been read by
+  // the app and shown (the query cache tells the screen on a zero timer of its own, set after the read: two timers on).
+  const holdSend = (ids) =>
+    page.evaluate(
+      (route, ids) => {
+        const real = window.fetch;
+        let go;
+        const gate = new Promise((r) => {
+          go = r;
+        });
+        window.__letSend = () => {
+          window.fetch = real;
+          go();
+        };
+        window.__held = null;
+        window.__listIn = false;
+        window.fetch = async (input, init) => {
+          const res = await real(input, init);
+          const at = new URL(String(input), location.href).pathname;
+          const method = init?.method ?? 'GET';
+          if (method === 'POST' && at === `${route}/send`) {
+            window.__held = 'held';
+            await gate;
+          } else if (method === 'GET' && at === route && !(await res.clone().json()).drafts.some((d) => ids.includes(d.id))) {
+            const read = res.json.bind(res);
+            res.json = async () => {
+              const data = await read();
+              setTimeout(() =>
+                setTimeout(() => {
+                  window.__listIn = true;
+                }),
+              );
+              return data;
+            };
+          }
+          return res;
+        };
+      },
+      `/api/review/${enc(slug2)}/drafts`,
+      ids,
+    );
   await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: SHOTS ? 2 : 1 });
   await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
 
@@ -570,15 +614,29 @@ try {
     });
     const ids = await page.$$eval('[data-testid=note-draft]', (cs) => cs.map((c) => c.dataset.id));
     assert(ids.length === 15, `15 cards: ${ids.length}`);
-    const waiting = tool('wait_for_feedback', { video: slug2, since: await cursor2(), timeout_s: 60 });
-    await page.keyboard.down('Shift');
-    await page.keyboard.down(MOD);
-    await page.keyboard.press('Enter');
-    await page.keyboard.up(MOD);
-    await page.keyboard.up('Shift');
-    const got = await waiting;
-    assert(/^15 new:\n/.test(got), `one answer with all 15 (⇧⌘↵): ${got.split('\n')[0]}`);
-    await page.waitForSelector('[data-testid=unsent]', { hidden: true, timeout: 20000 });
+    // the drafts event's list, none of them in it, is on screen before the send's answer comes
+    await holdSend(ids);
+    let meanwhile;
+    try {
+      const waiting = tool('wait_for_feedback', { video: slug2, since: await cursor2(), timeout_s: 60 });
+      await page.keyboard.down('Shift');
+      await page.keyboard.down(MOD);
+      await page.keyboard.press('Enter');
+      await page.keyboard.up(MOD);
+      await page.keyboard.up('Shift');
+      const got = await waiting;
+      assert(/^15 new:\n/.test(got), `one answer with all 15 (⇧⌘↵): ${got.split('\n')[0]}`);
+      await page.waitForFunction(() => window.__held === 'held' && window.__listIn, { polling: 100, timeout: 20000 });
+      meanwhile = {
+        going: await page.$$eval('[data-testid=note-draft]', (cs) => cs.map((c) => c.dataset.going ?? '')),
+        head: await headText().catch(() => null),
+        send: await sendAllText().catch(() => null),
+      };
+    } finally {
+      await page.evaluate(() => window.__letSend?.());
+    }
+    // gone from the page, not only closed to nothing by its motion (a box of no height reads as hidden already)
+    await page.waitForFunction(() => !document.querySelector('[data-testid=unsent]'), { polling: 100, timeout: 20000 });
     assert((await notes2()).length === 18 && (await drafts2()).length === 0, 'all 18 sent, none left');
     const went = await wentBy();
     assert(
@@ -586,6 +644,10 @@ try {
       `every card left with the motion: ${JSON.stringify(went)}`,
     );
     assert((await page.evaluate(() => window.__areaGone)) === 1, `the area left once: ${await page.evaluate(() => window.__areaGone)}`);
+    assert(
+      meanwhile.going.length === 15 && meanwhile.going.every((g) => g === 'sending') && meanwhile.head === 'Not sent yet · 15' && meanwhile.send === 'Send 15',
+      `until the answer every card kept its place, sending, and the head its count: ${JSON.stringify(meanwhile)}`,
+    );
   });
 
   // ---------------------------------------------------------------- an agent's video: notes go to it together

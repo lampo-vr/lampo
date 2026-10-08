@@ -14,7 +14,7 @@ import type { Comment, DraftsSent, Recording } from '../../api/types.ts';
 import { t } from '../../i18n/index.ts';
 import { toast, toastError } from '../../lib/toast.ts';
 import type { WakeChoice } from '../../sessions/Wake.tsx';
-import { LEAVE_MS, recordingsLeaving, withLeaving } from './leaving.ts';
+import { inPlace, LEAVE_MS, recordingsLeaving, withLeaving } from './leaving.ts';
 
 const heard = (r: Recording) => r.state === 'ready' || r.state === 'failed';
 const said = (d: Recording['drafts'][number]) => !!d.text.trim() || d.drawing.length > 0;
@@ -29,9 +29,12 @@ export type SendWay = 'send' | 'start' | 'ask';
 export type Going = 'sending' | 'leaving' | null;
 
 export interface Unsent {
-  /** Your drafts on this video, oldest first (the ones being deleted are gone already; the ones just sent still leave). */
+  /**
+   * Your drafts on this video, oldest first (the ones being deleted are gone already; the ones being sent or just sent
+   * stay until they have left).
+   */
   drafts: Comment[];
-  /** Your recordings waiting to be sent, their drafts just sent still leaving. */
+  /** Your recordings waiting to be sent, their drafts being sent or just sent still in place. */
   recordings: Recording[];
   /** Everything a send takes: the drafts and your recordings' drafts. */
   count: number;
@@ -101,13 +104,17 @@ export function useUnsent({ slug, enabled, recordings, wake, agent, waiting = fa
   beforeNow.current = before;
   // In flight: the drafts a send took, and whether it took everything.
   const [out, setOut] = useState<{ ids: ReadonlySet<string>; all: boolean } | null>(null);
+  // Until its answer the ones it took keep their places (`inPlace`); `out` lasts longer, while the lists are asked again.
+  const [holding, setHolding] = useState<ReadonlySet<string>>(NONE);
   const [asking, setAsking] = useState<{ one: string | null } | null>(null);
   const flushers = useRef(new Set<() => Promise<unknown>>());
 
   const live = useMemo(() => (query.data?.drafts ?? []).filter((d) => !hidden.has(d.id)), [query.data, hidden]);
-  const drafts = useMemo(() => withLeaving(before.drafts, live, leaving), [before.drafts, live, leaving]);
-  const shownRecordings = useMemo(() => recordingsLeaving(before.recordings, recordings, leaving), [before.recordings, recordings, leaving]);
-  const count = live.filter((d) => !leaving.has(d.id)).length + sendableOf(recordings, leaving);
+  const held = useMemo(() => inPlace(leaving, holding), [leaving, holding]);
+  const drafts = useMemo(() => withLeaving(before.drafts, live, held), [before.drafts, live, held]);
+  const shownRecordings = useMemo(() => recordingsLeaving(before.recordings, recordings, held), [before.recordings, recordings, held]);
+  // As shown: one being sent counts until it leaves, however soon the list drops it.
+  const count = drafts.filter((d) => !leaving.has(d.id)).length + sendableOf(shownRecordings, leaving);
 
   const refresh = useCallback(
     () =>
@@ -133,15 +140,19 @@ export function useUnsent({ slug, enabled, recordings, wake, agent, waiting = fa
     return c;
   };
 
-  /** The sent ones go with their motion: in place a moment (`before`), then off the list. */
-  const leave = (ids: string[], kept: Comment[]) => {
-    if (!ids.length) return;
-    const now = leavingNow.current;
+  /** The lists as they are on screen this moment (`before`): the ones `keep` names stay where they stood. */
+  const hold = (kept: Comment[], keep: ReadonlySet<string>) => {
     const was = beforeNow.current;
-    // the lists as they are on screen this moment, a draft still leaving from an earlier send included
-    const next = { drafts: withLeaving(was.drafts, kept, now), recordings: recordingsLeaving(was.recordings, recordingsNow.current, now) };
+    const next = { drafts: withLeaving(was.drafts, kept, keep), recordings: recordingsLeaving(was.recordings, recordingsNow.current, keep) };
     beforeNow.current = next;
     setBefore(next);
+  };
+  /** The sent ones go with their motion: in place a moment (`before`), then off the list. */
+  const leave = (ids: string[], kept: Comment[], taken: ReadonlySet<string>) => {
+    if (!ids.length) return;
+    const now = leavingNow.current;
+    // a draft still leaving from an earlier send stays, and so does one this send took that the list dropped already
+    hold(kept, inPlace(now, taken));
     const going = new Set([...now, ...ids]);
     leavingNow.current = going;
     setLeaving(going);
@@ -179,6 +190,8 @@ export function useUnsent({ slug, enabled, recordings, wake, agent, waiting = fa
       ? new Set([one])
       : new Set([...kept0.filter((d) => !hiddenNow.current.has(d.id) && !leavingNow.current.has(d.id)).map((d) => d.id), ...spoken]);
     setOut({ ids: taking, all: !one });
+    setHolding(taking);
+    hold(kept0, inPlace(leavingNow.current, taking));
     try {
       await Promise.all([...flushers.current].map((f) => f()));
       // The drafts on screen: one deleted a moment ago (its Undo still up) stays behind.
@@ -190,7 +203,10 @@ export function useUnsent({ slug, enabled, recordings, wake, agent, waiting = fa
       // On screen as leaving before they are off the list: the list's own update reaches the page on a schedule of its
       // own, and seen first it took every card off (and the whole holding area with the last ones) for a moment, to put
       // them back leaving.
-      flushSync(() => leave([...ids, ...spokenOut], kept));
+      flushSync(() => {
+        leave([...ids, ...spokenOut], kept, taking);
+        setHolding(NONE);
+      });
       qc.setQueryData(keys.drafts(slug), { drafts: kept.filter((d) => !ids.includes(d.id)) });
       await Promise.all([refresh(), qc.invalidateQueries({ queryKey: keys.review(slug) }), qc.invalidateQueries({ queryKey: keys.library })]);
       if (sent.error) toast(t('{n} note could not be sent: {error}|{n} notes could not be sent: {error}', { n: sent.left || 1, error: sent.error }), 'error');
@@ -214,6 +230,7 @@ export function useUnsent({ slug, enabled, recordings, wake, agent, waiting = fa
       return null;
     } finally {
       setOut(null);
+      setHolding(NONE);
     }
   };
 
