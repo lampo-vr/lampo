@@ -43,7 +43,7 @@ already decided.
 Split the scope by area. Where subagents are available, give one agent per area (or per two small areas) in
 parallel. Give each one the rules above, the known items, its checklist from [checklists.md](checklists.md) and the
 report format below. One more agent checks the written invariants across all code (`AGENTS.md` "Invariants" and
-"Rules learned the hard way"), because a rule broken in one new file is the most common finding.
+"Rules learned the hard way", with every file in `.claude/rules/`), because a rule broken in one new file is the most common finding.
 
 Verify every critical and high finding with a repro, and re-check any surprising claim yourself before it goes into
 the report. Calibrate: 10 real findings beat 40 maybes.

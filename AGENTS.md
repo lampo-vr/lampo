@@ -5,7 +5,9 @@ first, then:
 1. `CHANGELOG.md` → `[Unreleased]`: what changed recently;
 2. `ROADMAP.md`: what comes next and the open decisions;
 3. `AGENTS.local.md`, if it exists: the index of the current state, an area per file in `.claude/state/` (private);
-4. `HANDOFF.local.md`, if it exists: the maintainer's private context (gitignored, never commit its contents).
+4. `HANDOFF.local.md`, if it exists: the maintainer's private context (gitignored, never commit its contents);
+5. before you change code: the rules for its area in `.claude/rules/` (the table under *Rules learned the hard way*;
+   Claude Code loads them by itself when it opens a matching file).
 
 Agents that only *use* the tool to receive feedback on their renders want the README's "For agents" section and
 `docs/agents.md` instead.
@@ -99,8 +101,9 @@ Anything you start by hand (server, `lampo`, scripts) must use a throwaway store
    `test:all` runs once per batch, on CI.
 4. **`CHANGELOG.md`**: add a line under `[Unreleased]` for every user-visible change (Added / Changed / Fixed).
 5. **`.claude/state/<area>.md`** (when `AGENTS.local.md` exists): update your area's file when you finish a piece of
-   work. A rule learned the hard way gets one line below. `ROADMAP.md` when scope or priorities change. If `HANDOFF.local.md` exists,
-   append a dated line there too (private context, gitignored).
+   work. A rule learned the hard way gets one line in the `.claude/rules/` file of the area whose code it's about (the
+   table below; one that holds everywhere goes in this file). `ROADMAP.md` when scope or priorities change. If
+   `HANDOFF.local.md` exists, append a dated line there too (private context, gitignored).
 6. Docs live next to what they describe; update `docs/` in the same commit as the behaviour.
 7. **`AUDITS.md`**: when a merge changes an area's security surface, the same commit adds one line to the *Needs
    audit* queue. That covers new routes or inputs, auth or permission logic, workspace scoping, what review links
@@ -131,116 +134,22 @@ sessions or installs.
 
 ## Rules learned the hard way
 
-### Data and the store
-- Never mutate what a parsed-once cache returns (`listReviews()`, shares `load()`, OAuth `current()`).
-- Derived files are keyed by `renderKey(ver)`, never `ver.hash` alone: two renders can share a hash.
-- Compare times with `compareTime`, never as ISO strings or with `localeCompare`.
-- Ownership goes by account id (`author_id`, `by_id`, `isOwner`); names only for older records.
-- A registry file that can't be read (folders, shares, links, workspaces) is never "empty": refuse writes.
-- A review link points at a video or folder id (`Share.video_id` / `folder_id`), never a name.
-- Drafts and unsent recordings stay out of review.json and events; only their author reads them, never a token.
-- What a person made (avatars, refs, previews) goes through the storage adapter, never `cache/`.
-- The onboarding sample logs no events; Insights, taste, suggestions and `usageOf` skip it.
+Each area's rules live in its own file in `.claude/rules/`, so a session reads the ones for the code it changes and not
+the rest. Claude Code loads a file by itself when it reads or edits a file its paths match; any other agent reads the
+file for the paths it is about to change, from this table, before the first edit. A rule that holds everywhere stays
+here.
 
-### Workspaces
-- Every in-memory map keyed by a slug, a render's hash or a token goes through `wsKey`.
-- Use `dataDir()`, `cacheDir()`, `versionsDir()`, `eventsFile()`, `storage()`, never `DATA` / `CACHE` / `EVENTS_FILE`.
-- `rootStorage()` only for what no workspace owns (avatars); nothing at start or on `/readyz` reads `dataDir()`.
-- Work queued now and run later is wrapped in `boundToWorkspace(fn)`; never fall back to workspace #1.
-- Never read `user.role` for a permission (workspace #1's mirror): `req.auth.role`, `roleIn(ws, user)`.
-- A new per-workspace thing joins `ids.ownedSets` and `ids.ownedSetsA` in `workspace-isolation.test.ts`; run it.
-
-### Permissions and accounts
-- A new route goes in the permission table (`server/permissions.ts`): an unlisted write is refused to everyone.
-- A route touching credentials, roles, members, invites, tokens, apps, webhooks, workspaces or links is `PERSON_ONLY`.
-- Who runs the server is the operator list (`isOperator`, lib/operator.ts: LAMPO_OPERATOR, else #1's owners), never a role in workspace #1.
-- Decide by capability (`ctx.capabilities`) or `req.auth.via`, never by mode.
-- Sign-off (approve, carry, final, reopen) is a person's: API tokens get 403 (`signOffByPerson`).
-- Publishing is a person's too (`publish`, `PERSON_ONLY`); agents only draft, and no tool or scope publishes.
-- API tokens never read review-link tokens (`listedFor`).
-- Anything that ends access calls `accessEnded()` (and gets a row in `access-ends.test.ts`); nothing else may.
-- What a new password ends lives in `afterNewPassword`; new credential-bound things join it.
-- Account answers are the same for every address (sign-up, reset, invite, add user): no enumeration.
-- Read the session cookie with `sessionOf(req)` (`__Host-` over https), a query string with zod (`query`/`queryOr`).
-
-### Hosted server
-- A failure becomes a 4xx through `failFrom(status, e)`, never `fail(status, e.message)`.
-- Object-store and speech failures are `internal()`; their status is someone else's (`statusOf`).
-- Event screenshot paths are for `via === 'local'` only: everyone else gets URLs (`ctx.eventFor(via)`).
-- A path that goes to the log goes through `loggedPath`: review-link tokens and tickets live in paths.
-- Maps keyed by what visitors send are `Recent` / `RateLimit`, listed with `keptInMemory`; never a bare `Map`.
-- Per-address limits key by `addressKey` (IPv6 by its /64); guest write limits count only writes that landed.
-- ffmpeg runs through `run` / `spawnMedia` (timeout, stderr tail), `incoming: true` for outside files; never `spawn`.
-- ffmpeg someone waits for outside the job queue (a frame, a screenshot, a reference) passes `onDemand: true`; a
-  whole-video decode streams into a fixed window of frames, never holds them all; analysis heights go through `analysisRows`.
-- A background job gets a crash-guard key (`heavy(…, { key })`, lib/crashGuard.ts): one that kills the process isn't run on every start.
-- A `select` over a list of frame numbers goes through `selectFrames` (lib/probe.ts): FFmpeg 5.1.9 / 7.1.4 / 8.0.2 and
-  later refuse an expression over 100 deep, and `eq(n,a)+eq(n,b)+…` is one level per frame.
-- Outbound requests (webhooks, OAuth metadata) go through `lib/netguard.ts`; publishing's through `lib/publish/net.ts` on top of it.
-- An unsafe hosted setting is a refusal in `startupProblems`: one line, never a stack trace.
-- Hosted jobs: `needJobRoom` before a start, `unlessBusy` for warm-ups, `mustRun` for owed work.
-- Never broadcast `review` per request: every open player refetches on it.
-
-### What agents read
-- Every person-written field in a line format goes through `oneLine`: names, captions, reasons, not only notes.
-- Text whose lines are ours leaves through `keepLines` (MCP `text()`, `lampo` output): only `\n` ends a line.
-- Clean agent names where they come in (`cleanAgentName`) and stored ones on read (`shownName`, `shownEvent`).
-- What a caller posts under an agent's name carries the caller's account (`ownedAgentName`).
-- Agent formats keep their tokens (`lampo` lines, INBOX.md, `CHANGE WORDS`, `PICKED`): append, never reword.
-- New texts say `lampo` and `LAMPO_*`, never `vr` or `VR_*` (those are only the aliases' own code and their docs);
-  a setting is read through `lib/env.ts` (`setting`, `settings`), never `process.env.LAMPO_X ?? process.env.VR_X`.
-- A new MCP tool, field or line must fit `token-budget.test.ts`; raise a budget only with a `bench/tokens/` run.
-- MCP schemas go through `trimmed()`, inputs for the few are `.meta({ hidden })`; a new tool gets its `TOOL_ACCESS`.
-- Starting an agent: an argument list, no permission flag (`FORBIDDEN_FLAGS`), from the machine only.
-- An answer that hands work to the person ends with `lib/handoff.ts`'s line (wait now, cursor from that moment).
-
-### UI: speed
-- Never import `radix-ui` in a module the first paint needs; budget 183 KB (`BUNDLE_BUDGET_KB`).
-- On-demand code goes through `lib/lazy.ts` (`loader`, `useLoaded`, `screen`), not `lazy()` + Suspense.
-- A new dynamic import in the first paint costs its preload entry: ride an existing chunk, measure a build.
-- Loading states use the real layout (`pending` props, `SkLine`, `…Pending` rows); never a separate skeleton tree.
-- What follows playback subscribes to `player/frameStore.ts` (`pb.live`, `useFrame`), never `pb.frame`.
-- Writes are optimistic (`guess()` + rollback); SSE events patch their video, never refetch the library.
-- An action with Undo waits behind `later()` and is sent on `beforeunload` too, not only `pagehide`.
-
-### UI: look and layout
-- Every size and colour is a token in `base.css`; stylesheets define only their own classes.
-- No `var()` inside a `@keyframes` timing function: Safari ignores it and runs linear.
-- Implicit grid and auto columns: `minmax(0, 1fr)`; they grow to their content otherwise.
-- One layer order: overlay 50 < sheet 51 < dialog 52 < menu 55; never patch a single case.
-- No `grain` on a scrolling box; phone bars fit, they don't scroll; a strip that scrolls uses `useScrollEdges`.
-- `pre-wrap` still breaks after `-` and `/`: a token, URL or path to copy goes through `Code` (nowrap `.set-code-w`).
-- Status is a keyframe glyph (`KeyGlyph`), never a coloured dot; selection never wears the orange.
-- List selection is a flat fill (`--sel`, `--sel-on`), never raised; a bar floating over a list keeps its room at the end.
-- A popover opened by a pointerdown elsewhere (a timeline pick) opens once the press is over: the focus it moves closes it.
-- Empty lists use EmptyState (in a card or lane: `RowEmpty`, `LaneEmpty`); no headline ends with a full stop.
-- A box whose content switches (steps, tabs) keeps one height: every panel in one grid cell, the current one shown.
-- A lazy screen's styles come with its own code; never lean on a class only another chunk's stylesheet defines.
-- A bare `stop`, `close`, `open`, `print`, `find`, `status` or `name` is the window's (`stop()` aborts every request in flight): Biome refuses them, so a lost local helper of that name can't fall through to it.
-
-### UI: words and state
-- Every UI string goes through `t('…')` or `<T k>`; then `npm run i18n` and translate the new keys.
-- A language switch re-renders in place: words outside a component go through `perLang(() => …)`; a `memo` or a `useMemo` with words in it reads `useLang()` (`i18n.test.ts` finds the first two).
-- `|` in a UI string separates plural forms; a literal bar is `∣`.
-- `npm run i18n` reads only literal keys: a key picked by a condition (`t(a ? 'x' : 'y')`, `<T k={…}>`) is one call per branch.
-- Kept data and per-account localStorage are cleared in `afterSignOut`; none for review links.
-- Inbox work never has "Got it": it leaves when done; dismissals only hide what informs.
-
-### Tests
-- Browser suites use the harness in `test/e2e/lib/` (`e2e-harness.test.ts`); weigh a new one in `SECONDS`, and its
-  first line says what it tests (`// covers:`, read by `--changed`; `test/lib/affected.ts`).
-- Wait for a state (`until`, `settle`, `waitForFunction`), never a time; API tests start their app with `startApp()`.
-- A check that a frame was shown counts `presentedFrames`: rVFC reports one frame per rendering step, and a busy main
-  thread misses frames that were on screen (`startOf` in `test/e2e/range.mjs`).
-- Until `/api/auth/status` answers, a screen's loading state can show fetched data (cards, the bell's count) but nothing
-  role-gated, and the real page then replaces it: act after `signedIn(page)` (`test/e2e/lib/browser.mjs`).
-- A loading state in the real layout shows the screen's title too: wait for the loaded screen's testid (`consent`),
-  never its words. After a navigation, a click waits for the View Transition to end (`document.activeViewTransition`):
-  until then it lands on the snapshot.
-- Imports go above a unit file's first test once it has a top-level `after()` (`startApp()` too): Node 22 runs the
-  hook while a later top-level await is pending (`test-files.test.ts`).
-- Tests never run the real `claude` CLI or send mail: the harness's stand-in and the outbox transport.
-- Review a screen with real-shaped data (`test/e2e/lib/insightsStore.ts`) at 390–1920, both themes.
+| File | Rules about | Paths |
+|---|---|---|
+| [store.md](.claude/rules/store.md) | Data and the store | `lib/**` `server/**` `mcp/**` `bin/**` `scripts/**` |
+| [workspaces.md](.claude/rules/workspaces.md) | Workspaces | `lib/**` `server/**` `mcp/**` `scripts/**` `test/unit/workspace-isolation.test.ts` |
+| [permissions.md](.claude/rules/permissions.md) | Permissions and accounts | `lib/**` `server/**` `mcp/**` `test/unit/access-ends.test.ts` |
+| [hosted-server.md](.claude/rules/hosted-server.md) | Hosted server | `lib/**` `server/**` `mcp/**` `deploy/**` |
+| [agent-text.md](.claude/rules/agent-text.md) | What agents read | `lib/**` `server/**` `mcp/**` `bin/**` `skills/**` `docs/**` `README.md` `bench/tokens/**` `test/unit/token-budget.test.ts` |
+| [ui-speed.md](.claude/rules/ui-speed.md) | UI: speed | `web/**` |
+| [ui-look.md](.claude/rules/ui-look.md) | UI: look and layout | `web/**` |
+| [ui-words.md](.claude/rules/ui-words.md) | UI: words and state | `web/**` |
+| [tests.md](.claude/rules/tests.md) | Tests | `test/**` |
 
 ### Docs
 - A line in a code block of the README or `docs/*.md` fits 96 characters (`docs-shape.test.ts`); prose may run on.

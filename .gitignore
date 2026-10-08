@@ -18,6 +18,7 @@ BRIEF.md
 # agent worktrees and local agent material; the project's skills are shared
 .claude/*
 !.claude/skills/
+!.claude/rules/
 # the private cloud module (billing, signup, plan limits): its own local repository, never part of this one
 /cloud/
 /status/

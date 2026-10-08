@@ -124,7 +124,7 @@ likely to. The paths of each area are in `AUDITS.md`.
 - Client-side storage: the IndexedDB cache per account and workspace, cleared on sign-out; localStorage; what the
   service worker caches.
 - Navigation: open redirects, `target=_blank` with `noopener`, postMessage listeners, clickjacking.
-- The rules in `AGENTS.md`: strings through `t()`, the vocabulary, tokens only, no Radix in the first paint, the bundle
+- The rules in `.claude/rules/ui-*.md`: strings through `t()`, the vocabulary, tokens only, no Radix in the first paint, the bundle
   budget.
 
 ## deploy

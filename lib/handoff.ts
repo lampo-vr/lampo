@@ -2,8 +2,8 @@
 // notes. An agent hears notes only while it waits in wait_for_feedback (an MCP client acts only when prompted; nothing
 // can push into an idle one), so the hand-off itself says "wait now", with a cursor from that moment: nothing that
 // comes in between is lost. People keep notes as drafts and send them together, so a wait that ends with nothing new
-// is the normal case, and says so. Agent-facing lines: appended to answers, never reworded (AGENTS.md "What agents
-// read"); each fits test/unit/token-budget.test.ts.
+// is the normal case, and says so. Agent-facing lines: appended to answers, never reworded (.claude/rules/agent-text.md,
+// "What agents read"); each fits test/unit/token-budget.test.ts.
 import { BRAND_NAME, MCP_NAME } from './brand.ts';
 import { isFeedback } from './eventLine.ts';
 import type { ReviewEvent } from './types.ts';

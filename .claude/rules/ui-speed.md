@@ -1,0 +1,17 @@
+---
+paths:
+  - "web/**"
+---
+
+## Rules learned the hard way
+
+The rules for this area of the code (AGENTS.md lists every rules file and the paths it covers).
+
+### UI: speed
+- Never import `radix-ui` in a module the first paint needs; budget 183 KB (`BUNDLE_BUDGET_KB`).
+- On-demand code goes through `lib/lazy.ts` (`loader`, `useLoaded`, `screen`), not `lazy()` + Suspense.
+- A new dynamic import in the first paint costs its preload entry: ride an existing chunk, measure a build.
+- Loading states use the real layout (`pending` props, `SkLine`, `…Pending` rows); never a separate skeleton tree.
+- What follows playback subscribes to `player/frameStore.ts` (`pb.live`, `useFrame`), never `pb.frame`.
+- Writes are optimistic (`guess()` + rollback); SSE events patch their video, never refetch the library.
+- An action with Undo waits behind `later()` and is sent on `beforeunload` too, not only `pagehide`.
