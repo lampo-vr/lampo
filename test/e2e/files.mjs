@@ -650,6 +650,14 @@ try {
     await shot('files-phone-390');
     await page.tap('[data-testid=file-row] .pf-name');
     await page.waitForSelector('.modal [data-testid=file-sheet] [data-testid=file-version]');
+    // measured where it rests: the versions can come before its slide-up has begun (still pending at its first frame,
+    // translateY(100%): a bottom a sheet's height below the screen)
+    await page.waitForFunction(() =>
+      document
+        .querySelector('.modal')
+        ?.getAnimations()
+        .every((a) => !a.pending && a.playState !== 'running'),
+    );
     const sheet = await page.$eval('.modal', (x) => {
       const r = x.getBoundingClientRect();
       return { bottom: Math.round(r.bottom), width: Math.round(r.width) };
