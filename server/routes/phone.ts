@@ -7,6 +7,7 @@ import { countSubs, findSub, subscribe, unsubscribe, updatePrefs, vapidKeys } fr
 import { assignedState } from '../../lib/sessions.ts';
 import { stageForReview } from '../../lib/stageContext.ts';
 import type { PushState, Review } from '../../lib/types.ts';
+import { stillSignedIn } from '../auth.ts';
 import type { ServerContext } from '../context.ts';
 import { body, fail, failFrom, query, router } from '../http.ts';
 
@@ -99,6 +100,9 @@ export function phoneRoutes(ctx: ServerContext): Router {
 
   r.post('/api/push/subscribe', express.json(), (req, res) => {
     const b = body(Subscribe, req);
+    // A device is a lasting way out (what a reset and "sign out everywhere" end): never one for a session that ended
+    // while its request came in.
+    stillSignedIn(req);
     try {
       subscribe({ endpoint: b.subscription.endpoint, keys: b.subscription.keys, user: userOf(req), name: b.name, prefs: b.prefs }, ctx.pushHosts);
     } catch (e) {

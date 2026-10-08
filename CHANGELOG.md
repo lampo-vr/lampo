@@ -46,6 +46,9 @@ format stays backwards compatible throughout.
   you list your server's MCP connector there.
 
 ### Fixed
+- **Security:** recovering an account with a password reset or *Sign out everywhere* now also stops password and
+  address changes, API tokens, invites and notification devices asked for earlier in other sessions, and a reset link
+  the person asked for keeps working until it is used or expires.
 - The website's Start free opens the sign-up again (it showed the sign-in screen); signed in already, it opens the
   app, and a paid plan picked on the website opens Settings → Billing with that plan. Sign-in and sign-up keep the
   plan between them, and an email's link with a query after it opens its page.

@@ -663,7 +663,9 @@ test('AUTH-3: a new address or password ends the links sent before: a reset link
   await auth.updateUser(nils.id, { email: 'nils@third.example' });
   assert.equal(links.peekLink('reset', reset1.token).state, 'used', 'voided with the address');
   assert.equal(links.peekLink('verify', beforeAdmin.token).state, 'used');
-  // …and a new password (in Profile, and the admin route alike: both go through updateUser).
+  // A new password (in Profile, and the admin route alike: both go through updateUser) ends the confirmations sent
+  // before; a reset link to the address the account has stays, so a session holder can't keep the person's recovery
+  // dead by changing the password (the inbox could ask for another link anyway). Only a reset spends it.
   const reset2 = links.issueLink('reset', nils.id, 'nils@third.example');
   const verify2 = links.issueLink('verify', nils.id, 'nils@third.example');
   const relog = { Cookie: cookiesOf(await post('/api/auth/login', { email: 'nils@third.example', password: 'nils first password' })), ...origin };
@@ -672,8 +674,10 @@ test('AUTH-3: a new address or password ends the links sent before: a reset link
     headers: relog,
   });
   assert.equal(changed.status, 200, changed.text);
-  assert.equal(links.peekLink('reset', reset2.token).state, 'used');
   assert.equal(links.peekLink('verify', verify2.token).state, 'used');
+  assert.equal(links.peekLink('reset', reset2.token).state, 'ok');
+  assert.equal((await post('/api/auth/reset', { token: reset2.token, password: 'nils third password' })).status, 200);
+  assert.equal(links.peekLink('reset', reset2.token).state, 'used');
 });
 
 // ---------------------------------------------------------------- invites by email

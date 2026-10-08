@@ -13,7 +13,7 @@ import { addressKey, RateLimit } from '../../lib/rateLimit.ts';
 import { isSignupPlan } from '../../lib/setupFlow.ts';
 import * as workspaces from '../../lib/workspaces.ts';
 import { WorkspaceError } from '../../lib/workspaces.ts';
-import { CLEAR_SITE_DATA, sessionCookies, sha256 } from '../auth.ts';
+import { CLEAR_SITE_DATA, sessionCookies, sha256, stillSignedIn } from '../auth.ts';
 import type { ServerContext } from '../context.ts';
 import { sampleForFirstRun } from '../firstSample.ts';
 import { body, fail, failFrom, router } from '../http.ts';
@@ -317,8 +317,11 @@ export function accountRoutes(ctx: ServerContext): Router {
   r.post('/api/auth/verify/resend', express.json(), (req, res) => {
     mailOn();
     const b = body(AskLink, req);
-    const me = req.auth?.user ?? null;
-    if (me && req.auth?.via !== 'token') {
+    const signedIn = req.auth?.user ?? null;
+    if (signedIn && req.auth?.via !== 'token') {
+      // the account as it is now, while this session holds: a change of address its sessions' end called off sends nothing
+      stillSignedIn(req);
+      const me = auth.getUser(signedIn.id) ?? signedIn;
       ask(req, me.email);
       const to = me.pending_email || (me.unverified ? me.email : null);
       if (!to) throw fail(409, 'your address is confirmed already');

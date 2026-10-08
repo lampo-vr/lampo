@@ -52,8 +52,11 @@ addresses, never to a suspended member or a disabled account.
 
 Every link is built from `LAMPO_PUBLIC_URL`, with the token in the URL's fragment (`#/…`): browsers never send the fragment
 to a server, so no token lands in the server's or a proxy's log. The page posts it. A newer link of the same kind
-replaces the older one, and a new address or password ends every link sent before it: a reset link left in an inbox
-the account moved away from resets nothing.
+replaces the older one. A new address ends every link sent before it: a reset link left in an inbox the account moved
+away from resets nothing. A new password ends the confirmations sent before it; a reset link to the address the account
+has stays until it is used or its hour is up, so whoever else holds a session can't keep the person's recovery out of
+reach by changing the password (the inbox could ask for another link anyway). A change of address still waiting for its
+link is called off when every session of the account ends (a reset, a new password, *sign out everywhere*).
 
 ## Settings
 

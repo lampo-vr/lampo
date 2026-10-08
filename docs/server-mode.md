@@ -572,6 +572,10 @@ a browser that still holds one signs in once more, and the old cookie is expired
 signed in with the new one). They last at most 30 days and end after 14 days
 without use (`LAMPO_SESSION_DAYS`, `LAMPO_SESSION_IDLE_DAYS`). Signing out ends that session on the server too, so a copy of
 its cookie stops working, and tells the browser to drop its cached renders and pictures; changing the password, disabling the account or *sign out everywhere* ends all of them.
+A change asked for in a session that ends before the change is saved (a reset, *sign out everywhere*, a new password, the
+account disabled) changes nothing and answers `401`: no password, no address waiting for its link, no API token,
+invite or notification device, no fresh session. A password is changed in Profile at most 5 times an hour per
+account, an address too; *Forgot password?* is never held back by it.
 *Sign out everywhere* and any new password (in Profile, set by an admin, or from a reset link) also end the account's
 notifications on every device (its push subscriptions); a new password also ends its apps connected through sign-in,
 and a reset its API tokens. A browser told its session is gone (a `401`, or a status that names nobody) deletes the

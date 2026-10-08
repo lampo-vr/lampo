@@ -154,6 +154,58 @@ const change = <T>(fn: (f: UsersFile) => T): T =>
     return out;
   });
 
+// ---------------------------------------------------------------- the access a change was asked with
+
+/**
+ * The access a request came in with: its account, that account's epoch then (a session's cookie carries it) and the
+ * session's id. Whatever ends access moves the epoch on (a new password, a reset, "sign out everywhere", disabling) or
+ * remembers the session as signed out. A change asked for with it is saved only while it still holds — checked inside
+ * the lock that saves it, after every await (a password checked, a new one hashed, a body read): otherwise a request
+ * that began before a recovery lands after it, and puts back what the recovery ended (a password, an address, a
+ * token, a session).
+ */
+export interface Access {
+  user: string;
+  epoch: number;
+  /** A session's id (its cookie's `s`); absent for the machine's owner at the machine, who has no session. */
+  session?: string;
+}
+
+/** The access a change was asked with ended before the change was saved: nothing was changed. */
+export class AccessEndedError extends Error {
+  status = 401;
+  constructor() {
+    super('you were signed out meanwhile (a new password, a reset, “sign out everywhere” or a disabled account), so nothing was changed: sign in again');
+  }
+}
+
+const holdsIn = (users: readonly User[], signedOut: (s: string) => boolean, a: Access): boolean => {
+  const u = users.find((x) => x.id === a.user);
+  return !!u && !u.disabled && u.epoch === a.epoch && !(a.session !== undefined && signedOut(a.session));
+};
+
+/** Inside change() (the file as it is under the lock): the access still holds, or nothing is saved. */
+function stillIn(f: UsersFile, a: Access | undefined): void {
+  if (a && !holdsIn(f.users, (s) => !!f.revoked?.some((r) => r.s === s), a)) throw new AccessEndedError();
+}
+
+/** Whether an access still holds now: for a handler with nothing left to wait for before what it changes. */
+export function stillHolds(a: Access): boolean {
+  const { file, revoked } = current();
+  return holdsIn(file.users, (s) => revoked.has(s), a);
+}
+
+/**
+ * What ending every session of an account (its epoch moved on) also ends: a change of address still waiting for its
+ * link was asked for in one of them. Says the address it was waiting for, if any.
+ */
+function endSessions(u: User): string | undefined {
+  u.epoch++;
+  const waiting = u.pending_email;
+  delete u.pending_email;
+  return waiting;
+}
+
 // ---------------------------------------------------------------- access ended
 
 /**
@@ -451,6 +503,11 @@ export interface UserPatch {
   role?: Role;
   disabled?: boolean;
   password?: string;
+  /**
+   * A new address that waits for its link (setPendingEmail's rules), saved with the rest at once; null calls one off. With
+   * a new password in the same patch it waits under the new one.
+   */
+  pendingEmail?: string | null;
   /** Merged into the stored prefs; a key set to undefined stays as it is. */
   prefs?: UserPrefsPatch;
 }
@@ -469,17 +526,27 @@ export function setAvatar(id: string, file: string | null): { user: User; previo
 
 /**
  * Changes an account. `memberships`: roles live in workspaces (lib/workspaces.ts decides about owners and invites), so
- * the store-wide owner rules of a store without workspaces are left out and `role` must not be given.
+ * the store-wide owner rules of a store without workspaces are left out and `role` must not be given. `access`: who asked
+ * (Access) — the change is saved only while that still holds, after the new password is hashed; otherwise it throws
+ * AccessEndedError and nothing changed.
  */
-export async function updateUser(id: string, patch: UserPatch, { memberships = false }: { memberships?: boolean } = {}): Promise<User> {
+export async function updateUser(
+  id: string,
+  patch: UserPatch,
+  { memberships = false, access }: { memberships?: boolean; access?: Access } = {},
+): Promise<User> {
   if (patch.password !== undefined) checkPassword(patch.password);
   if (memberships && patch.role !== undefined) throw new Error('roles belong to workspaces');
   const hash = patch.password !== undefined ? await hashPassword(patch.password) : null;
   const before = getUser(id);
-  const user = changeUser(id, patch, hash, memberships);
-  // A new password or address: the links sent before (a reset, a confirmation) stop working — they may sit in an inbox
-  // or a hand the account just moved away from.
-  if (hash || (before && before.email !== user.email)) voidLinks(id);
+  const user = changeUser(id, patch, hash, memberships, access);
+  // A new address: every link sent before stops working (the inbox the account moved away from has no say any more).
+  // A new password: the confirmations sent before (asked for under the password it replaces). A reset link stays until
+  // it is used or its hour is up: it proves the inbox, which may ask for another at any time, so ending it protects
+  // nothing — and whoever holds a session and the password could keep the person's recovery dead by changing the
+  // password again and again. A reset spends it (server/routes/account.ts).
+  if (before && before.email !== user.email) voidLinks(id);
+  else if (hash) voidLinks(id, 'verify');
   if (memberships ? !!user.disabled : user.disabled || !can(user.role, 'admin')) revokeInvitesBy(id);
   if (hash || (user.disabled && !before?.disabled)) accessEnded();
   return user;
@@ -502,8 +569,9 @@ export function mirrorRole(id: string, role: Role | null): void {
   });
 }
 
-function changeUser(id: string, patch: UserPatch, hash: string | null, memberships = false): User {
+function changeUser(id: string, patch: UserPatch, hash: string | null, memberships = false, access?: Access): User {
   return change((f) => {
+    stillIn(f, access);
     const u = f.users.find((x) => x.id === id);
     if (!u) throw new Error('no such user');
     if (patch.name !== undefined) {
@@ -530,7 +598,7 @@ function changeUser(id: string, patch: UserPatch, hash: string | null, membershi
       if (patch.disabled && u.role === 'owner' && owners() === 1) throw new Error('the last owner cannot be disabled');
       if (patch.disabled) {
         u.disabled = isoLocal();
-        u.epoch++;
+        endSessions(u);
       } else delete u.disabled;
     }
     if (patch.prefs?.theme !== undefined) u.prefs = { ...u.prefs, theme: patch.prefs.theme };
@@ -545,8 +613,10 @@ function changeUser(id: string, patch: UserPatch, hash: string | null, membershi
     }
     if (hash) {
       u.password = hash;
-      u.epoch++;
+      endSessions(u);
     }
+    // after the password: an address asked for with a new one waits under it
+    if (patch.pendingEmail !== undefined) waitFor(u, patch.pendingEmail === null ? null : checkEmail(patch.pendingEmail));
     return u;
   });
 }
@@ -794,21 +864,30 @@ export function confirmAddress(userId: string, email: string): Confirmed {
 /** A held sign-up keeps the address it signed up with: its confirmation goes there, nowhere else. */
 export const HELD_ADDRESS = 'a sign-up keeps its address until that address is confirmed: sign up again with the right one';
 
-/** A new address waits for its link (or, with null, the wait is called off); the account keeps its address meanwhile. */
-export function setPendingEmail(userId: string, email: string | null): User {
+/**
+ * A new address waits for its link (or, with null, the wait is called off); the account keeps its address meanwhile.
+ * `access`: who asked — saved only while that still holds (updateUser). It waits only as long as the sessions it was
+ * asked in: ending them all (a new password, a reset, "sign out everywhere", disabling) calls it off.
+ */
+export function setPendingEmail(userId: string, email: string | null, { access }: { access?: Access } = {}): User {
   const e = email === null ? null : checkEmail(email);
   return change((f) => {
+    stillIn(f, access);
     const u = f.users.find((x) => x.id === userId);
     if (!u) throw new Error('no such user');
-    if (e === null || e === u.email) delete u.pending_email;
-    else {
-      if (isGated(u)) throw new Error(HELD_ADDRESS);
-      // An address another account uses waits like any other (its link never comes, and confirmAddress would refuse
-      // it): a refusal here would tell anyone who asks which addresses have accounts on this server.
-      u.pending_email = e;
-    }
+    waitFor(u, e);
     return { ...u };
   });
+}
+
+function waitFor(u: User, e: string | null): void {
+  if (e === null || e === u.email) delete u.pending_email;
+  else {
+    if (isGated(u)) throw new Error(HELD_ADDRESS);
+    // An address another account uses waits like any other (its link never comes, and confirmAddress would refuse
+    // it): a refusal here would tell anyone who asks which addresses have accounts on this server.
+    u.pending_email = e;
+  }
 }
 
 /**
@@ -858,15 +937,19 @@ export function sweepUnconfirmed(days = 7, now = Date.now()): number {
   return gone.length;
 }
 
-/** Signs out every session of the user (cookies carry the epoch they were issued for). */
+/**
+ * Signs out every session of the user (cookies carry the epoch they were issued for), and calls off a change of address
+ * still waiting for its link (endSessions).
+ */
 export function signOutEverywhere(id: string): void {
   if (!read().users.some((u) => u.id === id)) return;
   const done = change((f) => {
     const u = f.users.find((x) => x.id === id);
-    if (u) u.epoch++;
-    return !!u;
+    return u ? { waiting: endSessions(u) } : null;
   });
-  if (done) accessEnded();
+  if (!done) return;
+  if (done.waiting) voidLinks(id, 'verify', done.waiting);
+  accessEnded();
 }
 
 // ---------------------------------------------------------------- API tokens (CLI, MCP, agents)
@@ -874,15 +957,20 @@ export function signOutEverywhere(id: string): void {
 /** A token without `expires` works until it is revoked (tokens from before expiry existed, and the default). */
 export const tokenExpired = (t: Pick<ApiToken, 'expires'>, now = Date.now()): boolean => !!t.expires && Date.parse(t.expires) <= now;
 
-/** A new API token for `userId`, acting in `workspace` (absent: workspace #1, as tokens always did). */
+/**
+ * A new API token for `userId`, acting in `workspace` (absent: workspace #1, as tokens always did). `access`: the session
+ * that asked for it — made only while that still holds (a reset ends the tokens there are; one made after it from a
+ * session it ended would outlast it).
+ */
 export function createToken(
   userId: string,
   name: string,
-  { days, workspace }: { days?: number | null; workspace?: string } = {},
+  { days, workspace, access }: { days?: number | null; workspace?: string; access?: Access } = {},
 ): { token: string; info: ApiToken } {
   if (days != null && !(Number.isInteger(days) && days >= 1 && days <= 3650)) throw new Error('a token lasts 1 to 3650 days');
   const token = `vr_${crypto.randomBytes(24).toString('base64url')}`;
   const info = change((f) => {
+    stillIn(f, access);
     if (!f.users.some((u) => u.id === userId)) throw new Error('no such user');
     const t: ApiToken = {
       id: `t_${crypto.randomBytes(6).toString('hex')}`,
@@ -1178,6 +1266,7 @@ export function createInvite({
   by,
   workspace,
   isMember,
+  access,
 }: {
   role: Role;
   name?: string | null;
@@ -1188,6 +1277,11 @@ export function createInvite({
   workspace?: string;
   /** Whether an account is in that workspace already. Without it, any account with the address is (no workspaces). */
   isMember?: (user: User) => boolean;
+  /**
+   * The session of whoever invites: made only while that still holds — disabling an account revokes the invites it
+   * made, and one made after it from a session it ended would outlast it (Access).
+   */
+  access?: Access;
 }): { token: string; invite: PublicInvite } {
   if (!ROLES.includes(role)) throw new Error(`role must be one of ${ROLES.join(', ')}`);
   if (!Number.isFinite(days) || days < 1 || days > INVITE_MAX_DAYS) throw new Error(`an invite lasts 1–${INVITE_MAX_DAYS} days`);
@@ -1211,6 +1305,8 @@ export function createInvite({
     ...(workspace ? { workspace } : {}),
   };
   withLock(LOCK_DIR, () => {
+    // invites.json and users.json share this lock: the inviter's access as it is now
+    stillIn(load(), access);
     const all = loadInvites();
     const ws = workspace || 'w1';
     // waiting, or ended unused and still in the file: what the workspace's invites hold of it (accepted ones say who
@@ -1675,6 +1771,8 @@ export interface SessionCheck {
   until: number;
   /** When the person signed in with it (ms), or null for a cookie from before that was kept. */
   signedIn: number | null;
+  /** The session's id (null: a cookie from before session ids, which ends only with its epoch). */
+  session: string | null;
 }
 
 /** The account a session cookie stands for (null when forged, expired, idle too long, signed out or outdated). */
@@ -1693,6 +1791,7 @@ export function checkSession(value: string, now = Date.now()): SessionCheck | nu
     workspace: typeof claims.w === 'string' ? claims.w : null,
     until: typeof claims.a === 'number' ? Math.min(claims.x, claims.a + SESSION_IDLE_DAYS * 86400000) : claims.x,
     signedIn: typeof claims.i === 'number' ? claims.i : null,
+    session: typeof claims.s === 'string' ? claims.s : null,
   };
 }
 

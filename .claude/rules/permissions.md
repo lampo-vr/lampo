@@ -20,5 +20,7 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - API tokens never read review-link tokens (`listedFor`).
 - Anything that ends access calls `accessEnded()` (and gets a row in `access-ends.test.ts`); nothing else may.
 - What a new password ends lives in `afterNewPassword`; new credential-bound things join it.
+- What a reset or sign-out ends is made only while the asker's access holds: pass `accessOf(req)` into the lib call
+  (checked in its lock, after every await, a body read too) or call `stillSignedIn(req)` with nothing left to await.
 - Account answers are the same for every address (sign-up, reset, invite, add user): no enumeration.
 - Read the session cookie with `sessionOf(req)` (`__Host-` over https), a query string with zod (`query`/`queryOr`).

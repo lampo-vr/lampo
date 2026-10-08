@@ -9,7 +9,6 @@ import os from 'node:os';
 import path from 'node:path';
 import express, { type NextFunction, type Request, type Response, type Router } from 'express';
 import { z } from 'zod';
-import { voidLinks } from '../lib/accountLinks.ts';
 import * as auth from '../lib/auth.ts';
 import { AVATAR_FILE, AVATAR_LIMITS, avatarKey, people, removeAvatar, saveAvatar } from '../lib/avatars.ts';
 import type { Config } from '../lib/config.ts';
@@ -54,6 +53,8 @@ export interface Auth {
   until?: number;
   /** via cookie: when the person signed in with this session (ms; absent for a cookie from before it was kept). */
   signedIn?: number;
+  /** via cookie: the session's id (absent for a cookie from before session ids): what accessOf() names. */
+  session?: string;
 }
 
 /** The session cookie's Set-Cookie value; Secure whenever the request or the public URL is https, and then named
@@ -247,6 +248,7 @@ export function createIdentify({ machine, lanToken = null, peerUid = loopbackPee
           until: s.until,
           ...(s.refresh ? { refresh: s.refresh } : {}),
           ...(s.signedIn ? { signedIn: s.signedIn } : {}),
+          ...(s.session ? { session: s.session } : {}),
           ...oldName,
         };
       if (!workspace || !role) return null;
@@ -259,6 +261,7 @@ export function createIdentify({ machine, lanToken = null, peerUid = loopbackPee
         until: s.until,
         ...(s.refresh ? { refresh: s.refresh } : {}),
         ...(s.signedIn ? { signedIn: s.signedIn } : {}),
+        ...(s.session ? { session: s.session } : {}),
         ...oldName,
       };
     }
@@ -294,6 +297,26 @@ export const identify: Identify = createIdentify({ machine: false });
 export function requireUser(req: Request, _res: Response, next: NextFunction): void {
   if (!req.auth) throw fail(401, 'please sign in');
   next();
+}
+
+/**
+ * The access a request came in with (lib/auth.ts Access), for a change that must not outlive it: a session's (its
+ * account's epoch, which identify matched to the cookie's, and its id) or the machine owner's at the machine. Undefined for
+ * an API token: a token makes or changes no credential (PERSON_ONLY), and what it may change ends with the token.
+ */
+export function accessOf(req: Request): auth.Access | undefined {
+  const a = req.auth;
+  if (!a?.user || a.via === 'token') return undefined;
+  return { user: a.user.id, epoch: a.user.epoch, ...(a.session ? { session: a.session } : {}) };
+}
+
+/**
+ * The access a request came in with still holds now (a reset, "sign out everywhere" or disabling meanwhile ends it): for
+ * a handler that waited (a body read, a password checked) and has nothing left to wait for before what it changes.
+ */
+export function stillSignedIn(req: Request): void {
+  const a = accessOf(req);
+  if (a && !auth.stillHolds(a)) throw failFrom(401, new auth.AccessEndedError());
 }
 
 export function requireAdmin(req: Request, _res: Response, next: NextFunction): void {
@@ -401,7 +424,8 @@ const parse = <S extends z.ZodType>(schema: S, value: unknown): z.output<S> => {
 // Errors from lib/auth.ts and lib/workspaces.ts are the user's fault (taken name, short password, the last owner): a
 // 4xx with the message (workspaces say which).
 // a failure of ours (an object store's refusal) is the server's fault: a 500, whatever the store answered
-const statusOf = (e: unknown) => (e instanceof workspaces.WorkspaceError || e instanceof auth.TooManyInvitesError ? e.status : isInternal(e) ? 500 : 400);
+const statusOf = (e: unknown) =>
+  e instanceof workspaces.WorkspaceError || e instanceof auth.TooManyInvitesError || e instanceof auth.AccessEndedError ? e.status : isInternal(e) ? 500 : 400;
 // the failure stays the cause: one that is internal (an object store's refusal) is answered by audience, never as it is
 const userError = <T>(fn: () => T): T => {
   try {
@@ -755,38 +779,48 @@ export function authRoutes({ cfg, setupToken, setupDone, extension = () => NO_EX
    * the LAN link (the link would become a lasting credential). A held sign-up keeps its address. A new address waits for
    * the link mailed to it (when this server can email): until then the account keeps signing in with the old one, a typo
    * locks nobody out, and the answer is the same whether another account has the address or not.
+   *
+   * Nothing is saved here: the caller saves what this lets through with updateUser and the request's access (accessOf),
+   * so a session that ends while the password is checked or the new one hashed (a reset, "sign out everywhere") changes
+   * nothing. A few changes of each an hour per account: a session holder going round and round can't sign the person's
+   * other devices out without end (a reset still ends it: it is no change made here).
    */
   async function ownCredentials(req: Request, me: auth.User, b: { email?: string; password?: string; current_password?: string }) {
     const first = !me.password && req.auth?.via === 'local';
     const newEmail = b.email !== undefined && !auth.sameEmail(me.email, b.email) ? b.email : undefined;
     if (newEmail !== undefined && auth.isGated(me)) throw fail(403, auth.HELD_ADDRESS);
+    const pending = newEmail !== undefined && accountMail.enabled && !first;
     if (b.password !== undefined || newEmail !== undefined) {
       person(req, 'a password or an email address is changed');
-      if (!first && !(b.current_password && (await auth.verifyPassword(b.current_password, me.password)))) throw fail(403, 'current password is wrong');
+      // the machine owner's very first password and address are set once, at the machine: no current one, no limit
+      if (!first) {
+        // Each new address is emailed: a few an hour per account (a typo, then the right one), within the account's share
+        // of the server's mail (lib/mail) — hundreds of changes once pushed everyone's password resets past their links.
+        const passwordWait = b.password !== undefined ? passwordChanges.retryAfter(me.id) : 0;
+        const wait = Math.max(passwordWait, newEmail !== undefined ? addressChanges.retryAfter(me.id) : 0, pending ? accountMail.accountWait(me.id) : 0);
+        const what = passwordWait ? 'password' : 'address';
+        if (wait) throw Object.assign(fail(429, `too many ${what} changes for now: try again in ${Math.ceil(wait / 60)} min`), { retryAfter: wait });
+        if (!(b.current_password && (await auth.verifyPassword(b.current_password, me.password)))) throw fail(403, 'current password is wrong');
+        if (b.password !== undefined) passwordChanges.hit(me.id);
+        if (newEmail !== undefined) addressChanges.hit(me.id);
+      }
     }
-    const pending = newEmail !== undefined && accountMail.enabled && !first;
-    if (pending) {
-      // Each new address is emailed: a few an hour per account (a typo, then the right one), within the account's share
-      // of the server's mail (lib/mail) — hundreds of changes once pushed everyone's password resets past their links.
-      const wait = Math.max(addressChanges.retryAfter(me.id), accountMail.accountWait(me.id));
-      if (wait) throw Object.assign(fail(429, `too many address changes for now: try again in ${Math.ceil(wait / 60)} min`), { retryAfter: wait });
-      addressChanges.hit(me.id);
-      userError(() => auth.setPendingEmail(me.id, newEmail as string));
-    }
-    return { first, pending, email: pending ? undefined : newEmail, password: b.password };
+    return { first, pendingEmail: pending ? newEmail : undefined, email: pending ? undefined : newEmail, password: b.password };
   }
   type Own = Awaited<ReturnType<typeof ownCredentials>>;
-  /** What follows a change ownCredentials let through, once it is saved: the new address's link, this session, notices. */
+  /**
+   * What follows a change ownCredentials let through, once it is saved (never for one refused): the new address's link,
+   * this session, notices. A reset link the person asked for stays (lib/auth.ts updateUser).
+   */
   function afterOwnChange(req: Request, res: Response, user: auth.User, own: Own, lang?: string) {
     // (Not to an address another account keeps: the answer is the same, and nobody's inbox gets someone else's link. A
     // sign-up nobody confirmed keeps none: the link lets that inbox decide — A12 INV-REV-11.)
-    if (own.pending && !auth.addressKept(user.pending_email as string)) accountMail.verify(user, user.pending_email as string, accountMail.langOf(user, lang));
+    if (own.pendingEmail !== undefined && user.pending_email && !auth.addressKept(user.pending_email))
+      accountMail.verify(user, user.pending_email, accountMail.langOf(user, lang));
     if (own.password !== undefined) {
-      // A password change signs out other sessions; keep this one (in the workspace it works in). Any reset link still
-      // out stops working.
+      // A password change signs out other sessions; keep this one (in the workspace it works in).
       const a = req.auth as Auth;
       if (a.via === 'cookie') setCookie(req, res, user, a.workspace);
-      voidLinks(user.id, 'reset');
       afterNewPassword(user.id);
       if (!own.first) accountMail.passwordChanged(user);
     }
@@ -809,8 +843,13 @@ export function authRoutes({ cfg, setupToken, setupDone, extension = () => NO_EX
     // teams' people (A12 INV-REV-5). A store without workspaces is one team: told apart from everyone, as always.
     const migrated = workspaces.isMigrated();
     if (migrated && b.name !== undefined) nameFreeFor(me, b.name);
+    // all of it at once, and only while this session still holds once the new password is hashed
     const user = await userErrorAsync(() =>
-      auth.updateUser(me.id, { name: b.name, email: own.email, password: own.password, prefs: b.prefs }, { memberships: migrated }),
+      auth.updateUser(
+        me.id,
+        { name: b.name, email: own.email, pendingEmail: own.pendingEmail, password: own.password, prefs: b.prefs },
+        { memberships: migrated, access: accessOf(req) },
+      ),
     );
     afterOwnChange(req, res, user, own, b.lang);
     res.json({ user: userIn(user, a.workspace) });
@@ -877,7 +916,10 @@ export function authRoutes({ cfg, setupToken, setupDone, extension = () => NO_EX
     if (!me) throw fail(401, 'please sign in');
     const b = parse(NewToken, req.body);
     const ws = (req.auth as Auth).workspace;
-    const { token, info } = auth.createToken(me.id, b.name || 'token', { days: b.days, ...(ws !== DEFAULT_WORKSPACE ? { workspace: ws } : {}) });
+    // made only while this session still holds (a reset ends the tokens there are: one made after it would outlast it)
+    const { token, info } = userError(() =>
+      auth.createToken(me.id, b.name || 'token', { days: b.days, ...(ws !== DEFAULT_WORKSPACE ? { workspace: ws } : {}), access: accessOf(req) }),
+    );
     res.json({ token, info: auth.publicToken(info) });
   });
 
@@ -937,8 +979,10 @@ export function authRoutes({ cfg, setupToken, setupDone, extension = () => NO_EX
       );
   };
   // An address change emails the new address: a few an hour per account (a typo, then the right one), and within the
-  // account's share of the server's mail (lib/mail).
+  // account's share of the server's mail (lib/mail). Password changes from a session, a few an hour per account too
+  // (ownCredentials).
   const addressChanges = new RateLimit(5, 3600_000);
+  const passwordChanges = new RateLimit(5, 3600_000);
   // Invites one account makes in an hour, emailed or not, and revokes (keyed by account id): each rewrites invites.json.
   const invitesMade = new RateLimit(INVITES_PER_HOUR, 3600_000);
   const invitesRevoked = new RateLimit(INVITES_PER_HOUR, 3600_000);
@@ -962,6 +1006,7 @@ export function authRoutes({ cfg, setupToken, setupDone, extension = () => NO_EX
           by: { id: me.user?.id || 'local', name: me.name },
           ...(ws !== DEFAULT_WORKSPACE ? { workspace: ws } : {}),
           isMember: (u) => !!workspaces.roleIn(ws, u.id),
+          access: accessOf(req),
         }),
       );
       const sent = accountMail.invite(invite, token, accountMail.langOf(me.user, lang), me.user?.id);
@@ -981,7 +1026,11 @@ export function authRoutes({ cfg, setupToken, setupDone, extension = () => NO_EX
     // password, the first one at the machine only, a new address through its link. Someone else's is an admin's below.
     const self = target.id === req.auth?.user?.id;
     const own = self ? await ownCredentials(req, target, { email: patch.email, password: patch.password, current_password }) : null;
-    const b = own ? { ...patch, email: own.email, password: own.password } : patch;
+    // What follows is saved only while the session that asked still holds: checked now for the roles and memberships
+    // (nothing is awaited before they are saved), and by updateUser once a new password is hashed.
+    stillSignedIn(req);
+    const access = accessOf(req);
+    const b = own ? { ...patch, email: own.email, pendingEmail: own.pendingEmail, password: own.password } : patch;
     const newEmail = b.email !== undefined && !auth.sameEmail(target.email, b.email);
     const ws = (req.auth as Auth).workspace;
     // The person hears what was done to their account, at the address they had (confirmed addresses only).
@@ -992,14 +1041,13 @@ export function authRoutes({ cfg, setupToken, setupDone, extension = () => NO_EX
       if (user.email !== target.email) accountMail.emailChanged(target.email, user, !target.unverified);
       if (own) afterOwnChange(req, res, user, own);
       else if (b.password !== undefined) {
-        voidLinks(user.id, 'reset');
         afterNewPassword(user.id);
         accountMail.passwordChanged(user);
       }
     };
     if (!workspaces.isMigrated()) {
       // A store without workspaces: the account and its role are one, as always.
-      const user = await userErrorAsync(() => auth.updateUser(target.id, b));
+      const user = await userErrorAsync(() => auth.updateUser(target.id, b, { access }));
       tell(user);
       res.json({ user: self ? userIn(user, ws) : memberView(user, ws) });
       return;
@@ -1012,7 +1060,7 @@ export function authRoutes({ cfg, setupToken, setupDone, extension = () => NO_EX
       if (self) throw fail(400, 'you cannot disable yourself');
       userError(() => workspaces.suspendMember(ws, target.id, disabled));
       if (!disabled && target.disabled && workspaces.accountIsOnlyIn(ws, target.id))
-        await userErrorAsync(() => auth.updateUser(target.id, { disabled: false }, { memberships: true }));
+        await userErrorAsync(() => auth.updateUser(target.id, { disabled: false }, { memberships: true, access }));
     }
     if (Object.values(account).some((v) => v !== undefined)) {
       // Someone else's account itself (name, email, password) is only this workspace's to change when the person works
@@ -1031,7 +1079,7 @@ export function authRoutes({ cfg, setupToken, setupDone, extension = () => NO_EX
     }
     if (role !== undefined) await userErrorAsync(() => workspaces.setMemberRole(ws, target.id, role));
     const user = Object.values(account).some((v) => v !== undefined)
-      ? await userErrorAsync(() => auth.updateUser(target.id, account, { memberships: true }))
+      ? await userErrorAsync(() => auth.updateUser(target.id, account, { memberships: true, access }))
       : (auth.getUser(target.id) as auth.User);
     tell(user, { notice: false });
     // yourself: your own record (Profile reads it); anyone else: what an admin sees of them
@@ -1089,6 +1137,7 @@ export function authRoutes({ cfg, setupToken, setupDone, extension = () => NO_EX
         by: { id: me.user?.id || 'local', name: me.name },
         ...(ws !== DEFAULT_WORKSPACE ? { workspace: ws } : {}),
         ...(isMember ? { isMember } : {}),
+        access: accessOf(req),
       }),
     );
     invitesMade.hit(who); // counted when it landed

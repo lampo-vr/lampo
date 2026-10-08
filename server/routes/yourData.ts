@@ -16,7 +16,7 @@ import * as auth from '../../lib/auth.ts';
 import { deleteAccount, deleteWorkspace, planAccountDeletion, planWorkspaceDeletion } from '../../lib/deletion.ts';
 import { RateLimit } from '../../lib/rateLimit.ts';
 import * as workspaces from '../../lib/workspaces.ts';
-import { type Auth, CLEAR_SITE_DATA, requireUser, sessionCookies } from '../auth.ts';
+import { type Auth, CLEAR_SITE_DATA, requireUser, sessionCookies, stillSignedIn } from '../auth.ts';
 import type { ServerContext } from '../context.ts';
 import { body, fail, failFrom, query, router, sendStreamed } from '../http.ts';
 
@@ -82,6 +82,9 @@ export function yourDataRoutes(ctx: ServerContext): Router {
       }
     } else if (!(a.signedIn && Date.now() - a.signedIn < auth.RECENT_SIGN_IN_MS))
       throw fail(403, me.password ? 'type your password to delete your account' : 'sign in again to delete your account', { password: !!me.password });
+    // The session (and the password just checked) still the account's: a reset or "sign out everywhere" while it was
+    // checked ends what it may do. Nothing is awaited from here until the first thing is deleted.
+    stillSignedIn(req);
     let plan: Awaited<ReturnType<typeof deleteAccount>>;
     try {
       plan = await deleteAccount(me.id, 'self');
