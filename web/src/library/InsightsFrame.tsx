@@ -1,7 +1,9 @@
-// Insights' frame, light enough to ride in the library's chunk: the period in the page's header, the card every section
-// shares, and the page in its loading shape — the rows each card showed last time (remembered per device), each in
-// the anatomy of the row that replaces it, so nothing moves when the answer arrives. The page itself (Insights.tsx)
-// loads on its own when it is first opened; this stands in meanwhile, and again while its answer is on its way.
+// Insights' frame, a small chunk of its own (out of the library's first paint; Library.tsx asks for it with the
+// library's when the page opens on Insights, right after the first paint otherwise): the period in the page's header,
+// the card every section shares, and the page in its loading shape — the rows each card showed last time (remembered
+// per device), each in the anatomy of the row that replaces it, so nothing moves when the answer arrives. The page
+// itself (Insights.tsx) loads on its own when it is first opened; this stands in meanwhile, and again while its answer
+// is on its way.
 import type { ReactNode } from 'react';
 import type { InsightsBoard, InsightsPeriod } from '../api/types.ts';
 import { t } from '../i18n/index.ts';

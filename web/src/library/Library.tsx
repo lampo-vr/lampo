@@ -51,7 +51,6 @@ import { Film, FilmPending } from './Film.tsx';
 import { FilmGrid } from './FilmGrid.tsx';
 import { FilmList, FilmListPending } from './FilmList.tsx';
 import { FilterButton, FilterChips } from './Filters.tsx';
-import { InsightsPending, PeriodPicker } from './InsightsFrame.tsx';
 import { LibraryTopbar } from './LibraryTopbar.tsx';
 import {
   applyFilters,
@@ -86,9 +85,14 @@ const PlaybookPage = screen(loader(() => import('../playbook/PlaybookPage.tsx'))
 const inboxViewCode = loader(() => import('../inbox/InboxView.tsx'));
 if (/^#\/(inbox|for-you|verify)\b/.test(location.hash)) void inboxViewCode.load().catch(() => {});
 const InboxView = screen(inboxViewCode);
-// Insights too: its frame and loading state ride here (InsightsFrame.tsx), the page arrives when it is opened.
+// Insights too: the page arrives when it is opened. Its frame and loading state (InsightsFrame.tsx: the period picker,
+// the page in its remembered shape) are a small chunk of their own, out of the library's first paint: asked for with
+// the library's when the page opens on Insights — the first render waits for both — and right after the first paint
+// otherwise, so a click on Insights still draws its loading state at once.
 const insightsCode = loader(() => import('./Insights.tsx'));
-if (/^#\/insights\b/.test(location.hash)) void insightsCode.load().catch(() => {});
+const insightsFrameCode = loader(() => import('./InsightsFrame.tsx'));
+const onInsights = /^#\/insights\b/.test(location.hash);
+if (onInsights) void insightsCode.load().catch(() => {});
 const Insights = screen(insightsCode);
 // The board is a chunk of its own (Board.tsx): asked for with the library's when it is the layout — the first render
 // waits for both (App.tsx) —, right after the first paint otherwise; its lanes stand meanwhile (BoardFrame.tsx).
@@ -100,6 +104,7 @@ const FilesPage = screen(filesCode);
 export const firstChunks: Promise<unknown> = Promise.all([
   readPrefs(LIBRARY_PREFS, LIBRARY_PER_TAB).layout === 'board' && boardCode.load().catch(() => {}),
   /^#\/files\//.test(location.hash) && filesCode.load().catch(() => {}),
+  onInsights && insightsFrameCode.load().catch(() => {}),
 ]);
 // Add video opens on a click or a drop, never in the first paint: its code (and the folder picker's) comes right after.
 const addVideoCode = loader(() => import('./AddVideo.tsx'));
@@ -349,6 +354,7 @@ function Hero({
   /** A project's own ⋯ (its owners and admins): what it does to the project as a whole, Archive among it. */
   menu?: MenuEntry[] | null;
 }) {
+  const Frame = useLoaded(insightsFrameCode, !!page.insights);
   return (
     <div className="hero">
       {/* a crumb only inside a project (the top views, projects and agents have none); its line stays, so titles never move */}
@@ -416,7 +422,7 @@ function Hero({
               </span>
             </div>
           ))}
-        {page.insights && <PeriodPicker />}
+        {page.insights && Frame && <Frame.PeriodPicker />}
         {archived ? (
           <ArchivedBanner onRestore={archived.onRestore} />
         ) : (
@@ -645,6 +651,7 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
   const moveTo = useMoves(can, useSettle());
   const onBoard = layout === 'board';
   const BoardCode = useLoaded(boardCode, onBoard || painted);
+  const InsightsFrame = useLoaded(insightsFrameCode, view.kind === 'insights' || painted);
   // a folder's Files tab opens at once: its code comes after the folder's first paint (for whoever sees files)
   useLoaded(filesCode, painted && folderPage !== null && !!likelyRole && roleCan(likelyRole, 'files'));
   const kit = useMemo<CardKit>(() => ({ can, actions: actionsRef, move: moveTo, board: onBoard }), [can, moveTo, onBoard]);
@@ -1039,7 +1046,7 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
                     projects={page.archive ? (data ? Object.keys(archivedProjects).length : null) : undefined}
                   />
                   {page.insights ? (
-                    <Suspense fallback={<InsightsPending />}>
+                    <Suspense fallback={InsightsFrame ? <InsightsFrame.InsightsPending /> : null}>
                       <Insights pending={pending} />
                     </Suspense>
                   ) : page.inbox ? (

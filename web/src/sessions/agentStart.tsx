@@ -5,7 +5,7 @@
 // the agent, then the agent connected and what it does (the connected-agents registry, useAgents: the state Connect an
 // agent shows, refetched when the `sessions` event says one arrived). Its V1 arriving ends the empty page by itself.
 // Light: the library's first paint draws it. The prompt's builder (mcpConfig, with every client's setup) is a chunk
-// of its own, asked for right after the first paint.
+// of its own, asked for right after the first paint (or as soon as the pointer or the focus reaches the button).
 import { useEffect, useRef, useState } from 'react';
 import { AGENT_KIND_LABELS } from '../../../lib/agentKind.ts';
 import { compareTime } from '../../../lib/time.ts';
@@ -87,6 +87,10 @@ export function useAgentStart(project: string | null, want = true): AgentStartSt
   return { copy, copied, flash, agent, named: agent && (!copied || withAgent) ? agent : null };
 }
 
+/** The builder asked for when the pointer or the focus reaches the button too (not only once the page was idle): the
+ * click then writes the clipboard in its own moment, which Safari requires. */
+const warm = () => void builder.load().catch(() => {});
+
 /** The button that copies it: its words stay, its glyph says Copied for a moment (the line under it says the rest). */
 export function StartButton({
   start,
@@ -106,6 +110,8 @@ export function StartButton({
       type="button"
       className={`${className} agent-start-copy`}
       onClick={() => void start.copy()}
+      onPointerEnter={warm}
+      onFocus={warm}
       data-testid={testid}
       data-agent={start.agent ? (start.agent.kind ?? 'mcp') : undefined}
       data-copied={start.flash ? '' : undefined}
