@@ -224,7 +224,7 @@ test('who may: members and up draft, only owners and admins publish; no scope gr
 test('PUB-14: a sealed secret opens only in its workspace, for its record', async () => {
   const { seal, unseal } = await import('../../lib/publish/seal.ts');
   const { inWorkspace } = await import('../../lib/scope.ts');
-  const key = { api_key: 'sk_live_0123456789abcdef' };
+  const key = { api_key: 'test-api-key-0123456789abcdef' };
   const sealed = inWorkspace('w1', () => seal('pc_000000000001', key));
   assert.deepEqual(
     inWorkspace('w1', () => unseal('pc_000000000001', sealed)),

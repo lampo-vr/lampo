@@ -76,7 +76,7 @@ const run = async () => {
 };
 
 const account = (id: string, platform: PublishAccount['platform']): PublishAccount => ({ id, platform, name: `${platform} account` });
-const social = addConnection({ kind: 'zernio', label: 'Social', secret: { api_key: 'sk_test_key_0123456789' }, by: 'tester' });
+const social = addConnection({ kind: 'zernio', label: 'Social', secret: { api_key: 'test-key-0123456789' }, by: 'tester' });
 changeConnection(social.id, { state: 'ready', accounts: [account('ig1', 'instagram'), account('fb1', 'facebook')] });
 const tube = addConnection({
   kind: 'youtube',
@@ -539,7 +539,7 @@ test('PUB-16: what a platform says about its accounts is kept bounded: one line 
   );
   const wordy: Adapter = { ...zn.adapter, accounts: async () => many };
   const checker = createPublisher({ adapters: { youtube: yt.adapter as never, zernio: wordy }, ...options });
-  const c = addConnection({ kind: 'zernio', label: 'Wordy', secret: { api_key: 'sk_test_wordy_0123456789' }, by: 'tester' });
+  const c = addConnection({ kind: 'zernio', label: 'Wordy', secret: { api_key: 'test-wordy-0123456789' }, by: 'tester' });
   const out = await checker.check(c.id);
   assert.equal(out.state, 'ready');
   assert.equal(out.accounts.length, 100);
