@@ -1,0 +1,99 @@
+/* The way into agent work (sessions/agentStart.tsx): the prompt to copy, the line under it that follows the agent,
+   then the ways by hand. In an empty state one centred column, as wide as its widest button: the copy and Connect your
+   agent as wide as each other, the upload quieter under them. The line takes no part in that width
+   (it is 0 wide, then the column's), so the buttons never move when it says something longer: on a desk it runs past
+   the column's edges, centred; on a phone it wraps inside it. */
+.agent-start {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  width: max-content;
+  max-width: 100%;
+}
+.agent-start > .btn:not(.ghost) {
+  align-self: stretch;
+}
+/* the line between the copy and the hand-made ways keeps its own breath above and below */
+.agent-start > .agent-line {
+  width: 0;
+  min-width: 100%;
+  justify-content: center;
+  text-align: center;
+  margin: var(--sp-0_5) 0 var(--sp-3);
+}
+@media (min-width: 640px) {
+  .agent-start > .agent-line {
+    white-space: nowrap;
+  }
+}
+/* the upload is the last resort here: quieter than Connect your agent, its key still shown */
+.agent-start > .btn.ghost {
+  margin-top: var(--sp-1);
+  color: var(--muted);
+}
+.agent-start > .btn.ghost:hover {
+  color: var(--fg);
+}
+/* a question waiting above (AskLead): everything here steps back, side by side again */
+.agent-start.quiet {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: auto;
+}
+.agent-start.quiet > .btn:not(.ghost) {
+  align-self: auto;
+}
+.agent-start.quiet > .agent-line {
+  flex-basis: 100%;
+  width: auto;
+  min-width: 0;
+  order: 9;
+  margin: 0;
+}
+
+/* One line's room in every state: which agents it is for, waiting for one, the one connected and what it does. */
+.agent-line {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--h-sm);
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-ui);
+  color: var(--muted);
+  text-wrap: balance;
+}
+.agent-line b {
+  font-weight: var(--fw-ui);
+  color: var(--fg-2);
+}
+.agent-line .kg {
+  --kg-size: 10px;
+  flex: none;
+  color: var(--muted);
+}
+.agent-line[data-state='waiting'] .kg {
+  animation: agent-line-wait 1.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+.agent-line:is([data-state='idle'], [data-state='listening'], [data-state='working']) .kg {
+  color: var(--ok);
+}
+.agent-line-marks {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex: none;
+  color: var(--fg-2);
+}
+@keyframes agent-line-wait {
+  50% {
+    opacity: 0.25;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-line[data-state='waiting'] .kg {
+    animation: none;
+  }
+}

@@ -159,7 +159,10 @@ try {
           ]),
         `tiles ${JSON.stringify(tiles)}`,
       );
-      assert((await snippetOf(page)) === `claude mcp add --transport http lampo ${BASE}/mcp --header "Authorization: Bearer ${token}"`, await snippetOf(page));
+      assert(
+        (await snippetOf(page)) === `claude mcp add --transport http --scope user lampo ${BASE}/mcp --header "Authorization: Bearer ${token}"`,
+        await snippetOf(page),
+      );
       assert(
         (await page.$eval('[data-testid="token-login"] pre', (e) => e.textContent)) === `lampo login ${BASE} --token -`,
         'lampo takes the token at its prompt',
@@ -367,7 +370,7 @@ try {
     const pick = (id) => page.click(`[data-testid="agent-tiles"] input[value="${id}"]`);
     const until = (fn, what) => page.waitForFunction(fn, { polling: 100, timeout: 8000 }).catch(() => assert(false, what));
     // Claude Code first, through the running app: it gets updates pushed and shows up in the last step.
-    assert((await snippet()) === `claude mcp add --transport http lampo ${BASE}/mcp`, `http ${await snippet()}`);
+    assert((await snippet()) === `claude mcp add --transport http --scope user lampo ${BASE}/mcp`, `http ${await snippet()}`);
     assert((await state()).includes('Waiting for it to connect'), await state());
     // then the one sentence that sets it to work — the whole loop — for a project of the library's (none yet: this one);
     // Claude Code's /lampo:watch is named as its shortcut
@@ -375,14 +378,18 @@ try {
     assert(/^Use Lampo for (".+"|this project)$/.test((await tell()) ?? ''), `the sentence: ${await tell()}`);
     assert((await text('[data-testid="agent-tell-it"]')).startsWith('Tell Claude Code'), await text('[data-testid="agent-tell-it"]'));
     assert((await text('[data-testid="agent-shortcut"]')).includes('/lampo:watch'), 'the shortcut named');
+    // the quick way first (one prompt for any agent: test/e2e/agent-start.mjs), then the steps by hand
     const cards = await page.$$eval('.set-card h2', (h) => h.map((e) => e.textContent.replace(/^\d/, '')));
-    assert(JSON.stringify(cards.slice(0, 4)) === JSON.stringify(['Pick your agent', 'Add Lampo to it', 'Now tell it', 'See it work']), `${cards}`);
+    assert(
+      JSON.stringify(cards.slice(0, 5)) === JSON.stringify(['Let your agent set it up', 'Pick your agent', 'Add Lampo to it', 'Now tell it', 'See it work']),
+      `${cards}`,
+    );
     // Or the client starts its own server: works while the app is closed, but it can't show up here.
     await page.evaluate(() =>
       [...document.querySelectorAll('[data-testid="agent-snippet"] button')].find((b) => b.textContent.startsWith('Or let it')).click(),
     );
     await until(() => document.querySelector('[data-testid="agent-snippet"] pre')?.textContent.includes('bin/lampo-mcp'), 'the stdio command');
-    assert((await snippet()) === `claude mcp add lampo -- ${info.root}/bin/lampo-mcp`, `stdio ${await snippet()}`);
+    assert((await snippet()) === `claude mcp add --scope user lampo -- ${info.root}/bin/lampo-mcp`, `stdio ${await snippet()}`);
     assert((await state()).includes('doesn’t show up here'), await state());
     await page.evaluate(() =>
       [...document.querySelectorAll('[data-testid="agent-snippet"] button')].find((b) => b.textContent.startsWith('Connect through')).click(),

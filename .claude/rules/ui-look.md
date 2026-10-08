@@ -21,3 +21,4 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - A box whose content switches (steps, tabs) keeps one height: every panel in one grid cell, the current one shown.
 - A lazy screen's styles come with its own code; never lean on a class only another chunk's stylesheet defines.
 - A bare `stop`, `close`, `open`, `print`, `find`, `status` or `name` is the window's (`stop()` aborts every request in flight): Biome refuses them, so a lost local helper of that name can't fall through to it.
+- A new component's stylesheet is imported by the component, not added to `styles/index.css`: index.css is under every screen, so `test:e2e -- --changed` would run all suites.

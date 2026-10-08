@@ -25,7 +25,8 @@ import { loader, useLoaded } from '../lib/lazy.ts';
 import { posterUrl } from '../lib/posterUrl.ts';
 import { projectsOf } from '../lib/projects.ts';
 import { toast, toastError } from '../lib/toast.ts';
-import { I } from '../ui/icons.tsx';
+import { AgentLine, agentWord, StartButton, useAgentStart } from '../sessions/agentStart.tsx';
+import { AgentMark, I } from '../ui/icons.tsx';
 import { AGENTS, agentLabel, ConnectBlock, Mark, PickIcon, seenLine, useConnected, useWhere } from './connect.tsx';
 import { linkVideos, makeProject, makeSample, onboardingKey, pickAgent, removeSample, setHidden, useFolders, useOnboarding } from './data.ts';
 import { fromMenu, SideRow } from './Panel.tsx';
@@ -547,15 +548,22 @@ function SamplePane({ ctx }: { ctx: PaneCtx }) {
   );
 }
 
+/**
+ * The agent step leads with the prompt every empty page copies (sessions/agentStart.tsx): copied, the line under it
+ * follows the agent until it connects. By hand comes second: the agents to pick, or — one picked in the setup — its
+ * connect block, a click away.
+ */
 function AgentPane({ ctx }: { ctx: PaneCtx }) {
   const qc = useQueryClient();
   const where = useWhere();
   const projects = projectsOf(useLibrary().data);
-  const pick = ctx.agent;
+  const pick = ctx.agent && ctx.agent !== 'none' ? ctx.agent : null;
   const connected = useConnected(pick);
   const label = agentLabel(pick) ?? '';
+  const start = useAgentStart(null);
+  const [byHand, setByHand] = useState(false);
   // connected now, or once (the step is done): what it does, and that it's there
-  if (pick && pick !== 'none' && (connected || ctx.done))
+  if (pick && (connected || ctx.done))
     return (
       <Step
         title={connected ? t('{name} is connected', { name: label }) : titleOf('agent', pick, ctx.upload)}
@@ -567,44 +575,77 @@ function AgentPane({ ctx }: { ctx: PaneCtx }) {
         {connected && <Live on label={label} sub={seenLine(connected, !!where?.atMachine)} />}
       </Step>
     );
-  if (!pick || pick === 'none' || !where)
+  // none picked: the agent the prompt set going (or one that connected before)
+  if (!pick && (start.agent || ctx.done))
     return (
       <Step
-        title={t('Connect your agent')}
-        lede={t('Claude Code, Codex, Cursor or any MCP client reads your notes, fixes the video and answers here. Which one?')}
-        pic={<StepPic kind="agent" />}
+        title={start.agent ? t('{name} is connected', { name: agentWord(start.agent) }) : t('Your agent is connected')}
+        mark={start.agent ? <AgentMark kind={start.agent.kind ?? 'mcp'} size={16} /> : undefined}
+        lede={t('It asks how you want to start, puts up V1 and reads every note you send. You check.')}
+        said={!start.agent && <DoneNote>{t('Done.')}</DoneNote>}
+        pic={<StepPic kind="agent" on />}
       >
-        <fieldset className="ob-picks" aria-label={t('Your agent')}>
-          {AGENTS()
-            .filter((x) => x.id !== 'none')
-            .map((x) => (
-              <button key={x.id} type="button" onClick={() => pickAgent(qc, x.id).catch(toastError)} data-agent={x.id}>
-                <PickIcon id={x.id} />
-                {x.label}
-              </button>
-            ))}
-        </fieldset>
+        {start.agent && <AgentLine start={start} testid="ob-agent-line" />}
       </Step>
     );
-  // picked, not connected yet: the connect block in its compact form, its live status first, under the headline
+  // one picked in the setup, set up by hand: its connect block, the prompt a click back
+  if (pick && where && byHand)
+    return (
+      <Step
+        title={t('Connect {name}', { name: pick === 'other' ? t('any MCP client') : label })}
+        mark={<Mark id={pick} size={16} />}
+        pic={<StepPic kind="agent" mark={<Mark id={pick} size={12} />} />}
+      >
+        <ConnectBlock
+          pick={pick}
+          where={where}
+          connected={connected}
+          project={projects[0] ?? null}
+          headless
+          more={
+            <>
+              <button type="button" className="ob-lk" onClick={() => setByHand(false)} data-testid="ob-agent-prompt">
+                {t('Copy a prompt instead')}
+              </button>
+              <button type="button" className="ob-lk" onClick={() => pickAgent(qc, 'none').catch(toastError)} data-testid="ob-agent-change">
+                {t('Another agent')}
+              </button>
+            </>
+          }
+        />
+      </Step>
+    );
   return (
     <Step
-      title={t('Connect {name}', { name: pick === 'other' ? t('any MCP client') : label })}
-      mark={<Mark id={pick} size={16} />}
-      pic={<StepPic kind="agent" mark={<Mark id={pick} size={12} />} />}
+      title={t('Connect your agent')}
+      lede={t('Paste one prompt into it: it connects itself to Lampo, asks how you want to start and puts up V1.')}
+      pic={<StepPic kind="agent" mark={pick ? <Mark id={pick} size={12} /> : undefined} />}
     >
-      <ConnectBlock
-        pick={pick}
-        where={where}
-        connected={connected}
-        project={projects[0] ?? null}
-        headless
-        more={
-          <button type="button" className="ob-lk" onClick={() => pickAgent(qc, 'none').catch(toastError)} data-testid="ob-agent-change">
-            {t('Another agent')}
+      <div className="ob-gs-acts">
+        <StartButton start={start} className="ob-btn ob-raised" label={t('Copy prompt for your agent')} testid="ob-copy-prompt" />
+      </div>
+      <AgentLine start={start} testid="ob-agent-line" />
+      {pick && where ? (
+        <div className="ob-gs-hand">
+          <button type="button" className="ob-lk ob-u" onClick={() => setByHand(true)} data-testid="ob-agent-by-hand">
+            {t('Or connect {name} yourself', { name: pick === 'other' ? t('any MCP client') : label })}
           </button>
-        }
-      />
+        </div>
+      ) : (
+        <div className="ob-gs-hand">
+          <p id={`ob-hand-${ctx.where}`}>{t('Or connect it yourself')}</p>
+          <fieldset className="ob-picks" aria-labelledby={`ob-hand-${ctx.where}`}>
+            {AGENTS()
+              .filter((x) => x.id !== 'none')
+              .map((x) => (
+                <button key={x.id} type="button" onClick={() => pickAgent(qc, x.id).then(() => setByHand(true), toastError)} data-agent={x.id}>
+                  <PickIcon id={x.id} />
+                  {x.label}
+                </button>
+              ))}
+          </fieldset>
+        </div>
+      )}
     </Step>
   );
 }

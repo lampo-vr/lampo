@@ -35,9 +35,11 @@ const PUT_UP: Record<AgentWay, string> = {
  * Where questions go: to the person in the app, on the frame. A chat client is told where they go, not where they
  * mustn't (its chat is the person's own place to talk).
  */
+// (About the video: how the work starts — a folder, a tool — is asked where the person set the agent going, the setup
+// prompt's step 2 in lib/mcpConfig.ts.)
 const ASK: Record<AgentWay, string> = {
-  machine: `Ask the person in ${BRAND_NAME}, never in your chat: add_note (kind question, choices) on the frame; ask_options for what they must see or hear first.`,
-  coding: `Ask the person in ${BRAND_NAME}, never in your chat: add_note (kind question, choices) on the frame; ask_options for what they must see or hear first.`,
+  machine: `Ask about the video in ${BRAND_NAME}, never in your chat: add_note (kind question, choices) on the frame; ask_options for what they must see or hear first.`,
+  coding: `Ask about the video in ${BRAND_NAME}, never in your chat: add_note (kind question, choices) on the frame; ask_options for what they must see or hear first.`,
   chat: `Questions about the video go to the person in ${BRAND_NAME}, on the frame: add_note (kind question, choices); ask_options for what they must see or hear first.`,
 };
 

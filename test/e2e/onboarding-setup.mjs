@@ -228,7 +228,7 @@ try {
     await ana.click('[data-agent=claude-code] input');
     await ana.waitForSelector('[data-testid=ob-connect][data-connect-id=claude-code] [data-testid=ob-live][data-state=waiting]');
     const snippet = await ana.$eval('[data-testid=ob-snippet]', (e) => e.textContent);
-    assert(snippet.includes(`claude mcp add --transport http lampo ${cloud.base}/mcp`), snippet);
+    assert(snippet.includes(`claude mcp add --transport http --scope user lampo ${cloud.base}/mcp`), snippet);
     // then the one sentence, for the project just made: the whole loop, no command
     const tell = await ana.$eval('[data-testid=ob-start-cmd]', (e) => e.textContent);
     assert(tell.startsWith('Use Lampo for "Spring launch"'), tell);

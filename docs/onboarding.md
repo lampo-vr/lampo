@@ -123,13 +123,17 @@ land here for you"), and Insights' Agents card.
 
 ## Empty pages
 
-An empty library, project or folder leads with the agent. With the person's agent connected it offers **Ask Claude
-Code to make one** (the agent named as it connected), which copies one prompt to paste into it: *Make a short video:
-<what it's for, who it's for, how long>. Then use Lampo for it: put it up as V1 in a project and work my notes there
-until I approve.* (on an empty project's page, that project instead of "a project"). With none connected yet, **Make
-one with an agent** opens Settings → Connect an agent. Adding a video yourself is the second choice (*Upload video*,
-or *Add video* on the machine), with its key and the drop hint. Reviewers, who can't add videos, read that videos
-show up as soon as someone on the team uploads them.
+An empty library, project or folder leads with the agent, top to bottom: **Copy prompt for your agent**, the page's
+one raised button (Add video in the top bar steps back too); right under it one line that follows the agent — the
+agents it is for, then *Waiting for your agent…*, then *Claude Code connected* and what it does now; then **Connect
+your agent** (Settings → Connect an agent, the setup by hand); then adding a video yourself, quieter (*Upload video*,
+or *Add video* on the machine, with its key), and the drop hint. The prompt is the one [docs/mcp.md](mcp.md#the-quick-way)
+describes: the agent connects itself, says what only the person can do, asks how the work starts and puts up V1 (on an
+empty project's page, in that project). With the person's agent connected already, the button reads **Ask Claude Code to
+make one** (the agent named as it connected) and copies the same prompt; Connect your agent steps aside. Get started's
+agent step (in the card and the sidebar's panel) and Settings → Connect an agent lead with the same copy, the agents to
+pick by hand second. Reviewers, who can't add videos, read that videos show up as soon as someone on the team uploads
+them.
 
 ![The empty library of a hosted server with Claude Code connected: Ask Claude Code to make one first, uploading a video yourself second](assets/library-empty.webp)
 

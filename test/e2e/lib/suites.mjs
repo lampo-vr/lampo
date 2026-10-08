@@ -80,6 +80,7 @@ const SECONDS = {
   // Get started at the sidebar's foot: the row, its panel, hiding, the account menu, phone and tablet, the end
   'getstarted-sidebar': 45,
   // an agent seen the moment it connects: the sidebar at 390 and 1440, both themes and German, the empty project, Settings
+  'agent-start': 26,
   'agents-connected': 21,
   webkit: 17,
   playbook: 15,

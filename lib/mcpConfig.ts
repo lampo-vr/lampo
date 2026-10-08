@@ -72,10 +72,11 @@ export function mcpSnippet(client: McpClient, target: McpTarget, name = MCP_NAME
 
   switch (client) {
     case 'claude': {
+      // user scope: Lampo in every folder Claude Code opens (the default, local, is only the folder it was added in)
       const text =
         target.kind === 'stdio'
-          ? `claude mcp add ${name} -- ${shellQuote(target.command)}`
-          : `claude mcp add --transport http ${name} ${target.url}${secured ? ` --header "Authorization: ${bearer(`$${envName}`)}"` : ''}`;
+          ? `claude mcp add --scope user ${name} -- ${shellQuote(target.command)}`
+          : `claude mcp add --transport http --scope user ${name} ${target.url}${secured ? ` --header "Authorization: ${bearer(`$${envName}`)}"` : ''}`;
       return {
         client,
         label,
@@ -209,6 +210,57 @@ export function mcpSnippet(client: McpClient, target: McpTarget, name = MCP_NAME
 }
 
 export const isMcpClient = (x: unknown): x is McpClient => (MCP_CLIENTS as readonly unknown[]).includes(x);
+
+/** Where the chat apps add a connector by hand (they can't add one themselves). Agent-facing, so in English. */
+export const CONNECTOR_STEPS = {
+  claude: 'Customize → Connectors → + Add → Add custom connector',
+  chatgpt: 'developer mode in Settings → Security and login, then chatgpt.com/plugins → + → create an app',
+} as const;
+
+/** Where the setup prompt points the agent: this app's MCP endpoint, and the work it is for. */
+export interface SetupPlace {
+  /** The MCP endpoint (`…/mcp`): the running app's, local or hosted. */
+  url: string;
+  /** The app's folder when the person is at the machine it runs on: no sign-in, Claude's desktop app starts the stdio
+   * server itself. Null or absent: a server people sign in to. */
+  root?: string | null;
+  /** The project the work goes into, when the page knows it (an empty project's page); else the agent asks. */
+  project?: string | null;
+}
+
+/** A setup's JSON on one line (the clients' files hold it as an object; the prompt shows it whole). */
+const oneLineJson = (text: string) => JSON.stringify(JSON.parse(text));
+
+/**
+ * The prompt a person pastes into any agent to start working with Lampo, with no setup page read first: the agent
+ * connects itself to this server (the commands are mcpSnippet's, the ones Connect an agent hands out), says the one step
+ * only the person can do (signing in, a restart), asks how the work starts (from scratch, their footage, a project they
+ * have) and sets it up, then runs the loop the server's instructions tell (mcp/loop.ts). No token is ever in it: hosted
+ * servers sign in with OAuth, the machine needs none. Every line is about setting up this work and Lampo, nothing else.
+ * Agent-facing, so in English; held to a token budget by test/unit/setup-prompt.test.ts.
+ */
+export function setupPrompt({ url, root, project }: SetupPlace): string {
+  const http: McpTarget = { kind: 'http', url };
+  const machine = !!root;
+  const codex = mcpSnippet('codex', http);
+  const chat = machine
+    ? `- Claude's desktop app: I put ${oneLineJson(mcpSnippet('json', { kind: 'stdio', command: stdioCommand(root as string) }).text)} in its Settings → Developer → Edit Config and restart it. ChatGPT can't reach this computer.`
+    : url.startsWith('https://')
+      ? `- Claude, ChatGPT: I add a custom connector with that address. Claude: ${CONNECTOR_STEPS.claude}. ChatGPT: ${CONNECTOR_STEPS.chatgpt}.`
+      : '- Claude and ChatGPT reach only https addresses, not this one.';
+  const signIn = machine ? '' : `sign in (Claude Code: /mcp → ${MCP_NAME} → Authenticate; Codex: codex mcp login ${MCP_NAME}), `;
+  return `Set up ${BRAND_NAME} with me, then start the work. In ${BRAND_NAME} I pin notes to exact frames of your videos; you fix them.
+1. Connect ${BRAND_NAME}, unless its tools are here already: add its MCP server as ${MCP_NAME}.
+- Claude Code: ${mcpSnippet('claude', http).text}
+- Codex, in ${codex.where}:
+${codex.text}
+- Cursor, in ~/.cursor/mcp.json: ${oneLineJson(mcpSnippet('cursor', http).text)}
+- Other clients: a remote MCP server at ${url}
+${chat}
+Then tell me what only I can do: ${signIn}restart you if your client needs it (Claude Code: then claude -c), run a command you aren't allowed to.
+2. Ask me here how we start: from scratch (what, how long, 16:9 or 9:16, which tool, e.g. Remotion, which folder), from my footage (its folder), or my project (its folder, how it renders). Ask before creating or moving files; touch only folders I name. In a chat app, work with what I attach.
+3. ${lampoFor(project)} and follow its instructions to the end: the project named after the work, V1, then my notes until I approve.`;
+}
 
 const shellQuote = (s: string) => (/^[\w./@:+-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`);
 const tomlString = (s: string) => JSON.stringify(s);

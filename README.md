@@ -157,9 +157,11 @@ and the agent that should act on the notes. Nothing is scanned; the tool only re
 account is created on first start; set an email and a password in Settings → Profile to sign in from your phone or
 another computer.
 
-**Working with an agent?** Connect it in Settings → Connect an agent and tell it *Use Lampo for "<project>"*: it puts
-V1 up itself ([For agents](#for-agents)). Until there is a video, the empty library offers *Ask Claude Code to make one*
-(or whichever agent you connected), with the prompt copied for you.
+**Working with an agent?** The empty library leads with *Copy prompt for your agent*: paste it into Claude Code,
+Codex, Cursor, ChatGPT or Claude, and it connects itself to Lampo, tells you what only you can do (signing in, a
+restart), asks how the work starts (from scratch, your footage or a project you have) and puts up V1
+([docs/mcp.md](docs/mcp.md#the-quick-way)). The prompt holds no token. By hand: Settings → Connect an agent, then tell
+it *Use Lampo for "<project>"* ([For agents](#for-agents)).
 
 **No footage at hand?** `npm run demo` renders synthetic clips and builds a review history on a throwaway store:
 notes, an agent's fixes, a re-render with its diff, a review link and an approval. Ctrl+C deletes it again.
@@ -269,12 +271,13 @@ next Lampo answer says so, once: it stops there. Claude Code's `/lampo:watch` is
 | the agent on the machine Lampo runs on | MCP (stdio or the app) | `track_video`, then re-renders to the same path |
 | scripts without MCP | `lampo` (`npm run link`; `--json` on every read) | `lampo render`, `lampo push` |
 
-- **Connect:** Settings → Connect an agent gives each client its one snippet (or a chat app its connector address);
-  `lampo mcp config <client>` prints the same ([docs/mcp.md](docs/mcp.md)): stdio (`bin/lampo-mcp`) or Streamable HTTP at
-  `/mcp` (the local app, or a hosted server by signing in or with an API token).
+- **Connect:** one prompt the person copies from the app and pastes into their agent sets it up (it connects itself,
+  then asks how the work starts); Settings → Connect an agent gives each client its one snippet (or a chat app its
+  connector address); `lampo mcp config <client>` prints the same ([docs/mcp.md](docs/mcp.md)): stdio
+  (`bin/lampo-mcp`) or Streamable HTTP at `/mcp` (the local app, or a hosted server by signing in or with an API token).
 
   ```sh
-  claude mcp add lampo -- /path/to/lampo/bin/lampo-mcp
+  claude mcp add --scope user lampo -- /path/to/lampo/bin/lampo-mcp
   lampo mcp config codex   # or claude, cursor, vscode, antigravity, windsurf, gemini, zed, json
   ```
 - **Few tokens:** pictures only for notes with a drawing, cropped to it; only what changed when an agent hands back

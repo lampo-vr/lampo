@@ -22,9 +22,12 @@ export const readFold = (): boolean => {
   }
 };
 
-/** An agent picked and not connected yet: Get started's agent step holds its connect form (a taller pane). */
+/**
+ * The agent step still to do: Get started's agent pane holds a connect form (a taller pane) — the prompt to copy with
+ * its line and the agents to pick by hand, or the picked one's connect block. Not for "no agent for now".
+ */
 export const connecting = (agent: OnboardingPrefs['agent'] | null | undefined, steps: readonly StepState[]): boolean =>
-  !!agent && agent !== 'none' && steps.some((s) => s.id === 'agent' && !s.done);
+  agent !== 'none' && steps.some((s) => s.id === 'agent' && !s.done);
 
 /**
  * The room Get started keeps while its code arrives: the card's own height, by the same CSS (onboarding.css) — folded

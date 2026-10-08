@@ -275,7 +275,8 @@
 
 /* the pane's room by width, measured on every step and state in English and German (test/e2e/onboarding.mjs keeps
    the card in it): a wide card has the step's picture beside the words, a narrower one gives the words the pane. An
-   agent picked and not connected yet (.ob-tall) has its connect form in its pane: the room for that. */
+   agent step still to do (.ob-tall) has a connect form in its pane (the prompt to copy and the picks, or a picked
+   agent's connect block): the room for that. */
 @container lib (min-width: 1400px) {
   .ob-gs {
     --gs-pane: 264px;

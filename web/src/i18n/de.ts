@@ -1745,7 +1745,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   '{n} fix waiting|{n} fixes waiting': '{n} Korrektur wartet|{n} Korrekturen warten',
   'Or let it start its own server': 'Oder ihn seinen eigenen Server starten lassen',
   'Other client': 'Anderer Client',
-  'Make one with an agent': 'Mit einem Agenten machen',
   '{n} day ago|{n} days ago': 'vor {n} Tag|vor {n} Tagen',
   'All versions, to switch and compare': 'Alle Versionen, zum Wechseln und Vergleichen',
   'Approve or request changes': 'Freigeben oder Änderungen anfordern',
@@ -3450,8 +3449,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   Checking: 'Prüfe',
   'Choose Add custom connector.': 'Wähle „Benutzerdefinierten Connector hinzufügen“.',
   'Claude Code · in a terminal': 'Claude Code · im Terminal',
-  'Claude Code, Codex, Cursor or any MCP client reads your notes, fixes the video and answers here. Which one?':
-    'Claude Code, Codex, Cursor oder ein anderer MCP-Client liest deine Notizen, korrigiert das Video und antwortet hier. Welcher?',
   'Review link · 2 notes': 'Review-Link · 2 Notizen',
   'Link review': 'Link-Review',
   'Anyone with the link watches and pins notes to frames, no account needed.': 'Wer den Link hat, schaut und heftet Notizen an Frames, ohne Konto.',
@@ -4824,20 +4821,38 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Where in the files': 'Wo in den Dateien',
   'Where it was': 'Wo sie lag',
   'ZIP archive': 'ZIP-Archiv',
+  // one prompt for any agent (sessions/agentStart.tsx): copied, the line under it follows the agent; by hand second
+  '{agent} connected': '{agent} verbunden',
+  'and other agents': 'und andere Agenten',
+  'Copy a prompt instead': 'Stattdessen einen Prompt kopieren',
+  'Copy prompt for your agent': 'Prompt für deinen Agenten kopieren',
+  'For Claude Code, Codex, Cursor, ChatGPT, Claude and other agents': 'Für Claude Code, Codex, Cursor, ChatGPT, Claude und andere Agenten',
+  'Hide the prompt': 'Prompt ausblenden',
+  'it asks how you want to start': 'er fragt, wie du anfangen willst',
+  'It asks how you want to start, puts up V1 and reads every note you send. You check.':
+    'Er fragt, wie du anfangen willst, stellt V1 ein und liest jede Notiz, die du schickst. Du prüfst.',
+  'Let your agent set it up': 'Lass deinen Agenten es einrichten',
+  'One prompt for any agent: it connects itself to Lampo, tells you what only you can do (signing in, a restart), asks how you want to start and puts up V1.':
+    'Ein Prompt für jeden Agenten: Er verbindet sich selbst mit Lampo, sagt dir, was nur du tun kannst (anmelden, ein Neustart), fragt, wie du anfangen willst, und stellt V1 ein.',
+  'Or connect {name} yourself': 'Oder verbinde {name} selbst',
+  'Or connect it yourself': 'Oder verbinde ihn selbst',
+  'Paste one prompt into it: it connects itself to Lampo, asks how you want to start and puts up V1.':
+    'Ein Prompt, in deinen Agenten eingefügt: Er verbindet sich selbst mit Lampo, fragt, wie du anfangen willst, und stellt V1 ein.',
+  'paste the prompt into it': 'füg den Prompt dort ein',
+  'ready for the prompt': 'bereit für den Prompt',
+  'See the prompt': 'Prompt ansehen',
+  'The prompt, as it is copied': 'Der Prompt, so wie er kopiert wird',
+  'Waiting for your agent…': 'Warte auf deinen Agenten …',
+  'Your agent is connected': 'Dein Agent ist verbunden',
   // close the loop: the first project, the agent puts up V1, the one sentence that sets it to work
   'Ask {agent} to make one': '{agent} eins machen lassen',
-  'Copied: paste it into {agent} and say what the video is for': 'Kopiert: Füg es in {agent} ein und sag, wofür das Video ist',
   'In Claude Code, <0>{command}</0> does the same.': 'In Claude Code macht <0>{command}</0> dasselbe.',
-  'Make a short video: <what it’s for, who it’s for, how long>. Then use Lampo for it: put it up as V1 in {project} and work my notes there until I approve.':
-    'Mach ein kurzes Video: <wofür, für wen, wie lang>. Nutz dann Lampo dafür: Stell es als V1 in {project} ein und arbeite dort meine Notizen ab, bis ich freigebe.',
   'Upload a video, and every note you pin stays on its frame.': 'Lade ein Video hoch, und jede Notiz, die du anheftest, bleibt auf ihrem Frame.',
   'Your agent makes the video and puts it here. Every note you pin reaches it, frame-exact.':
     'Dein Agent macht das Video und stellt es hier ein. Jede Notiz, die du anheftest, erreicht ihn, auf den Frame genau.',
   'Meanwhile: try the sample': 'Bis dahin: Beispiel ausprobieren',
   'An agent shows up here while it talks to Lampo, and you can hand videos to it. It hears new notes only while it waits for them; it disappears about a minute after it stops.':
     'Ein Agent erscheint hier, solange er mit Lampo spricht, und du kannst ihm Videos geben. Neue Notizen hört er nur, während er auf sie wartet; etwa eine Minute nachdem er aufhört, verschwindet er.',
-  'Make a short video: <what it’s for, who it’s for, how long>. Then use Lampo for it: put it up as V1 in a project and work my notes there until I approve.':
-    'Mach ein kurzes Video: <wofür, für wen, wie lang>. Nutz dann Lampo dafür: Stell es als V1 in ein Projekt ein und arbeite dort meine Notizen ab, bis ich freigebe.',
   'One snippet in your agent, then one sentence: Use Lampo for your project.': 'Ein Snippet in deinem Agenten, dann ein Satz: Nutz Lampo für dein Projekt.',
   'Your agent puts its exports up too, once you tell it to use Lampo.': 'Dein Agent stellt seine Exporte auch ein, sobald du ihm sagst, er soll Lampo nutzen.',
   '{name} is in review.': '{name} ist im Review.',

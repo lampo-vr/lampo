@@ -9,7 +9,7 @@ import { useState } from 'react';
 import { agentShown } from '../../../lib/agentKind.ts';
 import { WAKE_DEFAULT } from '../../../lib/agentRun.ts';
 import { BRAND_NAME } from '../../../lib/brand.ts';
-import { lampoFor, MCP_NAME, type McpClient, type McpTarget, mcpSnippet, stdioCommand } from '../../../lib/mcpConfig.ts';
+import { lampoFor, MCP_NAME, type McpClient, type McpTarget, mcpSnippet, setupPrompt, stdioCommand } from '../../../lib/mcpConfig.ts';
 import { compareTime } from '../../../lib/time.ts';
 import type { AgentKind, AgentListenState, WakePref } from '../../../lib/types.ts';
 import { useAgents, useAuthStatus, useUpdateMe } from '../api/auth.ts';
@@ -18,6 +18,7 @@ import { t } from '../i18n/index.ts';
 import { T } from '../i18n/T.tsx';
 import { projectsOf } from '../lib/projects.ts';
 import { toastError } from '../lib/toast.ts';
+import { AgentLine, placeOf, StartButton, useAgentStart } from '../sessions/agentStart.tsx';
 import { WATCH_COMMAND } from '../sessions/listening.tsx';
 import { Badge } from '../ui/Badge.tsx';
 import { AgentMark } from '../ui/icons.tsx';
@@ -189,6 +190,35 @@ function TellIt({ pick }: { pick: AgentPick }) {
   );
 }
 
+/**
+ * The quick way, first: one prompt for any agent (the one every empty page copies, sessions/agentStart.tsx) — it
+ * connects itself, says what only the person can do, asks how the work starts and puts up V1 — the line that follows
+ * it, and the prompt itself to read before pasting it.
+ */
+function PromptStart() {
+  const info = useInfo();
+  const via = useAuthStatus().data?.via;
+  const start = useAgentStart(null);
+  const [see, setSee] = useState(false);
+  const place = placeOf(info, via);
+  return (
+    <>
+      <div className="set-actions set-start">
+        <StartButton start={start} label={t('Copy prompt for your agent')} testid="agent-prompt-copy" />
+        <button type="button" className="btn ghost set-more" aria-expanded={see} onClick={() => setSee(!see)} data-testid="agent-prompt-see">
+          {see ? t('Hide the prompt') : t('See the prompt')}
+        </button>
+      </div>
+      <AgentLine start={start} testid="agent-prompt-line" />
+      {see && place && (
+        <Code label={t('The prompt, as it is copied')} testid="agent-prompt-text">
+          {setupPrompt({ ...place, project: null })}
+        </Code>
+      )}
+    </>
+  );
+}
+
 export function Mcp() {
   const info = useInfo();
   const atMachine = useAuthStatus().data?.via === 'local' && !!info?.root;
@@ -212,6 +242,18 @@ export function Mcp() {
           )}
         </p>
       </header>
+
+      <Card
+        title={t('Let your agent set it up')}
+        lede={t(
+          'One prompt for any agent: it connects itself to Lampo, tells you what only you can do (signing in, a restart), asks how you want to start and puts up V1.',
+        )}
+        testid="agent-prompt"
+      >
+        <PromptStart />
+      </Card>
+
+      <h2 className="set-or">{t('Or connect it yourself')}</h2>
 
       <Card step={1} title={t('Pick your agent')}>
         <AgentTiles value={pick} onChange={setPick} name="agent" label={t('Pick your agent')} />

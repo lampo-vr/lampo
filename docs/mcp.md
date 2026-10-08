@@ -6,7 +6,30 @@ Windsurf, Gemini CLI, Zed, Claude, ChatGPT and any other MCP client.
 
 ## The quick way
 
-**In the app**, open **Settings → Connect an agent**:
+**Copy one prompt into your agent.** An empty library, project or folder leads with **Copy prompt for your agent**;
+Get started's agent step and **Settings → Connect an agent** have the same button (and the prompt to read before you
+paste it). Paste it into Claude Code, Codex, Cursor, ChatGPT, Claude or any other agent, and it:
+
+1. connects itself to this server's `/mcp`, unless Lampo's tools are there already: the same command or config the
+   steps below hand out (`claude mcp add …` for Claude Code, the `[mcp_servers.lampo]` lines for Codex, the
+   `mcp.json` entry for Cursor, a remote MCP server for any other client). A chat app can't add a connector itself: it
+   tells you where to add it;
+2. tells you the steps only you can do: signing in (Claude Code: `/mcp` → lampo → Authenticate; Codex:
+   `codex mcp login lampo`), a restart if the client reads new servers only at start (Claude Code: then `claude -c`
+   carries the chat on), or a command it isn't allowed to run;
+3. asks how the work starts: from scratch (what, how long, 16:9 or 9:16, which tool, which folder), from footage you
+   have (its folder), or a project you already work in (its folder, how it renders). It asks before it creates or
+   moves files and touches only the folders you name; a chat app works with what you attach;
+4. runs the loop: **Use Lampo for this project** (or the project the page is about), the project named after the
+   work, V1, then your notes until you approve.
+
+The prompt holds no secret: on a hosted server the agent signs in with OAuth, on your own machine there is nothing to
+sign in (and Claude's desktop app is told to start `bin/lampo-mcp` itself). The line under the button follows it live:
+the agents it is for, then *Waiting for your agent…*, then *Claude Code connected* and what it does; its V1 ends the
+empty page. The prompt stays well under the size of the server's instructions
+(`test/unit/setup-prompt.test.ts`).
+
+**Step by step**, open **Settings → Connect an agent** (or **Connect your agent** under the copy):
 
 1. Pick your agent.
 2. Copy the one snippet it needs (a command, a few lines for its config file, or a chat app's connector address).
@@ -72,11 +95,12 @@ The examples use `https://review.example.com/mcp`: put your server's address the
 ### Claude Code
 
 ```sh
-claude mcp add --transport http lampo https://review.example.com/mcp
+claude mcp add --transport http --scope user lampo https://review.example.com/mcp
 ```
 
 Then sign in: run `/mcp` in Claude Code and follow the steps in your browser (or run `claude mcp login lampo`).
-The server is added for the current project; add `--scope user` to have it in every project.
+`--scope user` adds it for every folder Claude Code opens; without it, only for the current one. Claude Code reads its
+servers at start: one added from inside a session shows up after a restart (`claude -c` carries the chat on).
 
 Then tell it: `Use Lampo for "<project>"`. It runs the whole loop: puts up V1, works your notes and keeps waiting for
 new ones until you approve or say stop. `/lampo:watch` is its shortcut (Claude Code lists Lampo's `watch` prompt as a
@@ -308,7 +332,7 @@ Instead of an address, the client can start `bin/lampo-mcp` itself:
 
 | Client | The entry |
 |---|---|
-| Claude Code | `claude mcp add lampo -- /path/to/lampo/bin/lampo-mcp` |
+| Claude Code | `claude mcp add --scope user lampo -- /path/to/lampo/bin/lampo-mcp` |
 | Codex | `command = "/path/to/lampo/bin/lampo-mcp"` in place of `url` |
 | Cursor, Antigravity, Windsurf, Gemini CLI, Claude desktop | `"command": "/path/to/lampo/bin/lampo-mcp"` in place of the address |
 | VS Code | `"type": "stdio", "command": "/path/to/lampo/bin/lampo-mcp"` |

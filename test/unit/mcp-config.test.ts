@@ -22,7 +22,7 @@ const targets: Record<string, McpTarget> = {
 
 /** The server's key in a snippet, read the way its client reads it. */
 function keyOf(s: McpSnippet): string | undefined {
-  if (s.language === 'shell') return /^claude mcp add (?:--transport http )?(\S+) /.exec(s.text)?.[1];
+  if (s.language === 'shell') return /^claude mcp add (?:--transport http )?(?:--scope user )?(\S+) /.exec(s.text)?.[1];
   if (s.language === 'toml') return /^\[mcp_servers\.([^\]]+)\]$/m.exec(s.text)?.[1];
   const j = JSON.parse(s.text) as Record<string, Record<string, unknown>>;
   const keys = Object.keys(j.mcpServers ?? j.servers ?? j.context_servers ?? {});
@@ -64,11 +64,16 @@ test('every client × setup parses and wires URL and token the way that client e
       if (kind === 'local') assert.ok(!/Authorization/.test(s.text), `${what}: loopback needs no token`);
       if (kind === 'literal') assert.ok(s.text.includes('vr_secret123'), what);
     }
-  assert.match(mcpSnippet('claude', targets.stdio).text, /^claude mcp add lampo -- '\/opt\/video review\/bin\/lampo-mcp'$/, 'paths with spaces are quoted');
-  assert.equal(mcpSnippet('claude', targets.local).text, 'claude mcp add --transport http lampo http://localhost:4747/mcp');
+  assert.match(
+    mcpSnippet('claude', targets.stdio).text,
+    /^claude mcp add --scope user lampo -- '\/opt\/video review\/bin\/lampo-mcp'$/,
+    'paths with spaces are quoted',
+  );
+  // user scope: Lampo in every folder Claude Code opens, not only the one it was added in
+  assert.equal(mcpSnippet('claude', targets.local).text, 'claude mcp add --transport http --scope user lampo http://localhost:4747/mcp');
   assert.match(
     mcpSnippet('claude', targets.hosted).text,
-    /--transport http lampo https:\/\/review\.example\.com\/mcp --header "Authorization: Bearer \$LAMPO_TOKEN"/,
+    /--transport http --scope user lampo https:\/\/review\.example\.com\/mcp --header "Authorization: Bearer \$LAMPO_TOKEN"/,
   );
   assert.match(mcpSnippet('cursor', targets.hosted).text, /"Authorization": "Bearer \$\{env:LAMPO_TOKEN\}"/);
   assert.match(mcpSnippet('vscode', targets.hosted).text, /\$\{input:lampo-token\}[\s\S]*"password": true/);
@@ -122,7 +127,7 @@ test('lampo mcp config: stdio here, the local app over HTTP, or a hosted server 
 
   const local = vr(['mcp', 'config', 'vscode', '--http'], env);
   assert.deepEqual(JSON.parse(local.out).servers.lampo, { type: 'http', url: 'http://localhost:4747/mcp' });
-  assert.equal(vr(['mcp', 'config', 'claude', '--http'], env).out.trim(), 'claude mcp add --transport http lampo http://localhost:4747/mcp');
+  assert.equal(vr(['mcp', 'config', 'claude', '--http'], env).out.trim(), 'claude mcp add --transport http --scope user lampo http://localhost:4747/mcp');
 
   const hostedEnv = { ...env, VR_SERVER: 'https://review.example.com/', VR_TOKEN: 'vr_fromenv' };
   const codex = vr(['mcp', 'config', 'codex'], hostedEnv);
@@ -160,7 +165,7 @@ test('a setup under the earlier key video-review is still served: --name prints 
   // The key lives in the client's config only; the client never sends it, so the server can't tell the two apart.
   const old = vr(['mcp', 'config', 'claude', '--stdio', '--name', 'video-review'], env);
   assert.equal(old.code, 0, old.err);
-  assert.match(old.out, /^claude mcp add video-review -- \S*bin\/lampo-mcp/);
+  assert.match(old.out, /^claude mcp add --scope user video-review -- \S*bin\/lampo-mcp/);
   const codex = vr(['mcp', 'config', 'codex', '--name', 'video-review'], env);
   assert.match(codex.out, /^\[mcp_servers\.video-review\]\ncommand = /);
   // Claude Code names an MCP tool mcp__<key>__<tool>: the live agent monitor reads Lampo's tools under either key.

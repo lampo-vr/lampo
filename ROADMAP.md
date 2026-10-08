@@ -367,6 +367,9 @@ Findings of audit A13 (2026-10-05, `AUDITS.md`) and its verification rounds that
 - Accounts scoped to folders (clients with their own logins) or share links only. (Importing an existing local store
   into a hosted instance: `lampo export` / `lampo admin import`, docs/moving.md. Not in a bundle yet: questions asked on a
   folder before any video (`asks.json`), and notes made on a video after it moved, which a later export can't merge.)
+- The setup prompt (Copy prompt for your agent): whether the server's instructions also learn "no version yet: ask how
+  the work starts" (an agent connected by hand skips that question today; it costs the instructions about 15 tokens over
+  their 480 budget), and whether the first run's own agent step (Welcome) leads with the same copy as Get started does.
 
 ## Decided
 

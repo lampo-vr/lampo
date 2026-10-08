@@ -8,6 +8,8 @@ format stays backwards compatible throughout.
 ## [Unreleased]
 
 ### Changed
+- The command for Claude Code adds Lampo for every folder you open (`claude mcp add --scope user …`), not only the
+  one you were in when you added it.
 - Safe zones and the phone view are two separate choices. The safe-zones button (G) draws only the zones, the phone
   view (V) only the phone and an app's interface around the picture, and each button names its own choice; pick both
   to see an app's buttons and caption inside its zones. What you had set keeps showing as it did.
@@ -25,6 +27,13 @@ format stays backwards compatible throughout.
   and the card declares that it loads nothing from anywhere.
 
 ### Added
+- **Start with your agent in one paste.** An empty library, project or folder leads with **Copy prompt for your
+  agent**: paste it into Claude Code, Codex, Cursor, ChatGPT, Claude or any other agent, and it connects itself to
+  Lampo, tells you the one step only you can do (signing in, a restart), asks how you want to start — from scratch,
+  from your footage, or a project you already have — sets that up and puts up V1. The prompt holds no token. A line
+  right under the button follows it live: waiting for your agent, then your agent connected and what it does, until
+  its V1 arrives. Connect your agent (the setup by hand) comes next, adding a video yourself last; Get started and
+  Settings → Connect an agent lead with the same prompt.
 - `LAMPO_OPENAI_APPS_CHALLENGE`: the token ChatGPT's app directory checks at `/.well-known/openai-apps-challenge` when
   you list your server's MCP connector there.
 

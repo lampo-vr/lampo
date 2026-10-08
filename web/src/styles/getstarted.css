@@ -111,6 +111,17 @@
   }
 }
 
+/* the agent step's way by hand, under the prompt and its line: a quiet label over the picks (or the picked one's link) */
+.ob-gs-hand {
+  display: grid;
+  justify-items: start;
+  gap: var(--sp-2);
+}
+.ob-gs-hand p {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
 /* the agent's picks */
 .ob-picks {
   display: flex;

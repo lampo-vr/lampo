@@ -185,7 +185,7 @@ try {
     await a.click('[data-agent=claude-code] input');
     await a.waitForSelector('[data-testid=ob-connect][data-connect-id=claude-code] [data-testid=ob-live][data-state=waiting]', { timeout: 10000 });
     const snippet = await a.$eval('[data-testid=ob-snippet]', (e) => e.textContent);
-    assert(snippet.includes(`claude mcp add --transport http lampo ${BASE}/mcp`), snippet);
+    assert(snippet.includes(`claude mcp add --transport http --scope user lampo ${BASE}/mcp`), snippet);
     assert(!(await a.$('[data-testid=ob-token-toggle]')), 'no token at the machine');
     assert((await textOf(a, '[data-testid=ob-connect]')).includes('No sign-in'), 'nothing to sign in');
     // what `vr watch` says every 30 s (at the machine every agent is its owner's)
@@ -391,9 +391,10 @@ try {
     await p.browserContext().close();
   });
 
-  // An empty library leads with the agent: it makes the video and puts it here; adding one yourself is the quiet second
+  // An empty library leads with the agent: one prompt to copy (it connects the agent, asks how the work starts, puts up
+  // V1), Connect your agent by hand second, adding one yourself quieter (test/e2e/agent-start.mjs looks at it closely)
   await check(
-    'an empty library leads with the agent: Make one with an agent (to Connect an agent, none yet), then a heartbeat names it and copies its prompt',
+    'an empty library leads with the agent: the prompt to copy, Connect your agent, then Add video; a heartbeat names it, its prompt is the same',
     async () => {
       const p = await fresh();
       await p.browserContext().overridePermissions(old.base, ['clipboard-read', 'clipboard-write', 'clipboard-sanitized-write']);
@@ -401,25 +402,23 @@ try {
       const text = await p.$eval('.empty-library', (e) => e.textContent);
       assert(text.includes('Your agent makes the video and puts it here.'), text);
       assert(!text.includes('No video yet?'), 'no second line saying the same');
-      // no agent connected yet: the primary leads to Connect an agent; adding a video (the machine links one) is second
-      const first = await p.$eval('.empty-library [data-testid=make-with-agent]', (e) => ({
-        cls: e.className,
-        text: e.textContent.trim(),
-        href: e.getAttribute('href'),
-      }));
-      assert(first.cls.includes('primary') && first.text === 'Make one with an agent' && first.href === '#/settings/mcp', JSON.stringify(first));
+      // no agent connected yet: the primary copies the prompt; Connect an agent by hand, then adding a video (the machine links one)
+      const first = await p.$eval('.empty-library [data-testid=make-with-agent]', (e) => ({ cls: e.className, text: e.textContent.trim() }));
+      assert(first.cls.includes('primary') && first.text === 'Copy prompt for your agent', JSON.stringify(first));
+      assert((await p.$eval('.empty-library [data-testid=connect-agent]', (e) => e.getAttribute('href'))) === '#/settings/mcp', 'Connect your agent');
       const add = await p.$$eval('.empty-library button', (bs) => bs.map((b) => `${b.className} ${b.textContent.trim()}`).find((x) => x.includes('Add video')));
-      assert(add && !add.includes('primary') && add.includes('A'), `the quiet second, with its key: ${add}`);
-      // an agent connects (what `vr watch` says every 30 s): the primary names it and copies the one prompt to paste into it
+      assert(add && !add.includes('primary') && add.includes('ghost') && add.includes('A'), `the quiet last, with its key: ${add}`);
+      // an agent connects (what `vr watch` says every 30 s): the primary names it and copies the same prompt
       await api('/api/agents/heartbeat', 'POST', { session_id: 'e2e-empty', name: 'spot-edit', kind: 'claude-code' }, old.base);
       await p.waitForFunction(() => document.querySelector('[data-testid=make-with-agent]')?.textContent.includes('Ask Claude Code to make one'), {
         timeout: 40000,
       });
+      assert(!(await p.$('.empty-library [data-testid=connect-agent]')), 'connected: nothing to connect by hand');
       await p.click('[data-testid=make-with-agent]');
-      await p.waitForFunction(() => document.body.textContent.includes('Copied: paste it into Claude Code'), { timeout: 5000 });
+      await p.waitForFunction(() => document.querySelector('[data-testid=agent-line]')?.textContent.includes('Claude Code connected'), { timeout: 5000 });
       const copied = await p.evaluate(() => navigator.clipboard.readText());
-      // "use Lampo" is the whole loop: no command in it
-      assert(copied.startsWith('Make a short video:') && copied.includes('use Lampo for it') && !/\bvr\b/.test(copied), copied);
+      // "use Lampo" is the whole loop: no older command in it, no token
+      assert(copied.startsWith('Set up Lampo with me') && copied.includes('Use Lampo for this project') && !/\bvr\b|Bearer/.test(copied), copied);
       await shot(p, '00-empty-library');
       await p.browserContext().close();
     },

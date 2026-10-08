@@ -270,7 +270,7 @@ try {
     // Connect an agent with it: Claude Code's command first, then any client's config, for this server's /mcp with the
     // key lampo and this token.
     const snippet = () => page.$eval('[data-testid="token-snippet"] pre', (e) => e.textContent);
-    assert((await snippet()) === `claude mcp add --transport http lampo ${BASE}/mcp --header "Authorization: Bearer ${token}"`, await snippet());
+    assert((await snippet()) === `claude mcp add --transport http --scope user lampo ${BASE}/mcp --header "Authorization: Bearer ${token}"`, await snippet());
     await page.click('[data-testid="token-fresh"] [data-testid="agent-tiles"] input[value="codex"]');
     await page.waitForFunction(() => document.querySelector('[data-testid="token-snippet"] pre')?.textContent.startsWith('[mcp_servers.lampo]'), {
       polling: 100,

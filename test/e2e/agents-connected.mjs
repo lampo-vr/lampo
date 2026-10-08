@@ -80,13 +80,15 @@ try {
     });
   const shot = async (p, name) => SHOTS && p.screenshot({ path: path.join(SHOTS, `agents-connected-${name}.png`) });
 
-  await check('before an agent connects: no Agents section, and the empty project offers Make one with an agent', async () => {
+  await check('before an agent connects: no Agents section, and the empty project offers the prompt to copy, then Connect your agent', async () => {
     const p = await fresh();
     await open(p, `#/folder/${encodeURIComponent('Spring launch')}`);
     await p.waitForSelector('[data-testid=make-with-agent]', { timeout: 15000 });
     assert(!(await p.$('[data-testid=nav-agents]')), 'no agents yet');
-    const first = await p.$eval('[data-testid=make-with-agent]', (e) => ({ cls: e.className, href: e.getAttribute('href'), text: e.textContent.trim() }));
-    assert(first.cls.includes('primary') && first.href === '#/settings/mcp' && first.text === 'Make one with an agent', JSON.stringify(first));
+    const first = await p.$eval('[data-testid=make-with-agent]', (e) => ({ cls: e.className, tag: e.tagName, text: e.textContent.trim() }));
+    assert(first.cls.includes('primary') && first.tag === 'BUTTON' && first.text === 'Copy prompt for your agent', JSON.stringify(first));
+    const by = await p.$eval('[data-testid=connect-agent]', (e) => ({ cls: e.className, href: e.getAttribute('href'), text: e.textContent.trim() }));
+    assert(!by.cls.includes('primary') && by.href === '#/settings/mcp' && by.text === 'Connect your agent', JSON.stringify(by));
     await p.browserContext().close();
   });
 

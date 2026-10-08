@@ -175,6 +175,18 @@
   align-items: center;
   gap: var(--sp-2);
 }
+/* Connect an agent's quick way: the copy leads, reading the prompt is the quiet thing beside it */
+.set-actions.set-start {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+/* between the quick way and the steps by hand: a quiet label, not a card's title */
+.set-or {
+  margin: var(--sp-4) 0 0;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-ui);
+  color: var(--muted);
+}
 .set-expired {
   color: var(--must);
 }
