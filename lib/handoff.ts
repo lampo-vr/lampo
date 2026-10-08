@@ -4,7 +4,7 @@
 // comes in between is lost. People keep notes as drafts and send them together, so a wait that ends with nothing new
 // is the normal case, and says so. Agent-facing lines: appended to answers, never reworded (AGENTS.md "What agents
 // read"); each fits test/unit/token-budget.test.ts.
-import { MCP_NAME } from './brand.ts';
+import { BRAND_NAME, MCP_NAME } from './brand.ts';
 import { isFeedback } from './eventLine.ts';
 import type { ReviewEvent } from './types.ts';
 
@@ -44,3 +44,5 @@ export const PENDING_LINE = `${ON_SEND.charAt(0).toUpperCase()}${ON_SEND.slice(1
 /** After QUIET_STOP_MIN minutes of only that: stop, and tell the person how to start listening again. */
 export const QUIET_STOP_MIN = 30;
 export const STOP_LINE = `${QUIET_STOP_MIN} min with nothing new: stop waiting now. Tell the person you stopped listening; the watch prompt (/${MCP_NAME}:watch in Claude Code) starts you again.`;
+/** The same for a chat client (Claude, ChatGPT): no command or other app to name, the person asks again in the chat. */
+export const CHAT_STOP_LINE = `${QUIET_STOP_MIN} min with nothing new: stop waiting now. Tell the person you stopped listening; asking you to use ${BRAND_NAME} again starts you again.`;

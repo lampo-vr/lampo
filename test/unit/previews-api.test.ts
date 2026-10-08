@@ -173,7 +173,8 @@ test('MCP: set_render_source, attach_preview inline and as an upload URL, get_no
 
     const ticket = await call('attach_preview', { id: note, kind: 'clip', frame: 5 });
     assert.ok(!ticket.isError, ticket.text);
-    assert.match(ticket.text, /curl -fT <file> 'http:\/\/review\.test\/api\/uploads\/direct\/vrup_[\w-]+'/);
+    // the URL alone: a client that isn't a coding agent is told what it takes, never a command to run (mcp/loop.ts)
+    assert.match(ticket.text, /^PUT the clip to this URL once \(valid until [^)]+\):\nhttp:\/\/review\.test\/api\/uploads\/direct\/vrup_[\w-]+$/);
     const after = await call('get_note', { id: note });
     assert.match(after.text, /preview p_[a-f0-9]{10} still of f20 on v2 by agent:ae-agent/);
     assert.match(after.text, /\[fixed v2\]: Grade zurückgenommen Preview: still of 00:00:20 \(f20\) on top of v2\./);

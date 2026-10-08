@@ -138,7 +138,7 @@ export const RENAMED_DEV = [
 ] as const;
 
 /** Settings that were born LAMPO_: read as they are, with no older spelling (a VR_OPERATOR never meant anything). */
-export const LAMPO_ONLY = ['LAMPO_OPERATOR', 'LAMPO_RUN', 'LAMPO_TEST_CLI'] as const;
+export const LAMPO_ONLY = ['LAMPO_OPERATOR', 'LAMPO_RUN', 'LAMPO_TEST_CLI', 'LAMPO_OPENAI_APPS_CHALLENGE'] as const;
 
 type Renamed = (typeof RENAMED)[number] | (typeof RENAMED_DEV)[number];
 export type SettingName = `LAMPO_${Renamed}` | (typeof LAMPO_ONLY)[number];

@@ -22,6 +22,7 @@ const ws = await import('../../lib/workspaces.ts');
 const { inWorkspace } = await import('../../lib/scope.ts');
 const store = await import('../../lib/store.ts');
 const { slugify } = await import('../../lib/paths.ts');
+const { AGENT_PLAN_WORDS } = await import('../../lib/planWords.ts');
 
 const PUBLIC = 'http://review.test';
 const origin = { Origin: PUBLIC };
@@ -172,7 +173,7 @@ test('a read-only workspace: no new uploads, videos, members or review links —
   assert.match(big.text, /used its 10 GB/);
 });
 
-test('an upload refused for room: a person’s browser reads the refusal’s reason and numbers, an agent the sentence alone', async () => {
+test('an upload refused for room: a person’s browser reads the refusal’s reason and numbers, an agent a plain sentence alone', async () => {
   const openCookie = await inWs(open);
   const tus = (headers: Record<string, string>) =>
     request('POST', '/api/uploads', {
@@ -189,13 +190,13 @@ test('an upload refused for room: a person’s browser reads the refusal’s rea
   const said = JSON.parse(big.text);
   assert.equal(said.error, 'This workspace has used its 10 GB.');
   assert.equal(said.reason, 'storage');
-  // an agent (an API token) and `vr` read the plan's sentence as before, nothing else
+  // an agent (an API token) and `lampo` read a plain sentence by the reason, nothing else (lib/planWords.ts)
   const olivia = auth.findUserByEmail('olivia@example.com');
   assert.ok(olivia);
   const { token } = auth.createToken(olivia.id, 'agent', { workspace: open });
   const agent = await tus({ Authorization: `Bearer ${token}` });
   assert.equal(agent.status, 402);
-  assert.equal(agent.text.trim(), 'This workspace has used its 10 GB.');
+  assert.equal(agent.text.trim(), AGENT_PLAN_WORDS.storage);
 });
 
 /** The stand-in's `locked` set, from the very instance the app loaded (modules are cached by URL). */

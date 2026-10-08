@@ -14,6 +14,7 @@ import { age, isolatedEnv, makeVideo } from '../lib/helpers.ts';
 
 const { dir } = isolatedEnv();
 const { APP_URI } = await import('../../mcp/app.ts');
+const { imageSize } = await import('../../bench/tokens/count.ts');
 
 const video = makeVideo(path.join(dir, 'proj/export/http.mp4'), { w: 320, h: 180, dur: 1 });
 age(video);
@@ -191,23 +192,39 @@ test('A12-D13: each device with the LAN link is a connection of its own (by its 
   }
 });
 
-test('show_review: the card data, a frame image for hosts without apps, and the ui:// resource', async () => {
+test('show_review: the card data (no picture: the card loads its own), a downscaled frame for the model, and the ui:// resource', async () => {
   const c = await modern();
   const r = (await c.callTool({ name: 'show_review', arguments: { video: 'http.mp4' } })) as Result;
   assert.ok(!r.isError, textOf(r));
-  const card = r.structuredContent as { name: string; notes: { id: string }[]; still: { image: string; kind: string }; playerUrl: string };
+  const card = r.structuredContent as { name: string; notes: { id: string }[]; still: { image: string; kind: string; note: string }; playerUrl: string };
   assert.equal(card.name, 'http.mp4');
   assert.ok(card.notes.length >= 2);
   assert.equal(card.still.kind, 'marked');
-  assert.match(card.still.image, /^data:image\/jpeg;base64,/);
+  // what the model reads stays small: ChatGPT's model reads structuredContent as it is, Claude keeps an answer inline up
+  // to about 150,000 characters
+  assert.equal(card.still.image, '', 'no picture in the card data');
+  assert.ok(JSON.stringify(r).length < 100_000, `${JSON.stringify(r).length} characters`);
   assert.match(card.playerUrl, new RegExp(`^${base}/#/v/`));
-  assert.ok(r.content.some((x) => x.type === 'image'));
+  const image = r.content.find((x) => x.type === 'image');
+  assert.ok(image?.data, 'a frame for hosts without apps');
+  assert.ok((imageSize(image.data)?.w ?? 0) <= 640, 'downscaled for the model');
   const tool = (await c.listTools()).tools.find((t) => t.name === 'show_review');
   assert.equal((tool?._meta as { ui?: { resourceUri?: string } })?.ui?.resourceUri, APP_URI);
   const res = await c.readResource({ uri: APP_URI });
-  const html = res.contents[0] as { mimeType?: string; text?: string };
+  const html = res.contents[0] as { mimeType?: string; text?: string; _meta?: Record<string, unknown> };
   assert.equal(html.mimeType, 'text/html;profile=mcp-app');
   assert.match(html.text || '', /<!doctype html>/i);
+  // the card loads nothing from anywhere, and says so; ChatGPT names its origin after this server's
+  const meta = html._meta as { ui: { csp: Record<string, string[]>; domain?: string; prefersBorder: boolean } } & Record<string, unknown>;
+  assert.deepEqual(meta.ui.csp, { connectDomains: [], resourceDomains: [] });
+  assert.equal(meta.ui.domain, undefined, 'Claude takes ui.domain only in its own form: left to the host');
+  assert.equal(meta['openai/widgetDomain'], new URL(base).origin);
+  assert.match(String(meta['openai/widgetDescription']), /^One video's review/);
+  // the frame the card asks for: the marked one of the note, sharp enough for the card
+  const first = (await c.callTool({ name: 'review_frame', arguments: { video: 'http.mp4', note: card.still.note } })) as Result;
+  const still = first.structuredContent as { kind: string; image: string };
+  assert.equal(still.kind, 'marked');
+  assert.match(still.image, /^data:image\/jpeg;base64,/);
   const step = (await c.callTool({ name: 'review_frame', arguments: { video: 'http.mp4', frame: 7 } })) as Result;
   assert.equal((step.structuredContent as { frame: number; kind: string }).frame, 7);
   assert.equal((step.structuredContent as { frame: number; kind: string }).kind, 'clean');

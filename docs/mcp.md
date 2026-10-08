@@ -220,6 +220,29 @@ plans the organization's owner adds it; **Settings → Connect an agent → Clau
 uploads the file themselves: `request_upload`'s answer ends with the app's page for it, the folder in the library or,
 for a next version, the video's page.
 
+**At a plan's limit.** Where a billing provider runs (Lampo Cloud), a tool answer at the workspace's limit says what
+can't be done and that a person decides in Lampo (`This workspace has no room for this upload: a person can make room or
+change the plan in Lampo.`); the plans, what they cost and the way to them are for people, in the app. The same goes for
+requests with an API token: the 402 keeps its `reason` (`storage`, `videos`, `members`, `read-only`, `payment`) and its
+numbers (`needed`, `room`).
+
+#### In the chat apps' directories
+
+Lampo Cloud's connector (`https://app.lampo.video/mcp`) is listed in Claude's and ChatGPT's directories. A server of
+your own can be listed too; what the directories check is built in:
+
+- **Tool hints.** Every tool has a title and says whether it only reads, whether it overwrites, and that it stays in the
+  workspace ([Tools](#tools)).
+- **Sign-in.** OAuth with client ID metadata documents (Claude's and ChatGPT's own) or dynamic registration; the
+  consent screen names the app by the host its document comes from, and where the answer goes.
+- **Words for chat apps.** Claude, ChatGPT and other chat clients are told the loop through MCP only: no command to run,
+  no other app named, and no plan sold (above).
+- **ChatGPT's domain check.** OpenAI asks for a token at `/.well-known/openai-apps-challenge` on the server's host: set
+  `LAMPO_OPENAI_APPS_CHALLENGE` to it ([server-mode.md](server-mode.md#configuration)) and restart; nothing else needs to change in
+  front of the app.
+- **The card's links.** The review card opens one address, the player on the server's own host: list it (e.g.
+  `https://review.example.com`) as an allowed link in Claude's directory form.
+
 On your own machine, without a hosted server, Claude's desktop app can start the server itself: in the menu bar,
 **Claude → Settings… → Developer → Edit Config**, add the entry below, and restart Claude.
 
@@ -471,7 +494,10 @@ them at most: the stop first, then the new notes, then nothing to do.
 `show_review` shows the person you work with a video's review. Hosts that show MCP Apps (Claude, ChatGPT, VS Code,
 Goose, …) render an interactive card inline: the marked frame, the open notes, exact frame stepping, reply and mark
 fixed, and Open in the player. Every other host gets the same as text and a picture. The card needs no network access
-of its own: frames come through the host.
+of its own: frames come through the host, the card's first one too (`show_review`'s answer carries the card's data
+without a picture, so what the model reads stays small; the model gets one downscaled frame). Its resource declares an
+empty content security policy (it loads nothing from anywhere), and the one link it opens is the player on the server's
+own address.
 
 ![The review card in an MCP Apps host: a note’s marked frame with its drawing, the frame-step buttons, Open in the player, and the open notes, one opened with Reply and Mark fixed](assets/mcp-review-card.webp)
 
@@ -481,7 +507,14 @@ of its own: frames come through the host.
 machine itself (stdio, or the app on this machine) names a file that isn't under review yet: `add_note` on one tracks it
 where it is. Anyone else names a video of the library ([No paths](#security-hosted)). Frames are 0-based at the
 file's frame rate, timecodes `mm:ss:ff`, and drawings are in video pixels (the pictures are made smaller for the model;
-the coordinates are not). Read tools are marked read-only, so clients can allow them without asking.
+the coordinates are not).
+
+Every tool says what it does to the client (MCP tool annotations, all three hints set): the reading tools are
+read-only, so clients can let them run without asking. The writes that replace or move what is there — `move_video`,
+`set_render_source`, `draft_post` (a second draft writes over the first) — are destructive, so clients ask before each
+one (Claude always does). Every other write adds something or keeps its history: a note, a reply, a fix or a won't-fix
+(a person reopens it), a version, a status. No tool reaches beyond the workspace: none fetches from the web or sends
+anything elsewhere.
 
 ### Reading
 

@@ -1065,12 +1065,12 @@ async function mcpCard(s: LocalScene, camera: Camera) {
     const frameEl = await page.waitForSelector('iframe');
     const card = await frameEl?.contentFrame();
     if (!card) throw new Error('no card');
-    await card.waitForFunction("document.querySelector('.frame img')?.naturalWidth > 0", { timeout: 20_000 });
+    await card.waitForFunction("document.querySelector('.frame img:not(.wait)')?.naturalWidth > 0", { timeout: 20_000 });
     // an open note with a drawing, opened: its marked frame, its reply box and "Mark fixed"
     await card.evaluate(`[...document.querySelectorAll('.note')].find((n) => n.textContent.includes('glow'))?.querySelector('.note-head')?.click()`);
     await card.waitForSelector('.note-body textarea');
     await card.waitForFunction(`document.querySelector('figcaption')?.textContent.includes('f168')`, { timeout: 10_000 }).catch(() => {});
-    await card.waitForFunction("document.querySelector('.frame img')?.complete", { timeout: 10_000 });
+    await card.waitForFunction("document.querySelector('.frame img:not(.wait)')?.complete", { timeout: 10_000 });
     await sleep(800);
     const height = (await card.evaluate(
       'Math.ceil(Math.max(...[...document.body.querySelectorAll("*")].map((e) => e.getBoundingClientRect().bottom)))',

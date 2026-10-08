@@ -1,5 +1,6 @@
-// Starting an upload asks the workspace's plan first (a billing module). Its refusal goes out as it is — a 402 with the
-// module's sentence, and for a person's browser the reason and numbers the limit sheet shows —, but a plan check that
+// Starting an upload asks the workspace's plan first (a billing module). Its refusal goes out as a 402 — for a person's
+// browser the module's sentence with the reason and numbers the limit sheet shows, for an agent a plain sentence by its
+// reason (lib/planWords.ts) —, but a plan check that
 // fails inside (here a module whose store can't be read, an errno naming its file) is the server's fault: a 500 with
 // a sentence and a ref, never the errno or the path, for a person and an agent alike.
 import assert from 'node:assert/strict';
@@ -15,6 +16,7 @@ const { loadConfig } = await import('../../lib/config.ts');
 const { createContext } = await import('../../server/context.ts');
 const ext = await import('../../server/extension.ts');
 const auth = await import('../../lib/auth.ts');
+const { AGENT_PLAN_WORDS } = await import('../../lib/planWords.ts');
 
 let mode: 'broken' | 'full' = 'broken';
 const canUpload = async () => {
@@ -52,7 +54,7 @@ test('a plan check that fails inside: a 500 sentence with a ref, no errno, no pa
   }
 });
 
-test('the plan’s own refusal still goes out as it is: a 402, its reason for the browser, its sentence for the agent', async () => {
+test('the plan’s own refusal: a 402, its sentence and reason for the browser, a plain sentence for the agent', async () => {
   mode = 'full';
   const [[, browser], [, token]] = callers;
   const b = await tusUpload(request, clip, { filename: 'spot.mp4' }, browser);
@@ -62,5 +64,5 @@ test('the plan’s own refusal still goes out as it is: a 402, its reason for th
   assert.equal(said.reason, 'storage');
   const t = await tusUpload(request, clip, { filename: 'spot.mp4' }, token);
   assert.equal(t.status, 402, t.text);
-  assert.equal(t.text, 'This workspace’s plan is full.');
+  assert.equal(t.text, AGENT_PLAN_WORDS.storage);
 });

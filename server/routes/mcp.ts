@@ -22,12 +22,12 @@ import { GRANTS_FILE, verifyAccess } from '../../lib/oauth/store.ts';
 import { can } from '../../lib/permissions.ts';
 import { addressKey, RateLimit, Recent } from '../../lib/rateLimit.ts';
 import { currentWorkspace, DEFAULT_WORKSPACE, inWorkspace } from '../../lib/scope.ts';
-import { SCOPE_LIST, scopeAllows, scopeFor } from '../../lib/scopes.ts';
+import { scopeAllows, scopeFor } from '../../lib/scopes.ts';
 import { grabCount } from '../../lib/shots.ts';
 import * as store from '../../lib/store.ts';
 import type { AgentKind } from '../../lib/types.ts';
 import * as workspaces from '../../lib/workspaces.ts';
-import { type Access, allowed, changedUris, createReviewServer, type Principal, TOOL_ACCESS, wayOf } from '../../mcp/core.ts';
+import { type Access, allowed, changedUris, createReviewServer, MCP_SCOPES, type Principal, TOOL_ACCESS, wayOf } from '../../mcp/core.ts';
 import { type Hold, type QuietRun, quietIn, toldIn, type Wake } from '../../mcp/feedback.ts';
 import type { Auth } from '../auth.ts';
 import { sessionOf } from '../auth.ts';
@@ -401,7 +401,8 @@ export function mcpRoutes(ctx: ServerContext): Router {
     {
       const { issuer, resource } = oauthBase(ctx, req);
       const challenge = (extra: string) =>
-        `Bearer realm="video-review", resource_metadata="${resourceMetadataUrl(issuer)}", scope="${SCOPE_LIST.join(' ')}"${extra}`;
+        // what the tools need, not every scope there is: clients ask the person for what is named here
+        `Bearer realm="video-review", resource_metadata="${resourceMetadataUrl(issuer)}", scope="${MCP_SCOPES.join(' ')}"${extra}`;
       if (!req.auth) {
         // Not an API token or a session: maybe an access token from our OAuth sign-in, valid only for this resource.
         const bearer = /^Bearer\s+(\S+)$/i.exec(req.headers.authorization || '')?.[1];
@@ -575,8 +576,9 @@ function authInfoFor(p: Principal): AuthInfo {
  * always may.
  */
 function guardFor(principal: Principal, issuer: TicketIssuer | null, action: Access): TicketGuard {
-  if (principal.via === 'local') return {};
-  return teamGuard(issuer, action);
+  // every URL a tool hands out goes to an agent: a plan's refusal at its PUT is told in an agent's words
+  if (principal.via === 'local') return { agent: true };
+  return { ...teamGuard(issuer, action), agent: true };
 }
 
 /** Who a request's AuthInfo says is calling (exported for its test: nothing missing ever reads as the machine's owner). */

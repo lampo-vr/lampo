@@ -111,16 +111,20 @@ export function registerNoteTools({ b, o, tool, author, accountOf, byArg }: Tool
     return b.attachRef(id, input);
   }
 
+  // How to send a file to a one-time URL: an example command for an agent with a shell; a chat client is told what the
+  // URL takes, never a command to run (mcp/loop.ts).
+  const example = (url: string) => (o.way === 'chat' ? '' : `\n\ncurl -fT <file> '${url}'`);
   const refResult = (id: string, out: Awaited<ReturnType<typeof attachOne>>): string =>
     'ref' in out
       ? `${id}: reference ${describeRef(out.ref)}`
-      : `${id}: PUT the image or clip to this URL once (valid until ${out.upload.expires}):\n${out.upload.url}\n\ncurl -fT <file> '${out.upload.url}'`;
+      : `${id}: PUT the image or clip to this URL once (valid until ${out.upload.expires}):\n${out.upload.url}${example(out.upload.url)}`;
 
   tool(
     'attach_preview',
     {
       title: 'Show a fix before rendering',
-      description: `Show your fix of a note before rendering: a still (PNG/JPEG/WebP) or a clip ≤ 10 s exported from your project (e.g. After Effects comp.saveFrameToPng at the project time get_note shows). The reviewer can verify on it and the next render is compared with it; a fix verified only on a preview keeps the video from final until a render has it. Same frame shape as the render. Default position: the note's frame in the newest render. ${onThisMachine ? 'File: path or' : 'File:'} base64 data ${inline(requestPreviewUpload)}.`,
+      // an editing app's own export call is an example for agents that run one; a chat client is named no software
+      description: `Show your fix of a note before rendering: a still (PNG/JPEG/WebP) or a clip ≤ 10 s exported from your project${o.way === 'chat' ? '' : ' (e.g. After Effects comp.saveFrameToPng at the project time get_note shows)'}. The reviewer can verify on it and the next render is compared with it; a fix verified only on a preview keeps the video from final until a render has it. Same frame shape as the render. Default position: the note's frame in the newest render. ${onThisMachine ? 'File: path or' : 'File:'} base64 data ${inline(requestPreviewUpload)}.`,
       inputSchema: z.object({
         id: z.string(),
         kind: z.enum(['still', 'clip']).optional(),
@@ -167,7 +171,7 @@ export function registerNoteTools({ b, o, tool, author, accountOf, byArg }: Tool
       } else if (requestPreviewUpload) {
         await o.checkUpload?.(0);
         const t = requestPreviewUpload({ comment: args.id, request }, who);
-        return ok(text(`PUT the ${request.kind} to this URL once (valid until ${t.expires}):\n${t.url}\n\ncurl -fT <file> '${t.url}'`));
+        return ok(text(`PUT the ${request.kind} to this URL once (valid until ${t.expires}):\n${t.url}${example(t.url)}`));
       } else throw new Error(onThisMachine ? 'give the file as path or data' : 'give the file as base64 data');
       return ok(
         text(

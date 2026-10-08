@@ -297,9 +297,10 @@ test('SDK client with a Client ID Metadata Document served over https', async (t
   }
   const cert = fs.readFileSync(path.join(certDir, 'c.pem'));
   let doc: object = {};
-  const meta = https.createServer({ key: fs.readFileSync(path.join(certDir, 'k.pem')), cert }, (_req, res) => {
+  const docs = new Map<string, object>();
+  const meta = https.createServer({ key: fs.readFileSync(path.join(certDir, 'k.pem')), cert }, (req, res) => {
     res.setHeader('content-type', 'application/json');
-    res.end(JSON.stringify(doc));
+    res.end(JSON.stringify(docs.get(req.url || '') ?? doc));
   });
   await new Promise<void>((r) => meta.listen(0, '127.0.0.1', r));
   const origin = `127.0.0.1:${(meta.address() as AddressInfo).port}`;
@@ -316,10 +317,107 @@ test('SDK client with a Client ID Metadata Document served over https', async (t
     const c = await connect(p);
     const listed = (await c.callTool({ name: 'list_videos', arguments: {} })) as Result;
     assert.ok(!listed.isError, textOf(listed));
+
+    // ChatGPT's own document (chatgpt.com/oauth/client.json, MCP SEP-3149): it can be a public client or sign an
+    // assertion, and prefers the second; this server takes public clients with PKCE, so ChatGPT signs in as one. The
+    // answer goes to its stable callback with `iss` (RFC 9207: this server advertises it), and the screen names it.
+    const CHATGPT_CALLBACK = 'https://chatgpt.com/connector_platform_oauth_redirect';
+    const chatgptId = `https://${origin}/oauth/chatgpt-client.json`;
+    docs.set('/oauth/chatgpt-client.json', {
+      client_id: chatgptId,
+      client_uri: 'https://chatgpt.com/',
+      redirect_uris: [CHATGPT_CALLBACK],
+      token_endpoint_auth_method: 'private_key_jwt',
+      token_endpoint_auth_methods_supported: ['none', 'private_key_jwt'],
+      grant_types: ['authorization_code', 'refresh_token'],
+      response_types: ['code'],
+      client_name: 'ChatGPT',
+      jwks_uri: 'https://chatgpt.com/oauth/jwks.json',
+    });
+    const { verifier, challenge } = pkce();
+    const asked = await consent(
+      authorizeUrl({
+        response_type: 'code',
+        client_id: chatgptId,
+        redirect_uri: CHATGPT_CALLBACK,
+        code_challenge: challenge,
+        code_challenge_method: 'S256',
+        state: 'chatgpt-state',
+        resource: `${base}/mcp`,
+        scope: 'review:read review:comment review:act',
+      }),
+      owner,
+    );
+    assert.equal(asked.view.client_name, 'ChatGPT');
+    assert.equal(asked.view.verified, true, 'its name comes from its own document');
+    assert.equal(asked.view.redirect_host, 'chatgpt.com', 'the screen says where the answer goes');
+    assert.equal(`${asked.redirect.origin}${asked.redirect.pathname}`, CHATGPT_CALLBACK);
+    assert.equal(asked.redirect.searchParams.get('state'), 'chatgpt-state');
+    assert.equal(asked.redirect.searchParams.get('iss'), base);
+    const tokens = await fetch(
+      `${base}/oauth/token`,
+      form({
+        grant_type: 'authorization_code',
+        code: asked.redirect.searchParams.get('code') as string,
+        code_verifier: verifier,
+        client_id: chatgptId,
+        redirect_uri: CHATGPT_CALLBACK,
+        resource: `${base}/mcp`,
+      }),
+    );
+    const got = (await tokens.json()) as Record<string, string>;
+    assert.equal(tokens.status, 200, JSON.stringify(got));
+    assert.match(got.access_token, /^vro_/);
+    assert.equal((await mcpList(got.access_token)).status, 200, 'ChatGPT reaches /mcp with it');
   } finally {
     configureCimd({});
     meta.closeAllConnections();
     meta.close();
+  }
+});
+
+test('Claude’s and ChatGPT’s callbacks: a registration with them gets its code back at exactly the address asked for', async () => {
+  const callbacks = [
+    'https://claude.ai/api/mcp/auth_callback',
+    'https://claude.com/api/mcp/auth_callback',
+    'https://chatgpt.com/connector_platform_oauth_redirect',
+    'https://chatgpt.com/connector/oauth/AbC123_x',
+  ];
+  // one registration (registrations are limited per address, and this file makes many)
+  const { status, json } = await register({ client_name: 'Chat app', redirect_uris: callbacks, token_endpoint_auth_method: 'none' });
+  assert.equal(status, 201, JSON.stringify(json));
+  for (const callback of callbacks) {
+    const { verifier, challenge } = pkce();
+    const { view, redirect } = await consent(
+      authorizeUrl({
+        response_type: 'code',
+        client_id: json.client_id,
+        redirect_uri: callback,
+        code_challenge: challenge,
+        code_challenge_method: 'S256',
+        state: 'st',
+        resource: `${base}/mcp`,
+      }),
+      owner,
+    );
+    assert.equal(view.verified, false, `${callback}: a registered name is the app's own say`);
+    assert.equal(view.local_redirect, false);
+    // an app that names no scope is asked for what the MCP tools need, not the project files' scopes no tool uses yet
+    assert.deepEqual(view.scopes, ['review:read', 'review:comment', 'review:act', 'post:draft']);
+    assert.equal(`${redirect.origin}${redirect.pathname}`, callback);
+    assert.equal(redirect.searchParams.get('iss'), base);
+    const r = await fetch(
+      `${base}/oauth/token`,
+      form({
+        grant_type: 'authorization_code',
+        code: redirect.searchParams.get('code') as string,
+        code_verifier: verifier,
+        client_id: json.client_id,
+        redirect_uri: callback,
+        resource: `${base}/mcp`,
+      }),
+    );
+    assert.equal(r.status, 200, `${callback}: ${await r.clone().text()}`);
   }
 });
 

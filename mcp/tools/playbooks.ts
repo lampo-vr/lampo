@@ -34,6 +34,18 @@ const statusLine = (p: PlaybookProposal): string =>
     `- ${p.id} · ${p.section} · ${p.status}${p.status === 'rejected' && p.reject_reason ? `: “${p.reject_reason}”` : ''}${p.status === 'accepted' ? ` (revision ${p.rev})` : ''} · by ${p.by}`,
   );
 
+/**
+ * Lampo's own lines in what an agent reads of a playbook (lib/playbooks.ts agentMarkdown) name a `lampo` command beside
+ * each tool; a chat client reads the tool alone (mcp/loop.ts: MCP only). Only these exact lines: the team's own text is
+ * left as it is.
+ */
+const CLI_ASIDES: readonly [string, string][] = [
+  ['propose_playbook_change (MCP) or `lampo playbook propose`', 'propose_playbook_change'],
+  ['get_skill or `lampo playbook skill <name>`', 'get_skill'],
+  ['(propose_playbook_change / `lampo playbook propose`)', '(propose_playbook_change)'],
+];
+export const forChatClient = (markdown: string): string => CLI_ASIDES.reduce((md, [aside, tool]) => md.split(aside).join(tool), markdown);
+
 export function registerPlaybookTools({ b, o, tool, author, byArg, openReview }: ToolKit): void {
   /** A video → its slug (the backend's playbook lookups take slugs), else the folder as given. */
   const whereOf = async (w: { video?: string; folder?: string }) => (w.video ? { video: (await openReview(w.video)).slug } : { folder: w.folder || '' });
@@ -43,7 +55,7 @@ export function registerPlaybookTools({ b, o, tool, author, byArg, openReview }:
     {
       title: 'The playbook for a video or folder',
       description:
-        'What the team decided before your render: brief, rules, references and skills, from the House down to the folder (deeper wins). Read it before rendering and follow it; get_skill loads a skill; propose_playbook_change suggests a change (a person decides). known: the revisions you have read (e.g. "House r2 · Acme r1") → only whether they changed.',
+        'What the team decided before your render: brief, rules, references and skills, from the House down to the folder (deeper wins). Read it before rendering; get_skill loads a skill; propose_playbook_change suggests a change (a person decides). known: the revisions you have read (e.g. "House r2 · Acme r1") → only whether they changed.',
       inputSchema: z.object({ ...where, known: z.string().optional() }),
     },
     async ({ known, ...args }) => {
@@ -56,7 +68,8 @@ export function registerPlaybookTools({ b, o, tool, author, byArg, openReview }:
       const tail = [view.stamp.length ? `Revisions in force: ${revisions} (a render made now is stamped with them).` : '', suggestions]
         .filter(Boolean)
         .join('\n');
-      return ok(text(`${view.markdown}${tail ? `\n${tail}\n` : ''}`));
+      const markdown = o.way === 'chat' ? forChatClient(view.markdown) : view.markdown;
+      return ok(text(`${markdown}${tail ? `\n${tail}\n` : ''}`));
     },
   );
 
@@ -64,7 +77,7 @@ export function registerPlaybookTools({ b, o, tool, author, byArg, openReview }:
     'get_skill',
     {
       title: 'Load a playbook skill',
-      description: 'One playbook skill (its SKILL.md) and its files: presets, LUTs, scripts to use on your side.',
+      description: 'One playbook skill: its SKILL.md and its files (presets, LUTs, scripts).',
       inputSchema: z.object({ name: z.string(), ...where }),
     },
     async ({ name, ...w }) => {

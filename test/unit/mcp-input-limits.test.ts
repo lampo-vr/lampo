@@ -2,8 +2,8 @@
 // reply, fix note, reason, tag, status, render source, caption or playbook suggestion too long for the API is refused
 // over /mcp too — before, a reviewer's token could put a 1 MB note into review.json and every agent's next read — and
 // a team file sent inline (a reference, a fix preview), or an upload URL for one, asks the plan's upload gate as
-// `POST /api/comments/:id/refs|previews` do: a read-only workspace refuses it with the plan's sentence. The schemas are
-// shared (lib/inputs.ts); the tool list doesn't announce the caps.
+// `POST /api/comments/:id/refs|previews` do: a read-only workspace refuses it, in an agent's plain words (lib/planWords.ts).
+// The schemas are shared (lib/inputs.ts); the tool list doesn't announce the caps.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -24,6 +24,7 @@ const ext = await import('../../server/extension.ts');
 const auth = await import('../../lib/auth.ts');
 const store = await import('../../lib/store.ts');
 const { slugify } = await import('../../lib/paths.ts');
+const { AGENT_PLAN_WORDS } = await import('../../lib/planWords.ts');
 
 // A plan module that makes a workspace read-only on demand (the stand-in of server/extension.ts's tests).
 const MODULE = path.join(dir, 'plan-module.ts');
@@ -149,7 +150,7 @@ test('the caps are checked, not announced: the tool list carries no 20,000-chara
   assert.match(JSON.stringify(addNote?.inputSchema), /"minItems":2,"maxItems":4/);
 });
 
-test('a read-only workspace: a reference or fix preview sent over MCP, or an upload URL for one, gets the plan’s sentence', async () => {
+test('a read-only workspace: a reference or fix preview sent over MCP, or an upload URL for one, is refused in plain words', async () => {
   const locked = await lockOf();
   locked.add('w1');
   try {
@@ -164,7 +165,8 @@ test('a read-only workspace: a reference or fix preview sent over MCP, or an upl
     for (const [name, args] of cases) {
       const r = await call(name, args);
       assert.ok(r.refused, `${name} was taken in a read-only workspace: ${r.text.slice(0, 200)}`);
-      assert.match(r.text, /read-only until its invoice is paid/, `${name}: the plan's sentence`);
+      assert.ok(r.text.includes(AGENT_PLAN_WORDS['read-only']), `${name}: an agent's sentence for the reason: ${r.text}`);
+      assert.doesNotMatch(r.text, /invoice/, `${name}: never the plan's own words`);
     }
     assert.equal(JSON.stringify(notes().find((c) => c.id === noteId)), before, 'nothing was added to the note');
     // as over HTTP
@@ -181,14 +183,14 @@ test('a read-only workspace: a reference or fix preview sent over MCP, or an upl
 
 // The same gate for an option's file sent inline over MCP (ask_options), as `POST /api/asks` asks it for the whole
 // request; an upload URL's file is asked when it arrives. Words, links and moments of renders cost no storage.
-test('a read-only workspace: an option’s file sent inline over MCP gets the plan’s sentence, like POST /api/asks', async () => {
+test('a read-only workspace: an option’s file sent inline over MCP is refused in plain words, like POST /api/asks', async () => {
   const locked = await lockOf();
   const asked = (text: string) => notes().some((c) => c.text === text);
   locked.add('w1');
   try {
     const r = await call('ask_options', { video: slug, text: 'Inline file?', groups: [{ id: 'look', items: [{ id: 'a', data: pngData }, { id: 'b' }] }] });
     assert.ok(r.refused, `taken in a read-only workspace: ${r.text.slice(0, 200)}`);
-    assert.match(r.text, /read-only until its invoice is paid/, "the plan's sentence");
+    assert.ok(r.text.includes(AGENT_PLAN_WORDS['read-only']), `an agent's sentence for the reason: ${r.text}`);
     assert.ok(!asked('Inline file?'), 'no question made');
     // as over HTTP
     const viaHttp = await request('POST', '/api/asks', {
@@ -196,7 +198,8 @@ test('a read-only workspace: an option’s file sent inline over MCP gets the pl
       headers: bearer,
     });
     assert.equal(viaHttp.status, 402, viaHttp.text);
-    assert.match(viaHttp.json().error, /read-only until its invoice is paid/);
+    assert.equal(viaHttp.json().error, AGENT_PLAN_WORDS['read-only'], 'an API token reads the same plain sentence');
+    assert.equal(viaHttp.json().reason, 'read-only');
     // words and links cost no storage: still fine over MCP
     const words = await call('ask_options', {
       video: slug,

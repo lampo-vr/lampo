@@ -2,6 +2,9 @@
 // Goose, …) render an interactive card inline — the frame with its drawing, the notes, frame stepping, reply and
 // "mark fixed". Frames travel as images through the tool bridge (review_frame), so the card needs no network access,
 // no media URLs and no auth of its own; every other host gets the same content as text + an image.
+// What the model reads stays small: show_review's data for the card (structuredContent, which ChatGPT's model reads as
+// it is) carries no picture — the card asks review_frame for its frame once it shows — and the one picture the model
+// gets is downscaled, so the answer stays well under what a host keeps inline (Claude: about 150,000 characters).
 import fs from 'node:fs';
 import path from 'node:path';
 import { RESOURCE_MIME_TYPE, registerAppResource, registerAppTool } from '@modelcontextprotocol/ext-apps/server';
@@ -20,8 +23,9 @@ const label = (c: Comment): string => {
   return kind === 'feedback' ? c.severity : kind === 'agent' ? 'question' : kind;
 };
 
+import { agentText } from '../lib/planWords.ts';
 import { publicMessage } from '../lib/publicError.ts';
-import { type Access, audienceOf, type Principal } from './access.ts';
+import { type Access, audienceOf, hintsFor, type Principal } from './access.ts';
 import { text } from './format.ts';
 import { trimmed } from './lean.ts';
 
@@ -29,6 +33,13 @@ import { trimmed } from './lean.ts';
 // (tools name it in `_meta.ui.resourceUri`), and no person ever reads it.
 export const APP_URI = 'ui://video-review/review.html';
 const BUILT = path.join(ROOT, 'web', 'dist-mcp', 'review.html');
+/** The card's frame: as wide as the card is shown (a chat's column, at twice its pixels). */
+const CARD_WIDTH = 960;
+/** The frame show_review's answer gives the model (the card shows the person its own, sharper one). */
+export const MODEL_WIDTH = 640;
+/** What a host tells its model the card shows when it opens (ChatGPT's `openai/widgetDescription`). */
+export const CARD_SAYS =
+  "One video's review: the frame with the reviewer's drawing and the open notes. The person can step through frames, reply and mark notes fixed in the card.";
 
 export interface ReviewAppOptions {
   backend: Backend;
@@ -84,18 +95,18 @@ export interface FrameStill {
 export function registerReviewApp(server: McpServer, o: ReviewAppOptions): void {
   const b = o.backend;
 
-  async function still(review: Review, ver: Version, frame: number, noteId: string | null): Promise<FrameStill> {
+  async function still(review: Review, ver: Version, frame: number, noteId: string | null, width = CARD_WIDTH): Promise<FrameStill> {
     const note = noteId ? review.comments.find((c) => c.id === noteId) : null;
     if (note) {
       await b.fetchShots(review, [note]);
       const f = b.shotFile(review, note.shots?.marked);
       if (f && fs.existsSync(f)) {
-        const img = await o.preview(f, 960);
+        const img = await o.preview(f, width);
         return { frame: note.frame, timecode: note.timecode, v: note.v, kind: 'marked', note: note.id, image: `data:${img.mimeType};base64,${img.data}` };
       }
     }
     const png = await b.frame(review, ver, frame);
-    const img = await o.preview(png, 960);
+    const img = await o.preview(png, width);
     return { frame, timecode: timecode(frame, ver.fps), v: ver.v, kind: 'clean', note: null, image: `data:${img.mimeType};base64,${img.data}` };
   }
 
@@ -150,7 +161,7 @@ export function registerReviewApp(server: McpServer, o: ReviewAppOptions): void 
       return await fn();
     } catch (e) {
       return {
-        content: [text(`Error: ${publicMessage(e, audienceOf(o.principal), { status: 400, where: 'mcp show_review' })}`)],
+        content: [text(`Error: ${agentText(e, publicMessage(e, audienceOf(o.principal), { status: 400, where: 'mcp show_review' }))}`)],
         isError: true,
       };
     }
@@ -170,7 +181,7 @@ export function registerReviewApp(server: McpServer, o: ReviewAppOptions): void 
           frame: z.number().int().min(0).optional(),
         }),
       ),
-      annotations: { readOnlyHint: true, openWorldHint: false },
+      annotations: hintsFor('show_review'),
       _meta: { ui: { resourceUri: APP_URI } },
     },
     async ({ video, note, frame }, ctx: ServerContext) =>
@@ -179,8 +190,9 @@ export function registerReviewApp(server: McpServer, o: ReviewAppOptions): void 
         o.activity?.('show_review', { video }, ctx);
         const first = review.comments.filter((c) => c.status === 'open').sort((a, c) => a.t - c.t)[0];
         const pick = note ?? (frame === undefined ? first?.id : undefined) ?? null;
-        const s = await still(review, ver, frame ?? review.comments.find((c) => c.id === pick)?.frame ?? 0, pick);
-        const c = card(review, ver, s, pick);
+        // the model's look at the frame, downscaled; the card loads its own (review_frame)
+        const s = await still(review, ver, frame ?? review.comments.find((c) => c.id === pick)?.frame ?? 0, pick, MODEL_WIDTH);
+        const c = card(review, ver, { ...s, image: '' }, pick);
         const lines = [
           `${c.name} · v${c.v} · ${c.width}×${c.height} · ${c.fps} fps · open ${c.counts.open} (must ${c.counts.must}) · fixed ${c.counts.fixed}`,
           ...c.notes.map((n) => `${n.id} ${n.status.toUpperCase()} ${n.severity.toUpperCase()} ${n.timecode} f${n.frame} — ${n.text || '(drawing only)'}`),
@@ -211,7 +223,7 @@ export function registerReviewApp(server: McpServer, o: ReviewAppOptions): void 
           v: z.number().int().min(1).optional(),
         }),
       ),
-      annotations: { readOnlyHint: true, openWorldHint: false },
+      annotations: hintsFor('review_frame'),
       _meta: { ui: { resourceUri: APP_URI, visibility: ['app'] } },
     },
     async ({ video, frame, note, v }) =>
@@ -229,9 +241,26 @@ export function registerReviewApp(server: McpServer, o: ReviewAppOptions): void 
     APP_URI,
     { title: 'Review card', description: 'Interactive review card (MCP App)', mimeType: RESOURCE_MIME_TYPE, _meta: { ui: { prefersBorder: true } } },
     async (uri) => ({
-      contents: [{ uri: uri.href, mimeType: RESOURCE_MIME_TYPE, text: appHtml(), _meta: { ui: { prefersBorder: true, csp: {} } } }],
+      contents: [{ uri: uri.href, mimeType: RESOURCE_MIME_TYPE, text: appHtml(), _meta: cardMeta(o.appUrl) }],
     }),
   );
+}
+
+/**
+ * How the card asks to be shown. It loads nothing from anywhere — one self-contained file, frames as data: images
+ * through the tool bridge — so every origin list of its content security policy is empty, said outright (ChatGPT's
+ * review compares the declared policy with what the card does). ChatGPT gives each app's card an origin of its own,
+ * named after this server's (`openai/widgetDomain`, its name for the standard `ui.domain`); the standard field stays
+ * unset, because Claude takes it only in its own form and shows its default sandbox without it. A link the card opens
+ * (Open in the player) goes to this server's own address.
+ */
+export function cardMeta(appUrl: string | null): Record<string, unknown> {
+  const origin = appUrl && /^https?:\/\//.test(appUrl) ? new URL(appUrl).origin : null;
+  return {
+    ui: { prefersBorder: true, csp: { connectDomains: [], resourceDomains: [] } },
+    ...(origin ? { 'openai/widgetDomain': origin } : {}),
+    'openai/widgetDescription': CARD_SAYS,
+  };
 }
 
 // Built by `npm run build` (web/mcp-app → web/dist-mcp/review.html, one self-contained file). Without a build the

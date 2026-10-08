@@ -177,6 +177,82 @@ test('a metadata document is fetched over https and validated', async (t) => {
   await assert.rejects(resolveClient(`https://${origin}/moved.json`), /answered 302/, 'redirects are not followed');
 });
 
+// The chat apps' own documents, as they publish them (claude.ai/oauth/mcp-oauth-client-metadata,
+// claude.ai/oauth/claude-code-client-metadata, chatgpt.com/oauth/client.json), served here under a local id.
+const CLAUDE = {
+  client_name: 'Claude',
+  client_uri: 'https://claude.ai',
+  redirect_uris: ['https://claude.ai/api/mcp/auth_callback'],
+  grant_types: ['authorization_code', 'refresh_token', 'urn:ietf:params:oauth:grant-type:jwt-bearer'],
+  response_types: ['code'],
+  token_endpoint_auth_method: 'none',
+};
+const CLAUDE_CODE = {
+  client_name: 'Claude Code',
+  client_uri: 'https://claude.ai',
+  redirect_uris: ['http://localhost/callback', 'http://127.0.0.1/callback'],
+  grant_types: ['authorization_code', 'refresh_token'],
+  response_types: ['code'],
+  token_endpoint_auth_method: 'none',
+};
+const CHATGPT = {
+  client_uri: 'https://chatgpt.com/',
+  redirect_uris: ['https://chatgpt.com/connector_platform_oauth_redirect'],
+  token_endpoint_auth_method: 'private_key_jwt',
+  token_endpoint_auth_methods_supported: ['none', 'private_key_jwt'],
+  grant_types: ['authorization_code', 'refresh_token'],
+  response_types: ['code'],
+  client_name: 'ChatGPT',
+  token_endpoint_auth_signing_alg: 'RS256',
+  jwks_uri: 'https://chatgpt.com/oauth/jwks.json',
+};
+
+test('Claude’s, Claude Code’s and ChatGPT’s own documents are accepted, with exactly their redirect URIs', async (t) => {
+  if (!server || !cert) return t.skip('openssl is not available');
+  configureCimd({ ca: cert, allowOrigins: [origin] });
+  const load = async (p: string, doc: object) => {
+    const id = `https://${origin}${p}`;
+    serve(p, { client_id: id, ...doc });
+    return resolveClient(id);
+  };
+  const claude = await load('/claude.json', CLAUDE);
+  assert.equal(claude.name, 'Claude');
+  assert.equal(claude.auth, 'none');
+  assert.equal(redirectMatches(claude.redirect_uris, 'https://claude.ai/api/mcp/auth_callback'), true);
+  assert.equal(redirectMatches(claude.redirect_uris, 'https://claude.ai/api/mcp/auth_callback/x'), false);
+  // Claude Code: a loopback port picked per session, on localhost or 127.0.0.1 (RFC 8252 §7.3)
+  const code = await load('/claude-code.json', CLAUDE_CODE);
+  assert.equal(redirectMatches(code.redirect_uris, 'http://localhost:3118/callback'), true);
+  assert.equal(redirectMatches(code.redirect_uris, 'http://127.0.0.1:51004/callback'), true);
+  assert.equal(redirectMatches(code.redirect_uris, 'http://localhost:3118/other'), false);
+  // ChatGPT (MCP SEP-3149): it can be a public client or sign an assertion, and prefers the second; this server takes
+  // public clients only, which it can be — so it is one here, with PKCE alone
+  const chatgpt = await load('/chatgpt.json', CHATGPT);
+  assert.equal(chatgpt.name, 'ChatGPT');
+  assert.equal(chatgpt.auth, 'none');
+  assert.equal(redirectMatches(chatgpt.redirect_uris, 'https://chatgpt.com/connector_platform_oauth_redirect'), true);
+  assert.equal(redirectMatches(chatgpt.redirect_uris, 'https://chatgpt.com/connector/oauth/abc123'), false, 'only what its document names');
+  // a client that can't be public at all is refused, whichever field says so
+  const only = `https://${origin}/assertion-only.json`;
+  serve('/assertion-only.json', { ...CHATGPT, client_id: only, token_endpoint_auth_methods_supported: ['private_key_jwt'] });
+  await assert.rejects(resolveClient(only), /public clients/);
+  configureCimd({});
+});
+
+test('dynamic registration takes the chat apps’ callbacks: Claude’s on claude.ai and claude.com, ChatGPT’s stable one and its per-connection one', () => {
+  for (const uri of [
+    'https://claude.ai/api/mcp/auth_callback',
+    'https://claude.com/api/mcp/auth_callback',
+    'https://chatgpt.com/connector_platform_oauth_redirect',
+    'https://chatgpt.com/connector/oauth/AbC123_x',
+  ]) {
+    const r = registerClient({ client_name: 'Chat app', redirect_uris: [uri] });
+    assert.deepEqual(r.redirect_uris, [uri], uri);
+    assert.equal(r.application_type, 'web', `${uri}: a web app's https callback`);
+    assert.equal(redirectMatches(r.redirect_uris as string[], uri), true);
+  }
+});
+
 test('a document that trickles in is dropped at the deadline, however busy it keeps the connection', async (t) => {
   if (!server || !cert) return t.skip('openssl is not available');
   configureCimd({ ca: cert, allowOrigins: [origin], timeoutMs: 400 });

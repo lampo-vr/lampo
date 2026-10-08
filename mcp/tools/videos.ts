@@ -41,6 +41,7 @@ const uploadPage = (slug: string | null, folder: string | null | undefined): str
 };
 
 export function registerVideoTools({ b, o, tool, author, accountOf, byArg, me }: ToolKit): void {
+  const chat = o.way === 'chat';
   // Tracking a path only makes sense where the file is: stdio on this machine, or the local app over loopback.
   if (o.principal.via === 'local')
     tool(
@@ -117,8 +118,8 @@ export function registerVideoTools({ b, o, tool, author, accountOf, byArg, me }:
       'request_upload',
       {
         title: 'Upload a render',
-        description:
-          'A one-time URL (15 min) to upload a render with one PUT: `curl -fT render.mp4 "<url>"`. A new video (in folder), or the next version of video. The PUT answers {slug, v, created, duplicate}, or {pending: true} for big files: then GET the URL until done. A 403 from your own sandbox or network proxy: ask the person to allow the URL’s host in their client’s network settings, or give them the app link.',
+        // A chat client is told what the URL takes, never a command to run (mcp/loop.ts: chat agents use MCP only).
+        description: `A one-time URL (15 min) to upload a render with one PUT${chat ? ' of the file' : ': `curl -fT render.mp4 "<url>"`'}. A new video (in folder), or the next version of video. The PUT answers {slug, v, created, duplicate}, or {pending: true} for big files: then GET the URL until done. ${chat ? 'If your network refuses the PUT, the person can allow the URL’s host in their client’s settings, or upload the file through the app link the answer ends with.' : 'A 403 from your own sandbox or network proxy: ask the person to allow the URL’s host in their client’s network settings, or give them the app link.'}`,
         inputSchema: z.object({
           filename: fileName.describe('e.g. "spot_v3.mp4"'),
           folder: folderName.optional(),
@@ -147,9 +148,8 @@ export function registerVideoTools({ b, o, tool, author, accountOf, byArg, me }:
         const page = o.appUrl
           ? `\n\nIf your network refuses the PUT, the person can upload it in the app: ${o.appUrl}/${routeIn(uploadPage(slug, folder))}`
           : '';
-        return ok(
-          text(`PUT the file to this URL once (valid until ${t.expires}):\n${t.url}\n\ncurl -fT '${filename.replace(/'/g, "'\\''")}' '${t.url}'${page}`),
-        );
+        const example = chat ? '' : `\n\ncurl -fT '${filename.replace(/'/g, "'\\''")}' '${t.url}'`;
+        return ok(text(`PUT the file to this URL once (valid until ${t.expires}):\n${t.url}${example}${page}`));
       },
     );
 

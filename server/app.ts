@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
 import { ROLES } from '../lib/auth.ts';
-import { spelledAs } from '../lib/env.ts';
+import { setting, spelledAs } from '../lib/env.ts';
 import { DEFAULT_WORKSPACE, ROOT } from '../lib/paths.ts';
 import { internal } from '../lib/publicError.ts';
 import { rootStorage } from '../lib/storage/index.ts';
@@ -128,6 +128,14 @@ export function createApp(ctx: ServerContext, { ui }: AppOptions = {}): Express 
   // Crawlers may fetch pages (so they see the noindex every answer carries), but there is nothing to index.
   app.get('/robots.txt', (_req, res) => {
     res.type('text/plain').send(ROBOTS);
+  });
+  // The token OpenAI checks before it lists this server's MCP connector in ChatGPT's directory: plain text, nothing else,
+  // no sign-in (LAMPO_OPENAI_APPS_CHALLENGE, docs/server-mode.md). Unset, the path is what any other unknown one is.
+  app.get('/.well-known/openai-apps-challenge', (_req, res, next) => {
+    const token = openaiChallenge();
+    if (!token) return next();
+    res.setHeader('Cache-Control', 'no-store');
+    res.type('text/plain').send(token);
   });
   // The machine's tunnel: review links tell its visitors apart by Cloudflare's header (ipOf, server/routes/shares).
   app.locals.tunnel = ctx.capabilities.tunnel;
@@ -352,4 +360,13 @@ export function staticUi(dist = path.join(ROOT, 'web', 'dist')) {
       sendPage(req, res, index, token ? { token, kind: 'g' } : undefined);
     });
   };
+}
+
+/**
+ * The domain-verification token for OpenAI's app directory (LAMPO_OPENAI_APPS_CHALLENGE), read at each request: the
+ * exact token, one word of printable characters; anything else (empty, spaces, a line break) is as good as unset.
+ */
+export function openaiChallenge(env: NodeJS.ProcessEnv = process.env): string | null {
+  const token = setting('LAMPO_OPENAI_APPS_CHALLENGE', env)?.trim();
+  return token && /^[\x21-\x7e]{1,512}$/.test(token) ? token : null;
 }

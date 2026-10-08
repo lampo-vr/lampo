@@ -23,6 +23,7 @@ import { unlessBusy } from '../../lib/jobs.ts';
 import { ingestPart } from '../../lib/parts.ts';
 import { CACHE, isoLocal, slugify } from '../../lib/paths.ts';
 import { can } from '../../lib/permissions.ts';
+import { agentText } from '../../lib/planWords.ts';
 import { type Attached, attachPreview, PREVIEW_LIMITS, type PreviewTarget } from '../../lib/previews.ts';
 import { publicMessage, statusOf } from '../../lib/publicError.ts';
 import { attachDraftRefFile, attachRefFile, REF_LIMITS, type RefAttached, type RefTarget } from '../../lib/refs.ts';
@@ -32,7 +33,7 @@ import type { FileUploadResult, Role, UploadResult } from '../../lib/types.ts';
 import * as workspaces from '../../lib/workspaces.ts';
 import type { ServerContext } from '../context.ts';
 import { countStep } from '../funnel.ts';
-import { body, fail, failFrom, HttpError, router } from '../http.ts';
+import { agentReads, body, fail, failFrom, forAgent, HttpError, router } from '../http.ts';
 import { SUSPENDED_ERROR } from '../permissions.ts';
 import { freeBytes } from '../ready.ts';
 import { issuerOf, type Outcome, TicketInput, teamGuard, type UploadMeta, uploadMeta } from '../uploadTickets.ts';
@@ -298,11 +299,14 @@ export function uploadRoutes(ctx: ServerContext): Router {
           } catch (e) {
             // A refusal keeps its own status and words; anything else (a plan check that failed inside) is the server's
             // fault, answered by audience: a sentence and a ref, never an errno or a file path.
-            const status = statusOf(e);
-            const words = publicMessage(e, who?.via === 'local' ? 'owner' : 'other', { status, where: 'upload' });
-            const { details } = e as { details?: Record<string, unknown> };
-            // A person's browser reads the refusal's reason and numbers (the limit's sheet); an agent and `lampo` keep the sentence.
-            const said = who?.via !== 'token' && status === 402 && details ? JSON.stringify({ error: words, ...details }) : words;
+            const agent = agentReads(who?.via);
+            // a plan's refusal in an agent's words for an agent and `lampo` (lib/planWords.ts)
+            const shown = agent ? forAgent(e) : e;
+            const status = statusOf(shown);
+            const words = publicMessage(shown, who?.via === 'local' ? 'owner' : 'other', { status, where: 'upload' });
+            const { details } = shown as { details?: Record<string, unknown> };
+            // A person's browser reads the refusal's reason and numbers (the limit's sheet); an agent and `lampo` read the sentence.
+            const said = !agent && status === 402 && details ? JSON.stringify({ error: words, ...details }) : words;
             throw reject(status, said);
           }
           held.set(upload.id, { id: upload.id, kind: 'tus', ws, by, size, offset: 0, moved: Date.now(), at: Date.now() });
@@ -552,7 +556,8 @@ export function uploadRoutes(ctx: ServerContext): Router {
       });
     } catch (e) {
       t.used = false;
-      throw e;
+      // handed to an agent (over MCP, or to an API token): a plan's refusal in an agent's words (lib/planWords.ts)
+      throw t.agent ? forAgent(e) : e;
     }
     const file = path.join(dir, id);
     try {
@@ -598,9 +603,11 @@ export function uploadRoutes(ctx: ServerContext): Router {
         // a project file's refusals keep their status, a conflict its files (FileConflictAnswer), a refusal for now
         // when to come back (Retry-After, and `retry_after` in the body)
         const file = target.kind === 'file';
+        // handed to an agent: a plan's refusal in an agent's words (lib/planWords.ts)
+        const agentsRead = (words: string) => (t.agent ? agentText(e, words) : words);
         t.outcome = {
           status: 'failed',
-          error: publicMessage(e, 'other', { status, where: 'upload ticket' }),
+          error: agentsRead(publicMessage(e, 'other', { status, where: 'upload ticket' })),
           ...(status === 409 || status >= 500 || file ? { code: status } : {}),
           ...(file && (status === 409 || status === 429) && e.details ? { details: e.details } : {}),
           ...(file && e.retryAfter ? { retryAfter: e.retryAfter } : {}),

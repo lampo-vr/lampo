@@ -31,7 +31,7 @@ import { registerPostTools } from './tools/posts.ts';
 import { registerReadingTools } from './tools/read.ts';
 import { registerVideoTools } from './tools/videos.ts';
 
-export { type Access, allowed, backendFor, NO_FILES, type Principal, TOOL_ACCESS } from './access.ts';
+export { type Access, allowed, backendFor, hintsFor, MCP_SCOPES, NO_FILES, OVERWRITES, type Principal, TOOL_ACCESS, type ToolHints } from './access.ts';
 export { changedUris, reviewUri } from './format.ts';
 export { type AgentWay, instructionsFor, WATCH_PROMPT, watchPromptText, wayOf } from './loop.ts';
 export type { ReviewServerOptions } from './toolkit.ts';
@@ -42,14 +42,19 @@ export const SERVER_VERSION = pkg.version || '0.0.0';
 /** Builds one MCP server instance over a backend. Tools report errors as results, so a bad id never breaks a session. */
 export function createReviewServer(options: ReviewServerOptions): McpServer {
   // Files on this server's disk are the machine's own business: everyone else reaches videos by name (access.ts).
-  const o: ReviewServerOptions = { ...options, backend: backendFor(options.principal, options.backend) };
+  // How this agent works decides what it is told (mcp/loop.ts): the machine for `via: local`, else the MCP way.
+  const o: ReviewServerOptions = {
+    ...options,
+    backend: backendFor(options.principal, options.backend),
+    way: options.way ?? wayOf(options.principal.via, null),
+  };
   const b = o.backend;
   const server = new McpServer(
     // `name` is the identifier (the key people give it in their configs, MCP_NAME); `title` is what a client shows.
     { name: MCP_NAME, title: BRAND_NAME, version: SERVER_VERSION, ...(o.sourceUrl ? { websiteUrl: o.sourceUrl } : {}) },
     {
       // Sent once per connection (every tool description goes on every turn): the loop, told the way this agent works.
-      instructions: instructionsFor(o.way ?? wayOf(o.principal.via, null)),
+      instructions: instructionsFor(o.way ?? 'chat'),
       capabilities: { resources: { subscribe: true, listChanged: true } },
       cacheHints: { 'tools/list': { ttlMs: 3_600_000, cacheScope: 'private' } },
     },
@@ -86,6 +91,7 @@ export function createReviewServer(options: ReviewServerOptions): McpServer {
       quiet: o.quiet,
       onWait: o.onWait,
       log: o.log,
+      chat: o.way === 'chat',
     });
   if (kit.offers('wait_for_feedback')) registerWatchPrompt(server, o.log);
   if (kit.offers('show_review'))

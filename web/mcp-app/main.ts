@@ -1,5 +1,6 @@
 // The review card (an MCP App view). The host hands us show_review's structuredContent; everything else goes through
-// the host bridge as tool calls — review_frame for exact frames, reply / mark_fixed for actions. No network access.
+// the host bridge as tool calls — review_frame for exact frames (the first one too: show_review's data carries no
+// picture, so what the model reads stays small), reply / mark_fixed for actions. No network access.
 import { App, applyDocumentTheme } from '@modelcontextprotocol/ext-apps';
 import './review.css';
 
@@ -21,6 +22,7 @@ interface Still {
   v: number;
   kind: 'marked' | 'clean';
   note: string | null;
+  /** A data: URL; empty in show_review's answer until the card has loaded it (review_frame). */
   image: string;
 }
 interface Card {
@@ -58,6 +60,7 @@ app.ontoolresult = (result) => {
   if (c?.slug && c.still) {
     card = c;
     render();
+    if (!c.still.image) void loadStill();
   }
 };
 await app.connect();
@@ -95,11 +98,24 @@ const show = (args: { frame?: number; note?: string }) =>
     card.selected = args.note ?? null;
   });
 
+/** The frame show_review's data names, grabbed now (its answer carries no picture): the selection stays as it is. */
+const loadStill = () =>
+  run('', async () => {
+    if (!card) return;
+    const s = card.still;
+    card.still = await call<Still>('review_frame', { video: card.slug, v: s.v, ...(s.note ? { note: s.note } : { frame: s.frame }) });
+  });
+
 const step = (by: number) => card && show({ frame: Math.max(0, Math.min(card.frames - 1, card.still.frame + by)) });
 
 async function refresh(noteId: string): Promise<void> {
   if (!card) return;
-  card = await call<Card>('show_review', { video: card.slug, note: noteId });
+  const shown = card.still;
+  const next = await call<Card>('show_review', { video: card.slug, note: noteId });
+  // the same frame keeps the picture it has; another one is grabbed exactly
+  const same = shown.image && shown.note === next.still.note && shown.frame === next.still.frame && shown.v === next.still.v;
+  card = { ...next, still: same ? shown : next.still };
+  if (!card.still.image) card.still = await call<Still>('review_frame', { video: card.slug, note: noteId });
 }
 
 const reply = (n: Note, text: string) =>
@@ -160,7 +176,10 @@ function render(): void {
     h(
       'figure',
       { class: 'frame' },
-      h('img', { src: c.still.image, alt: `Frame ${c.still.frame}` }),
+      // until its frame is in: a blank of the video's shape, so nothing moves when it arrives
+      c.still.image
+        ? h('img', { src: c.still.image, alt: `Frame ${c.still.frame}` })
+        : h('img', { class: 'wait', src: blank(c.width, c.height), alt: 'Loading the frame…' }),
       h('figcaption', {}, h('b', {}, c.still.timecode), ` f${c.still.frame} · v${c.still.v}`, c.still.kind === 'marked' ? ' · marked' : ''),
     ),
     h(
@@ -221,3 +240,7 @@ function button(label: string, onclick: () => unknown, title = '', kind = ''): H
 }
 
 const withFrame = (url: string, frame: number) => url.replace(/([?&])f=\d+/, `$1f=${frame}`);
+
+/** An empty picture of the video's shape (a data: image: the card loads nothing from anywhere). */
+const blank = (w: number, h: number) =>
+  `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w || 16}" height="${h || 9}"><rect width="100%" height="100%" fill="#000"/></svg>`)}`;

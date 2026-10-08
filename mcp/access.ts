@@ -7,7 +7,7 @@ import type { Backend } from '../lib/backend/types.ts';
 import { slugify } from '../lib/paths.ts';
 import { type Action, can } from '../lib/permissions.ts';
 import type { Audience } from '../lib/publicError.ts';
-import { scopeAllows } from '../lib/scopes.ts';
+import { SCOPE_LIST, type Scope, scopeAllows, scopeFor } from '../lib/scopes.ts';
 import type { Role } from '../lib/types.ts';
 
 /**
@@ -68,6 +68,39 @@ export const TOOL_ACCESS: Record<string, Access> = {
   // Footage search: reading the workspace's index (and one contact sheet of what it found).
   find_footage: 'view',
 };
+
+/**
+ * The writes that replace or move what is there: a video filed elsewhere, a version's source said anew, a draft written
+ * over. Clients ask before each of these (Claude always does for a destructive tool). Every other write adds something
+ * or keeps its history and can be undone in the app: a note, a reply, a fix (reopened by a person), a status.
+ */
+export const OVERWRITES: ReadonlySet<string> = new Set(['move_video', 'set_render_source', 'draft_post']);
+
+/** What a tool says it does, for clients to decide when to ask the person (MCP tool annotations; every hint explicit). */
+export interface ToolHints {
+  readOnlyHint: boolean;
+  destructiveHint: boolean;
+  openWorldHint: boolean;
+}
+
+/**
+ * A tool's hints, from its TOOL_ACCESS entry: reading (`view`) changes nothing; a write is destructive only when it
+ * overwrites (OVERWRITES). None reaches beyond the workspace: no tool fetches from the web or sends anything outside
+ * (a link a note keeps is stored, never fetched; publishing is a person's, in the app).
+ */
+export function hintsFor(name: string): ToolHints {
+  const access = TOOL_ACCESS[name];
+  if (!access) throw new Error(`${name} is missing from TOOL_ACCESS`);
+  const reads = access === 'view';
+  return { readOnlyHint: reads, destructiveHint: !reads && OVERWRITES.has(name), openWorldHint: false };
+}
+
+/**
+ * What an app connecting to /mcp is asked to allow by default: the scopes its tools need, nothing more (the project
+ * files' scopes join once a tool reads or writes files). An app may still ask for others by name; a tool beyond what
+ * it was given asks for more (`insufficient_scope`).
+ */
+export const MCP_SCOPES: readonly Scope[] = SCOPE_LIST.filter((s) => Object.values(TOOL_ACCESS).some((a) => scopeFor(a) === s));
 
 /**
  * Stdio and loopback are the machine's own agent; hosted accounts get exactly what their role may do in the app, and

@@ -7,7 +7,27 @@ format stays backwards compatible throughout.
 
 ## [Unreleased]
 
+### Changed
+- MCP tools now say which of them change things: reading tools are marked read-only, so clients can let them run
+  without asking, and the three that replace or move what is there (filing a video elsewhere, saying a version's source
+  anew, drafting over a post) are marked destructive, so clients ask before each one. Every tool has a title.
+- At a plan's limit an agent hears a plain sentence — what can't be done, and that a person decides in Lampo — instead
+  of the plan's own words; people in the app still see the plan that would fit. API tokens get the same, with the
+  refusal's reason and numbers kept.
+- Chat apps (Claude, ChatGPT) connected over MCP are told the loop without commands to run: upload answers hand them
+  the URL to `PUT`, with the app's page as the way out.
+- An app that connects over OAuth is asked to allow what Lampo's MCP tools use (reading, notes, acting on feedback,
+  drafting posts), no longer the project files' scopes, which no tool uses yet; an app may still ask for them.
+- The review card loads its frame itself, so `show_review`'s answer stays small for the model (one downscaled frame),
+  and the card declares that it loads nothing from anywhere.
+
+### Added
+- `LAMPO_OPENAI_APPS_CHALLENGE`: the token ChatGPT's app directory checks at `/.well-known/openai-apps-challenge` when
+  you list your server's MCP connector there.
+
 ### Fixed
+- ChatGPT can sign in with its own client metadata document: a client that may be public (it lists `none` among its
+  token methods) is no longer refused because it prefers another one.
 - Send all on a busy connection no longer makes the notes not sent yet vanish for a moment before they leave: they
   stay where they are, sending, until they go with their motion (and so does a draft sent on its own).
 

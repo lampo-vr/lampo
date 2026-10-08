@@ -2,8 +2,8 @@
 // covers: web/mcp-app/ server/routes/mcp.ts mcp/
 // The review card (MCP App) end to end: a real server (temp store, free port), the SDK v2 client over /mcp, and the
 // card rendered in headless Chrome by a minimal MCP Apps host (test/e2e/mcp-host) that forwards its tool calls to
-// /mcp. Checks: the marked frame shows, stepping gives the exact next frame, reply and "mark fixed" reach the review,
-// the card takes the host's theme.
+// /mcp. Checks: the marked frame shows (the card loads it: show_review's answer carries no picture), stepping gives
+// the exact next frame, reply and "mark fixed" reach the review, the card takes the host's theme.
 // Without Chrome or web/dist-mcp it fails (see prereq.mjs).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -77,8 +77,10 @@ try {
   const card = await frameEl.contentFrame();
   const caption = () => card.$eval('figcaption', (el) => el.textContent);
 
-  await check('the card renders the marked frame of the first open note', async () => {
-    await card.waitForFunction(() => document.querySelector('.frame img')?.naturalWidth > 0, { timeout: 10000 });
+  await check('the card renders the marked frame of the first open note (loaded by the card: the answer carries none)', async () => {
+    assert(!result.structuredContent.still.image, 'show_review hands the card no picture');
+    await card.waitForFunction(() => document.querySelector('.frame img:not(.wait)')?.naturalWidth > 0, { timeout: 10000 });
+    assert(calls.includes('review_frame'), `the card asked for its frame: ${calls.join()}`);
     const cap = await caption();
     assert(/00:00:20 f20 · v1 · marked/.test(cap), cap);
     assert((await card.$$eval('.note', (els) => els.length)) === 1, 'one open note');

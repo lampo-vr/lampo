@@ -11,6 +11,7 @@ import { settings } from '../lib/env.ts';
 import { byName } from '../lib/inputs.ts';
 import { cleanAuthor, wellFormed } from '../lib/names.ts';
 import { isoLocal } from '../lib/paths.ts';
+import { agentText } from '../lib/planWords.ts';
 import type { PreviewTarget } from '../lib/previews.ts';
 import { publicMessage } from '../lib/publicError.ts';
 import type { RefTarget } from '../lib/refs.ts';
@@ -18,7 +19,7 @@ import { currentSession } from '../lib/sessions.ts';
 import type { GrabCount } from '../lib/shots.ts';
 import type { SessionInput } from '../lib/store.ts';
 import type { AgentKind, OptionGroup, Review, ReviewEvent } from '../lib/types.ts';
-import { allowed, audienceOf, type Principal, TOOL_ACCESS } from './access.ts';
+import { allowed, audienceOf, hintsFor, type Principal, TOOL_ACCESS } from './access.ts';
 import type { Hold, Quiet, Told, Wake } from './feedback.ts';
 import { clientName, fail, isIdle, nextStep } from './format.ts';
 import { toolFilter, trimmed } from './lean.ts';
@@ -157,8 +158,7 @@ export function createToolKit(server: McpServer, o: ReviewServerOptions): ToolKi
     const access = TOOL_ACCESS[name];
     if (!access) throw new Error(`${name} is missing from TOOL_ACCESS`);
     if (!offers(name)) return;
-    const annotations =
-      access === 'view' ? { readOnlyHint: true, openWorldHint: false } : { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
+    const annotations = hintsFor(name);
     const cb = async (args: z.output<S>, ctx: ServerContext): Promise<CallToolResult> => {
       const started = Date.now();
       const out = await run(args, ctx);
@@ -183,7 +183,8 @@ export function createToolKit(server: McpServer, o: ReviewServerOptions): ToolKi
           (isIdle(out) && offers('wait_for_feedback') && agentOf(ctx) ? await nextStep(b).catch(() => null) : null);
         return line ? { ...out, content: [...out.content, { type: 'text', text: line }] } : out;
       } catch (e) {
-        return fail(publicMessage(e, audienceOf(o.principal), { status: 400, where: `mcp ${name}` }));
+        // a tool's answer is an agent's to read: a plan's refusal in plain words, never the plan's pitch (lib/planWords.ts)
+        return fail(agentText(e, publicMessage(e, audienceOf(o.principal), { status: 400, where: `mcp ${name}` })));
       }
     };
     // The SDK's overloads are conditional on the schema type; for a generic schema TypeScript cannot pick one.

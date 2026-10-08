@@ -3,6 +3,7 @@ import { type NextFunction, type Request, type Response, Router } from 'express'
 import { z } from 'zod';
 import { ProjectArchivedError } from '../lib/archived.ts';
 import { wellFormed } from '../lib/names.ts';
+import { agentPlanDetails, agentPlanWords, planRefusalOf } from '../lib/planWords.ts';
 import { type Audience, publicMessage, statusOf } from '../lib/publicError.ts';
 
 /** Review-link paths (also server/guard.ts): nobody on them is identified, so nobody there is the owner. /e/<token> is
@@ -41,6 +42,22 @@ const archivedFail = (e: ProjectArchivedError): HttpError => Object.assign(new H
  * visitor never counts as the owner, whoever opens it.
  */
 export const audienceOf = (req: Request): Audience => (req.auth?.via === 'local' && !GUEST_PATH.test(req.path) ? 'owner' : 'other');
+
+/**
+ * Whether an agent reads the answer: an API token (an agent, `lampo`) or an app connected through OAuth. A plan's
+ * refusal reaches it in plain words (lib/planWords.ts); a person — in the browser, at the machine, on a LAN device —
+ * reads the plan's own sentence with its limit sheet. By who asks, never by mode.
+ */
+export const agentReads = (via: string | undefined): boolean => via === 'token' || via === 'oauth';
+
+/**
+ * A plan's refusal as an agent gets it: a 402 with the plain sentence for its reason and only the fields an agent keeps
+ * (agentPlanDetails); any other error as it is.
+ */
+export function forAgent(e: unknown): unknown {
+  const refusal = planRefusalOf(e);
+  return refusal ? new HttpError(402, agentPlanWords(refusal.reason), agentPlanDetails(refusal.details)) : e;
+}
 
 /**
  * Every router matches paths exactly as written: case-sensitive, and a trailing slash is a different path. Express's
@@ -158,8 +175,10 @@ export const loggedPath = (p: string): string =>
  */
 export function createErrorHandler({ hosted = false } = {}) {
   return (thrown: StatusError, req: Request, res: Response, next: NextFunction): void => {
-    // the store's refusal for an archived project, as a route's own would be (lib/folderIds.ts checkNotArchived)
-    const err: StatusError = thrown instanceof ProjectArchivedError ? archivedFail(thrown) : thrown;
+    // the store's refusal for an archived project, as a route's own would be (lib/folderIds.ts checkNotArchived); a
+    // plan's refusal in an agent's words when an agent asked
+    const err: StatusError =
+      thrown instanceof ProjectArchivedError ? archivedFail(thrown) : agentReads(req.auth?.via) ? (forAgent(thrown) as StatusError) : thrown;
     // An internal error's own status is someone else's (an object store's 403): to the caller it is this server's fault.
     const status = err instanceof HttpError ? err.status : statusOf(err);
     if (res.headersSent) {

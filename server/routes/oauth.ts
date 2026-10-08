@@ -36,6 +36,7 @@ import { addressKey, RateLimit } from '../../lib/rateLimit.ts';
 import { parseScope, SCOPE_LIST, SCOPES, type Scope } from '../../lib/scopes.ts';
 import type { OAuthRequestView } from '../../lib/types.ts';
 import * as workspaces from '../../lib/workspaces.ts';
+import { MCP_SCOPES } from '../../mcp/access.ts';
 import { type Auth, requireAdmin, requireUser } from '../auth.ts';
 import type { ServerContext } from '../context.ts';
 import { CONSENT_PAGE } from '../guard.ts';
@@ -274,7 +275,8 @@ export function oauthRoutes(ctx: ServerContext): Router {
       return res.redirect(302, `${CONSENT_PAGE}#/oauth/${pending.id}`);
     }
     if (p.resource !== undefined && !sameResource(p.resource, resource)) return showError(res, 'invalid_target');
-    const scopes = p.scope === undefined ? SCOPE_LIST : parseScope(p.scope);
+    // an app that names no scope is asked for what the MCP tools need (mcp/access.ts MCP_SCOPES), not every scope there is
+    const scopes = p.scope === undefined ? [...MCP_SCOPES] : parseScope(p.scope);
     if (!scopes.length) return showError(res, 'invalid_scope');
     const pending = grants.createRequest({ client, redirect_uri: p.redirect_uri, state: p.state ?? null, code_challenge: p.code_challenge, scopes, resource });
     pendingByAddress.hit(from);

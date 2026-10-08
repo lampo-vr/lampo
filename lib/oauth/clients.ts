@@ -300,9 +300,17 @@ async function fetchMetadataClient(id: string): Promise<ClientInfo> {
     if (doc.client_id !== id) throw new ClientError('invalid_client', 'the client metadata document names a different client_id');
     if ('client_secret' in doc || 'client_secret_expires_at' in doc)
       throw new ClientError('invalid_client', 'a client metadata document may not carry a secret');
-    const method = doc.token_endpoint_auth_method ?? 'none';
-    if (method !== 'none')
-      throw new ClientError('invalid_client', `this server accepts public clients with PKCE only (token_endpoint_auth_method "${String(method)}")`);
+    // The methods the client can use: the plural list when it gives one (MCP SEP-3149: ChatGPT's document lists `none`
+    // and `private_key_jwt`, with the singular as its preference among them), else its one method. This server takes
+    // public clients with PKCE only, and its metadata says so: a client that can't be one is refused.
+    const methods = Array.isArray(doc.token_endpoint_auth_methods_supported)
+      ? doc.token_endpoint_auth_methods_supported
+      : [doc.token_endpoint_auth_method ?? 'none'];
+    if (!methods.includes('none'))
+      throw new ClientError(
+        'invalid_client',
+        `this server accepts public clients with PKCE only (token_endpoint_auth_method "${String(doc.token_endpoint_auth_method ?? methods.join(' '))}")`,
+      );
     const name = cleanName(doc.client_name);
     if (!name) throw new ClientError('invalid_client', 'the client metadata document has no client_name');
     const uris = doc.redirect_uris;

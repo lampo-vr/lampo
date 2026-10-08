@@ -26,6 +26,8 @@ export const ROUTE_ACTIONS: [string, string, Rule][] = [
   // OAuth for MCP clients: consenting is your own business; token, registration and revocation authenticate the client.
   ['*', '/api/oauth/*', 'self'],
   ['*', '/oauth/*', 'public'],
+  // OpenAI's app directory checks this server owns its host (LAMPO_OPENAI_APPS_CHALLENGE): the token, to anyone.
+  ['GET', '/.well-known/openai-apps-challenge', 'public'],
   // oEmbed for Embed links (server/routes/shares/embed.ts): the address it is asked about is its only key, like the
   // link's own pages; it answers signed in or not, and never for any other link.
   ['GET', '/oembed', 'public'],

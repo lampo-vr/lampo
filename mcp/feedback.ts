@@ -9,7 +9,7 @@ import type { CallToolResult, McpServer, ServerContext } from '@modelcontextprot
 import { z } from 'zod';
 import type { Backend } from '../lib/backend/types.ts';
 import { isFeedback, shortEventLine } from '../lib/eventLine.ts';
-import { PENDING_LINE, QUIET_STOP_MIN, STOP_LINE } from '../lib/handoff.ts';
+import { CHAT_STOP_LINE, PENDING_LINE, QUIET_STOP_MIN, STOP_LINE } from '../lib/handoff.ts';
 import { forAgents } from '../lib/onboarding.ts';
 import { slugify } from '../lib/paths.ts';
 import { type Audience, publicMessage } from '../lib/publicError.ts';
@@ -17,6 +17,7 @@ import { Recent } from '../lib/rateLimit.ts';
 import { matchesSession } from '../lib/sessions.ts';
 import { instant, isAgent, isIdea, isRequired, keepLines, oneLine } from '../lib/time.ts';
 import type { Comment, ReviewEvent } from '../lib/types.ts';
+import { hintsFor } from './access.ts';
 import { trimmed } from './lean.ts';
 import { took } from './toolkit.ts';
 
@@ -140,6 +141,8 @@ export interface FeedbackOptions {
   log?: (line: string) => void;
   /** The wait handed over work on these videos (new feedback, what waited for it): the agent's runs there begin. */
   handed?: (slugs: string[], ctx: ServerContext) => void;
+  /** A chat client (mcp/loop.ts): told to stop without a command or another app's name. */
+  chat?: boolean;
 }
 
 const GONE = 'your access ended (the token was revoked, or the account left this workspace or was disabled)';
@@ -239,7 +242,7 @@ export function registerFeedback(server: McpServer, o: FeedbackOptions): void {
           images: z.enum(['drawn', 'all', 'none']).optional().describe('drawn (default): new notes with a drawing; all: every new note'),
         }),
       ),
-      annotations: { readOnlyHint: true, openWorldHint: false },
+      annotations: hintsFor('wait_for_feedback'),
     },
     async ({ video, since, timeout_s = DEFAULT_WAIT_S, images = 'drawn' }, ctx: ServerContext) => {
       if (!o.allowed) return { content: [{ type: 'text', text: 'Error: your role may not read feedback' }], isError: true };
@@ -313,7 +316,9 @@ export function registerFeedback(server: McpServer, o: FeedbackOptions): void {
             const stop = !ctx.mcpReq.signal.aborted && !!o.quiet?.nothing(quietFrom);
             if (stop) outcome = 'timeout, told to stop';
             return {
-              content: [{ type: 'text', text: `No new feedback in ${timeout_s} s.\ncursor: ${next}\n${stop ? STOP_LINE : PENDING_LINE}` }],
+              content: [
+                { type: 'text', text: `No new feedback in ${timeout_s} s.\ncursor: ${next}\n${stop ? (o.chat ? CHAT_STOP_LINE : STOP_LINE) : PENDING_LINE}` },
+              ],
               structuredContent: { events: [], cursor: next, ...(stop ? { stop: true } : {}) },
             };
           }

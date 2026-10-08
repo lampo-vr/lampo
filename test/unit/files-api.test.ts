@@ -21,6 +21,7 @@ const APP = 'review.test';
 const MEDIA = 'media.review.test';
 isolatedEnv({ vars: { VR_MODE: 'server', VR_PUBLIC_URL: `http://${APP}`, VR_MEDIA_ORIGIN: `http://${MEDIA}`, VR_FOOTAGE: 'off', VR_OCR: 'off' } });
 const auth = await import('../../lib/auth.ts');
+const { AGENT_PLAN_WORDS } = await import('../../lib/planWords.ts');
 const folders = await import('../../lib/folders.ts');
 const files = await import('../../lib/files.ts');
 const fileAreas = await import('../../lib/fileAreas.ts');
@@ -364,7 +365,9 @@ test('a push the plan has no room for is refused before any byte, with the limit
     assert.equal(r.answer.status, 402, r.answer.text);
     assert.equal(r.answer.json().reason, 'storage');
     assert.equal(r.answer.json().needed, 5000);
-    assert.equal(r.answer.json().fits, 'team');
+    // an API token (an agent, `lampo files push`) reads a plain sentence and the numbers, never the plan that would fit
+    assert.equal(r.answer.json().fits, undefined);
+    assert.equal(r.answer.json().error, AGENT_PLAN_WORDS.storage);
     assert.equal(r.puts.length, 0);
   } finally {
     ctx.extension = real;

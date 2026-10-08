@@ -9,7 +9,14 @@ import { quiet } from '../../lib/inputs.ts';
 import { ok, text } from '../format.ts';
 import type { ToolKit } from '../toolkit.ts';
 
-export function registerFootageTools({ b, tool }: ToolKit): void {
+/** What the index says to a chat client: the same, without the `lampo` command it names (mcp/loop.ts: MCP only). */
+export const withoutCommands = (note: string): string =>
+  note
+    .replace(/\s*\((?:`)?lampo [^)]*\)/g, '')
+    .replace(/\s*—\s*lampo .*$/, '')
+    .trim();
+
+export function registerFootageTools({ b, o, tool }: ToolKit): void {
   tool(
     'find_footage',
     {
@@ -30,7 +37,8 @@ export function registerFootageTools({ b, tool }: ToolKit): void {
       }),
     },
     async ({ sheet, ...req }) => {
-      const a = await b.findFootage(req);
+      const found = await b.findFootage(req);
+      const a = o.way === 'chat' && found.index.note ? { ...found, index: { ...found.index, note: withoutCommands(found.index.note) } } : found;
       const list = text(compactList(a));
       if (!sheet || !a.shots.length) return ok(list);
       const { file } = await b.footageSheet(a.shots.slice(0, 9).map((s) => s.id));

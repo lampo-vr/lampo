@@ -102,6 +102,7 @@ The settings that matter most on a server. All the others, and where config.json
 | `LAMPO_SIGNUP` | `signup` | off | Who may sign up on their own: `off`, `invite` or `open` ([below](#accounts-and-tokens)). |
 | `LAMPO_IMPRINT_URL`, `LAMPO_PRIVACY_URL`, `LAMPO_TERMS_URL` | `imprint_url`, `privacy_url`, `terms_url` | none | Your imprint, privacy policy and terms, linked at the foot of the sign-in screens and of review links, and in *Settings → About* ([configuration.md → Legal pages](configuration.md#legal-pages)). `LAMPO_SIGNUP=open` needs the terms and the privacy policy. |
 | `LAMPO_OPERATOR` | | the first workspace's owners | Who runs this server, by email address or account id ([below](#the-operators-pages)). |
+| `LAMPO_OPENAI_APPS_CHALLENGE` | | none | The token OpenAI asks you to host when you list this server's MCP connector in ChatGPT's app directory: the server answers it as plain text at `/.well-known/openai-apps-challenge`, to anyone; unset, that path is unknown ([mcp.md → In the chat apps' directories](mcp.md#in-the-chat-apps-directories)). |
 
 Where the store is on disk: [configuration.md → Where data lives](configuration.md#where-data-lives).
 
@@ -714,7 +715,8 @@ What happens when you add `https://review.example.com/mcp` to such a client:
    it where to sign in.
 2. It identifies itself with a **Client ID Metadata Document** (its client id is an https address of a JSON document
    it hosts; the server fetches and checks it), or registers itself (`/oauth/register`; deprecated in MCP but still
-   used by some clients).
+   used by some clients). The server takes public clients with PKCE: a document must allow `none` among its token
+   methods (Claude's says `none`; ChatGPT's lists `none` beside `private_key_jwt` and signs in the first way here).
 3. Your browser opens the server's **consent screen**, after you sign in if needed. It shows who asks (a name verified
    by its metadata's host, or marked as self-named), where the answer goes (with a warning when that is a program on
    your own computer) and what the app may do. You allow or deny.
@@ -735,7 +737,10 @@ the person who allowed it, so a reviewer's app can't mark notes fixed, whatever 
 | `files:write` | the above, plus add, replace, rename, move and trash project files (every change a version anyone can bring back) |
 
 The project files have scopes of their own, so an app connected with `review:act` (which uploads renders) never gains
-a project's footage without being asked for it; an app connected before they existed has neither.
+a project's footage without being asked for it; an app connected before they existed has neither. What `/mcp` asks a
+connecting app for (the `scope` of its 401 challenge, and what an authorization request without a `scope` gets) is
+what its tools need — `review:read review:comment review:act post:draft` — so nobody is asked to allow what no tool
+uses; an app may still name more.
 
 Apps never check fixes, approve, mark final, edit other people's notes, remove videos, make review links, download
 folders, edit playbooks, publish or administer the server. A call outside the granted scopes gets 403 with an

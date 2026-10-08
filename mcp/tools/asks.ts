@@ -141,7 +141,8 @@ export function registerAskTools({ b, o, tool, author, accountOf, byArg }: ToolK
           oneLine(`${made.id} asked ${where}: ${optionsSummary(groups)}`),
           'The person auditions and picks in Lampo; wait_for_feedback brings: ANSWERED … PICKED <group>=<item> … · note: "…"',
         ];
-        for (const [key, t] of urls) lines.push(`${key}: PUT its file once (until ${t.expires}): curl -fT <file> '${t.url}'`);
+        // a command to run for agents with a shell; a chat client is told what the URL takes (mcp/loop.ts)
+        for (const [key, t] of urls) lines.push(`${key}: PUT its file once (until ${t.expires}): ${o.way === 'chat' ? t.url : `curl -fT <file> '${t.url}'`}`);
         return ok(text(lines.join('\n')));
       } finally {
         for (const d of scratch) fs.rmSync(d, { recursive: true, force: true });

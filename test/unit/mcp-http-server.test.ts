@@ -54,7 +54,7 @@ test('no token: 401 with a Bearer challenge that points at the OAuth metadata; a
   assert.equal(none.status, 401);
   assert.equal(
     none.headers.get('www-authenticate'),
-    `Bearer realm="video-review", resource_metadata="${PUBLIC}/.well-known/oauth-protected-resource/mcp", scope="review:read review:comment review:act post:draft files:read files:write"`,
+    `Bearer realm="video-review", resource_metadata="${PUBLIC}/.well-known/oauth-protected-resource/mcp", scope="review:read review:comment review:act post:draft"`,
     'clients can discover the OAuth sign-in from the challenge (RFC 9728)',
   );
   const wrong = await fetch(`${base}/mcp`, { method: 'POST', headers: { 'content-type': 'application/json', Authorization: 'Bearer vr_forged' }, body });
@@ -195,7 +195,8 @@ test('request_upload: a one-time URL that takes one plain PUT and becomes a vide
   assert.ok(!first.isError, textOf(first));
   const url = urlOf(first);
   assert.ok(url?.startsWith(`${PUBLIC}/api/uploads/direct/`), textOf(first));
-  assert.match(textOf(first), /curl -fT 'agent-cut\.mp4'/);
+  // a client that isn't a coding agent is told what the URL takes, never a command to run (mcp/loop.ts)
+  assert.doesNotMatch(textOf(first), /curl/);
   const clip = makeVideo(path.join(dir, 'agent/agent-cut.mp4'), { w: 160, h: 90, dur: 1 });
   const done = await put(url, clip);
   assert.equal(done.status, 200, JSON.stringify(done.json));

@@ -22,7 +22,7 @@ import * as store from '../lib/store.ts';
 import type { FileUploadResult, GuestRef, OptionGroup, TooManyAnswerFields, UploadResult } from '../lib/types.ts';
 import { roleIn } from '../lib/workspaces.ts';
 import { sessionOf } from './auth.ts';
-import { fail } from './http.ts';
+import { agentReads, fail } from './http.ts';
 
 const TICKET = /^vrup_[\w-]{32}$/;
 const TICKET_MS = 15 * 60_000;
@@ -126,6 +126,8 @@ export interface Ticket {
   /** Whose URL it is, and whose open URLs it counts among (TicketGuard). */
   owner?: string;
   pool?: string;
+  /** Handed to an agent (TicketGuard): a plan's refusal at its PUT is told in an agent's words. */
+  agent?: boolean;
 }
 
 /**
@@ -142,6 +144,11 @@ export interface TicketGuard {
   pool?: string;
   /** Other limits than OPEN_PER_OWNER / OPEN_PER_POOL (a push of project files: a ticket per file). */
   limits?: { owner: number; pool: number };
+  /**
+   * The URL goes to an agent (an MCP tool's answer, an API token's request): whoever sends the PUT is never identified,
+   * so a plan's refusal there is told by who asked for the URL (lib/planWords.ts).
+   */
+  agent?: boolean;
 }
 
 /** Upload URLs one account (or one review-link visitor) may hold open at once. */
@@ -202,6 +209,7 @@ export function issuerStill(i: TicketIssuer, action: Action): boolean {
 /** The guard of a URL handed to a member of the team: checked again, when it is used, as `issuerStill`. */
 export const teamGuard = (issuer: TicketIssuer | null, action: Action): TicketGuard => ({
   ...(issuer ? { owner: `user:${issuer.user}` } : {}),
+  ...(agentReads(issuer?.via) ? { agent: true } : {}),
   pool: 'team',
   check: () => {
     if (!issuer || !issuerStill(issuer, action)) throw fail(403, 'whoever asked for this upload URL may no longer upload here; ask for a new one');

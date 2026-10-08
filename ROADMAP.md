@@ -31,8 +31,10 @@ knows why it matters. Done work moves to `CHANGELOG.md`.
 **A real deployment: running** (since 2026-10-03; open sign-up since 2026-10-06). The first hosted instance serves the
 app behind a CDN proxy with video from a media host of its own (`LAMPO_MEDIA_ORIGIN`), mail from a verified sending
 domain, nightly backups to a second place with a restore drilled, and the smoke test green; CI runs on GitHub's runners
-in the public repository (outside contributors' workflows wait for approval). Still to do there: the OAuth connectors
-in ChatGPT and Claude.ai for real, an uptime check from outside, the Linux screenshot baselines from CI's artifact
+in the public repository (outside contributors' workflows wait for approval). Still to do there: listing the connector
+in Claude's and ChatGPT's directories (the server is ready for their reviews — tool hints, plain words at a plan's
+limit, ChatGPT's sign-in and domain check; the submissions are made by hand; then `outputSchema` for the tools that
+return data, which OpenAI recommends), an uptime check from outside, the Linux screenshot baselines from CI's artifact
 (then drop `LAMPO_BASELINE_MISSING`), perf budgets measured on CI's runners (then drop `LAMPO_PERF_TIMES`), a Parakeet
 voice note and an Auto-check run measured on x86, `npm audit` of the pinned versions. Open: whether review links speak
 the visitor's browser language (clients have no Settings, so today they always get English).
