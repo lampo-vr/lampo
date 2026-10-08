@@ -2,18 +2,14 @@
 // data — exporting it, deleting your account or the workspace you own. Only the screens that use them load this
 // (auth/AccountScreens.tsx, Settings → Profile and Workspace): none of it is in the first paint.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isSignupPlan } from '../../../lib/setupFlow.ts';
 import type { AccountDeletionPlan, SignupPlan, WorkspaceDeletionPlan } from '../../../lib/types.ts';
+import { planIn } from '../auth/signupLink.ts';
 import { afterSignIn, afterSignOut, authKeys, pageLang } from './auth.ts';
 import { ApiError, api } from './client.ts';
 import type { AuthStatus, PublicUser, Role } from './types.ts';
 
 /** The plan the website's sign-up link named (`?plan=`, in the address's query or the hash's): known ids only. */
-export function signupPlan(): SignupPlan | undefined {
-  const hashQuery = location.hash.includes('?') ? location.hash.slice(location.hash.indexOf('?') + 1) : '';
-  const plan = new URLSearchParams(location.search).get('plan') ?? new URLSearchParams(hashQuery).get('plan');
-  return isSignupPlan(plan) ? plan : undefined;
-}
+export const signupPlan = (): SignupPlan | undefined => planIn(location.hash, location.search);
 
 /** Sign-up answers the same for every address (`{ok: true}`) and signs nobody in: the emailed link does. */
 export const useSignUp = () =>

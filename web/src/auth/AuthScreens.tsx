@@ -23,6 +23,7 @@ import { scopeHint, scopeLabel } from '../i18n/scopeTerms.ts';
 import { T } from '../i18n/T.tsx';
 import { roleWord } from '../i18n/terms.ts';
 import { SendAgain } from './SendAgain.tsx';
+import { withPlan } from './signupLink.ts';
 
 /** Kept room for words still on their way (the foot's version and source): there, unseen, so nothing slides once they come. */
 const Waiting = ({ children }: { children: ReactNode }) => (
@@ -213,6 +214,8 @@ export function SignInScreen({ resumed }: { resumed: boolean }) {
   // In front of an app's request to connect (#/oauth/<request>): the app sent the person here, so the screen says so
   // and leaves agents' own sign-in out of it
   const forApp = /^#\/oauth\/[A-Za-z0-9_-]+$/.test(location.hash);
+  // landed here from the website's sign-up link with a plan (or its "Sign in"): the way to sign up keeps it
+  const signupHref = withPlan('#/signup', location.hash, location.search);
   return (
     <Frame testid="signin">
       <EntranceHead title={t('Sign in')}>
@@ -272,10 +275,10 @@ export function SignInScreen({ resumed }: { resumed: boolean }) {
           {!info ? (
             <SkLine w="14em" />
           ) : signup === 'open' ? (
-            <T k="New here? <0>Create an account</0>" tags={[(c) => <a href="#/signup">{c}</a>]} />
+            <T k="New here? <0>Create an account</0>" tags={[(c) => <a href={signupHref}>{c}</a>]} />
           ) : signup === 'invite' ? (
             <>
-              <T k="Invited? <0>Create your account</0>" tags={[(c) => <a href="#/signup">{c}</a>]} />{' '}
+              <T k="Invited? <0>Create your account</0>" tags={[(c) => <a href={signupHref}>{c}</a>]} />{' '}
               <Qm side="start">{t('Use the address the invite went to.')}</Qm>
             </>
           ) : (

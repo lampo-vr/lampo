@@ -35,7 +35,10 @@ depends on where the app runs (`setupVariant`, `setupStepsFor` in [lib/setupFlow
 
 - **Welcome**, where a billing module runs (Lampo Cloud), shows the trial it gives ("Team trial · 14 days · no
   card"); a sign-up from Lampo's pricing page (`?plan=cloud-solo|cloud-team|cloud-business` on the sign-up link,
-  carried through the confirm link) is still a Team trial, and Get started offers the plan picked.
+  carried through the confirm link) is still a Team trial, and Get started offers the plan picked. The link is
+  `#/signup?plan=…` (Start free: `cloud-free`, the default); sign-in's *Create an account* and sign-up's *Sign in*
+  keep the plan. Someone signed in already who opens it goes into the app, in the workspace they last used; a paid plan
+  opens Settings → Billing with it, where billing runs.
 - **Who the videos are for** (for other brands, for our own brand, for my channel, something else in a few words; several at
   once) is kept on the workspace (`personas`, `personaOther`). It changes a few words, the role an invite starts with
   (in-house teams invite reviewers) and Get started's order. A channel alone has no team step.

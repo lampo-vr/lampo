@@ -1,7 +1,8 @@
 // Hash routes:  #/v/<slug>?c=&f=&v=  player · #/print/<slug> · #/ #/inbox #/unsorted #/insights #/archived
 // #/folder/<path> #/playbook/<path>[?tab=…] #/files/<path>[?path=&trash=&open=] #/session/<name>  library views (old addresses: #/for-you and #/verify open
 // #/inbox, #/open opens All videos on the Being fixed lane) · #/status (where every video stands) · #/settings[/<section>] · #/invite/<token> ·
-// #/signup · #/forgot · #/reset/<token> · #/verify/<token> (what emailed links open, server mode) · #/oauth/<request> and
+// #/signup[?plan=…] · #/forgot · #/reset/<token> · #/verify/<token> (what emailed links open, server mode; each may carry a
+// query, as the website's links and utm tags do) · #/oauth/<request> and
 // #/oauth/error?error=…  (an app asking to connect, server mode) · #/welcome[/<step>] (a new account's setup) ·
 // #/operator/funnel|workspaces[/<id>]|accounts[/<id>] (the server's operator) · #/styleguide (dev and test builds) ·
 // /g/<token>  client link (real paths, served by the server)
@@ -79,16 +80,18 @@ export function parseRoute(hash: string, pathname: string): Route {
   if (OLD_OPEN.test(hash)) return { name: 'library', view: { kind: 'all' } };
   if (/^#\/status\/?$/.test(hash)) return { name: 'status' };
   if (/^#\/styleguide\/?$/.test(hash)) return { name: 'styleguide' };
-  const wl = /^#\/welcome(?:\/([a-z]+))?\/?$/.exec(hash);
+  // A route a link from outside opens (the website, an email, a campaign) takes a query (`?plan=` from the website's
+  // Start free, utm tags): without one it was read as the library — the sign-in screen for a new visitor.
+  const wl = /^#\/welcome(?:\/([a-z]+))?\/?(?:\?.*)?$/.exec(hash);
   if (wl) return { name: 'welcome', step: wl[1] ?? null };
-  const inv = /^#\/invite\/(inv_[A-Za-z0-9_-]+)$/.exec(hash);
+  const inv = /^#\/invite\/(inv_[A-Za-z0-9_-]+)(?:\?.*)?$/.exec(hash);
   if (inv) return { name: 'invite', token: inv[1] };
   // What an email's link opens; the token stays in the fragment and the page posts it.
-  if (/^#\/signup\/?$/.test(hash)) return { name: 'signup' };
-  if (/^#\/forgot\/?$/.test(hash)) return { name: 'forgot' };
-  const rt = /^#\/reset\/(rt_[A-Za-z0-9_-]+)$/.exec(hash);
+  if (/^#\/signup\/?(?:\?.*)?$/.test(hash)) return { name: 'signup' };
+  if (/^#\/forgot\/?(?:\?.*)?$/.test(hash)) return { name: 'forgot' };
+  const rt = /^#\/reset\/(rt_[A-Za-z0-9_-]+)(?:\?.*)?$/.exec(hash);
   if (rt) return { name: 'reset', token: rt[1] };
-  const vt = /^#\/verify\/(vt_[A-Za-z0-9_-]+)$/.exec(hash);
+  const vt = /^#\/verify\/(vt_[A-Za-z0-9_-]+)(?:\?.*)?$/.exec(hash);
   if (vt) return { name: 'verify', token: vt[1] };
   const oe = /^#\/oauth\/error(?:\?(.*))?$/.exec(hash);
   if (oe) {
@@ -118,7 +121,8 @@ export function parseRoute(hash: string, pathname: string): Route {
   if (pb) return { name: 'library', view: { kind: pb[1] as 'playbook' | 'files', id: decoded(pb[2]) } };
   const s = /^#\/session\/(.+)$/.exec(hash);
   if (s) return { name: 'library', view: { kind: 'session', id: decoded(s[1]) } };
-  const k = /^#\/(inbox|unsorted|insights|archived)$/.exec(hash);
+  // (a notification's #/inbox, with utm tags from a campaign)
+  const k = /^#\/(inbox|unsorted|insights|archived)(?:\?.*)?$/.exec(hash);
   return { name: 'library', view: { kind: k ? (k[1] as 'inbox' | 'unsorted' | 'insights' | 'archived') : 'all' } };
 }
 

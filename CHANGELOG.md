@@ -29,6 +29,9 @@ format stays backwards compatible throughout.
   you list your server's MCP connector there.
 
 ### Fixed
+- The website's Start free opens the sign-up again (it showed the sign-in screen); signed in already, it opens the
+  app, and a paid plan picked on the website opens Settings → Billing with that plan. Sign-in and sign-up keep the
+  plan between them, and an email's link with a query after it opens its page.
 - ChatGPT can sign in with its own client metadata document: a client that may be public (it lists `none` among its
   token methods) is no longer refused because it prefers another one.
 - Send all on a busy connection no longer makes the notes not sent yet vanish for a moment before they leave: they

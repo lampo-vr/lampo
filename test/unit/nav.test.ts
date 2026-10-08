@@ -10,6 +10,11 @@ const { parseRoute, canonicalHash, isOldOpenNotes } = (await import(new URL('../
   canonicalHash: (hash: string) => string | null;
   isOldOpenNotes: (hash: string) => boolean;
 };
+const { planIn, withPlan, signedInTo } = (await import(new URL('../../web/src/auth/signupLink.ts', import.meta.url).href)) as {
+  planIn: (hash: string, search: string) => string | undefined;
+  withPlan: (to: '#/signup' | '#/', hash: string, search: string) => string;
+  signedInTo: (hash: string, search: string, billing: boolean) => string;
+};
 
 test('a malformed % in the hash is taken as written, not a blank page', () => {
   assert.deepEqual(parseRoute('#/folder/100%', '/'), { name: 'library', view: { kind: 'folder', id: '100%' } });
@@ -56,6 +61,61 @@ test('Settings → Billing’s checkout and its cancellation (§ 312k) are steps
   assert.notEqual(parseRoute('#/settings/profile/cancel', '/').name, 'settings');
   assert.notEqual(parseRoute('#/settings/billing/checkoutx', '/').name, 'settings');
   assert.notEqual(parseRoute('#/settings/billing/cancelled', '/').name, 'settings');
+});
+
+test('a route an outside link opens takes a query: the website’s Start free (#/signup?plan=…), utm tags, an email’s link', () => {
+  // lampo.video's Start free opened the sign-in screen: #/signup?plan=cloud-free was read as the library
+  for (const hash of [
+    '#/signup',
+    '#/signup/',
+    '#/signup?plan=cloud-free',
+    '#/signup/?plan=cloud-solo&utm_source=x',
+    '#/signup?utm_source=site&utm_campaign=launch',
+  ])
+    assert.deepEqual(parseRoute(hash, '/'), { name: 'signup' }, hash);
+  for (const hash of ['#/forgot', '#/forgot/', '#/forgot?utm_source=x']) assert.deepEqual(parseRoute(hash, '/'), { name: 'forgot' }, hash);
+  assert.deepEqual(parseRoute('#/invite/inv_Ab-1_z?utm_source=mail', '/'), { name: 'invite', token: 'inv_Ab-1_z' });
+  assert.deepEqual(parseRoute('#/reset/rt_Ab-1_z?utm_medium=email', '/'), { name: 'reset', token: 'rt_Ab-1_z' });
+  assert.deepEqual(parseRoute('#/verify/vt_Ab-1_z?utm_medium=email', '/'), { name: 'verify', token: 'vt_Ab-1_z' });
+  assert.deepEqual(parseRoute('#/welcome?utm_source=x', '/'), { name: 'welcome', step: null });
+  assert.deepEqual(parseRoute('#/welcome/team?utm_source=x', '/'), { name: 'welcome', step: 'team' });
+  assert.deepEqual(parseRoute('#/inbox?utm_source=push', '/'), { name: 'library', view: { kind: 'inbox' } });
+  assert.deepEqual(parseRoute('#/insights?utm_source=x', '/'), { name: 'library', view: { kind: 'insights' } });
+  // only the query: what each route accepts before it stays as strict
+  for (const hash of [
+    '#/signupx',
+    '#/signup/x',
+    '#/signup//?a',
+    '#/forgotten',
+    '#/invite/inv_a/b',
+    '#/invite/x_1?plan=1',
+    '#/reset/rt_a b',
+    '#/verify/vt_a#b',
+    '#/inbox/x',
+  ])
+    assert.deepEqual(parseRoute(hash, '/'), { name: 'library', view: { kind: 'all' } }, hash);
+  // the token is the token, never the query after it
+  assert.deepEqual(parseRoute('#/reset/rt_a?x=rt_b', '/'), { name: 'reset', token: 'rt_a' });
+  // routes that read their query keep reading it
+  assert.deepEqual(parseRoute('#/settings/billing?plan=cloud-solo', '/'), { name: 'settings', section: 'billing' });
+  assert.equal(parseRoute('#/v/a?c=n1&utm_source=x', '/').name, 'player');
+});
+
+test('the website’s sign-up link: its plan, the links between sign-in and sign-up keep it, and where it takes someone signed in', () => {
+  // the plan in the hash's query or the address's; known ids only (Start free's cloud-free is the default: no id)
+  assert.equal(planIn('#/signup?plan=cloud-solo&utm_source=x', ''), 'cloud-solo');
+  assert.equal(planIn('#/signup', '?plan=cloud-team'), 'cloud-team');
+  assert.equal(planIn('#/signup?plan=cloud-free', ''), undefined);
+  assert.equal(planIn('#/signup?plan=enterprise', ''), undefined);
+  assert.equal(withPlan('#/signup', '#/?plan=cloud-business', ''), '#/signup?plan=cloud-business');
+  assert.equal(withPlan('#/', '#/signup?plan=cloud-solo', ''), '#/?plan=cloud-solo');
+  assert.equal(withPlan('#/signup', '#/?plan=cloud-free&utm_source=x', ''), '#/signup');
+  // signed in: the app (the session's workspace, the one last used); a paid plan to Billing's picker where billing runs
+  assert.equal(signedInTo('#/signup?plan=cloud-free', '', true), '#/');
+  assert.equal(signedInTo('#/signup?plan=cloud-solo', '', false), '#/');
+  assert.equal(signedInTo('#/signup?plan=cloud-solo&utm_source=x', '', true), '#/settings/billing?plan=cloud-solo');
+  assert.equal(signedInTo('#/signup?plan=cloud-team&interval=year&currency=usd', '', true), '#/settings/billing?plan=cloud-team&interval=year&currency=usd');
+  assert.equal(signedInTo('#/signup', '?plan=cloud-business&interval=weekly&currency=xyz', true), '#/settings/billing?plan=cloud-business');
 });
 
 test('the operator’s pages: the funnel, the workspaces and the accounts, a list or one of it — nothing else', () => {

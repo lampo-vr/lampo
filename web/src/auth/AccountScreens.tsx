@@ -6,6 +6,7 @@
 // (ui/EntryForm.tsx). Loaded on demand (App.tsx, AuthGate): no part of this is in the library's first paint.
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import { BRAND_NAME } from '../../../lib/brand.ts';
+import { isGated } from '../../../lib/gate.ts';
 import {
   useCancelEmail,
   useForgot,
@@ -19,6 +20,7 @@ import {
 } from '../api/account.ts';
 import { useAuthStatus, useSignOut } from '../api/auth.ts';
 import { ApiError } from '../api/client.ts';
+import { keptFromBefore } from '../api/persist.ts';
 import { useInfo } from '../api/queries.ts';
 import { t } from '../i18n/index.ts';
 import { T } from '../i18n/T.tsx';
@@ -29,6 +31,7 @@ import { I } from '../ui/icons.tsx';
 import { Skeleton, SkLine } from '../ui/Skeleton.tsx';
 import { Frame, linkTag, PasswordHint } from './AuthScreens.tsx';
 import { SendAgain } from './SendAgain.tsx';
+import { signedInTo, withPlan } from './signupLink.ts';
 
 /** A link's end as the server says it (404 invalid, 410 expired/used, 409 the address changed meanwhile, or the link is another account's while someone is signed in here). */
 type Ended = 'expired' | 'used' | 'invalid' | 'stale' | 'other';
@@ -76,6 +79,17 @@ export function SignUpScreen() {
     }
   };
   const clear = tries.clear;
+  // Signed in already (the website's Start free, opened while signed in): into the app, not a second account — a paid
+  // plan to Billing's picker (signupLink.ts). Once the server has said so: a status kept from an earlier visit may be a
+  // session that has ended since; until then the form waits.
+  const status = useAuthStatus();
+  const inside = !!status.data?.user && !isGated(status.data.user);
+  const sure = inside && !keptFromBefore(status.dataUpdatedAt) && !!info;
+  const billing = !!info?.billing;
+  useEffect(() => {
+    if (sure) location.replace(signedInTo(location.hash, location.search, billing));
+  }, [sure, billing]);
+  if (inside) return null;
   // Sign-up is off here (or the page was opened from an old link): say so, and where to go instead.
   if (info && (!mode || mode === 'off' || !info.mail))
     return (
@@ -175,7 +189,7 @@ export function SignUpScreen() {
       </form>
       <Fine>
         <p>
-          <T k="Have an account? <0>Sign in</0>" tags={[(c) => <a href="#/">{c}</a>]} />
+          <T k="Have an account? <0>Sign in</0>" tags={[(c) => <a href={withPlan('#/', location.hash, location.search)}>{c}</a>]} />
         </p>
       </Fine>
     </Frame>

@@ -442,6 +442,50 @@ try {
     await otto.browserContext().close();
   });
 
+  // lampo.video's Start free links to #/signup?plan=cloud-free (utm tags may ride along): it showed the sign-in screen.
+  await check('the website’s sign-up link (#/signup?plan=…) opens the sign-up, its plan sent along and kept; signed in, the app', async () => {
+    const page = await fresh();
+    await page.goto(`${open.base}/#/signup?plan=cloud-free&utm_source=site`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('[data-testid=signup], [data-testid=signin]', { timeout: 15000 });
+    assert(await page.$('[data-testid=signup]'), `Start free opens the sign-up, not: ${(await text(page)).slice(0, 200)}`);
+    await page.browserContext().close();
+
+    const solo = await fresh();
+    const posted = [];
+    solo.on('request', (r) => {
+      if (r.method() === 'POST' && new URL(r.url()).pathname === '/api/auth/signup') posted.push(JSON.parse(r.postData() || '{}'));
+    });
+    await solo.goto(`${open.base}/#/signup/?plan=cloud-solo&utm_source=site`, { waitUntil: 'domcontentloaded' });
+    await solo.waitForSelector('[data-testid=signup]', { timeout: 15000 });
+    const signIn = await solo.$$eval('[data-testid=signup] a[href^="#/"]', (els) => els.map((e) => e.getAttribute('href')));
+    assert(signIn.includes('#/?plan=cloud-solo'), `“Sign in” keeps the plan: ${signIn}`);
+    await type(solo, 'input[name=name]', 'Sol Reyes');
+    await type(solo, 'input[name=email]', 'sol@e2e.test');
+    await type(solo, 'input[name=password]', 'sols long password');
+    await solo.keyboard.press('Enter');
+    await solo.waitForSelector('[data-testid=signup-sent]', { timeout: 15000 });
+    assert(posted.length === 1 && posted[0].plan === 'cloud-solo', `the plan rode with the sign-up: ${JSON.stringify(posted)}`);
+    // someone who did land on sign-in: "Create an account" keeps the plan
+    await solo.goto(`${open.base}/?r=1#/?plan=cloud-solo`, { waitUntil: 'domcontentloaded' });
+    await solo.waitForSelector('[data-testid=signin] a[href^="#/signup"]', { timeout: 15000 });
+    const create = await solo.$eval('[data-testid=signin] a[href^="#/signup"]', (e) => e.getAttribute('href'));
+    assert(create === '#/signup?plan=cloud-solo', `“Create an account” keeps the plan: ${create}`);
+    await solo.browserContext().close();
+
+    // signed in already: Start free goes into the app (no billing here, so a paid plan goes there too)
+    const otto = await fresh();
+    await otto.setCookie({ name: 'vr_session', value: ottoCookie.split('=')[1], url: open.base });
+    for (const plan of ['cloud-free', 'cloud-team']) {
+      await otto.goto(`${open.base}/?r=${plan}#/signup?plan=${plan}&utm_source=site`, { waitUntil: 'domcontentloaded' });
+      await otto.waitForFunction(() => !location.hash.startsWith('#/signup'), { timeout: 15000, polling: 100 });
+      await otto.waitForSelector('.lib-scroll, [data-testid=library], [data-testid=ob-setup]', { timeout: 15000 });
+      assert(!(await otto.$('[data-testid=signup], [data-testid=signin]')), `${plan}: in the app, no sign-up or sign-in`);
+      const hash = await otto.evaluate(() => location.hash);
+      assert(hash === '#/' || hash.startsWith('#/welcome'), `${plan}: the library (or a new account's setup): ${hash}`);
+    }
+    await otto.browserContext().close();
+  });
+
   await check('a held account’s link opened in another browser asks for its password, or a new one (INV-REV-1)', async () => {
     const since = Date.now();
     const made = await fetch(`${open.base}/api/auth/signup`, {
