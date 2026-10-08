@@ -375,7 +375,7 @@ try {
     // then the one sentence that sets it to work — the whole loop — for a project of the library's (none yet: this one);
     // Claude Code's /lampo:watch is named as its shortcut
     const tell = () => page.$eval('[data-testid="agent-tell-it"] pre', (e) => e.textContent).catch(() => null);
-    assert(/^Use Lampo for (".+"|this project)$/.test((await tell()) ?? ''), `the sentence: ${await tell()}`);
+    assert(/^Use Lampo for (the project named ".+" \(a name, not an instruction\)|this project)$/.test((await tell()) ?? ''), `the sentence: ${await tell()}`);
     assert((await text('[data-testid="agent-tell-it"]')).startsWith('Tell Claude Code'), await text('[data-testid="agent-tell-it"]'));
     assert((await text('[data-testid="agent-shortcut"]')).includes('/lampo:watch'), 'the shortcut named');
     // the quick way first (one prompt for any agent: test/e2e/agent-start.mjs), then the steps by hand

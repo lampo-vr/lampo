@@ -97,14 +97,15 @@ function slugFor(video: string | null | undefined): string | null {
 
 const line = (s: unknown, max: number) => cutChars(oneLine(String(s ?? '')).trim(), max);
 
-/** A template's fill-ins as sent: a few short one-line values (a file, a note id, a frame), nothing else. */
+/** A template's fill-ins as sent: a few short one-line values (a file, a note id, a frame), nothing else; what looks like
+ * a secret taken out (a command's words are one). */
 function cleanVars(v: unknown): Record<string, string | number> | undefined {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
   const out: Record<string, string | number> = {};
   for (const [k, x] of Object.entries(v).slice(0, 6)) {
     if (!/^\w{1,20}$/.test(k)) continue;
     if (typeof x === 'number' && Number.isFinite(x)) out[k] = x;
-    else if (typeof x === 'string') out[k] = line(x, 80);
+    else if (typeof x === 'string') out[k] = line(redact(x), 80);
   }
   return Object.keys(out).length ? out : undefined;
 }
@@ -116,8 +117,9 @@ export function cleanActivity(a: ActivityRecord): (AgentActivity & { video?: str
   const agent = agentName(a.agent);
   if (!agent || !KINDS.has(a.kind)) return null;
   const failure = a.kind === 'error';
-  // a failure's words are a tool's last lines: what looks like a secret goes here too, whatever sent them
-  const scrub = (x: unknown) => (failure && typeof x === 'string' ? redact(x) : x);
+  // whoever has the agents right reads it (the activity, a run's steps): what looks like a secret goes, from every
+  // kind — a command it ran, what it said, a tool's last lines —, before anything is cut, whatever sent it
+  const scrub = (x: unknown) => (typeof x === 'string' ? redact(x) : x);
   const text = line(scrub(a.text), failure ? ERROR_MAX : a.kind === 'status' ? STATUS_CHARS : 160);
   if (!text) return null;
   const target = typeof a.target === 'string' ? cutChars(a.target, 40) : null;

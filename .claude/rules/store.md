@@ -20,4 +20,6 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - A review link points at a video or folder id (`Share.video_id` / `folder_id`), never a name.
 - Drafts and unsent recordings stay out of review.json and events; only their author reads them, never a token.
 - What a person made (avatars, refs, previews) goes through the storage adapter, never `cache/`.
+- A deleted video takes its stored copies (`dropStored`): a new kind of copy per render joins `playbackKeys`; one goes
+  only when no other video has its render (`renderKept`): the same bytes uploaded twice share a renderKey.
 - The onboarding sample logs no events; Insights, taste, suggestions and `usageOf` skip it.

@@ -32,6 +32,7 @@ import {
 } from '../../lib/oauth/clients.ts';
 import * as grants from '../../lib/oauth/store.ts';
 import { can } from '../../lib/permissions.ts';
+import { publicMessage, statusOf } from '../../lib/publicError.ts';
 import { addressKey, RateLimit } from '../../lib/rateLimit.ts';
 import { parseScope, SCOPE_LIST, SCOPES, type Scope } from '../../lib/scopes.ts';
 import type { OAuthRequestView } from '../../lib/types.ts';
@@ -40,7 +41,7 @@ import { MCP_SCOPES } from '../../mcp/access.ts';
 import { type Auth, requireAdmin, requireUser } from '../auth.ts';
 import type { ServerContext } from '../context.ts';
 import { CONSENT_PAGE } from '../guard.ts';
-import { fail, router } from '../http.ts';
+import { audienceOf, fail, router } from '../http.ts';
 import { keptInMemory } from './shares/access.ts';
 
 /** The issuer and the MCP resource, from the public URL (or, without one, from the request). */
@@ -80,7 +81,14 @@ class OAuthFailure extends Error {
   }
 }
 
-function oauthError(res: Response, e: unknown): void {
+/**
+ * An OAuth endpoint's failure as the caller reads it (RFC 6749 5.2). What the caller got wrong keeps its own words;
+ * anything else is the server's own failure (its store unreadable, a bug): `server_error`, and the words go by audience
+ * like every other route's (lib/publicError.ts) — an app is never the machine's owner, so a sentence and a ref, never an
+ * errno, a path or a quote of a damaged file, the whole error in the log under that ref.
+ */
+function oauthError(req: Request, res: Response, e: unknown): void {
+  const status = statusOf(e);
   const f =
     e instanceof OAuthFailure
       ? e
@@ -88,7 +96,9 @@ function oauthError(res: Response, e: unknown): void {
         ? new OAuthFailure(400, e.code, e.message)
         : e instanceof ClientError
           ? new OAuthFailure(e.code === 'invalid_client' ? 401 : 400, e.code, e.message)
-          : new OAuthFailure(400, 'invalid_request', (e as Error).message);
+          : status < 500
+            ? new OAuthFailure(400, 'invalid_request', publicMessage(e, audienceOf(req), { status, where: 'oauth' }))
+            : new OAuthFailure(500, 'server_error', publicMessage(e, audienceOf(req), { status, where: 'oauth' }));
   if (f.basic) res.setHeader('WWW-Authenticate', 'Basic realm="video-review"');
   res.setHeader('Cache-Control', 'no-store');
   res.status(f.status).json({ error: f.code, error_description: f.message });
@@ -127,7 +137,9 @@ async function authenticateClient(req: Request): Promise<string> {
   try {
     client = await resolveClient(id);
   } catch (e) {
-    throw new OAuthFailure(401, 'invalid_client', (e as Error).message, !!basic);
+    // a client this server doesn't know or accept; any other failure (its store unreadable) is the server's own
+    if (!(e instanceof ClientError)) throw e;
+    throw new OAuthFailure(401, 'invalid_client', e.message, !!basic);
   }
   if (client.kind === 'dcr' && !clientSecretMatches(id, client.auth === 'none' ? null : secret))
     throw new OAuthFailure(401, 'invalid_client', 'client authentication failed', !!basic);
@@ -377,7 +389,7 @@ export function oauthRoutes(ctx: ServerContext): Router {
       res.json(tokens);
     } catch (e) {
       if ((e as { retryAfter?: number }).retryAfter) res.setHeader('Retry-After', String((e as { retryAfter: number }).retryAfter));
-      oauthError(res, e);
+      oauthError(req, res, e);
     }
   });
 
@@ -391,7 +403,7 @@ export function oauthRoutes(ctx: ServerContext): Router {
       res.status(201).json(registerClient(wellFormed(req.body ?? {}), { inUse: (id) => connected.has(id) }));
     } catch (e) {
       if ((e as { retryAfter?: number }).retryAfter) res.setHeader('Retry-After', String((e as { retryAfter: number }).retryAfter));
-      oauthError(res, e);
+      oauthError(req, res, e);
     }
   });
 
@@ -404,7 +416,7 @@ export function oauthRoutes(ctx: ServerContext): Router {
       grants.revokeToken(str(req.body?.token) || '', client_id);
       res.json({});
     } catch (e) {
-      oauthError(res, e);
+      oauthError(req, res, e);
     }
   });
 

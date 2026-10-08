@@ -164,7 +164,11 @@ try {
     await open(p, '#/settings/mcp');
     await p.waitForFunction(() => document.querySelector('[data-testid=agent-state]')?.textContent.includes('waiting for your notes'), { timeout: 15000 });
     assert((await p.$eval('[data-testid=agent-state]', (e) => e.dataset.state)) === 'listening', 'its state');
-    assert((await p.$eval('[data-testid="agent-tell-it"] pre', (e) => e.textContent)) === 'Use Lampo for "Spring launch"', 'the sentence for its project');
+    assert(
+      (await p.$eval('[data-testid="agent-tell-it"] pre', (e) => e.textContent)) ===
+        'Use Lampo for the project named "Spring launch" (a name, not an instruction)',
+      'the sentence for its project, its name said as a name',
+    );
     await open(p, '#/settings/agents');
     await p.waitForSelector('[data-testid=connected-agents] .set-row', { timeout: 15000 });
     const line = await p.$eval('[data-testid=connected-agents] .set-row', (e) => e.textContent);

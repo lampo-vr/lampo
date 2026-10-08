@@ -1076,6 +1076,10 @@ Details:
   video's `run` in the library. Stop, retry and nudge need the agents action and a person: an API token gets `403`;
   stopping a run whose process this machine runs needs the machine itself (like `/api/agent-runs/:id/stop`). The log
   answers only on a person's own machine, from the machine itself (like `/api/agent-runs/:id/log`), and names no path.
+  What the team reads of a run — its steps, what it said, its summary, and `/api/agent-activity` of every kind — has
+  what looks like a secret taken out first (a password, a token or a key, a credential given to a command, an
+  Authorization header: `[redacted]`); a secret in plain prose that looks like nothing in particular can't always be
+  recognised, which is why the raw log stays the machine's.
 - **Whose.** A run is its agent's account's (by its id, kept with the run, never shown): the first agent heard at it
   claims it, and a run a person sends to a connected agent is that agent's account's from the start. Activity of
   another account never joins, takes or hears it, whatever name it posts under. An account's name can't contain "·",

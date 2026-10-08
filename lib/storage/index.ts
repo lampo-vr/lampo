@@ -2,7 +2,8 @@
 //   versions/<slug>/v<N>.<ext>     every registered render (NOT regenerable)
 //   previews/<slug>/<p_id>.<ext>   fix previews agents attach to notes (NOT regenerable; locally in data/<slug>/previews)
 //   refs/<slug>/<r_id>[.t|.s|.e].<ext>   references on notes: images, clips and their stills (NOT regenerable; data/<slug>/refs)
-//   scrub/<key>.mp4, proxies/<key>.mp4     playback copies (regenerable; lib/renderKey.ts)
+//   scrub/<key>.mp4, proxies/<key>.mp4, phone/<key>.mp4   playback copies (regenerable; lib/renderKey.ts): they go
+//                                 with the last video that has their render (lib/store.ts playbackKeys)
 //   avatars/<user>-<hash>.jpg     profile pictures (accounts belong to no workspace: rootStorage(); locally data/avatars)
 //   asks/<c_id>/<r_id>[.t|.s].<ext>   pictures, clips and sounds of a question asked on a folder (lib/asks.ts; data/asks)
 //   files/sha256/<ab>/<sha256>    project files' bytes, once per workspace (lib/files.ts; NOT regenerable; data/files):
@@ -324,7 +325,11 @@ export function createRemoteStorage(store: RemoteStore, { workCacheBytes = 20e9,
     },
     async remove(keyOrPrefix) {
       await remote.remove(keyOrPrefix);
-      fs.rmSync(localPath(keyOrPrefix.replace(/\/$/, '')), { recursive: true, force: true });
+      const p = localPath(keyOrPrefix.replace(/\/$/, ''));
+      fs.rmSync(p, { recursive: true, force: true });
+      // one key's marker too: left behind, it says the store still has the bytes (`has`), and a player asking for the
+      // same render's copy again would get a URL to nothing instead of a new copy
+      fs.rmSync(marker(p), { force: true });
     },
     read(key, start, end) {
       const p = localPath(key);

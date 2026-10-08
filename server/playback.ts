@@ -200,6 +200,8 @@ export function createPlayback(broadcast: Broadcast): Playback {
         await run(FFMPEG, args(file, `${out}.tmp.mp4`, review.meta), { nice: 5, timeout: Math.max(MEDIA_TIMEOUT_MS, review.duration * 3000) });
         fs.renameSync(`${out}.tmp.mp4`, out);
         await storage().commit(key, 'video/mp4');
+        // the video was deleted while its copy was made (what its deletion took from storage didn't have it yet)
+        if (!store.renderKept(renderKey(ver))) await storage().remove(key);
         pruneProxies(path.dirname(out));
       },
       PRIORITY.scrub,

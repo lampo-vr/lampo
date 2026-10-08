@@ -100,7 +100,7 @@ cache/agent-activity.jsonl    what agents on this machine did through lampo and
   `data/avatars/` at its next start.
 - **In a bucket.** With Bunny or S3 storage, versions, fix previews, references, profile pictures, playbook files and
   playback copies live in the bucket (`versions/<slug>/vN.<ext>`, `previews/<slug>/…`, `refs/<slug>/…`,
-  `avatars/…`, `playbooks/<id>/…`, `scrub/…`, `proxies/…`), and the cache keeps working copies of them. Project files'
+  `avatars/…`, `playbooks/<id>/…`, `scrub/…`, `proxies/…`, `phone/…`), and the cache keeps working copies of them. Project files'
   bytes (`files/sha256/…`) go through the same adapter, by one function (`filesStorage()`) that can give them a bucket
   of their own; their catalogs stay in `data/files/`. A workspace
   other than #1 keeps its keys under `w/<workspace id>/`; profile pictures belong to no workspace.

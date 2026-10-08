@@ -26,6 +26,7 @@ import { stampFor } from './playbookFiles.ts';
 import { checkIncoming, isVideoContainer, probe, probeSync, quickHash, sampleHash } from './probe.ts';
 import { describeRange, frameInRange, normalizeRange, rangeOnGrid } from './range.ts';
 import { describeRef } from './refLine.ts';
+import { renderKey } from './renderKey.ts';
 import { currentWorkspace, inWorkspace, wsKey } from './scope.ts';
 import { approvalsOf, partyOf, STAGE_LABELS, type StageContext, stageOf, verdictOn } from './stage.ts';
 import { moveFile, storage } from './storage/index.ts';
@@ -383,6 +384,14 @@ export const refKey = (slug: string, file: string): string => `refs/${slug}/${fi
 export const ensureRefFile = (slug: string, file: string): Promise<string | null> => storage().ensureLocal(refKey(slug, file));
 /** Every stored file of a reference (the file itself and its stills). */
 export const refFiles = (r: NoteRef): string[] => [r.file, r.still, r.strip, r.end].filter((f): f is string => !!f);
+/**
+ * The storage keys of a render's playback copies, by its renderKey (server/playback.ts: the scrub copy — full size, in
+ * effect the video —, the proxy of a codec browsers can't play, a phone's copy; a part's whole video, lib/splice.ts):
+ * in cache/ on this disk, else in the bucket and its working copies. Any of them is made again when a player needs it.
+ */
+export const playbackKeys = (key: string): string[] => ['scrub', 'proxies', 'phone'].map((dir) => `${dir}/${key}.mp4`);
+/** Whether a video of the workspace running now (an archived one too) still has the render with this renderKey. */
+export const renderKept = (key: string): boolean => listReviews().some((r) => r.versions.some((x) => renderKey(x) === key));
 /** At most this many references on one note. */
 export const REFS_PER_NOTE = 8;
 /** A project file's name without the folders it sits in on the agent's machine (reviewers see it). */
@@ -1503,6 +1512,34 @@ export function deleteReply(id: string, n: number, at: string, by = USER): Comme
   });
 }
 
+// Removals from storage a deleted video started: not waited for (the bucket may be slow), but counted.
+const removing = new Set<Promise<void>>();
+
+/** Resolves once every removal from storage that deleting a video or the sample started has ended. */
+export async function removalsSettled(): Promise<void> {
+  while (removing.size) await Promise.allSettled([...removing]);
+}
+
+/**
+ * What a deleted video (its folders on this disk already gone) still has through the storage adapter: where that is
+ * away from this disk, its own prefixes (renders, fix previews, references — a draft's too); and wherever it is, the
+ * playback copies of its versions (playbackKeys) that no other video of the workspace still has — the same bytes put
+ * up twice share them. Started at once, ended in the background (removalsSettled). A copy still being made goes once it
+ * is stored (server/playback.ts).
+ */
+function dropStored(slug: string, versions: readonly Version[]): void {
+  const st = storage();
+  const own = st.kind === 'local' ? [] : ['versions', 'previews', 'refs'].map((prefix) => `${prefix}/${slug}/`);
+  const copies = [...new Set(versions.map(renderKey))].filter((k) => !renderKept(k)).flatMap(playbackKeys);
+  const p = (async () => {
+    for (const key of [...own, ...copies])
+      await st
+        .remove(key)
+        .catch((e: Error) => console.error(`could not delete ${key.startsWith('versions/') ? 'the renders' : key.split('/')[0]} of ${slug}:`, e.message));
+  })().finally(() => removing.delete(p));
+  removing.add(p);
+}
+
 export function removeVideo(slug: string, by = USER): Review | null {
   return withLock(reviewDir(slug), () => {
     const review = loadReview(slug);
@@ -1513,10 +1550,7 @@ export function removeVideo(slug: string, by = USER): Review | null {
     } else {
       fs.rmSync(reviewDir(slug), { recursive: true, force: true });
       fs.rmSync(path.join(versionsDir(), slug), { recursive: true, force: true });
-      if (review.versions.some((x) => x.stored))
-        storage()
-          .remove(`versions/${slug}/`)
-          .catch((e: Error) => console.error(`could not delete the stored renders of ${slug}:`, e.message));
+      dropStored(slug, review.versions);
     }
     logEvent({ type: 'removed', by, review, text: review.comments.length ? 'archived (has comments)' : 'removed' });
     return review;
@@ -1524,8 +1558,9 @@ export function removeVideo(slug: string, by = USER): Review | null {
 }
 
 /**
- * Deletes the first run's sample for good: its review (notes, screenshots, drafts) and its renders, wherever the
- * storage adapter keeps them. Refuses anything that isn't a sample. Its derived files in cache/ are disposable.
+ * Deletes the first run's sample for good: its review (notes, screenshots, drafts), its renders and their playback
+ * copies, wherever the storage adapter keeps them. Refuses anything that isn't a sample. Its other derived files in
+ * cache/ are disposable.
  */
 export function removeSample(slug: string): Review | null {
   return withLock(reviewDir(slug), () => {
@@ -1537,11 +1572,7 @@ export function removeSample(slug: string): Review | null {
       throw Object.assign(new Error('versions were uploaded onto the sample, so it stays: they would be lost with it'), { status: 409 });
     fs.rmSync(reviewDir(slug), { recursive: true, force: true });
     fs.rmSync(path.join(versionsDir(), slug), { recursive: true, force: true });
-    // remote storage keeps renders, fix previews and references under the video's own prefixes
-    const st = storage();
-    if (st.kind !== 'local')
-      for (const prefix of ['versions', 'previews', 'refs'])
-        st.remove(`${prefix}/${slug}/`).catch((e: Error) => console.error(`could not delete the stored ${prefix} of the sample ${slug}:`, e.message));
+    dropStored(slug, review.versions);
     return review;
   });
 }

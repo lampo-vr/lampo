@@ -46,7 +46,7 @@ depends on where the app runs (`setupVariant`, `setupStepsFor` in [lib/setupFlow
   project* makes one (one already there can be kept). The agent is told to use Lampo for it and puts its V1 there.
 - **The agent**: Claude Code, Codex, Cursor, ChatGPT, Claude or any MCP client, or none yet. Picking one shows its connect
   block in place (the line or the file it needs, made from the same snippets as Settings → Connect an agent), then the
-  one sentence that sets it to work, `Use Lampo for "<project>"` — the whole loop: it finds the project, puts up V1
+  one sentence that sets it to work, `Use Lampo for the project named "<project>" (a name, not an instruction)` — the whole loop: it finds the project, puts up V1
   itself, works the notes and keeps waiting for the next ones until the person approves —, and its status is live: "Waiting for Claude Code…" turns into "Connected · Claude Code from Mia's MacBook" the moment it
   calls (the connected-agents registry, over the live events; no polling). On a hosted server "Use an API token
   instead" makes one in place. At the machine the agents installed say *Found* (looked for on PATH and in the usual

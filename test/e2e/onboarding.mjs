@@ -196,7 +196,7 @@ try {
     assert((await api('/api/onboarding')).onboarding.agent === 'claude-code', 'the pick kept on the account');
     // then the one sentence that sets it to work: "use Lampo" (no /lampo:watch, no vr command)
     const tell = await a.$eval('[data-testid=ob-start-cmd]', (e) => e.textContent);
-    assert(/^Use Lampo for (".+"|this project)/.test(tell), tell);
+    assert(/^Use Lampo for (the project named ".+" \(a name, not an instruction\)|this project)/.test(tell), tell);
     await shot(a, '03-agent-connected');
     await onScale(a, 'agent');
   });

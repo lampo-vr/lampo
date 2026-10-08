@@ -12,6 +12,8 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 
 ### Hosted server
 - A failure becomes a 4xx through `failFrom(status, e)`, never `fail(status, e.message)`.
+- An endpoint with an error format of its own (OAuth) passes on only its own refusals; anything else is a server
+  fault said by audience (`publicMessage`, `server_error`), never `e.message`, and a catch rethrows what it didn't expect.
 - Object-store and speech failures are `internal()`; their status is someone else's (`statusOf`).
 - Event screenshot paths are for `via === 'local'` only: everyone else gets URLs (`ctx.eventFor(via)`).
 - A path that goes to the log goes through `loggedPath`: review-link tokens and tickets live in paths.

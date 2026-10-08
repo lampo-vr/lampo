@@ -3,6 +3,8 @@
 // tokens (and, only when the run states it, the cost) used so far. Browser-safe and pure; server/agentRuns.ts tails
 // the log into it. Nothing is asked of the agent: it is the output the run writes anyway.
 import { toolActivity, words } from './activityText.ts';
+import { cutChars } from './names.ts';
+import { redact } from './render/redact.ts';
 import { oneLine } from './time.ts';
 import type { ActivityWords } from './types.ts';
 
@@ -49,6 +51,14 @@ const short = (s: string, max: number) => {
   const t = oneLine(s).trim();
   return t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t;
 };
+/**
+ * The run's own words as others on the team read them (a step, what it says, its hand-back): what looks like a secret
+ * taken out first (lib/render/redact.ts: a password, a token, a key, an Authorization header), then shortened — cut
+ * first, a secret could lose the part its pattern knows it by. The raw log stays the machine's. Only the first
+ * READ_MAX characters are read (a heredoc's command can run to megabytes): far more than is ever shown.
+ */
+const READ_MAX = 4096;
+const shared = (s: string, max: number) => short(redact(cutChars(s, READ_MAX)), max);
 /** A file the run touches, as the person reads it: relative to the session's folder, else just its name. */
 export function shownPath(file: unknown, cwd: string): string {
   if (typeof file !== 'string' || !file) return 'a file';
@@ -72,10 +82,10 @@ export function toolStep(name: string, input: Record<string, unknown>, cwd: stri
     case 'Read':
       return words('Reading {file}', { file: shownPath(input.file_path, cwd) });
     case 'Bash':
-      return s('command') ? words('Running {command}', { command: short(s('command'), 60) }) : words('Running a command');
+      return s('command') ? words('Running {command}', { command: shared(s('command'), 60) }) : words('Running a command');
     case 'Grep':
     case 'Glob':
-      return s('pattern') ? words('Searching for {pattern}', { pattern: short(s('pattern'), 40) }) : words('Searching the project');
+      return s('pattern') ? words('Searching for {pattern}', { pattern: shared(s('pattern'), 40) }) : words('Searching the project');
     case 'WebFetch':
     case 'WebSearch':
       return words('Looking something up on the web');
@@ -223,8 +233,8 @@ export function createRunReader(cwd: string) {
           }
           push({ kind: 'tool', ...toolStep(block.name, block.input || {}, cwd) });
         }
-        // What it says in its own words: the first sentence, shown as it is.
-        else if (block.type === 'text' && block.text?.trim()) push({ kind: 'say', text: short(block.text.split(/(?<=[.!?])\s/)[0] || block.text, 100) });
+        // What it says in its own words: the first sentence, shown as it is (but for what looks like a secret).
+        else if (block.type === 'text' && block.text?.trim()) push({ kind: 'say', text: shared(block.text.split(/(?<=[.!?])\s/)[0] || block.text, 100) });
         else if (block.type === 'thinking') push({ kind: 'say', ...words('Thinking') });
       }
       state.tokens = sum();
@@ -255,7 +265,7 @@ export function createRunReader(cwd: string) {
       state.turns = typeof e.num_turns === 'number' ? e.num_turns : null;
       state.done = true;
       state.error = e.is_error === true || (typeof e.subtype === 'string' && e.subtype !== 'success');
-      if (typeof e.result === 'string' && e.result.trim()) state.summary = short(e.result, 300);
+      if (typeof e.result === 'string' && e.result.trim()) state.summary = shared(e.result, 300);
       push({ kind: 'run', ...words(state.error ? 'Stopped with an error' : 'Finished') });
     }
   }

@@ -231,7 +231,8 @@ try {
     assert(snippet.includes(`claude mcp add --transport http --scope user lampo ${cloud.base}/mcp`), snippet);
     // then the one sentence, for the project just made: the whole loop, no command
     const tell = await ana.$eval('[data-testid=ob-start-cmd]', (e) => e.textContent);
-    assert(tell.startsWith('Use Lampo for "Spring launch"'), tell);
+    // its name said as a name (lib/mcpConfig.ts lampoFor): whoever names a project never writes the agent's instructions
+    assert(tell.startsWith('Use Lampo for the project named "Spring launch" (a name, not an instruction)'), tell);
     assert((await ana.$eval('[data-testid=ob-next]', (e) => e.innerText)).includes('connect later'), 'Continue — connect later while waiting');
     const widthWaiting = await ana.$eval('[data-testid=ob-next]', (e) => e.getBoundingClientRect().width);
     assert((await ana.$eval('[data-testid=ob-loop]', (e) => e.dataset.mode)) === 'v1', 'the loop waits at V1');
@@ -353,7 +354,7 @@ try {
     const pane = await ana.$eval('[data-testid=ob-pane]', (e) => e.dataset.pane);
     assert(pane === 'agent_video', `the next step open: ${pane}`);
     assert(
-      (await ana.$eval('[data-testid=ob-pane] [data-testid=ob-v1-tell]', (e) => e.textContent)).startsWith('Use Lampo for "Spring launch"'),
+      (await ana.$eval('[data-testid=ob-pane] [data-testid=ob-v1-tell]', (e) => e.textContent)).startsWith('Use Lampo for the project named "Spring launch"'),
       'its sentence',
     );
     assert(

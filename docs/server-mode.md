@@ -473,6 +473,10 @@ People's own data is theirs to take home and to end (GDPR Art. 15, 17, 20); the 
   made (`data/backups/workspaces-*`). What it watched stays in the team's numbers, under no name. **Notes and replies
   it wrote stay** in their workspaces, signed with its name: they are the team's record of a review. Someone removed
   from one workspace while the account goes on loses their drafts and recordings there.
+- **What goes with a video** deleted from the library (only one without notes: one with notes is archived and can come
+  back): its renders, fix previews and references (a draft's too), and the copies the player plays (the scrub copy,
+  a proxy, a phone's copy), on the server's disk and in the bucket, also a copy that was still being made. A copy
+  another video plays from (the same file uploaded twice) stays until that video goes too.
 - **What goes with a workspace**: its folders (`data/w/<id>`, `versions/w/<id>`, `cache/w/<id>`) and every object
   under its storage prefix (`w/<id>/` in Bunny or S3), its review links (they name nothing any more), invites, API
   tokens and app connections, its waiting jobs, the accounts it leaves in no workspace, and its billing (a billing

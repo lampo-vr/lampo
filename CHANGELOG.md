@@ -71,6 +71,15 @@ format stays backwards compatible throughout.
 - The note filters in a phone's notes sheet are a finger's height, and at 360 px the composer's toolbar stays one row.
 - A folder's review link on a phone no longer hides the top of its title under the bar.
 - On touch tablets, + Note, Record, the composer's buttons and Check now are easier to hit.
+- The prompt you copy for your agent and the sentence you tell it name a project as a name and nothing more:
+  whatever a project is called, your agent never reads its name as something to do.
+- Deleting a video deletes everything stored for it: the copies the player plays (the phone's too) and its references
+  go from storage with it, also when it is deleted while such a copy is still being made. Copies another video plays
+  from stay.
+- What an agent Lampo started on your machine shows the rest of your team (its steps, what it says and how it ends)
+  and every line of the agents' activity leave out what looks like a password, a token or a key.
+- An app signing in to a hosted server is told only that something went wrong (with a reference to quote) when the
+  server itself fails, never details of the server.
 
 ## [0.2.0] - 2026-10-08
 
