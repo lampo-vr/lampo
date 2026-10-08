@@ -24,6 +24,8 @@ nothing open, `get_open_notes` with nothing left) ends with `Nothing waiting for
 call wait_for_feedback with since "<cursor>".` The person sees the agent from its first call: in the sidebar's Agents
 ("Claude Code · connected", then "ready" while it waits for their notes) and in Settings → Connect an agent.
 
+![The sidebar's Agents: Codex not heard from, launch-edit rendering at 42 %, teaser-edit failed, each with how many videos it is on, and Claude Code connected, on no video yet](assets/sidebar-agents.webp)
+
 ## One way per kind of agent
 
 | The agent | Talks to Lampo through | Puts up a version with |
@@ -31,7 +33,7 @@ call wait_for_feedback with since "<cursor>".` The person sees the agent from it
 | **Chat and desktop apps**: Claude, ChatGPT, Cursor's chat, any other MCP client | MCP only: its instructions name no command | `request_upload`: one `PUT` to the URL it gives (a new video with `folder`, its next version with `video`) |
 | **Coding agents**: Claude Code, Codex | MCP for everything | `lampo render --to <video> --out <file> -- <your render command>` (V1: `--folder <project>` instead of `--to`): the person sees the render's progress, and it puts the file up. Without `lampo`: `request_upload` |
 | **The agent on the machine Lampo runs on** (stdio, or `/mcp` from that machine) | MCP | `track_video` puts a render up where it is; the next version is a re-render to the same path, through `lampo render` |
-| **Scripts and agents without MCP** | the `lampo` command: `npm run link` links it into `~/.local/bin` | `lampo render`, `lampo push`, `lampo track` ([below](#the-loop-with-vr)) |
+| **Scripts and agents without MCP** | the `lampo` command: `npm run link` links it into `~/.local/bin` | `lampo render`, `lampo push`, `lampo track` ([below](#the-loop-with-lampo)) |
 
 Lampo tells each kind its own way (the instructions by the client's own name). All of them read and write the same
 notes, and every write is locked and atomic, so the app, several agents and the CLI can work at the same time; on the
@@ -230,7 +232,7 @@ or the environment variable `LAMPO_BY=agent:<name>` changes that.
 | `lampo assign <video> (--me \| --session <name> \| --none)` | change which agent the video is assigned to |
 | `lampo move <video> "A/B"` | file a video into a project or folder (created if new; at most 12 levels and 400 characters, as for `--folder` everywhere); `--none` takes it out |
 | `lampo sync <video>` | register a re-render now (`lampo fix` and the running app pick it up by themselves) |
-| `lampo render [--to <video> --out <file>] [--detach] [--verbose] -- <command> [args…]` | run your render command with its progress shown in Lampo, then put `--out` up as the next version of `--to`; two lines back instead of the render's output ([below](#rendering-through-vr-render-the-person-sees-the-progress)) |
+| `lampo render [--to <video> --out <file>] [--detach] [--verbose] -- <command> [args…]` | run your render command with its progress shown in Lampo, then put `--out` up as the next version of `--to`; two lines back instead of the render's output ([below](#rendering-through-lampo-render-the-person-sees-the-progress)) |
 | `lampo render wait <id>` | wait (9 minutes at most) for a render started with `--detach`: how far it is, or how it ended |
 | `lampo post draft <video> --platform yt\|ig\|fb [--title …] [--text …] [--at …]` · `lampo post [<video>]` | after Final: draft a post of the final version (a person publishes it); where a video's posts stand ([below](#drafting-a-post-of-a-final-video)) |
 
@@ -722,14 +724,14 @@ builds it from what it sees anyway:
   324", "Fixed “caption moved to y 1392”" (what your `mark_fixed` note says). People see a note by its moment or its
   words, never its id. A wait (`lampo watch`, `wait_for_feedback`) shows as one line: "Waiting for your answer · since
   14:02".
-- **Uploads and renders**: a render through [`lampo render`](#rendering-through-vr-render-the-person-sees-the-progress)
+- **Uploads and renders**: a render through [`lampo render`](#rendering-through-lampo-render-the-person-sees-the-progress)
   (its stage, percent and time left), an upload's progress (`lampo push`, upload URLs), and a render file still growing
   next to its video ("Rendering… 340 MB, still growing").
 - **A run Lampo started for you** ([below](#when-youre-not-running-the-machine-can-start-you)): the step it's on
   ("Editing src/Logo.tsx", "Running npm run render"), and the tokens and cost only when Claude Code reports them,
   never estimated. Files show relative to the session's folder; their contents never do.
 
-![The agent menu while the agent works: Live, with what it is doing now and its last actions with their times](assets/agent-menu-live.webp)
+![The player while the agent renders V3 through lampo render: the run strip under the panel's head (“launch-edit · rendering V3 · about 1 min left”, 42 %, Stop) and the Agent view below it, with the two notes it was sent (on it), Now at 170 of 408 frames, its steps (reading each note, what it said, rendering) and its earlier work](assets/agent-view.webp)
 
 None of it costs you a token or asks anything of you, and none of it is written into the review: it lives in the app's
 memory and a small rolling file in the cache, and the spine of it is kept with the video as a run (below). So `lampo status` and `set_status` are optional: use them for what Lampo

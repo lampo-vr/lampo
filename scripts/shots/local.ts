@@ -1,10 +1,15 @@
 // The pictures of the app on a person's own machine, from one demo store whose story moves on between them (made-up
 // names, synthetic footage): the README's library, player, check mode and review link; then a recording, a transcript,
-// settings, a playbook and the MCP review card; then an agent at work (a fix preview, a question with choices, the board,
-// the inbox, the live monitor); then V3 approved (the player's next step); then the review links' activity and room.
+// settings, a playbook and the MCP review card; then agents at work (a fix preview, a question with choices, a render
+// that failed, an agent gone quiet, the inbox); then V3 rendering (the run strip and the Agent view, the board, the
+// sidebar's agents, the inbox's agent work) and approved (the player's next step); then the review links' activity
+// and room; then a project's files.
 // Every state is made the way people and agents make it: the HTTP API the app uses, the guest API a client's browser
-// uses, `lampo` run as the agent (LAMPO_BY=agent:…), an MCP client over /mcp, and the app's own UI.
+// uses, `lampo` run as the agent (LAMPO_BY=agent:…, `lampo render` with a stand-in render tool: render.ts), an MCP client
+// over /mcp, and the app's own UI. Only an agent gone quiet needs the clock to have passed: that run is written as the
+// server keeps it (runs.ts).
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
@@ -12,13 +17,15 @@ import type { Browser, KeyInput, Page } from 'puppeteer-core';
 import { build } from 'vite';
 import { ROOT } from '../../lib/paths.ts';
 import { FFMPEG } from '../../lib/probe.ts';
-import type { Comment, Review } from '../../lib/types.ts';
+import type { Comment, DraftsSent, FileUploadAnswer, FileUploadRequest, FileUploadResult, Review, Run } from '../../lib/types.ts';
 import { encodeParts, PARTS } from '../../lib/watch.ts';
 import type { DemoMedia } from '../demo/media.ts';
 import { render, score } from '../demo/media.ts';
 import type { DemoServer } from '../demo/server.ts';
 import type { DemoStore } from '../demo/store.ts';
 import { type Camera, DAY_ZONE, noPrivate, scheme, sleep, tipsSeen } from './camera.ts';
+import { renderStandIn } from './render.ts';
+import { writeQuietRun } from './runs.ts';
 
 /** What the browser calls the app on this machine: Chrome maps it to the demo server (--host-resolver-rules). */
 export const LOCAL_HOST = 'localhost:4747';
@@ -90,6 +97,21 @@ export async function localPictures(s: LocalScene): Promise<void> {
   });
   const lampo = (agent: string, ...args: string[]) =>
     execFileSync(process.execPath, [path.join(ROOT, 'bin/lampo'), ...args], { env: agentEnv(agent), encoding: 'utf8', cwd: s.work });
+  // a command that goes on while the pictures are taken (a render): how it ended, once it has
+  const lampoGoing = (agent: string, ...args: string[]) => {
+    const p = spawn(process.execPath, [path.join(ROOT, 'bin/lampo'), ...args], { env: agentEnv(agent), stdio: ['ignore', 'pipe', 'pipe'], cwd: s.work });
+    let said = '';
+    p.stdout?.on('data', (d) => {
+      said += d;
+    });
+    p.stderr?.on('data', (d) => {
+      said += d;
+    });
+    process.on('exit', () => p.kill());
+    return new Promise<{ code: number | null; said: string }>((resolve) => p.on('close', (code) => resolve({ code, said })));
+  };
+  // the render tool an agent's `lampo render` runs: a stand-in that prints Remotion's progress (render.ts)
+  const renderTool = renderStandIn(path.join(s.work, 'render-tool'));
   const vrWatching: ChildProcess[] = [];
   const vrWatch = (agent: string) => {
     const p = spawn(process.execPath, [path.join(ROOT, 'bin/lampo'), 'watch', '--mine'], { env: agentEnv(agent), stdio: 'ignore', cwd: s.work });
@@ -266,17 +288,20 @@ export async function localPictures(s: LocalScene): Promise<void> {
 
   // ================================================================ settings: connect an agent, voice notes
   console.log('settings…');
-  {
-    // Claude Code connects over HTTP the way `claude mcp add --transport http` sets it up: it names itself in initialize
-    const claude = new Client({ name: 'claude-code', version: '2.1.0' }, { versionNegotiation: { mode: 'auto' } });
-    await claude.connect(new StreamableHTTPClientTransport(new URL(`${server.url}/mcp`)));
-    await claude.listTools();
-    await open('#/settings/mcp');
-    await until("document.querySelector('[data-testid=agent-state]')?.textContent.includes('Connected')");
-    await sleep(500);
-    await camera.shoot(page, 'settings-connect-agent', { around: ['.set-head', '.set-card:has([data-testid=agent-state])'], pad: [24, 24, 8, 24] });
-    await claude.close();
-  }
+  // Claude Code connects over HTTP the way `claude mcp add --transport http` sets it up: it names itself in initialize.
+  // It stays connected, not yet on any video: the sidebar's Agents lists it while agents work (below).
+  const claude = new Client({ name: 'claude-code', version: '2.1.0' }, { versionNegotiation: { mode: 'auto' } });
+  await claude.connect(new StreamableHTTPClientTransport(new URL(`${server.url}/mcp`)));
+  await claude.listTools();
+  // all four steps, from picking the agent to seeing it connected: a window tall enough for them
+  await page.setViewport({ width: 1440, height: 1900, deviceScaleFactor: 2 });
+  await open('#/settings/mcp');
+  await until("document.querySelector('[data-testid=agent-state]')?.textContent.includes('Connected')");
+  await page.waitForSelector('[data-testid=agent-tell-it]');
+  await rest();
+  await sleep(500);
+  await camera.shoot(page, 'settings-connect-agent', { around: ['.set-head', '.set-card:has([data-testid=agent-state])'], pad: [24, 24, 8, 24] });
+  await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
   await call('PATCH', '/api/auth/me', { prefs: { voice_languages: ['en', 'de'] } });
   await open('#/settings/speech');
   await page.waitForSelector('[data-testid=speech-facts]');
@@ -298,9 +323,30 @@ export async function localPictures(s: LocalScene): Promise<void> {
 
   // ================================================================ B. an agent at work
   console.log('an agent at work…');
-  // A new episode arrives to be reviewed.
+  // Two new episodes arrive to be reviewed.
   const episode = renderEpisode(media.root);
   const ep = (await call<{ video: { slug: string } }>('POST', '/api/library', { path: episode, folder: 'Studio/Field Notes', session: null })).video.slug;
+  const ep2 = (
+    await call<{ video: { slug: string } }>('POST', '/api/library', { path: renderEpisode(media.root, 2), folder: 'Studio/Field Notes', session: null })
+  ).video.slug;
+  // The first goes to the studio's Codex with two notes. Codex began on them half an hour ago and hasn't been heard from since:
+  // the one state here that needs the clock to have passed, so its run is written as the server keeps it (runs.ts).
+  await call('PUT', `/api/review/${enc(ep)}/session`, { name: 'Codex', sessionId: 'mcp-codex-studio', agent: 'codex' });
+  const epNotes = [];
+  for (const n of [
+    { frame: 52, text: 'Hold “Field Notes” a beat longer before “Part one” comes in.', tags: ['timing'], severity: 'should' },
+    { frame: 120, text: 'The cut to the coast road is abrupt: a short dissolve here.', tags: ['cut'], severity: 'should' },
+  ])
+    epNotes.push({ id: (await call<Comment>('POST', `/api/review/${enc(ep)}/comments`, n)).id, frame: n.frame });
+  writeQuietRun({
+    data: path.join(s.dir, 'data'),
+    slug: ep,
+    agent: { name: 'Codex', kind: 'codex', session_id: 'mcp-codex-studio' },
+    by: 'Alex',
+    notes: epNotes,
+    sentMin: 48,
+    quietMin: 31,
+  });
   // On the teaser, a note with a box and an arrow: its clean and marked screenshots are the data format's picture.
   const subtitle = await call<Comment>('POST', `/api/review/${enc(demo.teaser)}/comments`, {
     frame: 75,
@@ -404,19 +450,38 @@ export async function localPictures(s: LocalScene): Promise<void> {
   // The cut-down shipped: approved and final.
   await call('PUT', `/api/review/${enc(demo.cutdown)}/approval`, { status: 'approved', note: 'Good to go.' });
   await call('PUT', `/api/review/${enc(demo.cutdown)}/final`, {});
-  await settle(`/api/analysis/${enc(ep)}/1`);
-  await settle(`/api/qa/${enc(ep)}/1`);
+  for (const e of [ep, ep2]) {
+    await settle(`/api/analysis/${enc(e)}/1`);
+    await settle(`/api/qa/${enc(e)}/1`);
+  }
 
-  // The teaser's agent says what it is rendering (its card shows it while it works).
+  // The teaser's agent renders V2 through `lampo render`, and the render fails on a font its project can't find: the
+  // tool's last words reach Lampo, the Inbox lists it under Agents that stopped.
   lampo('teaser-edit', 'open', 'field-notes-teaser.mp4');
-  lampo('teaser-edit', 'status', 'field-notes-teaser.mp4', 'Rendering V2 with a short dissolve', '--eta', '300');
-  await open('#/status');
-  await until("document.querySelectorAll('.bcard').length >= 5");
-  await imagesLoaded('.bcard img');
-  await until("[...document.querySelectorAll('[data-testid=bcard-agent]')].some((e) => e.textContent.includes('·'))", 20_000).catch(() => {});
-  await sleep(1200);
-  await rest();
-  await camera.shoot(page, 'board', { full: true }, { ready: () => imagesLoaded('.bcard img') });
+  renderTool.plan({
+    frames: 192,
+    failAt: 118,
+    error: [
+      'Error: Could not load the font "Field Notes Serif": public/fonts/FieldNotesSerif.woff2 was not found',
+      '    at loadFont (src/fonts.ts:14:11)',
+      '    at TitleCard (src/TitleCard.tsx:22:3)',
+    ],
+  });
+  const failed = await lampoGoing(
+    'teaser-edit',
+    'render',
+    '--to',
+    'field-notes-teaser.mp4',
+    '--out',
+    media.teaser,
+    '--',
+    renderTool.bin,
+    'render',
+    'src/index.ts',
+    'Teaser',
+    'out/teaser-v2.mp4',
+  );
+  if (failed.code === 0) throw new Error(`the teaser's render was to fail: ${failed.said}`);
 
   // the inbox, by video: a fix to check picked
   await open('#/inbox');
@@ -442,17 +507,6 @@ export async function localPictures(s: LocalScene): Promise<void> {
   await rest();
   await camera.shoot(page, 'inbox-agent-question', { full: true }, { ready: () => videoReady(page, '[data-testid=inbox-video]') });
 
-  // the agent's menu while it works: what it is doing now, and what it did
-  await open(`#/v/${enc(demo.film)}`);
-  await videoReady();
-  await page.waitForSelector('[data-testid=agent-button]');
-  await sleep(800);
-  await page.click('[data-testid=agent-button]');
-  await page.waitForSelector('[data-testid=agent-live]', { timeout: 15_000 });
-  await sleep(800);
-  await camera.shoot(page, 'agent-menu-live', { around: ['[data-testid=agent-menu]'], pad: [0, 8, 12, 8], fromTop: true });
-  await page.keyboard.press('Escape');
-
   // check mode on the glow: the fix exists as a still from the project so far
   await open(`#/v/${enc(demo.film)}?verify=${glow}`);
   await page.waitForSelector('.verify', { timeout: 15_000 });
@@ -461,8 +515,8 @@ export async function localPictures(s: LocalScene): Promise<void> {
   await rest();
   await camera.shoot(page, 'fix-preview-check', { full: true }, { ready: () => videoReady() });
 
-  // ================================================================ C. V3, approved
-  console.log('V3…');
+  // ================================================================ C. V3: rendering, then approved
+  console.log('V3, rendering…');
   // both fixes looked right on their previews; the question answered
   for (const id of [glow, endCard]) {
     const preview = (await review(demo.film)).comments.find((c) => c.id === id)?.previews?.at(-1)?.id;
@@ -470,11 +524,93 @@ export async function localPictures(s: LocalScene): Promise<void> {
   }
   await call('PATCH', `/api/comments/${question}`, { status: 'verified', note: 'Yes' });
   for (const p of vrWatching.splice(0)) p.kill();
-  media.renderFilmV3();
-  const settled = new Date(Date.now() - 60_000);
-  fs.utimesSync(media.film, settled, settled);
-  lampo('launch-edit', 'sync', 'northwind-launch.mp4');
+  // Two more notes, saved while watching and sent together: they join the agent's work on the film.
+  for (const d of [
+    { frame: 96, text: 'The logo sting lands a beat late: put it on the downbeat.', tags: ['timing'], severity: 'should' },
+    { frame: 300, text: 'Warm up the last shot a little, it reads cold next to the rest.', tags: ['color/grade'], severity: 'nice' },
+  ])
+    await call('POST', `/api/review/${enc(demo.film)}/drafts`, d);
+  const sent = (await call<DraftsSent>('POST', `/api/review/${enc(demo.film)}/drafts/send`, {})).notes;
+  // The agent reads them, says what it is rendering, and renders V3 through `lampo render`: the stand-in holds at 42 %
+  // while the pictures are taken, then puts V3 in place (the film's next version, rendered beforehand).
+  for (const c of sent) lampo('launch-edit', 'show', c.id);
+  lampo('launch-edit', 'status', 'northwind-launch.mp4', 'Rendering V3: the logo sting on the downbeat, a warmer last shot, the end card held');
+  renderTool.plan({ frames: 408, hold: 171, from: media.prepareFilmV3(), to: media.film });
+  const rendering = lampoGoing(
+    'launch-edit',
+    'render',
+    '--to',
+    'northwind-launch.mp4',
+    '--out',
+    media.film,
+    '--',
+    renderTool.bin,
+    'render',
+    'src/index.ts',
+    'Main',
+    'out/v3.mp4',
+  );
+  const filmRun = async () => (await call<{ runs: Run[] }>('GET', `/api/runs?slug=${enc(demo.film)}`)).runs.find((r) => r.ended === null);
+  await waitFor(
+    'the render at 42 % with the time left',
+    async () => {
+      const p = (await filmRun())?.progress;
+      return p?.stage === 'rendering' && (p.pct ?? 0) >= 42 && !!p.eta_s;
+    },
+    90_000,
+  );
+
+  // the player: the run strip and the Agent view
+  await open(`#/v/${enc(demo.film)}`);
+  await videoReady();
+  await page.waitForSelector('[data-testid=run-strip]');
+  // the line on screen, as someone checking in on the agent would leave it
+  await goto(demo.film, 2, 180);
+  await videoReady();
+  await page.click('[data-testid=panel-agent]');
+  await page.waitForSelector('[data-testid=agent-view] [data-testid=agent-plan]', { timeout: 15_000 });
+  await until("document.querySelector('[data-testid=run-strip]')?.textContent.includes('%')");
+  await sleep(1200);
+  await rest();
+  await camera.shoot(page, 'agent-view', { full: true }, { ready: () => videoReady() });
+
+  // the board: what every agent's work says on its card; the sidebar's agents, Claude Code among them, on no video yet
+  // (the list shows the agents heard from in the last minute and a half: it connects again, as a session reopened does)
+  await claude.close().catch(() => {});
+  const claudeAgain = new Client({ name: 'claude-code', version: '2.1.0' }, { versionNegotiation: { mode: 'auto' } });
+  await claudeAgain.connect(new StreamableHTTPClientTransport(new URL(`${server.url}/mcp`)));
+  await claudeAgain.listTools();
+  await open('#/status');
+  await until("document.querySelectorAll('.bcard').length >= 5");
+  await imagesLoaded('.bcard img');
+  await until("[...document.querySelectorAll('.bcard [data-testid=run-line]')].some((e) => e.textContent.includes('%'))", 20_000);
+  await page.waitForSelector('[data-testid=nav-agents]');
+  await sleep(1200);
+  await rest();
+  await camera.shoot(page, 'board', { full: true }, { ready: () => imagesLoaded('.bcard img') });
+  await camera.shoot(page, 'sidebar-agents', { around: ['[data-testid=nav-agents]'], pad: [12, 12, 12, 12] });
+
+  // the inbox by kind: an agent that stopped (the teaser's render), picked; one gone quiet under Stalled
+  await open('#/inbox');
+  await page.waitForSelector('[data-testid=inbox-view].split', { timeout: 20_000 });
+  await page.evaluate(`[...document.querySelectorAll('button, [role=radio], [role=tab]')].find((b) => b.textContent.trim() === 'By kind')?.click()`);
+  await page.waitForSelector('[data-testid=inbox-row-failed]', { timeout: 20_000 });
+  await clickRow(page, 'inbox-row-failed', 'teaser-edit');
+  await page.waitForSelector('[data-testid=inbox-run-retry]', { timeout: 15_000 });
+  await sleep(1200);
+  await rest();
+  await camera.shoot(page, 'inbox-agents', { full: true });
+  // back to By video, the inbox's default, for whoever opens it next
+  await page.evaluate(`[...document.querySelectorAll('button, [role=radio], [role=tab]')].find((b) => b.textContent.trim() === 'By video')?.click()`);
+
+  // the render goes on and V3 lands; the agent marks the two notes fixed in it
+  renderTool.release();
+  const rendered = await rendering;
+  if (rendered.code !== 0) throw new Error(`the film's render failed: ${rendered.said}`);
   await waitFor('V3 registered', async () => (await review(demo.film)).versions.length === 3);
+  lampo('launch-edit', 'fix', sent[0].id, '--note', 'The sting now hits on the downbeat at 00:04:00, 6 frames earlier.');
+  lampo('launch-edit', 'fix', sent[1].id, '--note', 'Warmed the last shot: +300 K, a touch more amber in the highlights.');
+  console.log('V3…');
   await settle(`/api/diff/${enc(demo.film)}/3`);
   await settle(`/api/analysis/${enc(demo.film)}/3`);
   await settle(`/api/qa/${enc(demo.film)}/3`);
@@ -535,6 +671,65 @@ export async function localPictures(s: LocalScene): Promise<void> {
   });
   await reviewRoom(s, room.token, BASE);
 
+  // ================================================================ E. a project's files
+  console.log('project files…');
+  {
+    const made = makeProjectFiles(path.join(s.work, 'files'), media);
+    // a push as the app's Add files makes it: what is coming, then each file's bytes to its one-time URL (committed as
+    // they arrive); `agent`: the film's agent pushing with this account, as `lampo` does
+    const push = async (folder: string, list: { path: string; file: string; base?: number }[], agent = false) => {
+      const ask: FileUploadRequest = {
+        folder,
+        files: list.map((f) => ({ path: f.path, size: fs.statSync(f.file).size, sha256: sha256Of(f.file), ...(f.base ? { base: f.base } : {}) })),
+        ...(agent ? { agent: 'launch-edit', agent_kind: 'claude-code' as const, via: 'vr' as const } : {}),
+      };
+      const answer = await call<FileUploadAnswer>('POST', '/api/files/uploads', ask);
+      const ids: Record<string, string> = {};
+      for (const slot of answer.uploads) {
+        const f = list.find((x) => x.path === slot.path);
+        if (!f || !slot.url) throw new Error(`no upload for ${slot.path}: ${JSON.stringify(slot)}`);
+        const res = await fetch(new URL(slot.url, server.url), {
+          method: 'PUT',
+          body: fs.readFileSync(f.file),
+          headers: { 'content-type': 'application/octet-stream' },
+        });
+        const text = await res.text();
+        if (!res.ok) throw new Error(`PUT ${slot.path} → ${res.status} ${text}`);
+        for (const c of (JSON.parse(text) as FileUploadResult).commit?.files ?? []) ids[c.path] = c.id;
+      }
+      return ids;
+    };
+    // the House's: the studio's typeface, which every project sees
+    if (made.font) await push('', [{ path: 'Fonts/Instrument Sans.woff2', file: made.font }]);
+    // the project's own, as Alex added them
+    const first = await push('Northwind', [
+      { path: 'Brief.md', file: made.brief },
+      { path: 'northwind-launch.aep', file: made.project[0] },
+      { path: 'end card.png', file: made.still[0] },
+      { path: 'Footage/Day 1/A001C003.mov', file: made.footage[0] },
+      { path: 'Footage/Day 1/A001C007.mov', file: made.footage[1] },
+      { path: 'Music/Night Drive (stem mix).wav', file: made.music },
+      { path: 'Grade/Northwind warm.cube', file: made.lut },
+    ]);
+    // the film's agent saved its project and the end card again for V3: new versions, marked as its own
+    await push(
+      'Northwind',
+      [
+        { path: 'northwind-launch.aep', file: made.project[1], base: 1 },
+        { path: 'end card.png', file: made.still[1], base: 1 },
+      ],
+      true,
+    );
+    await open(`#/files/${enc('Northwind')}?open=${enc(first['end card.png'])}`);
+    await page.waitForSelector('[data-testid=files-list] [data-testid=file-row]', { timeout: 20_000 });
+    await page.waitForSelector('[data-testid=file-sheet] [data-testid=file-version]', { timeout: 20_000 });
+    await imagesLoaded('[data-testid=file-preview] img');
+    await sleep(1000);
+    await rest();
+    await camera.shoot(page, 'files', { full: true }, { ready: () => imagesLoaded('[data-testid=file-preview] img') });
+  }
+
+  await claudeAgain.close().catch(() => {});
   if (errors.length) console.log(`  (page errors: ${errors.join(' | ')})`);
   await page.close();
 }
@@ -578,22 +773,92 @@ async function watchLink(
   });
 }
 
-/** Field Notes, part one: a new episode to review (synthetic, like the rest of the demo). */
-function renderEpisode(root: string): string {
+/** Field Notes, part one or two: a new episode to review (synthetic, like the rest of the demo). */
+function renderEpisode(root: string, part: 1 | 2 = 1): string {
+  const [word, place, gradient] =
+    part === 1
+      ? ['O N E', 'The coast road', 'c0=0x13261f:c1=0x3d7a63:c2=0xe0c98e:c3=0x13261f:n=4:type=spiral:speed=0.05:seed=8']
+      : ['T W O', 'The harbour', 'c0=0x101a2b:c1=0x2f5d7c:c2=0xd8b98a:c3=0x101a2b:n=4:type=spiral:speed=0.05:seed=21'];
   return render({
-    file: path.join(root, 'Field Notes/episode-1/export/field-notes-01.mp4'),
+    file: path.join(root, `Field Notes/episode-${part}/export/field-notes-0${part}.mp4`),
     w: 1920,
     h: 1080,
     fps: 25,
     dur: 7,
-    gradient: 'c0=0x13261f:c1=0x3d7a63:c2=0xe0c98e:c3=0x13261f:n=4:type=spiral:speed=0.05:seed=8',
-    audio: score(120, 220),
+    gradient,
+    audio: score(120, part === 1 ? 220 : 196),
     captions: [
       { text: 'Field Notes', from: 0.3, to: 3.4, size: 120, y: '(h-text_h)/2-30' },
-      { text: 'P A R T   O N E', from: 0.8, to: 3.4, size: 30, y: '(h/2)+90', font: 'sans' },
-      { text: 'The coast road', from: 3.8, to: 7, size: 104, y: '(h-text_h)/2' },
+      { text: `P A R T   ${word}`, from: 0.8, to: 3.4, size: 30, y: '(h/2)+90', font: 'sans' },
+      { text: place, from: 3.8, to: 7, size: 104, y: '(h-text_h)/2' },
     ],
   });
+}
+
+const sha256Of = (file: string) => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+
+/**
+ * What a project's Files tab holds in the pictures, all made here and synthetic: footage (gradients, like the demo's
+ * renders), a music bed (tones), the end card as a still (two saves, frames of the film), a grade's LUT,
+ * the brief, and an After Effects project that is only its name and bytes (two saves). The House's typeface is the
+ * app's own (Instrument Sans, OFL), when the checkout has it.
+ */
+function makeProjectFiles(dir: string, media: DemoMedia) {
+  fs.mkdirSync(dir, { recursive: true });
+  const ff = (...args: string[]) => execFileSync(FFMPEG, ['-v', 'error', ...args]);
+  const footage = [
+    { name: 'A001C003.mov', colors: 'c0=0x0b1626:c1=0x1d3a57:c2=0xb86f48:n=3:seed=4', d: 6 },
+    { name: 'A001C007.mov', colors: 'c0=0x13261f:c1=0x3d7a63:c2=0xe0c98e:n=3:seed=9', d: 5 },
+  ].map((c) => {
+    const out = path.join(dir, c.name);
+    // grain, as camera footage has: it takes the bitrate a camera's file would
+    const src = `gradients=s=1920x1080:r=25:d=${c.d}:speed=0.03:${c.colors},noise=alls=10:allf=t`;
+    ff('-f', 'lavfi', '-i', src, '-c:v', 'libx264', '-b:v', '24M', '-pix_fmt', 'yuv420p', '-y', out);
+    return out;
+  });
+  const music = path.join(dir, 'night-drive.wav');
+  ff('-f', 'lavfi', '-i', `aevalsrc='${score(96, 196)}':s=48000:d=30`, '-ac', '2', '-c:a', 'pcm_s24le', '-y', music);
+  // the end card, twice: a frame of the film as it is now (V3), and one a few frames on
+  const still = [360, 395].map((frame, i) => {
+    const out = path.join(dir, `end-card-${i + 1}.png`);
+    ff('-i', media.film, '-vf', `select=eq(n\\,${frame})`, '-frames:v', '1', '-y', out);
+    return out;
+  });
+  // a warm grade as a 17-point cube: a little more red, a little less blue, as the rules ask ("warm light")
+  const lut = path.join(dir, 'northwind-warm.cube');
+  const n = 17;
+  const rows: string[] = ['TITLE "Northwind warm"', `LUT_3D_SIZE ${n}`];
+  for (let b = 0; b < n; b++)
+    for (let g = 0; g < n; g++)
+      for (let r = 0; r < n; r++) {
+        const [R, G, B] = [r, g, b].map((x) => x / (n - 1));
+        rows.push([Math.min(1, R * 1.04 + 0.01), G, Math.max(0, B * 0.94)].map((x) => x.toFixed(6)).join(' '));
+      }
+  fs.writeFileSync(lut, `${rows.join('\n')}\n`);
+  const brief = path.join(dir, 'brief.md');
+  fs.writeFileSync(
+    brief,
+    [
+      '# Northwind launch film',
+      '',
+      'A 16-second film for the spring launch, with a 6-second cut-down and a 9:16 reel for social.',
+      '',
+      '- The line is the hero: "Every mile, on the record." Word for word.',
+      '- Warm light, never a glow over the line.',
+      '- End on the wordmark, held two seconds before the cut to black.',
+      '',
+    ].join('\n'),
+  );
+  // an After Effects project in name only: its first bytes as such a file has them, then filler (two saves)
+  const project = [1, 2].map((i) => {
+    const out = path.join(dir, `northwind-launch-${i}.aep`);
+    const bytes = crypto.randomBytes(2_400_000 + i * 180_000);
+    bytes.write('RIFX', 0, 'latin1');
+    fs.writeFileSync(out, bytes);
+    return out;
+  });
+  const font = path.join(ROOT, 'node_modules/@fontsource-variable/instrument-sans/files/instrument-sans-latin-wght-normal.woff2');
+  return { footage, music, still, lut, brief, project, font: fs.existsSync(font) ? font : null };
 }
 
 /** One note's clean and marked screenshots side by side (what the store writes for agents), transparent between them. */

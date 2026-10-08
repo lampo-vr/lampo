@@ -5,14 +5,37 @@ knows why it matters. Done work moves to `CHANGELOG.md`.
 
 ## Now
 
+**0.2.0 is out** (2026-10-08; CHANGELOG `[0.2.0]`). What it brought, and what each part leaves for next:
+- **The agent experience, phase 1: "I can see it."** Every Send, Ask, nudge, answer or Try again opens one piece of
+  work for the video's agent (a run), built from the calls it makes anyway: the run strip under the notes panel's head
+  (fixing 3 of 6, rendering V4 · 42 % with the time left, needs you, done, failed, not heard from) and the Agent view
+  behind it (the notes as its plan, what it is doing now, its steps, Tell it…, Stop); the plan on each note, the
+  hourglass on the timeline, who made each version; the library's cards, the board and the sidebar in the same words.
+  `lampo render -- <command>` shows a render's progress (Remotion, ffmpeg, aerender, Blender; `--detach` and
+  `lampo render wait` for long ones) and puts the file up. The Inbox lists agents that failed, wait for a permission or
+  went quiet, phones ping for them if wanted, and Stop reaches agents that listen at their next call. Phase 2 is next
+  (below).
+- **Close the loop.** "Use Lampo for <project>" is all an agent needs to hear: it finds or names the project, puts up
+  V1 itself, works the notes and waits for the next ones until the person approves; one way per kind of agent (chat
+  apps through MCP alone, coding agents rendering through `lampo render`); an agent shows in the sidebar and in
+  Settings → Connect an agent the moment it connects; Connect an agent is one page per agent; empty pages and the first
+  run lead with the agent.
+- **Project files, phase 1.** The server (`/api/files…`, per House, project and folder, versioned, attributed,
+  counted toward the plan, a trash of 30 days) and the app's Files tab (drops of files and folders with the check
+  before upload, resumable uploads, conflicts kept, versions with Restore, previews, Copy for an agent). The agents'
+  own tools and phase 2 are next (below).
+- **The command is `lampo`**, with `lampo-mcp`, `LAMPO_*`, `lampo://` and the npm package name `@lampo-vr/lampo`; the
+  older names keep working.
+- **The last audit's backlog**, fixed; what it leaves for later is listed with the deferred findings at the end.
+
 **A real deployment: running** (since 2026-10-03; open sign-up since 2026-10-06). The first hosted instance serves the
 app behind a CDN proxy with video from a media host of its own (`LAMPO_MEDIA_ORIGIN`), mail from a verified sending
-domain, nightly backups, and the smoke test green; CI runs on GitHub's runners in the public repository (outside contributors' workflows wait for
-approval). Still to do there: the OAuth connectors in ChatGPT and Claude.ai for real, backups to a second
-place, an uptime check from outside, the Linux screenshot baselines from CI's artifact (then drop
-`LAMPO_BASELINE_MISSING`), perf budgets measured on CI's runners (then drop `LAMPO_PERF_TIMES`), a Parakeet voice note and an
-Auto-check run measured on x86, `npm audit` of the pinned versions. Open: whether review links speak the visitor's
-browser language (clients have no Settings, so today they always get English).
+domain, nightly backups to a second place with a restore drilled, and the smoke test green; CI runs on GitHub's runners
+in the public repository (outside contributors' workflows wait for approval). Still to do there: the OAuth connectors
+in ChatGPT and Claude.ai for real, an uptime check from outside, the Linux screenshot baselines from CI's artifact
+(then drop `LAMPO_BASELINE_MISSING`), perf budgets measured on CI's runners (then drop `LAMPO_PERF_TIMES`), a Parakeet
+voice note and an Auto-check run measured on x86, `npm audit` of the pinned versions. Open: whether review links speak
+the visitor's browser language (clients have no Settings, so today they always get English).
 
 **Lampo Cloud: sign-up and billing, open** (2026-10-06). Open sign-up gives each person a workspace of their own on a
 trial, then the plans, with payments live. In the open app (CHANGELOG): the extension point answers sign-ups and mails
@@ -20,8 +43,7 @@ a workspace's people for a module, Settings → Billing, the banner and the 402 
 the trial's line and card, the banner at its end, read-only's locked Add video, the moments of value, limit sheets that
 pay in place, and the operator's first-party funnel. Left: a periodic check of seats against members; the module's
 side of the conversion (`host.funnel` for `trial_end` and `plan_paid`, `features` on BillingInfo,
-`POST /api/billing/storage`, the preview's `prorated`, a storage refusal's `room`); the real address behind
-Business's "Talk to us".
+`POST /api/billing/storage`, the preview's `prorated`, a storage refusal's `room`).
 
 **Workspaces, next.** Several teams on one server, each seeing only its own projects, are in (CHANGELOG): the model,
 paths and migration, auth per workspace, everything scoped, the switcher and Settings → Workspace, the two-workspace
@@ -54,16 +76,46 @@ encode of it); agents only draft (`draft_post`, `lampo post draft`, never "publi
   `instagram_content_publish`, `pages_manage_posts`); TikTok app review and the Direct Post audit — each needs a live
   domain, privacy policy and terms URLs, demo videos and a test account.
 
-**The demo footage's terms: decided (2026-10-05).** Lampo's own demo footage (AI-generated, Higgsfield, Seedance 2.0)
-is ours to publish, in the repository and an AGPL release: the brand film, the setup's stills, the sample and the
-website's clips.
-
 ## Next
 
-- **Project files, next** (the server, `docs/files.md`, and the app's Files tab are built): the agents' way in
-  (`lampo files ls/push/pull/status`, MCP `list_files`, `get_file`, `add_file`, the discovery line); in the app, a
-  folder downloaded as one zip, *Delete for good* in the trash for owners and admins, posters for pictures and video
-  in the rows; then phase 2 — the Handover link, editing leases, 720p proxies, what a final version was made from.
+- **The agent experience, phase 2: "It comes by itself."** Today an agent hears notes only while it listens (an open
+  session in `wait_for_feedback` or `lampo watch`), and only Claude Code on the person's own machine can be started by
+  Lampo. Next:
+  - **the local runner**: `lampo connect` sets a computer up once — signs it in, finds the agents installed, binds the
+    folders that hold projects to Lampo projects (the paths stay on that computer), offers the plugin, prints the
+    permission lines to add (it never writes a client's settings) and proves it with a practice note — and
+    `lampo runner` keeps a small process there that claims the work people send and starts the agent for it (Claude
+    Code, then Codex), with a token per computer that the app revokes; the local app's own start of an agent becomes
+    this runner;
+  - **publishing `@lampo-vr/lampo` to npm**: a thin CLI for other machines (`lampo`, `lampo render`, `lampo connect`,
+    `lampo runner`), without the speech engine or ffmpeg, with provenance;
+  - **the plugin**: the loop, `watch`, the setup and `lampo render` as skills, for Claude Code and other clients that
+    load plugins;
+  - **Settings → Agents** in place of Connect an agent: the computers with their runners, the agents connected, and
+    connecting a new one.
+
+- **The agents' file tools.** MCP `list_files`, `get_file` and `add_file`, and `lampo files push` / `lampo files pull`
+  (with `ls` and `status`), so an agent works from the same footage, fonts and project files as the team on any machine
+  and saves its project back as a version of its own. The app's *Copy for an agent* already hands out the
+  `lampo files pull` line for the files picked; the instructions agents read gain one line on where the files are.
+
+- **Project files, phase 2**: the **Handover link**, a fourth kind of link (a project's videos and files with a
+  generated `HANDOVER.md`, for whoever takes the project over), and **editing leases** (who has a project file open,
+  shown and ending by themselves; a push against one is kept beside it as a copy, never refused, never overwriting);
+  then proxies of the footage and what a final version was made from. In the app meanwhile: a folder downloaded as one
+  zip, *Delete for good* in the trash for owners and admins, posters for pictures and video in the rows.
+
+- **A click inside a menu never reaches what is behind it.** A menu opens in a layer of its own (a portal), and a click
+  on one of its items can still bubble to the clickable row or card it was opened from: on a narrow screen a menu that
+  opens over its own button could open the row too. The Files tab guards its rows (`onRowItself`); the general fix
+  belongs in the menu layer itself, so the library's cards and rows and the inbox's rows are covered too.
+
+- **An explicit `LAMPO_DATA` wins over a saved login.** After `lampo login`, every `lampo` command talks to that server
+  even when `LAMPO_DATA` names a store on this machine (only `LAMPO_REMOTE=0` keeps it local). A store named on purpose
+  should win, or at least `lampo` should say which one it uses.
+
+- **Audit ids out of code comments.** Comments explain why, in words; the ids of findings stay in AUDITS.md and the
+  reports.
 
 - First run, next: a short guided pass through the sample in the player (point at the fix to check, then the agent's
   question) for people who open it and don't know where to look; the agent step showing the client the person picked
@@ -135,7 +187,8 @@ website's clips.
   *Channels* (research preview: a server declares `claude/channel` and pushes a message the open session acts on)
   could deliver a note to an idle session; today it needs a stdio server started with a development flag (or an
   allow-listed plugin) and isn't carried over a 2026-07-28 HTTP connection, so a `lampo` plugin with a channel for the
-  stdio server is the candidate. Also: long waits behind a proxy for clients that send no progress token (a JSON answer
+  stdio server is the candidate. Parked for now: the runner (phase 2, above) brings an agent by itself without it. Also:
+  long waits behind a proxy for clients that send no progress token (a JSON answer
   only after the wait; Cloudflare gives up after 100 s): keep-alive bytes or a shorter cap for them.
 - Live agent monitor, next: **opt-in reading of Claude Code sessions Lampo didn't start** (their transcripts under
   `~/.claude/projects/`) for the same live view of an agent working in a terminal — its steps and the tokens it
@@ -245,10 +298,16 @@ Findings of audit A13 (2026-10-05, `AUDITS.md`) and its verification rounds that
   characters). What reaches them is cut first (2,000 characters a line on the agent's machine, 300 on the server: about
   15 ms and under 1 ms), so it costs nothing today. Make their leading group read each word once (an atomic group
   through a lookahead and a backreference). The MySQL rule is linear, measured by doubling adversarial and random lines.
+- **A13 RENDER-1g** (low): a failed render's last lines still keep a MySQL client's password in three shapes the rule
+  doesn't read yet: a JSON argument list written without spaces, the client run in a backquoted subcommand, and a
+  command continued on the next line with a backslash.
 - **A13 RUNS-FIT-2c** (info): a run the queued bound stops tells whoever sent it nothing (it ends `stopped`, credited to
   the person whose new run made room), and a store from before the bound stops its surplus all at once on the next
   send, with as many stop events in that person's name. Tell the sender (a step on the run, or the Inbox) and credit
   the bound itself.
+- **A13 RUNS-FIT-2d** (low): the account's bound on open runs (`roomToBegin`) counts queued runs too, so an account
+  with many runs waiting to be picked up (sends, Try again) can leave none of them able to begin. Count only the runs
+  that began.
 - **A13 RUNS-FIT-4** (info): the first write of a runs file that holds thousands of open runs with steps takes a while
   (seconds at 20,000), as each pass of `fitRuns` sorts every run again; only a file written before the bounds gets
   there, never the API. Sort each kind once and walk it (or a heap for the longest open run).
@@ -301,8 +360,8 @@ Findings of audit A13 (2026-10-05, `AUDITS.md`) and its verification rounds that
 ## Open decisions
 
 - 1.0 criteria: the data format frozen, server mode audited, CI green on GitHub.
-- Distribution: a published CLI / MCP package (`npx`) and a registry container image, so agents on other machines
-  don't need a clone.
+- Distribution: a registry container image beside the CLI / MCP package, so agents and servers on other machines don't
+  need a clone (the package, `@lampo-vr/lampo` on npm, is phase 2 of the agent experience above).
 - Accounts scoped to folders (clients with their own logins) or share links only. (Importing an existing local store
   into a hosted instance: `lampo export` / `lampo admin import`, docs/moving.md. Not in a bundle yet: questions asked on a
   folder before any video (`asks.json`), and notes made on a video after it moved, which a later export can't merge.)
@@ -315,3 +374,6 @@ Findings of audit A13 (2026-10-05, `AUDITS.md`) and its verification rounds that
   (2026-10-07), with `lampo-mcp`, `LAMPO_*` settings, `lampo://` resources and the npm package `@lampo-vr/lampo`
   (plain `lampo` is someone else's on npm; nothing is published yet). `vr`, `vr-mcp`, `VR_*` and `vr://` keep working
   for setups made with them. The MCP tool names, data paths and file formats keep their names.
+- **The demo footage's terms** (2026-10-05). Lampo's own demo footage (AI-generated, Higgsfield, Seedance 2.0) is ours
+  to publish, in the repository and an AGPL release: the brand film, the setup's stills, the sample and the website's
+  clips.

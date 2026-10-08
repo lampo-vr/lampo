@@ -1,7 +1,9 @@
 // The pictures of a hosted server (LAMPO_MODE=server) at a believable public address, https://review.northwind.example
-// (an https front in this process; Chrome resolves the name to it): its first start's setup screen, a fresh API token,
-// the consent screen an app's sign-in opens, and the sign-in screen. Nothing but the app's own screens and API.
+// (an https front in this process; Chrome resolves the name to it): its first start's setup screen, the empty library
+// with Claude Code connected, a fresh API token, the consent screen an app's sign-in opens, and the sign-in screen.
+// Nothing but the app's own screens and API (and an MCP client, as Claude Code connects).
 import crypto from 'node:crypto';
+import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import type { Browser } from 'puppeteer-core';
 import { type DemoServer, startServer } from '../demo/server.ts';
 import { type Camera, DAY_ZONE, scheme, sleep, tipsSeen } from './camera.ts';
@@ -56,6 +58,30 @@ export async function hostedPictures(h: HostedScene): Promise<void> {
     await camera.shoot(page, 'hosted-setup', { around: ['.ent-col'], pad: [56, 72, 56, 72] });
     await page.click('.gate-go');
     await page.waitForSelector('.user-chip:enabled', { timeout: 15_000 });
+
+    // ---------------------------------------------------------------- the empty library, Claude Code connected
+    // Claude Code connects with an API token of the owner's, as `lampo mcp config claude` sets it up, and is on no video
+    // yet: the empty library asks it by name to make the first one. The token goes again afterwards.
+    if (camera.wants('library-empty')) {
+      const made = (await page.evaluate(`fetch('/api/auth/tokens', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Studio Mac · Claude Code' }),
+      }).then((r) => r.json())`)) as { token: string; info: { id: string } };
+      const claude = new Client({ name: 'claude-code', version: '2.1.0' }, { versionNegotiation: { mode: 'auto' } });
+      await claude.connect(
+        new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${h.port}/mcp`), {
+          requestInit: { headers: { Authorization: `Bearer ${made.token}`, Host: PUBLIC_HOST } },
+        }),
+      );
+      await claude.listTools();
+      await page.goto('about:blank');
+      await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('[data-testid=make-with-agent][data-agent=claude-code]', { timeout: 30_000 });
+      await page.mouse.move(2, 2);
+      await sleep(800);
+      await camera.shoot(page, 'library-empty', { full: true });
+      await claude.close().catch(() => {});
+      await page.evaluate(`fetch('/api/auth/tokens/${made.info.id}', { method: 'DELETE' })`);
+    }
 
     // ---------------------------------------------------------------- Settings → API tokens, a token just made
     await page.goto(`${BASE}/#/settings/tokens`, { waitUntil: 'domcontentloaded' });

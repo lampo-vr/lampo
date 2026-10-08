@@ -41,7 +41,7 @@ agrees with the *To review* lane and adds agents' questions and notes from revie
 ([mobile.md](mobile.md#the-inbox)). Whoever reviews through a link is never "the client" in the app: it says the link's
 name, "via review link" or the person's name, since a link is for anyone — a colleague, a producer, a client.
 
-![The board: To review with “Check 2 fixes” and a new V1, Being fixed with what its agent is doing, Approved with “Mia · 85%”, and Final](assets/board.webp)
+![The board: To review with a new V1, Being fixed with each agent’s work in a line (rendering V3 at 42 % with a thin edge along the poster’s foot, a render that failed, an agent not heard from), Approved with “Mia · 85%”, and Final; the sidebar’s Agents say the same in a word or two](assets/board.webp)
 
 **Archiving a project.** A project that is done can be put away: *Archive project* in its ⋯ menu (owners and admins),
 with Undo. It leaves the sidebar, All videos, the board, Recent, the Inbox and Insights' lists of what waits now, and

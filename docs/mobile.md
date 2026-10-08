@@ -38,7 +38,7 @@ On a screen 1100 px wide or more, the inbox reads like a mail client: the list o
 on the right with its action. Narrower, every item is a card with its action right on it; tap one to open it in the
 player.
 
-![The Inbox by video on a wide screen: a question, fixes to check and a new version in the list, the picked fix with its frame and timeline on the right, and Looks right at the bottom](assets/inbox.webp)
+![The Inbox by video on a wide screen: an agent's question, fixes to check and a reply on one video, an agent that stopped, a new video to review, a note from a review link and an agent gone quiet on others; the picked fix with its frame and timeline on the right, and Looks right at the bottom](assets/inbox.webp)
 
 ### What lands there
 
@@ -57,6 +57,8 @@ player.
 | New versions | a new version that carries open notes over to be checked again (the last 7 days) | *Got it* |
 | Stalled | a video that waits too long: fixes keep coming back, four full renders and still no approval, or nothing happened for two days. It offers *Nudge agent* (a request to the video's agent) or *Review link* | its video moves on, or *Got it* (it comes back if it stalls again) |
 | Stalled (an agent) | no word from an agent at work for a while, or notes sent that no agent picked up in 10 minutes: *Nudge* and *Stop* (*Cancel*) | the agent is heard from again, or you stop it |
+
+![The Inbox by kind: under Agents that stopped, a render that failed, picked, with its last lines on the right and Try again; a note from a review link and a reply below it; and under Stalled, no word from Codex for 32 minutes](assets/inbox-agents.webp)
 
 **Work leaves when it is done.** Questions, an agent's work that needs you, fixes, versions to review, failed posts
 and playbook suggestions have no *Got it*: they leave when they are answered, checked or decided. Only what informs
@@ -136,7 +138,7 @@ inbox says what to do. Once they are on, **Settings → Notifications** shows th
 worth a ping on it, *Send a test* checks the way through, and *Turn off here* stops them. Each device is turned on and
 set up on its own.
 
-![Settings → Notifications: notifications are on for this device, a switch for each kind of ping, Send a test and Turn off here](assets/notifications-settings.webp)
+![Settings → Notifications: notifications are on for this device, a switch for each kind of ping (agents that stop or wait, and agents gone quiet, among them), Send a test and Turn off here](assets/notifications-settings.webp)
 
 ### What pings you
 

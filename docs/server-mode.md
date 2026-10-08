@@ -285,7 +285,7 @@ the last 30 days (`429` past any of them). A revoked or expired invite leaves th
 lists that long) and counts toward the 200 until then, so revoking one makes no room; accepted ones stay, since they
 say who invited whom, and don't count.
 
-**Sign-up.** With `LAMPO_SIGNUP=open` ([email.md](email.md#sign-up-vr_signup)), everyone who signs up gets a workspace
+**Sign-up.** With `LAMPO_SIGNUP=open` ([email.md](email.md#sign-up-lampo_signup)), everyone who signs up gets a workspace
 of their own once their address is confirmed: empty, with them as its owner, named after them until they rename it.
 They never see anyone else's. With `LAMPO_SIGNUP=invite` an invited address gets its invite again, and the invite's link
 puts them in its workspace.
@@ -556,7 +556,7 @@ address (the old one gets a notice) and account notices. Without them every mess
 cache instead, and the server says so at start. `lampo admin mail-test <to>` sends one message now and prints the
 relay's answer.
 
-**Sign-up** (`LAMPO_SIGNUP`, [email.md](email.md#sign-up-vr_signup)): `off` (the default), `invite` (an address a pending
+**Sign-up** (`LAMPO_SIGNUP`, [email.md](email.md#sign-up-lampo_signup)): `off` (the default), `invite` (an address a pending
 invite names gets the invite again; its link makes the account) or `open` (anyone, each into a workspace of their own;
 a hosted server only). An open sign-up can do nothing until its address is confirmed, and can't change that address
 meanwhile.

@@ -14,7 +14,7 @@ itself.
 - A folder inherits every playbook above it: *Acme/Reels* reads the House, then *Acme*, then its own. **The deeper
   one wins** where they disagree. Every part says where it comes from ("From Acme r1"), so nothing is merged silently.
 
-![A project’s Playbook tab: the line under the title with House r3 and the project’s own r6, which wins; the brief from House; four rules of its own over four folded from House; and What agents read beside them](assets/playbook-folder.webp)
+![A project’s Playbook tab beside its Videos and Files: the line under the title with House r3 and the project’s own r6, which wins; the brief from House, folded under an empty one of its own; four rules of its own over four folded from House; and What agents read beside them](assets/playbook-folder.webp)
 
 ## The page
 

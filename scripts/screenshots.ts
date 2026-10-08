@@ -5,9 +5,11 @@
 // writes somewhere else than docs/assets. Needs `npm run build` (the app's UI and the MCP review card), ffmpeg with
 // libwebp, openssl, and a Chrome: chrome-headless-shell (`npm run chrome:install`) or CHROME_PATH. Takes a few minutes.
 //
-// What runs: a local demo store (scripts/shots/local.ts) with a stand-in speech engine (scripts/shots/speech.ts), and a
-// hosted server behind an https front (scripts/shots/hosted.ts, scripts/shots/https.ts); Chrome reaches them as
-// localhost:4747 and https://review.northwind.example. Everything lives in one temp folder, removed at the end.
+// What runs: a local demo store (scripts/shots/local.ts) with a stand-in speech engine (scripts/shots/speech.ts), a
+// stand-in render tool for agents' `lampo render` (scripts/shots/render.ts) and one agent's run written as gone quiet
+// (scripts/shots/runs.ts), and a hosted server behind an https front (scripts/shots/hosted.ts, scripts/shots/https.ts);
+// Chrome reaches them as localhost:4747 and https://review.northwind.example. Everything lives in one temp folder,
+// removed at the end.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';

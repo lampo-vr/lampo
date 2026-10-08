@@ -13,7 +13,7 @@ it, set a severity, or just talk. The agent that made the render (Claude Code, o
 notes as plain files with frame numbers, timecodes and the marked screenshot. It fixes, re-renders, and says what it
 changed. You see exactly what changed on screen and check every fix before and after, one key each.
 
-![The player: a note drawn on the frame, what changed since V1, the notes panel with an agent's fixes](docs/assets/player.webp)
+![The player: a note drawn on the frame, what changed since V1, and the notes panel with the agent's line under its head and the agent's fixes to check](docs/assets/player.webp)
 
 It runs on your machine (no sign-up, no telemetry) or as a server for a team and its clients. On your machine, nothing
 leaves it unless a feature you use needs to: the speech model downloads once from Hugging Face, and so does footage
@@ -90,9 +90,12 @@ the exact frame and what's on it. Lampo turns review into data an agent can act 
   from its ⋯ menu, and a project that is done can be **archived**: out of sight and read only until it is restored,
   in one click.
 - **See what your agent is doing.** One line under the notes says where the video's agent is — fixing 3 of 6,
-  rendering V4 at 42 % with the time left, waiting for your answer, or not heard from — and the Agent view shows your
-  notes as its plan and the steps it took. A version an agent made says who made it and what it fixed. When an agent
-  fails, waits for a permission or goes quiet, the inbox (and your phone, if you like) says so
+  rendering V4 at 42 % with the time left (when it renders through `lampo render`), needs you with **Answer**, or not
+  heard from — and pressing it opens the **Agent** view beside Notes and Transcript: your notes as its plan, what it is
+  doing now, the steps it took, and **Stop**, at once. The library's cards, the board and the sidebar's Agents say the
+  same in a word or two, and an agent shows there the moment it connects. A version an agent made says who made it, in
+  how long and what it fixed. When an agent fails, waits for a permission or goes quiet, the inbox (and your phone, if
+  you like) says so, with **Try again** or **Nudge**
   ([docs/agents.md](docs/agents.md#your-work-as-the-person-sees-it-runs)).
 - **Publish the final.** Post a final version to YouTube, Instagram and Facebook with your own keys, or download the
   publish kit (each platform's encode, captions, cover, copy). Agents draft the posts; a person publishes
@@ -114,6 +117,14 @@ the exact frame and what's on it. Lampo turns review into data an agent can act 
   revisions it was made under ([docs/playbooks.md](docs/playbooks.md)).
 - **The taste file.** Every note is a data point. Per project, Lampo distills them into one page the agent reads before
   it renders: what you keep asking for, what you love, decisions that stand ([docs/taste.md](docs/taste.md)).
+- **Files for every project.** A **Files** tab on every project and folder, and the House's in Settings → Files, keeps
+  what the work is made from: footage, music, fonts, logos, After Effects, Cinema 4D and Photoshop files, LUTs, briefs.
+  Drop files and folders on it: before a byte moves, one sheet says what will happen — what is already in Lampo, which
+  files become a new version, what is left out, whether it fits the plan. Big drops resume where they stopped, and a
+  file someone changed meanwhile is never overwritten. Every file keeps its versions (an agent's marked as such) with
+  **Restore**, the trash keeps it up to 30 days, and pictures, video, sound, PDF and text open right there. Files count
+  toward the plan's storage; reviewers and review links never see them. The agents' own commands for files come next
+  ([docs/files.md](docs/files.md)).
 - **One app, on your machine or hosted.** The same accounts, invites, API tokens, uploads and review links in both
   places ([docs/server-mode.md](docs/server-mode.md)). On your machine you're signed in automatically, renders can
   stay where they are, and Claude Code sessions, Apple's text recognition and plain files come on top. Hosted, renders
@@ -124,6 +135,8 @@ the exact frame and what's on it. Lampo turns review into data an agent can act 
 | ![The library: projects, agents, open notes, approvals](docs/assets/library.webp) | ![Check mode: V1 and V2 side by side with the fix](docs/assets/verify.webp) |
 | **Review link** | **Hosted sign-in** |
 | ![A client reviewing through a review link](docs/assets/guest.webp) | ![The sign-in screen of a hosted server](docs/assets/signin.webp) |
+| **An agent at work** | **Files** |
+| ![The player while the agent renders V3: the run strip at 42 % with the time left, and the Agent view with its plan, what it is doing now and its steps](docs/assets/agent-view.webp) | ![A project's Files tab: its folders and files, the House's typeface folded below, and the end card opened beside them with its preview and two versions, the newer one by the film's agent](docs/assets/files.webp) |
 | **Light: library** | **Light: player** |
 | ![The library in the light theme](docs/assets/library-light.webp) | ![The player in the light theme: the stage stays dark](docs/assets/player-light.webp) |
 
@@ -143,6 +156,10 @@ machine* to review it where it lives (rendering again to the same path adds the 
 and the agent that should act on the notes. Nothing is scanned; the tool only reads the files you add. Your owner
 account is created on first start; set an email and a password in Settings → Profile to sign in from your phone or
 another computer.
+
+**Working with an agent?** Connect it in Settings → Connect an agent and tell it *Use Lampo for "<project>"*: it puts
+V1 up itself ([For agents](#for-agents)). Until there is a video, the empty library offers *Ask Claude Code to make one*
+(or whichever agent you connected), with the prompt copied for you.
 
 **No footage at hand?** `npm run demo` renders synthetic clips and builds a review history on a throwaway store:
 notes, an agent's fixes, a re-render with its diff, a review link and an approval. Ctrl+C deletes it again.
@@ -183,11 +200,15 @@ docker compose logs       # the first start prints a one-time setup token
 ```
 
 Open your URL, enter the token and create the owner account. Then invite people, upload renders (drop them on the
-library, or `lampo push`), and connect agents with an API token:
+library, or `lampo push`), keep each project's material in its Files tab, and connect agents: through Settings →
+Connect an agent (a chat app by its connector address, signing in once), or `lampo login`, which signs in through the
+browser and gives `lampo` and the stdio MCP server an API token:
 
 ```sh
 lampo login https://review.example.com
-lampo push render.mp4 --folder "Acme/Reels"   # the same name again becomes v2, v3, …
+lampo push render.mp4 --folder "Acme/Reels"   # the same name again becomes V2, V3, …
+lampo render --to render.mp4 --out out/v3.mp4 -- \
+  npx remotion render src/index.ts Main out/v3.mp4   # the progress shows in Lampo, then V3
 ```
 
 [docs/docker.md](docs/docker.md) covers the image, volumes, upgrades and backups.
@@ -213,6 +234,7 @@ to check a running instance.
 | <kbd>=</kbd> <kbd>−</kbd> <kbd>0</kbd> · <kbd>Z</kbd> <kbd>⇧Z</kbd> | timeline zoom (or ⌘ + scroll; far in, every frame is a cell) · to the section or around the playhead · the whole video |
 | <kbd>⌘K</kbd> (<kbd>Ctrl K</kbd>) · <kbd>⌘,</kbd> | find a video, folder or note anywhere, or run an action · Settings |
 | <kbd>A</kbd> · <kbd>1</kbd>–<kbd>4</kbd> · <kbd>/</kbd> · <kbd>F</kbd> | library: add video · grid, compact, list, board · search this view · filter |
+| <kbd>↑</kbd> <kbd>↓</kbd> (⇧ picks) · <kbd>↵</kbd> · <kbd>Space</kbd> · <kbd>⌫</kbd> | Files tab: move through the list · open · look · trash (with Undo); <kbd>⌘A</kbd> picks all, <kbd>⌘↑</kbd> goes up a folder, <kbd>/</kbd> searches |
 | <kbd>?</kbd> | every key |
 
 ## For agents
@@ -234,7 +256,9 @@ server tells every agent that connects what to do, in its first read. The full r
 
 Every answer says what comes next: a hand-off ends with `Now call wait_for_feedback with since "<cursor>"…`, a read
 that leaves nothing to do with `Nothing waiting for you: …`. The person sees the agent from its first call, in the
-sidebar's Agents and in Settings → Connect an agent. Claude Code's `/lampo:watch` is a shortcut for the same loop.
+sidebar's Agents and in Settings → Connect an agent, and its work on a video as one line with the Agent view behind it,
+built from the calls it makes anyway (no status calls needed, no tokens spent). If the person presses Stop, the agent's
+next Lampo answer says so, once: it stops there. Claude Code's `/lampo:watch` is a shortcut for the same loop.
 
 ### One way per kind of agent
 
@@ -302,6 +326,7 @@ accuracy is kept end to end. The HTTP API is in [docs/api.md](docs/api.md).
 | [docs/data-format.md](docs/data-format.md) | `review.json`, `events.jsonl`, the files in `data/` |
 | [docs/playbooks.md](docs/playbooks.md) | playbooks: brief, rules, references and skills per studio and folder; agents' suggestions; trust |
 | [docs/taste.md](docs/taste.md) | the taste file: what the notes taught, for agents to read before they render |
+| [docs/files.md](docs/files.md) | project files: footage, music, fonts and project files per House, project and folder; versions, the trash, the plan, the Files tab, the API |
 | [docs/sharing.md](docs/sharing.md) | review links for clients and colleagues, what they record, webhooks |
 | [docs/workflow.md](docs/workflow.md) | where a video stands: stages, approvals per party, final, who can do what |
 | [docs/publishing.md](docs/publishing.md) | posting a final video to YouTube, Instagram and Facebook; the publish kit; what to set up first |

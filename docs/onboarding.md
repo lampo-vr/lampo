@@ -10,7 +10,7 @@ An instance whose people know Lampo already turns it off for new accounts with `
 ## Who sees it
 
 An account starts with a first run when it is made: the owner who sets up a hosted server, someone who signs up on
-their own (with a workspace of their own, [email.md](email.md#sign-up-vr_signup)), everyone who accepts an invite or is
+their own (with a workspace of their own, [email.md](email.md#sign-up-lampo_signup)), everyone who accepts an invite or is
 created by an admin (`lampo admin create-user` too), and the machine's owner on its very first start (a store without a
 video). **Accounts from before the first run existed have none and never see it**: someone who already uses Lampo is
 never greeted like a newcomer.
@@ -117,6 +117,18 @@ each step the first time it sees it done, so deleting the video later doesn't ta
 The card follows what happens without a reload (a video added, a note, an agent connecting), and so do the empty states
 that point at the next step: the bell's popover and the Inbox ("Connect an agent: its questions and the fixes it makes
 land here for you"), and Insights' Agents card.
+
+## Empty pages
+
+An empty library, project or folder leads with the agent. With the person's agent connected it offers **Ask Claude
+Code to make one** (the agent named as it connected), which copies one prompt to paste into it: *Make a short video:
+<what it's for, who it's for, how long>. Then use Lampo for it: put it up as V1 in a project and work my notes there
+until I approve.* (on an empty project's page, that project instead of "a project"). With none connected yet, **Make
+one with an agent** opens Settings → Connect an agent. Adding a video yourself is the second choice (*Upload video*,
+or *Add video* on the machine), with its key and the drop hint. Reviewers, who can't add videos, read that videos
+show up as soon as someone on the team uploads them.
+
+![The empty library of a hosted server with Claude Code connected: Ask Claude Code to make one first, uploading a video yourself second](assets/library-empty.webp)
 
 ## The sample
 

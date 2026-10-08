@@ -33,7 +33,7 @@ do and what came of it (who opened it, how far they watched). The line opens the
 and its ⋯ menu changes or revokes it. *All links* leads to Settings → Review links, every link of the workspace in
 the same lines.
 
-![The share dialog for one video: “Who is it for?” with Create link, Review · Watch only · Delivery with the settings under them, “Visitors see it’s from Alex.”, and the links below](assets/share-dialog.webp)
+![The share dialog for one video: “Who is it for?” with Create link, “Visitors see it’s from Alex.”, Review · Watch only · Delivery · Embed with the settings under them, and the link made before below it](assets/share-dialog.webp)
 
 A link to a project or folder opens a **review room**: every video filed in it and in its folders. It is looked up on
 every visit, so videos you add later show up by themselves. Renaming or moving the folder takes its links along.
@@ -209,7 +209,7 @@ instance over the network too). Under them, the operator's *Imprint* and *Privac
 owners and admins may hide it in *Settings → Review links* (*Hide the Lampo badge*): the source offer and the legal
 pages stay. A plan that lapses shows the badge again by itself.
 
-![A folder link’s review room: “Alex shared 3 videos with you”, 1 of 3 reviewed, Download all with its size, and the videos with where they stand](assets/review-room.webp)
+![A folder link’s review room: “Alex shared 3 videos with you”, 0 of 3 reviewed, Download all with its size, and the videos with where they stand](assets/review-room.webp)
 
 ## Embedding a video
 

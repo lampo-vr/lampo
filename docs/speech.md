@@ -43,7 +43,7 @@ device, and for an admin where to change them. A workspace on a hosted server ca
 5. *Send all* sends them, with your other notes not sent yet, as one batch. They become ordinary notes, each with its
    own clip of your voice.
 
-![The player right after a recording: three drafts under “Not sent yet” with their timecodes, words and severity, Send all, and the draft looked at shown on its frame with its ring](assets/recorded-feedback.webp)
+![The player right after a recording: three drafts under “Not sent yet” with their timecodes, words and severity, Send 3 to launch-edit, and the draft looked at shown on its frame with its ring](assets/recorded-feedback.webp)
 
 Only you see the drafts until you send them. They are kept on the server until you send or discard them, so a reload
 loses nothing. A recording is at most ten minutes. It needs the microphone (an https page, or the app on this computer)

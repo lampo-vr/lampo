@@ -16,7 +16,7 @@ Windsurf, Gemini CLI, Zed, Claude, ChatGPT and any other MCP client.
 4. See it work: the page (and the sidebar's Agents) shows it as soon as it calls, "connected", then waiting for your
    notes.
 
-![Settings → Connect an agent with Claude Code picked: the command that adds Lampo, and “Connected: claude-code”, seen just now](assets/settings-connect-agent.webp)
+![Settings → Connect an agent with Claude Code picked, in four steps: pick your agent; the command that adds Lampo to it; Now tell it, with the project picked and “Use Lampo for "Northwind"” to copy; See it work, “Connected: Claude Code”, seen just now](assets/settings-connect-agent.webp)
 
 **In a terminal**, `lampo mcp config <client>` prints the same config. The clients are `claude`, `codex`, `cursor`,
 `vscode`, `antigravity`, `windsurf`, `gemini`, `zed` and `json` (the common shape for any other client).
@@ -365,8 +365,8 @@ An agent hears about new feedback without asking:
 |---|---|
 | **`wait_for_feedback`** | any MCP client: one call waits until a person says something new |
 | **Change notifications** | clients that listen (`subscriptions/listen`; over stdio also `resources/subscribe`): `lampo://inbox` and `lampo://review/<slug>` changed |
-| **`lampo watch`** | scripts and agents without MCP: one line per new note, reply or request ([agents.md](agents.md#what-vr-watch-prints)) |
-| **INBOX.md** | agents that read files on your own machine (a hosted server doesn't write it): rewritten on every event from a person ([agents.md](agents.md#what-vr-watch-prints)) |
+| **`lampo watch`** | scripts and agents without MCP: one line per new note, reply or request ([agents.md](agents.md#what-lampo-watch-prints)) |
+| **INBOX.md** | agents that read files on your own machine (a hosted server doesn't write it): rewritten on every event from a person ([agents.md](agents.md#what-lampo-watch-prints)) |
 
 **`wait_for_feedback`** waits until a person leaves new feedback (a note, a reply, an edit, a check or reopen, an
 assignment, a decision, a request, or a reference on a note) or the time is up: 50 s by default, 300 s at most
