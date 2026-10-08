@@ -905,6 +905,11 @@ try {
       polling: 100,
       timeout: 10000,
     });
+    // the switch turns at once (optimistic, rolled back on a failure); the link answers once the server has it: the toast
+    await page.waitForFunction(() => [...document.querySelectorAll('[data-testid=toast]')].some((t) => t.textContent.includes('The Lampo badge shows again')), {
+      polling: 100,
+      timeout: 10000,
+    });
     assert((await badgeOnLink()) === true, 'shown again');
   });
 

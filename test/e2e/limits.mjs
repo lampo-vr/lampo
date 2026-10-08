@@ -254,7 +254,9 @@ try {
     assert(!(await page.$('[data-testid=invite-beyond]')), 'nothing before an address is typed');
     await page.type('form.set-form input[type=email]', 'ben.kruse@example.com');
     await page.waitForSelector('[data-testid=invite-beyond]', { timeout: 10000 });
-    await waitText('[data-testid=invite-beyond]', /Visa •••• 4242/);
+    // the card and the prorated amount are two answers (the account, the provider's preview), in either order: wait for
+    // the sentence that has both, not for the card alone
+    await waitText('[data-testid=invite-beyond]', /€[\d.,]+ plus VAT, is on the invoice of .+, paid with Visa •••• 4242/);
     const line = await text('[data-testid=invite-beyond]');
     assert(/^Solo is for one person\./.test(line), line);
     assert(/Team brings Ben in: €48 a month for the 2 of you\./.test(line), line);

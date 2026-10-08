@@ -417,8 +417,31 @@ try {
     'a clip opens large in the dialog: most of its width at 16:9, ←/→ at the same moment, A back, picked, Esc and All options to the grid',
     async () => {
       const p = run;
-      const modal = () => p.$eval('.modal', (el) => [...Object.values(el.getBoundingClientRect().toJSON())].map(Math.round).join(','));
+      // The dialog's box once it holds still: no animation of its own left (it comes in scaled and lifted, and on a
+      // loaded machine that frame can be the one measured) and the same box two frames in a row.
+      const modal = () =>
+        p.$eval(
+          '.modal',
+          (el) =>
+            new Promise((resolve) => {
+              const t0 = performance.now();
+              let last = '';
+              const tick = () => {
+                const box = Object.values(el.getBoundingClientRect().toJSON()).map(Math.round).join(',');
+                if ((box === last && !el.getAnimations().length) || performance.now() - t0 > 8000) resolve(box);
+                else {
+                  last = box;
+                  requestAnimationFrame(tick);
+                }
+              };
+              requestAnimationFrame(tick);
+            }),
+        );
       const grid = await modal();
+      const sameBox = async (what) => {
+        const now = await modal();
+        assert(now === grid, `${what}: ${now}, was ${grid}`);
+      };
       const width = await p.$eval('.modal', (el) => el.getBoundingClientRect().width);
       assert(width >= 1300, `the dialog takes the room at 1440: ${width}px`);
       // the tiles use it too: three across the row
@@ -439,7 +462,7 @@ try {
       });
       assert(big.share > 0.7 && Math.abs(big.ratio - 16 / 9) < 0.02 && big.controls, `large: ${JSON.stringify(big)}`);
       assert(big.list === 'hidden', 'the grid waits under it');
-      assert((await modal()) === grid, 'grid and large view in one box: the dialog did not move');
+      await sameBox('grid and large view in one box: the dialog did not move');
       // it plays; → goes to the next one at the same moment
       await p.waitForFunction(() => document.querySelector('[data-testid=audition-large-video]').currentTime > 0.8, { timeout: 15000 });
       const at = await p.$eval('[data-testid=audition-large-video]', (v) => v.currentTime);
@@ -458,12 +481,12 @@ try {
       // its pick under it
       await p.click('[data-testid=audition-large-pick]');
       assert((await p.$eval('[data-testid=audition-large-pick]', (b) => b.getAttribute('aria-checked'))) === 'true', 'picked in the large view');
-      assert((await modal()) === grid, 'moving between them kept the box');
+      await sameBox('moving between them kept the box');
       await p.keyboard.press('Escape');
       await p.waitForFunction(() => !document.querySelector('[data-testid=audition-large]'));
       assert(await p.$('[data-testid=audition]'), 'Esc went back to the grid, the dialog stays');
       assert((await checked(p)).join() === 'a', `the pick shows in the grid: ${await checked(p)}`);
-      assert((await modal()) === grid, 'back in the same box');
+      await sameBox('back in the same box');
       // Expand on a tile, and All options back
       await p.click('[data-testid=audition-item]:nth-child(3) [data-testid=audition-expand]');
       await p.waitForSelector('[data-testid=audition-large][data-item=c]');

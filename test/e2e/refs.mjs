@@ -83,10 +83,45 @@ try {
       },
       { polling: 100, timeout: 20000 },
     );
-  // The composer's paperclip is one menu: image or clip, link, frame from a video.
+  // The composer's paperclip is one menu: image or clip, link, frame from a video. A press lands where the paperclip is
+  // when it is sent: it waits until the paperclip holds still (the composer coming in, the link field going, a card's
+  // pictures arriving above it) and is what a press at its middle reaches; if its menu still doesn't open, the failure
+  // says where the press went.
   const attach = async (item, scope = '.composer') => {
-    await page.click(`${scope} [data-testid=ref-attach]`);
-    await page.waitForSelector('.menu[data-state=open]');
+    const clip = `${scope} [data-testid=ref-attach]`;
+    const ready = await page.evaluate(
+      (sel) =>
+        new Promise((resolve) => {
+          const t0 = performance.now();
+          document.querySelector(sel)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+          let last = '';
+          const tick = () => {
+            const el = document.querySelector(sel);
+            const r = el?.getBoundingClientRect();
+            const box = r ? [r.x, r.y, r.width, r.height].map(Math.round).join() : '';
+            const hit = r && document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+            if (box && box === last && !el.disabled && el.contains(hit)) resolve('');
+            else if (performance.now() - t0 > 10000) resolve(`box ${box}, disabled ${el?.disabled}, at its middle ${hit?.outerHTML.slice(0, 120)}`);
+            else {
+              last = box;
+              requestAnimationFrame(tick);
+            }
+          };
+          requestAnimationFrame(tick);
+        }),
+      clip,
+    );
+    assert(!ready, `the paperclip never held still under a press: ${ready}`);
+    await page.click(clip);
+    await page.waitForSelector('.menu[data-state=open]', { timeout: 10000 }).catch(async (e) => {
+      const at = await page.$eval(clip, (el) => {
+        const r = el.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+        const menus = [...document.querySelectorAll('.menu')].map((m) => m.dataset.state).join() || 'none';
+        return `paperclip ${el.getAttribute('aria-expanded')}, menus ${menus}, at its middle ${hit?.outerHTML.slice(0, 120)}, focus ${document.activeElement?.outerHTML.slice(0, 80)}`;
+      });
+      throw new Error(`${e.message} (${at})`);
+    });
     for (const h of await page.$$('.menu[data-state=open] [role^=menuitem]'))
       if ((await h.evaluate((e) => e.textContent.trim())).startsWith(item)) return h.click();
     throw new Error(`no "${item}" in the paperclip's menu`);
