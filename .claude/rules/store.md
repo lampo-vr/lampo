@@ -24,4 +24,7 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
   only when no other video has its render (`renderKept`): the same bytes uploaded twice share a renderKey.
 - What a deletion owes the storage goes through `removeOwed` (written down first, crossed out as each key goes,
   finished by `finishRemovals`), never a bare `storage().remove` whose failure is only logged and then forgotten.
+- What is written down to remove later is exact keys, never a prefix: a same-name upload's bytes land under the prefix
+  before its review exists. A video id's keys go under its upload hold (`reserveUpload`), and anything that puts bytes
+  under an id crosses its owed keys out first (`forgetOwed`); `versions/` is never swept by prefix.
 - The onboarding sample logs no events; Insights, taste, suggestions and `usageOf` skip it.

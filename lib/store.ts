@@ -922,6 +922,9 @@ async function ingestReserved(
   // registers meanwhile (syncVersions, under the same lock) is never written over. A remote store's upload takes too
   // long to hold the lock for; nothing else writes its version keys.
   const here = store.kind === 'local';
+  // a deleted video of this id may still owe keys under it (pendingRemovalsFile): crossed out before the first byte, under
+  // this upload's hold, so no retry removes what this upload puts there (its bytes land before its review exists)
+  forgetOwed(slug);
   if (!here) await store.put(bytes, file, { keep: o.keep, contentType: CONTENT_TYPE[ext.toLowerCase()] || 'video/mp4' });
   return withLock(reviewDir(slug), () => {
     let review = loadReview(slug);
@@ -1564,78 +1567,204 @@ function changePending(file: string, fn: (keys: PendingRemoval[]) => PendingRemo
   });
 }
 
-/**
- * Removes `keys` through `st` one after another and crosses out of `file` those that went; what failed stays written
- * down for the next pass. Returns the keys removed.
- */
-async function removeKeys(st: ReturnType<typeof storage>, file: string, keys: readonly string[], what: (key: string) => string): Promise<string[]> {
-  const gone: string[] = [];
-  for (const key of keys)
-    try {
-      await st.remove(key);
-      gone.push(key);
-    } catch (e) {
-      console.error(`could not delete ${what(key)} (it stays written down for the next pass):`, (e as Error).message);
-    }
-  if (gone.length)
-    try {
-      const went = new Set(gone);
-      changePending(file, (all) => all.filter((p) => !went.has(p.key)));
-    } catch (e) {
-      // still written down: the next pass removes them again (removing what is gone is no error)
-      console.error(`removals: ${gone.length} removed but not crossed out (${(e as Error).message})`);
-    }
-  return gone;
-}
+// What a deletion writes down are exact keys: a video's own (its versions' bytes, its notes' and drafts' references and
+// fix previews, by name) and its renders' playback copies. Never a whole prefix: a new video under the same name puts
+// its bytes under the same prefix before its review exists, and `versions/` can't be made again.
+const SLUG_KEY = /^(?:versions|previews|refs)\/([^/]+)\/[^/]+$/;
+const COPY_KEY = /^(?:scrub|proxies|phone)\/([^/]+)\.mp4$/;
+/** The video id an exact key of a video's own is under (its versions, references, fix previews), else null. */
+const slugOfKey = (key: string): string | null => SLUG_KEY.exec(key)?.[1] ?? null;
+/** The video id is someone's again: a review under it, or an import filling it. */
+const slugInUse = (slug: string): boolean => fs.existsSync(reviewFile(slug)) || !!importingFrom(slug);
 
 /**
- * Removes storage keys a deletion owes, in the workspace running now: written down first (pendingRemovalsFile), then
- * removed one after another, each crossed out once it went. Counted until it ends (removalsSettled); resolves with the
- * keys removed, never rejects. `what` names a key in the log.
+ * Whether a written-down key may still go, asked right before it is removed: a video's own key while nobody has its
+ * video id again, a copy while no video has its render. Anything else — a whole prefix an earlier version wrote down —
+ * never goes in a pass.
  */
-export function removeOwed(keys: readonly string[], what: (key: string) => string = (key) => key): Promise<string[]> {
-  if (!keys.length) return Promise.resolve([]);
-  const st = storage();
-  const file = pendingRemovalsFile();
-  try {
-    const at = isoLocal();
-    changePending(file, (all) => [...all.filter((p) => !keys.includes(p.key)), ...keys.map((key) => ({ key, at }))]);
-  } catch (e) {
-    // a record that can't be written doesn't keep the deletion from removing what it can now
-    console.error(`removals: not written down (${(e as Error).message})`);
-  }
-  const p = removeKeys(st, file, keys, what).finally(() => removing.delete(p));
-  removing.add(p);
-  return p;
-}
-
-/**
- * What a deleted video (its folders on this disk already gone) still has through the storage adapter: where that is
- * away from this disk, its own prefixes (renders, fix previews, references — a draft's too); and wherever it is, the
- * playback copies of its versions (playbackKeys) that no other video of the workspace still has — the same bytes put
- * up twice share them. Written down first (pendingRemovalsFile), then started at once and ended in the background
- * (removalsSettled). A copy still being made goes once it is stored (server/playback.ts).
- */
-function dropStored(slug: string, versions: readonly Version[]): void {
-  const own = storage().kind === 'local' ? [] : ['versions', 'previews', 'refs'].map((prefix) => `${prefix}/${slug}/`);
-  const copies = [...new Set(versions.map(renderKey))].filter((k) => !renderKept(k)).flatMap(playbackKeys);
-  void removeOwed([...own, ...copies], (key) => `${key.startsWith('versions/') ? 'the renders' : key.split('/')[0]} of ${slug}`);
-}
-
-/** Whether a pending key may still go: never one a video has again (its slug's folders back, its render again). */
 function stillOwed(key: string): boolean {
-  const own = /^(?:versions|previews|refs)\/([^/]+)\/$/.exec(key);
-  if (own) return !fs.existsSync(reviewDir(own[1] as string));
-  const copy = /^(?:scrub|proxies|phone)\/([^/]+)\.mp4$/.exec(key);
+  const slug = slugOfKey(key);
+  if (slug) return !slugInUse(slug);
+  const copy = COPY_KEY.exec(key);
   if (copy) return !renderKept(copy[1] as string);
   return false;
 }
 
 /**
+ * An upload (or an import) is about to put bytes under video id `slug`: what a deleted video of that id still owes
+ * under it is crossed out first, under the record's lock — after the upload took its hold, which keeps every remover
+ * off the id meanwhile (removeKeys). A record that can't be read changes nothing (no pass runs on it either).
+ */
+export function forgetOwed(slug: string): void {
+  const file = pendingRemovalsFile();
+  if (!fs.existsSync(file)) return;
+  const under = (key: string) => /^(?:versions|previews|refs)\//.test(key) && key.split('/')[1] === slug;
+  try {
+    changePending(file, (all) => all.filter((p) => !under(p.key)));
+  } catch (e) {
+    console.error(`removals: what ${slug} owed not crossed out (${(e as Error).message})`);
+  }
+}
+
+/**
+ * Removes `keys` through `st`, each crossed out of `file` once it went (a stop mid-way redoes none). A video's own keys
+ * go while its upload hold is the remover's: an upload of that name meanwhile is refused (409, asked again) instead of
+ * putting bytes where they would be removed; a video id an upload holds is left for the next pass. Right before each
+ * removal the key is asked again: still written down (`listed`: the record took it), still owed (stillOwed). `sweep`:
+ * whole prefixes a deletion clears at once under the same hold (what nothing names: a reference whose own removal
+ * failed earlier) — never written down, so a pass never removes a prefix. Never rejects.
+ */
+async function removeKeys(
+  st: ReturnType<typeof storage>,
+  file: string,
+  keys: readonly string[],
+  what: (key: string) => string,
+  o: { listed?: boolean; sweep?: { slug: string; prefixes: string[] } } = {},
+): Promise<{ removed: string[]; failed: number; held: number }> {
+  const out = { removed: [] as string[], failed: 0, held: 0 };
+  const written = (key: string): boolean => {
+    if (o.listed === false) return true;
+    try {
+      return readPending(file).some((p) => p.key === key);
+    } catch {
+      // a record that can't be read says nothing against removing what this deletion owes
+      return true;
+    }
+  };
+  const crossOut = (key: string) => {
+    try {
+      changePending(file, (all) => all.filter((p) => p.key !== key));
+    } catch (e) {
+      // still written down: the next pass asks again (removing what is gone is no error)
+      console.error(`removals: ${what(key)} not crossed out (${(e as Error).message})`);
+    }
+  };
+  const groups = new Map<string, string[]>();
+  for (const key of keys) {
+    const slug = slugOfKey(key) ?? '';
+    groups.set(slug, [...(groups.get(slug) ?? []), key]);
+  }
+  if (o.sweep && !groups.has(o.sweep.slug)) groups.set(o.sweep.slug, []);
+  for (const [slug, group] of groups) {
+    let release = () => {};
+    if (slug)
+      try {
+        release = reserveUpload(slug);
+      } catch {
+        out.held += group.length;
+        continue;
+      }
+    try {
+      for (const key of group) {
+        if (!written(key)) continue;
+        if (!stillOwed(key)) {
+          crossOut(key);
+          continue;
+        }
+        try {
+          await st.remove(key);
+          out.removed.push(key);
+          crossOut(key);
+        } catch (e) {
+          out.failed++;
+          console.error(`could not delete ${what(key)} (it stays written down for the next pass):`, (e as Error).message);
+        }
+      }
+      if (slug && o.sweep?.slug === slug && !slugInUse(slug))
+        for (const prefix of o.sweep.prefixes) await st.remove(prefix).catch((e: Error) => console.error(`could not delete ${what(prefix)}:`, e.message));
+    } finally {
+      release();
+    }
+  }
+  return out;
+}
+
+/**
+ * Removes exact storage keys a deletion owes, in the workspace running now: written down first (pendingRemovalsFile),
+ * then removed one after another (removeKeys), each crossed out once it went. Counted until it ends (removalsSettled);
+ * resolves with the keys removed, never rejects. `what` names a key in the log.
+ */
+export function removeOwed(
+  keys: readonly string[],
+  what: (key: string) => string = (key) => key,
+  sweep?: { slug: string; prefixes: string[] },
+): Promise<string[]> {
+  if (!keys.length && !sweep) return Promise.resolve([]);
+  const st = storage();
+  const file = pendingRemovalsFile();
+  let listed = true;
+  try {
+    const at = isoLocal();
+    if (keys.length) changePending(file, (all) => [...all.filter((p) => !keys.includes(p.key)), ...keys.map((key) => ({ key, at }))]);
+  } catch (e) {
+    // a record that can't be written doesn't keep the deletion from removing what it can now
+    listed = false;
+    console.error(`removals: not written down (${(e as Error).message})`);
+  }
+  const p = removeKeys(st, file, keys, what, { listed, ...(sweep ? { sweep } : {}) })
+    .then((r) => r.removed)
+    .finally(() => removing.delete(p));
+  removing.add(p);
+  return p;
+}
+
+/** Drafts' references of a video (read before its folder goes): data/<slug>/drafts/<account>.json. */
+function draftNotes(slug: string): Comment[] {
+  const dir = path.join(reviewDir(slug), 'drafts');
+  let names: string[] = [];
+  try {
+    names = fs.readdirSync(dir).filter((n) => n.endsWith('.json'));
+  } catch {
+    return [];
+  }
+  return names.flatMap((n) => {
+    try {
+      const drafts = (JSON.parse(fs.readFileSync(path.join(dir, n), 'utf8')) as { drafts?: unknown }).drafts;
+      return Array.isArray(drafts) ? (drafts as Comment[]) : [];
+    } catch {
+      return [];
+    }
+  });
+}
+
+/**
+ * A video's own keys through the storage adapter, by exact name (read before its folder goes): its versions' bytes,
+ * its notes' and drafts' references and fix previews. None on this disk: its folders hold them.
+ */
+function ownKeys(slug: string, review: Review): string[] {
+  if (storage().kind === 'local') return [];
+  const ext = path.extname(review.video);
+  const keys = review.versions.map((v) => versionKey(slug, v.v, ext));
+  for (const c of [...review.comments, ...draftNotes(slug)]) {
+    for (const p of c.previews ?? []) keys.push(previewKey(slug, p.file));
+    for (const r of [...(c.refs ?? []), ...optionRefs(c.options)]) for (const f of refFiles(r)) keys.push(refKey(slug, f));
+  }
+  return [...new Set(keys)];
+}
+
+/**
+ * What a deleted video (its folders on this disk already gone) still has through the storage adapter: its own keys
+ * (`own`, ownKeys) and wherever it is, the playback copies of its versions (playbackKeys) that no other video of the
+ * workspace still has — the same bytes put up twice share them. Written down first (pendingRemovalsFile), then started
+ * at once and ended in the background (removalsSettled); what nothing names under its references and fix previews goes
+ * then too, never later. A copy still being made goes once it is stored (server/playback.ts).
+ */
+function dropStored(slug: string, own: readonly string[], versions: readonly Version[]): void {
+  const copies = [...new Set(versions.map(renderKey))].filter((k) => !renderKept(k)).flatMap(playbackKeys);
+  const remote = storage().kind !== 'local';
+  void removeOwed(
+    [...own, ...copies],
+    (key) => `${key.startsWith('versions/') ? 'the renders' : key.split('/')[0]} of ${slug}`,
+    remote ? { slug, prefixes: [`previews/${slug}/`, `refs/${slug}/`] } : undefined,
+  );
+}
+
+/**
  * Finishes the removals a deleted video owes in the workspace running now (pendingRemovalsFile): at most `max` keys a
- * pass, oldest first. A key a video has again — a new video under the deleted one's name, the same render put up again
- * — is crossed out without removing anything. A record that can't be read is left alone (logged). Returns the keys
- * removed, those that failed, and how many still wait.
+ * pass, oldest first, by exact name only. A key a video has again — a new video under the deleted one's name, the same
+ * render put up again — is crossed out without removing anything; so is a whole prefix an earlier version wrote down.
+ * A record that can't be read is left alone (logged). Returns the keys removed, those that failed, and how many still
+ * wait (a video id an upload holds right now among them).
  */
 export async function finishRemovals({ max = 200 }: { max?: number } = {}): Promise<{ removed: string[]; failed: number; left: number }> {
   const file = pendingRemovalsFile();
@@ -1647,17 +1776,22 @@ export async function finishRemovals({ max = 200 }: { max?: number } = {}): Prom
     return { removed: [], failed: 0, left: 0 };
   }
   if (!pending.length) return { removed: [], failed: 0, left: 0 };
+  const prefixes = pending.filter((p) => p.key.endsWith('/')).length;
+  if (prefixes) console.error(`removals: ${prefixes} whole prefixes written down by an earlier version crossed out, not removed`);
   const settled = new Set(pending.filter((p) => !stillOwed(p.key)).map((p) => p.key));
   if (settled.size) changePending(file, (all) => all.filter((p) => !settled.has(p.key)));
   const owed = pending.filter((p) => !settled.has(p.key)).map((p) => p.key);
   const tried = owed.slice(0, Math.max(0, max));
   const p = removeKeys(storage(), file, tried, (key) => key).finally(() => removing.delete(p));
   removing.add(p);
-  const removed = await p;
-  const out = { removed, failed: tried.length - removed.length, left: owed.length - removed.length };
+  const { removed, failed } = await p;
+  let left = owed.length - removed.length;
+  try {
+    left = readPending(file).length;
+  } catch {}
   if (removed.length) console.log(`removals (${currentWorkspace()}): ${removed.length} left behind by deleted videos removed now`);
-  if (out.left) console.log(`removals (${currentWorkspace()}): ${out.left} still wait for the storage`);
-  return out;
+  if (left) console.log(`removals (${currentWorkspace()}): ${left} still wait for the storage`);
+  return { removed, failed, left };
 }
 
 export function removeVideo(slug: string, by = USER): Review | null {
@@ -1668,9 +1802,10 @@ export function removeVideo(slug: string, by = USER): Review | null {
       review.archived = isoLocal();
       saveReview(review);
     } else {
+      const own = ownKeys(slug, review);
       fs.rmSync(reviewDir(slug), { recursive: true, force: true });
       fs.rmSync(path.join(versionsDir(), slug), { recursive: true, force: true });
-      dropStored(slug, review.versions);
+      dropStored(slug, own, review.versions);
     }
     logEvent({ type: 'removed', by, review, text: review.comments.length ? 'archived (has comments)' : 'removed' });
     return review;
@@ -1690,9 +1825,10 @@ export function removeSample(slug: string): Review | null {
     // versions/ can't be made again: renders someone put on the sample keep it where it is
     if (versionsOnSample(review).length)
       throw Object.assign(new Error('versions were uploaded onto the sample, so it stays: they would be lost with it'), { status: 409 });
+    const own = ownKeys(slug, review);
     fs.rmSync(reviewDir(slug), { recursive: true, force: true });
     fs.rmSync(path.join(versionsDir(), slug), { recursive: true, force: true });
-    dropStored(slug, review.versions);
+    dropStored(slug, own, review.versions);
     return review;
   });
 }
@@ -1741,6 +1877,8 @@ export function claimForImport(slug: string, bundle: string): string | null {
     if (mark !== bundle && (fs.existsSync(reviewDir(slug)) || fs.existsSync(path.join(versionsDir(), slug))))
       return mark ? 'another import is filling this video id' : 'this workspace has files under this video id';
     markImporting(slug, bundle);
+    // what a deleted video of this id still owed goes out of the record before the import puts bytes here
+    forgetOwed(slug);
     return null;
   } finally {
     release();

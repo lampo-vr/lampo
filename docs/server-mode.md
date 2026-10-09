@@ -486,8 +486,10 @@ People's own data is theirs to take home and to end (GDPR Art. 15, 17, 20); the 
   written down and billing stops before anything that can fail: when the storage is down, the workspace is gone all the
   same and its files wait; the server erases them once the storage answers again (a minute after a start, then hourly,
   a few at a time, never while it can't read its list of workspaces). A deleted video works the same way: what it
-  still has in the bucket is written down in `pending-removals.json` first and removed afterwards; what a storage
-  outage or a stop cut short goes on the next pass, never anything a video has again.
+  still has in the bucket is written down in `pending-removals.json` by exact name first and removed afterwards; what a
+  storage outage or a stop cut short goes on the next pass, never a whole folder and never anything a video has again.
+  A new video under the same name crosses out what its name still owed before its first byte goes up, and while a
+  video's leftovers are being removed an upload under its name is turned away with a "try again" until they are gone.
 - **The erasure log** (`data/erasures.jsonl`, ids only): every deleted account and workspace. Your nightly backups keep
   what was deleted until their retention drops it (with `restic forget --keep-monthly 12`, up to a year). After you
   restore one, run `lampo admin erasures` (what is back that was deleted) and `lampo admin erasures --apply` (delete it

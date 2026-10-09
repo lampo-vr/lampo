@@ -40,6 +40,11 @@ export interface MockBunny extends MockStore {
   deleteStatus: number | null;
   /** Delay every DELETE's answer by this many ms (a slow bucket: what a stop must wait for). */
   deleteDelayMs: number;
+  /**
+   * While set, a PUT's bytes are stored at once and its answer waits here (each an answer to send): an upload whose
+   * bytes are in the bucket while it is still going on.
+   */
+  heldPuts: (() => void)[] | null;
 }
 
 /** Bunny Storage API: /{zone}/{path}, header AccessKey, optional Checksum (uppercase hex sha256), Range on GET. */
@@ -61,7 +66,9 @@ export async function mockBunny({ zone = 'zone', accessKey = 'secret' } = {}): P
         return;
       }
       objects.set(key, body);
-      res.writeHead(201).end('{"HttpCode":201,"Message":"File uploaded."}');
+      const answer = () => res.writeHead(201).end('{"HttpCode":201,"Message":"File uploaded."}');
+      if (mock.heldPuts) mock.heldPuts.push(answer);
+      else answer();
     } else if (req.method === 'GET') {
       const hit = objects.get(key);
       if (!hit) {
@@ -100,7 +107,7 @@ export async function mockBunny({ zone = 'zone', accessKey = 'secret' } = {}): P
       else answer();
     } else res.writeHead(405).end();
   });
-  const mock: MockBunny = { ...s, objects, getDelayMs: 0, maxParallelGets: 0, deleteStatus: null, deleteDelayMs: 0 };
+  const mock: MockBunny = { ...s, objects, getDelayMs: 0, maxParallelGets: 0, deleteStatus: null, deleteDelayMs: 0, heldPuts: null };
   return mock;
 }
 
