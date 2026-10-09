@@ -69,6 +69,11 @@ A transcript detects its own language (the language lists for voice notes play n
 `lampo transcript` or the MCP tool `get_transcript`, and a note that changes the words as one line
 ([agents.md](agents.md#changing-the-words-the-transcript)).
 
+A version longer than half an hour is heard in half-hour stretches, one after the other, to its end. Each stretch
+hears the last ten seconds of the one before again, so a word said where one stretch ends is heard whole, and what
+both heard is kept once. A transcript made before this of a version that long is heard again the next time it is asked
+for; a shorter one is kept.
+
 ## Engine and models
 
 The engine is [transcribe.cpp](https://github.com/handy-computer/transcribe.cpp) (MIT), installed with `npm install`:

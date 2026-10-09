@@ -204,9 +204,10 @@ with `Retry-After`.
 A job that takes the whole process down with it (the system's out-of-memory killer, a crash in native code) is not
 started again and again: each job of the warm-up leaves a marker in `cache/.jobs/` while it runs, the next start counts
 a marker whose process died, and after two such ends the job is refused (`CrashedJobError`; the comparison it would
-have made says so). A graceful stop (SIGTERM, Ctrl-C) removes the marker: an interrupted job runs again. Clearing the
-cache gives every job its chances back. The diff itself streams both renders, keeping only the old version's frames
-within a few seconds of the one it compares, so its memory doesn't grow with the length of the video.
+have made says so). A graceful stop (SIGTERM, Ctrl-C, or SIGHUP when the terminal running the app is closed) removes
+the marker: an interrupted job runs again. Clearing the cache gives every job its chances back. The diff itself
+streams both renders, keeping only the old version's frames within a few seconds of the one it compares, so its memory
+doesn't grow with the length of the video.
 
 ## Frame accuracy
 

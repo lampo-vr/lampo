@@ -9,7 +9,9 @@ import type { FrameRange, TextEdit, Transcript, TranscriptLine, TranscriptRepair
 // so they are heard again the next time someone asks.
 // 3: a render longer than half an hour is heard to its end (lib/stt hears long audio in windows). A version-2 transcript
 // of a render that long stopped there and is heard again; a shorter one is complete and kept (lib/transcripts.ts).
-export const TRANSCRIPT_VERSION = 3;
+// 4: the windows overlap, so a word spoken where one ends is heard whole (lib/stt/seams.ts). A version-3 transcript of a
+// render longer than one window cut such words in two and is heard again; a shorter one is the same and kept.
+export const TRANSCRIPT_VERSION = 4;
 
 /** What an engine gives back: timed words when it can, else only timed segments (sentences). Seconds. */
 export interface HeardWord {

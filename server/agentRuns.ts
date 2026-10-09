@@ -3,7 +3,8 @@
 // 30 minutes without a sign of it (its output, or a call it makes through Lampo) and after 3 hours in all, the output
 // in cache/agent-runs/<id>.log, an `agent_run` event when it starts and when it ends, and Stop ends the whole process
 // group (SIGINT first: Claude Code ends its turn cleanly; SIGTERM 5 s later, SIGKILL 5 s after that — to what is left
-// of the group, also once the run itself has ended: lib/processGroup.ts). A permission the
+// of the group, also once the run itself has ended: lib/processGroup.ts); a run that ends on its own gets the same
+// steps for whatever it left running. What leaves the group (setsid, a detached spawn) is out of reach. A permission the
 // run is denied (its own output says so) makes it need the person, with the settings rule that would allow it. Each is an agent run (server/runs.ts) with delivery `machine`: its process carries the run's id in LAMPO_RUN,
 // so what it does through `lampo` and the stdio MCP server joins that run. Runs belong to this process: when the app
 // stops, its runs stop with it (nobody would be left to time them out), the app waiting for their groups to end.
@@ -17,7 +18,7 @@ import { words } from '../lib/activityText.ts';
 import { claudeRunArgs, RUN_RATE_MAX, RUN_RATE_WINDOW_MS, RUN_TIMEOUT_MS } from '../lib/agentRun.ts';
 import { setting } from '../lib/env.ts';
 import { CACHE, isoLocal } from '../lib/paths.ts';
-import { endGroupsNow, type GroupStop, stopGroup } from '../lib/processGroup.ts';
+import { endGroupsNow, type GroupStop, groupAlive, stopGroup } from '../lib/processGroup.ts';
 import { RateLimit } from '../lib/rateLimit.ts';
 import { createRunReader } from '../lib/runStream.ts';
 import { type Exit, RUN_ID, RUN_TIMES } from '../lib/runs.ts';
@@ -66,6 +67,8 @@ interface Run {
   /** Why it was ended, when Lampo ended it (stop, timeout, the app stopping), and who stopped it. */
   ending: AgentRunPhase | null;
   stopper: string | null;
+  /** Its group being stopped (a stop, or what it left running when it ended on its own). */
+  stop: GroupStop | null;
   /** Reads the run's log as it grows (stream-json): the step it is on and the tokens so far. */
   live: { reader: ReturnType<typeof createRunReader>; text: StringDecoder; offset: number; timer: NodeJS.Timeout | null; sent: string } | null;
 }
@@ -174,6 +177,14 @@ export function createAgentRuns({
     } catch {}
   }
 
+  /** The ladder for run `r`'s group (its leader's pid): one per run, kept until the group has ended. */
+  const stopTheGroup = (r: Run, pid: number) => {
+    const stop = stopGroup(pid, { graceMs });
+    r.stop = stop;
+    stopping.add(stop);
+    void stop.done.then(() => stopping.delete(stop));
+  };
+
   // Stop asks first: Claude Code ends its turn cleanly on SIGINT. Whatever is still there (it, or something it started
   // that ignores SIGINT) gets SIGTERM, then SIGKILL — always the whole group (it runs detached, as the group's leader),
   // as long as the group has a member: the run ending first doesn't end what it left behind.
@@ -191,9 +202,16 @@ export function createAgentRuns({
       setTimeout(() => send('SIGKILL'), 2 * graceMs).unref();
       return;
     }
-    const stop = stopGroup(pid, { graceMs });
-    stopping.add(stop);
-    void stop.done.then(() => stopping.delete(stop));
+    stopTheGroup(r, pid);
+  };
+
+  // A run that ended on its own may leave something it started still running (a background job, a server it began):
+  // nobody would stop that, not even the app quitting. One look at its group as it ends, and what is still there gets
+  // the same steps as a stop. A group seen empty is never signalled (its id may go to another group).
+  const leftBehind = (r: Run) => {
+    const pid = r.proc?.pid;
+    if (r.stop || !pid || process.platform === 'win32') return;
+    if (groupAlive(pid)) stopTheGroup(r, pid);
   };
 
   // What the run printed since the last look, into its live step and tokens; each new step is activity too.
@@ -245,6 +263,7 @@ export function createAgentRuns({
     r.info.exit = code;
     r.info.ended = isoLocal();
     r.info.state = error ? 'failed' : r.ending || (code === 0 ? 'finished' : signal ? 'stopped' : 'finished');
+    leftBehind(r);
     if (error)
       try {
         fs.appendFileSync(logPath(r.info.id), `\n[lampo] could not start: ${error.message}\n`);
@@ -312,6 +331,7 @@ export function createAgentRuns({
         timer: null,
         ending: null,
         stopper: null,
+        stop: null,
         live: { reader: createRunReader(o.cwd), text: new StringDecoder('utf8'), offset: 0, timer: null, sent: '' },
       };
       runs.set(id, r);

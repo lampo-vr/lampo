@@ -8,7 +8,7 @@ import { poster, projectTracks, waveform } from '../../lib/media.ts';
 import { cacheDir, reviewDir } from '../../lib/paths.ts';
 import { FRAME_CACHE_BYTES, pruneDir } from '../../lib/prune.ts';
 import { renderKey } from '../../lib/renderKey.ts';
-import { type GrabCount, grabCount, grabFrame } from '../../lib/shots.ts';
+import { countedGrab, type GrabCount, grabCount, grabFrame } from '../../lib/shots.ts';
 import { rootStorage } from '../../lib/storage/index.ts';
 import { openMedia } from '../../lib/storage/mediaHost.ts';
 import * as store from '../../lib/store.ts';
@@ -115,12 +115,12 @@ export function mediaRoutes(ctx: ServerContext): Router {
     const thumb = q.size === 'thumb';
     const out = path.join(cacheDir(), 'frames', `${renderKey(ver).slice(0, 16)}_${q.frame}${thumb ? '_t.jpg' : '.png'}`);
     if (!fs.existsSync(out)) {
-      // a frame nobody asked for yet is a grab: counted for the account once it is made (429 past its limit)
-      const count = grabsOf(ctx, req);
-      count?.check();
+      // a frame nobody asked for yet is a grab: one of the account's new frames, counted before it starts (429 past its
+      // limit) and given back when it fails
       fs.mkdirSync(path.dirname(out), { recursive: true });
-      await grabFrame(await versionBytes(review, ver), q.frame, { ...(review.meta || {}), ...ver }, out, thumb ? { side: THUMB_SIDE } : {});
-      count?.landed();
+      await countedGrab(grabsOf(ctx, req), async () =>
+        grabFrame(await versionBytes(review, ver), q.frame, { ...(review.meta || {}), ...ver }, out, thumb ? { side: THUMB_SIDE } : {}),
+      );
       pruneDir(path.dirname(out), FRAME_CACHE_BYTES, (f) => /\.(png|jpg)$/.test(f) && f !== path.basename(out));
     }
     res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');

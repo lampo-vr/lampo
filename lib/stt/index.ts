@@ -15,6 +15,7 @@ import { httpTranscribe } from './http.ts';
 import { type EngineState, LocalEngine, MissingModelError } from './local.ts';
 import { MODELS, type ModelPreset, modelFile } from './models.ts';
 import { type Attempt, isSilent, type SttResult, transcribeWithPolicy, vocabularyPrompt } from './policy.ts';
+import { keptStretches } from './seams.ts';
 
 type SttSettings = Config['stt'];
 
@@ -141,39 +142,60 @@ const RATE = 16000;
  * engine hears it. A longer file is heard window after window, never cut at the first.
  */
 export const PCM_WINDOW_SECONDS = 1800;
-/** The most windows one file is heard in (a day of audio): past that it is refused, never heard in part. */
+/**
+ * How much of the window before it each later window hears again: a word spoken across where a window ends is heard
+ * whole by the next one, and the join keeps it once (lib/stt/seams.ts).
+ */
+export const PCM_OVERLAP_SECONDS = 10;
+/** Where each window starts after the one before. */
+const PCM_STEP_SECONDS = PCM_WINDOW_SECONDS - PCM_OVERLAP_SECONDS;
+/** The most windows one file is heard in (a day of audio, near enough): past that it is refused, never heard in part. */
 export const PCM_WINDOWS_MAX = 48;
+/**
+ * Audio decoded before a window that starts later in the file, and dropped: a decoder seeking into compressed audio
+ * (AAC) needs it to warm up, and right after a bare seek the first 20–40 ms came out damaged.
+ */
+const PRE_ROLL_SECONDS = 1;
 
 /**
  * Mono 16 kHz float PCM, the format every engine takes: `seconds` of the file from `from` on, and never more (what
- * follows is the next window's; run() fails rather than cut an answer short).
+ * follows is the next window's; run() fails rather than cut an answer short). The same samples a decode from the file's
+ * start gives there: a later start is decoded from a second before it.
  */
 export async function decodePcm(file: string, { from = 0, seconds = PCM_WINDOW_SECONDS }: { from?: number; seconds?: number } = {}): Promise<Float32Array> {
-  const seek = from > 0 ? ['-ss', from.toFixed(3)] : [];
+  const pre = Math.min(from, PRE_ROLL_SECONDS);
+  const start = from - pre;
+  const seek = start > 0 ? ['-ss', start.toFixed(3)] : [];
   const { stdout } = await run(
     FFMPEG,
-    ['-v', 'error', ...seek, '-i', file, '-t', String(seconds), '-vn', '-ac', '1', '-ar', String(RATE), '-f', 'f32le', 'pipe:1'],
+    ['-v', 'error', ...seek, '-i', file, '-t', String(seconds + pre), '-vn', '-ac', '1', '-ar', String(RATE), '-f', 'f32le', 'pipe:1'],
     {
       // what -t lets through, and a frame of the resampler's slack
-      maxBuffer: Math.ceil(seconds * RATE) * 4 + 64 * 1024,
+      maxBuffer: Math.ceil((seconds + pre) * RATE) * 4 + 64 * 1024,
     },
   );
-  const samples = Math.min(Math.floor(stdout.length / 4), Math.round(seconds * RATE));
-  return new Float32Array(stdout.buffer.slice(stdout.byteOffset, stdout.byteOffset + samples * 4));
+  const skip = Math.round(pre * RATE);
+  const samples = Math.max(0, Math.min(Math.floor(stdout.length / 4) - skip, Math.round(seconds * RATE)));
+  const at = stdout.byteOffset + skip * 4;
+  return new Float32Array(stdout.buffer.slice(at, at + samples * 4));
 }
 
 /**
- * A file's audio window after window (where each starts, in seconds, and its samples) until it ends: one window in
- * memory at a time. Throws past PCM_WINDOWS_MAX windows.
+ * A file's audio window after window (where each starts, in seconds, and its samples) until it ends, each window
+ * hearing the last PCM_OVERLAP_SECONDS of the one before again: one window in memory at a time. Throws past
+ * PCM_WINDOWS_MAX windows.
  */
 async function* pcmWindows(file: string): AsyncGenerator<{ from: number; pcm: Float32Array }> {
   for (let i = 0; ; i++) {
-    const from = i * PCM_WINDOW_SECONDS;
+    const from = i * PCM_STEP_SECONDS;
     const pcm = await decodePcm(file, { from });
     if (pcm.length || i === 0) yield { from, pcm };
     // a window short of full (a second's slack for the resampler) was the last
     if (pcm.length < (PCM_WINDOW_SECONDS - 1) * RATE) return;
-    if (i + 1 >= PCM_WINDOWS_MAX) throw new Error(`the audio runs longer than ${(PCM_WINDOWS_MAX * PCM_WINDOW_SECONDS) / 3600} hours: too long to hear`);
+    if (i + 1 >= PCM_WINDOWS_MAX) {
+      const hours = Math.floor(((PCM_WINDOWS_MAX - 1) * PCM_STEP_SECONDS + PCM_WINDOW_SECONDS) / 3600);
+      throw new Error(`the audio runs longer than ${hours} hours: too long to hear`);
+    }
   }
 }
 
@@ -266,28 +288,37 @@ function shifted(t: TimedTranscript, from: number): TimedTranscript {
 }
 
 /**
- * The file heard window after window (pcmWindows), each on the file's clock, joined in order: a window that is silence
- * adds nothing, a failing one fails the whole (nothing heard in part is kept as if it were all). One window (every file
- * up to PCM_WINDOW_SECONDS) is heard exactly as it always was.
+ * The file heard window after window (pcmWindows), each on the file's clock, joined in order with what two windows
+ * both heard kept once (lib/stt/seams.ts): a window that is silence adds nothing, a failing one fails the whole
+ * (nothing heard in part is kept as if it were all). One window (every file up to PCM_WINDOW_SECONDS) is heard exactly
+ * as it always was.
  */
 async function heardTimed(file: string, s: SttSettings, log: (m: string) => void, opts: { repair?: boolean }): Promise<TimedTranscript> {
-  const parts: TimedTranscript[] = [];
+  const parts: { from: number; end: number; heard: TimedTranscript }[] = [];
   for await (const { from, pcm } of pcmWindows(file)) {
     if (isSilent(pcm)) continue;
-    parts.push(shifted(await heardWindow(pcm, s, log, opts), from));
+    parts.push({ from, end: from + pcm.length / RATE, heard: shifted(await heardWindow(pcm, s, log, opts), from) });
   }
   const [first] = parts;
   if (!first)
     return { text: '', language: '', words: [], segments: [], engine: s.backend === 'http' ? `http:${s.http?.model || 'whisper-1'}` : `local:${s.model}` };
-  if (parts.length === 1) return first;
-  const repairs = parts.flatMap((p) => p.repairs ?? []);
+  if (parts.length === 1) return first.heard;
+  // each window keeps what starts in its own stretch between the seams
+  const kept = keptStretches(parts);
+  const own = <T extends { t0: number }>(list: T[], i: number): T[] => {
+    const k = kept[i];
+    return k ? list.filter((x) => x.t0 >= k.from && x.t0 < k.until) : list;
+  };
+  const words = parts.flatMap((p, i) => own(p.heard.words, i));
+  const segments = parts.flatMap((p, i) => own(p.heard.segments, i));
+  const repairs = parts.flatMap((p, i) => own(p.heard.repairs ?? [], i));
   return {
-    text: joined(parts),
-    language: parts.find((p) => p.language)?.language ?? '',
-    words: parts.flatMap((p) => p.words),
-    segments: parts.flatMap((p) => p.segments),
-    engine: first.engine,
-    ...(parts.some((p) => p.timing === 'line') ? { timing: 'line' as const } : {}),
+    text: joined(words.length ? words : segments),
+    language: parts.find((p) => p.heard.language)?.heard.language ?? '',
+    words,
+    segments,
+    engine: first.heard.engine,
+    ...(parts.some((p) => p.heard.timing === 'line') ? { timing: 'line' as const } : {}),
     ...(repairs.length ? { repairs } : {}),
   };
 }

@@ -45,6 +45,11 @@ export interface RunOptions {
   onDemand?: boolean;
   /** ffmpeg's threads for its inputs, filters and output (default: the machine's or container's, at most 8). */
   threads?: number;
+  /**
+   * Its output as it comes, piece by piece, for a run whose answer is read while it is written (a decode measured as it
+   * goes): nothing of it is kept, `stdout` is empty, and `maxBuffer` doesn't apply.
+   */
+  onStdout?: (chunk: Buffer) => void;
 }
 
 /**
@@ -288,7 +293,7 @@ export async function run(cmd: string, args: readonly string[], options: RunOpti
 function runNow(
   cmd: string,
   args: readonly string[],
-  { input, maxBuffer = 64 * 1024 * 1024, nice, env, timeout, incoming = false, stderrLimit = STDERR_KEEP, threads }: RunOptions,
+  { input, maxBuffer = 64 * 1024 * 1024, nice, env, timeout, incoming = false, stderrLimit = STDERR_KEEP, threads, onStdout }: RunOptions,
 ): Promise<RunResult> {
   const limit = timeout ?? (cmd === FFPROBE ? PROBE_TIMEOUT_MS : MEDIA_TIMEOUT_MS);
   return new Promise((resolve, reject) => {
@@ -304,6 +309,7 @@ function runNow(
     // past maxBuffer the tool is stopped and the run fails (OutputTooLargeError): what it wrote is never half an answer
     let over = false;
     p.stdout.on('data', (d: Buffer) => {
+      if (onStdout) return onStdout(d);
       if (over) return;
       size += d.length;
       if (size <= maxBuffer) {

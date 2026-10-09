@@ -313,15 +313,19 @@ for (const ws of startIds)
   });
 
 // SIGTERM (docker stop, a deploy): stop taking connections, end the live streams, and give uploads being registered
-// and the running job up to 30 s (compose's stop_grace_period must be longer). Ctrl-C locally stops at once.
+// and the running job up to 30 s (compose's stop_grace_period must be longer). Ctrl-C locally stops at once. SIGHUP
+// (the terminal `npm start` runs in was closed) is SIGTERM's stop: without a handler the app died by the signal, its
+// `exit` handler never ran, and the agents it had started went on without it.
 async function stop(sig: NodeJS.Signals) {
   if (ctx.stopping) return;
   ctx.stopping = true;
+  // the terminal is gone: what is still said on the way out has nowhere to go, and must not end the stop halfway
+  if (sig === 'SIGHUP') for (const out of [process.stdout, process.stderr]) out.on('error', () => {});
   // nothing new is sent; an upload on its way resumes where it stopped on the next start
   void ctx.publisher.stop();
   // a module's timers (reminders) pick up on the next start
   ctx.extension.stop();
-  if (sig === 'SIGTERM') {
+  if (sig === 'SIGTERM' || sig === 'SIGHUP') {
     console.log('stopping: finishing uploads and the running job (up to 30 s)…');
     http.close();
     ctx.hub.closeAll();
@@ -341,6 +345,7 @@ async function stop(sig: NodeJS.Signals) {
 }
 process.on('SIGTERM', stop);
 process.on('SIGINT', stop);
+process.on('SIGHUP', stop);
 process.on('exit', () => {
   ctx.tunnel.stop();
   // an exit that didn't come through stop(): nothing is waited for any more, so at once (after stop(), nothing is left)

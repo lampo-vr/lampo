@@ -806,7 +806,7 @@ kept in `data/<slug>/views.json` for the signed-in account. With an API token th
 | `GET /api/poster/:slug.jpg` | the poster |
 | `GET /api/sprite/:slug.jpg?h=&s=` | the newest version's hover-scrub sprite: 24 frames in a 6 × 4 grid (below) |
 | `GET /api/waveform/:slug/:v` | one peak and RMS value per frame |
-| `GET /api/review/:slug/frame?frame=&v=[&size=thumb]` | one exact frame as PNG; `size=thumb`: a JPEG at most 320 px on its long side (an Auto-check finding's picture); `503` + `Retry-After` while the workspace's places for pictures are taken, `429` + `Retry-After` past 200 frames nobody asked for before in ten minutes per account |
+| `GET /api/review/:slug/frame?frame=&v=[&size=thumb]` | one exact frame as PNG; `size=thumb`: a JPEG at most 320 px on its long side (an Auto-check finding's picture); `503` + `Retry-After` while the workspace's places for pictures are taken, `429` + `Retry-After` past 200 frames nobody asked for before in ten minutes per account (each counted as its grab starts, requests sent together included; a grab that fails doesn't count) |
 | `GET /data/:slug/:file` | a note's screenshots and voice notes |
 | `GET /api/analysis/:slug/:v` | loudness and freezes |
 | `GET /api/diff/:slug/:v` | what changed from the version before |

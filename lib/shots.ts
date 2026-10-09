@@ -270,15 +270,31 @@ export class TooManyGrabsError extends Error {
   }
 }
 
-/** One account's new frames, counted: `check` before a grab (TooManyGrabsError past the limit), `landed` once it is made. */
+/**
+ * One account's new frames, counted: `take` holds one of them before a grab starts (TooManyGrabsError past the limit)
+ * and returns what gives it back.
+ */
 export interface GrabCount {
-  check(): void;
-  landed(): void;
+  take(): () => void;
 }
 export const grabCount = (limit: RateLimit, key: string): GrabCount => ({
-  check() {
-    const wait = limit.retryAfter(key);
-    if (wait) throw new TooManyGrabsError(wait);
+  take() {
+    const giveBack = limit.reserve(key);
+    if (!giveBack) throw new TooManyGrabsError(limit.retryAfter(key));
+    return giveBack;
   },
-  landed: () => limit.hit(key),
 });
+
+/**
+ * A new frame made for `count`'s account: counted before the grab starts, given back when it fails. Counted once it had
+ * landed, a burst of requests in flight together all passed the check made before any of them landed.
+ */
+export async function countedGrab<T>(count: GrabCount | null | undefined, grab: () => Promise<T>): Promise<T> {
+  const giveBack = count?.take();
+  try {
+    return await grab();
+  } catch (e) {
+    giveBack?.();
+    throw e;
+  }
+}

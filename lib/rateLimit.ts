@@ -208,6 +208,27 @@ export class RateLimit {
     return true;
   }
 
+  /**
+   * `take`, with a way back: one more for the key when it's under the limit, and a function that gives that one back
+   * (what it was taken for didn't happen); null over the limit, with nothing counted. Taken before the work starts, so
+   * requests in flight together can't all pass a check that counts only what has landed.
+   */
+  reserve(key: string): (() => void) | null {
+    if (this.recent(key).length >= this.max) return null;
+    const at = this.now();
+    this.count(key, at);
+    let given = false;
+    return () => {
+      if (given) return;
+      given = true;
+      const list = this.hits.get(key);
+      const i = list ? list.lastIndexOf(at) : -1;
+      if (!list || i < 0) return;
+      list.splice(i, 1);
+      if (!list.length) this.hits.delete(key);
+    };
+  }
+
   /** Whether the key is under the limit, without counting anything (count what landed with `hit`). */
   allows(key: string): boolean {
     return this.recent(key).length < this.max;
@@ -215,8 +236,12 @@ export class RateLimit {
 
   /** Counts one for the key, allowed or not (e.g. a failed sign-in). */
   hit(key: string): void {
+    this.count(key, this.now());
+  }
+
+  private count(key: string, at: number): void {
     const list = this.recent(key);
-    list.push(this.now());
+    list.push(at);
     this.hits.delete(key);
     this.hits.set(key, list);
     while (this.hits.size > this.maxKeys) this.hits.delete(this.hits.keys().next().value as string);

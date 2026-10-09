@@ -295,7 +295,7 @@ export interface Backend {
   fetchShots(review: Review, comments: Comment[]): Promise<void>;
   /**
    * An exact frame as a PNG on this machine. `count`: the caller's new frames are counted (lib/shots.ts GrabCount),
-   * asked before a frame is grabbed and told once it was; a frame made before isn't a grab.
+   * one taken before a frame is grabbed and given back when the grab fails; a frame made before isn't a grab.
    */
   frame(review: Review, ver: Version, frame: number, o?: { count?: GrabCount | null }): Promise<string>;
   /** Where review.json can be read: a path, or the API URL of a remote review. */

@@ -25,7 +25,7 @@ import { renderKey } from '../renderKey.ts';
 // a version `lampo` registers here names the agent run it came from (Version.run): lib/runs.ts tells the store which
 import '../runs.ts';
 import { listSessions } from '../sessions.ts';
-import { dropShots, followShots, grabFrame, shotsOrLater } from '../shots.ts';
+import { countedGrab, dropShots, followShots, grabFrame, shotsOrLater } from '../shots.ts';
 import { stageForReview } from '../stageContext.ts';
 import { storage } from '../storage/index.ts';
 import * as store from '../store.ts';
@@ -334,10 +334,9 @@ export function createLocalBackend(): Backend {
     async frame(review, ver, frame, o) {
       const png = path.join(cacheDir(), 'mcp', 'frames', `${renderKey(ver).slice(0, 16)}_${frame}.png`);
       if (!fs.existsSync(png)) {
-        o?.count?.check();
         fs.mkdirSync(path.dirname(png), { recursive: true });
-        await grabFrame(await bytes(review, ver.v), frame, { ...(review.meta || {}), ...ver }, png);
-        o?.count?.landed();
+        // counted before it starts, given back when it fails (lib/shots.ts countedGrab)
+        await countedGrab(o?.count, async () => grabFrame(await bytes(review, ver.v), frame, { ...(review.meta || {}), ...ver }, png));
         pruneDir(path.dirname(png), FRAME_CACHE_BYTES, (f) => f.endsWith('.png') && f !== path.basename(png));
       }
       return png;

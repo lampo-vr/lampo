@@ -34,6 +34,8 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - Starting an agent: an argument list, no permission flag (`FORBIDDEN_FLAGS`), from the machine only.
 - Stopping what Lampo started (a run, a render's tool) goes to its process group as long as the group has a member,
   never only while its leader runs (`stopGroup`, lib/processGroup.ts); an app that exits waits for it (`stopAll`).
+- Every way the app ends runs that stop: SIGTERM, Ctrl-C and SIGHUP (a closed terminal; without a handler the app died
+  by the signal and its `exit` handler never ran), and a run that ended on its own gets it for what it left running.
 - An answer that hands work to the person ends with `lib/handoff.ts`'s line (wait now, cursor from that moment).
 - A stopped render is decided by the stop, never by the tool's exit code (a wrapper script runs on to exit 0 with its
   file cut short), and the same stop aborts the upload that follows (`hooks.abort`, lib/render/job.ts).

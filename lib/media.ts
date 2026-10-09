@@ -156,7 +156,62 @@ export async function sprite(file: string, ver: Version, meta: MediaMeta | undef
   });
 }
 
-// Peak (0–1) per video frame, so the strip lines up with frame numbers exactly.
+/**
+ * Peak and RMS (0–1) per video frame of 16-bit little-endian samples fed as they are decoded, `perFrame` samples to a
+ * frame (frame f: samples ⌊f · perFrame⌋ up to ⌊(f + 1) · perFrame⌋). What follows the last frame is skipped; a frame the
+ * audio stops inside is measured on what it has, and frames after it stay 0.
+ */
+export function frameMeter(frames: number, perFrame: number): { feed: (chunk: Buffer) => void; result: () => { peaks: number[]; rms: number[] } } {
+  const peaks = new Array<number>(frames).fill(0);
+  const rms = new Array<number>(frames).fill(0);
+  let f = 0;
+  let end = Math.floor(perFrame);
+  let i = 0;
+  let pk = 0;
+  let sq = 0;
+  let n = 0;
+  // the first byte of a sample whose second came in the next piece
+  let carry: number | null = null;
+  const close = () => {
+    peaks[f] = Math.round(pk * 1000) / 1000;
+    rms[f] = n ? Math.round(Math.sqrt(sq / n) * 1000) / 1000 : 0;
+    pk = 0;
+    sq = 0;
+    n = 0;
+    f++;
+    end = Math.floor((f + 1) * perFrame);
+  };
+  const sample = (s: number) => {
+    while (f < frames && i >= end) close();
+    i++;
+    if (f >= frames) return;
+    const v = Math.abs(s) / 32768;
+    if (v > pk) pk = v;
+    sq += v * v;
+    n++;
+  };
+  return {
+    feed(chunk) {
+      if (f >= frames || !chunk.length) return;
+      let at = 0;
+      if (carry !== null) {
+        sample((((chunk[0] as number) << 24) >> 16) | carry);
+        carry = null;
+        at = 1;
+      }
+      const last = chunk.length - ((chunk.length - at) % 2);
+      for (; at < last; at += 2) sample(chunk.readInt16LE(at));
+      if (at < chunk.length) carry = chunk[at] as number;
+    },
+    result() {
+      if (f < frames && n) close();
+      return { peaks, rms };
+    },
+  };
+}
+
+// Peak (0–1) per video frame, so the strip lines up with frame numbers exactly. Measured while ffmpeg decodes, never
+// held: a long render's audio went into memory whole (about 350 MB at 4 h), and past 1 GiB there was no waveform at all.
 export async function waveform(src: MediaSource, ver: Pick<Version, 'hash' | 'sample' | 'fps' | 'frames'>): Promise<Waveform> {
   const out = cacheFile('waveforms', renderKey(ver), '.json');
   const hit = readJson<Waveform>(out);
@@ -165,31 +220,13 @@ export async function waveform(src: MediaSource, ver: Pick<Version, 'hash' | 'sa
     slot(async () => {
       const file = await fileOf(src);
       const sr = 12000;
-      let pcm: Buffer;
+      const meter = frameMeter(ver.frames, sr / ver.fps);
       try {
-        pcm = (await runBg(FFMPEG, ['-v', 'error', '-i', file, '-map', '0:a:0', '-ac', '1', '-ar', String(sr), '-f', 's16le', '-'], { maxBuffer: 1 << 30 }))
-          .stdout;
+        await runBg(FFMPEG, ['-v', 'error', '-i', file, '-map', '0:a:0', '-ac', '1', '-ar', String(sr), '-f', 's16le', '-'], { onStdout: meter.feed });
       } catch {
         return writeJson(out, { fps: ver.fps, peaks: [], rms: [], audio: false });
       }
-      const samples = new Int16Array(pcm.buffer, pcm.byteOffset, Math.floor(pcm.length / 2));
-      const perFrame = sr / ver.fps;
-      const peaks = new Array<number>(ver.frames).fill(0);
-      const rms = new Array<number>(ver.frames).fill(0);
-      for (let f = 0; f < ver.frames; f++) {
-        const a = Math.floor(f * perFrame);
-        const b = Math.min(samples.length, Math.floor((f + 1) * perFrame));
-        let pk = 0;
-        let sq = 0;
-        for (let i = a; i < b; i++) {
-          const v = Math.abs(samples[i]) / 32768;
-          if (v > pk) pk = v;
-          sq += v * v;
-        }
-        peaks[f] = Math.round(pk * 1000) / 1000;
-        rms[f] = b > a ? Math.round(Math.sqrt(sq / (b - a)) * 1000) / 1000 : 0;
-      }
-      return writeJson(out, { fps: ver.fps, peaks, rms, audio: true });
+      return writeJson(out, { fps: ver.fps, ...meter.result(), audio: true });
     }),
   );
 }

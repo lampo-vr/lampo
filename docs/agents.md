@@ -775,7 +775,8 @@ V4 rendered in 3m12s and put up for review (900 frames). Now mark each note fixe
   server. It runs in a process group of its own with stdin closed, so Ctrl-C (or a stop) reaches everything it
   started: what is still there after 5 seconds gets SIGTERM, and SIGKILL 5 seconds after that, also once your
   command itself has ended (a background job it started), and `lampo render` returns when all of it has; a second
-  Ctrl-C kills it at once. A stopped render puts nothing up, whatever your command exits with (a script around ffmpeg
+  Ctrl-C kills it at once. What leaves that group (`setsid`, a detached spawn, a daemon) is out of a stop's reach.
+  A stopped render puts nothing up, whatever your command exits with (a script around ffmpeg
   may exit 0 with the file cut short), and a stop while the file goes up ends the upload: `Render failed (exit 130):
   stopped.` One exception: a video linked to its file on this machine is rendered in place, so what your command
   already wrote there stays, and the app, if it runs, may take it in as a version.
@@ -916,10 +917,15 @@ The prompt is one line, for example:
 - **Limits:** one run per session at a time, stopped after 30 minutes without a sign of it (no output, no call to Lampo:
   `LAMPO_AGENT_RUN_TIMEOUT`, in seconds) and after 3 hours in all; five starts per ten minutes. Stop asks first (SIGINT,
   as Ctrl-C does), then SIGTERM after 5 seconds, then SIGKILL, always to the run's whole process group, as long as
-  anything of it is left, also after the run itself has ended. It carries
+  anything of it is left, also after the run itself has ended. A run that ends on its own gets the same steps for
+  whatever it left running in its group (a background job, a dev server it started). It carries
   `LAMPO_RUN=<run id>` in its environment, and `lampo` and the stdio MCP server name that run with what they report. The person sees the run working in the agent menu, with **Stop** (it ends the run and everything it
   started) and **Log** (`cache/agent-runs/<run>.log`: the run's whole transcript, so readable by you only). A run ends
-  when the app quits, in shorter steps, and the app waits until all of its group has ended.
+  when the app quits (Ctrl-C, SIGTERM, or the terminal that runs it closed), in shorter steps, and the app waits until
+  all of its group has ended.
+- **What a stop can't reach:** a process that leaves the run's process group (`setsid`, a detached spawn, a tool that
+  daemonises itself) is out of reach of Stop, the time limits and the app quitting alike. Anything you start that way
+  you end yourself.
 - **The request is still a `REQUEST` line**, as always: do the work the usual way and finish with the next render (or
   your answer). `lampo watch` also prints the run's start and end:
 

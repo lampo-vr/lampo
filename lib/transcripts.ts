@@ -17,11 +17,12 @@ const dir = () => path.join(cacheDir(), 'transcripts');
 export const transcriptFile = (hash: string): string => path.join(dir(), `${hash}.json`);
 
 /**
- * Whether a kept transcript is one to use: made by this version, or by version 2 for a render short enough to have
- * been heard whole then (version 2 heard the first half hour of any render, and kept it as all of it).
+ * Whether a kept transcript is one to use: made by this version, or by version 2 or 3 for a render heard in one window
+ * (version 2 heard the first half hour of any render, and kept it as all of it; version 3 cut a word at each seam).
  */
 const current = (t: Transcript): boolean =>
-  t.transcript_version === TRANSCRIPT_VERSION || (t.transcript_version === 2 && t.fps > 0 && t.frames / t.fps <= PCM_WINDOW_SECONDS - 2);
+  t.transcript_version === TRANSCRIPT_VERSION ||
+  ((t.transcript_version === 2 || t.transcript_version === 3) && t.fps > 0 && t.frames / t.fps <= PCM_WINDOW_SECONDS - 2);
 
 export function cachedTranscript(ver: Pick<Version, 'hash' | 'sample'>): Transcript | null {
   try {

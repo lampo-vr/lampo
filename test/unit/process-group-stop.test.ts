@@ -4,13 +4,15 @@
 // with SIGINT ignored) that beats into a file, and its leader either ends on SIGINT or ignores it. Stop of a run Lampo
 // started (server/agentRuns.ts) and a stop of `lampo render`'s tool (lib/render/run.ts) go on to SIGTERM and SIGKILL
 // as long as anything of the group is left — also after the leader has gone — and the app stopping (stopAll, or an
-// exit that can't wait: endNow) ends every group before it goes. Every process started here is killed in `after`.
+// exit that can't wait: endNow) ends every group before it goes. A run that ends on its own gets the same steps for
+// what it left running, and the real app (server/index.ts) stops like that when its terminal is closed (SIGHUP).
+// Every process started here is killed in `after`.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, test } from 'node:test';
-import { isolatedEnv, until } from '../lib/helpers.ts';
+import { age, freePort, isolatedEnv, makeVideo, ROOT, until } from '../lib/helpers.ts';
 
 const { dir } = isolatedEnv({ vars: { VR_REMOTE: '0' } });
 const { createAgentRuns } = await import('../../server/agentRuns.ts');
@@ -38,19 +40,21 @@ after(() => {
 
 /**
  * A stand-in: a background job beating into `hb` (its pid in `<hb>.pid`, the leader's in `<hb>.leader`). The leader ends
- * on SIGINT (`exit`) or ignores it (`ignore`); the job ignores SIGINT as every background job does, and SIGTERM too
- * with `stubborn`.
+ * on SIGINT (`exit`), ignores it (`ignore`), or ends on its own once the job beats (`done`); the job ignores SIGINT as
+ * every background job does, and SIGTERM too with `stubborn`. Asked for its sessions (`claude agents --json`, as the
+ * app asks at start), it has none.
  */
-function standIn(name: string, leader: 'exit' | 'ignore', { stubborn = false } = {}): { bin: string; hb: string } {
+function standIn(name: string, leader: 'exit' | 'ignore' | 'done', { stubborn = false } = {}): { bin: string; hb: string } {
   const hb = path.join(dir, `${name}.hb`);
   const bin = path.join(dir, `${name}.sh`);
   fs.writeFileSync(
     bin,
     `#!/bin/sh
+[ "$1" = agents ] && { echo '[]'; exit 0; }
 echo $$ > "${hb}.leader"
 ( ${stubborn ? "trap '' TERM; " : ''}while :; do echo x >> "${hb}"; sleep 0.05; done ) &
 echo $! > "${hb}.pid"
-${leader === 'exit' ? "trap 'exit 0' INT" : "trap '' INT"}
+${leader === 'done' ? `while [ ! -s "${hb}" ]; do sleep 0.05; done; exit 0` : leader === 'exit' ? "trap 'exit 0' INT" : "trap '' INT"}
 while :; do sleep 0.05; done
 `,
     { mode: 0o755 },
@@ -96,6 +100,19 @@ test('Stop goes on to SIGKILL for what ignores SIGINT and SIGTERM, after the lea
   runs.stop(r.id, 'tester');
   await until(() => runs.get(r.id)?.state === 'stopped', 'the run to be stopped', 30_000);
   await until(() => !alive(child), 'SIGKILL to reach the job', 30_000);
+});
+
+test('a run that ends on its own leaves nothing running: what it started gets the steps of a stop', async () => {
+  const { bin, hb } = standIn('run-done', 'done', { stubborn: true });
+  const { runs, r } = startRun(bin, 300);
+  const { leader, child } = await running(hb);
+  await until(() => !alive(leader) && runs.get(r.id)?.state !== 'running', 'the run to end on its own', 30_000);
+  assert.equal(runs.get(r.id)?.state, 'finished', 'it ended by itself: finished, not stopped');
+  await until(
+    () => !alive(child),
+    () => `the job it left ${alive(child) ? 'still runs' : 'is gone'}`,
+    30_000,
+  );
 });
 
 /** A process that starts a run with `bin`, waits until it runs, then does `then` (stopping the app) and exits. */
@@ -150,4 +167,71 @@ test('a render stopped: its tool and whatever it started have ended once the ren
     assert.equal(alive(leader), false);
     assert.equal(alive(child), false, `${name}: its job ended before the render did`);
   }
+});
+
+test('closing the terminal the app runs in (SIGHUP) stops it as SIGTERM does: its runs end, and what they started', { timeout: 180_000 }, async () => {
+  const { bin, hb } = standIn('app-hup', 'exit');
+  const home = path.join(dir, 'hup');
+  const port = await freePort();
+  const base = `http://127.0.0.1:${port}`;
+  fs.mkdirSync(home, { recursive: true });
+  const config = path.join(home, 'config.json');
+  fs.writeFileSync(config, JSON.stringify({ browse_root: dir }));
+  const env: NodeJS.ProcessEnv = {
+    PATH: process.env.PATH,
+    HOME: home,
+    VR_DATA: path.join(home, 'data'),
+    VR_CACHE: path.join(home, 'cache'),
+    VR_CONFIG: config,
+    VR_HOST: '127.0.0.1',
+    VR_PORT: String(port),
+    VR_USER: 'tester',
+    VR_STT: 'off',
+    VR_FOOTAGE: 'off',
+    VR_ONBOARDING: 'off',
+    VR_ONBOARDING_SAMPLE: 'off',
+    VR_CLAUDE_BIN: bin,
+    VR_REMOTE: '0',
+    LAMPO_REMOTE: '0',
+    XDG_CONFIG_HOME: path.join(home, 'xdg-config'),
+    XDG_CACHE_HOME: path.join(home, 'xdg-cache'),
+  };
+  const app = spawn(process.execPath, [path.join(ROOT, 'server/index.ts')], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  if (app.pid) started.add(app.pid);
+  let log = '';
+  app.stdout.on('data', (d) => (log += d));
+  app.stderr.on('data', (d) => (log += d));
+  const ended = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((r) => app.on('close', (code, signal) => r({ code, signal })));
+  const api = async (p: string, method = 'GET', body?: unknown) => {
+    const r = await fetch(base + p, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+    const text = await r.text();
+    if (!r.ok) throw new Error(`${method} ${p}: ${r.status} ${text}`);
+    return text ? JSON.parse(text) : null;
+  };
+  await until(
+    async () => (await fetch(`${base}/api/library`).catch(() => null))?.ok,
+    () => `the app to answer: ${log}`,
+    60_000,
+  );
+  const film = makeVideo(path.join(project, 'export/hup.mp4'), { dur: 1 });
+  age(film);
+  const { video } = await api('/api/library', 'POST', { path: film });
+  await api(`/api/review/${encodeURIComponent(video.slug)}/session`, 'PUT', {
+    name: 'hup-edit',
+    sessionId: '0f8fad5b-d9cb-469f-a165-708677289577',
+    cwd: project,
+    agent: 'claude-code',
+  });
+  const { run } = await api(`/api/review/${encodeURIComponent(video.slug)}/wake`, 'POST', { text: 'go on' });
+  assert.ok(run?.id, 'the app started a run');
+  const { leader, child } = await running(hb);
+
+  app.kill('SIGHUP');
+  const { code, signal } = await ended;
+  assert.deepEqual({ code, signal }, { code: 0, signal: null }, `the app stopped by its own stop, not killed by the signal: ${log}`);
+  await until(
+    () => !alive(leader) && !alive(child),
+    () => `the run's ${alive(leader) ? 'agent' : 'job'} still runs after the app went`,
+    10_000,
+  );
 });

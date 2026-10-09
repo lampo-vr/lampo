@@ -6,6 +6,7 @@ import { ROLES } from '../lib/auth.ts';
 import { setting, spelledAs } from '../lib/env.ts';
 import { DEFAULT_WORKSPACE, ROOT } from '../lib/paths.ts';
 import { internal } from '../lib/publicError.ts';
+import { holdingForResponse } from '../lib/storage/held.ts';
 import { rootStorage } from '../lib/storage/index.ts';
 import type { Role } from '../lib/types.ts';
 import { authRoutes } from './auth.ts';
@@ -155,6 +156,9 @@ export function createApp(ctx: ServerContext, { ui }: AppOptions = {}): Express 
     }),
   );
 
+  // A working copy a request is handed (a remote store's version, to grab a frame of) stays until its answer has gone
+  // (lib/storage/held.ts): fetched outside any work, the next download's prune could take it before the grab opened it.
+  app.use(holdingForResponse);
   // Everything after this runs in the request's workspace (server/workspace.ts, lib/scope.ts).
   app.use(workspaceScope({ hosted: ctx.hosted }));
   // What the caller's role may do, checked once for every route (server/permissions.ts); an extension module's routes
