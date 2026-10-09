@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
+import { pathToFileURL } from 'node:url';
 import { age, FFMPEG, isolatedEnv, makeVideo, until, vr, vrAsync } from '../lib/helpers.ts';
 
 const FFPROBE = path.join(path.dirname(FFMPEG), 'ffprobe');
@@ -84,6 +85,62 @@ test('a Ctrl-C while the store takes the render in puts nothing up, and says it 
   assert.equal(versions('pushed.mp4'), before, 'nothing put up');
 });
 
+// The hash, not the probe: `lampo` itself is held in its synchronous read of the rendered file (a preload blocks the first
+// read for 3 s), so the Ctrl-C lands while nothing can handle it. The probe before it closes its output before it exits:
+// its answer then comes with the exit, in a poll phase, and the hash runs there, where one `setImmediate` comes before the
+// next poll and so before the signal is heard (an answer that comes with the closed output runs after the poll already).
+const lateExit = path.join(dir, 'ffprobe-late-exit.sh');
+fs.writeFileSync(lateExit, `#!/bin/sh\n"${FFPROBE}" "$@"\ncode=$?\nexec >&- 2>&-\nsleep 0.3\nexit $code\n`, { mode: 0o755 });
+const hashSlow = path.join(dir, 'hash-slow.mjs');
+fs.writeFileSync(
+  hashSlow,
+  `import fs from 'node:fs';
+const target = process.env.HASH_SLOW_FILE;
+const fds = new Set();
+const open = fs.openSync;
+fs.openSync = function (p, ...rest) { const fd = open.call(this, p, ...rest); if (target && String(p) === target) fds.add(fd); return fd; };
+const read = fs.readSync;
+let done = false;
+fs.readSync = function (fd, ...rest) {
+  if (!done && fds.has(fd) && fs.existsSync(process.env.HASH_SLOW_ARM)) {
+    done = true;
+    fs.writeFileSync(process.env.HASH_SLOW_ARM + '.hit', '');
+    const t = Date.now();
+    while (Date.now() - t < 3000) {}
+  }
+  return read.call(this, fd, ...rest);
+};
+`,
+);
+test('a Ctrl-C while the store hashes the render (synchronous work) puts nothing up, every time', async () => {
+  const ARM = path.join(dir, 'hash-arm');
+  for (let i = 0; i < 3; i++) {
+    const before = versions('pushed.mp4');
+    const out = path.join(work, `hashed-${i}.mp4`);
+    fs.rmSync(`${ARM}.hit`, { force: true });
+    fs.writeFileSync(ARM, '');
+    const p = vrAsync(['render', '--to', 'pushed.mp4', '--out', out, '--', process.execPath, quick, clipOf(`h${i}`), out], {
+      ...agentEnv,
+      VR_FFPROBE: lateExit,
+      NODE_OPTIONS: `--import=${pathToFileURL(hashSlow).href}`,
+      HASH_SLOW_FILE: out,
+      HASH_SLOW_ARM: ARM,
+    });
+    let said = '';
+    p.stdout.on('data', (d) => {
+      said += d;
+    });
+    const done = new Promise<number | null>((r) => p.on('close', (code) => r(code)));
+    await until(() => fs.existsSync(`${ARM}.hit`), 'lampo hashing the render', 60_000);
+    p.kill('SIGINT');
+    const code = await done;
+    fs.rmSync(ARM, { force: true });
+    assert.equal(code, 130, said);
+    assert.match(said, /^Render failed \(exit 130\): stopped\. The person sees it in Lampo\./m, `run ${i + 1}`);
+    assert.equal(versions('pushed.mp4'), before, `run ${i + 1}: nothing put up`);
+  }
+});
+
 test('the same for a detached render stopped with SIGTERM while it is taken in', async () => {
   const before = versions('pushed.mp4');
   const out = path.join(work, 'take-in-detached.mp4');
@@ -130,6 +187,10 @@ test('the file a stopped linked render left in place is no version for later syn
   assert.match(sync.out, /what a stopped lampo render left/);
   assert.equal(versions(clip), before, 'not taken in by lampo sync or ls');
   assert.deepEqual(fs.readFileSync(clip), left, 'the file stays as the render left it');
+  // a touch (an editor, a sync tool) changes the time, not the content: still set aside
+  age(clip, 30);
+  assert.match(vr(['sync', clip], env, { cwd: work }).out, /what a stopped lampo render left/);
+  assert.equal(versions(clip), before, 'a touch takes nothing in');
   // rendered again: the next version comes in as always
   fs.copyFileSync(clipOf('e'), clip);
   age(clip);

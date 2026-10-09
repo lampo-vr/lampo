@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { ActivityRecord, ActivitySink } from '../activity.ts';
 import { type ActivityKey, excerpt, words } from '../activityText.ts';
-import { type Backend, StoppedError } from '../backend/types.ts';
+import { type Backend, StoppedError, signalsHeard } from '../backend/types.ts';
 import { stillOpenLine, WATCH_NOW_LINE } from '../handoff.ts';
 import { isoLocal, slugify } from '../paths.ts';
 import { probe } from '../probe.ts';
@@ -85,12 +85,6 @@ export function failedWords(code: number, quote: string): ActivityWords {
   const shown = quote.length > room ? `${quote.slice(0, room - 1).trimEnd()}…` : quote;
   return { text: quote ? `${filled} “${shown}”` : filled, key, vars: { code }, ...(quote ? { quote } : {}) };
 }
-
-/**
- * One turn of the event loop: a signal that came during synchronous work (a registration's probe and copy) is handled
- * only then, and `stopped()` asked before it would say no.
- */
-const signalsHeard = (): Promise<void> => new Promise((r) => setImmediate(r));
 
 /** What a stopped render exits with when its tool said nothing else (0, or no code): 128 + SIGINT, as a shell does. */
 const STOPPED_CODE = 130;

@@ -53,6 +53,8 @@ format stays backwards compatible throughout.
   you list your server's MCP connector there.
 
 ### Fixed
+- A drop-frame timecode in a note (`00:01:23;15`, as editors write them at 29.97 and 59.94 fps) opens its own frame
+  at those rates; at any other rate it stays plain text (`00:00:01;15` opened frame 1).
 - An agent Lampo started on your machine that finishes on its own no longer leaves something it started running
   behind. Closing the terminal the app runs in now stops the app as Ctrl-C does, with the agents it started. What an
   agent starts outside its own process group can't be stopped by Lampo, and the docs now say so.
@@ -140,7 +142,8 @@ format stays backwards compatible throughout.
 - A stopped `lampo render` never puts its file up, also when the render command exits as if it had succeeded (a script
   around ffmpeg does), and a Ctrl-C while the file is taken in or goes up ends that too; a stop that comes too late
   says the version is up (or going up) instead of claiming success or nothing. What a stopped render left in a linked
-  video's own file stays there, but no later sync takes it in until it is rendered again.
+  video's own file stays there, but no later sync takes it in until it is rendered again (a file only touched since,
+  its content the same, stays out too).
 - `lampo export` no longer stops at a version an agent's run made or a reply written through a review link, and the
   reply's history comes along with it.
 - A voice note longer than ten minutes is refused in plain words instead of being kept with only part of it heard.

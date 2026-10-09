@@ -783,8 +783,8 @@ V4 rendered in 3m12s and put up for review (900 frames). Now mark each note fixe
   `Stopped, but V4 was already put up for review.`, or, while a server registers a big render after its last byte,
   `Stopped, but the server already had the whole file: it puts it up as V4.` A video linked to its file on this
   machine is rendered in place: what your command wrote there before the stop stays as it is, but it is set aside —
-  `lampo sync`, the app and every later lookup leave a file with that size, time and content alone (`lampo sync` says
-  so) until it is rendered again.
+  `lampo sync`, the app and every later lookup leave a file with that size and content alone (`lampo sync` says so;
+  a `touch` changes nothing) until it is rendered again.
 - **What it reads:** Remotion (`npx remotion render`, `remotion render`): bundling, rendering and encoding, from the
   lines it prints when its output isn't a terminal. ffmpeg: `lampo render` adds `-progress pipe:3 -nostats` (progress
   flags only; a command that names its own `-progress` keeps it) and measures against the length your arguments give

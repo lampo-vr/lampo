@@ -77,24 +77,44 @@ export interface TimecodeMention {
 }
 
 // Timecodes as the app writes them — mm:ss:ff, with hours h:mm:ss:ff — and the short forms people and agents type
-// ("0:28:20"). Not part of a longer run of digits and colons or decimals ("12:30:00:00:00", "1.12:03:04").
-const TIMECODE_IN_TEXT = /(?<![\d:.])(?:\d{1,2}:)?\d{1,2}:\d{2}:\d{2}(?![\d:]|\.\d)/g;
+// ("0:28:20"); a `;` before the frames is drop-frame, as editors write 29.97 and 59.94 fps ("00:01:23;15"). Not part of a
+// longer run of digits and colons, or of a decimal or a drop-frame tail ("12:30:00:00:00", "1.12:03:04", "00:00:01;15"
+// is never "00:00:01"); a `;` after it as punctuation ("at 00:00:12; then") ends it like a full stop.
+const TIMECODE_IN_TEXT = /(?<![\d:.]|\d;)(?:\d{1,2}:)?\d{1,2}:\d{2}[:;]\d{2}(?![\d:]|[.;]\d)/g;
+
+/** The drop-frame rates: 29.97 and 59.94 fps, which leave out 2 and 4 frame numbers a minute, except every tenth. */
+const dropOf = (fps: number): { nominal: number; drop: number } | null =>
+  Math.abs(fps - 30000 / 1001) < 0.01 ? { nominal: 30, drop: 2 } : Math.abs(fps - 60000 / 1001) < 0.01 ? { nominal: 60, drop: 4 } : null;
+
+/**
+ * The frame a drop-frame timecode names (SMPTE: the first `drop` frame numbers of every minute but each tenth don't
+ * exist, so the count keeps up with the clock), or null for a number drop-frame leaves out.
+ */
+function dropFrame(h: number, min: number, sec: number, ff: number, { nominal, drop }: { nominal: number; drop: number }): number | null {
+  if (ff < drop && sec === 0 && min % 10 !== 0) return null;
+  const minutes = h * 60 + min;
+  return (minutes * 60 + sec) * nominal + ff - drop * (minutes - Math.floor(minutes / 10));
+}
 
 /**
  * The timecodes written in a text that name a frame of a render with these fps and frames: seconds and minutes under
  * 60, frames under the frame rate, inside the render. What doesn't fit ("10:30:00" in a 20-second video — a time of
- * day more likely) stays plain text.
+ * day more likely) stays plain text, and so does a drop-frame timecode for a render at any other rate than 29.97 or
+ * 59.94 fps: it names no frame there.
  */
 export function timecodesIn(text: string, fps: number, frames = Number.POSITIVE_INFINITY): TimecodeMention[] {
   const out: TimecodeMention[] = [];
   if (!text || !(fps > 0)) return out;
   const perSecond = Math.ceil(fps - 1e-6);
   for (const m of text.matchAll(TIMECODE_IN_TEXT)) {
-    const parts = m[0].split(':').map(Number);
+    const df = m[0].includes(';');
+    const parts = m[0].split(/[:;]/).map(Number);
     const [h, min, sec, ff] = parts.length === 4 ? parts : [0, ...parts];
     if ((parts.length === 4 && min >= 60) || sec >= 60 || ff >= perSecond) continue;
-    const frame = Math.ceil((h * 3600 + min * 60 + sec) * fps - 1e-6) + ff;
-    if (frame >= frames) continue;
+    const drop = df ? dropOf(fps) : null;
+    if (df && !drop) continue;
+    const frame = drop ? dropFrame(h, min, sec, ff, drop) : Math.ceil((h * 3600 + min * 60 + sec) * fps - 1e-6) + ff;
+    if (frame === null || frame >= frames) continue;
     out.push({ start: m.index, end: m.index + m[0].length, text: m[0], frame });
   }
   return out;

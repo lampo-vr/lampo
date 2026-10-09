@@ -33,7 +33,7 @@ data/
                               their screenshots and voice notes (never read by agents)
     views.json                who on the team watched the video (never read by agents)
     runs.jsonl                agents' runs on the video: one line each, its steps kept (below)
-    stopped-render.json       a linked video only: size, time and sample of what a stopped
+    stopped-render.json       a linked video only: the size and sample of what a stopped
                               `lampo render` left in its file, never taken in as a version
   events.jsonl                one line per change, appended
   events.imported.jsonl       another store's history, as `lampo admin import` brought it in

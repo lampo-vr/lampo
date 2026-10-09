@@ -104,3 +104,24 @@ test('timecodes in a note: the forms people and agents write, only frames the re
   assert.equal('see 00:00:12!'.slice(m.start, m.end), '00:00:12');
   assert.equal(posterFrame({ frames: 100, duration: 4, fps: 25 }), 15, 'a preview without a moment opens where the poster is');
 });
+
+test('a drop-frame timecode (";", as editors write 29.97 and 59.94 fps) names its frame there, and nothing elsewhere', () => {
+  const at = (s: string, fps: number, frames = 1e7) => timecodesIn(s, fps, frames).map((m) => [m.text, m.frame]);
+  const ntsc = 30000 / 1001;
+  // both separators, the same moment: one second and fifteen frames is frame 45
+  assert.deepEqual(at('00:00:01;15 and 00:00:01:15', ntsc), [
+    ['00:00:01;15', 45],
+    ['00:00:01:15', 45],
+  ]);
+  assert.deepEqual(at('at 00:01:23;15', ntsc), [['00:01:23;15', 2503]], 'two frame numbers are left out at minute 1');
+  assert.deepEqual(at('00:10:00;00', ntsc), [['00:10:00;00', 17982]], 'none at each tenth minute: ten minutes are 17982 frames');
+  assert.deepEqual(at('00:01:00;02', ntsc), [['00:01:00;02', 1800]], 'the first frame of minute 1');
+  assert.deepEqual(at('00:01:00;00', ntsc), [], 'a number drop-frame leaves out names no frame');
+  assert.deepEqual(at('00:01:00;04', 60000 / 1001), [['00:01:00;04', 3600]], 'at 59.94 four are left out');
+  // at any other rate a drop-frame timecode names no frame, and is never read as its first part ("00:00:01" = frame 1)
+  assert.deepEqual(at('00:00:01;15', 30), []);
+  assert.deepEqual(at('00:00:01;15', 25), []);
+  // a semicolon after a timecode is punctuation: it ends it like a full stop
+  assert.deepEqual(at('logo at 00:00:12; then the title', 25), [['00:00:12', 12]]);
+  assert.deepEqual(at('00:00:01;02;03 or 00:01;00:00:01', ntsc), [], 'not inside longer runs');
+});

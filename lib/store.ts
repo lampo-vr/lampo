@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { ProjectArchivedError } from './archived.ts';
-import { StoppedError } from './backend/types.ts';
+import { StoppedError, signalsHeard } from './backend/types.ts';
 import { cleanChoices } from './choices.ts';
 import { describeShape } from './drawing.ts';
 import { pointersOf } from './elementMaps.ts';
@@ -476,19 +476,19 @@ export interface SyncResult {
   stopped?: boolean;
 }
 
-/** Where a linked video's set-aside file is described: its size, mtime and sample, beside review.json. */
+/** Where a linked video's set-aside file is described: its size and sample, beside review.json. */
 const stoppedFile = (slug: string) => path.join(reviewDir(slug), 'stopped-render.json');
 interface Fingerprint {
   size: number;
-  mtime: string;
   sample: string;
 }
 
 /**
  * A `lampo render` stopped while it wrote the very file a linked video is tracked from: what it left (cut short, or
- * finished after the stop) is not the next version. Its fingerprint — size, mtime and sample, what renderKey tells
+ * finished after the stop) is not the next version. Its fingerprint — the size and the sample, what renderKey tells
  * bytes apart by — is written down, and syncVersions (every sync, the app's watcher, `lampo`'s lookups) leaves a file
- * with it alone until it changes again. The file itself is the person's: it stays as it is.
+ * with it alone until its content changes: a touch, or a tool that rewrites the same bytes, keeps it aside. The file
+ * itself is the person's: it stays as it is.
  */
 export function setAsideStopped(slug: string): void {
   const review = loadReview(slug);
@@ -499,11 +499,11 @@ export function setAsideStopped(slug: string): void {
   } catch {
     return;
   }
-  const mark: Fingerprint = { size: st.size, mtime: new Date(st.mtimeMs).toISOString(), sample: sampleHash(review.video, st) };
+  const mark: Fingerprint = { size: st.size, sample: sampleHash(review.video, st) };
   writeAtomic(stoppedFile(slug), JSON.stringify(mark));
 }
 
-/** Whether the file is the one a stopped render left (setAsideStopped); a file that changed since lets the mark go. */
+/** Whether the file is the one a stopped render left (setAsideStopped); new content lets the mark go. */
 function setAside(slug: string, file: string, st: fs.Stats): boolean {
   let mark: Fingerprint;
   try {
@@ -511,7 +511,7 @@ function setAside(slug: string, file: string, st: fs.Stats): boolean {
   } catch {
     return false;
   }
-  if (mark.size === st.size && mark.mtime === new Date(st.mtimeMs).toISOString() && mark.sample === sampleHash(file, st)) return true;
+  if (mark.size === st.size && mark.sample === sampleHash(file, st)) return true;
   fs.rmSync(stoppedFile(slug), { force: true });
   return false;
 }
@@ -929,8 +929,8 @@ async function ingest(file: string, { slug, video, folder }: ReturnType<typeof u
   const hash = quickHash(file, st);
   const sample = sampleHash(file, st);
   // a big render's probe and hash take a while: a stop that came meanwhile takes nothing in (the hash is synchronous:
-  // a signal during it is handled once the event loop turns)
-  if (o.signal) await new Promise((r) => setImmediate(r));
+  // a signal during it is handled only once the event loop has passed a poll phase)
+  if (o.signal) await signalsHeard();
   if (o.signal?.aborted) throw new StoppedError();
   const release = reserveUpload(slug);
   try {

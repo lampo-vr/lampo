@@ -182,6 +182,13 @@ export class StoppedError extends Error {
   }
 }
 
+/**
+ * Two turns of the event loop: a signal that came during synchronous work (a big render's hash, a registration's probe
+ * and copy) is handled only in a poll phase, and a single `setImmediate` can run in the check phase of the very turn
+ * whose poll came before the signal. An immediate inside an immediate always has a poll phase in between.
+ */
+export const signalsHeard = (): Promise<void> => new Promise((done) => setImmediate(() => setImmediate(done)));
+
 export interface PushResult {
   review: Review;
   created: boolean;
