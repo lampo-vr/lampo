@@ -113,6 +113,23 @@ format stays backwards compatible throughout.
   way of asking for a frame.
 - Stopping an agent Lampo started on your machine, or a `lampo render`, now ends everything it started, also what
   keeps running after the agent or the render tool itself has ended; quitting the app ends them too, and waits for it.
+- **Frame exactness:** a link, a frame reference or a note's timecode that opens another version at a frame the
+  version on screen doesn't have now shows that frame (V1 of 90 frames, sent to V2's frame 250, showed frame 89).
+- Recorded feedback stays on the version it was recorded on: picking another version while recording ends the
+  recording on the one it was made on, with its notes on the frames you saw, and a new version that arrives while you
+  record no longer takes over the player: a message says it's there.
+- A note not sent yet sends the words in its box: a Send while the last change is still being saved waits for it, and
+  after a save that failed it saves them again first, or sends nothing and keeps them.
+- An interrupted upload of a version continues only when it is uploaded to the same video or folder again: the same
+  file uploaded as the next version of another video no longer became the first video's version.
+- A server that restarts (an update) while it hears recorded feedback hears it again by itself; a recording whose
+  sound didn't arrive, or was refused, says so, keeps what you drew as notes not sent yet, and can always be discarded
+  (it used to wait as "Hearing what you said…" for good).
+- A stopped `lampo render` never puts its file up, also when the render command exits as if it had succeeded (a script
+  around ffmpeg does), and a Ctrl-C while the file goes up ends the upload.
+- `lampo export` no longer stops at a version an agent's run made or a reply written through a review link, and the
+  reply's history comes along with it.
+- A voice note longer than ten minutes is refused in plain words instead of being kept with only part of it heard.
 
 ## [0.2.0] - 2026-10-08
 

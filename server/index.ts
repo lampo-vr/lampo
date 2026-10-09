@@ -30,6 +30,7 @@ import { startServerFeed } from './feed.ts';
 import { lanIps } from './guard.ts';
 import { listen, serverTimeouts } from './listen.ts';
 import { purgeEveryWorkspace } from './routes/files.ts';
+import { resumeRecordings } from './routes/recordings.ts';
 import { cleanVoiceCache } from './routes/voice.ts';
 import { drain } from './shutdown.ts';
 import { onSignup } from './signup.ts';
@@ -292,9 +293,16 @@ inWorkspace(DEFAULT_WORKSPACE, () => {
 });
 preloadStt(cfg.stt);
 if (SERVER) ctx.readiness.logStartup().catch(() => {});
-// Every workspace's newest renders get their posters and checks, each in its own workspace.
+// Every workspace's newest renders get their posters and checks, each in its own workspace; recordings a stop cut off
+// while they were heard (or on their audio's way in) are taken up again first (their makers wait for them).
 for (const ws of startIds)
   inWorkspace(ws, () => {
+    try {
+      const n = resumeRecordings(ctx);
+      if (n) console.log(`recordings (${ws}): ${n} cut off by the last stop taken up again`);
+    } catch (e) {
+      console.error(`recordings (${ws}): ${(e as Error).message}`);
+    }
     for (const r of store.listReviews()) if (!r.archived) ctx.background.warm(r);
     // footage search: what no video needs any more leaves its index; what isn't indexed yet is queued (after the rest)
     try {

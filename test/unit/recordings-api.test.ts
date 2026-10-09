@@ -332,3 +332,26 @@ test('audio longer than a recording may be is refused in plain words, and none o
   assert.deepEqual(kept, [], 'no audio of it stays, cut or whole');
   assert.equal((await request('DELETE', `${base()}/${rec}`, { headers: olivia })).status, 200);
 });
+
+test('audio the server refuses leaves a recording that says so, its drawing a draft and Discard at hand: never "uploading" for good', async () => {
+  const box = { type: 'box', x: 10, y: 10, w: 40, h: 20 };
+  const events = [
+    { t: 0, k: 'frame', f: 20 },
+    { t: 0.5, k: 'stroke', f: 20, shape: box },
+  ];
+  const made = await request('POST', base(), { body: { v: 1, duration: 3, events }, headers: olivia });
+  assert.equal(made.status, 200, made.text);
+  const rec = made.json().id;
+  const put = await request('PUT', `${base()}/${rec}/audio`, { body: Buffer.from('not a sound at all'), headers: { ...olivia, 'content-type': 'audio/webm' } });
+  assert.equal(put.status, 400, put.text);
+  const after = (await request('GET', base(), { headers: olivia })).json().recordings.find((x: { id: string }) => x.id === rec);
+  assert.equal(after?.state, 'failed', JSON.stringify(after));
+  assert.equal(after.audio, false, 'nothing to hear again');
+  assert.equal(after.error, 'not an audio recording');
+  assert.equal(after.drafts.length, 1, 'the drawing is a draft');
+  assert.equal(after.drafts[0].frame, 20);
+  assert.equal((await request('POST', `${base()}/${rec}/hear`, { headers: olivia })).status, 409, 'no audio to hear');
+  const again = await request('PUT', `${base()}/${rec}/audio`, { body: audio, headers: { ...olivia, 'content-type': 'audio/mp4' } });
+  assert.equal(again.status, 409, 'its way in is over');
+  assert.equal((await request('DELETE', `${base()}/${rec}`, { headers: olivia })).status, 200);
+});

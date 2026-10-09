@@ -138,7 +138,7 @@ const U = '__@uploads__Client A__teaser.mp4';
 
 test('export: the bundle carries the reviews and the history, and leaves the machine behind', async () => {
   const c = manifest.counts;
-  assert.deepEqual([c.reviews, c.versions, c.notes, c.replies, c.drawings, c.folders, c.playbooks, c.views], [4, 5, 7, 5, 3, 3, 1, 1]);
+  assert.deepEqual([c.reviews, c.versions, c.notes, c.replies, c.drawings, c.folders, c.playbooks, c.views], [4, 6, 7, 6, 3, 3, 1, 1]);
   assert.ok(c.events > 20, `${c.events} events`);
   assert.deepEqual(manifest.owner.names, ['Tester', 'tester'], 'the machine owner and the names it wrote under');
   assert.deepEqual(manifest.people, [], 'no other account');
@@ -154,7 +154,12 @@ test('export: the bundle carries the reviews and the history, and leaves the mac
   for (const m of machineMarks) assert.ok(!text.includes(m), `the bundle names ${m}`);
   assert.ok(!text.includes('sess-123'), "a Claude Code session's id stays");
   assert.ok(!/"share":/.test(text), 'review links travel nowhere, not even as ids');
+  assert.ok(!/"run":/.test(text), "an agent's run stays here: its version travels without it");
   assert.ok(text.includes('rendered to clip.mp4'), 'a path in a reply became its file name');
+  // a visitor's reply through the link travels, on the note and as its event (never dropped from the history)
+  const replyEvents = text.split('\n').filter((l) => l.includes('"type":"reply"') && l.includes('And bolder, please'));
+  assert.equal(replyEvents.length, 1, "the visitor's reply event");
+  assert.match(replyEvents[0], /"by":"guest:Mia"/);
   assert.ok(!fs.existsSync(path.join(src, 'data', A)), 'the machine store holds nothing new');
 });
 

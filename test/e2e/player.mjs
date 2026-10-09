@@ -22,6 +22,7 @@ import { bentEdges, layoutMatrix } from './layout.mjs';
 import { jsonApi } from './lib/api.mjs';
 import { launch, requireChrome, shotsDir } from './lib/browser.mjs';
 import { assert, check, crashed, finish } from './lib/checks.mjs';
+import { closestFrame, shownPicture } from './lib/frames.mjs';
 import { startServer } from './lib/server.mjs';
 
 const LABEL = 'player e2e';
@@ -61,6 +62,15 @@ try {
   const rfile = makeVideo(path.join(dir, 'Acme/export/reel.mp4'), { w: 180, h: 320, fps: 25, dur: 2, pattern: 'testsrc2' });
   age(rfile);
   const reel = (await api('/api/library', 'POST', { path: rfile, folder: 'Acme/Reels' })).video;
+  // long.mp4: V1 of 90 frames, V2 of 300 — a jump from V1 to V2's frame 250 (a link, a frame reference) lands on 250.
+  const lfile = makeVideo(path.join(dir, 'Acme/export/long.mp4'), { w: 320, h: 180, fps: 30, dur: 3, pattern: 'testsrc2' });
+  age(lfile);
+  const long = (await api('/api/library', 'POST', { path: lfile, folder: 'Acme/Reels' })).video;
+  makeVideo(lfile, { w: 320, h: 180, fps: 30, dur: 10, pattern: 'testsrc2', freq: 660 });
+  age(lfile);
+  await api(`/api/review/${enc(long.slug)}/sync`, 'POST', {});
+  const longV2 = path.join(dir, 'long-v2.mp4');
+  fs.copyFileSync(lfile, longV2);
   const review = async (s = slug) => (await api(`/api/review/${enc(s)}`)).review;
   const note = async (id) => (await review()).comments.find((c) => c.id === id);
 
@@ -130,6 +140,61 @@ try {
     await page.waitForSelector('.vpick-list');
     await clickText('.vpick-row', 'V2');
     await until(async () => (await text('[data-testid=version-picker]')) === 'V2', 'back on V2');
+  });
+
+  await check('a jump from V1 to a frame only V2 has (a link, a frame reference) shows that frame, as ffmpeg decodes it', async () => {
+    const vs = (await review(long.slug)).versions;
+    assert(vs.length === 2 && vs[0].frames === 90 && vs[1].frames === 300, `V1 90 frames, V2 300: ${vs.map((x) => x.frames)}`);
+    // the player settled on V2: the timecode, and which of ffmpeg's V2 frames around 250 and around 89 the picture is
+    const settled = async () => {
+      await until(async () => (await text('[data-testid=version-picker]'))?.startsWith('V2'), 'V2 on screen');
+      const shownNow = () =>
+        page.evaluate(() => ({
+          tc: document.querySelector('.tc .main')?.textContent,
+          t: document.querySelector('.vbox video')?.currentTime,
+          hash: location.hash,
+        }));
+      await until(
+        async () => (await shownNow()).tc === '00:08:10',
+        async () => `the timecode says frame 250: ${JSON.stringify(await shownNow())}`,
+      );
+      await page.waitForFunction(
+        () => {
+          const v = document.querySelector('.vbox video');
+          return v && v.readyState >= 2 && !v.seeking && Math.abs(v.currentTime - 250.5 / 30) < 1e-3;
+        },
+        { polling: 100, timeout: 20000 },
+      );
+      // the picture on screen is ffmpeg's V2 f250 (not f89, where V1's last frame would have held it)
+      let seen = '';
+      await until(
+        async () => {
+          const px = await shownPicture(page);
+          const near250 = closestFrame(longV2, px, 250, 300);
+          const near89 = closestFrame(longV2, px, 89, 300);
+          seen = `around 250: ${near250.line}; around 89: ${near89.line}`;
+          return near250.k === 250 && near250.e < near89.e;
+        },
+        () => `V2 f250 on screen (${seen})`,
+      );
+    };
+    const onV1 = async () => {
+      await page.goto('about:blank');
+      await page.goto(`${BASE}/#/v/${enc(long.slug)}?v=1`, { waitUntil: 'domcontentloaded' });
+      await page.waitForFunction(() => document.querySelector('.vbox video')?.readyState >= 2, { timeout: 20000 });
+      await until(async () => (await text('[data-testid=version-picker]'))?.startsWith('V1'), 'V1 on screen');
+    };
+    // ⌘K, the inbox's "Open in player", a notification: the address changes while the player is open
+    await onV1();
+    await page.evaluate((s) => {
+      location.hash = `#/v/${encodeURIComponent(s)}?v=2&f=250`;
+    }, long.slug);
+    await settled();
+    assert((await page.evaluate(() => decodeURIComponent(location.hash))).endsWith('?v=2&f=250'), 'the address still says frame 250');
+    // a frame reference's "Open in player", a note's timecode: the event for the video already open
+    await onV1();
+    await page.evaluate((s) => window.dispatchEvent(new CustomEvent('vr-goto-frame', { detail: { slug: s, v: 2, frame: 250 } })), long.slug);
+    await settled();
   });
 
   await check('compare: B opens side by side against the approved version; wipe, overlay, onion skin, swap, Esc', async () => {

@@ -127,6 +127,27 @@ export function usePlayback({ ver, url, startFrame, b, quiet = false }: Playback
     [N, fps, syncB, live],
   );
 
+  // A jump to a frame of another version (a link, a frame reference, a note's timecode): `seek` clamps by this version's
+  // frame count and seeks this version's source, so V1's 90 frames would hold V2's frame 250 at 89. The frame is taken on
+  // the target's grid and put up once the target is the version rendered: by the source's loadedmetadata (onMeta reads
+  // frameRef) or, when the source stays the same, by the effect below. The frame store hears of it then too, not
+  // before: what follows it (a recording's log) must not take V2's frame for one of V1.
+  const jumped = useRef<number | null>(null);
+  const [jumps, setJumps] = useState(0);
+  const jumpTo = useCallback((to: number, frames: number) => {
+    const f = clamp(Math.round(to), 0, Math.max(0, frames - 1));
+    segments.current = null;
+    loopSegment.current = false;
+    setRangeLoop(null);
+    jumped.current = f;
+    frameRef.current = f;
+    setFrame(f);
+    setJumps((n) => n + 1);
+    // nothing more from the outgoing source: playing on, its frames would take frameRef back
+    videoRef.current?.pause();
+    bRef.current?.pause();
+  }, []);
+
   const play = useCallback(() => {
     stopReverse();
     const vid = videoRef.current;
@@ -200,8 +221,12 @@ export function usePlayback({ ver, url, startFrame, b, quiet = false }: Playback
     const vid = videoEl;
     if (!vid) return;
     const onMeta = () => {
+      // a jump to this version: its frame goes up now (the frame store hears of it here when this comes first)
+      if (jumped.current != null) live.set(jumped.current);
+      jumped.current = null;
       vid.currentTime = (clamp(frameRef.current, 0, N - 1) + 0.5) / fps;
       vid.playbackRate = rate;
+      syncBRef.current(frameRef.current);
     };
     const onPlay = () => setPlaying(true);
     const onPause = () => {
@@ -212,8 +237,10 @@ export function usePlayback({ ver, url, startFrame, b, quiet = false }: Playback
       segments.current = null;
       loopSegment.current = false;
       setRangeLoop(null);
-      seekVideo(vid, (frameRef.current + 0.5) / fps); // snap to the middle of the frame on screen
       bRef.current?.pause();
+      // a jump to another version pauses the outgoing source: the frame is the target's, put up with it
+      if (jumped.current != null) return;
+      seekVideo(vid, (frameRef.current + 0.5) / fps); // snap to the middle of the frame on screen
       syncBRef.current(frameRef.current);
     };
     const onEnded = () => {
@@ -232,6 +259,11 @@ export function usePlayback({ ver, url, startFrame, b, quiet = false }: Playback
     let alive = true;
     const cb: VideoFrameRequestCallback = (_now, meta) => {
       if (!alive) return;
+      // a jump to another version waits for its source: a frame of this one isn't the frame on screen
+      if (jumped.current != null) {
+        id = vid.requestVideoFrameCallback(cb);
+        return;
+      }
       const f = clamp(presentedFrame(meta.mediaTime, fps), 0, N - 1);
       // What is shown only matters paused (the drift check); playing, a quiet player doesn't render per frame for it.
       if (vid.paused || !quietRef.current) setShown(f);
@@ -280,6 +312,20 @@ export function usePlayback({ ver, url, startFrame, b, quiet = false }: Playback
       vid.removeEventListener('ended', onEnded);
     };
   }, [videoEl, src, fps, N]);
+
+  // A jump to another version, once that version is the one rendered: a source that changed puts the frame up when it
+  // has loaded (onMeta); one that stayed (both versions play the same file) is seeked here, on the target's grid.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per jump; fps is the target's by now
+  useEffect(() => {
+    const f = jumped.current;
+    if (f == null) return;
+    live.set(f);
+    const vid = videoRef.current;
+    if (!vid || vid.readyState < 1) return;
+    jumped.current = null;
+    seekVideo(vid, (f + 0.5) / fps);
+    syncBRef.current(f);
+  }, [jumps]);
 
   // A source that stops working part-way (a review link's signed URL ran out) is loaded again and plays on (recover.ts).
   // biome-ignore lint/correctness/useExhaustiveDependencies: one watch per element and source
@@ -373,6 +419,7 @@ export function usePlayback({ ver, url, startFrame, b, quiet = false }: Playback
     revSpeed,
     src,
     seek,
+    jumpTo,
     play,
     pause,
     startReverse,

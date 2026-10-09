@@ -237,38 +237,49 @@ function NoteDraft({ slug, d, fps, v, unsent, going, onSeek, onFocus }: NoteDraf
   const me = useAuthStatus().data?.user ?? null;
   const [text, setText] = useState(d.text);
   const [viewing, setViewing] = useState<ViewRef | null>(null);
-  // Typing is saved a moment after it stops (and before any send); the server's copy wins until you type.
+  // Typing is saved a moment after it stops (and before any send); the server's copy wins until you type. The words are
+  // unsaved (`dirty`) until a save of exactly them has landed: a save still on its way is waited for, a failed one leaves
+  // them unsaved, and a send first saves them — failing that, it sends nothing rather than the server's older words.
   const dirty = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saving = useRef<Promise<unknown> | null>(null);
   const latest = useRef(text);
   latest.current = text;
   useEffect(() => {
     if (!dirty.current) setText(d.text);
   }, [d.text]);
+  const save = useRef(async () => {});
+  save.current = async () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    // one save at a time: the one on its way first (another caller may start the next meanwhile)
+    while (saving.current) await saving.current.catch(() => {});
+    if (!dirty.current) return;
+    const words = latest.current;
+    const p = editDraft(slug, d.id, { text: words }).then(() => {
+      if (latest.current === words) dirty.current = false;
+    });
+    saving.current = p;
+    try {
+      await p;
+    } finally {
+      if (saving.current === p) saving.current = null;
+    }
+  };
   const { register } = unsent;
   useEffect(() => {
-    const flush = async () => {
-      if (timer.current) clearTimeout(timer.current);
-      timer.current = null;
-      if (!dirty.current) return;
-      dirty.current = false;
-      await editDraft(slug, d.id, { text: latest.current });
-    };
+    const flush = () => save.current();
     const off = register(flush);
     return () => {
       off();
       flush().catch(() => {});
     };
-  }, [register, slug, d.id]);
+  }, [register]);
   const type = (next: string) => {
     setText(next);
     dirty.current = true;
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      timer.current = null;
-      dirty.current = false;
-      editDraft(slug, d.id, { text: latest.current }).catch(toastError);
-    }, 700);
+    timer.current = setTimeout(() => save.current().catch(toastError), 700);
   };
   const [severity, setSeverity] = useState(d.severity);
   useEffect(() => setSeverity(d.severity), [d.severity]);

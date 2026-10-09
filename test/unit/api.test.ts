@@ -244,6 +244,17 @@ test('voice: a browser recording (WebM/Opus) is kept; empty or non-audio bodies 
   assert.equal(text.status, 400);
 });
 
+test('voice: a note longer than ten minutes is refused in plain words, and nothing of it is kept', async () => {
+  // small on the wire, long to hear: tone at a low rate, as a WAV
+  const long = path.join(dir, 'long-note.wav');
+  execFileSync(FFMPEG, ['-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=300:sample_rate=8000:duration=700', '-ac', '1', '-c:a', 'pcm_s16le', '-y', long]);
+  const before = fs.existsSync(path.join(dir, 'cache/voice')) ? fs.readdirSync(path.join(dir, 'cache/voice')) : [];
+  const r = await request('POST', '/api/voice', { body: fs.readFileSync(long), headers: { 'content-type': 'audio/wav' } });
+  assert.equal(r.status, 413, r.text);
+  assert.equal(r.json().error, 'a voice note is at most 10 minutes');
+  assert.deepEqual(fs.readdirSync(path.join(dir, 'cache/voice')), before, 'none of it kept, cut or whole');
+});
+
 test('machine endpoints never fall back to the web page', async () => {
   const dist = fs.mkdtempSync(path.join(os.tmpdir(), 'vr-dist-'));
   fs.writeFileSync(path.join(dist, 'index.html'), '<!doctype html><title>app</title>');

@@ -363,6 +363,73 @@ try {
     await shot('still-wrong-dark-360');
   });
 
+  // A recording belongs to the version it was made on: V1 here is 12 s at 25 fps (300 frames), V2 4 s at 30 fps (120).
+  const vfile = makeVideo(path.join(dir, 'Spot/export/cut.mp4'), { w: 320, h: 180, fps: FPS, dur: 12, pattern: 'testsrc2' });
+  age(vfile);
+  const cut = (await api('/api/library', 'POST', { path: vfile })).video.slug;
+  makeVideo(vfile, { w: 320, h: 180, fps: 30, dur: 4, pattern: 'testsrc', freq: 660 });
+  age(vfile);
+  await api(`/api/review/${enc(cut)}/sync`, 'POST', {});
+  const cutRecordings = async () => (await api(`/api/review/${enc(cut)}/recordings`)).recordings;
+  const heardOne = () =>
+    until(async () => {
+      const r = await cutRecordings();
+      return r.length === 1 && r[0].state === 'ready' ? r[0] : null;
+    }, 'the recording heard');
+  const pickerSays = () => page.$eval('[data-testid=version-picker]', (e) => e.textContent.trim()).catch(() => '');
+  const recordOn = async (v, frame) => {
+    await page.goto('about:blank');
+    await page.goto(`${BASE}/#/v/${enc(cut)}?v=${v}`, { waitUntil: 'domcontentloaded' });
+    await videoReady();
+    await page.waitForSelector('[data-testid=record]:not([disabled])');
+    await page.evaluate((f, s, v) => window.dispatchEvent(new CustomEvent('vr-goto-frame', { detail: { slug: s, v, frame: f } })), frame, cut, v);
+    await until(async () => (await shownFrame()) === frame, `the player shows F${frame}`);
+    await page.keyboard.down('Shift');
+    await page.keyboard.press('R');
+    await page.keyboard.up('Shift');
+    await page.waitForSelector('[data-testid=rec-bar]', { timeout: 15000 });
+    // the words are said at 0.4–1.5 s on the recording's clock
+    await sleep(2200);
+  };
+
+  await check('recording on V1 at F200 and then picking V2 ends the recording on V1, its draft on F200', async () => {
+    await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: SHOTS ? 2 : 1, isMobile: false, hasTouch: false });
+    await recordOn(1, 200);
+    await page.click('[data-testid=version-picker]');
+    await page.waitForSelector('.vpick-list .vpick-row');
+    await page.evaluate(() =>
+      [...document.querySelectorAll('.vpick-list .vpick-row')].find((b) => b.querySelector('.vpick-num')?.textContent === 'V2').click(),
+    );
+    await until(async () => (await pickerSays()).startsWith('V2'), 'V2 on screen');
+    await page.waitForSelector('[data-testid=rec-bar]', { hidden: true, timeout: 15000 });
+    const rec = await heardOne();
+    const drafts = JSON.stringify(rec.drafts.map((d) => ({ frame: d.frame, range: d.range })));
+    assert(rec.v === 1, `the recording made on V1 went to V${rec.v}: ${drafts}`);
+    assert(rec.drafts.length === 1 && rec.drafts[0].frame === 200 && !rec.drafts[0].range, `one draft on V1's F200: ${drafts}`);
+    // nothing of V2 in its log: every frame it saw is V1's F200 (V2 has 120 frames)
+    const stored = JSON.parse(fs.readFileSync(path.join(dir, 'data', cut, 'recordings', `${rec.id}.json`), 'utf8'));
+    const seen = stored.events.filter((e) => e.k === 'frame' || e.k === 'seek').map((e) => e.f);
+    assert(seen.length && seen.every((f) => f === 200), `the frames it logged: ${seen}`);
+    await api(`/api/review/${enc(cut)}/recordings/${rec.id}`, 'DELETE');
+  });
+
+  await check('a new version arriving while recording on the newest stays a toast: the recording goes on and lands on its version', async () => {
+    await recordOn(2, 100);
+    // V3 lands meanwhile (as long as V1 again)
+    makeVideo(vfile, { w: 320, h: 180, fps: FPS, dur: 12, pattern: 'testsrc2', freq: 880 });
+    age(vfile);
+    await api(`/api/review/${enc(cut)}/sync`, 'POST', {});
+    await until(async () => /not the newest/.test(await pickerSays()), 'the player knows of V3 and stays on V2');
+    assert((await pickerSays()).startsWith('V2'), `V2 still on screen: ${await pickerSays()}`);
+    assert(await page.$('[data-testid=rec-bar]'), 'still recording');
+    await page.click('[data-testid=rec-done]');
+    await page.waitForSelector('[data-testid=rec-bar]', { hidden: true, timeout: 15000 });
+    const rec = await heardOne();
+    const drafts = JSON.stringify(rec.drafts.map((d) => ({ frame: d.frame, range: d.range })));
+    assert(rec.v === 2 && rec.drafts.length === 1 && rec.drafts[0].frame === 100, `on V2's F100: V${rec.v} ${drafts}`);
+    await api(`/api/review/${enc(cut)}/recordings/${rec.id}`, 'DELETE');
+  });
+
   await check('no page errors', async () => {
     assert(!errors.length, errors.join('\n'));
   });

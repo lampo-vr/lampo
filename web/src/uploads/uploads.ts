@@ -233,12 +233,16 @@ export async function startUpload(file: File, target: UploadTarget): Promise<voi
     },
   });
   running.set(id, upload);
-  const previous = await upload.findPreviousUploads().catch(() => [] as PreviousUpload[]);
-  if (previous[0]) {
-    upload.resumeFromPreviousUpload(previous[0]);
+  // The browser knows an upload by the file and the endpoint, not by where it goes: an entry left by the same file on
+  // its way to another video (as its next version) or into another folder is that upload's — resumed here, the server
+  // would finish it where it was first sent. Only one going where this one goes is continued.
+  const sameTarget = (p: PreviousUpload) => (p.metadata?.slug ?? '') === (metadata.slug ?? '') && (p.metadata?.folder ?? '') === (metadata.folder ?? '');
+  const previous = (await upload.findPreviousUploads().catch(() => [] as PreviousUpload[])).find(sameTarget);
+  if (previous) {
+    upload.resumeFromPreviousUpload(previous);
     patch(id, { resumed: true });
+    forgetInterrupted(file, previous.metadata?.folder ?? null);
   }
-  forgetInterrupted(file);
   upload.start();
 }
 
@@ -266,9 +270,10 @@ export const dismiss = (id: string) => {
 
 // ---------------------------------------------------------------- interrupted uploads (a previous page)
 
-function forgetInterrupted(file: File) {
+/** The file's entries off the list (`folder`: only the one going there, which is being continued). */
+function forgetInterrupted(file: File, folder?: string | null) {
   const before = interrupted.length;
-  interrupted = interrupted.filter((x) => !(x.name === file.name && x.size === file.size));
+  interrupted = interrupted.filter((x) => !(x.name === file.name && x.size === file.size && (folder === undefined || x.folder === folder)));
   if (interrupted.length !== before) emit();
 }
 

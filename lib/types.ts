@@ -591,6 +591,8 @@ export interface Recording {
   state: RecordingState;
   /** Why it couldn't be heard (the audio is kept; drafts from drawings still come). */
   error?: string;
+  /** Failed before its audio arrived (refused, or cut off): there is nothing to hear again; its drawings are drafts. */
+  audio?: false;
   /** Heard nothing: no drafts from speech. */
   silent?: boolean;
   drafts: RecordingDraft[];

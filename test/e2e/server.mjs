@@ -422,6 +422,51 @@ try {
     assert(again.status === 404, `the link works once: ${again.status}`);
   });
 
+  await check('a render cut off as the next version of one video, then uploaded as the next version of another, lands on the other', async () => {
+    const lib = (await inPage('/api/library')).body.videos;
+    const A = slug;
+    const B = lib.find((x) => x.name === 'e2e-offline.mp4').slug;
+    const versionsOf = async (s) => (await inPage(`/api/review/${encodeURIComponent(s)}`)).body.review.versions.length;
+    const [a0, b0] = [await versionsOf(A), await versionsOf(B)];
+    // about 1 MB, sent at 150 KB/s: the reload lands in the middle
+    const next = makeVideo(path.join(dir, 'renders/next-cut.mp4'), { w: 1280, h: 720, fps: 30, dur: 2, pattern: 'testsrc2', freq: 550 });
+    const versionOf = async (s) => {
+      await page.goto('about:blank');
+      await page.goto(`${BASE}/#/v/${encodeURIComponent(s)}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('input[data-testid=version-input]', { timeout: WAIT });
+      await (await page.$('input[data-testid=version-input]')).uploadFile(next);
+    };
+    const cdp = await page.createCDPSession();
+    await cdp.send('Network.enable');
+    try {
+      await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: 150 * 1024 });
+      await versionOf(A);
+      await page.waitForFunction(
+        () =>
+          [...document.querySelectorAll('.up-row.uploading')].some((r) => {
+            const pct = Number.parseInt(r.querySelector('.up-num')?.textContent ?? '', 10);
+            return pct >= 5 && pct < 80;
+          }),
+        { polling: 50, timeout: WAIT },
+      );
+      const entries = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('tus::')).length);
+      assert(entries === 1, `the browser keeps the cut-off upload to resume: ${entries}`);
+      // a closed tab: the upload stops where it is
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
+      await versionOf(B);
+      await page.waitForFunction(() => [...document.querySelectorAll('.up-row.done')].some((r) => r.textContent.includes('next-cut.mp4')), {
+        polling: 200,
+        timeout: 60000,
+      });
+      const [a, b] = [await versionsOf(A), await versionsOf(B)];
+      assert(b === b0 + 1 && a === a0, `the next version of the other video: it has ${b} (was ${b0}), the first has ${a} (was ${a0})`);
+    } finally {
+      await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 }).catch(() => {});
+      await cdp.detach().catch(() => {});
+    }
+  });
+
   await check('signing out ends the browser session and leaves nothing of the account in storage (A12 WEB-7)', async () => {
     // what the screens remember: the player's panel and zoom per video, the sidebar's open folders, a tab's last view
     await page.goto(`${BASE}/#/v/${encodeURIComponent(slug)}`, { waitUntil: 'domcontentloaded' });

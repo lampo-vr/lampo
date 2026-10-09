@@ -41,7 +41,7 @@ import type {
   Version,
 } from '../types.ts';
 import type { Credentials } from './credentials.ts';
-import type { Backend, PlaybookWhere, PushResult } from './types.ts';
+import { type Backend, type PlaybookWhere, type PushResult, StoppedError } from './types.ts';
 
 // Exported by tus-js-client's Node build, missing from its type declarations.
 type UrlStorage = NonNullable<ConstructorParameters<typeof tus.Upload>[1]>['urlStorage'];
@@ -131,7 +131,9 @@ async function uploadRender(
   file: string,
   meta: Record<string, string>,
   onProgress?: (sent: number, total: number) => void,
+  signal?: AbortSignal,
 ): Promise<UploadResult> {
+  if (signal?.aborted) throw new StoppedError();
   const size = fs.statSync(file).size;
   fs.mkdirSync(cacheRoot, { recursive: true });
   let resolveBody: (s: string) => void = () => {};
@@ -156,8 +158,20 @@ async function uploadRender(
   });
   const previous = (await up.findPreviousUploads()).find((p) => JSON.stringify(p.metadata) === JSON.stringify(meta));
   if (previous) up.resumeFromPreviousUpload(previous);
-  up.start();
-  let r = JSON.parse((await body) || '{}') as UploadResult & { pending?: boolean; id?: string };
+  // A stop ends the upload and lets its bytes on the server go (it is never registered): nothing is put up.
+  const stop = () => {
+    void up.abort(true).catch(() => {});
+    rejectBody(new StoppedError());
+  };
+  if (signal?.aborted) throw new StoppedError();
+  signal?.addEventListener('abort', stop, { once: true });
+  let r: UploadResult & { pending?: boolean; id?: string };
+  try {
+    up.start();
+    r = JSON.parse((await body) || '{}') as UploadResult & { pending?: boolean; id?: string };
+  } finally {
+    signal?.removeEventListener('abort', stop);
+  }
   // Big renders into remote storage finish after the last byte: ask until the version is registered.
   while (r.pending && r.id) {
     await sleep(2000);
@@ -511,7 +525,7 @@ export function createRemoteBackend(c: Credentials, { cacheRoot }: { cacheRoot: 
       return { review: session !== undefined ? await backend.review(slugOf(r.review)) : r.review, created: r.created };
     },
 
-    async push(file, { folder, name, to, part, onProgress }): Promise<PushResult> {
+    async push(file, { folder, name, to, part, onProgress, signal }): Promise<PushResult> {
       const meta: Record<string, string> = { filename: name || path.basename(file) };
       if (folder) meta.folder = folder;
       if (to) meta.slug = to;
@@ -519,7 +533,7 @@ export function createRemoteBackend(c: Credentials, { cacheRoot }: { cacheRoot: 
         meta.part_at = String(part.at);
         if (part.handles !== undefined) meta.handles = String(part.handles);
       }
-      const r = await uploadRender(api, cacheRoot, file, meta, onProgress);
+      const r = await uploadRender(api, cacheRoot, file, meta, onProgress, signal);
       return { review: await backend.review(r.slug), created: r.created, duplicate: r.duplicate, v: r.v, ...(r.part ? { part: r.part } : {}) };
     },
 

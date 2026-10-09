@@ -3,7 +3,7 @@
 // until they are sent). The recorder and its UI are loaded on first use (lib/lazy.ts): nothing of it is in the player's
 // first paint. Leaving the player while recording finishes it (its drafts wait for you); closing the tab asks first.
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { keys } from '../../api/queries.ts';
 import { uploadRecording, useRecordings } from '../../api/recordings.ts';
 import type { Recording, Shape, Tool } from '../../api/types.ts';
@@ -72,10 +72,15 @@ export function useRecordFeedback({ slug, v, fps, frames, video, enabled }: Opti
     setPhase('idle');
   }, []);
 
+  // The video and version the recording is made on (set when it starts): what was said belongs to them, whatever is on
+  // screen when it ends — another version picked, one that arrived, the ten minutes up, the player left.
+  const shown = useRef({ slug, v });
+  shown.current = { slug, v };
+  const madeOn = useRef({ slug, v });
+
   // Finishing: the audio and the log go up; the server hears them and the drafts appear in the notes panel.
   const upload = useCallback(
-    async (r: Recorder, take?: { v: number; slug: string }) => {
-      const to = take ?? { v, slug };
+    async (r: Recorder, to: { v: number; slug: string }) => {
       const result = await r.stop();
       const drew = result.events.some((e) => e.k === 'stroke');
       if (result.duration < 1 && !drew) return toast(t('That was too short to hear. Press ⇧R and talk while you watch.'));
@@ -84,7 +89,7 @@ export function useRecordFeedback({ slug, v, fps, frames, video, enabled }: Opti
       await uploadRecording(to.slug, to.v, result);
       await qc.invalidateQueries({ queryKey: keys.recordings(to.slug) });
     },
-    [qc, slug, v],
+    [qc],
   );
 
   const start = useCallback(async () => {
@@ -101,6 +106,7 @@ export function useRecordFeedback({ slug, v, fps, frames, video, enabled }: Opti
         onLevel: (n) => level.current?.(n),
         onLimit: () => finishRef.current(),
       });
+      madeOn.current = shown.current;
       setPhase('rec');
     } catch (e) {
       rec.current = null;
@@ -112,9 +118,11 @@ export function useRecordFeedback({ slug, v, fps, frames, video, enabled }: Opti
   const finish = useCallback(async () => {
     const r = rec.current;
     if (!r) return;
+    // taken: leaving the player while it is sent must not send it twice (the unmount below)
+    rec.current = null;
     setPhase('saving');
     try {
-      await upload(r);
+      await upload(r, madeOn.current);
     } catch (e) {
       toast(t('The recording could not be sent: {errorMessage}', { errorMessage: errorMessage(e) }), 'error');
     } finally {
@@ -147,11 +155,10 @@ export function useRecordFeedback({ slug, v, fps, frames, video, enabled }: Opti
     [frames],
   );
 
-  // Another version on screen: what was said so far belongs to the version it was said about.
-  const madeOn = useRef({ slug, v });
-  useEffect(() => {
-    if (!active) madeOn.current = { slug, v };
-    else if (madeOn.current.v !== v || madeOn.current.slug !== slug) finishRef.current();
+  // Another version on screen: the recording ends there, on the version it was made on. A layout effect, so it ends
+  // before the player's own effects put the other version's frame up (the recorder would log it).
+  useLayoutEffect(() => {
+    if (active && (madeOn.current.v !== v || madeOn.current.slug !== slug)) finishRef.current();
   }, [slug, v, active]);
 
   // Closing the tab while recording asks first; leaving the player finishes the recording on the way out.

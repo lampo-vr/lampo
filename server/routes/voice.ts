@@ -5,7 +5,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import express, { type Router } from 'express';
 import { CACHE, cacheDir } from '../../lib/paths.ts';
-import { probeFormat } from '../../lib/probe.ts';
+import { probeAudio, probeFormat } from '../../lib/probe.ts';
+import { VOICE_MAX_SECONDS } from '../../lib/recording.ts';
 import { transcribeFile } from '../../lib/stt/index.ts';
 import { forSpeaker } from '../../lib/stt/policy.ts';
 import type { VoiceResponse } from '../../lib/types.ts';
@@ -14,6 +15,8 @@ import type { ServerContext } from '../context.ts';
 import { fail, router } from '../http.ts';
 
 const AUDIO_CONTAINERS = new Set(['matroska', 'webm', 'ogg', 'mov', 'mp4', 'wav']);
+/** A voice note's longest, with the moment a recorder takes to stop. */
+const VOICE_LONGEST = VOICE_MAX_SECONDS + 5;
 
 export function voiceRoutes(ctx: ServerContext): Router {
   const r = router();
@@ -32,7 +35,16 @@ export function voiceRoutes(ctx: ServerContext): Router {
       // Transcribe from the original recording (no AAC round trip) while the m4a for playback is written, listening
       // for the languages the speaker chose in Settings (Automatic: any; else the server's list).
       const stt = forSpeaker(ctx.cfg.stt, req.auth?.user?.prefs?.voice_languages);
-      const [, transcript] = await Promise.all([toM4a(raw, path.join(dir, `${id}.m4a`)), transcribeFile(raw, stt)]);
+      // As long as a voice note may be, and no longer: its header's length is the sender's word (a browser's webm has
+      // none), so it is written only up to just past the limit, and one that reaches it is refused, not kept cut (and
+      // what is kept is heard whole: well inside one window of lib/stt).
+      const m4a = path.join(dir, `${id}.m4a`);
+      await toM4a(raw, m4a, { maxSeconds: VOICE_LONGEST + 1 });
+      if ((await probeAudio(m4a)).duration > VOICE_LONGEST) {
+        fs.rmSync(m4a, { force: true });
+        throw fail(413, `a voice note is at most ${VOICE_MAX_SECONDS / 60} minutes`);
+      }
+      const transcript = await transcribeFile(raw, stt);
       const out: VoiceResponse = { id, transcript, whisper: transcript !== null };
       res.json(out);
     } finally {

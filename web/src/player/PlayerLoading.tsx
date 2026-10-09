@@ -47,6 +47,7 @@ const IDLE: Playback = {
   revSpeed: 0,
   src: '',
   seek: noop,
+  jumpTo: noop,
   play: noop,
   pause: noop,
   startReverse: noop,

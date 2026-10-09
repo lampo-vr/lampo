@@ -6,10 +6,10 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import express, { type Request, type Router } from 'express';
+import express, { type Request, type RequestHandler, type Router } from 'express';
 import { z } from 'zod';
 import { heavy, PRIORITY } from '../../lib/jobs.ts';
-import { cacheDir, isoLocal } from '../../lib/paths.ts';
+import { cacheDir, isoLocal, slugify } from '../../lib/paths.ts';
 import { probeAudio, probeFormat } from '../../lib/probe.ts';
 import { shownTo } from '../../lib/publicError.ts';
 import { normalizeRange } from '../../lib/range.ts';
@@ -17,6 +17,7 @@ import { RateLimit } from '../../lib/rateLimit.ts';
 import { RECORDING_MAX_BYTES, RECORDING_MAX_EVENTS, RECORDING_MAX_SECONDS } from '../../lib/recording.ts';
 import {
   audioFile,
+  audioMissed,
   clipOf,
   hearRecording,
   isRecordingId,
@@ -29,6 +30,7 @@ import {
   type StoredRecording,
   saveRecording,
 } from '../../lib/recordings.ts';
+import { wsKey } from '../../lib/scope.ts';
 import type { CommentInput } from '../../lib/store.ts';
 import * as store from '../../lib/store.ts';
 import { sttAvailable } from '../../lib/stt/index.ts';
@@ -188,11 +190,58 @@ export function settleRecording(rec: StoredRecording, left: RecordingDraft[]): v
   else removeRecording(rec.slug, rec.id);
 }
 
-/** A recording as its maker reads it here: why hearing it failed only in words for them (lib/publicError.ts). */
+/**
+ * A recording as its maker reads it here: why hearing it failed only in words for them (lib/publicError.ts). Why its
+ * audio didn't arrive is in our own words (the refusal its upload was answered with, or a fixed sentence): as it is.
+ */
 const shown = (req: Request, r: StoredRecording): Recording => {
   const out = publicRecording(r);
-  return out.error ? { ...out, error: shownTo(audienceOf(req), out.error, 'the recording could not be heard') } : out;
+  return out.error && out.audio !== false ? { ...out, error: shownTo(audienceOf(req), out.error, 'the recording could not be heard') } : out;
 };
+
+const told = (ctx: ServerContext, slug: string, id: string) => ctx.broadcast('recording', { slug, id });
+
+/**
+ * Hears a recording in the background, in its maker's languages (`rec.languages`, kept with it). Owed work (`mustRun`),
+ * named for the crash guard: a recording whose hearing took the process down is not heard again on every start. Work
+ * that never ran (refused by the guard, its workspace gone) leaves it as one that couldn't be heard, never "hearing".
+ */
+function hearLater(ctx: ServerContext, rec: StoredRecording): void {
+  const ver = getVersion(getReview(rec.slug), rec.v);
+  const stt = forSpeaker(ctx.cfg.stt, rec.languages);
+  heavy(() => hearRecording(rec.slug, rec.id, ver, stt), PRIORITY.recording, { mustRun: true, key: wsKey(`recording:${rec.id}`) })
+    .catch((e: Error) => {
+      console.error(`recording ${rec.id}: ${e.message}`);
+      const now = loadRecording(rec.slug, rec.id);
+      if (now?.state === 'hearing') saveRecording({ ...now, state: 'failed', error: e.message });
+    })
+    .finally(() => told(ctx, rec.slug, rec.id));
+}
+
+/** What a recording whose audio a stop cut off on its way says. */
+const AUDIO_CUT_OFF = 'its audio did not arrive: the server restarted';
+
+/**
+ * At start, in the workspace running now: what a stop (a deploy) cut off is taken up again. Queued work doesn't outlive
+ * its process and a hearing in flight ends with it, so a recording still "hearing" is heard again (its audio is kept);
+ * one still waiting for its audio lost it on the way and says so, its drawings its drafts. Returns how many.
+ */
+export function resumeRecordings(ctx: ServerContext): number {
+  let n = 0;
+  for (const review of store.listReviews())
+    for (const rec of listRecordings(slugify(review.video))) {
+      if (rec.state !== 'hearing' && rec.state !== 'uploading') continue;
+      n++;
+      try {
+        if (rec.state === 'uploading') audioMissed(rec.slug, rec.id, getVersion(review, rec.v), AUDIO_CUT_OFF);
+        else if (fs.existsSync(audioFile(rec.slug, rec.id))) hearLater(ctx, rec);
+        else saveRecording({ ...rec, state: 'failed', error: 'the audio of this recording is gone' });
+      } catch (e) {
+        console.error(`recording ${rec.id}: not taken up again: ${(e as Error).message}`);
+      }
+    }
+  return n;
+}
 
 export function recordingRoutes(ctx: ServerContext): Router {
   const r = router();
@@ -213,16 +262,31 @@ export function recordingRoutes(ctx: ServerContext): Router {
     if (!rec || !mine(req, rec)) throw fail(404, 'no such recording');
     return rec;
   };
-  const tell = (slug: string, id: string) => ctx.broadcast('recording', { slug, id });
-
-  // Heard in the languages its maker speaks (Settings → Voice notes), like a voice note.
-  const hear = (rec: StoredRecording, req: Request) => {
-    const review = getReview(rec.slug);
-    const ver = getVersion(review, rec.v);
-    const stt = forSpeaker(ctx.cfg.stt, req.auth?.user?.prefs?.voice_languages);
-    heavy(() => hearRecording(rec.slug, rec.id, ver, stt), PRIORITY.recording, { mustRun: true })
-      .catch((e: Error) => console.error(`recording ${rec.id}: ${e.message}`))
-      .finally(() => tell(rec.slug, rec.id));
+  const tell = (slug: string, id: string) => told(ctx, slug, id);
+  // Heard in the languages its maker speaks (Settings → Voice notes), like a voice note: kept with it, for a hearing a
+  // stop cuts off (resumeRecordings).
+  const spoken = (req: Request): Pick<StoredRecording, 'languages'> => {
+    const languages = req.auth?.user?.prefs?.voice_languages;
+    return languages ? { languages } : {};
+  };
+  // Its audio's way in ends in "hearing", or — refused, cut off on the way, unreadable — in one that couldn't be heard
+  // (its drawings its drafts, Discard at hand): never in one that waits for audio for good.
+  const missed = (rec: StoredRecording, e: unknown, otherwise: string) => {
+    const why = e instanceof HttpError && e.status < 500 ? e.message : otherwise;
+    try {
+      if (audioMissed(rec.slug, rec.id, getVersion(getReview(rec.slug), rec.v), why)) tell(rec.slug, rec.id);
+    } catch (x) {
+      console.error(`recording ${rec.id}: ${(x as Error).message}`);
+    }
+  };
+  // Whose recording and whether it waits for audio, before a byte of the body is read.
+  const waitingForAudio: RequestHandler<{ slug: string; id: string }> = (req, res, next) => {
+    const rec = own(req, req.params.slug, req.params.id);
+    if (rec.state !== 'uploading') throw fail(409, 'this recording has its audio already');
+    audioBody(req, res, (e?: unknown) => {
+      if (e) missed(rec, e, 'its audio did not arrive');
+      next(e);
+    });
   };
 
   r.get('/api/review/:slug/recordings', (req, res) => {
@@ -275,33 +339,43 @@ export function recordingRoutes(ctx: ServerContext): Router {
   // Then its audio: what the browser recorded (webm/opus, mp4/aac, ogg) or a wav; nothing else reaches ffmpeg's decoders.
   // As long as a recording may be and no longer: its header's duration is the sender's word (a browser's webm has none),
   // so the audio is turned into m4a up to just past the limit, and what reached it is refused, not kept cut.
-  r.put('/api/review/:slug/recordings/:id/audio', audioBody, async (req, res) => {
+  r.put('/api/review/:slug/recordings/:id/audio', waitingForAudio, async (req, res) => {
     const slug = req.params.slug;
     const rec = own(req, slug, req.params.id);
     if (rec.state !== 'uploading') throw fail(409, 'this recording has its audio already');
-    if (!Buffer.isBuffer(req.body) || !req.body.length) throw fail(400, 'no audio');
-    fs.mkdirSync(recordingsDir(slug), { recursive: true });
-    // the disk keeps its reserve (LAMPO_MIN_FREE) for renders and the store, as for notes' screenshots
-    const free = freeBytes(recordingsDir(slug));
-    if (free !== null && free < (ctx.cfg.min_free_bytes ?? 0) + req.body.length + 64e6)
-      throw fail(507, 'the server has no room for recordings right now: try again later');
-    const raw = path.join(recordingsDir(slug), `${rec.id}.raw`);
-    const file = audioFile(slug, rec.id);
-    fs.writeFileSync(raw, req.body);
     try {
-      const format = await probeFormat(raw);
-      if (!format.split(',').some((f) => AUDIO_CONTAINERS.has(f))) throw fail(400, 'not an audio recording');
-      await toM4a(raw, file, { maxSeconds: LONGEST + 1 });
-      if ((await probeAudio(file)).duration > LONGEST) {
-        fs.rmSync(file, { force: true });
-        throw fail(413, TOO_LONG);
+      if (!Buffer.isBuffer(req.body) || !req.body.length) throw fail(400, 'no audio');
+      fs.mkdirSync(recordingsDir(slug), { recursive: true });
+      // the disk keeps its reserve (LAMPO_MIN_FREE) for renders and the store, as for notes' screenshots
+      const free = freeBytes(recordingsDir(slug));
+      if (free !== null && free < (ctx.cfg.min_free_bytes ?? 0) + req.body.length + 64e6)
+        throw fail(507, 'the server has no room for recordings right now: try again later');
+      const raw = path.join(recordingsDir(slug), `${rec.id}.raw`);
+      const file = audioFile(slug, rec.id);
+      fs.writeFileSync(raw, req.body);
+      try {
+        const format = await probeFormat(raw);
+        if (!format.split(',').some((f) => AUDIO_CONTAINERS.has(f))) throw fail(400, 'not an audio recording');
+        await toM4a(raw, file, { maxSeconds: LONGEST + 1 });
+        if ((await probeAudio(file)).duration > LONGEST) {
+          fs.rmSync(file, { force: true });
+          throw fail(413, TOO_LONG);
+        }
+      } finally {
+        fs.rmSync(raw, { force: true });
       }
-    } finally {
-      fs.rmSync(raw, { force: true });
+    } catch (e) {
+      missed(rec, e, 'its audio could not be read');
+      throw e;
     }
-    const next: StoredRecording = { ...rec, state: 'hearing' };
+    // discarded while its audio came in (Discard shows in every state): it stays gone
+    if (!loadRecording(slug, rec.id)) {
+      fs.rmSync(audioFile(slug, rec.id), { force: true });
+      throw fail(404, 'no such recording');
+    }
+    const next: StoredRecording = { ...rec, state: 'hearing', ...spoken(req) };
     saveRecording(next);
-    hear(next, req);
+    hearLater(ctx, next);
     tell(slug, rec.id);
     res.json(shown(req, next));
   });
@@ -311,10 +385,10 @@ export function recordingRoutes(ctx: ServerContext): Router {
     const rec = own(req, req.params.slug, req.params.id);
     if (rec.state !== 'failed') throw fail(409, 'only a recording that could not be heard is heard again');
     if (!fs.existsSync(audioFile(rec.slug, rec.id))) throw fail(409, 'the audio of this recording is gone');
-    const next: StoredRecording = { ...rec, state: 'hearing' };
-    delete next.error;
+    const { error: _error, languages: _before, ...rest } = rec;
+    const next: StoredRecording = { ...rest, state: 'hearing', ...spoken(req) };
     saveRecording(next);
-    hear(next, req);
+    hearLater(ctx, next);
     tell(rec.slug, rec.id);
     res.json(shown(req, next));
   });

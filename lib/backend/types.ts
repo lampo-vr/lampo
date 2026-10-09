@@ -167,6 +167,13 @@ export interface PlaybookProposalInput {
   by: string;
 }
 
+/** A push stopped by its caller (`signal`): nothing was put up. */
+export class StoppedError extends Error {
+  constructor() {
+    super('stopped: nothing was put up');
+  }
+}
+
 export interface PushResult {
   review: Review;
   created: boolean;
@@ -214,10 +221,19 @@ export interface Backend {
   /** Put a render under review: a path on this machine (local) or an upload of that file (remote). */
   track(videoPath: string, o: { by: string; byId?: string; session?: SessionInput | null; folder?: string }): Promise<{ review: Review; created: boolean }>;
   /** Upload a render as a new review or the next version of one (`to`: its slug); `onProgress`: bytes sent so far (an
-   * upload to a server; the store on this machine takes the file in one go). */
+   * upload to a server; the store on this machine takes the file in one go). `signal`: a stop — an upload under way is
+   * ended (its bytes on the server let go) and nothing is put up; the promise rejects with StoppedError. */
   push(
     file: string,
-    o: { by: string; folder?: string | null; name?: string; to?: string | null; part?: PartPushInput; onProgress?: (sent: number, total: number) => void },
+    o: {
+      by: string;
+      folder?: string | null;
+      name?: string;
+      to?: string | null;
+      part?: PartPushInput;
+      onProgress?: (sent: number, total: number) => void;
+      signal?: AbortSignal;
+    },
   ): Promise<PushResult>;
   /** Attaches an elements map (parsed JSON, checked whole where it is stored) to version `v`, the newest when absent. */
   putElements(slug: string, v: number | undefined, map: unknown): Promise<ElementsAttached>;

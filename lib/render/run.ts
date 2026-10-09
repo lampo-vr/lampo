@@ -205,6 +205,17 @@ export function runTool(o: ToolRunOptions): ToolRun {
   let stopping: GroupStop | null = null;
   // the group seen empty after the tool ended: never signalled again (its id may be another's by then)
   let gone = false;
+  let ended = false;
+  // The tool ended and left something running in its group (a background job): watched until the group is empty, so a
+  // stop that comes later (a Ctrl-C during the upload) reaches what is left, and never the id once another may have it.
+  const watchGroup = (pgid: number) => {
+    const watch = setInterval(() => {
+      if (groupAlive(pgid)) return;
+      gone = true;
+      clearInterval(watch);
+    }, 100);
+    watch.unref();
+  };
   const done = new Promise<ToolResult>((resolve) => {
     let settled = false;
     const finish = (code: number, signal: NodeJS.Signals | null, startError?: string) => {
@@ -214,7 +225,9 @@ export function runTool(o: ToolRunOptions): ToolRun {
       outLines.end();
       errLines.end();
       void (stopping?.done ?? Promise.resolve()).then(() => {
+        ended = true;
         if (!child.pid || !group || !groupAlive(child.pid)) gone = true;
+        else watchGroup(child.pid);
         resolve({ code, signal, ...(startError ? { startError } : {}), tail, elapsedMs: Date.now() - started });
       });
     };
@@ -243,14 +256,25 @@ export function runTool(o: ToolRunOptions): ToolRun {
     tool,
     signal(sig) {
       if (!child.pid || gone) return;
+      // the tool has ended: only a group still seen with a member is signalled (a probe, signal 0, harms no one)
+      if (ended && group && !groupAlive(child.pid)) {
+        gone = true;
+        return;
+      }
       if (!group) {
         try {
           child.kill(sig);
         } catch {}
         return;
       }
-      if (!stopping) stopping = stopGroup(child.pid, { first: sig, graceMs: o.stopGraceMs ?? STOP_GRACE_MS, ref: true });
-      else if (sig === 'SIGKILL') stopping.kill();
+      if (!stopping) {
+        const pgid = child.pid;
+        stopping = stopGroup(pgid, { first: sig, graceMs: o.stopGraceMs ?? STOP_GRACE_MS, ref: true });
+        // a stop that found the group empty in the end: nothing of it is signalled again
+        void stopping.done.then(() => {
+          if (!groupAlive(pgid)) gone = true;
+        });
+      } else if (sig === 'SIGKILL') stopping.kill();
     },
     done,
   };

@@ -56,6 +56,13 @@ makeVideo(clipA, { w: 320, h: 180, fps: 25, dur: 2, pattern: 'testsrc2' });
 settle(clipA);
 store.sync(slugA);
 
+// The agent's video re-rendered while its run is open: the version names the run that made it (lib/runs.ts's hook).
+store.setVersionRunProvider((slug) => (slug === slugC ? 'run_0123456789ab' : undefined));
+makeVideo(loose, { w: 160, h: 90, fps: 30, dur: 1, pattern: 'testsrc2' });
+settle(loose);
+store.sync(slugC);
+store.setVersionRunProvider(() => undefined);
+
 // An upload, as `vr push` / the browser make one.
 const pushed = makeVideo(path.join(home, 'tmp/teaser.mp4'), { w: 160, h: 90, fps: 25, dur: 1, freq: 550 });
 const up = await store.ingestUpload(pushed, { name: 'teaser.mp4', folder: 'Client A', by: 'tester', byId: owner.id, keep: true });
@@ -108,6 +115,8 @@ const question = store.addComment(slugA, {
   choices: ['Blue', 'Warmer'],
 });
 const client = store.addComment(slugA, { v: 2, frame: 40, text: 'Can the price be bigger?', author: 'guest:Mia', share: 's_abcdef123456' });
+// her reply through the link, as the review link's route writes one (the link's id on it)
+store.updateComment(client.id, { note: 'And bolder, please', by: 'guest:Mia', share: 's_abcdef123456' });
 // a voice clip next to review.json, as the composer leaves one
 const voiceFile = `${ranged.id}.m4a`;
 execFileSync(FFMPEG, ['-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=300:duration=0.5', '-c:a', 'aac', '-y', path.join(reviewDir(slugA), voiceFile)]);

@@ -229,11 +229,10 @@ export function Drafts({ slug, rec, fps, onSeek, onFocus, register, sending, goi
         <span className="rec-dot still" aria-hidden="true" />
         <b className="grow">{head}</b>
         <span className="drafts-len">{clock(rec.duration)}</span>
-        {!hearing && (
-          <button type="button" className="btn sm ghost drafts-discard" onClick={discard} disabled={sending}>
-            {t('Discard')}
-          </button>
-        )}
+        {/* in every state: one that never comes out of hearing must not stay for good */}
+        <button type="button" className="btn sm ghost drafts-discard" onClick={discard} disabled={sending}>
+          {t('Discard')}
+        </button>
       </div>
       {hearing && (
         <p className="drafts-note busy">
@@ -241,7 +240,12 @@ export function Drafts({ slug, rec, fps, onSeek, onFocus, register, sending, goi
           <span>{t('Each thing you said becomes a note on the frame that was on screen.')}</span>
         </p>
       )}
-      {rec.state === 'failed' && (
+      {rec.state === 'failed' && rec.audio === false && (
+        <p className="drafts-note" data-testid="drafts-no-audio">
+          {t('Its sound didn’t reach Lampo: {error}', { error: rec.error || t('the connection dropped') })}
+        </p>
+      )}
+      {rec.state === 'failed' && rec.audio !== false && (
         <p className="drafts-note">
           {t('The recording is kept: {error}', { error: rec.error || t('the speech engine did not answer') })}
           <button type="button" className="btn sm" onClick={retry}>

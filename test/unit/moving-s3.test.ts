@@ -104,7 +104,7 @@ test('and on from the server: its export reads the bucket, its accounts travel a
   const r = await vrHere(['export', again, '--json'], { ...env, VR_WORKSPACE: 'w1' });
   assert.equal(r.code, 0, r.err);
   const m = JSON.parse(r.out) as BundleManifest;
-  assert.equal(m.counts.versions, 5);
+  assert.equal(m.counts.versions, 6);
   assert.deepEqual(m.owner.names, [], 'a server has no machine owner');
   assert.deepEqual(
     m.people.map((p) => p.name),

@@ -35,3 +35,5 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - Stopping what Lampo started (a run, a render's tool) goes to its process group as long as the group has a member,
   never only while its leader runs (`stopGroup`, lib/processGroup.ts); an app that exits waits for it (`stopAll`).
 - An answer that hands work to the person ends with `lib/handoff.ts`'s line (wait now, cursor from that moment).
+- A stopped render is decided by the stop, never by the tool's exit code (a wrapper script runs on to exit 0 with its
+  file cut short), and the same stop aborts the upload that follows (`hooks.abort`, lib/render/job.ts).

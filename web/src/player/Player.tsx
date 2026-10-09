@@ -18,7 +18,7 @@ import { type NewComment, useCommentActions, useRequest } from '../api/mutations
 import { keys, useAnalysis, useAudience, useInfo, useLibrary, useReview, useTracks, useWaveform } from '../api/queries.ts';
 import { useRunActions, useRunDetail, useRuns } from '../api/runs.ts';
 import { spriteUrl, useSprite } from '../api/sprite.ts';
-import type { ActivityWords, DraftsSent, FrameRange, LibraryResponse, PlacedComment, QaItem, ReviewResponse, Shape, Tool } from '../api/types.ts';
+import type { ActivityWords, DraftsSent, FrameRange, LibraryResponse, PlacedComment, QaItem, ReviewResponse, Shape, Tool, Version } from '../api/types.ts';
 import { billingCode } from '../billing/code.ts';
 import { t } from '../i18n/index.ts';
 import { useLang } from '../i18n/T.tsx';
@@ -92,6 +92,14 @@ const PHONE_TOOLS = 48;
 const unsentUi = loader(() => import('./drafts/Unsent.tsx'));
 /** Publishing a final version (publish/Publishing.tsx): loaded when "Publish…" is chosen or the address asks for it. */
 const publishUi = loader(() => import('../publish/Publishing.tsx'));
+
+type Grid = Pick<Version, 'v' | 'fps' | 'frames'>;
+/** Frame `f` of version `cv` on `target`'s grid: the same index at the same rate, else the frame on screen at that moment. */
+function frameOnGrid(versions: Grid[], cv: number, f: number, target: Grid) {
+  const own = versions.find((x) => x.v === cv);
+  const at = !own || cv === target.v || own.fps === target.fps ? f : timeToFrame(f / own.fps, target.fps);
+  return clamp(at, 0, target.frames - 1);
+}
 
 interface PlayerProps {
   slug: string;
@@ -370,12 +378,14 @@ function PlayerView({
     [setPref, slug],
   );
 
-  // new render arrived
+  // new render arrived: the player follows it from the newest, unless a note is being written or feedback recorded about
+  // the one on screen (a recording ends on the version it was made on: useRecordFeedback)
   const prevLatest = useRef(latestV);
+  const recording = useRef(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: react to a new newest version only
   useEffect(() => {
     if (latestV === prevLatest.current) return;
-    if (v === prevLatest.current && !composer) {
+    if (v === prevLatest.current && !composer && !recording.current) {
       setV(latestV);
       toast(t('New version: now showing V{latestV}', { latestV }), 'ok');
     } else toast(t('V{latestV} is available', { latestV }));
@@ -403,14 +413,7 @@ function PlayerView({
   );
   const sprite = useSprite(ver.v === latestV && !phone && ver.hash ? spriteUrl(slug, renderKey(ver)) : null, slug, true);
 
-  const toHere = useCallback(
-    (cv: number, f: number) => {
-      const other = review.versions.find((x) => x.v === cv);
-      if (!other || cv === ver.v || other.fps === fps) return clamp(f, 0, N - 1);
-      return clamp(timeToFrame(f / other.fps, fps), 0, N - 1);
-    },
-    [review.versions, ver.v, fps, N],
-  );
+  const toHere = useCallback((cv: number, f: number) => frameOnGrid(review.versions, cv, f, { v: ver.v, fps, frames: N }), [review.versions, ver.v, fps, N]);
   // Notes deleted a moment ago are gone from the screen while their Undo toast is up.
   const hidden = useHiddenNotes();
   const placed = useMemo(
@@ -669,12 +672,16 @@ function PlayerView({
     const go = (e: Event) => {
       const to = (e as CustomEvent<GotoFrame>).detail;
       if (to.slug !== slug) return;
-      if (review.versions.some((x) => x.v === to.v)) setV(to.v);
-      seek(to.frame);
+      const target = review.versions.find((x) => x.v === to.v);
+      // another version: its frame on its own grid (pb.jumpTo), never clamped by the one being left
+      if (target && target.v !== ver.v) {
+        setV(target.v);
+        pb.jumpTo(to.frame, target.frames);
+      } else seek(to.frame);
     };
     window.addEventListener(GOTO_FRAME, go);
     return () => window.removeEventListener(GOTO_FRAME, go);
-  }, [slug, review.versions, seek]);
+  }, [slug, review.versions, ver.v, seek, pb.jumpTo]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: only the note in the URL, once
   useEffect(() => {
     if (!focus) return;
@@ -889,6 +896,8 @@ function PlayerView({
     }
     const to = review.versions.find((x) => String(x.v) === startV);
     if (to) setV(to.v);
+    // another version: the frame is on its grid and goes up with it (pb.jumpTo), never clamped by the one being left
+    const other = to && to.v !== ver.v ? to : null;
     const c = focus ? placed.find((x) => x.id === focus) : null;
     if (c && (c.status === 'verified' || c.status === 'wontfix')) setFilter('all');
     const at = startFrame != null ? Number.parseInt(startFrame, 10) : null;
@@ -896,8 +905,12 @@ function PlayerView({
       verifyFrame.current = at;
       verify.startAt(verifyAt);
     } else if (at != null && !Number.isNaN(at)) {
-      seek(at);
+      if (other) pb.jumpTo(at, other.frames);
+      else seek(at);
       if (c) setSelected(c.id);
+    } else if (c && other) {
+      setSelected(c.id);
+      pb.jumpTo(frameOnGrid(review.versions, c.v, c.frame, other), other.frames);
     } else if (c) selectComment(c);
   }, [focus, startFrame, startV, verifyAt, atAgent]);
 
@@ -926,6 +939,7 @@ function PlayerView({
 
   // ---------------------------------------------------------------- recorded feedback (⇧R)
   const recorder = useRecordFeedback({ slug, v: ver.v, fps, frames: pb.live, video: () => pb.videoRef.current, enabled: speech });
+  recording.current = recorder.phase !== 'idle';
   const pendingRecordings = recorder.pending;
   const RecordUI = useLoaded(recordUi, recorder.phase !== 'idle' || pendingRecordings.length > 0);
   const [draftFocus, setDraftFocus] = useState<DraftFocus>(null);

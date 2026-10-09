@@ -157,10 +157,13 @@ export async function supervise(dir: string): Promise<void> {
   const { executeRender } = await import('./job.ts');
   const sink = d.job.agent ? openActivitySink() : null;
   let stopped = false;
+  // the same stop ends an upload or registration under way once the tool has ended: nothing goes up
+  const halt = new AbortController();
   let tool: { signal(sig: NodeJS.Signals): void } | null = null;
   for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const)
     process.on(sig, () => {
       stopped = true;
+      halt.abort();
       tool?.signal(sig);
     });
   try {
@@ -169,6 +172,7 @@ export async function supervise(dir: string): Promise<void> {
       sink,
       every: d.every,
       stopped: () => stopped,
+      abort: halt.signal,
       onStart: (run) => {
         tool = run;
         if (!run.pid) return;

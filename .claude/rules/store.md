@@ -28,3 +28,5 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
   before its review exists. A video id's keys go under its upload hold (`reserveUpload`), and anything that puts bytes
   under an id crosses its owed keys out first (`forgetOwed`); `versions/` is never swept by prefix.
 - The onboarding sample logs no events; Insights, taste, suggestions and `usageOf` skip it.
+- A new field on `Version`, `Comment`, `Reply` or `NoteRef` travels in the bundle's schema or is named in
+  `LEFT_OUT` (lib/bundleExport.ts): one an export doesn't know stops `lampo export` (`bundle-portable.test.ts`).

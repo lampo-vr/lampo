@@ -32,7 +32,7 @@ import * as store from '../store.ts';
 import { buildTaste, writeTaste } from '../taste.ts';
 import { cachedTranscript, forgetTranscript, makeTranscript } from '../transcripts.ts';
 import type { AskCreated, Comment, OptionGroup, ReviewEvent } from '../types.ts';
-import type { Backend, PlaybookWhere } from './types.ts';
+import { type Backend, type PlaybookWhere, StoppedError } from './types.ts';
 
 // A render that is still being written must settle before "the newest version" means anything.
 async function syncWait(slug: string, maxMs = 15000) {
@@ -179,7 +179,9 @@ export function createLocalBackend(): Backend {
       if (folder !== undefined) review = moveVideo(slugify(review.video), folder, by);
       return { review, created };
     },
-    async push(file, { by, folder, name, to, part }) {
+    async push(file, { by, folder, name, to, part, signal }) {
+      // taken in one go here: a stop that came first puts nothing up
+      if (signal?.aborted) throw new StoppedError();
       const o = { name: name || path.basename(file), folder, slug: to, by, keep: true };
       const r = part ? await ingestPart(file, { ...o, ...part }) : await store.ingestUpload(file, o);
       return { review: r.review, created: r.created, duplicate: r.duplicate, v: r.version.v, ...(r.version.part ? { part: r.version.part } : {}) };

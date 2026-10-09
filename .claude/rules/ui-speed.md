@@ -17,3 +17,5 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - Every `usePlayback` is `quiet`: only a small component that shows the frame subscribes, and a button reads `pb.live.get()` when pressed (the review link ran without it and redrew its whole page per frame; a row with the timecode in it renders with the timecode).
 - Writes are optimistic (`guess()` + rollback); SSE events patch their video, never refetch the library.
 - An action with Undo waits behind `later()` and is sent on `beforeunload` too, not only `pagehide`.
+- A jump to another version goes through `pb.jumpTo(frame, target.frames)`: `seek` clamps by the version on
+  screen and seeks its source (V1's 90 frames held V2's frame 250 at 89); the target's source puts the frame up.

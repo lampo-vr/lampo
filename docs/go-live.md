@@ -328,7 +328,10 @@ On `up -d` the old container gets SIGTERM: it stops taking connections, ends liv
 reconnect by themselves), and waits up to 30 s for uploads being registered, the running job and what deleted videos
 are removing from storage (`stop_grace_period: 45s`; removals it cuts short are written down, and the new container
 finishes them). Uploads in flight pause and resume on their own (they retry for about four minutes).
-Queued background jobs run again in the new container.
+Queued background jobs don't move to the new container. Work that comes back by itself is asked for again (posters,
+checks and transcripts when the videos are opened or warmed up at the start); recorded feedback the old container was
+hearing, or had queued, is heard again by the new one as it starts. A recording whose sound was still on its way when
+the old container stopped shows as one that couldn't be heard, with its drawings as drafts and Discard at hand.
 
 Rollback: `git checkout <previous>`, `docker tag lampo:<previous> lampo:local`,
 `docker compose up -d app`. The store format only grows (new fields are optional), so the previous version reads it;

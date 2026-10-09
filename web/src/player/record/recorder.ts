@@ -77,8 +77,11 @@ export async function startRecorder(o: RecorderOptions): Promise<Recorder> {
   const now = () => ((paused ? pausedAt : performance.now()) - started - pausedFor) / 1000;
 
   const events: RecordingEvent[] = [];
+  // Once stop() has begun the log is closed: what the page does while the audio is still being finished (another
+  // version going up, its frame) didn't happen in this recording.
+  let ended = false;
   const log = (e: Unstamped<RecordingEvent>) => {
-    if (paused || events.length >= RECORDING_MAX_EVENTS) return;
+    if (paused || ended || events.length >= RECORDING_MAX_EVENTS) return;
     events.push({ ...e, t: round3(e.t ?? Math.max(0, now())) } as RecordingEvent);
   };
 
@@ -204,6 +207,7 @@ export async function startRecorder(o: RecorderOptions): Promise<Recorder> {
     async stop() {
       resume();
       logFrame();
+      ended = true;
       const duration = round3(now());
       await new Promise<void>((resolve) => {
         mr.onstop = () => resolve();

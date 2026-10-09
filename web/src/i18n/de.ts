@@ -2327,6 +2327,8 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'The recording could not be sent: {errorMessage}': 'Die Aufnahme konnte nicht gesendet werden: {errorMessage}',
   'The recording is kept: {error}': 'Die Aufnahme bleibt erhalten: {error}',
   'the speech engine did not answer': 'die Spracherkennung hat nicht geantwortet',
+  'Its sound didn’t reach Lampo: {error}': 'Der Ton ist nicht bei Lampo angekommen: {error}',
+  'the connection dropped': 'die Verbindung ist abgebrochen',
   'What should change here?': 'Was soll sich hier ändern?',
   'What should change here? (the drawing says where)': 'Was soll sich hier ändern? (Die Zeichnung zeigt, wo)',
   'You pointed here while you said it': 'Hierhin hast du gezeigt, während du es gesagt hast',

@@ -877,6 +877,91 @@ try {
     },
   );
 
+  // A draft's words as typed are what a Send sends: its autosave still on its way, or failed. The page's fetch is wrapped
+  // for the draft's PATCH and the send only: 'hold' keeps the PATCH until __release(), 'fail' drops it like a lost
+  // connection (`fails` times; then it goes through).
+  const efile = makeVideo(path.join(dir, 'Spot/export/edits.mp4'), { w: 320, h: 180, fps: 25, dur: 4, pattern: 'testsrc2' });
+  age(efile);
+  const slug4 = (await api('/api/library', 'POST', { path: efile })).video.slug;
+  const notes4 = async () => (await api(`/api/review/${enc(slug4)}`)).review.comments;
+  const draftsOf4 = async () => (await api(`/api/review/${enc(slug4)}/drafts`)).drafts;
+  const editing = async (mode, fails, before, after) => {
+    await api(`/api/review/${enc(slug4)}/drafts`, 'POST', { v: 1, frame: 40, text: before });
+    await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: SHOTS ? 2 : 1, isMobile: false, hasTouch: false });
+    await page.goto('about:blank');
+    await page.goto(`${BASE}/#/v/${enc(slug4)}`, { waitUntil: 'domcontentloaded' });
+    await videoReady();
+    await page.waitForSelector('[data-testid=note-draft] textarea');
+    await page.evaluate(
+      (mode, fails) => {
+        const real = window.fetch;
+        let go;
+        const gate = new Promise((r) => {
+          go = r;
+        });
+        window.__release = () => go();
+        window.__patches = [];
+        window.__sent = null;
+        let failing = fails;
+        window.fetch = async (input, init) => {
+          const at = new URL(String(input), location.href).pathname;
+          const method = init?.method ?? 'GET';
+          if (method === 'POST' && at.endsWith('/drafts/send')) window.__sent = { held: window.__patches.some((p) => p.state === 'held') };
+          if (method === 'PATCH' && /\/drafts\/[^/]+$/.test(at)) {
+            const p = { body: JSON.parse(init.body), state: mode === 'hold' ? 'held' : 'failed' };
+            window.__patches.push(p);
+            if (mode === 'fail' && failing-- > 0) throw new TypeError('Failed to fetch');
+            if (mode === 'hold') await gate;
+            p.state = 'done';
+          }
+          return real(input, init);
+        };
+      },
+      mode,
+      fails,
+    );
+    await page.click('[data-testid=note-draft] textarea');
+    await page.$eval('[data-testid=note-draft] textarea', (t) => t.select());
+    await page.keyboard.type(after);
+    // the autosave went out (700 ms after the last key)
+    await until(() => page.evaluate(() => window.__patches.length), 'the autosave');
+  };
+  const sentText = (letter) => until(async () => (await notes4()).find((c) => c.text.endsWith(` words ${letter}`))?.text, 'the note sent');
+
+  await check('a draft sent while its autosave is still on its way waits for it: the note says what the box says', async () => {
+    await editing('hold', 0, 'old words A', 'new words A');
+    await page.click('[data-testid=draft-send]');
+    await page.waitForSelector('[data-testid=note-draft][data-going=sending]');
+    assert(!(await page.evaluate(() => window.__sent)), 'nothing sent while the save is on its way');
+    await page.evaluate(() => window.__release());
+    const sent = await sentText('A');
+    assert(sent === 'new words A', `the note sent: "${sent}"`);
+    assert((await page.evaluate(() => window.__sent)).held === false, 'sent after the save landed');
+    await until(async () => !(await draftsOf4()).length, 'the draft sent');
+  });
+
+  await check('a draft whose autosave failed is saved again before its Send: the note says what the box says', async () => {
+    await editing('fail', 1, 'old words B', 'new words B');
+    await until(() => toastSaid('Failed to fetch'), 'the failed save says so');
+    assert((await draftsOf4())[0].text === 'old words B', 'the failed save left the server’s copy');
+    await page.click('[data-testid=draft-send]');
+    const sent = await sentText('B');
+    assert(sent === 'new words B', `the note sent: "${sent}"`);
+    await until(async () => !(await draftsOf4()).length, 'the draft sent');
+  });
+
+  await check('a draft that can’t be saved is not sent with older words: nothing goes, the box keeps them', async () => {
+    await editing('fail', 99, 'old words C', 'new words C');
+    await page.click('[data-testid=draft-send]');
+    await until(() => page.evaluate(() => window.__patches.length >= 2), 'Send saves them first');
+    await page.waitForSelector('[data-testid=note-draft]:not([data-going])');
+    assert(!(await page.evaluate(() => window.__sent)), 'nothing sent');
+    assert(!(await notes4()).some((c) => c.text.endsWith(' words C')), 'no note');
+    const shown = await page.$eval('[data-testid=note-draft] textarea', (t) => t.value);
+    assert(shown === 'new words C', `the box keeps the words: "${shown}"`);
+    await api(`/api/review/${enc(slug4)}/drafts/${(await draftsOf4())[0].id}`, 'DELETE');
+  });
+
   await check('no page errors', async () => {
     assert(!errors.length, errors.join('\n'));
   });

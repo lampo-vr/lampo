@@ -18,6 +18,9 @@ import type { Recording, RecordingDraft, RecordingEvent, Version } from './types
 /** A recording as kept: the public part plus the event log the drafts are made from. */
 export interface StoredRecording extends Recording {
   events: RecordingEvent[];
+  /** The languages its maker speaks (Settings → Voice notes) when it was given to be heard: a hearing a stop cut off is
+   * heard again in them. Absent: the server's. */
+  languages?: string[];
 }
 
 const ID = /^rec_[a-f0-9]{12}$/;
@@ -65,10 +68,24 @@ export function removeRecording(slug: string, id: string): void {
   fs.rmSync(audioFile(slug, id), { force: true });
 }
 
-/** What the API shows: everything but the event log. */
+/** What the API shows: everything but the event log (and the languages it is heard in). */
 export function publicRecording(r: StoredRecording): Recording {
-  const { events: _events, ...rest } = r;
+  const { events: _events, languages: _languages, ...rest } = r;
   return rest;
+}
+
+/**
+ * A recording whose audio didn't arrive — refused (not audio, too long, no room) or cut off — as one that couldn't be
+ * heard, with `why`: its drawings are its drafts, and nothing waits for audio for good. Returns it as saved, or null
+ * when it is gone or no longer waiting for audio.
+ */
+export function audioMissed(slug: string, id: string, ver: Pick<Version, 'fps' | 'frames' | 'width' | 'height'>, why: string): StoredRecording | null {
+  const r = loadRecording(slug, id);
+  if (r?.state !== 'uploading') return null;
+  const drafts = segmentRecording({ events: r.events, fps: ver.fps, frames: ver.frames, width: ver.width, height: ver.height, newId: newDraftId, words: [] });
+  const next: StoredRecording = { ...r, state: 'failed', error: why, audio: false, drafts };
+  saveRecording(next);
+  return next;
 }
 
 /** Words with timings from what the engine heard; engines that only time lines have their words spread over them. */

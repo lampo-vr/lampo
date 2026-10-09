@@ -29,3 +29,5 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
   machine delivers them apart, and the page's `timeStamp`s follow the stamps (`mobile.mjs`).
 - A row that must fit a phone is also checked with letters a little wider (`letter-spacing: 0.04em`): Linux sets them
   wider than a Mac, and CI's 390 px overflowed by 6 px where the Mac's fit (`record.mjs`, `zoom.mjs`).
+- After a seek, wait for the picture (`closestFrame` in an `until`), not for a new rVFC: a paused video presents
+  nothing new once the seek's frame is up, so a callback asked for after it never comes (`player.mjs`).

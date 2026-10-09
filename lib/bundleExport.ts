@@ -110,6 +110,27 @@ const appVersion = (): string => {
   }
 };
 
+/**
+ * What the store keeps on a record that a bundle doesn't carry, and why; every other field goes as the bundle's strict
+ * schema says (lib/bundle.ts), so a field neither carried nor named here stops an export. `bundle-portable.test.ts`
+ * holds every field of these types to one or the other, before it reaches anyone's export.
+ */
+export const LEFT_OUT = {
+  // where this store keeps the bytes (the other store keeps its own); the agent's run that made it (runs stay behind)
+  version: ['stored', 'run'],
+  // the review link it came through (links stay behind; what a visitor wrote stays theirs, by name)
+  reply: ['share'],
+  comment: ['share', 'draft'],
+  ref: ['share'],
+} as const satisfies Record<string, readonly string[]>;
+
+/** A copy of `x` without `keys`. */
+const without = <T extends object>(x: T, keys: readonly string[]): T => {
+  const o = { ...x } as Record<string, unknown>;
+  for (const k of keys) delete o[k];
+  return o as T;
+};
+
 const problemOf = (e: { issues: { path: PropertyKey[]; message: string }[] }): string => {
   const i = e.issues[0];
   return i ? `${i.path.map(String).join('.') || '(top)'}: ${i.message}` : 'invalid';
@@ -215,7 +236,7 @@ export async function exportBundle(o: ExportOptions): Promise<ExportResult> {
 
   // ------------------------------------------------------------------ references, people, links: as the server holds them
   const refOut = (ref: NoteRef): NoteRef => {
-    const { share: _share, by_id, ...rest } = ref;
+    const { by_id, ...rest } = without(ref, LEFT_OUT.ref);
     const x: NoteRef = { ...rest };
     const who = personOf(by_id, ref.by);
     if (who) x.by_id = who;
@@ -228,13 +249,13 @@ export async function exportBundle(o: ExportOptions): Promise<ExportResult> {
     return x;
   };
   const commentOut = (c: Comment): Comment => {
-    const { share: _share, draft: _draft, author_id, ...rest } = c;
+    const { author_id, ...rest } = without(c, LEFT_OUT.comment);
     const x: Comment = { ...rest };
     const who = personOf(author_id, c.author);
     if (who) x.author_id = who;
     if (!c.author.startsWith('agent') && !c.author.startsWith('guest:') && who === 'owner') ownerNames.add(c.author);
     x.replies = c.replies.map((rp) => {
-      const { by_id, ...r } = rp;
+      const { by_id, ...r } = without(rp, LEFT_OUT.reply);
       const y = { ...r };
       const w = personOf(by_id, rp.by);
       return w ? { ...y, by_id: w } : y;
@@ -268,7 +289,7 @@ export async function exportBundle(o: ExportOptions): Promise<ExportResult> {
         ? { name: r.session.name, id: null, cwd: null, assigned: r.session.assigned, by: r.session.by, ...(r.session.agent ? { agent: r.session.agent } : {}) }
         : null,
       versions: r.versions.map((v) => {
-        const { stored: _stored, ...rest } = v;
+        const rest = without(v, LEFT_OUT.version);
         return rest.source?.project ? { ...rest, source: { ...rest.source, project: store.fileName(rest.source.project) } } : rest;
       }),
       comments: r.comments.map(commentOut),
@@ -435,7 +456,8 @@ export async function exportBundle(o: ExportOptions): Promise<ExportResult> {
       };
       if (e.shots) x.shots = { clean: base(e.shots.clean), marked: base(e.shots.marked), ...(e.shots.range ? { range: base(e.shots.range) } : {}) };
       if (e.reply) {
-        const { by_id: _by, ...reply } = e.reply;
+        // as on the note: a visitor's reply comes along without the link it came through
+        const { by_id: _by, ...reply } = without(e.reply, LEFT_OUT.reply);
         x.reply = reply;
       }
       if (e.ref) {

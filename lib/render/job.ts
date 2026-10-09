@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { ActivityRecord, ActivitySink } from '../activity.ts';
 import { type ActivityKey, excerpt, words } from '../activityText.ts';
-import type { Backend } from '../backend/types.ts';
+import { type Backend, StoppedError } from '../backend/types.ts';
 import { stillOpenLine, WATCH_NOW_LINE } from '../handoff.ts';
 import { isoLocal, slugify } from '../paths.ts';
 import { probe } from '../probe.ts';
@@ -56,6 +56,8 @@ export interface RenderHooks {
   onStart?: (run: ToolRun) => void;
   /** True once someone stopped it (Ctrl-C, a signal to the supervisor). */
   stopped?: () => boolean;
+  /** Aborted by the same stop: what is being put up when it comes is ended, and nothing goes up. */
+  abort?: AbortSignal;
 }
 
 export interface RenderOutcome {
@@ -83,6 +85,9 @@ export function failedWords(code: number, quote: string): ActivityWords {
   const shown = quote.length > room ? `${quote.slice(0, room - 1).trimEnd()}…` : quote;
   return { text: quote ? `${filled} “${shown}”` : filled, key, vars: { code }, ...(quote ? { quote } : {}) };
 }
+
+/** What a stopped render exits with when its tool said nothing else (0, or no code): 128 + SIGINT, as a shell does. */
+const STOPPED_CODE = 130;
 
 const probeInput = async (file: string) => {
   try {
@@ -170,13 +175,18 @@ export async function executeRender(job: RenderJob, hooks: RenderHooks): Promise
     return { ok: false, code, lines: [oneLine(`Render failed (exit ${code})${line ? `: ${line.replace(/[.\s]+$/, '')}` : ''}.${sees}`)] };
   };
 
-  if (result.code !== 0 || result.startError) {
-    if (result.startError) return fail(result.code, redact(result.startError), redact(result.startError));
+  // A stopped render never goes up, whatever its tool exited with: a wrapper script around ffmpeg (no `set -e`) runs
+  // on to exit 0 after a Ctrl-C, and the file it leaves is cut short.
+  const stoppedFail = (code: number) => {
     const said = failureWords(result.tail, { home: os.homedir() });
-    if (hooks.stopped?.() || (!said.line && result.signal)) {
-      const why = `stopped${result.signal ? ` (${result.signal})` : ''}${said.quote ? ` · ${said.quote}` : ''}`;
-      return fail(result.code, why.slice(0, ERROR_MAX), said.line ? `stopped · ${said.line}` : 'stopped');
-    }
+    const why = `stopped${result.signal ? ` (${result.signal})` : ''}${said.quote ? ` · ${said.quote}` : ''}`;
+    return fail(code || STOPPED_CODE, why.slice(0, ERROR_MAX), said.line ? `stopped · ${said.line}` : 'stopped');
+  };
+  if (result.startError) return fail(result.code, redact(result.startError), redact(result.startError));
+  if (hooks.stopped?.()) return stoppedFail(result.code);
+  if (result.code !== 0) {
+    const said = failureWords(result.tail, { home: os.homedir() });
+    if (!said.line && result.signal) return stoppedFail(result.code);
     return fail(result.code, said.quote, said.line);
   }
 
@@ -185,7 +195,7 @@ export async function executeRender(job: RenderJob, hooks: RenderHooks): Promise
     const why = `it finished, but ${path.basename(job.out)} isn't there: check --out`;
     return fail(1, why, why, words('Stopped with an error', undefined, why));
   }
-  if (job.into) return putUpNew(job, job.into, { hooks, elapsed, frames, sees, say, report, latest });
+  if (job.into) return putUpNew(job, job.into, { hooks, elapsed, frames, sees, say, report, latest, stoppedFail });
   if (!job.to) {
     say('render', words('Rendered in {time}', { time: elapsed }));
     const what = job.outShown ? ` ${job.outShown}` : '';
@@ -200,6 +210,7 @@ export async function executeRender(job: RenderJob, hooks: RenderHooks): Promise
   let got: number;
   let duplicate = false;
   try {
+    if (hooks.stopped?.()) return stoppedFail(0);
     if (to.same) {
       // re-rendered where it is tracked: registered in place (the app's watcher may have been first)
       report({ stage: 'checking', pct: null }, undefined, true);
@@ -220,12 +231,14 @@ export async function executeRender(job: RenderJob, hooks: RenderHooks): Promise
           if (sent >= total) report({ stage: 'checking', pct: null });
           else report({ stage: 'uploading', pct: total > 0 ? (sent / total) * 100 : null });
         },
+        ...(hooks.abort ? { signal: hooks.abort } : {}),
       });
       review = r.review;
       got = r.v;
       duplicate = r.duplicate;
     }
   } catch (e) {
+    if (e instanceof StoppedError) return stoppedFail(0);
     const why = redact(oneLine((e as Error).message)).slice(0, ERROR_MAX);
     say('error', words('Stopped with an error', undefined, why), latest.p ? { progress: latest.p } : {});
     return { ok: false, code: 1, lines: [oneLine(`V${to.next} rendered in ${elapsed}, but putting it up failed: ${why.replace(/[.\s]+$/, '')}.${sees}`)] };
@@ -262,12 +275,14 @@ async function putUpNew(
     say: (kind: AgentActivityKind, w: ActivityWords, more?: Partial<ActivityRecord>) => void;
     report: (r: Reading, b?: number, force?: boolean) => void;
     latest: { p: RunProgress | null };
+    stoppedFail: (code: number) => RenderOutcome;
   },
 ): Promise<RenderOutcome> {
   const b = ctx.hooks.backend;
   const out = job.out as string;
   let review: Review;
   try {
+    if (ctx.hooks.stopped?.()) return ctx.stoppedFail(0);
     if (b.kind === 'local') {
       ctx.report({ stage: 'checking', pct: null }, undefined, true);
       review = (await b.track(out, { by: job.by, folder: into.folder, ...(into.session ? { session: into.session } : {}) })).review;
@@ -280,11 +295,13 @@ async function putUpNew(
           if (sent >= total) ctx.report({ stage: 'checking', pct: null });
           else ctx.report({ stage: 'uploading', pct: total > 0 ? (sent / total) * 100 : null });
         },
+        ...(ctx.hooks.abort ? { signal: ctx.hooks.abort } : {}),
       });
       review = r.review;
       if (into.session && r.created) await b.assign(slugify(review.video), into.session, job.by);
     }
   } catch (e) {
+    if (e instanceof StoppedError) return ctx.stoppedFail(0);
     const why = redact(oneLine((e as Error).message)).slice(0, ERROR_MAX);
     ctx.say('error', words('Stopped with an error', undefined, why), ctx.latest.p ? { progress: ctx.latest.p } : {});
     return { ok: false, code: 1, lines: [oneLine(`Rendered in ${ctx.elapsed}, but putting it up failed: ${why.replace(/[.\s]+$/, '')}.${ctx.sees}`)] };

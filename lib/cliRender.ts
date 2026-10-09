@@ -121,12 +121,15 @@ export async function render({ pos, opt, cmd }: RenderArgs, b: Backend, io: Rend
     return;
   }
 
-  // In the foreground: Ctrl-C and a stop reach the whole render (its own process group); a second one kills it.
+  // In the foreground: Ctrl-C and a stop reach the whole render (its own process group); a second one kills it. Once the
+  // tool has ended, the same stop ends the upload or registration under way: a stopped render puts nothing up.
   const sink = agent ? openActivitySink() : null;
   let run: ToolRun | null = null;
   let stops = 0;
+  const halt = new AbortController();
   const onSignal = (sig: NodeJS.Signals) => {
     stops++;
+    halt.abort();
     run?.signal(stops > 1 ? 'SIGKILL' : sig);
   };
   const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
@@ -141,6 +144,7 @@ export async function render({ pos, opt, cmd }: RenderArgs, b: Backend, io: Rend
         run = r;
       },
       stopped: () => stops > 0,
+      abort: halt.signal,
     });
     await sink?.flush();
     for (const l of outcome.lines) io.out(l);

@@ -33,3 +33,5 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - An unsafe hosted setting is a refusal in `startupProblems`: one line, never a stack trace.
 - Hosted jobs: `needJobRoom` before a start, `unlessBusy` for warm-ups, `mustRun` for owed work.
 - Never broadcast `review` per request: every open player refetches on it.
+- Owed work a person waits for (a recording being heard) is taken up again at start from what is on disk
+  (`resumeRecordings`): queued jobs die with the process, and a SIGTERM's drain waits only for the running one.

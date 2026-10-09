@@ -775,7 +775,10 @@ V4 rendered in 3m12s and put up for review (900 frames). Now mark each note fixe
   server. It runs in a process group of its own with stdin closed, so Ctrl-C (or a stop) reaches everything it
   started: what is still there after 5 seconds gets SIGTERM, and SIGKILL 5 seconds after that, also once your
   command itself has ended (a background job it started), and `lampo render` returns when all of it has; a second
-  Ctrl-C kills it at once.
+  Ctrl-C kills it at once. A stopped render puts nothing up, whatever your command exits with (a script around ffmpeg
+  may exit 0 with the file cut short), and a stop while the file goes up ends the upload: `Render failed (exit 130):
+  stopped.` One exception: a video linked to its file on this machine is rendered in place, so what your command
+  already wrote there stays, and the app, if it runs, may take it in as a version.
 - **What it reads:** Remotion (`npx remotion render`, `remotion render`): bundling, rendering and encoding, from the
   lines it prints when its output isn't a terminal. ffmpeg: `lampo render` adds `-progress pipe:3 -nostats` (progress
   flags only; a command that names its own `-progress` keeps it) and measures against the length your arguments give
