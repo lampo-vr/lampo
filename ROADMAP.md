@@ -379,6 +379,11 @@ Findings of audit A13 (2026-10-05, `AUDITS.md`) and its verification rounds that
   and the session), and leaves review links (clients may hold them) to (a)'s list. Recommendation: (a) first — it
   removes nothing a teammate or a client relies on and shows the person what to look at; (b) on top once webhooks
   record the session that made them.
+- A media answer its reader stops reading (A14, after R07's request hold) keeps its connection, and on a server with
+  Bunny or S3 its working copy, for as long as the connection lives: nothing ends a stream that makes no progress. An
+  idle limit (end a streamed answer that moved no byte for a few minutes) would bound it, but a paused player holds its
+  media request open the same way, by not reading: decide the limit, and check that Chrome, Safari and Firefox pick a
+  cut-off media request up again when play resumes.
 
 ## Decided
 

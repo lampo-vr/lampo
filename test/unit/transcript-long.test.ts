@@ -23,38 +23,44 @@ const { cachedTranscript, makeTranscript, transcriptFile } = await import('../..
 const { renderKey } = await import('../../lib/renderKey.ts');
 const { decodePcm } = await import('../../lib/stt/index.ts');
 
-// 32 minutes as a small WAV (8 kHz, 8 bits): silence, and a burst of tone for every word, one of them across 30:00
-const MINUTES = 32;
+/** A small WAV (8 kHz, 8 bits) of `seconds`: silence, and a burst of tone for every word. */
 const RATE = 8000;
+function wav(name: string, seconds: number, said: [number, number][]): string {
+  const n = seconds * RATE;
+  const out = Buffer.alloc(44 + n, 128);
+  out.write('RIFF', 0);
+  out.writeUInt32LE(36 + n, 4);
+  out.write('WAVEfmt ', 8);
+  out.writeUInt32LE(16, 16);
+  out.writeUInt16LE(1, 20);
+  out.writeUInt16LE(1, 22);
+  out.writeUInt32LE(RATE, 24);
+  out.writeUInt32LE(RATE, 28);
+  out.writeUInt16LE(1, 32);
+  out.writeUInt16LE(8, 34);
+  out.write('data', 36);
+  out.writeUInt32LE(n, 40);
+  for (const [t0, t1] of said)
+    for (let i = Math.round(t0 * RATE); i < Math.round(t1 * RATE); i++) out[44 + i] = 128 + Math.round(100 * Math.sin((2 * Math.PI * 330 * i) / RATE));
+  const file = path.join(dir, name);
+  fs.writeFileSync(file, out);
+  return file;
+}
+// 32 minutes, one word across 30:00
+const MINUTES = 32;
 const SAID: [number, number][] = [
   [300, 300.5],
   [1793, 1793.4],
   [1799.7, 1800.3],
   [1900, 1900.5],
 ];
-const audio = path.join(dir, 'talk.wav');
-{
-  const n = MINUTES * 60 * RATE;
-  const wav = Buffer.alloc(44 + n, 128);
-  wav.write('RIFF', 0);
-  wav.writeUInt32LE(36 + n, 4);
-  wav.write('WAVEfmt ', 8);
-  wav.writeUInt32LE(16, 16);
-  wav.writeUInt16LE(1, 20);
-  wav.writeUInt16LE(1, 22);
-  wav.writeUInt32LE(RATE, 24);
-  wav.writeUInt32LE(RATE, 28);
-  wav.writeUInt16LE(1, 32);
-  wav.writeUInt16LE(8, 34);
-  wav.write('data', 36);
-  wav.writeUInt32LE(n, 40);
-  for (const [t0, t1] of SAID)
-    for (let i = Math.round(t0 * RATE); i < Math.round(t1 * RATE); i++) wav[44 + i] = 128 + Math.round(100 * Math.sin((2 * Math.PI * 330 * i) / RATE));
-  fs.writeFileSync(audio, wav);
-}
+const audio = wav('talk.wav', MINUTES * 60, SAID);
 
-// the engine: how long each WAV it is sent runs, and a word for every burst in it, timed on that WAV's clock
+// The engine: how long each WAV it is sent runs, and a word for every burst in it, timed on that WAV's clock. With
+// `bySentence` it answers as engines that time only sentences do: bursts less than a second apart are one segment,
+// and there are no words.
 const received: number[] = [];
+let bySentence = false;
 const stt = http.createServer((req, res) => {
   const chunks: Buffer[] = [];
   req.on('data', (d: Buffer) => chunks.push(d));
@@ -76,8 +82,16 @@ const stt = http.createServer((req, res) => {
       last = i;
     }
     if (start >= 0) words.push({ word: 'word', start: start / 16000, end: (last + 1) / 16000 });
+    const segments: { text: string; start: number; end: number }[] = [];
+    for (const w of words) {
+      const prev = segments.at(-1);
+      if (bySentence && prev && w.start - prev.end < 1) {
+        prev.end = w.end;
+        prev.text += ` ${w.word}`;
+      } else segments.push({ text: w.word, start: w.start, end: w.end });
+    }
     res.setHeader('content-type', 'application/json');
-    res.end(JSON.stringify({ text: words.map((w) => w.word).join(' '), language: 'english', words, segments: words.map((w) => ({ text: w.word, ...w })) }));
+    res.end(JSON.stringify({ text: segments.map((s) => s.text).join(' '), language: 'english', words: bySentence ? [] : words, segments }));
   });
 });
 await new Promise<void>((r) => stt.listen(0, '127.0.0.1', r));
@@ -134,6 +148,31 @@ test('a render longer than one window is heard to its end: every word once and w
   assert.equal(cachedTranscript(ver)?.words.length, SAID.length, 'kept as heard');
 });
 
+test('speech with no pause across the seam, from an engine that times only sentences: none of it lost, none twice', async () => {
+  // a word every half second from 29:35 to 30:15: each window hears one sentence there, the first cut by its end
+  const said: [number, number][] = [];
+  for (let k = 0; k < 80; k++) said.push([1775 + k * 0.5, 1775 + k * 0.5 + 0.3]);
+  bySentence = true;
+  try {
+    const t = await makeTranscript(wav('speech.wav', 31 * 60, said), version(31 * 60, 11), settings);
+    const span = [t.words[0]?.t0 ?? 0, t.words.at(-1)?.t1 ?? 0].map((x) => Math.round(x * 10) / 10);
+    assert.deepEqual(span, [1775, 1814.8], `from the first word to the last: ${JSON.stringify(span)}`);
+    assert.ok(Math.abs(t.words.length - said.length) <= 1, `${t.words.length} words for ${said.length} said`);
+    assert.equal(t.timing, 'line', 'words spread over sentences say so');
+  } finally {
+    bySentence = false;
+  }
+});
+
+test('a sound longer than the overlap, cut by both windows’ edges: heard to its end, as one word', async () => {
+  const t = await makeTranscript(wav('tone.wav', 31 * 60, [[1780, 1810]]), version(31 * 60, 13), settings);
+  assert.deepEqual(
+    t.words.map((w) => [Math.round(w.t0), Math.round(w.t1)]),
+    [[1780, 1810]],
+    JSON.stringify(t.words.map((w) => [w.t0, w.t1])),
+  );
+});
+
 test('the seam is cut where neither window hears a word, in the middle half of their overlap', async () => {
   const { seamCut } = await import('../../lib/stt/seams.ts');
   const heard = (spans: [number, number][]) => ({ words: spans.map(([t0, t1]) => ({ t0, t1 })), segments: [] });
@@ -151,8 +190,53 @@ test('the seam is cut where neither window hears a word, in the middle half of t
     100,
   );
   assert.ok(cut > 93.4 && cut < 97.5, `cut at ${cut}`);
-  // speech all through the middle half: its middle
+  // words that touch, a boundary both windows have: there
+  const touching = heard([
+    [92, 95],
+    [95, 98],
+  ]);
+  assert.equal(seamCut(touching, touching, 90, 100), 95);
+  // no boundary in common: a boundary of one window's that the other's words cross least (of two alike, the one nearer
+  // the middle)
+  assert.equal(
+    seamCut(
+      heard([
+        [92, 94],
+        [94, 98],
+      ]),
+      heard([
+        [92.1, 94.2],
+        [94.2, 98],
+      ]),
+      90,
+      100,
+    ),
+    94.2,
+  );
+  // one sound all through the middle half: its middle
   assert.equal(seamCut(heard([[91, 99]]), heard([[91, 99]]), 90, 100), 95);
+});
+
+test('each word is kept from the window that heard it whole', async () => {
+  const { joinWords, seamCuts } = await import('../../lib/stt/seams.ts');
+  const w = (text: string, t0: number, t1: number) => ({ text, t0, t1 });
+  const join = (earlier: ReturnType<typeof w>[], later: ReturnType<typeof w>[]) => {
+    const windows = [
+      { from: 0, end: 100, words: earlier },
+      { from: 90, end: 200, words: later },
+    ];
+    return joinWords(windows, seamCuts(windows)).map((x) => [x.text, x.t0, x.t1]);
+  };
+  // a word across the later window's start (whole in the earlier), one inside both, one across the earlier's end
+  assert.deepEqual(join([w('a', 89.8, 90.4), w('b', 94, 94.5), w('c', 99.7, 100)], [w('a', 90, 90.4), w('b', 94, 94.5), w('c', 99.7, 100.3)]), [
+    ['a', 89.8, 90.4],
+    ['b', 94, 94.5],
+    ['c', 99.7, 100.3],
+  ]);
+  // a long sound across the whole overlap, which neither window heard whole
+  assert.deepEqual(join([w('aah', 80, 100)], [w('aah', 90, 110)]), [['aah', 80, 110]]);
+  // a long sound the later window heard whole: its copy
+  assert.deepEqual(join([w('oh', 91, 100)], [w('oh', 91, 105)]), [['oh', 91, 105]]);
 });
 
 test('a window that starts later in the file gives the samples a decode from its start gives there', async () => {

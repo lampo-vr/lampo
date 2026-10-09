@@ -8,6 +8,7 @@ import type { Config } from '../config.ts';
 import { CACHE } from '../paths.ts';
 import { FFMPEG, run } from '../probe.ts';
 import { internal } from '../publicError.ts';
+import { spreadWords } from '../transcript.ts';
 import type { TranscriptRepair } from '../types.ts';
 import { type RepairDeps, repairCollapses } from './collapse.ts';
 import { type Dropped, dropHallucinations, stripHallucinations } from './hallucinations.ts';
@@ -15,7 +16,7 @@ import { httpTranscribe } from './http.ts';
 import { type EngineState, LocalEngine, MissingModelError } from './local.ts';
 import { MODELS, type ModelPreset, modelFile } from './models.ts';
 import { type Attempt, isSilent, type SttResult, transcribeWithPolicy, vocabularyPrompt } from './policy.ts';
-import { keptStretches } from './seams.ts';
+import { joinWords, keptBetween, seamCuts } from './seams.ts';
 
 type SttSettings = Config['stt'];
 
@@ -303,22 +304,21 @@ async function heardTimed(file: string, s: SttSettings, log: (m: string) => void
   if (!first)
     return { text: '', language: '', words: [], segments: [], engine: s.backend === 'http' ? `http:${s.http?.model || 'whisper-1'}` : `local:${s.model}` };
   if (parts.length === 1) return first.heard;
-  // each window keeps what starts in its own stretch between the seams
-  const kept = keptStretches(parts);
-  const own = <T extends { t0: number }>(list: T[], i: number): T[] => {
-    const k = kept[i];
-    return k ? list.filter((x) => x.t0 >= k.from && x.t0 < k.until) : list;
-  };
-  const words = parts.flatMap((p, i) => own(p.heard.words, i));
-  const segments = parts.flatMap((p, i) => own(p.heard.segments, i));
-  const repairs = parts.flatMap((p, i) => own(p.heard.repairs ?? [], i));
+  // A window an engine timed only by sentence has its words spread over them (as lib/transcript.ts would later), so
+  // each seam is cut between words: a sentence one window heard only the start of is never kept for the rest of it.
+  const spread = parts.some((p) => !p.heard.words.length && p.heard.segments.length);
+  const windows = parts.map((p) => ({ from: p.from, end: p.end, words: p.heard.words.length ? p.heard.words : p.heard.segments.flatMap(spreadWords) }));
+  const cuts = seamCuts(windows);
+  const words = joinWords(windows, cuts);
+  const segments = parts.flatMap((p, i) => keptBetween(p.heard.segments, cuts, i));
+  const repairs = parts.flatMap((p, i) => keptBetween(p.heard.repairs ?? [], cuts, i));
   return {
     text: joined(words.length ? words : segments),
     language: parts.find((p) => p.heard.language)?.heard.language ?? '',
     words,
     segments,
     engine: first.heard.engine,
-    ...(parts.some((p) => p.heard.timing === 'line') ? { timing: 'line' as const } : {}),
+    ...(spread || parts.some((p) => p.heard.timing === 'line') ? { timing: 'line' as const } : {}),
     ...(repairs.length ? { repairs } : {}),
   };
 }

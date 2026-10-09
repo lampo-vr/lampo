@@ -65,8 +65,9 @@ format stays backwards compatible throughout.
 - A version's waveform is measured while its audio is decoded instead of after loading all of it, so a long video's
   waveform takes little memory, and a very long one gets a waveform at all.
 - In the transcript of a video longer than half an hour, a word said where one half hour ends and the next begins is
-  no longer cut in two, and every word there is kept once. Such transcripts made before are heard again the next time
-  they are asked for.
+  no longer cut in two, and every word there is kept once, also when speech goes on there without a pause and with
+  speech engines that time only sentences. Such transcripts made before are heard again the next time they are asked
+  for.
 - **Security:** recovering an account with a password reset or *Sign out everywhere* now also stops password and
   address changes, API tokens, invites and notification devices asked for earlier in other sessions, and a reset link
   the person asked for keeps working until it is used or expires.
