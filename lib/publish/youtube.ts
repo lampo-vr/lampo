@@ -316,10 +316,13 @@ export function createYouTube(o: YouTubeOptions): YouTube {
       const item = r.json<{
         items?: { status?: { privacyStatus?: string; publishAt?: string; uploadStatus?: string; failureReason?: string; rejectionReason?: string } }[];
       }>().items?.[0];
+      // gone may be someone's deletion on the channel: the post keeps where it stood
       if (!item) throw new PublishError('The video is gone from YouTube (deleted on the channel?)');
       const s = item.status ?? {};
-      if (s.uploadStatus === 'rejected') throw new PublishError(`YouTube rejected the video${s.rejectionReason ? ` (${s.rejectionReason})` : ''}`);
-      if (s.uploadStatus === 'failed') throw new PublishError(`YouTube couldn’t process the video${s.failureReason ? ` (${s.failureReason})` : ''}`);
+      // YouTube's own verdict on the video it holds: the post's outcome, whatever it was before, with its id (PUB-1)
+      const verdict = (msg: string) => Object.assign(new PublishError(msg), { remoteId: id });
+      if (s.uploadStatus === 'rejected') throw verdict(`YouTube rejected the video${s.rejectionReason ? ` (${s.rejectionReason})` : ''}`);
+      if (s.uploadStatus === 'failed') throw verdict(`YouTube couldn’t process the video${s.failureReason ? ` (${s.failureReason})` : ''}`);
       const due = !post.schedule_at || Date.parse(post.schedule_at) <= now();
       const wanted = post.visibility !== 'private' || !!post.schedule_at;
       const locked = wanted && s.privacyStatus === 'private' && !(s.publishAt && !due);

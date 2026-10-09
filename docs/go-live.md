@@ -213,7 +213,11 @@ What, and how often:
 | posters, playback copies, the speech model | `/data/cache/` | never: rebuilt on demand |
 
 Files in `data/` and `versions/` are written by atomic renames, so a copy taken while the app runs is consistent per
-file; nothing needs to stop. A backup holds the keys (`secret.key` signs sessions, `share-secret.key` seals review
+file, not across files; nothing needs to stop. The backup below copies `data/` first and `versions/` after it, so an
+upload made meanwhile only leaves a render no review names yet (harmless). A video without notes deleted while the
+backup runs can come back from it without its render: the app shows it as a version whose file is gone, and deleting
+it again is enough. For a set consistent across files, back up a filesystem snapshot of the volume (LVM, ZFS, btrfs),
+or stop the app for the copy. A backup holds the keys (`secret.key` signs sessions, `share-secret.key` seals review
 links): **encrypt it**, and keep it somewhere else than the server. Losing `secret.key` also loses every publishing
 connection (their keys and sign-ins are sealed under it: each is added again) and any upload to a platform that hadn't
 finished (it starts over).

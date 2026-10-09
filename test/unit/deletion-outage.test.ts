@@ -217,3 +217,36 @@ test('while the registry can’t be read, a pass erases nothing', async () => {
   }
   assert.deepEqual((await deletion.finishDeletions()).erased, [id]);
 });
+
+test('an erasure log that can’t be written refuses the deletion before anything goes: registry, billing, people, files', async () => {
+  const dan = await auth.createUser({ email: 'dan@example.com', name: 'Dan Okafor', password: PASSWORD, role: 'member' });
+  const D = ws.createWorkspace({ name: 'Heron Films', ownerId: dan.id }).id;
+  if (ws.roleIn('w1', dan.id)) ws.removeMember('w1', dan.id);
+  await objectIn(D, 'v1.mp4');
+  const login = await request('POST', '/api/auth/login', { body: { email: 'dan@example.com', password: PASSWORD }, headers: origin });
+  assert.equal(login.status, 200, login.text);
+  const before = heard.length;
+  // the log can't take a line (a folder in its place: refused for root too, as a full disk or a lost permission would)
+  const log = fs.readFileSync(ERASURES_FILE);
+  fs.rmSync(ERASURES_FILE);
+  fs.mkdirSync(ERASURES_FILE);
+  let r!: Awaited<ReturnType<typeof request>>;
+  try {
+    r = await request('POST', '/api/workspaces/current/delete', { body: { name: 'Heron Films' }, headers: { Cookie: cookieFrom(login), ...origin } });
+  } finally {
+    fs.rmSync(ERASURES_FILE, { recursive: true });
+    fs.writeFileSync(ERASURES_FILE, log, { mode: 0o600 });
+  }
+  assert.equal(r.status, 500, r.text);
+  assert.doesNotMatch(r.text, /erasure|EISDIR/, 'a server fault, said by audience');
+  assert.ok(ws.getWorkspace(D), 'still in the registry');
+  assert.equal(await erased(D), false);
+  await ctx.extension.idle();
+  assert.equal(heard.length, before, 'billing heard nothing');
+  assert.ok(auth.getUser(dan.id), 'its owner’s account stays');
+  assert.equal(objectsOf(D).length, 1, 'its files stay');
+  // with a log that works, the same deletion goes through and is on record
+  const again = await request('POST', '/api/workspaces/current/delete', { body: { name: 'Heron Films' }, headers: { Cookie: cookieFrom(login), ...origin } });
+  assert.equal(again.status, 200, again.text);
+  assert.equal(await erased(D), true);
+});

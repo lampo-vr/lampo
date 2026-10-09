@@ -491,6 +491,8 @@ async function start(key: string) {
   });
   running.set(key, upload);
   const previous = await upload.findPreviousUploads().catch(() => [] as PreviousUpload[]);
+  // cancelled, or signed out, while the lookup ran: start() would bring an aborted upload back to life
+  if (running.get(key) !== upload) return;
   if (previous[0]) {
     upload.resumeFromPreviousUpload(previous[0]);
     patch([key], { resumed: true });

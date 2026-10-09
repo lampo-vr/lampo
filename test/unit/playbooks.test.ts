@@ -398,6 +398,53 @@ test('accepting a suggestion never overwrites what a person changed in that sect
   playbooks.rejectProposal(stale.id, { by: 'Sam', reason: 'Mia’s rules stand' });
 });
 
+test('a history trimmed past where an edit or a suggestion began: whether its section changed can’t be told, so it counts as changed', () => {
+  folders.createFolder('Trimmed');
+  const scope = 'Trimmed';
+  playbooks.writeText(scope, 'brief', 'Brief v1', { by: 'Sam' }); // r1
+  playbooks.putSkill(scope, playbooks.parseSkill('---\nname: grade\ndescription: Grade a reel\n---\n\nWarm.'), { by: 'Sam' }); // r2: the old tab opens here
+  const old = playbooks.propose(scope, { section: 'brief', content: 'Brief from an old suggestion', reason: 'Old', by: 'agent:promo-edit' });
+  playbooks.writeText(scope, 'brief', 'Brief v2 (deliberate)', { by: 'Mia', base_rev: 2 }); // r3
+  const limit = text.PLAYBOOK_LIMITS.history;
+  for (let i = 0; i <= limit; i++) playbooks.writeText(scope, 'rules', `- rule ${i}`, { by: 'Mia' });
+  const p = playbooks.loadPlaybook(scope);
+  assert.equal(p.history.length, limit);
+  assert.ok((p.history[0]?.rev ?? 0) > 3, 'Mia’s brief is no longer in the history');
+  // the old tab's edit: refused, never written over Mia's brief
+  assert.throws(
+    () => playbooks.writeText(scope, 'brief', 'Brief from the old tab', { by: 'Sam', base_rev: 2 }),
+    (e: { status: number; message: string }) => e.status === 409 && /can’t be told: open it again/.test(e.message),
+  );
+  assert.equal(playbooks.loadPlaybook(scope).brief, 'Brief v2 (deliberate)');
+  // a skill removed from that revision: the same
+  assert.throws(
+    () => playbooks.deleteSkill(scope, 'grade', { by: 'Sam', base_rev: 2 }),
+    (e: { status: number }) => e.status === 409,
+  );
+  assert.ok(playbooks.loadPlaybook(scope).skills.some((s) => s.name === 'grade'));
+  // the old suggestion: the card says it may replace a change, an accept without the revision looked at is refused
+  const now = playbooks.loadPlaybook(scope);
+  const said = text.changedSince(now, old);
+  assert.equal(said?.unknown, true);
+  assert.equal(said?.rev, now.history[0]?.rev, 'the history’s oldest revision');
+  assert.throws(
+    () => playbooks.acceptProposal(old.id, { by: 'Sam' }),
+    (e: { status: number; message: string; details?: Record<string, unknown> }) =>
+      e.status === 409 && /may have changed/.test(e.message) && e.details?.unknown === true,
+  );
+  assert.equal(playbooks.loadPlaybook(scope).brief, 'Brief v2 (deliberate)');
+  // looked at against the playbook as it is now, it is replaced on purpose
+  assert.equal(text.changedSince(now, old, now.rev), null);
+  assert.equal(playbooks.acceptProposal(old.id, { by: 'Sam', base_rev: now.rev }).rev.section, 'brief');
+  assert.equal(playbooks.loadPlaybook(scope).brief, 'Brief from an old suggestion');
+  // an edit opened now saves
+  assert.ok(playbooks.writeText(scope, 'brief', 'Brief v3', { by: 'Sam', base_rev: playbooks.loadPlaybook(scope).rev }));
+  // a base the history still covers changes nothing: a rules edit from a kept revision that saw no brief change saves
+  const p2 = playbooks.loadPlaybook(scope);
+  assert.equal(text.historyCovers(p2, p2.history[0]?.rev ?? 0), true);
+  assert.equal(text.historyCovers(p2, (p2.history[0]?.rev ?? 0) - 2), false);
+});
+
 test('HTTP: accepting a suggestion someone overtook answers 409 with who and which revision', async () => {
   const scope = 'Acme';
   const prop = await request('POST', '/api/playbook/proposals', {

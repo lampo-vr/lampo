@@ -219,7 +219,8 @@ image to roll back to ([go-live.md → Updates and rollback](go-live.md#11-updat
   private (local working files such as `*.local.md` notes, `cloud/`) even reaches the build context (see `.dockerignore`).
 - `docker images lampo` shows its size on your platform.
 - CI builds it (linux/amd64) on every push to main and every pull request, and checks that a container started from it
-  answers `/healthz` (`.github/workflows/ci.yml`).
+  the way `docker-compose.yml` starts one (a read-only root, no capabilities, its data on a volume) is ready: `/readyz`,
+  not only `/healthz` (`.github/workflows/ci.yml`).
 - Its OCI labels say where its source is (`org.opencontainers.image.source` and `.url`: the `SOURCE_URL` build
   argument, the project's repository by default), its licence (`AGPL-3.0-only`) and the commit it was built from
   (`.revision`: the `REVISION` build argument; CI passes it). Build with the commit:

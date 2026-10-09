@@ -11,7 +11,18 @@ import { checkNotArchived } from './folderIds.ts';
 import { cutChars } from './names.ts';
 import { isoLocal } from './paths.ts';
 import { chainOf, HOUSE, listPlaybooks, playbookFile, playbookRoot, readPlaybook, stampFor } from './playbookFiles.ts';
-import { changedSince, cleanText, PLAYBOOK_LIMITS, parseSkill, SKILL_FILE, type SkillText, scopeLabel, skillMarkdown, skillProblem } from './playbookText.ts';
+import {
+  changedSince,
+  cleanText,
+  historyCovers,
+  PLAYBOOK_LIMITS,
+  parseSkill,
+  SKILL_FILE,
+  type SkillText,
+  scopeLabel,
+  skillMarkdown,
+  skillProblem,
+} from './playbookText.ts';
 import { frameRef, frameTarget, imageRef, linkRef } from './refs.ts';
 import { storage } from './storage/index.ts';
 import * as store from './store.ts';
@@ -184,6 +195,13 @@ function checkBase(p: Playbook, section: PlaybookSection, base: number | undefin
     const last = since.at(-1) as PlaybookRevision;
     throw new PlaybookError(409, `${last.accepted_by || last.by} changed this since you opened it`, { rev: p.rev });
   }
+  // nothing kept says so, but the history no longer reaches back to the revision it was opened on: can't tell, refused
+  if (!historyCovers(p, base))
+    throw new PlaybookError(
+      409,
+      `the playbook changed more than ${PLAYBOOK_LIMITS.history} times since you opened it, so whether this changed too can’t be told: open it again`,
+      { rev: p.rev },
+    );
 }
 
 // ---------------------------------------------------------------- brief and rules
@@ -471,6 +489,12 @@ function checkProposalBase(p: Playbook, prop: PlaybookProposal, seen?: number): 
   const what = prop.section.startsWith('skill:') ? `the skill ${prop.section.slice(6)}` : `the ${prop.section}`;
   const after =
     seen !== undefined && seen > prop.base_rev ? `r${Math.min(seen, p.rev)}, the revision you looked at` : `this suggestion was made on r${prop.base_rev}`;
+  if (last.unknown)
+    throw new PlaybookError(
+      409,
+      `${what} may have changed since ${after}: the playbook's history only goes back to r${last.rev}, so accepting it could replace a change. Look at the diff again, then accept it with base_rev ${p.rev} to replace what is there on purpose, or reject it`,
+      { unknown: true, changed_rev: last.rev, base_rev: prop.base_rev, rev: p.rev },
+    );
   throw new PlaybookError(
     409,
     `${by} changed ${what} in r${last.rev}, after ${after}; accepting it would replace that change. Look at the diff again, then accept it with base_rev ${p.rev} to replace it on purpose, or reject it`,

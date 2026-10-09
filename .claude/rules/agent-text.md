@@ -24,6 +24,9 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
   `cleanActivity` (a refused permission: `cleanDenied`) is cleaned the same way, and a rule built from its words stops
   before a word `redact()` would change (`commandPrefix`).
 - Text whose lines are ours leaves through `keepLines` (MCP `text()`, `lampo` output): only `\n` ends a line.
+- With `--json`, stdout is one JSON document: a line `lampo` appends after a command (a stop, new notes) goes to stderr.
+- A decision about what runs on the machine (is that session running?) asks afresh (`sessions.get({ fresh: true })`),
+  never from the list the app shows: it is refreshed only when someone looks, and the first look answers with nothing.
 - Clean agent names where they come in (`cleanAgentName`) and stored ones on read (`shownName`, `shownEvent`).
 - What a caller posts under an agent's name carries the caller's account (`ownedAgentName`).
 - Agent formats keep their tokens (`lampo` lines, INBOX.md, `CHANGE WORDS`, `PICKED`): append, never reword.

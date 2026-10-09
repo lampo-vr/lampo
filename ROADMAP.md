@@ -370,6 +370,15 @@ Findings of audit A13 (2026-10-05, `AUDITS.md`) and its verification rounds that
 - The setup prompt (Copy prompt for your agent): whether the server's instructions also learn "no version yet: ask how
   the work starts" (an agent connected by hand skips that question today; it costs the instructions about 15 tokens over
   their 480 budget), and whether the first run's own agent step (Welcome) leads with the same copy as Get started does.
+- What recovering an account does with what someone else made in it. A password reset (or Sign out everywhere) ends
+  the account's sessions, API tokens, app connections, sign-in codes and push devices, but not the review links and
+  webhooks made meanwhile: they belong to the workspace, not to a session, so a webhook keeps sending the workspace's
+  events and a link keeps its access until someone revokes it in Settings. Options: (a) after a reset, Settings and the
+  "your password was reset" mail list the review links and webhooks made since the last sign-in the person made
+  themselves, with one Revoke for all of them; (b) a reset revokes the webhooks the sessions it ended made (by `by_id`
+  and the session), and leaves review links (clients may hold them) to (a)'s list. Recommendation: (a) first — it
+  removes nothing a teammate or a client relies on and shows the person what to look at; (b) on top once webhooks
+  record the session that made them.
 
 ## Decided
 

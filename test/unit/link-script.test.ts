@@ -1,7 +1,7 @@
 // `npm run link` is the quick start's second step (README, docs/agents.md). Run here the way npm runs it — the script
 // line through sh, from the checkout — with HOME a fresh folder, like a stock Mac without ~/.local/bin (A12 OSS-10).
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -28,6 +28,62 @@ test('npm run link puts lampo (and vr, its older name) in ~/.local/bin on a mach
     assert.equal(fs.realpathSync(link), fs.realpathSync(path.join(ROOT, 'bin/lampo')));
     assert.equal(fs.realpathSync(old), fs.realpathSync(path.join(ROOT, 'bin/vr')));
     assert.doesNotMatch(again, /not on your PATH/);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+const runAll = (home: string) =>
+  spawnSync('sh', ['-c', script], { cwd: ROOT, env: { HOME: home, PATH: `${NODE_PATH}:/usr/bin:/bin`, PWD: ROOT }, encoding: 'utf8' });
+
+test('another program’s lampo or vr in ~/.local/bin is never replaced: the person is told, a folder of that name too', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'vr-link-'));
+  const bin = path.join(home, '.local/bin');
+  try {
+    fs.mkdirSync(bin, { recursive: true });
+    fs.writeFileSync(path.join(bin, 'vr'), '#!/bin/sh\necho "their own vr"\n', { mode: 0o755 });
+    // their vr stays, byte for byte; lampo is linked
+    let r = runAll(home);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(fs.readFileSync(path.join(bin, 'vr'), 'utf8'), '#!/bin/sh\necho "their own vr"\n');
+    assert.equal(fs.lstatSync(path.join(bin, 'vr')).isSymbolicLink(), false);
+    assert.equal(fs.realpathSync(path.join(bin, 'lampo')), fs.realpathSync(path.join(ROOT, 'bin/lampo')));
+    assert.match(r.stdout, /vr is another program’s: left as it is/);
+    // their lampo: refused with the path, nothing replaced
+    fs.rmSync(path.join(bin, 'lampo'));
+    fs.writeFileSync(path.join(bin, 'lampo'), 'their lampo', { mode: 0o755 });
+    r = runAll(home);
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /\.local\/bin\/lampo is there already and isn’t Lampo’s/);
+    assert.equal(fs.readFileSync(path.join(bin, 'lampo'), 'utf8'), 'their lampo');
+    // a folder of that name: said, no stack trace
+    fs.rmSync(path.join(bin, 'lampo'));
+    fs.mkdirSync(path.join(bin, 'lampo'));
+    r = runAll(home);
+    assert.equal(r.status, 1);
+    assert.doesNotMatch(r.stderr, /at .*link\.mjs|EISDIR/, 'no stack trace');
+    assert.ok(fs.statSync(path.join(bin, 'lampo')).isDirectory());
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('a link from another Lampo checkout, or one to nothing, is replaced', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'vr-link-'));
+  const bin = path.join(home, '.local/bin');
+  try {
+    // an older checkout (before the rename) the links pointed into
+    const old = path.join(home, 'old-checkout');
+    fs.mkdirSync(path.join(old, 'bin'), { recursive: true });
+    fs.writeFileSync(path.join(old, 'package.json'), JSON.stringify({ name: 'video-review' }));
+    fs.writeFileSync(path.join(old, 'bin/vr'), '');
+    fs.mkdirSync(bin, { recursive: true });
+    fs.symlinkSync(path.join(old, 'bin/vr'), path.join(bin, 'vr'));
+    fs.symlinkSync(path.join(home, 'moved-away/bin/lampo'), path.join(bin, 'lampo'));
+    const r = runAll(home);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(fs.realpathSync(path.join(bin, 'lampo')), fs.realpathSync(path.join(ROOT, 'bin/lampo')));
+    assert.equal(fs.realpathSync(path.join(bin, 'vr')), fs.realpathSync(path.join(ROOT, 'bin/vr')));
   } finally {
     fs.rmSync(home, { recursive: true, force: true });
   }

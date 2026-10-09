@@ -2,9 +2,10 @@
 // Settings and `lampo admin`: what goes is said first (the plans: counts, never contents), then it goes in an order that
 // never leaves a way in to something half gone.
 //
-// A workspace: out of the registry first (nobody reaches it from then on: sessions fall back to their other workspaces,
-// its review links name nothing), and with that the decision is made: the erasure log gets its line and the billing
-// module hears it (it cancels and forgets the subscription) before anything that can fail. Then its API tokens, app
+// A workspace: the erasure log gets its line first (one that can't be written refuses the deletion, nothing gone), then
+// out of the registry (nobody reaches it from then on: sessions fall back to their other workspaces, its review links
+// name nothing), and with that the decision is made: the billing module hears it (it cancels and forgets the
+// subscription) before anything that can fail. Then its API tokens, app
 // connections, invites and links' index entries go, the accounts it leaves in no workspace go (each with what it kept:
 // lib/erasure.ts afterAccountGone), its waiting jobs are dropped and the running one awaited, then its files — every
 // object under its storage prefix, then its folders. A storage that is down keeps the files, never the deletion: the
@@ -14,11 +15,12 @@
 // first); it leaves the workspaces others go on with, the workspaces it alone works in go with it, then the account.
 import fs from 'node:fs';
 import * as auth from './auth.ts';
-import { erasedWorkspaces, eraseWorkspaceFiles, erasuresSettled, listErasures, recordErasure } from './erasure.ts';
+import { erasedWorkspaces, eraseWorkspaceFiles, erasuresSettled, listErasures, writeErasure } from './erasure.ts';
 import { filesHeld } from './files.ts';
 import { dropJobsOf } from './jobs.ts';
 import { forgetGrants, listApps } from './oauth/store.ts';
 import { DEFAULT_WORKSPACE } from './paths.ts';
+import { internal } from './publicError.ts';
 import { inWorkspace, WORKSPACE_ID } from './scope.ts';
 import { forgetLinksIn, listShares } from './shares.ts';
 import { finishRemovals, listReviews } from './store.ts';
@@ -88,10 +90,18 @@ export interface Told {
 export async function deleteWorkspace(ws: string, by: Deleter): Promise<{ plan: WorkspaceDeletionPlan; people: Told[] }> {
   const plan = planWorkspaceDeletion(ws);
   if (plan.refused) throw new workspaces.WorkspaceError(plan.refused, 409);
+  // On record before anything goes: a deletion the log can't name would cancel billing and leave files nothing finishes,
+  // and a restore would bring the workspace back. A log that can't be written refuses it whole (a server fault, said by
+  // audience). The reverse — the line written, the registry then failing — reads as a restore would: erased, still
+  // listed (`lampo admin erasures`), and deleting it again finishes it.
+  try {
+    writeErasure('workspace', ws, by);
+  } catch (e) {
+    throw internal(new Error(`the erasure log can't be written, so ${ws} was not deleted: ${(e as Error).message}`, { cause: e }));
+  }
   const w = workspaces.dropWorkspace(ws);
-  // decided: written down and unbilled now, so that nothing failing below (a storage outage) can leave a workspace
-  // gone from the app but billed, or brought back by a restore
-  recordErasure('workspace', ws, by);
+  // decided: unbilled now, so that nothing failing below (a storage outage) can leave a workspace gone from the app
+  // but billed
   workspaces.workspaceDeleted(ws);
   auth.accessEnded();
   const people: Told[] = [];

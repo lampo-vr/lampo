@@ -626,6 +626,37 @@ test('folders inside an area: made empty, renamed with their files, trashed and 
   assert.ok(await fileAt('Acme', 'Handover/Final/cut.mov'), 'restored with its files');
 });
 
+test('a folder moved to another area is told to both areas’ views, and so is its Undo', async () => {
+  inWorkspace('w1', () => {
+    folders.createFolder('Globex/Spring');
+    folders.createFolder('Globex/Summer');
+  });
+  await push(asMax, 'Globex/Spring', [{ path: 'Renders/cut.mov', data: blob(700) }]);
+  const dir = (await api('GET', `/api/files?folder=${enc('Globex/Spring')}`, asMax)).json().dirs.find((d: { path: string }) => d.path === 'Renders');
+  assert.ok(dir, 'the folder is there');
+  const heard: string[] = [];
+  const broadcast = ctx.broadcast;
+  ctx.broadcast = ((type: string, data: { area?: string }, ...rest: unknown[]) => {
+    if (type === 'files') heard.push(String(data.area));
+    return (broadcast as (...a: unknown[]) => unknown)(type, data, ...rest);
+  }) as typeof ctx.broadcast;
+  try {
+    const moved = await api('PATCH', `/api/files/${dir.id}`, asMax, { folder: 'Globex/Summer' });
+    assert.equal(moved.status, 200, moved.text);
+    assert.deepEqual(heard.sort(), ['Globex/Spring', 'Globex/Summer'], 'the area it left hears it too');
+    heard.length = 0;
+    const back = await api('PATCH', `/api/files/${dir.id}`, asMax, { folder: 'Globex/Spring' });
+    assert.equal(back.status, 200, back.text);
+    assert.deepEqual(heard.sort(), ['Globex/Spring', 'Globex/Summer'], 'Undo: the area it came back from too');
+    heard.length = 0;
+    const renamed = await api('PATCH', `/api/files/${dir.id}`, asMax, { path: 'Masters' });
+    assert.equal(renamed.status, 200, renamed.text);
+    assert.deepEqual(heard, ['Globex/Spring'], 'a rename inside its area: told once');
+  } finally {
+    ctx.broadcast = broadcast;
+  }
+});
+
 test('a project renamed carries its files; a folder deleted trashes its files whole into the one above', async () => {
   await push(asOlivia, 'Acme/Spring', [{ path: 'Music/bed.wav', data: blob(600) }]);
   const pr = await raw('PATCH', '/api/folders', {

@@ -359,6 +359,21 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
   const rowId = (key: string) => rowIds.get(key) ?? '';
 
   const [dialog, setDialog] = useState<Dialog>(null);
+  // A dialog that closes and leaves the focus on nothing (it gives it back to its own field, gone with it: F2's rename)
+  // hands the keys back to the list. Run after the dialog's own focus return, which comes a task after it unmounts.
+  const hadDialog = useRef(false);
+  useEffect(() => {
+    if (dialog) {
+      hadDialog.current = true;
+      return;
+    }
+    if (!hadDialog.current) return;
+    hadDialog.current = false;
+    const back = setTimeout(() => {
+      if (!document.activeElement || document.activeElement === document.body) grid.current?.focus({ preventScroll: true });
+    }, 0);
+    return () => clearTimeout(back);
+  }, [dialog]);
   const [check, setCheck] = useState<{ gathered: Gathered; dir: string } | null>(null);
 
   // ---- actions
@@ -427,6 +442,8 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
       qc.setQueriesData<{ pages: Listing[]; pageParams: unknown[] }>({ queryKey: [...fileKeys.area(area), 'list'] }, (d) =>
         d ? { ...d, pages: d.pages.map((pg) => ({ ...pg, dirs: pg.dirs.map((x) => (x.id === r.d.id ? { ...x, path: to } : x)) })) } : d,
       );
+      // a folder's row goes by its path: the keys stay on it under its new name
+      setActive((a) => (a === r.key ? dirKey(to) : a));
       try {
         await moveFile(r.d.id, { path: to });
       } catch (e) {
@@ -514,7 +531,7 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
     { label: t('Download'), icon: 'download', onClick: () => download(f.id) },
     { label: t('Copy for an agent'), icon: 'copy', onClick: () => void copyFor([fileKey(f.id)]) },
     'sep',
-    write && { label: t('Rename'), icon: 'edit', onClick: () => acts.rename(f) },
+    write && { label: t('Rename'), icon: 'edit', shortcut: 'F2', onClick: () => acts.rename(f) },
     write && { label: t('Move to…'), icon: 'moveTo', onClick: () => acts.move(f) },
     { label: t('Versions'), icon: 'history', onClick: () => open(f.id) },
     'sep',
@@ -526,7 +543,7 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
     { label: t('Open'), icon: 'folderOpen', onClick: () => enter(r.d.path) },
     { label: t('Copy for an agent'), icon: 'copy', onClick: () => void copyFor([r.key]) },
     'sep',
-    write && !!r.d.id && { label: t('Rename'), icon: 'edit', onClick: () => setDialog({ kind: 'rename', row: r }) },
+    write && !!r.d.id && { label: t('Rename'), icon: 'edit', shortcut: 'F2', onClick: () => setDialog({ kind: 'rename', row: r }) },
     write && !!r.d.id && { label: t('Move to…'), icon: 'moveTo', onClick: () => setDialog({ kind: 'move', keys: [r.key] }) },
     'sep',
     write && !!r.d.id && { label: t('Trash'), icon: 'trash', danger: true, shortcut: '⌫', onClick: () => trashKeys([r.key]) },
@@ -562,6 +579,10 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
     } else if (e.key === ' ' && r?.kind === 'file') {
       e.preventDefault();
       open(opened?.id === r.f.id ? null : r.f.id);
+    } else if (e.key === 'F2' && write && r && (r.kind === 'file' || (r.kind === 'dir' && r.d.id))) {
+      // Rename from the keys, as in a file manager: a folder's Rename otherwise sits only in its row's ⋯ (pointer)
+      e.preventDefault();
+      setDialog({ kind: 'rename', row: r });
     } else if ((e.key === 'Backspace' || e.key === 'Delete') && write) {
       e.preventDefault();
       trashKeys(checked.size ? [...checked] : active ? [active] : []);

@@ -238,6 +238,8 @@ export async function startUpload(file: File, target: UploadTarget): Promise<voi
   // would finish it where it was first sent. Only one going where this one goes is continued.
   const sameTarget = (p: PreviousUpload) => (p.metadata?.slug ?? '') === (metadata.slug ?? '') && (p.metadata?.folder ?? '') === (metadata.folder ?? '');
   const previous = (await upload.findPreviousUploads().catch(() => [] as PreviousUpload[])).find(sameTarget);
+  // cancelled, or signed out, while the lookup ran: start() would bring an aborted upload back to life
+  if (running.get(id) !== upload) return;
   if (previous) {
     upload.resumeFromPreviousUpload(previous);
     patch(id, { resumed: true });

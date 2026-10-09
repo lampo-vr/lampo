@@ -4396,6 +4396,7 @@ export const EN = [
   'Where this workspace’s posts go. Each one uses your own app or key: nothing goes through Lampo’s.',
   'Where you are',
   'Where your agent puts its versions.',
+  'Whether {what} changed after this suggestion was made can’t be told: the playbook’s history only goes back to r{rev}. The diff shows what accepting it would replace.',
   'Which accounts',
   'Which agent do you use?',
   'Which agent should act on the feedback?',

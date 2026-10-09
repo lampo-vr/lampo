@@ -454,8 +454,11 @@ export function createPublisher(o: PublisherOptions): Publisher {
         return;
       }
       // the platform's own "it failed" for a post it was still working on is the post's outcome; the id stays known, so
-      // Retry asks again instead of sending (PUB-1). Anything else — a revoked key, a post that is out — keeps its state.
-      if (p0.state === 'uploading' && !why.auth) fail(id, loadReview(p0.slug), why.message);
+      // Retry asks again instead of sending (PUB-1). So is its verdict on a post it holds (`remoteId`: YouTube rejected
+      // a video it took, posted or scheduled), which no later look would change. Anything else — a revoked key, a post
+      // gone from the platform — keeps its state.
+      const verdict = e instanceof PublishError && !!e.remoteId;
+      if ((p0.state === 'uploading' || verdict) && !why.auth) fail(id, loadReview(p0.slug), why.message);
       else lookFailed(id, conn, why);
     }
   }

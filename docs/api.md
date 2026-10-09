@@ -840,7 +840,8 @@ Details:
 - **Auto-check** items (`QaResult.items`) have `key`, `kind`, `severity`, `tags`, `frame`, `range?`, `text`, `detail?`,
   `box?` and `zone?`. They may also carry `likely` (`intended` or `problem`: a freeze judged by the motion at its
   edges, its sound and its shot), `why` (what flagged it), `holds`, `word`, `guess`, `line` and `value`; a result has
-  `spelling`. A finding's picture is `GET /api/review/:slug/frame?size=thumb`. Accepting answers `404` when the
+  `spelling` (its `unread`: sampled frames the text recognition failed on, never "no text"; on all of them the state is
+  `unavailable`, and a note says so). A finding's picture is `GET /api/review/:slug/frame?size=thumb`. Accepting answers `404` when the
   suggestion isn't in the current result.
 - **The sprite** is laid out by `lib/sprite.ts` (`spriteUrl()`); `s` is the layout version, so a new layout isn't
   served from old caches. It is made on the first request, as the least urgent background job: `202 {preparing: true}`
@@ -924,7 +925,9 @@ Details:
   after `base_rev`. Accepting a suggestion is refused (`409` with `by`, `changed_rev`, `rev` and, when it was another
   suggestion accepted, its `proposal`) when its section changed after the suggestion was made: the person looks at the
   diff against the section as it is now, then accepts with that revision as `base_rev` to replace the change on
-  purpose. Another section's changes never hold a suggestion up.
+  purpose. Another section's changes never hold a suggestion up. Only the last 200 revisions are kept: a `base_rev` (or
+  a suggestion's) older than the oldest of them counts as changed, since nothing kept can say it wasn't (an edit:
+  `409`, open it again; an accept: `409` with `unknown: true` and `changed_rev` the oldest kept revision).
 - **References**: a link `{folder?, kind: "link", url, caption?}`, a frame-exact still of a video
   `{folder?, kind: "frame", video, v?, frame, to_frame?, caption?}`, or an image `{folder?, kind: "image", data,
   caption?}` (base64).

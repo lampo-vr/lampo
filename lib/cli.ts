@@ -1462,10 +1462,14 @@ export async function main(argv: string[], { as = 'lampo' }: { as?: 'lampo' | 'v
     if (name !== 'watch') {
       record();
       // The person stopped this agent's work and it hasn't heard yet: one line after the command's own output, once —
-      // read from this machine's runs, or what the hosted server answered the activity with.
+      // read from this machine's runs, or what the hosted server answered the activity with. With `--json`, stdout is
+      // one JSON document a script parses: the line goes to stderr, which the agent still reads.
       const local = guess && !readCredentials() ? localStopLine(agent, { kind: guess.kind, video: guess.video ?? null, target: guess.target ?? null }) : null;
       const lines = [...(local ? [local] : []), ...((await sink?.flush()) ?? [])];
-      for (const l of lines.slice(0, 2)) out(l);
+      for (const l of lines.slice(0, 2)) {
+        if (args.opt.json) process.stderr.write(`${keepLines(l)}\n`);
+        else out(l);
+      }
     }
   } catch (e) {
     if (!(e instanceof Exit)) {

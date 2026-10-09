@@ -543,6 +543,44 @@ try {
     );
   });
 
+  await check('F2 renames the active folder from the keys (no pointer), and the keys go on in the list', async () => {
+    await open(campaign());
+    await page.focus('[data-testid=files-list]');
+    const active = () => page.$eval('[data-testid=files-list] .pf-row.active .pf-name', (x) => x.textContent).catch(() => null);
+    const dirs = async () => (await listing(CAMPAIGN, '', false)).dirs.map((d) => d.path);
+    assert((await active()) === 'Brief', `the first row: ${await active()}`);
+    const focused = () =>
+      page.evaluate(() => {
+        const a = document.activeElement;
+        return a ? `${a.tagName.toLowerCase()}${a.getAttribute('data-testid') ? `[${a.getAttribute('data-testid')}]` : ''}` : 'none';
+      });
+    const rename = async (to) => {
+      await page.keyboard.press('F2');
+      await until(
+        async () => !!(await page.$('[data-testid=files-name]')),
+        async () => `F2 opens the rename dialog (focus on ${await focused()})`,
+      );
+      // the name is picked and has the focus: typing replaces it
+      await until(
+        async () => (await focused()) === 'input[files-name]',
+        async () => `the name field has the focus (it is on ${await focused()})`,
+      );
+      await page.keyboard.type(to);
+      await page.keyboard.press('Enter');
+      await until(async () => !(await page.$('[data-testid=files-name]')), 'Enter renames and closes the dialog');
+      await until(async () => (await dirs()).includes(to), `${to} on the server`);
+      // the dialog gave the keys back to the list
+      await until(
+        () => page.evaluate(() => !!document.activeElement?.closest('[data-testid=files-list]')),
+        async () => `the keys back in the list (they are on ${await focused()})`,
+      );
+    };
+    await rename('Briefing');
+    await until(async () => (await rowNames()).includes('Briefing'), 'the list says the new name');
+    await rename('Brief');
+    await until(async () => (await rowNames()).includes('Brief'), 'and the old one again');
+  });
+
   await check('trash: picked rows go with Undo, for real once the toast goes, and come back from the trash', async () => {
     await open(campaign());
     await page.$$eval('[data-testid=file-row]', (rows) =>

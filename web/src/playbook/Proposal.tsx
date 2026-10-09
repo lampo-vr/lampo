@@ -85,12 +85,12 @@ export function ProposalCard({
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   // Refused because the section changed after the playbook on this screen: who and when, until it is read again.
-  const [refused, setRefused] = useState<{ by: string; rev: number; accepted: boolean } | null>(null);
+  const [refused, setRefused] = useState<{ by: string; rev: number; accepted: boolean; unknown?: boolean } | null>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: a newer playbook says itself what changed
   useEffect(() => setRefused(null), [playbook.rev]);
   const pending = p.status === 'pending';
   const changed = pending ? changedSince(playbook, p) : null;
-  const notice = changed ? { by: who(changed.accepted_by || changed.by), rev: changed.rev, accepted: !!changed.proposal } : refused;
+  const notice = changed ? { by: who(changed.accepted_by || changed.by), rev: changed.rev, accepted: !!changed.proposal, unknown: !!changed.unknown } : refused;
   const same = pending ? waitingFor(playbook.proposals, p.section) : [];
   const newest = same.length > 1 && same[0]?.id === p.id;
   const what = sectionWords(p.section);
@@ -104,7 +104,8 @@ export function ProposalCard({
       onDecided?.(how);
     } catch (e) {
       const d = e instanceof ApiError && e.status === 409 ? e.details : null;
-      if (d && typeof d.changed_rev === 'number') setRefused({ by: who(String(d.by || '')), rev: d.changed_rev, accepted: !!d.proposal });
+      if (d && typeof d.changed_rev === 'number')
+        setRefused({ by: who(String(d.by || '')), rev: d.changed_rev, accepted: !!d.proposal, unknown: d.unknown === true });
       else toastError(e);
     } finally {
       setBusy(false);
@@ -151,17 +152,22 @@ export function ProposalCard({
         <p className="pb-prop-note changed" role="status" data-testid="pb-overtaken">
           <KeyGlyph shape="half" size={10} className="pb-prop-note-key" />
           <span>
-            {notice.accepted
-              ? t('{name} accepted another suggestion for {what} in r{rev}. The diff shows what accepting this one would replace.', {
-                  name: notice.by,
-                  what,
-                  rev: notice.rev,
-                })
-              : t('{name} changed {what} in r{rev}, after this suggestion was made. The diff shows what accepting it would replace.', {
-                  name: notice.by,
-                  what,
-                  rev: notice.rev,
-                })}
+            {notice.unknown
+              ? t(
+                  'Whether {what} changed after this suggestion was made can’t be told: the playbook’s history only goes back to r{rev}. The diff shows what accepting it would replace.',
+                  { what, rev: notice.rev },
+                )
+              : notice.accepted
+                ? t('{name} accepted another suggestion for {what} in r{rev}. The diff shows what accepting this one would replace.', {
+                    name: notice.by,
+                    what,
+                    rev: notice.rev,
+                  })
+                : t('{name} changed {what} in r{rev}, after this suggestion was made. The diff shows what accepting it would replace.', {
+                    name: notice.by,
+                    what,
+                    rev: notice.rev,
+                  })}
           </span>
         </p>
       )}

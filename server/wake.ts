@@ -30,7 +30,9 @@ export async function startAgent(req: Request, ctx: ServerContext, slug: string,
   checkWake(req, ctx, review);
   const session = review.session;
   if (!session?.id || !session.cwd) throw fail(409, 'this agent can’t be started from Lampo');
-  if ((await ctx.sessions.get()).some((s) => matchesSession(session, s))) return null;
+  // asked afresh: the list the app shows may be minutes old (it refreshes when someone looks), or still loading, and
+  // either way can't say whether the person started that session since, or ended it (A14 R30)
+  if ((await ctx.sessions.get({ fresh: true })).some((s) => matchesSession(session, s))) return null;
   const who = ctx.actor(req);
   const prompt = wakePrompt({ who, video: path.basename(review.video), slug, v: review.versions.at(-1)?.v, text });
   return ctx.agentRuns.start({ slug, name: session.name, sessionId: session.id, cwd: session.cwd, by: who, prompt, ...(run ? { run } : {}) });

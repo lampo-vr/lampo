@@ -1,7 +1,7 @@
 // The Files tab's small dialogs: a name (rename a file or folder, make a folder) and a place (move to another folder
 // of the area, or into another project's or folder's files). Each says what is wrong with a name before it is sent
 // (lib/fileText.ts: what a path can be; a name taken here), and the change shows at once (FilesPage.tsx).
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { caseKey, dirOf, filePathProblem } from '../../../lib/fileText.ts';
 import { useLibrary } from '../api/queries.ts';
 import { t } from '../i18n/index.ts';
@@ -33,15 +33,18 @@ export function NameDialog({
   onClose: () => void;
 }) {
   const [name, setName] = useState(was);
-  const field = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    const el = field.current;
-    if (!el) return;
-    el.focus();
-    // the name without its extension, as a Finder does
-    const dot = was.lastIndexOf('.');
-    el.setSelectionRange(0, dot > 0 ? dot : was.length);
-  }, [was]);
+  // When the field is there: the dialog's code may arrive after this mounts (the first dialog of a page, opened from the
+  // keys too), and an effect on mount found no field then, leaving the keys outside it.
+  const field = useCallback(
+    (el: HTMLInputElement | null) => {
+      if (!el) return;
+      el.focus();
+      // the name without its extension, as a Finder does
+      const dot = was.lastIndexOf('.');
+      el.setSelectionRange(0, dot > 0 ? dot : was.length);
+    },
+    [was],
+  );
   const n = name.trim() === name ? name : name.trim();
   const path = dir ? `${dir}/${n}` : n;
   const problem = !n

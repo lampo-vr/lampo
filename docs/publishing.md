@@ -171,7 +171,9 @@ wall-clock deadline (its timeout plus the time its body needs at 64 KiB/s), an a
   holds that fails — a revoked sign-in or key, the platform away — keeps where the post stands (posted, scheduled,
   still being published) and marks the connection; looks through a connection that doesn't work wait until it is
   fixed. A post the posting API is still publishing after six hours is `sent` too. Only the platform's own "it failed"
-  fails a post it holds, and that post keeps its id.
+  fails a post it holds, and that post keeps its id: also one already `posted` or `scheduled` that YouTube rejects or
+  can't process later (a look after the upload, or after a schedule's time, finds it), which then waits in the inbox
+  instead of reading as posted. A video gone from the channel keeps where its post stood (someone may have deleted it).
 - **Taking back**: a post waiting in Lampo is cancelled at once. One YouTube already holds (scheduled there) can't be
   taken back with the upload scope: Lampo says so and links to YouTube Studio.
 - The server stops without waiting for an upload: it resumes on the next start.

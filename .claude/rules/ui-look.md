@@ -27,4 +27,5 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - On a phone the keyboard shrinks the visual viewport, not the layout: a one-screen layout fits itself to it (`player/phoneSheet.ts` `useKeyboard`), or its field and buttons sit under the keyboard.
 - A review link's layout rule goes in `guest.css`, not `mobile.css`: guest.css comes later (with its chunk) and wins at equal specificity (the sideways rows lost to its 820 px block on a 750 px iPhone, and the picture got no height).
 - Two buttons that take turns in one place get their own `key`: React keeps the pressed node, and its `:active` scale outlasts the tap (the phone's zoom button measured 42 px).
+- A field in a `Modal` is focused by a callback ref, never an effect on mount: the dialog's code (`useLoaded(layerCode)`) can arrive after the component mounted, and the effect finds no field (the Files tab's first rename left the keys outside it).
 - A double tap is told by the events' `timeStamp` (when the finger made them), never by `performance.now()` when they are handled: a busy page handles two quick taps far apart (`player/SidewaysBar.tsx` `usePictureTap`).

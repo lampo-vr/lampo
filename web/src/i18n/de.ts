@@ -1945,6 +1945,8 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Waiting for someone who edits playbooks': 'Wartet auf jemanden, der Playbooks bearbeitet',
   '{name} changed {what} in r{rev}, after this suggestion was made. The diff shows what accepting it would replace.':
     '{name} hat {what} in r{rev} geändert, nachdem dieser Vorschlag gemacht wurde. Der Vergleich zeigt, was er beim Annehmen ersetzen würde.',
+  'Whether {what} changed after this suggestion was made can’t be told: the playbook’s history only goes back to r{rev}. The diff shows what accepting it would replace.':
+    'Ob sich {what} geändert hat, nachdem dieser Vorschlag gemacht wurde, lässt sich nicht sagen: Der Verlauf des Playbooks reicht nur bis r{rev} zurück. Der Vergleich zeigt, was er beim Annehmen ersetzen würde.',
   '{name} accepted another suggestion for {what} in r{rev}. The diff shows what accepting this one would replace.':
     '{name} hat in r{rev} einen anderen Vorschlag für {what} angenommen. Der Vergleich zeigt, was dieser beim Annehmen ersetzen würde.',
   '{n} suggestions for {what}, the newest first. Whichever you accept, the others then show what they would replace.':

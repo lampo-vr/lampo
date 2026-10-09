@@ -30,6 +30,7 @@ import {
   fileInfo,
   filesSummary,
   filesUsage,
+  findDir,
   findFile,
   heldBlob,
   heldBlobs,
@@ -511,9 +512,11 @@ export function fileRoutes(ctx: ServerContext): Router {
       const b = body(MoveBody, req);
       const to = { ...(b.path !== undefined ? { path: b.path } : {}), ...(b.folder !== undefined ? { area: writeArea(b.folder) } : {}) };
       const stamp = stampOf(req, b);
-      const before = DIR_ID.test(id) ? null : findFile(id);
+      // where it was, a folder's too: views of the area it left drop it (a move to another area names both)
+      const before = DIR_ID.test(id) ? findDir(id) : findFile(id);
       const out = DIR_ID.test(id) ? moveDir(id, to, stamp) : moveFile(id, to, stamp);
-      if (before) told(scopeOf(before.area));
+      const from = before ? scopeOf(before.area) : null;
+      if (from !== null && from !== (out.area ?? '')) told(from);
       told(out.area ?? '');
       res.json(out);
     }),

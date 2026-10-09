@@ -100,7 +100,7 @@ come as a pair: both `LAMPO_` when either is set, else both `VR_`, so one server
 To start it on your machine:
 
 ```sh
-npm start      # http://localhost:4747, signed in as you (builds the UI on first start)
+npm start      # http://localhost:4747, signed in as you (builds UI + card on first start)
 npm run dev    # the same with hot reload, for work on the UI
 npm run lan    # also on your Wi-Fi: prints a link with an access token for your phone
 ```

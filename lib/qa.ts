@@ -556,6 +556,7 @@ async function doQa(file: string, ver: Version, meta: MediaMeta, { onProgress, p
       if (it.detail === undefined) delete it.detail;
     }
     items.sort((a, b) => a.frame - b.frame || a.kind.localeCompare(b.kind));
+    const read = textRead(frames, pages, !!text.ocr);
     const result: QaResult = {
       qa_version: QA_VERSION,
       hash: ver.hash,
@@ -564,9 +565,9 @@ async function doQa(file: string, ver: Version, meta: MediaMeta, { onProgress, p
       samples: frames.length,
       text_language: spelling.lang || null,
       items,
-      spelling: spelling.spelling,
+      spelling: read.unread ? { ...spelling.spelling, unread: read.unread, ...(read.none ? { state: 'unavailable', words: 0 } : {}) } : spelling.spelling,
     };
-    const notes = [...text.notes, spelling.note].filter((n): n is string => !!n);
+    const notes = [...text.notes, spelling.note, read.note].filter((n): n is string => !!n);
     if (notes.length) result.notes = notes;
     fs.mkdirSync(path.dirname(cacheFile(renderKey(ver))), { recursive: true });
     fs.writeFileSync(cacheFile(renderKey(ver)), JSON.stringify(result));
@@ -574,6 +575,29 @@ async function doQa(file: string, ver: Version, meta: MediaMeta, { onProgress, p
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
+}
+
+/**
+ * How many sampled frames the text recognition couldn't read (an engine that failed on them: tesseract's broken
+ * language data, an OOM-killed run, Vision's per-page error). A frame it failed on is unread, never "no text": none read
+ * at all means the text wasn't checked (`none`), some means the rest was. Said in a note either way; Run again tries anew.
+ */
+export function textRead(frames: { file: string }[], pages: OcrPage[], ocr: boolean): { unread: number; none: boolean; note: string | null } {
+  if (!ocr || !frames.length) return { unread: 0, none: false, note: null };
+  const byFile = new Map(pages.map((p) => [p.path, p]));
+  const unread = frames.filter((fr) => {
+    const p = byFile.get(fr.file);
+    return !p || !!p.error;
+  }).length;
+  if (!unread) return { unread: 0, none: false, note: null };
+  const none = unread === frames.length;
+  return {
+    unread,
+    none,
+    note: none
+      ? `text recognition failed on all ${frames.length} sampled frames: on-screen text was neither read nor spell-checked (run it again to retry)`
+      : `text recognition failed on ${unread} of ${frames.length} sampled frames: text on those wasn't read or spell-checked`,
+  };
 }
 
 /** The text lines OCR found on the sampled frames, in video pixels, with the words worth spell-checking. */

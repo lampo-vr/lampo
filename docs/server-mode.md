@@ -483,7 +483,8 @@ People's own data is theirs to take home and to end (GDPR Art. 15, 17, 20); the 
   under its storage prefix (`w/<id>/` in Bunny or S3), its review links (they name nothing any more), invites, API
   tokens and app connections, its waiting jobs, the accounts it leaves in no workspace, and its billing (a billing
   module cancels the subscription at once and forgets its state). Never the server's own workspace. The deletion is
-  written down and billing stops before anything that can fail: when the storage is down, the workspace is gone all the
+  written down first, and a server that can't write it down (a full disk, a lost permission) deletes nothing and says
+  something went wrong; then billing stops before anything that can fail: when the storage is down, the workspace is gone all the
   same and its files wait; the server erases them once the storage answers again (a minute after a start, then hourly,
   a few at a time, never while it can't read its list of workspaces). A deleted video works the same way: what it
   still has in the bucket is written down in `pending-removals.json` by exact name first and removed afterwards; what a

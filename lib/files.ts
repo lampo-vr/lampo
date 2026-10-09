@@ -887,7 +887,7 @@ const isUnder = (p: string, root: string) => p === root || p.startsWith(`${root}
 const moved = (p: string, from: string, to: string) => (p === from ? to : `${to}${p.slice(from.length)}`);
 
 /** A folder by its id in this workspace (live, or in a trash). */
-function findDir(id: string): { area: FileArea; dir: FileDir | TrashedDir; trashed: boolean } | null {
+export function findDir(id: string): { area: FileArea; dir: FileDir | TrashedDir; trashed: boolean } | null {
   if (!DIR_ID.test(id)) return null;
   for (const area of listAreas()) {
     const dir = area.dirs?.find((d) => d.id === id);

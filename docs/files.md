@@ -159,7 +159,7 @@ are in Settings → Files. Reviewers have neither.
 - **The list**: the area's folders, then its files — what each is, its version, its size, who changed it last (an
   agent with its mark), when. What it inherits from its project and the House is folded under it. Search looks in
   every folder inside; the kinds and the order narrow the list in place. Keys: ↑↓ (⇧ to pick), ↵ opens, Space looks,
-  ⌫ trashes (with Undo), ⌘A picks all, ⌘↑ goes up a folder, `/` searches.
+  F2 renames a file or a folder, ⌫ trashes (with Undo), ⌘A picks all, ⌘↑ goes up a folder, `/` searches.
 - **Adding**: drop files and folders anywhere on the tab, or *Add files* (a folder, or a new empty folder, from its
   menu). Before a byte moves, one sheet says what will happen: what is already in Lampo (the browser hashes files up
   to 256 MB and asks), which files become a new version, what is left out (junk), and whether it fits the plan. The

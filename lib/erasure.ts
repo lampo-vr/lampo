@@ -235,13 +235,22 @@ export interface Erasure {
   by: string;
 }
 
-/** Writes down that an account or a workspace was deleted (ids only): a restored backup is held to it. */
+/**
+ * Writes down that an account or a workspace was deleted (ids only): a restored backup is held to it, and billing reads
+ * a workspace's deletion from it alone. Throws when the line can't be written (a lock that times out, a full disk, no
+ * permission): a deletion that must be on record asks this first and goes no further (deleteWorkspace).
+ */
+export function writeErasure(kind: Erasure['kind'], id: string, by: string): void {
+  withLock(LOCK, () => {
+    fs.mkdirSync(DATA, { recursive: true });
+    fs.appendFileSync(ERASURES_FILE, `${JSON.stringify({ at: isoLocal(), kind, id, by } satisfies Erasure)}\n`, { mode: 0o600 });
+  });
+}
+
+/** writeErasure for what is gone already (an account's after-hook): a line that can't be written is logged. */
 export function recordErasure(kind: Erasure['kind'], id: string, by: string): void {
   try {
-    withLock(LOCK, () => {
-      fs.mkdirSync(DATA, { recursive: true });
-      fs.appendFileSync(ERASURES_FILE, `${JSON.stringify({ at: isoLocal(), kind, id, by } satisfies Erasure)}\n`, { mode: 0o600 });
-    });
+    writeErasure(kind, id, by);
   } catch (e) {
     console.error(`erasure log: ${(e as Error).message}`);
   }

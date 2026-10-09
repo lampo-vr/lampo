@@ -18,6 +18,7 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - Work queued now and run later is wrapped in `boundToWorkspace(fn)`; never fall back to workspace #1.
 - Never read `user.role` for a permission (workspace #1's mirror): `req.auth.role`, `roleIn(ws, user)`.
 - A new per-workspace thing joins `ids.ownedSets` and `ids.ownedSetsA` in `workspace-isolation.test.ts`; run it.
-- A deletion is written down (`recordErasure`) and billing told (`workspaceDeleted`) right after the registry drops it,
-  before anything that can fail; what fails later is finished from the erasure log (`finishDeletions`), and only the
-  log says a workspace was erased (`workspaceErased`), never its absence from the registry.
+- A deletion is written down first (`writeErasure`, which throws: a log that can't take the line refuses the deletion
+  whole; `recordErasure` only logs and is for what is gone already), then the registry drops it and billing is told
+  (`workspaceDeleted`), before anything that can fail; what fails later is finished from the erasure log
+  (`finishDeletions`), and only the log says a workspace was erased (`workspaceErased`), never its absence from the registry.

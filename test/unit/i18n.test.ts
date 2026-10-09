@@ -12,7 +12,7 @@ import { LANG_KEY, pickLang, THEME_BOOT } from '../../lib/themeBoot.ts';
 import { catalog, definedKeys, usedKeys } from '../../scripts/i18n.ts';
 import { de } from '../../web/src/i18n/de.ts';
 import { EN } from '../../web/src/i18n/en.ts';
-import { english, message, perLang, setDictionary, t } from '../../web/src/i18n/index.ts';
+import { english, fill, message, perLang, setDictionary, t } from '../../web/src/i18n/index.ts';
 import { rich } from '../../web/src/i18n/rich.ts';
 
 const I18N = path.join(import.meta.dirname, '../../web/src/i18n');
@@ -111,6 +111,28 @@ test('t(): placeholders, plurals, contexts, and the German words', () => {
   assert.equal(t('client::Download all'), 'Alle herunterladen');
   assert.equal(t('Approved V{v}', { v: 6 }), 'V6 freigegeben');
   setDictionary('en', null);
+});
+
+test('a sentence never ends in two full stops when what fills its end has one ("zzgl. USt.", a name)', () => {
+  setDictionary('de', de);
+  for (const vat of ['{amount} plus VAT', '{amount} incl. VAT'] as const) {
+    const amount = t(vat, { amount: '24,00 €' });
+    assert.match(amount, /USt\.$/);
+    for (const said of [
+      t('Your trial ends today, and {plan} is billed now: {amount}.', { plan: 'Business', amount }),
+      t('It takes effect at once. Your trial ends today, and {plan} is billed now: {amount}.', { plan: 'Business', amount }),
+    ]) {
+      assert.doesNotMatch(said, /\.\./, said);
+      assert.match(said, /USt\.$/);
+    }
+  }
+  assert.equal(t('On {name}.', { name: 'Acme Inc.' }), 'Auf Acme Inc.');
+  assert.equal(t('On {name}.', { name: 'Acme' }), 'Auf Acme.', 'a value without one keeps the sentence’s');
+  const html = renderToStaticMarkup(createElement('p', null, rich(message('On {name}.'), { name: 'Acme Inc.' }, [])));
+  assert.equal(html, '<p>Auf Acme Inc.</p>', '<T> too');
+  setDictionary('en', null);
+  assert.equal(t('On {name}.', { name: 'Acme Inc.' }), 'On Acme Inc.');
+  assert.equal(fill('{a}. {b}', { a: 'One.', b: 'Two' }), 'One. Two', 'only a full stop right after the value');
 });
 
 test('<T>: numbered tags and placeholders in the order the language wants', () => {

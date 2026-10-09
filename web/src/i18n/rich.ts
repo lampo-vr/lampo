@@ -17,7 +17,12 @@ export function rich(text: string, values: Record<string, ReactNode>, tags: Tags
       out.push(createElement(Fragment, { key: out.length }, wrap ? wrap(inner) : inner));
     } else {
       const name = m[3] as string;
-      out.push(createElement(Fragment, { key: out.length }, name in values ? values[name] : m[0]));
+      const v = name in values ? values[name] : m[0];
+      out.push(createElement(Fragment, { key: out.length }, v));
+      // a value that ends with its own full stop takes the place of the sentence's right after it (fill() does the same)
+      if (typeof v === 'string' && v.endsWith('.') && text[i + m[0].length] === '.') at = i + m[0].length + 1;
+      else at = i + m[0].length;
+      continue;
     }
     at = i + m[0].length;
   }

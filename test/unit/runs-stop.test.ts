@@ -5,6 +5,7 @@
 // to copy; failures, refusals and agents gone quiet are inbox items for people with the agents right only, and pings.
 // The `claude` here is a stand-in: the real CLI is never run.
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, test } from 'node:test';
@@ -14,7 +15,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ForYouResponse, LibraryResponse, Run } from '../../lib/types.ts';
 import { startApp } from '../lib/app.ts';
-import { age, isolatedEnv, makeVideo, ROOT, until, vr } from '../lib/helpers.ts';
+import { age, isolatedEnv, makeVideo, ROOT, until, VR, vr } from '../lib/helpers.ts';
 
 const { dir, env } = isolatedEnv({ vars: { VR_REMOTE: '0' } });
 // The stand-in: prints ./stream.jsonl (its stream-json) when there is one, waits while ./hold exists, then exits.
@@ -165,6 +166,25 @@ test('lampo: the line after the command’s own output, once; the app clears it 
   assert.doesNotMatch(twice.out, /The person stopped/, 'told once');
   await until(() => ctx.runs.find(run.id)?.run.stop_pending === undefined, 'the app hears the call and clears it');
   assert.equal(openOf(C.slug, 'cut-cli'), undefined, 'and opens nothing for it');
+});
+
+test('lampo --json: stdout stays one JSON document; the stop line goes to stderr, once', async () => {
+  const n = note(B.slug, 'Logo smaller');
+  store.assignSession(B.slug, { name: 'json-cli', sessionId: 'cli-4123456789ab' }, 'tester');
+  act({ agent: 'json-cli', kind: 'fix', w: words('Fixed {id}', { id: n.id }), target: n.id });
+  const run = await until(() => openOf(B.slug, 'json-cli'), 'its run');
+  assert.equal((await call('POST', `/api/runs/${run.id}/stop`, {})).status, 200);
+  await until(() => fs.readFileSync(lib.runsFile(B.slug), 'utf8').includes('"stop_pending":true'), 'the stop written');
+  const lampo = () => spawnSync(process.execPath, [VR, 'open', B.file, '--json'], { env: { ...env, VR_BY: 'agent:json-cli' }, encoding: 'utf8' });
+  const first = lampo();
+  assert.equal(first.status, 0, first.stderr);
+  assert.doesNotThrow(() => JSON.parse(first.stdout), 'stdout parses');
+  assert.doesNotMatch(first.stdout, /The person stopped/);
+  assert.match(first.stderr.trim().split('\n').at(-1) as string, STOP, 'the agent still reads it');
+  const twice = lampo();
+  assert.doesNotThrow(() => JSON.parse(twice.stdout));
+  assert.doesNotMatch(twice.stderr, /The person stopped/, 'told once');
+  await until(() => ctx.runs.find(run.id)?.run.stop_pending === undefined, 'the app hears the call and clears it');
 });
 
 test('the stdio MCP server on this machine: its next answer about the video ends with the line, once', async () => {

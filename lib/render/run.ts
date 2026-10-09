@@ -42,6 +42,8 @@ export interface ToolRun {
    */
   signal(sig: NodeJS.Signals): void;
   done: Promise<ToolResult>;
+  /** The tool and all it left behind have ended: `signal` does nothing from then on (the group's id may be another's). */
+  readonly gone: boolean;
 }
 
 export interface ToolResult {
@@ -277,5 +279,8 @@ export function runTool(o: ToolRunOptions): ToolRun {
       } else if (sig === 'SIGKILL') stopping.kill();
     },
     done,
+    get gone() {
+      return gone;
+    },
   };
 }

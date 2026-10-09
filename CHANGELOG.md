@@ -146,6 +146,32 @@ format stays backwards compatible throughout.
 - A voice note longer than ten minutes is refused in plain words instead of being kept with only part of it heard.
 - A timecode written in a note opens the right frame when its version has another frame rate than the one on screen
   (00:02:10 on a 30 fps V1 opened frame 58 while a 24 fps V2 was showing, instead of 70).
+- A YouTube post that YouTube rejects or can't process after the upload now shows as failed, with YouTube's reason,
+  and waits in your inbox, instead of reading as posted (or staying scheduled and being asked about for good). Retry
+  asks YouTube again; it never uploads the video a second time.
+- Deleting a workspace on a server that can't keep its record of deletions (a full disk, a lost permission) now
+  deletes nothing and says something went wrong, instead of going ahead without the record.
+- `lampo … --json` prints one JSON document even when the person stopped the agent's work or sent it new notes: that
+  line goes to stderr with `--json`, where the agent still reads it.
+- Starting an agent from Lampo on your machine looks at its sessions as they are right then: a session that is already
+  running is no longer started a second time, and one that has ended is started.
+- A playbook edit, or a suggestion, made before the playbook's last 200 changes is no longer saved over newer work
+  without a word: the edit asks you to open the playbook again, and the suggestion says it may replace a change.
+- `lampo render` no longer sends a stop to a process group it no longer has, once everything its command started has
+  ended.
+- An upload you cancel, or one that signing out stops, while it is still looking for an earlier try of itself no
+  longer starts after all.
+- In the Files tab, F2 renames the file or folder the keys are on: a folder could be renamed only with the pointer.
+- A folder moved to another project's files leaves the open view of the project it came from at once; moving it back
+  (or Undo) updates both views too.
+- In German, a sentence that ends with a price “zzgl. USt.” or “inkl. USt.” no longer gets a second full stop.
+- When Auto-check's text recognition fails while it reads a version, it no longer says there is no text on screen:
+  the spelling reads as not checked, and `lampo qa` says on how many frames the text couldn't be read.
+- The first `npm start` of a fresh checkout builds the review card agents show over MCP too, not only the app, so an
+  MCP client no longer shows "not built yet" until you run `npm run build`.
+- `npm run link` no longer replaces another program called `lampo` or `vr` in `~/.local/bin`: it leaves it as it is and
+  says so (a link from an earlier Lampo checkout is still replaced).
+- The backup guide says what a copy taken while the app runs holds together, and what it doesn't.
 
 ## [0.2.0] - 2026-10-08
 

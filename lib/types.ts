@@ -1809,8 +1809,9 @@ export interface QaResult {
   /** The spelling of on-screen text: `checked` (`words` distinct words, none on screen = 0), `skipped` (too many words
    * unknown: a language the dictionaries here don't cover), `unavailable` (no text recognition or speller here).
    * `languages`: what the words were checked in, `text_language` first (lib/text/language.ts); absent in results from
-   * before, whose `text_language` was an unchecked guess. */
-  spelling?: { state: 'checked' | 'skipped' | 'unavailable'; words: number; languages?: string[] };
+   * before, whose `text_language` was an unchecked guess. `unread`: sampled frames the text recognition failed on (its
+   * engine errored there), never "no text"; on all of them, the state is `unavailable` (lib/qa.ts textRead). */
+  spelling?: { state: 'checked' | 'skipped' | 'unavailable'; words: number; languages?: string[]; unread?: number };
 }
 
 export interface QaProgress {

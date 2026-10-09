@@ -148,12 +148,18 @@ export function plural(message: string, n: number): string {
 
 const number = (v: number) => (Number.isInteger(v) && Math.abs(v) < 10000 ? String(v) : v.toLocaleString(locale()));
 
-/** Fills `{name}` placeholders; unknown ones stay as they are (a missing param is visible, not silently empty). */
+/**
+ * Fills `{name}` placeholders; unknown ones stay as they are (a missing param is visible, not silently empty). A value
+ * that ends with its own full stop ("24 € zzgl. USt.", "Acme Inc.") takes the place of the sentence's right after it:
+ * never "..".
+ */
 export function fill(message: string, params?: Params): string {
   if (!params) return message;
-  return message.replace(/\{(\w+)\}/g, (m, name: string) =>
-    name in params ? (typeof params[name] === 'number' ? number(params[name]) : String(params[name] ?? '')) : m,
-  );
+  return message.replace(/\{(\w+)\}(\.?)/g, (m, name: string, stop: string) => {
+    if (!(name in params)) return m;
+    const v = typeof params[name] === 'number' ? number(params[name]) : String(params[name] ?? '');
+    return stop && v.endsWith('.') ? v : v + stop;
+  });
 }
 
 /** The words for `key` in the current language, with the plural form picked but no placeholders filled (for <T>). */

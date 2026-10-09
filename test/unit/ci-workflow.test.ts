@@ -167,6 +167,18 @@ test('the Docker job stays on GitHub’s runner: a self-hosted one has no Docker
   for (const [name, block] of ourJobs()) assert.doesNotMatch(block, /\bdocker /, `${name} calls no docker`);
 });
 
+test('the Docker job waits for the built image to be ready, run as compose runs it: read-only, no capabilities, a data volume', () => {
+  const job = jobsOf(ci).docker as string;
+  // the `docker run` command, with its continued lines
+  const lines = job.slice(job.indexOf('docker run')).split('\n');
+  const run = lines.slice(0, lines.findIndex((l) => !l.trimEnd().endsWith('\\')) + 1).join('\n');
+  for (const flag of ['--read-only', '--tmpfs /tmp', '--cap-drop ALL', '--security-opt no-new-privileges', ':/data'])
+    assert.ok(run.includes(flag), `docker run ${flag}: ${run}`);
+  // ready, not just alive: /healthz answers while ffmpeg is missing or the store is read-only (/readyz checks those)
+  assert.match(job, /curl -fsS http:\/\/localhost:4747\/readyz/);
+  assert.doesNotMatch(job, /\/healthz && exit 0/, 'liveness is no proof of readiness');
+});
+
 test('nothing that can run on a self-hosted runner calls sudo or installs a package', () => {
   for (const [name, block] of ourJobs())
     for (const step of stepsOf(block))

@@ -34,6 +34,7 @@ import { resumeRecordings } from './routes/recordings.ts';
 import { cleanVoiceCache } from './routes/voice.ts';
 import { drain } from './shutdown.ts';
 import { onSignup } from './signup.ts';
+import { buildMissing } from './uiBuild.ts';
 import { startWatching } from './watch.ts';
 
 /** Why dir can't be written (an error code), or null: created when missing, a file written and removed. */
@@ -191,13 +192,8 @@ async function uiMount(): Promise<(app: Express) => void> {
         next();
       }, vite.middlewares);
   }
-  const dist = path.join(webRoot, 'dist');
-  if (!fs.existsSync(path.join(dist, 'index.html'))) {
-    console.log('building UI (first start)…');
-    const { build } = await import('vite');
-    await build({ root: webRoot, logLevel: 'warn' });
-  }
-  return staticUi(dist);
+  await buildMissing(webRoot);
+  return staticUi(path.join(webRoot, 'dist'));
 }
 
 cleanVoiceCache();

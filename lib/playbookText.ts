@@ -146,11 +146,26 @@ export function changedSince(
   p: { rev: number; history: PlaybookRevision[] },
   prop: Pick<PlaybookProposal, 'base_rev' | 'section'>,
   seen?: number,
-): PlaybookRevision | null {
+): SectionChange | null {
   const base = Math.max(typeof prop.base_rev === 'number' ? prop.base_rev : p.rev, Math.min(seen ?? -1, p.rev));
   if (base >= p.rev) return null;
-  return p.history.filter((h) => h.rev > base && h.section === prop.section && h.before !== h.after).at(-1) ?? null;
+  const last = p.history.filter((h) => h.rev > base && h.section === prop.section && h.before !== h.after).at(-1);
+  if (last) return last;
+  if (historyCovers(p, base)) return null;
+  // the history was trimmed past the base: whether the section changed since can't be told, so it counts as changed
+  const oldest = p.history[0];
+  return { rev: oldest?.rev ?? p.rev, at: oldest?.at ?? '', by: '', message: '', section: prop.section, before: null, after: null, unknown: true };
 }
+
+/** A change to a section after a revision; `unknown`: the history no longer reaches back that far (`rev`: its oldest). */
+export type SectionChange = PlaybookRevision & { unknown?: true };
+
+/**
+ * Whether the kept history (the newest PLAYBOOK_LIMITS.history revisions) has every revision after `base`: only then does
+ * finding no change to a section since it mean there was none.
+ */
+export const historyCovers = (p: { rev: number; history: PlaybookRevision[] }, base: number): boolean =>
+  base >= p.rev || base >= (p.history[0]?.rev ?? p.rev + 1) - 1;
 
 /**
  * Suggestions newest first. Times are whole seconds and an agent suggests several in a row: within one second, the one

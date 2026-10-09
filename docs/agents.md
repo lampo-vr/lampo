@@ -181,7 +181,8 @@ Good to know:
 ## CLI reference
 
 Read commands take `--json` (all but `lampo prompt`), and paths in the output are absolute, so screenshots open
-directly. `<video>` can be a path, a slug, or any unique part of a video's path (e.g. `ep02.mp4`).
+directly. With `--json`, stdout is one JSON document: a line Lampo adds after a command's output (the person stopped
+your work, new notes since you started) goes to stderr instead. `<video>` can be a path, a slug, or any unique part of a video's path (e.g. `ep02.mp4`).
 
 Your writes are signed `agent:<your Claude Code session's name>`, or `agent:vr` outside a named session. `--by <name>`
 or the environment variable `LAMPO_BY=agent:<name>` changes that.
@@ -856,7 +857,8 @@ joins it. Its plan is the notes they sent; its result is the version you put up.
 - `lampo watch --all` prints the runs too (`AGENT RUN OPENED`, `WORKING`, `NEEDS YOU`, `ENDED <state>`), beside the
   `AGENT RUN STARTED|FINISHED` lines of a run Lampo started; INBOX.md and `wait_for_feedback` never carry them.
 - **If the person stops your work**, it ends at once on their side. You hear it with your next Lampo answer — any
-  MCP tool, or any `lampo` command about that video (its last line) — once: `The person stopped this work on
+  MCP tool, or any `lampo` command about that video (its last line; on stderr with `--json`) — once: `The person
+  stopped this work on
   launch.mp4: stop now, render nothing, mark nothing, and say you stopped.` Stop then: don't render, don't mark notes fixed, say in a sentence that you stopped. A call you made just before
   you read it still lands, and nothing new opens for it. A wait (`wait_for_feedback`, `lampo watch`) hears nothing of
   it: you went back to waiting, so the work is over either way. If the person sends you notes again before you heard

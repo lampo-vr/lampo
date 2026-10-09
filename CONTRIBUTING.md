@@ -154,7 +154,7 @@ can't decide here calls `skip(why)`: it shows as skipped, never as passed. In un
 - **`npm run check` and `npm run test:all` pass.** CI (`.github/workflows/ci.yml`) runs the unit, MCP and Auto-check
   tests on Linux (Node 22.18 and 24) and the Chrome suites on Linux in two parts (on chrome-headless-shell from
   `npm run chrome:install`, the browser their time budgets were set on), and builds the Docker image and checks that it
-  answers `/healthz`; every job has a time limit and every failure is reported. In this repository every job runs on
+  is ready (`/readyz`) when run as `docker-compose.yml` runs it (read-only, no capabilities, a data volume); every job has a time limit and every failure is reported. In this repository every job runs on
   GitHub's `ubuntu-latest`. Only a private copy of the repository sends check, unit and the browser suites to a
   self-hosted runner (labels `self-hosted`, `linux`, `x64`, `lampo-ci`; never for a pull request from a fork or from
   Dependabot, never the Docker build); a job there has no sudo, installs nothing, fails naming what the machine lacks
