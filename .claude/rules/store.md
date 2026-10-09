@@ -22,4 +22,6 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - What a person made (avatars, refs, previews) goes through the storage adapter, never `cache/`.
 - A deleted video takes its stored copies (`dropStored`): a new kind of copy per render joins `playbackKeys`; one goes
   only when no other video has its render (`renderKept`): the same bytes uploaded twice share a renderKey.
+- What a deletion owes the storage goes through `removeOwed` (written down first, crossed out as each key goes,
+  finished by `finishRemovals`), never a bare `storage().remove` whose failure is only logged and then forgotten.
 - The onboarding sample logs no events; Insights, taste, suggestions and `usageOf` skip it.

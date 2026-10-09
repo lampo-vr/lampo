@@ -14,7 +14,8 @@
 // with the consent, and nothing says reverse charge (unticked again, it is cleared); a consumer's
 // express start and the terms line with the operator's pages sit above the button, which says "Buy now" ("Zahlungspflichtig
 // bestellen"), and the consent is recorded before the order; a new receipts address is saved once paid; a declined card is said under the card; paid, a calm
-// done panel with four facts, and See Billing goes back. The cookie settings ask first (A13 CLOUD-1): nothing from
+// done panel with four facts, and See Billing goes back. Two checkouts that raced (this one replaced, an earlier form
+// that couldn't be closed) say so, with Try again. The cookie settings ask first (A13 CLOUD-1): nothing from
 // js.stripe.com or Google before a choice; "Necessary only" says so where the form would be, Allow loads it, the choice
 // is kept, and Google's address suggestions only with their own service allowed. Phone to wide desktop in both themes (a sticky bar on phones),
 // German, and nothing in --faint but placeholders. Without Chrome or web/dist it fails (see prereq.mjs).
@@ -23,7 +24,7 @@ import path from 'node:path';
 import { readOutbox } from '../../lib/mail/index.ts';
 import { ROOT, sleep, tmpdir } from '../lib/helpers.ts';
 import { client } from '../lib/http.ts';
-import { layoutMatrix, settle } from './layout.mjs';
+import { fitsAt, layoutMatrix, settle } from './layout.mjs';
 import { launch, requireChrome, shotsDir } from './lib/browser.mjs';
 import { assert, check, crashed, finish, screenshotFailures } from './lib/checks.mjs';
 import { consentCookie } from './lib/consent.mjs';
@@ -523,6 +524,35 @@ try {
     );
     assert(!(await page.$('[data-testid=billing-due]')), 'nothing carries over: no "due today" box');
     assert((await text('[data-testid=billing-pay]')) === 'Buy now', await text('[data-testid=billing-pay]'));
+  });
+
+  await check('checkouts that raced: a replaced one and a form that couldn’t be closed say so, with Try again, phone to desktop', async () => {
+    for (const [race, said] of [
+      ['replaced', /^Someone started another checkout for this workspace a moment ago\. Open Billing again to see it\.$/],
+      ['still-open', /^An earlier payment form couldn’t be closed\. Try again in a moment\.$/],
+    ]) {
+      setFake(ws.id, { checkoutRace: race });
+      await page.setViewport({ width: 1440, height: 900 });
+      await fresh(TEAM);
+      await page.waitForSelector('[data-testid=billing-checkout-error]', { timeout: 15000 });
+      const line = await text('[data-testid=billing-checkout-error] .bill-error');
+      assert(said.test(line), `${race}: ${line}`);
+      assert((await text('[data-testid=billing-checkout-error] button')) === 'Try again', await text('[data-testid=billing-checkout-error]'));
+      const problems = await fitsAt(page, `checkout ${race}`);
+      assert(!problems.length, problems.join('\n'));
+      if (SHOTS)
+        for (const width of [1440, 390]) {
+          await page.setViewport({ width, height: width === 390 ? 844 : 900 });
+          await settle(page);
+          await page.screenshot({ path: path.join(SHOTS, `checkout-${race}-${width}.png`) });
+        }
+    }
+    // the race over, Try again opens the form
+    setFake(ws.id, { checkoutRace: undefined });
+    await page.setViewport({ width: 1440, height: 900 });
+    await page.click('[data-testid=billing-checkout-error] button');
+    await elementsReady(2);
+    assert(!(await page.$('[data-testid=billing-checkout-error]')), 'the form, not the error');
   });
 
   await check('every width, both themes; phones keep what is due and the one action in a bar at the bottom', async () => {

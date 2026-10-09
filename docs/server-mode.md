@@ -351,7 +351,9 @@ outside this repository. What such a module may do:
   for first; a workspace whose plan has no room for it, or that is read-only, is refused with a `402` and the
   module's sentence ([api.md](api.md#workspaces-and-plan-limits)). Reviewing, notes, answers, approvals, downloads and the review links
   already sent keep working, and nothing is ever deleted for a plan.
-- **Hear** a workspace made or deleted and a member count changed (after the fact, never in the way).
+- **Hear** a workspace made or deleted and a member count changed (after the fact, never in the way), and **ask** whether
+  a workspace it bills was deleted: the erasure log's answer, so a deletion whose message was lost still ends its billing,
+  and a workspace merely missing from the list (a damaged file, a restore) never does.
 - **Let a workspace hide the badge.** Review links and embeds show a small *Powered by Lampo*; a module may let a
   workspace's owners and admins hide it (Settings → Review links, on a paid plan). Without a module it always shows.
 - **Answer a sign-up** in place of the server's own: it places the person exactly as the server would ([Sign-up
@@ -480,7 +482,12 @@ People's own data is theirs to take home and to end (GDPR Art. 15, 17, 20); the 
 - **What goes with a workspace**: its folders (`data/w/<id>`, `versions/w/<id>`, `cache/w/<id>`) and every object
   under its storage prefix (`w/<id>/` in Bunny or S3), its review links (they name nothing any more), invites, API
   tokens and app connections, its waiting jobs, the accounts it leaves in no workspace, and its billing (a billing
-  module cancels the subscription at once and forgets its state). Never the server's own workspace.
+  module cancels the subscription at once and forgets its state). Never the server's own workspace. The deletion is
+  written down and billing stops before anything that can fail: when the storage is down, the workspace is gone all the
+  same and its files wait; the server erases them once the storage answers again (a minute after a start, then hourly,
+  a few at a time, never while it can't read its list of workspaces). A deleted video works the same way: what it
+  still has in the bucket is written down in `pending-removals.json` first and removed afterwards; what a storage
+  outage or a stop cut short goes on the next pass, never anything a video has again.
 - **The erasure log** (`data/erasures.jsonl`, ids only): every deleted account and workspace. Your nightly backups keep
   what was deleted until their retention drops it (with `restic forget --keep-monthly 12`, up to a year). After you
   restore one, run `lampo admin erasures` (what is back that was deleted) and `lampo admin erasures --apply` (delete it

@@ -1512,8 +1512,9 @@ export function deleteReply(id: string, n: number, at: string, by = USER): Comme
   });
 }
 
-// Removals from storage a deleted video started: not waited for (the bucket may be slow), but counted.
-const removing = new Set<Promise<void>>();
+// Removals from storage a deleted video started: not waited for (the bucket may be slow), but counted — a graceful stop
+// waits for them (server/shutdown.ts drain), and what they couldn't finish waits in the workspace's record.
+const removing = new Set<Promise<unknown>>();
 
 /** Resolves once every removal from storage that deleting a video or the sample started has ended. */
 export async function removalsSettled(): Promise<void> {
@@ -1521,23 +1522,142 @@ export async function removalsSettled(): Promise<void> {
 }
 
 /**
+ * The storage keys a deleted video still owes (data/pending-removals.json, per workspace: `{keys: [{key, at}]}`, keys
+ * as the workspace's storage() names them): written before anything is removed, a key crossed out once it went, so a
+ * bucket that fails, or a stop mid-way, never leaves a deleted video's renders and copies there for good —
+ * `finishRemovals` (the server's maintenance) tries again. At most `REMOVALS_KEPT`, the oldest given up first (logged).
+ */
+export const pendingRemovalsFile = (): string => path.join(dataDir(), 'pending-removals.json');
+export const REMOVALS_KEPT = 10_000;
+interface PendingRemoval {
+  key: string;
+  at: string;
+}
+
+/** The workspace's pending removals; a file that isn't there is none, one that can't be read throws (never "none"). */
+function readPending(file: string): PendingRemoval[] {
+  let text: string;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw e;
+  }
+  const keys = (JSON.parse(text) as { keys?: unknown }).keys;
+  if (!Array.isArray(keys)) throw new Error(`${file}: no list of keys in it`);
+  return keys.filter((k): k is PendingRemoval => typeof k?.key === 'string' && typeof k?.at === 'string');
+}
+
+/** Changes the workspace's pending removals under their lock (`file` is taken where the deletion ran: its workspace). */
+function changePending(file: string, fn: (keys: PendingRemoval[]) => PendingRemoval[]): void {
+  withLock(path.join(path.dirname(file), '.removals'), () => {
+    let keys = fn(readPending(file));
+    if (keys.length > REMOVALS_KEPT) {
+      console.error(`removals: ${keys.length - REMOVALS_KEPT} of the oldest left for good (${file} keeps ${REMOVALS_KEPT})`);
+      keys = keys.slice(-REMOVALS_KEPT);
+    }
+    if (!keys.length) fs.rmSync(file, { force: true });
+    else {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      writeAtomic(file, `${JSON.stringify({ keys }, null, 1)}\n`);
+    }
+  });
+}
+
+/**
+ * Removes `keys` through `st` one after another and crosses out of `file` those that went; what failed stays written
+ * down for the next pass. Returns the keys removed.
+ */
+async function removeKeys(st: ReturnType<typeof storage>, file: string, keys: readonly string[], what: (key: string) => string): Promise<string[]> {
+  const gone: string[] = [];
+  for (const key of keys)
+    try {
+      await st.remove(key);
+      gone.push(key);
+    } catch (e) {
+      console.error(`could not delete ${what(key)} (it stays written down for the next pass):`, (e as Error).message);
+    }
+  if (gone.length)
+    try {
+      const went = new Set(gone);
+      changePending(file, (all) => all.filter((p) => !went.has(p.key)));
+    } catch (e) {
+      // still written down: the next pass removes them again (removing what is gone is no error)
+      console.error(`removals: ${gone.length} removed but not crossed out (${(e as Error).message})`);
+    }
+  return gone;
+}
+
+/**
+ * Removes storage keys a deletion owes, in the workspace running now: written down first (pendingRemovalsFile), then
+ * removed one after another, each crossed out once it went. Counted until it ends (removalsSettled); resolves with the
+ * keys removed, never rejects. `what` names a key in the log.
+ */
+export function removeOwed(keys: readonly string[], what: (key: string) => string = (key) => key): Promise<string[]> {
+  if (!keys.length) return Promise.resolve([]);
+  const st = storage();
+  const file = pendingRemovalsFile();
+  try {
+    const at = isoLocal();
+    changePending(file, (all) => [...all.filter((p) => !keys.includes(p.key)), ...keys.map((key) => ({ key, at }))]);
+  } catch (e) {
+    // a record that can't be written doesn't keep the deletion from removing what it can now
+    console.error(`removals: not written down (${(e as Error).message})`);
+  }
+  const p = removeKeys(st, file, keys, what).finally(() => removing.delete(p));
+  removing.add(p);
+  return p;
+}
+
+/**
  * What a deleted video (its folders on this disk already gone) still has through the storage adapter: where that is
  * away from this disk, its own prefixes (renders, fix previews, references — a draft's too); and wherever it is, the
  * playback copies of its versions (playbackKeys) that no other video of the workspace still has — the same bytes put
- * up twice share them. Started at once, ended in the background (removalsSettled). A copy still being made goes once it
- * is stored (server/playback.ts).
+ * up twice share them. Written down first (pendingRemovalsFile), then started at once and ended in the background
+ * (removalsSettled). A copy still being made goes once it is stored (server/playback.ts).
  */
 function dropStored(slug: string, versions: readonly Version[]): void {
-  const st = storage();
-  const own = st.kind === 'local' ? [] : ['versions', 'previews', 'refs'].map((prefix) => `${prefix}/${slug}/`);
+  const own = storage().kind === 'local' ? [] : ['versions', 'previews', 'refs'].map((prefix) => `${prefix}/${slug}/`);
   const copies = [...new Set(versions.map(renderKey))].filter((k) => !renderKept(k)).flatMap(playbackKeys);
-  const p = (async () => {
-    for (const key of [...own, ...copies])
-      await st
-        .remove(key)
-        .catch((e: Error) => console.error(`could not delete ${key.startsWith('versions/') ? 'the renders' : key.split('/')[0]} of ${slug}:`, e.message));
-  })().finally(() => removing.delete(p));
+  void removeOwed([...own, ...copies], (key) => `${key.startsWith('versions/') ? 'the renders' : key.split('/')[0]} of ${slug}`);
+}
+
+/** Whether a pending key may still go: never one a video has again (its slug's folders back, its render again). */
+function stillOwed(key: string): boolean {
+  const own = /^(?:versions|previews|refs)\/([^/]+)\/$/.exec(key);
+  if (own) return !fs.existsSync(reviewDir(own[1] as string));
+  const copy = /^(?:scrub|proxies|phone)\/([^/]+)\.mp4$/.exec(key);
+  if (copy) return !renderKept(copy[1] as string);
+  return false;
+}
+
+/**
+ * Finishes the removals a deleted video owes in the workspace running now (pendingRemovalsFile): at most `max` keys a
+ * pass, oldest first. A key a video has again — a new video under the deleted one's name, the same render put up again
+ * — is crossed out without removing anything. A record that can't be read is left alone (logged). Returns the keys
+ * removed, those that failed, and how many still wait.
+ */
+export async function finishRemovals({ max = 200 }: { max?: number } = {}): Promise<{ removed: string[]; failed: number; left: number }> {
+  const file = pendingRemovalsFile();
+  let pending: PendingRemoval[];
+  try {
+    pending = readPending(file);
+  } catch (e) {
+    console.error(`removals: ${file} can't be read, nothing removed (${(e as Error).message})`);
+    return { removed: [], failed: 0, left: 0 };
+  }
+  if (!pending.length) return { removed: [], failed: 0, left: 0 };
+  const settled = new Set(pending.filter((p) => !stillOwed(p.key)).map((p) => p.key));
+  if (settled.size) changePending(file, (all) => all.filter((p) => !settled.has(p.key)));
+  const owed = pending.filter((p) => !settled.has(p.key)).map((p) => p.key);
+  const tried = owed.slice(0, Math.max(0, max));
+  const p = removeKeys(storage(), file, tried, (key) => key).finally(() => removing.delete(p));
   removing.add(p);
+  const removed = await p;
+  const out = { removed, failed: tried.length - removed.length, left: owed.length - removed.length };
+  if (removed.length) console.log(`removals (${currentWorkspace()}): ${removed.length} left behind by deleted videos removed now`);
+  if (out.left) console.log(`removals (${currentWorkspace()}): ${out.left} still wait for the storage`);
+  return out;
 }
 
 export function removeVideo(slug: string, by = USER): Review | null {

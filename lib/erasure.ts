@@ -13,7 +13,9 @@
 // - eraseWorkspaceFiles: a deleted workspace's storage prefix (renders, previews, references, playbooks' files: the
 //   adapter's `remove('w/<id>/')`) and its data and cache folders. Never workspace #1 (its folders are the store's own).
 // - the erasure log (data/erasures.jsonl): one line per deleted account or workspace — ids only —, so that whoever
-//   restores a backup taken before can delete them again (`lampo admin erasures --apply`, lib/deletion.ts).
+//   restores a backup taken before can delete them again (`lampo admin erasures --apply`, lib/deletion.ts), a deletion
+//   its storage interrupted is finished later (lib/deletion.ts finishDeletions), and a billing module can tell a deleted
+//   workspace from one merely missing (erasedWorkspaces, server/extension.ts workspaceErased).
 import fs from 'node:fs';
 import path from 'node:path';
 import { forgetLinksOf } from './accountLinks.ts';
@@ -245,14 +247,8 @@ export function recordErasure(kind: Erasure['kind'], id: string, by: string): vo
   }
 }
 
-/** Every deletion written down, oldest first (lines that don't parse are skipped). */
-export function listErasures(): Erasure[] {
-  let text = '';
-  try {
-    text = fs.readFileSync(ERASURES_FILE, 'utf8');
-  } catch {
-    return [];
-  }
+/** The log's lines, oldest first (lines that don't parse are skipped). */
+function parseErasures(text: string): Erasure[] {
   const out: Erasure[] = [];
   for (const line of text.split('\n')) {
     if (!line.trim()) continue;
@@ -262,4 +258,48 @@ export function listErasures(): Erasure[] {
     } catch {}
   }
   return out;
+}
+
+/** Every deletion written down, oldest first (lines that don't parse are skipped). */
+export function listErasures(): Erasure[] {
+  let text = '';
+  try {
+    text = fs.readFileSync(ERASURES_FILE, 'utf8');
+  } catch {
+    return [];
+  }
+  return parseErasures(text);
+}
+
+/** The erasure log is there but can't be read: whether something was deleted can't be told. */
+export class ErasuresUnreadableError extends Error {}
+
+// Asked for every workspace a billing module bills, once an hour: parsed again only when the file changed.
+let erased: { key: string; ids: ReadonlySet<string> } | null = null;
+/**
+ * The workspaces the erasure log records as deleted — what a billing module may stop billing for good, so the log alone
+ * decides, never the registry (a workspace missing from it may be a blip or a restore, not a deletion). No log yet:
+ * none. A log that can't be read throws ErasuresUnreadableError: "can't tell" is never "not deleted" or "deleted".
+ */
+export function erasedWorkspaces(): ReadonlySet<string> {
+  const unreadable = (e: unknown) =>
+    new ErasuresUnreadableError(`${ERASURES_FILE} can't be read (${(e as NodeJS.ErrnoException).code || (e as Error).message})`);
+  let key = 'none';
+  try {
+    const st = fs.statSync(ERASURES_FILE);
+    key = `${st.ino}:${st.size}:${st.mtimeMs}`;
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw unreadable(e);
+  }
+  if (erased?.key === key) return erased.ids;
+  let text = '';
+  if (key !== 'none')
+    try {
+      text = fs.readFileSync(ERASURES_FILE, 'utf8');
+    } catch (e) {
+      throw unreadable(e);
+    }
+  const ids = new Set(parseErasures(text).flatMap((e) => (e.kind === 'workspace' ? [e.id] : [])));
+  erased = { key, ids };
+  return ids;
 }

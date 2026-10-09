@@ -228,6 +228,15 @@ export function billingSaid(e: unknown): string {
       return t('This workspace holds more than that would leave room for: archive or delete videos first, then reduce the extra storage.');
     case 'no-notice':
       return t('This plan ends at the end of its period: one month’s notice is for a consumer’s yearly plan after its first year.');
+    // a switch that ends the trial changes nothing until its payment went through
+    case 'payment-incomplete':
+      return t('The payment for the new plan didn’t go through, so the plan is unchanged and the trial goes on. Check the card in Billing and try again.');
+    case 'trial-storage':
+      return t('Extra storage can be added once the trial has ended: until then the plan’s own storage applies.');
+    case 'checkout-replaced':
+      return t('Someone started another checkout for this workspace a moment ago. Open Billing again to see it.');
+    case 'form-still-open':
+      return t('An earlier payment form couldn’t be closed. Try again in a moment.');
     default:
       return said;
   }

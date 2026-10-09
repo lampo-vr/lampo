@@ -21,9 +21,10 @@ import { Spinner } from '../../ui/feedback.tsx';
 import { I, type IconName } from '../../ui/icons.tsx';
 import { KeyGlyph } from '../../ui/KeyGlyph.tsx';
 import { IconButton } from '../../ui/primitives.tsx';
+import { SkLine } from '../../ui/Skeleton.tsx';
 import { currencyOf, periodTotal } from '../facts.ts';
 import { momentEvent } from '../moments.ts';
-import { PayInPlace, type PayWhat, previewMoney, previewSwitch } from '../pay.tsx';
+import { PayInPlace, type PayWhat, previewMoney, trialEndWords, useSwitchPreview } from '../pay.tsx';
 import {
   changeRows,
   contractMail,
@@ -122,6 +123,8 @@ function Sheet({
   const { fit, need } = start;
   const currency = currencyOf(b, fit.kind === 'plan' ? fit.offer : null);
   const switching = fit.kind === 'plan' && !!b.subscribed;
+  // what the switch puts on the next invoice, or that it ends the trial and is billed now (undefined: on its way)
+  const preview = useSwitchPreview(switching && fit.kind === 'plan' ? fit.offer.plan : null, b.interval ?? interval);
   // shown: counted once; put away or used: counted as it happens
   useEffect(() => {
     momentEvent('shown', 'limit_sheet', reason);
@@ -167,7 +170,7 @@ function Sheet({
           }}
         >
           {phase === 'done' ? (
-            <Done ask={ask} b={b} fit={fit} reason={reason} workspace={workspace} onClose={onClose} />
+            <Done ask={ask} b={b} fit={fit} reason={reason} workspace={workspace} endsTrial={!!preview?.endsTrial} onClose={onClose} />
           ) : (
             <>
               <header className="lim-head">
@@ -209,6 +212,7 @@ function Sheet({
                     interval={interval}
                     currency={currency}
                     switching={switching}
+                    preview={preview}
                     busy={phase === 'confirming'}
                     onPaid={() => setPhase('confirming')}
                   />
@@ -411,6 +415,7 @@ function PayColumn({
   interval,
   currency,
   switching,
+  preview,
   busy,
   onPaid,
 }: {
@@ -423,19 +428,11 @@ function PayColumn({
   interval: 'month' | 'year';
   currency: string;
   switching: boolean;
+  /** The switch's preview: undefined while it is on its way, null without an answer (never asked: not a switch). */
+  preview: BillingPreview | null | undefined;
   busy: boolean;
   onPaid: () => void;
 }) {
-  const [preview, setPreview] = useState<BillingPreview | null>(null);
-  const plan = fit.kind === 'plan' ? fit.offer.plan : null;
-  useEffect(() => {
-    if (!switching || !plan) return;
-    let live = true;
-    void previewSwitch(plan, b.interval ?? interval).then((p) => live && setPreview(p));
-    return () => {
-      live = false;
-    };
-  }, [switching, plan, b.interval, interval]);
   const what: PayWhat | null = useMemo(
     () =>
       fit.kind === 'addon'
@@ -481,16 +478,21 @@ function PayColumn({
         : [];
   const prorated = previewMoney(preview);
   const when = preview?.date ? day(preview.date) : renews;
+  // a switch says nothing about the invoice before its preview has answered (then it may be the trial's end)
+  const waiting = switching && preview === undefined;
+  const charge = fit.kind === 'plan' && preview?.endsTrial ? trialEndWords(b, fit.offer, b.interval ?? interval, preview) : null;
   const note =
     fit.kind === 'addon'
       ? renews
         ? t('The rest of this period goes on the next invoice, on {date}, prorated and plus VAT.', { date: renews })
         : t('The rest of this period goes on the next invoice, prorated and plus VAT.')
-      : prorated && when
-        ? t('The difference for the rest of this period, {amount} plus VAT, is on the invoice of {date}.', { amount: prorated, date: when })
-        : when
-          ? t('The difference for the rest of this period goes on the invoice of {date}, plus VAT.', { date: when })
-          : t('The difference for the rest of this period goes on the next invoice, plus VAT.');
+      : charge && fit.kind === 'plan'
+        ? t('Your trial ends today, and {plan} is billed now: {amount}.', { plan: fit.offer.name, amount: charge })
+        : prorated && when
+          ? t('The difference for the rest of this period, {amount} plus VAT, is on the invoice of {date}.', { amount: prorated, date: when })
+          : when
+            ? t('The difference for the rest of this period goes on the invoice of {date}, plus VAT.', { date: when })
+            : t('The difference for the rest of this period goes on the next invoice, plus VAT.');
   return (
     <>
       {/* paid: the eyebrow says the plan is on its way, in the same line (nothing below moves) */}
@@ -508,7 +510,7 @@ function PayColumn({
         // the checkout puts its total where {amount} stands ("Pay €171.36 and upload")
         label={payLabel(reason, fit, ask, paysWithCard ? '{amount}' : null, switching)}
         order={order}
-        total={{ k: t('Today'), v: zero, note }}
+        total={{ k: t('Today'), v: waiting ? <SkLine w="4.5em" /> : (charge ?? zero), note: waiting ? <SkLine w="16em" /> : note }}
         onPaid={onPaid}
       />
       {paysWithCard && reason === 'members' && ask.name && (
@@ -563,6 +565,7 @@ function Done({
   fit,
   reason,
   workspace,
+  endsTrial,
   onClose,
 }: {
   ask: LimitAsk;
@@ -570,6 +573,8 @@ function Done({
   fit: Fit;
   reason: Reason;
   workspace: string;
+  /** The switch ended the trial: the plan was billed today. */
+  endsTrial: boolean;
   onClose: () => void;
 }) {
   const title =
@@ -587,9 +592,11 @@ function Done({
   const receipt =
     fit.kind === 'addon'
       ? t('Settings → Billing shows the extra storage; remove it there any time.')
-      : b.subscribed
-        ? t('The difference is on the next invoice; every invoice is in Settings → Billing.')
-        : t('The receipt goes to your billing email; every invoice is in Settings → Billing.');
+      : endsTrial && fit.kind === 'plan'
+        ? t('{plan} is billed from today; every invoice is in Settings → Billing.', { plan: fit.offer.name })
+        : b.subscribed
+          ? t('The difference is on the next invoice; every invoice is in Settings → Billing.')
+          : t('The receipt goes to your billing email; every invoice is in Settings → Billing.');
   return (
     <div className="lim-done" data-testid="limit-done">
       <KeyGlyph shape="diamond" size={22} className="lim-ok" pop />

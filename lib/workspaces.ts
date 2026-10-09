@@ -207,6 +207,17 @@ const registry = (): WorkspacesFile => stored() ?? implied();
 /** Whether this store has workspaces.json (a hosted store after migrateWorkspaces); else it is workspace #1 alone. */
 export const isMigrated = (): boolean => stored() !== null;
 
+/**
+ * Whether workspace `id` is in workspaces.json, from the file alone: nothing is implied. A store without the file (one
+ * that never moved to workspaces) or one whose file is lost or can't be read throws — never "not there" (what deletes
+ * a missing workspace's leftovers, lib/deletion.ts finishDeletions, must not read a blip as a deletion).
+ */
+export function inRegistry(id: string): boolean {
+  const f = stored();
+  if (!f) throw new WorkspacesLostError(`${WORKSPACES_FILE} isn't there: this store has no workspaces besides #1`);
+  return f.workspaces.some((w) => w.id === id);
+}
+
 // Work outside a request or job is refused once there is more than one workspace (lib/scope.ts). Asked often (every
 // path a background task resolves), so the answer is kept for a second; changes made here update it at once.
 let many = { at: 0, value: false };

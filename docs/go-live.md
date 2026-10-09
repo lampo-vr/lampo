@@ -325,8 +325,9 @@ node scripts/smoke.ts https://review.example.com  # from your laptop
 ```
 
 On `up -d` the old container gets SIGTERM: it stops taking connections, ends live streams (browsers and `lampo watch`
-reconnect by themselves), and waits up to 30 s for uploads being registered and the running job
-(`stop_grace_period: 45s`). Uploads in flight pause and resume on their own (they retry for about four minutes).
+reconnect by themselves), and waits up to 30 s for uploads being registered, the running job and what deleted videos
+are removing from storage (`stop_grace_period: 45s`; removals it cuts short are written down, and the new container
+finishes them). Uploads in flight pause and resume on their own (they retry for about four minutes).
 Queued background jobs run again in the new container.
 
 Rollback: `git checkout <previous>`, `docker tag lampo:<previous> lampo:local`,

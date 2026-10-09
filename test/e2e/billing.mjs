@@ -12,7 +12,9 @@
 // loads; nothing from Stripe until a payment form opens. Choosing a plan opens the checkout step at its own address and
 // pays there (the step itself: test/e2e/checkout.mjs); the account panel shows the card and the invoice, takes a new
 // card for renewals and a removal with Undo, the billing details edited in place with the VAT ID said wrong at its field
-// and then checked; on a phone its badges never wrap; a switch shows what the next invoice will be; cancelling shows
+// and then checked; on a phone its badges never wrap; a switch shows what the next invoice will be (a paid trial's switch
+// to Business: the trial ends today and Business is billed now, with the amount; a declined payment changes nothing);
+// cancelling shows
 // what Free would mean and keeping the plan is the one orange; a consumer's yearly plan after its first year may end
 // with one month's notice, its refund said in the step, the contract, what was received and the plan (kept, nothing is
 // owed); the plans' VAT line says a business abroad pays none only where the provider offers reverse charge; the Lampo badge stays on every plan and a paid
@@ -646,6 +648,52 @@ try {
     );
     await shot('account-390');
     await page.setViewport({ width: 1440, height: 900 });
+  });
+
+  await check('a paid trial switching to Business: the dialog says it ends the trial and bills now; a declined payment changes nothing', async () => {
+    // what is open (a dialog, a toast) at a phone's width and a desktop's, both themes: plain viewports, so nothing reloads
+    const fitsOpen = async (name) => {
+      const problems = await layoutMatrix(
+        page,
+        { [name]: null },
+        { widths: [390, 1440], each: async (width, theme) => SHOTS && page.screenshot({ path: path.join(SHOTS, `billing-${name}-${theme}-${width}.png`) }) },
+      );
+      assert(!problems.length, problems.join('\n'));
+    };
+    // Team paid during its trial (a card on file, the subscription trialing): Billing says paid, as the real module does;
+    // the payment that would end the trial is declined
+    setFake(piaWs, { trialing: true, trialDeclines: true });
+    try {
+      const plans = () => fake().calls.filter((c) => c.kind === 'plan').length;
+      const before = plans();
+      await openBilling();
+      await page.click('[data-testid=billing-change]');
+      await page.click('[data-testid=billing-offer-business]');
+      // the plans' bar says it before the confirmation does (Billing reads `paid`: only the provider's preview tells)
+      await waitText('[data-testid=billing-pick-bar]', /Takes effect at once: your trial ends today, and Business is billed now\./);
+      await page.click('[data-testid=billing-go]');
+      await page.waitForSelector('[data-testid=confirm-action]');
+      const dialog = await text('[data-testid=confirm]');
+      assert(/Switch to Business\?/.test(dialog), dialog);
+      // Business for the two of them, a month, billed now — said with VAT, as this page says its prices
+      assert(/It takes effect at once\. Your trial ends today, and Business is billed now: \$99\.96 incl\. VAT\./.test(dialog), dialog);
+      assert(!/next invoice/.test(dialog), `never “the next invoice”: ${dialog}`);
+      await fitsOpen('trial-business');
+      // confirmed, the payment fails: the module's sentence, and the plan and the trial stay as they were
+      await page.click('[data-testid=confirm-action]');
+      const declined = /The payment for Business didn’t go through, so the plan is unchanged and the trial goes on\. Check the card in Billing and try again\./;
+      await page.waitForFunction(
+        (src) => [...document.querySelectorAll('[data-testid=toast]')].some((t) => new RegExp(src).test(t.textContent)),
+        { polling: 100, timeout: 10000 },
+        declined.source,
+      );
+      await fitsOpen('trial-declined');
+      assert(plans() === before, JSON.stringify(fake().calls.filter((c) => c.kind === 'plan')));
+      assert(fake().workspaces[piaWs].plan === 'team' && fake().workspaces[piaWs].trialing === true, JSON.stringify(fake().workspaces[piaWs]));
+      await waitText('[data-testid=billing-plan] h2', /Team/);
+    } finally {
+      setFake(piaWs, { trialing: undefined, trialDeclines: undefined });
+    }
   });
 
   await check('a switch says what the next invoice will be; cancelling (what Free would mean) and keeping the plan', async () => {

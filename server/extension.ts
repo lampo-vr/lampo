@@ -16,6 +16,8 @@
 // keep working, and nothing is ever deleted for billing reasons.
 // What it hears (after the fact, never blocking): a workspace created, a workspace's member count changed, a workspace
 // deleted (the module stops billing it and forgets its state).
+// What it may ask: whether a workspace it bills was deleted (`workspaceErased`: the erasure log's word, for a deletion
+// whose hook it never heard).
 // What it may do: answer a sign-up (`onSignup`, in place of server/signup.ts — it places the person through the host's
 // `placeSignup`, then starts whatever the plan gives a newcomer), email a workspace's people through the app's mailer
 // and layout (`mail`, its own words in each language), and say it provides billing (Settings → Billing then shows
@@ -29,13 +31,14 @@ import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import type { Request } from 'express';
 import { bothSpellings, setting } from '../lib/env.ts';
+import { erasedWorkspaces } from '../lib/erasure.ts';
 import { filesUsage } from '../lib/files.ts';
 import { recordStep } from '../lib/funnel.ts';
 import { wellFormed } from '../lib/names.ts';
 import { slugify } from '../lib/paths.ts';
 import { RateLimit } from '../lib/rateLimit.ts';
 import { runsFile } from '../lib/runs.ts';
-import { currentWorkspace, inWorkspace } from '../lib/scope.ts';
+import { currentWorkspace, DEFAULT_WORKSPACE, inWorkspace } from '../lib/scope.ts';
 import * as store from '../lib/store.ts';
 import type { OperatorPlan, PlanChange, PlanLogEntry, PlanStamp } from '../lib/types.ts';
 import * as workspaces from '../lib/workspaces.ts';
@@ -156,6 +159,13 @@ export interface HostContext {
   placeSignup(account: string, opts?: { reset?: boolean }): Promise<SignupPlacement>;
   /** Queues a message to the workspace's people through the app's mailer; resolves with how many were queued. */
   mail(m: WorkspaceMail): Promise<number>;
+  /**
+   * Whether the workspace was deleted, as the erasure log records it (lib/erasure.ts): a module's regular round stops
+   * billing it for good even when the deletion's own `deleted` hook was lost (a deletion interrupted half-way, a
+   * process stopped). True only for a recorded deletion — never for a workspace merely missing from the registry, which
+   * a blip or a restore can make; it throws when the log can't be read, so nothing is decided then.
+   */
+  workspaceErased(workspace: string): boolean;
   /**
    * The funnel's two steps only the module sees (lib/funnel.ts, the operator's page): `trial_end` when a workspace's
    * trial ends — counted when it was active (anything done in its last three days: the module's `active`, or when it
@@ -490,6 +500,8 @@ export function hostContext(o: HostOptions): HostContext {
     },
     log,
     placeSignup: async (account, opts) => placeSignupOf(account, opts),
+    // the erasure log alone, never the registry; the server's own workspace is never deleted
+    workspaceErased: (w) => typeof w === 'string' && w !== DEFAULT_WORKSPACE && erasedWorkspaces().has(w),
     funnel(workspace, step, o = {}) {
       // a module's mistake is its own: anything but its two steps, a workspace that isn't one, an idle trial — nothing
       if ((step !== 'trial_end' && step !== 'plan_paid') || typeof workspace !== 'string' || !workspaces.getWorkspace(workspace)) return;

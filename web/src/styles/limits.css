@@ -676,6 +676,10 @@
       var(--raise),
       0 0 0 10px var(--ink-2);
   }
+  /* a refusal said above the floating button scrolls into view clear of it (pay.tsx) */
+  .lim-pay .pay-error {
+    scroll-margin-bottom: calc(var(--h-touch) + var(--sp-3) + var(--sp-4));
+  }
   .lim-foot {
     flex-wrap: wrap;
     padding: var(--sp-3) var(--sp-4) calc(var(--sp-3) + var(--safe-bottom));

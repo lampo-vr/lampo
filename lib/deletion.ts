@@ -3,22 +3,25 @@
 // never leaves a way in to something half gone.
 //
 // A workspace: out of the registry first (nobody reaches it from then on: sessions fall back to their other workspaces,
-// its review links name nothing), its API tokens, app connections, invites and links' index entries go, the accounts it
-// leaves in no workspace go (each with what it kept: lib/erasure.ts afterAccountGone), its waiting jobs are dropped and
-// the running one awaited, then its files — every object under its storage prefix and its folders —, then the billing
-// module hears it (it cancels and forgets the subscription), and the erasure log gets a line. Never workspace #1.
+// its review links name nothing), and with that the decision is made: the erasure log gets its line and the billing
+// module hears it (it cancels and forgets the subscription) before anything that can fail. Then its API tokens, app
+// connections, invites and links' index entries go, the accounts it leaves in no workspace go (each with what it kept:
+// lib/erasure.ts afterAccountGone), its waiting jobs are dropped and the running one awaited, then its files — every
+// object under its storage prefix, then its folders. A storage that is down keeps the files, never the deletion: the
+// server's maintenance (finishDeletions) erases them once it answers again. Never workspace #1.
 //
 // An account: refused while it is the last owner of a workspace where others work (it hands it over or deletes it
 // first); it leaves the workspaces others go on with, the workspaces it alone works in go with it, then the account.
+import fs from 'node:fs';
 import * as auth from './auth.ts';
-import { eraseWorkspaceFiles, erasuresSettled, listErasures, recordErasure } from './erasure.ts';
+import { erasedWorkspaces, eraseWorkspaceFiles, erasuresSettled, listErasures, recordErasure } from './erasure.ts';
 import { filesHeld } from './files.ts';
 import { dropJobsOf } from './jobs.ts';
 import { forgetGrants, listApps } from './oauth/store.ts';
 import { DEFAULT_WORKSPACE } from './paths.ts';
-import { inWorkspace } from './scope.ts';
+import { inWorkspace, WORKSPACE_ID } from './scope.ts';
 import { forgetLinksIn, listShares } from './shares.ts';
-import { listReviews } from './store.ts';
+import { finishRemovals, listReviews } from './store.ts';
 import type { AccountDeletionPlan, StoredWorkspace, WorkspaceDeletionPlan, WorkspaceInfo } from './types.ts';
 import * as workspaces from './workspaces.ts';
 
@@ -86,6 +89,10 @@ export async function deleteWorkspace(ws: string, by: Deleter): Promise<{ plan: 
   const plan = planWorkspaceDeletion(ws);
   if (plan.refused) throw new workspaces.WorkspaceError(plan.refused, 409);
   const w = workspaces.dropWorkspace(ws);
+  // decided: written down and unbilled now, so that nothing failing below (a storage outage) can leave a workspace
+  // gone from the app but billed, or brought back by a restore
+  recordErasure('workspace', ws, by);
+  workspaces.workspaceDeleted(ws);
   auth.accessEnded();
   const people: Told[] = [];
   for (const m of w.members) {
@@ -108,11 +115,64 @@ export async function deleteWorkspace(ws: string, by: Deleter): Promise<{ plan: 
       }
     }
   await dropJobsOf(ws);
-  await eraseWorkspaceFiles(ws);
-  recordErasure('workspace', ws, by);
-  workspaces.workspaceDeleted(ws);
+  try {
+    await eraseWorkspaceFiles(ws);
+  } catch (e) {
+    // the workspace is gone for everyone; its files wait for the storage (finishDeletions, the server's maintenance)
+    console.error(`deletion: the files of ${ws} stay until the next maintenance pass: ${(e as Error).message}`);
+  }
   await erasuresSettled();
   return { plan, people };
+}
+
+/** How many deleted workspaces' files one maintenance pass erases at most (finishDeletions). */
+export const FINISH_PER_PASS = 10;
+// When each deleted workspace's files last failed to go (this process): a pass tries the others first, so one prefix the
+// storage keeps refusing never holds up the rest. Only ids the erasure log names; dropped once erased.
+const lastFailed = new Map<string, number>();
+
+/**
+ * Finishes deletions their storage interrupted: every workspace the erasure log records as deleted that the registry
+ * no longer has and whose folders are still on this disk — its objects under `w/<id>/` and then its folders are erased
+ * again (eraseWorkspaceFiles; the objects go first, so folders left mean objects may be left). At most `max` per pass,
+ * those that failed last at the end; never workspace #1, never a workspace the registry has (one restored from a backup
+ * goes only with `lampo admin erasures --apply`), and nothing at all while the registry or the log can't be read.
+ * Idempotent. Returns the ids erased and failed now, and how many still wait.
+ */
+export async function finishDeletions({ max = FINISH_PER_PASS }: { max?: number } = {}): Promise<{ erased: string[]; failed: string[]; left: number }> {
+  const out = { erased: [] as string[], failed: [] as string[], left: 0 };
+  let waiting: string[];
+  try {
+    waiting = [...erasedWorkspaces()].filter(
+      (id) =>
+        id !== DEFAULT_WORKSPACE &&
+        WORKSPACE_ID.test(id) &&
+        !workspaces.inRegistry(id) &&
+        Object.values(workspaces.workspaceRoot(id)).some((dir) => fs.existsSync(dir)),
+    );
+  } catch (e) {
+    console.error(`deletions: not finished this time (${(e as Error).message})`);
+    return out;
+  }
+  for (const id of [...lastFailed.keys()]) if (!waiting.includes(id)) lastFailed.delete(id);
+  waiting.sort((a, b) => (lastFailed.get(a) ?? 0) - (lastFailed.get(b) ?? 0));
+  for (const id of waiting.slice(0, Math.max(0, max))) {
+    try {
+      // asked again right before: a workspace the registry has (or can't say about) is never erased
+      if (workspaces.inRegistry(id)) continue;
+      await eraseWorkspaceFiles(id);
+      lastFailed.delete(id);
+      out.erased.push(id);
+    } catch (e) {
+      lastFailed.set(id, Date.now());
+      out.failed.push(id);
+      console.error(`deletions: the files of ${id} stay for the next pass: ${(e as Error).message}`);
+    }
+  }
+  out.left = waiting.length - out.erased.length;
+  if (out.erased.length) console.log(`deletions: finished ${out.erased.length} interrupted by the storage (${out.erased.join(', ')})`);
+  if (out.left) console.log(`deletions: ${out.left} deleted workspace${out.left === 1 ? '' : 's'} still hold files`);
+  return out;
 }
 
 /** What deleting account `userId` means (AccountDeletionPlan). Throws 404 for no such account. */
@@ -196,4 +256,20 @@ export async function reapplyErasures({ apply }: { apply: boolean }): Promise<{ 
     if (auth.getUser(id)) auth.deleteUser(id, { memberships: true });
   }
   return { accounts, workspaces: spaces };
+}
+
+/**
+ * The server's maintenance for deletions their storage cut short: deleted workspaces' files (finishDeletions, a hosted
+ * server's), then in every workspace what deleted videos still owe the storage (store.finishRemovals). Never throws.
+ */
+export async function finishInterrupted({ workspacesToo }: { workspacesToo: boolean }): Promise<void> {
+  if (workspacesToo) await finishDeletions().catch((e: Error) => console.error(`deletions: ${e.message}`));
+  let ids: string[];
+  try {
+    ids = workspaces.workspaceIds();
+  } catch (e) {
+    console.error(`removals: not finished this time (${(e as Error).message})`);
+    return;
+  }
+  for (const ws of ids) await inWorkspace(ws, () => finishRemovals()).catch((e: Error) => console.error(`removals (${ws}): ${e.message}`));
 }

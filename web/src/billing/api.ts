@@ -55,6 +55,20 @@ export const usePlanPreview = () =>
     mutationFn: (c: PlanChoice) => api<BillingPreview>('/api/billing/plan/preview', { method: 'POST', body: { plan: c.plan, interval: c.interval } }),
   });
 
+/**
+ * Whether switching the running subscription to a plan ends its trial (`endsTrial`: billed now), asked once a plan is
+ * selected, so the plans' bar says so before the confirmation does (a paid trial reads as `paid`: nothing else tells).
+ */
+export const useSwitchEndsTrial = (c: { plan: string; interval: 'month' | 'year' } | null) =>
+  useQuery({
+    queryKey: [...keys.billing, 'preview', c?.plan, c?.interval],
+    queryFn: () => api<BillingPreview>('/api/billing/plan/preview', { method: 'POST', body: { plan: c?.plan, interval: c?.interval } }),
+    enabled: !!c,
+    staleTime: 60_000,
+    retry: false,
+    select: (p) => !!p.endsTrial,
+  });
+
 /** Another plan or interval for a running subscription (the provider confirms it a moment later). */
 export function useChangePlan() {
   const refresh = useRefresh();

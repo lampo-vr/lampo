@@ -3,10 +3,11 @@
 // page's checkout step in its one-column `sheet` layout (billing/Checkout.tsx: a Checkout Session, Stripe's card and
 // country, the session's own order and its one orange button); on a running subscription the card on file pays: another
 // plan (`POST /api/billing/plan`) or one more terabyte (`POST /api/billing/storage`, which takes the terabytes the
-// subscription carries in all), both settled on the next invoice.
+// subscription carries in all), both settled on the next invoice — unless a switch ends the trial (`endsTrial`): then the
+// new plan is billed now, and the moment says so with the amount.
 // Its own chunk's styles come with it (billing.css, settings.css, pay.css): nothing here leans on CSS another chunk loads.
-import { useState } from 'react';
-import type { BillingInfo, BillingMethod, BillingPreview } from '../../../lib/types.ts';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
+import type { BillingInfo, BillingMethod, BillingOffer, BillingPreview } from '../../../lib/types.ts';
 import { api } from '../api/client.ts';
 import { useBillingAccount } from '../billing/api.ts';
 import { CheckoutStep } from '../billing/Checkout.tsx';
@@ -14,6 +15,7 @@ import { billingSaid } from '../billing/words.ts';
 import { t } from '../i18n/index.ts';
 import { Spinner } from '../ui/feedback.tsx';
 import { I } from '../ui/icons.tsx';
+import { trialEndNet } from './facts.ts';
 import { money } from './limits/model.ts';
 import '../styles/settings.css';
 import '../styles/billing.css';
@@ -37,8 +39,8 @@ export interface PayProps {
   workspace: string;
   /** The lines of the order above the button, on a running subscription (the checkout shows its own total). */
   order?: { k: string; sub?: string; v: string; muted?: boolean }[];
-  /** What the order's total says ("Today €0.00") and the sentence under it. */
-  total?: { k: string; v: string; note?: string };
+  /** What the order's total says ("Today €0.00") and the sentence under it (a placeholder while it is on its way). */
+  total?: { k: string; v: ReactNode; note?: ReactNode };
   onPaid: () => void;
   onCancel?: () => void;
 }
@@ -124,6 +126,12 @@ function OnFile({ what, billing, label, order = [], total, onPaid }: PayProps) {
   const { card } = useCardOnFile(billing);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // a refusal is read where it is: on a phone the button floats over the end of the sheet, so the line comes into view
+  // above it (its scroll margin, limits.css)
+  const said = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (error) said.current?.scrollIntoView({ block: 'nearest' });
+  }, [error]);
   const go = async () => {
     setBusy(true);
     setError('');
@@ -165,7 +173,7 @@ function OnFile({ what, billing, label, order = [], total, onPaid }: PayProps) {
         {total?.note && <p className="pay-note">{total.note}</p>}
       </dl>
       {error && (
-        <p className="bill-error" role="alert" data-testid="pay-error">
+        <p className="bill-error pay-error" role="alert" data-testid="pay-error" ref={said}>
           {error}
         </p>
       )}
@@ -182,7 +190,11 @@ export function PayInPlace(props: PayProps) {
   return <OnFile {...props} />;
 }
 
-/** What a plan change puts on the next invoice: its date and the prorated difference (when the provider says it). */
+/**
+ * What a plan change puts on the next invoice: its date and the prorated difference (when the provider says it), or
+ * that it ends the trial and is billed now (`endsTrial`). Null when the provider gives no answer; a caller holds
+ * `undefined` while it is on its way, so "no amount" is never said before the answer.
+ */
 export async function previewSwitch(plan: string, interval: 'month' | 'year'): Promise<BillingPreview | null> {
   try {
     return await api<BillingPreview>('/api/billing/plan/preview', { method: 'POST', body: { plan, interval } });
@@ -190,6 +202,28 @@ export async function previewSwitch(plan: string, interval: 'month' | 'year'): P
     return null;
   }
 }
+
+/** previewSwitch for `plan` (none: nothing is asked): undefined while it is on its way, null when there is no answer. */
+export function useSwitchPreview(plan: string | null, interval: 'month' | 'year'): BillingPreview | null | undefined {
+  const [preview, setPreview] = useState<{ for: string; p: BillingPreview | null } | null>(null);
+  const key = plan ? `${plan}/${interval}` : null;
+  useEffect(() => {
+    if (!plan || !key) return;
+    let live = true;
+    void previewSwitch(plan, interval).then((p) => live && setPreview({ for: key, p }));
+    return () => {
+      live = false;
+    };
+  }, [plan, interval, key]);
+  // an answer for another plan or interval is no answer yet
+  return key && preview?.for === key ? preview.p : undefined;
+}
+
+/** "€84.00 plus VAT" (trialEndNet), or the provider's total ("€99.96") when that can't be said. */
+export const trialEndWords = (b: BillingInfo, offer: BillingOffer, interval: 'month' | 'year', p: BillingPreview): string => {
+  const net = trialEndNet(b, offer, interval, p.currency);
+  return net === null ? money(p.amount, p.currency, true) : t('{amount} plus VAT', { amount: money(net, p.currency, true) });
+};
 
 /**
  * "€17.60": the switch's own part of the next invoice — only what a step up costs; a credit, nothing, or a sum the

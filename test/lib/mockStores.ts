@@ -36,6 +36,10 @@ export interface MockBunny extends MockStore {
   getDelayMs: number;
   /** The most downloads that were in flight at once. */
   maxParallelGets: number;
+  /** While set, every DELETE answers this status and removes nothing (an outage). */
+  deleteStatus: number | null;
+  /** Delay every DELETE's answer by this many ms (a slow bucket: what a stop must wait for). */
+  deleteDelayMs: number;
 }
 
 /** Bunny Storage API: /{zone}/{path}, header AccessKey, optional Checksum (uppercase hex sha256), Range on GET. */
@@ -79,16 +83,24 @@ export async function mockBunny({ zone = 'zone', accessKey = 'secret' } = {}): P
         res.writeHead(206, { 'Content-Length': part.length, 'Content-Range': `bytes ${start}-${end}/${hit.length}` }).end(part);
       }, mock.getDelayMs);
     } else if (req.method === 'DELETE') {
-      let n = 0;
-      for (const k of [...objects.keys()])
-        if (k === key || (key.endsWith('/') && k.startsWith(key))) {
-          objects.delete(k);
-          n++;
+      const answer = () => {
+        if (mock.deleteStatus) {
+          res.writeHead(mock.deleteStatus).end();
+          return;
         }
-      res.writeHead(n ? 200 : 404).end();
+        let n = 0;
+        for (const k of [...objects.keys()])
+          if (k === key || (key.endsWith('/') && k.startsWith(key))) {
+            objects.delete(k);
+            n++;
+          }
+        res.writeHead(n ? 200 : 404).end();
+      };
+      if (mock.deleteDelayMs) setTimeout(answer, mock.deleteDelayMs);
+      else answer();
     } else res.writeHead(405).end();
   });
-  const mock: MockBunny = { ...s, objects, getDelayMs: 0, maxParallelGets: 0 };
+  const mock: MockBunny = { ...s, objects, getDelayMs: 0, maxParallelGets: 0, deleteStatus: null, deleteDelayMs: 0 };
   return mock;
 }
 

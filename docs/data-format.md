@@ -52,6 +52,9 @@ data/
   taste/<scope>.md, .json     taste files, made on demand (taste.md)
   qa-dictionary.txt           optional: words Auto-check's spelling check accepts, one per line
   for-you.json                what people cleared or put aside in their inbox
+  pending-removals.json       what deleted videos still owe the storage (renders, copies):
+                              written before each removal, crossed out as each goes; the
+                              server tries the rest again hourly
   webhooks.json               webhooks added in Settings
   moments.json                where a billing provider runs: one-time notices waiting for
                               the person they are for (api.md)

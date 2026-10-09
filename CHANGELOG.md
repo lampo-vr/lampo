@@ -56,6 +56,15 @@ format stays backwards compatible throughout.
 - **Security:** recovering an account with a password reset or *Sign out everywhere* now also stops password and
   address changes, API tokens, invites and notification devices asked for earlier in other sessions, and a reset link
   the person asked for keeps working until it is used or expires.
+- Switching from a trial to Business says it ends the trial and bills Business now, with the amount plus VAT, in
+  Settings → Billing, a limit's sheet and the invite form; they said it went on the next invoice. While the price of a
+  switch is being worked out, the invite form and the limit's sheet hold its place instead of saying a sentence
+  without the amount first. A payment that would end the trial and doesn't go through, extra storage asked for during
+  a trial, and a checkout another one replaced are said plainly where they happen, in German too; out of room during a
+  trial, the limit's sheet offers the plan that fits.
+- A workspace deletion that was interrupted finishes on its own: the workspace is gone and its billing ends at once,
+  and files a storage outage kept are removed once the storage answers again. The same holds for a deleted video's
+  renders and copies, and a server that stops for an update waits for removals under way.
 - The website's Start free opens the sign-up again (it showed the sign-in screen); signed in already, it opens the
   app, and a paid plan picked on the website opens Settings → Billing with that plan. Sign-in and sign-up keep the
   plan between them, and an email's link with a query after it opens its page.

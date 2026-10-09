@@ -3869,6 +3869,11 @@ export interface BillingPreview {
   date: string | null;
   /** The switch's own part of `amount`: what the rest of this period costs, or (negative) credits, for the new plan. */
   prorated?: number;
+  /**
+   * The switch ends the running trial (a plan bigger than the trial covers): the new plan is billed at once, `amount` is
+   * invoiced now (taxes included where the provider adds them) and `date` is today — not the trial's end.
+   */
+  endsTrial?: true;
 }
 
 /** A plan the workspace could choose (Settings → Billing's picker). */

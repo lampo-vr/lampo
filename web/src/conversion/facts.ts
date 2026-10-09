@@ -115,6 +115,19 @@ export function periodTotal(o: BillingOffer, interval: 'month' | 'year', members
 }
 
 /**
+ * A switch that ends the trial (`endsTrial`) bills the new plan now: its whole period for the members billed today, and
+ * the extra terabytes the subscription carries when the interval stays — before VAT, as every price on these pages
+ * is said (minor units). Null when that can't be said exactly (no price in the currency, extra storage on another
+ * interval): then the provider's own total, `amount` (its invoice, taxes included where it adds them), is said instead.
+ */
+export function trialEndNet(b: BillingInfo, offer: BillingOffer, interval: 'month' | 'year', currency: string): number | null {
+  const plan = periodTotal(offer, interval, b.usage.members, currency);
+  const tb = b.addons?.storageTB ?? 0;
+  const extra = tb === 0 ? 0 : b.addons && interval === b.interval ? tb * b.addons.price : null;
+  return plan === null || extra === null ? null : plan + extra;
+}
+
+/**
  * One more terabyte, when the provider sells it to this subscription (`addons`: the terabytes on it and one terabyte's
  * price per the subscription's interval), else null: then a bigger plan is the answer. The other interval's price isn't
  * known, so it is null, never guessed.

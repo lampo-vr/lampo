@@ -3,12 +3,13 @@
 // the three by a subgrid (name, line, price, billing, facts, note) so prices and lists sit level in any language; tags
 // only inform (Your trial, Current, Your pick). One bar under the tiles, sticky while the plans are in view, says what
 // the selection costs this workspace and holds the one orange action: on to the checkout step for a new plan, or a
-// switch (with what the next invoice will be) for a running one. The member stepper tries other team sizes and never
+// switch (with what the next invoice will be, or that it ends the trial and bills the plan now) for a running one. The member stepper tries other team sizes and never
 // changes the bill. Free and the rest in one row and one line below. Consumers may buy: where the provider
 // names the VAT a consumer pays (BillingInfo.vat), every price here is shown with it (PAngV), and the foot says that the
 // checkout works the tax out for the billing address.
 import { useState } from 'react';
-import type { BillingInfo, BillingOffer } from '../../../lib/types.ts';
+import type { BillingInfo, BillingOffer, BillingPreview } from '../../../lib/types.ts';
+import { trialEndNet } from '../conversion/facts.ts';
 import { contractMail } from '../conversion/limits/model.ts';
 import { currentLang, t } from '../i18n/index.ts';
 import { T } from '../i18n/T.tsx';
@@ -17,7 +18,7 @@ import { Spinner } from '../ui/feedback.tsx';
 import { I } from '../ui/icons.tsx';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { useConfirm } from '../ui/primitives.tsx';
-import { type PlanChoice, toastRefusal, useChangePlan, usePlanPreview } from './api.ts';
+import { type PlanChoice, toastRefusal, useChangePlan, usePlanPreview, useSwitchEndsTrial } from './api.ts';
 import { checkoutHash } from './Checkout.tsx';
 import { dayOf, daysUntil, gross, money, monthly, planLine, saving, size, unitsFor, vatRate } from './words.ts';
 
@@ -70,6 +71,8 @@ export function Picker({
     [chosen, from?.plan, b.plan, 'team', ...fitting.map((o) => o.plan)].map((p) => fitting.find((o) => o.plan === p)).find((o): o is BillingOffer => !!o) ??
     null;
   const isCurrent = !!sel && subscribed && sel.plan === b.plan && interval === b.interval;
+  // a switch that would end a paid trial says so in the bar too, before the confirmation
+  const endsTrial = useSwitchEndsTrial(subscribed && sel && !isCurrent && b.manage ? { plan: sel.plan, interval } : null).data === true;
 
   const go = async () => {
     if (!sel) return;
@@ -84,12 +87,14 @@ export function Picker({
       const p = await preview.mutateAsync(c);
       const ok = await ask({
         title: t('Switch to {plan}?', { plan: sel.name }),
-        body: p.date
-          ? t('It takes effect at once. The next invoice, on {date}, will be {amount}: the difference for the rest of this period is on it.', {
-              date: dayOf(p.date, { year: true }),
-              amount: money(p.amount, p.currency),
-            })
-          : t('It takes effect at once; the difference for the rest of this period is on the next invoice.'),
+        body: p.endsTrial
+          ? t('It takes effect at once. Your trial ends today, and {plan} is billed now: {amount}.', { plan: sel.name, amount: chargedNow(sel, p) })
+          : p.date
+            ? t('It takes effect at once. The next invoice, on {date}, will be {amount}: the difference for the rest of this period is on it.', {
+                date: dayOf(p.date, { year: true }),
+                amount: money(p.amount, p.currency),
+              })
+            : t('It takes effect at once; the difference for the rest of this period is on the next invoice.'),
         action: t('Switch to {plan}', { plan: sel.name }),
       });
       if (!ok) return;
@@ -111,6 +116,14 @@ export function Picker({
   const month = gross(Math.round(unit * units), b);
   const withVat = !!b.vat?.rate;
   const plusVat = !withVat && b.tax !== 'included';
+  // a switch that ends the trial bills the plan now: said as this page says its prices (with VAT where it names a rate,
+  // else plus VAT), or the provider's own total where the plan's price can't say it (conversion/facts.ts trialEndNet)
+  const chargedNow = (o: BillingOffer, p: BillingPreview): string => {
+    const net = trialEndNet(b, o, interval, p.currency);
+    if (net === null) return money(p.amount, p.currency, { cents: true });
+    if (withVat) return t('{amount} incl. VAT', { amount: money(gross(net, b), p.currency, { cents: true }) });
+    return plusVat ? t('{amount} plus VAT', { amount: money(net, p.currency, { cents: true }) }) : money(net, p.currency, { cents: true });
+  };
   const who = !sel
     ? ''
     : sel.perMember
@@ -133,7 +146,9 @@ export function Picker({
     : subscribed
       ? isCurrent
         ? t('This is your plan.')
-        : t('Takes effect at once; the difference for the rest of this period goes on the next invoice.')
+        : endsTrial
+          ? t('Takes effect at once: your trial ends today, and {plan} is billed now.', { plan: sel.name })
+          : t('Takes effect at once; the difference for the rest of this period goes on the next invoice.')
       : !canPay
         ? t('Paying isn’t open on this server yet: the plans show what they will cost.')
         : b.state === 'trial'

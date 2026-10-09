@@ -15,3 +15,4 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - Kept data and per-account localStorage are cleared in `afterSignOut`; none for review links.
 - Inbox work never has "Got it": it leaves when done; dismissals only hide what informs.
 - A hash route a link from outside opens (the website, an email, a campaign's utm tags) takes a query (`(?:\?.*)?` in `parseRoute`): without it `#/signup?plan=…` was the library, so the sign-in.
+- What a moment says it costs waits for every answer it rests on (`undefined` while on its way, `null` for none) behind an `SkLine`: a fallback sentence said first is read out by a `role=status` box, then rewritten.

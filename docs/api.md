@@ -122,7 +122,7 @@ answer `{clientSecret}`, which the page's payment form (the provider's elements,
 in place. `GET /api/billing/account` (`BillingAccount`) has the payment methods (a card's brand and last four), the
 name, address and tax IDs on the invoices, and the invoices with their PDFs; `/details`, `/tax-id`, `/tax-id/remove`,
 `/payment-method/default` and `/payment-method/remove` change them. `POST /api/billing/plan/preview {plan, interval}`
-says what the next invoice will be, `/plan` switches a running plan, `/storage {tb}` sets the extra storage a running
+says what the next invoice will be (or, with `endsTrial`, that the switch ends a running trial and bills the new plan now), `/plan` switches a running plan, `/storage {tb}` sets the extra storage a running
 plan carries (the terabytes in all, paid with the card on file), and `/cancel` and `/resume` end the plan at the
 period's end or keep it. `POST /api/billing/nudge` is for someone who can't pay (not an owner or admin) when a payment
 failed: it tells the workspace's owners and admins, once per failed payment. The module answers these routes; each

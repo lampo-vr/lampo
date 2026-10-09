@@ -10,6 +10,11 @@
 // hand: the override and its log live in the same file (`overrides`, `oplog`), as the real module keeps them. A
 // workspace's `reverseCharge: true` is the real module with the seller's VAT ID set; its `cancelWays` is what the cancel
 // step's GET /api/billing/cancel answers (a consumer's yearly plan after its first year: one month's notice, a refund).
+// A workspace's `trialing: true` is a paid trial (a card on file, Stripe's subscription trialing): a switch to a plan the
+// trial doesn't cover ends it, and the preview says so (`endsTrial`, billed now), as the real module's does; with
+// `trialDeclines` that switch's payment fails (409 payment-incomplete); no extra storage is sold meanwhile (no
+// `addons`, a plan `fits`, 409 trial-storage). `checkoutRace` answers a checkout as when two raced: `replaced` (409
+// checkout-replaced) or `still-open` (502 form-still-open).
 import fs from 'node:fs';
 
 type Json = Record<string, unknown>;
@@ -144,7 +149,8 @@ export default async function fakeBilling(host: Host, env: Record<string, string
   const fitsFor = (w: string, reason: 'storage' | 'members' | 'videos') => {
     const plan = String(stateOf(w).plan ?? 'free');
     if (reason === 'members') return plan === 'business' ? undefined : plan === 'team' ? 'business' : 'team';
-    if (reason === 'storage' && (plan === 'team' || plan === 'business') && stateOf(w).state === 'paid') return 'addon:storage_tb';
+    // a trialing subscription is offered a plan, never the terabyte (the real module: no add-on while trialing)
+    if (reason === 'storage' && (plan === 'team' || plan === 'business') && stateOf(w).state === 'paid' && !stateOf(w).trialing) return 'addon:storage_tb';
     return plan === 'free' ? 'solo' : plan === 'solo' ? 'team' : 'business';
   };
   // the plan's limits, said like the real module: the reason, what was asked for, the room the app counts, what fits
@@ -198,7 +204,11 @@ export default async function fakeBilling(host: Host, env: Record<string, string
     return { who };
   };
   // every write and the account: an owner's or admin's, a person's alone (the app holds callers to this, BILL-10)
-  const route = (method: 'GET' | 'POST', path: string, fn: (who: { workspace: string }, req: Req) => Promise<{ status: number; json: unknown }>) => ({
+  const route = (
+    method: 'GET' | 'POST',
+    path: string,
+    fn: (who: { workspace: string }, req: Req) => Promise<{ status: number; json: unknown; public?: boolean }>,
+  ) => ({
     method,
     path,
     role: 'admin' as const,
@@ -208,6 +218,11 @@ export default async function fakeBilling(host: Host, env: Record<string, string
       return m.error ?? fn(m.who as { workspace: string }, req);
     },
   });
+  /**
+   * A paid trial — a card on file, the subscription trialing until the trial's end (the suite's `trialing: true`; Billing
+   * says `paid`, as the real module does) — carries into Solo and Team only: a switch to Business ends it.
+   */
+  const endsTrial = (w: string, plan: string) => stateOf(w).trialing === true && plan !== 'solo' && plan !== 'team';
   const units = async (w: string, offer: (typeof OFFERS)[number]) => (offer.perMember ? Math.max(offer.members.min, (await host.usage(w)).members) : 1);
   const accountOf = (d: Data, w: string): Account => {
     d.accounts[w] ??= { details: { name: null, email: null, address: null, taxIds: [] }, methods: [], invoices: [] };
@@ -341,11 +356,15 @@ export default async function fakeBilling(host: Host, env: Record<string, string
             manage,
             // one more terabyte, sold on a running Team or Business plan: the terabytes bought and one terabyte's price for
             // the subscription's interval (BillingInfo.addons, present with none bought too, for the limit sheet's +1 TB)
-            ...(team && s.state === 'paid'
+            // not while a subscription trials: extra storage waits for the trial's end, as with the real module
+            ...(team && s.state === 'paid' && !s.trialing
               ? { addons: { storageTB: Number((s.addons as Json | undefined)?.storageTB ?? 0), price: s.interval === 'month' ? 1000 : 10000 } }
               : {}),
           };
           delete info.customer;
+          delete info.trialing;
+          delete info.trialDeclines;
+          delete info.checkoutRace;
           // the cancel step's other ways are their own answer (GET /api/billing/cancel), never the plan's
           delete info.cancelWays;
           delete info.keptRenewsAt;
@@ -397,6 +416,16 @@ export default async function fakeBilling(host: Host, env: Record<string, string
         const b = req.body ?? {};
         const offer = OFFERS.find((o) => o.plan === b.plan);
         if (!offer) return json(400, { error: 'no such plan' });
+        // the real module's answers when checkouts race (the suite's `checkoutRace`): another one replaced this one, or
+        // an earlier form couldn't be closed (a 502 whose sentence is for people)
+        const race = stateOf(who.workspace).checkoutRace;
+        if (race === 'replaced')
+          return json(409, {
+            error: 'Someone started another checkout for this workspace a moment ago. Open Billing again to see it.',
+            code: 'checkout-replaced',
+          });
+        if (race === 'still-open')
+          return { status: 502, public: true, json: { error: 'An earlier payment form couldn’t be closed. Try again in a moment.', code: 'form-still-open' } };
         const n = await units(who.workspace, offer);
         const unit = b.interval === 'year' ? offer.year : offer.month;
         // a trial with days to spare carries over into Solo and Team (not Business, as the real module): nothing is due today
@@ -569,6 +598,9 @@ export default async function fakeBilling(host: Host, env: Record<string, string
         if (!offer) return json(400, { error: 'no such plan' });
         const n = await units(who.workspace, offer);
         const next = n * (req.body?.interval === 'year' ? offer.year : offer.month);
+        // a paid trial (`trialing`) switching to a plan the trial doesn't cover ends it: billed now, as the real module
+        if (endsTrial(who.workspace, offer.plan))
+          return json(200, { amount: next, currency: String(stateOf(who.workspace).currency ?? 'usd'), date: new Date().toISOString(), endsTrial: true });
         const cur = OFFERS.find((o) => o.plan === stateOf(who.workspace).plan);
         const now = cur ? (await units(who.workspace, cur)) * (stateOf(who.workspace).interval === 'year' ? cur.year : cur.month) : 0;
         return json(200, {
@@ -582,10 +614,17 @@ export default async function fakeBilling(host: Host, env: Record<string, string
       route('POST', '/api/billing/plan', async (who, req) => {
         const offer = OFFERS.find((o) => o.plan === req.body?.plan);
         if (!offer) return json(400, { error: 'no such plan' });
+        const ends = endsTrial(who.workspace, offer.plan);
+        // the trial-ending payment declined (the suite's `trialDeclines`): nothing changes, the trial goes on
+        if (ends && stateOf(who.workspace).trialDeclines)
+          return json(409, {
+            error: `The payment for ${offer.name} didn’t go through, so the plan is unchanged and the trial goes on. Check the card in Billing and try again.`,
+            code: 'payment-incomplete',
+          });
         change(
           who.workspace,
-          { plan: offer.plan, planName: offer.name, interval: req.body?.interval, limits: LIMITS[offer.plan] },
-          { kind: 'plan', workspace: who.workspace, ...req.body },
+          { plan: offer.plan, planName: offer.name, interval: req.body?.interval, limits: LIMITS[offer.plan], ...(ends ? { trialing: undefined } : {}) },
+          { kind: 'plan', workspace: who.workspace, ...req.body, ...(ends ? { endsTrial: true } : {}) },
         );
         return json(202, { ok: true });
       }),
@@ -597,6 +636,8 @@ export default async function fakeBilling(host: Host, env: Record<string, string
         if (!Number.isInteger(tb) || tb < 0 || tb > 20) return json(400, { error: 'tb is a whole number of terabytes' });
         if (s.state !== 'paid') return json(409, { error: 'Extra storage comes with a running plan.' });
         const have = Number((s.addons as Json | undefined)?.storageTB ?? 0);
+        if (s.trialing && tb > have)
+          return json(409, { error: 'Extra storage can be added once the trial has ended: until then the plan’s own storage applies.', code: 'trial-storage' });
         if (tb < have) {
           const room = limitsOf(who.workspace).bytes;
           const used = Number((s.usage as Json | undefined)?.bytes ?? (await host.usage(who.workspace)).bytes);

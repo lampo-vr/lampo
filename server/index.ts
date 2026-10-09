@@ -12,6 +12,7 @@ import { forgetHeldChanges, listUsers, localOwner, secret, sweepUnconfirmed } fr
 import { migrateAvatars } from '../lib/avatars.ts';
 import { loadConfig, startupProblems } from '../lib/config.ts';
 import { jobsInterrupted } from '../lib/crashGuard.ts';
+import { finishInterrupted } from '../lib/deletion.ts';
 import { settings, spelledAs, spellingWarnings } from '../lib/env.ts';
 import { bindShareLinks } from '../lib/folders.ts';
 import { unknownOperators } from '../lib/operator.ts';
@@ -277,6 +278,14 @@ setInterval(sweep, 6 * 3600e3).unref();
 const purgeFiles = () => void purgeEveryWorkspace(ctx);
 setTimeout(purgeFiles, 5 * 60e3).unref();
 setInterval(purgeFiles, 3600e3).unref();
+// Deletions their storage cut short (lib/deletion.ts finishInterrupted): what deleted videos still owe the storage, and
+// on a hosted server the files of deleted workspaces, go once the storage answers again, a few at a time: half a minute
+// after start, then hourly.
+{
+  const finish = () => void finishInterrupted({ workspacesToo: SERVER });
+  setTimeout(finish, 30e3).unref();
+  setInterval(finish, 3600e3).unref();
+}
 inWorkspace(DEFAULT_WORKSPACE, () => {
   ctx.watchers.refresh();
   ctx.sessions.refresh();

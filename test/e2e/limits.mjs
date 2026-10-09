@@ -7,7 +7,11 @@
 // what fits (Solo) and waits in the tray; paying on the sheet lets it go on by itself. A second person on Free: the
 // invite's refusal opens Team's sheet, and the invite goes out once it's paid. On Solo with a card on file the invite
 // form itself says what brings them in, and its button switches the plan, then invites. On a paid Team, one more
-// terabyte is the answer, paid with the card on file. Insights on Free explains itself, and See Team opens the
+// terabyte is the answer, paid with the card on file. A paid trial on a full Team: the invite and the sheet say the trial
+// ends today and Business is billed now, with the amount, and say nothing while the provider's preview is on its way; a
+// declined payment changes nothing and says so; out of room while trialing, Business fits (no terabyte is sold until the
+// trial ends), and a terabyte paid after the trial began is refused in the module's words.
+// Insights on Free explains itself, and See Team opens the
 // feature's sheet, billed for two. Whoever doesn't choose the plan reads the sentence as a toast. Every sheet fits from a
 // phone to 2560 px, light and dark, with 44 px targets on a phone, and nothing moves while Stripe's fields load.
 import fs from 'node:fs';
@@ -120,9 +124,12 @@ try {
   const errors = [];
   /** While set, Stripe's frames wait here (each an answer to send) instead of loading. */
   let held = null;
+  /** While set, the provider's switch previews wait here (each a request to let go) instead of being answered. */
+  let heldPreviews = null;
   await page.setRequestInterception(true);
   page.on('request', (r) => {
     const u = r.url();
+    if (heldPreviews && u.endsWith('/api/billing/plan/preview')) return heldPreviews.push(() => r.continue());
     if (!/^https:\/\/([\w-]+\.)*stripe\.com\//.test(u)) return r.continue();
     if (u === STRIPE_JS) return r.respond({ status: 200, contentType: 'application/javascript', body: FAKE_STRIPE });
     if (u.startsWith('https://js.stripe.com/fake-frame.html')) {
@@ -341,6 +348,208 @@ try {
       timeout: 30000,
     });
     await page.click('[data-testid=limit-done-close]');
+  });
+
+  await check('a paid trial on a full Team: the invite and the sheet say the trial ends today and Business is billed now', async () => {
+    // what is open (a toast, a sheet's refusal) at a phone's width and a desktop's, both themes: plain viewports, so
+    // nothing reloads
+    const fitsOpen = async (name) => {
+      const problems = await layoutMatrix(
+        page,
+        { [name]: null },
+        {
+          show: dataTheme,
+          widths: [390, 1440],
+          each: async (width, theme) => SHOTS && page.screenshot({ path: path.join(SHOTS, `${name}-${theme}-${width}.png`) }),
+        },
+      );
+      assert(!problems.length, problems.join('\n'));
+    };
+    // Team paid during its trial (the Visa on file, the subscription trialing: Billing says paid, as the real module does)
+    const trialing = {
+      plan: 'team',
+      planName: 'Team',
+      state: 'paid',
+      trialing: true,
+      customer: true,
+      interval: 'month',
+      currency: 'eur',
+      renewsAt: new Date(Date.now() + 10 * DAY).toISOString(),
+      limits: { members: 2, bytes: 1e12, activeVideos: null },
+      usage: { members: 2, bytes: 4e11, activeVideos: 3 },
+    };
+    setFake(ana.ws, trialing);
+    await fresh('#/settings/users');
+    await page.waitForSelector('form.set-form');
+    // what the invite's Today line says, each time it changes (the box is read out: it says one thing, once)
+    await page.evaluate(() => {
+      window.__todaySaid = [];
+      new MutationObserver(() => {
+        const said = document.querySelector('[data-testid=invite-beyond] .lim-beyond-today > span:last-child')?.textContent.replace(/\s+/g, ' ').trim();
+        if (said && window.__todaySaid.at(-1) !== said) window.__todaySaid.push(said);
+      }).observe(document.body, { subtree: true, childList: true, characterData: true });
+    });
+    heldPreviews = [];
+    await page.type('form.set-form input[type=email]', 'tom.weber@example.com');
+    await page.waitForSelector('[data-testid=invite-beyond]', { timeout: 10000 });
+    for (let i = 0; i < 100 && !heldPreviews.length; i++) await sleep(50);
+    assert(heldPreviews.length, 'the provider was asked what the switch costs');
+    // while it answers, the Today line holds its place: no sentence about an amount nobody knows yet
+    await page.waitForSelector('[data-testid=invite-beyond] .lim-beyond-today .sk-line', { timeout: 10000 });
+    const asking = await text('[data-testid=invite-beyond] .lim-beyond-today');
+    assert(/^Today$/.test(asking), `nothing said while the preview is on its way: ${asking}`);
+    const answers = heldPreviews;
+    heldPreviews = null;
+    for (const go of answers) await go();
+    await waitText('[data-testid=invite-beyond]', /your trial ends today/);
+    const line = await text('[data-testid=invite-beyond]');
+    assert(/^Team holds 2 members\./.test(line), line);
+    assert(/Business brings Tom in: €126 a month for the 3 of you\./.test(line), line);
+    assert(/Today\s*€84\.00 plus VAT: your trial ends today, and Business is billed now, paid with Visa •••• 4242\./.test(line), line);
+    const said = await page.evaluate(() => window.__todaySaid);
+    assert(said.length === 1, `the Today line said one thing: ${JSON.stringify(said)}`);
+    await shots('2c-trial', null, { sel: '[data-testid=invite-beyond]' });
+    if (SHOTS)
+      for (const width of [1440, 390]) {
+        await page.setViewport({ width, height: width === 390 ? 844 : 900 });
+        await settle(page);
+        await page.$eval('[data-testid=invite-beyond]', (el) => el.scrollIntoView({ block: 'center' }));
+        await page.screenshot({ path: path.join(SHOTS, `2c-trial-line-${width}.png`) });
+      }
+    await page.setViewport({ width: 1440, height: 900 });
+    assert((await text('[data-testid=invite-submit]')) === 'Switch to Business and invite Tom', await text('[data-testid=invite-submit]'));
+    // the payment that ends the trial is declined first: the module's sentence, nobody invited, nothing changed
+    patchFake(ana.ws, { trialDeclines: true });
+    await page.click('[data-testid=invite-submit]');
+    await page.waitForFunction(
+      () =>
+        [...document.querySelectorAll('[data-testid=toast]')].some((t) =>
+          t.textContent.includes('The payment for Business didn’t go through, so the plan is unchanged and the trial goes on.'),
+        ),
+      { polling: 100, timeout: 20000 },
+    );
+    await fitsOpen('2c-trial-declined');
+    assert(fake().workspaces[ana.ws].plan === 'team' && fake().workspaces[ana.ws].trialing === true, JSON.stringify(fake().workspaces[ana.ws]));
+    const none = (await request('GET', '/api/admin/invites', { headers: { Cookie: ana.cookie } })).json().invites;
+    assert(!none.some((i) => i.email === 'tom.weber@example.com' && i.status === 'pending'), 'nobody invited');
+    patchFake(ana.ws, { trialDeclines: undefined });
+    await page.waitForFunction(() => !document.querySelector('[data-testid=invite-submit]')?.disabled, { polling: 100, timeout: 10000 });
+    await page.click('[data-testid=invite-submit]');
+    await page.waitForFunction(
+      () => [...document.querySelectorAll('[data-testid=toast]')].some((t) => t.textContent.includes('Costa Cuts is on Business. Tom’s invite is on its way.')),
+      { polling: 100, timeout: 20000 },
+    );
+    assert(
+      fake().calls.some((c) => c.kind === 'plan' && c.plan === 'business' && c.endsTrial),
+      JSON.stringify(fake().calls.filter((c) => c.kind === 'plan')),
+    );
+
+    // the same moment as a limit's sheet (a refused invite): the order, Today, and the sentence under it
+    setFake(ana.ws, trialing);
+    await fresh('#/settings/users');
+    await page.waitForSelector('form.set-form');
+    heldPreviews = [];
+    await ask({ reason: 'members', needed: 'lea.berg@example.com', name: 'Lea', fits: 'business' });
+    await sheet('members');
+    assert((await page.$eval('[data-testid=limit-sheet]', (e) => e.dataset.fit)) === 'business', 'Business brings Lea in');
+    for (let i = 0; i < 100 && !heldPreviews.length; i++) await sleep(50);
+    assert(heldPreviews.length, 'the sheet asked what the switch costs');
+    await page.waitForSelector('[data-testid=limit-sheet] .pay-total .sk-line', { timeout: 10000 });
+    const pending = await text('[data-testid=limit-sheet] [data-testid=pay-order]');
+    assert(!/€0\.00|next invoice|invoice of/.test(pending), `nothing said while the preview is on its way: ${pending}`);
+    const sheetAnswers = heldPreviews;
+    heldPreviews = null;
+    for (const go of sheetAnswers) await go();
+    await waitText('[data-testid=limit-sheet] [data-testid=pay-order]', /Your trial ends today/);
+    const order = await text('[data-testid=limit-sheet] [data-testid=pay-order]');
+    assert(/Today\s*€84\.00 plus VAT/.test(order), order);
+    assert(/Your trial ends today, and Business is billed now: €84\.00 plus VAT\./.test(order), order);
+    assert(!/€0\.00|next invoice/.test(order), order);
+    await shots('3f-trial', null);
+    await page.click('[data-testid=pay-go]');
+    await page.waitForSelector('[data-testid=limit-done]', { timeout: 20000 });
+    const done = await text('[data-testid=limit-done]');
+    assert(/Costa Cuts is on Business/.test(done), done);
+    assert(/Business is billed from today; every invoice is in Settings → Billing\./.test(done), done);
+    await page.click('[data-testid=limit-done-close]');
+    await sheetGone();
+
+    // out of room while trialing: no terabyte is sold until the trial ends (no `addons`), so Business is what fits — no
+    // gap where the terabyte would be, and a payment that is declined says so in the sheet and changes nothing
+    setFake(ana.ws, { ...trialing, trialDeclines: true, usage: { members: 2, bytes: 1e12 - 1e9, activeVideos: 3 } });
+    await fresh('#/');
+    await page.waitForSelector('.lib-scroll');
+    await ask({ reason: 'storage', needed: 64e9, name: 'pinewood-brand-film-90s_V7.mov', upload: 'posed', room: { videos: 0, bytes: 0 } });
+    await sheet('storage');
+    assert((await page.$eval('[data-testid=limit-sheet]', (e) => e.dataset.fit)) === 'business', 'Business, not a terabyte');
+    assert(!/\+1 TB/.test(await text('[data-testid=limit-sheet]')), await text('[data-testid=limit-sheet]'));
+    await waitText('[data-testid=limit-sheet] [data-testid=pay-order]', /Your trial ends today, and Business is billed now: €84\.00 plus VAT\./);
+    await page.waitForSelector('[data-testid=pay-go]:enabled');
+    await page.click('[data-testid=pay-go]');
+    await waitText(
+      '[data-testid=pay-error]',
+      /^The payment for Business didn’t go through, so the plan is unchanged and the trial goes on\. Check the card in Billing and try again\.$/,
+    );
+    assert(!(await page.$('[data-testid=limit-done]')), 'still the offer');
+    assert(fake().workspaces[ana.ws].plan === 'team', JSON.stringify(fake().workspaces[ana.ws]));
+    await shots('3g-trial-declined', null);
+    // on a phone the button floats over the sheet's end: the refusal comes into view above it, never under it
+    await page.setViewport({ width: 390, height: 844 });
+    await settle(page);
+    await page.click('[data-testid=pay-go]');
+    await page.waitForSelector('[data-testid=pay-go]:enabled', { timeout: 10000 });
+    await waitText('[data-testid=pay-error]', /didn’t go through/);
+    await settle(page);
+    const clear = await page.evaluate(() => {
+      const e = document.querySelector('[data-testid=pay-error]').getBoundingClientRect();
+      const b = document.querySelector('[data-testid=pay-go]').getBoundingClientRect();
+      return { top: Math.round(e.top), bottom: Math.round(e.bottom), button: Math.round(b.top) };
+    });
+    assert(clear.top >= 0 && clear.bottom <= clear.button, `the refusal in view, above the button: ${JSON.stringify(clear)}`);
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, '3g-trial-declined-phone.png') });
+    await page.setViewport({ width: 1440, height: 900 });
+    await page.click('[data-testid=limit-later]');
+    await sheetGone();
+
+    // a sheet opened before the trial began (one terabyte, the plan's answer then) and paid now: the module's refusal
+    setFake(ana.ws, {
+      plan: 'team',
+      planName: 'Team',
+      state: 'paid',
+      customer: true,
+      interval: 'year',
+      currency: 'eur',
+      renewsAt: new Date(Date.now() + 300 * DAY).toISOString(),
+      limits: { members: 50, bytes: 1000, activeVideos: null },
+      addons: { storageTB: 0 },
+      usage: { members: 2, bytes: 1e12 + 900, activeVideos: 1 },
+    });
+    await fresh('#/');
+    await page.waitForSelector('.lib-scroll');
+    await ask({ reason: 'storage', needed: 64e9, name: 'pinewood-brand-film-90s_V7.mov', upload: 'posed', room: { videos: 0, bytes: 0 } });
+    await sheet('storage');
+    assert((await page.$eval('[data-testid=limit-sheet]', (e) => e.dataset.fit)) === 'addon', 'one more terabyte, as the plan said then');
+    await waitText('[data-testid=limit-sheet] [data-testid=pay-saved-card]', /Visa •••• 4242/);
+    patchFake(ana.ws, { trialing: true });
+    await page.click('[data-testid=pay-go]');
+    await waitText('[data-testid=pay-error]', /^Extra storage can be added once the trial has ended: until then the plan’s own storage applies\.$/);
+    assert(!fake().calls.some((c) => c.kind === 'storage' && c.tb === 1), 'nothing bought');
+    await fitsOpen('3h-trial-storage');
+    await page.setViewport({ width: 390, height: 844 });
+    await settle(page);
+    await page.click('[data-testid=pay-go]');
+    await page.waitForSelector('[data-testid=pay-go]:enabled', { timeout: 10000 });
+    await settle(page);
+    const shown = await page.evaluate(() => {
+      const e = document.querySelector('[data-testid=pay-error]').getBoundingClientRect();
+      const b = document.querySelector('[data-testid=pay-go]').getBoundingClientRect();
+      return { top: Math.round(e.top), bottom: Math.round(e.bottom), button: Math.round(b.top) };
+    });
+    assert(shown.top >= 0 && shown.bottom <= shown.button, `the refusal in view, above the button: ${JSON.stringify(shown)}`);
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, '3h-trial-storage-phone.png') });
+    await page.setViewport({ width: 1440, height: 900 });
+    await page.click('[data-testid=limit-later]');
+    await sheetGone();
   });
 
   await check('Insights on Free explain themselves; See Team opens the feature’s sheet, billed for two', async () => {

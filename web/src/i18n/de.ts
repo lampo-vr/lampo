@@ -3762,6 +3762,9 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Invoices go to': 'Rechnungen gehen an',
   'It takes effect at once; the difference for the rest of this period is on the next invoice.':
     'Das gilt sofort; die Differenz für den Rest dieses Zeitraums steht auf der nächsten Rechnung.',
+  'It takes effect at once. Your trial ends today, and {plan} is billed now: {amount}.':
+    'Das gilt sofort. Deine Testphase endet heute, und {plan} wird jetzt abgerechnet: {amount}.',
+  '{amount} incl. VAT': '{amount} inkl. USt.',
   'It takes effect at once. The next invoice, on {date}, will be {amount}: the difference for the rest of this period is on it.':
     'Das gilt sofort. Die nächste Rechnung am {date} beträgt {amount}: Die Differenz für den Rest dieses Zeitraums ist darin enthalten.',
   'Keep {plan}': '{plan} behalten',
@@ -4149,6 +4152,13 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
     'Nichts. Die Differenz für den Rest des Zeitraums steht zzgl. USt. auf der nächsten Rechnung und wird mit {card} bezahlt.',
   'Nothing. The difference for the rest of this period, {amount} plus VAT, is on the invoice of {date}, paid with {card} like {plan}.':
     'Nichts. Die Differenz für den Rest des Zeitraums, {amount} zzgl. USt., steht auf der Rechnung vom {date} und wird wie {plan} mit {card} bezahlt.',
+  // a switch that ends a running trial: the new plan is billed now
+  '{amount} plus VAT': '{amount} zzgl. USt.',
+  '{amount}: your trial ends today, and {plan} is billed now, paid with {card}.':
+    '{amount}: Deine Testphase endet heute, und {plan} wird jetzt abgerechnet, bezahlt mit {card}.',
+  'Your trial ends today, and {plan} is billed now: {amount}.': 'Deine Testphase endet heute, und {plan} wird jetzt abgerechnet: {amount}.',
+  '{plan} is billed from today; every invoice is in Settings → Billing.':
+    '{plan} wird ab heute abgerechnet; jede Rechnung liegt unter Einstellungen → Abrechnung.',
   'On any plan, pooled for the whole workspace': 'Für jeden Plan, für den ganzen Workspace',
   'One more terabyte is the smallest step; the plan stays {plan}.': 'Ein Terabyte mehr ist der kleinste Schritt; der Plan bleibt {plan}.',
   'One person and their agents': 'Eine Person und ihre Agents',
@@ -4344,6 +4354,7 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
     'Stripe versucht es mit der alten Karte am {dates} noch einmal; eine neue Karte erledigt es sofort.',
   'Switch to monthly': 'Zu monatlich wechseln',
   'Switch to yearly': 'Zu jährlich wechseln',
+  'Takes effect at once: your trial ends today, and {plan} is billed now.': 'Gilt sofort: Deine Testphase endet heute, und {plan} wird jetzt abgerechnet.',
   'Takes effect at once; the difference for the rest of this period goes on the next invoice.':
     'Gilt sofort; die Differenz für den Rest des Zeitraums kommt auf die nächste Rechnung.',
   'talk to us': 'sprich mit uns',
@@ -4917,6 +4928,15 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
     'Dieser Workspace hat mehr Mitglieder, als dieser Plan Platz bietet. Wähl einen größeren.',
   'This workspace holds more than that would leave room for: archive or delete videos first, then reduce the extra storage.':
     'Dieser Workspace belegt mehr, als danach Platz wäre: Archiviere oder lösche zuerst Videos, dann verringere den Zusatzspeicher.',
+  // the provider's refusals around a trial and racing checkouts (billingSaid)
+  'The payment for the new plan didn’t go through, so the plan is unchanged and the trial goes on. Check the card in Billing and try again.':
+    'Die Zahlung für den neuen Plan ist nicht durchgegangen: Der Plan bleibt, wie er ist, und die Testphase läuft weiter. Prüf die Karte unter Abrechnung und versuch es noch einmal.',
+  'Extra storage can be added once the trial has ended: until then the plan’s own storage applies.':
+    'Zusätzlichen Speicher gibt es, sobald die Testphase vorbei ist: Bis dahin gilt der Speicher des Plans.',
+  'Someone started another checkout for this workspace a moment ago. Open Billing again to see it.':
+    'Gerade hat jemand anderes für diesen Workspace eine Bestellung begonnen. Öffne die Abrechnung noch einmal, um sie zu sehen.',
+  'An earlier payment form couldn’t be closed. Try again in a moment.':
+    'Ein früheres Zahlungsformular ließ sich nicht schließen. Versuch es gleich noch einmal.',
   'This plan ends at the end of its period: one month’s notice is for a consumer’s yearly plan after its first year.':
     'Dieser Plan endet zum Ende seines Zeitraums: Die Kündigung mit einer Frist von einem Monat gilt für den Jahresplan von Verbrauchern nach dem ersten Jahr.',
 };

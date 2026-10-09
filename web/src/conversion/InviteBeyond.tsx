@@ -1,20 +1,22 @@
 // Inviting a teammate the plan has no room for, on a running subscription (a card on file): as soon as a valid address
 // is typed and the plan's member limit is reached, the invite form says what brings them in — the plan that fits, its
 // price for the people there will be, what grows with it, and what is due today (nothing: the difference goes on the
-// next invoice, paid with the card on file) — and its button switches the plan, then sends the invite once the plan
-// shows. Without a subscription the invite is refused (402) and the limit's sheet takes over (conversion/limits/).
+// next invoice, paid with the card on file; or, when the switch ends a trial, the new plan billed now) — and its button
+// switches the plan, then sends the invite once the plan shows. Without a subscription the invite is refused (402) and the limit's sheet takes over (conversion/limits/).
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
-import type { BillingInfo, BillingOffer, BillingPreview } from '../../../lib/types.ts';
-import { api } from '../api/client.ts';
+import { useEffect, useMemo } from 'react';
+import type { BillingInfo, BillingOffer } from '../../../lib/types.ts';
+import { ApiError, api } from '../api/client.ts';
 import { keys, useBilling, useInfo } from '../api/queries.ts';
+import { billingSaid } from '../billing/words.ts';
 import { t } from '../i18n/index.ts';
 import { T } from '../i18n/T.tsx';
 import { I } from '../ui/icons.tsx';
+import { SkLine } from '../ui/Skeleton.tsx';
 import { bytesOf, currencyOf, monthTotal } from './facts.ts';
 import { day, fitFor, money, nameFromAddress, size } from './limits/model.ts';
 import { momentEvent } from './moments.ts';
-import { cardLabel, previewMoney, previewSwitch, useCardOnFile } from './pay.tsx';
+import { cardLabel, previewMoney, trialEndWords, useCardOnFile, useSwitchPreview } from './pay.tsx';
 import '../styles/limits.css';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -58,7 +60,13 @@ export function useSwitchPlan() {
   const qc = useQueryClient();
   return async (x: Beyond) => {
     momentEvent('used', 'invite_beyond', 'users');
-    await api('/api/billing/plan', { method: 'POST', body: { plan: x.plan.plan, interval: x.interval } });
+    try {
+      await api('/api/billing/plan', { method: 'POST', body: { plan: x.plan.plan, interval: x.interval } });
+    } catch (e) {
+      // the provider's refusal in the page's language (a switch out of a trial whose payment didn't go through: the plan
+      // and the trial stay as they were, and nobody is invited); a plan's limit (402) stays itself, for its sheet
+      throw e instanceof ApiError && e.status === 402 ? e : new Error(billingSaid(e));
+    }
     for (let i = 0; i < 30; i++) {
       const b = await qc.fetchQuery({ queryKey: keys.billing, queryFn: () => api<BillingInfo>('/api/billing'), staleTime: 0 });
       if (b.plan === x.plan.plan && (b.limits.members === null || b.limits.members > b.usage.members)) return;
@@ -70,15 +78,9 @@ export function useSwitchPlan() {
 /** What brings them in, in the invite form: the plan, its price for the people there will be, and what is due today. */
 export function BeyondLine({ x }: { x: Beyond }) {
   const { b, plan, interval, members } = x;
-  const { card } = useCardOnFile(b);
-  const [preview, setPreview] = useState<BillingPreview | null>(null);
-  useEffect(() => {
-    let live = true;
-    void previewSwitch(plan.plan, interval).then((p) => live && setPreview(p));
-    return () => {
-      live = false;
-    };
-  }, [plan.plan, interval]);
+  const { card, loading } = useCardOnFile(b);
+  // undefined while on its way, null when the provider gave no amount: the box is read out, so it says one thing, once
+  const preview = useSwitchPreview(plan.plan, interval);
   const currency = currencyOf(b, plan);
   const now = monthTotal(plan, interval, members, currency);
   const yearly = monthTotal(plan, 'year', members, currency);
@@ -103,16 +105,26 @@ export function BeyondLine({ x }: { x: Beyond }) {
   const when = preview?.date ? day(preview.date) : b.renewsAt ? day(b.renewsAt) : null;
   const paidWith = card ? cardLabel(card) : t('the card on file');
   const today =
-    prorated && when
-      ? t('Nothing. The difference for the rest of this period, {amount} plus VAT, is on the invoice of {date}, paid with {card} like {plan}.', {
-          amount: prorated,
-          date: when,
-          card: paidWith,
-          plan: b.planName,
-        })
-      : when
-        ? t('Nothing. The difference for the rest of this period is on the invoice of {date}, plus VAT, paid with {card}.', { date: when, card: paidWith })
-        : t('Nothing. The difference for the rest of this period is on the next invoice, plus VAT, paid with {card}.', { card: paidWith });
+    preview === undefined || loading ? (
+      <SkLine w="22em" />
+    ) : preview?.endsTrial ? (
+      t('{amount}: your trial ends today, and {plan} is billed now, paid with {card}.', {
+        amount: trialEndWords(b, plan, interval, preview),
+        plan: plan.name,
+        card: paidWith,
+      })
+    ) : prorated && when ? (
+      t('Nothing. The difference for the rest of this period, {amount} plus VAT, is on the invoice of {date}, paid with {card} like {plan}.', {
+        amount: prorated,
+        date: when,
+        card: paidWith,
+        plan: b.planName,
+      })
+    ) : when ? (
+      t('Nothing. The difference for the rest of this period is on the invoice of {date}, plus VAT, paid with {card}.', { date: when, card: paidWith })
+    ) : (
+      t('Nothing. The difference for the rest of this period is on the next invoice, plus VAT, paid with {card}.', { card: paidWith })
+    );
   return (
     <div className="lim-beyond" data-testid="invite-beyond" role="status">
       <I name="users" size={16} />
