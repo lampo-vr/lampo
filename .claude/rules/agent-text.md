@@ -39,3 +39,5 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - An answer that hands work to the person ends with `lib/handoff.ts`'s line (wait now, cursor from that moment).
 - A stopped render is decided by the stop, never by the tool's exit code (a wrapper script runs on to exit 0 with its
   file cut short), and the same stop aborts the upload that follows (`hooks.abort`, lib/render/job.ts).
+- A signal that lands during synchronous work (a registration's probe and copy) is handled only once the event loop
+  turns: ask `stopped()` after one `setImmediate` (`signalsHeard`, lib/render/job.ts), never right after the call returns.

@@ -125,6 +125,9 @@ async function poll<T>(
 }
 
 /** A render as a resumable tus upload: running lampo push again continues an unfinished one. */
+/** How long a stop that came after the last byte waits for the server to say what it did with the file. */
+const LATE_ANSWER_MS = 10_000;
+
 async function uploadRender(
   api: Api,
   cacheRoot: string,
@@ -142,6 +145,8 @@ async function uploadRender(
     resolveBody = resolve;
     rejectBody = reject;
   });
+  // every byte on its way: the server registers the file whatever this side does now (an abort lets nothing go)
+  let sentAll = false;
   const up = new tus.Upload(fs.createReadStream(file), {
     endpoint: `${api.base}/api/uploads`,
     uploadSize: size,
@@ -152,16 +157,29 @@ async function uploadRender(
     // Remembers unfinished uploads (by path, size, mtime and server): running lampo push again continues them.
     urlStorage: new FileUrlStorage(path.join(cacheRoot, 'uploads.json')),
     removeFingerprintOnSuccess: true,
-    ...(onProgress ? { onProgress: (sent: number, total: number | null) => onProgress(sent, total ?? size) } : {}),
+    onProgress: (sent: number, total: number | null) => {
+      if (sent >= size) sentAll = true;
+      onProgress?.(sent, total ?? size);
+    },
     onError: (e) => rejectBody(new Error(`upload failed: ${e.message.split('\n')[0]}`)),
     onSuccess: ({ lastResponse }) => resolveBody(lastResponse.getBody() || ''),
   });
   const previous = (await up.findPreviousUploads()).find((p) => JSON.stringify(p.metadata) === JSON.stringify(meta));
   if (previous) up.resumeFromPreviousUpload(previous);
-  // A stop ends the upload and lets its bytes on the server go (it is never registered): nothing is put up.
+  // A stop ends the upload and lets its bytes on the server go (it is never registered): nothing is put up. Once every
+  // byte has gone, the server may have the file and register it, whatever this side does: its answer is waited for (a
+  // while) and said as it is — put up, or going up — so the caller never says "nothing" for a version that is there.
+  let late: NodeJS.Timeout | undefined;
   const stop = () => {
-    void up.abort(true).catch(() => {});
-    rejectBody(new StoppedError());
+    if (!sentAll) {
+      void up.abort(true).catch(() => {});
+      rejectBody(new StoppedError());
+      return;
+    }
+    late = setTimeout(() => {
+      void up.abort(false).catch(() => {});
+      rejectBody(new StoppedError({ arrived: true, unsure: true }));
+    }, LATE_ANSWER_MS);
   };
   if (signal?.aborted) throw new StoppedError();
   signal?.addEventListener('abort', stop, { once: true });
@@ -171,10 +189,15 @@ async function uploadRender(
     r = JSON.parse((await body) || '{}') as UploadResult & { pending?: boolean; id?: string };
   } finally {
     signal?.removeEventListener('abort', stop);
+    clearTimeout(late);
   }
-  // Big renders into remote storage finish after the last byte: ask until the version is registered.
+  // Big renders into remote storage finish after the last byte: ask until the version is registered. A stop meanwhile:
+  // the server goes on with it, this side stops waiting and says so.
+  const stopping = new Promise<void>((go) => signal?.addEventListener('abort', () => go(), { once: true }));
   while (r.pending && r.id) {
-    await sleep(2000);
+    if (signal?.aborted) throw new StoppedError({ arrived: true });
+    await Promise.race([sleep(2000), stopping]);
+    if (signal?.aborted) throw new StoppedError({ arrived: true });
     const o = await api.get<{ status: string; result?: UploadResult; error?: string }>(`/api/upload-results/${r.id}`);
     if (o.status === 'failed') throw new Error(o.error || 'the server could not register the upload');
     if (o.status === 'done' && o.result) r = o.result;

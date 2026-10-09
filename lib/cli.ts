@@ -936,6 +936,7 @@ const commands: Record<string, Command> = {
     // a new render waits on disk: nothing new in an archived project
     else if (r.archived) die(archivedWords(r.archived));
     else if (r.pending) out(`the file is still being written; try again in a moment (current v${latest.v})`);
+    else if (r.stopped) out(`the file is what a stopped lampo render left: not a version until it is rendered again (current v${latest.v})`);
     else out(`unchanged, v${latest.v}`);
   },
 

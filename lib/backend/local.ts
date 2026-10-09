@@ -34,10 +34,12 @@ import { cachedTranscript, forgetTranscript, makeTranscript } from '../transcrip
 import type { AskCreated, Comment, OptionGroup, ReviewEvent } from '../types.ts';
 import { type Backend, type PlaybookWhere, StoppedError } from './types.ts';
 
-// A render that is still being written must settle before "the newest version" means anything.
-async function syncWait(slug: string, maxMs = 15000) {
+// A render that is still being written must settle before "the newest version" means anything. A stop (`signal`) while
+// it settles registers nothing; one during a registration (synchronous) is seen by the caller once it returns.
+async function syncWait(slug: string, maxMs = 15000, signal?: AbortSignal) {
   const until = Date.now() + maxMs;
   for (;;) {
+    if (signal?.aborted) throw new StoppedError();
     const r = store.sync(slug);
     if (!r?.pending || Date.now() > until) return r;
     await sleep(750);
@@ -180,9 +182,9 @@ export function createLocalBackend(): Backend {
       return { review, created };
     },
     async push(file, { by, folder, name, to, part, signal }) {
-      // taken in one go here: a stop that came first puts nothing up
+      // taken in here: a stop before the store registers it puts nothing up (the store looks once probe and hash are done)
       if (signal?.aborted) throw new StoppedError();
-      const o = { name: name || path.basename(file), folder, slug: to, by, keep: true };
+      const o = { name: name || path.basename(file), folder, slug: to, by, keep: true, ...(signal ? { signal } : {}) };
       const r = part ? await ingestPart(file, { ...o, ...part }) : await store.ingestUpload(file, o);
       return { review: r.review, created: r.created, duplicate: r.duplicate, v: r.version.v, ...(r.version.part ? { part: r.version.part } : {}) };
     },
@@ -198,7 +200,8 @@ export function createLocalBackend(): Backend {
     async assign(slug, session, by) {
       store.assignSession(slug, session, by);
     },
-    sync: (slug) => syncWait(slug),
+    sync: (slug, o) => syncWait(slug, 15000, o?.signal),
+    setAsideStopped: (slug) => store.setAsideStopped(slug),
     sessions: () => listSessions(),
 
     async qa(review, ver, { rerun = false, progress } = {}) {

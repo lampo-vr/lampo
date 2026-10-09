@@ -430,6 +430,7 @@ function PlayerView({
             // through the end of its last frame, which at another frame rate may be more than that frame's start
             rangeHere: c.range ? rangeOnGrid(c.range, own?.fps || fps, fps, N) : null,
             ...(own?.width && own.height ? { shotSize: { width: own.width, height: own.height } } : {}),
+            ...(own?.fps && own.frames ? { ownGrid: { fps: own.fps, frames: own.frames } } : {}),
           };
         }),
     [review.comments, review.versions, hidden, toHere, fps, N],

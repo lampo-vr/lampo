@@ -6,6 +6,7 @@
 // upload's bytes on their way (a slow connection).
 import assert from 'node:assert/strict';
 import { type ChildProcess, spawn } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -26,29 +27,36 @@ const v1 = makeVideo(path.join(dir, 'renders/spot.mp4'), { w: 320, h: 180, fps: 
 // what the tool "renders": other bytes, so it would be a version of its own
 const rendered = makeVideo(path.join(dir, 'renders/next.mp4'), { w: 320, h: 180, fps: 25, dur: 1, pattern: 'smptebars' });
 
-// The proxy `lampo` talks to: everything goes through, except an upload's bytes (PATCH) while `holding` — those wait
-// until released (and go nowhere once their sender has gone).
+// The proxy `lampo` talks to: everything goes through, except an upload's bytes (PATCH) while `holding` — those are not
+// read until released (a slow link: the sender can't get them all out) and go nowhere once their sender has gone — and,
+// while `holdingAnswers`, the server's answer to an upload's bytes (they went in; the answer waits here). `pendingSeen`:
+// the server answered an upload "pending" (it registers in the background).
 let holding = false;
+let holdingAnswers = false;
+let pendingSeen = false;
 const held: { go: () => void; gone: boolean }[] = [];
+const answers: { go: () => void }[] = [];
 const proxy = http.createServer((req, res) => {
-  const chunks: Buffer[] = [];
-  req.on('data', (c: Buffer) => chunks.push(c));
-  req.on('end', () => {
-    const forward = () => {
-      const up = http.request({ host: '127.0.0.1', port: app.port, method: req.method, path: req.url, headers: req.headers }, (r) => {
+  const forward = () => {
+    const up = http.request({ host: '127.0.0.1', port: app.port, method: req.method, path: req.url, headers: req.headers }, (r) => {
+      const pass = () => {
         res.writeHead(r.statusCode ?? 502, r.headers);
         r.pipe(res);
-      });
-      up.on('error', () => res.destroy());
-      up.end(Buffer.concat(chunks));
-    };
-    if (!(holding && req.method === 'PATCH' && req.url?.startsWith('/api/uploads/'))) return forward();
-    const h = { gone: false, go: () => (h.gone ? undefined : forward()) };
-    res.on('close', () => {
-      h.gone = true;
+      };
+      if (req.method === 'PATCH' && r.statusCode === 202) pendingSeen = true;
+      if (holdingAnswers && req.method === 'PATCH') answers.push({ go: pass });
+      else pass();
     });
-    held.push(h);
+    up.on('error', () => res.destroy());
+    req.pipe(up);
+  };
+  if (!(holding && req.method === 'PATCH' && req.url?.startsWith('/api/uploads/'))) return forward();
+  req.pause();
+  const h = { gone: false, go: () => (h.gone ? undefined : forward()) };
+  res.on('close', () => {
+    h.gone = true;
   });
+  held.push(h);
 });
 await new Promise<void>((r) => proxy.listen(0, '127.0.0.1', r));
 const viaProxy = `http://127.0.0.1:${(proxy.address() as AddressInfo).port}`;
@@ -162,21 +170,76 @@ test('a tool that ended and left a job running: once the job has gone too, a sto
 test('a stop while the render goes up ends the upload: nothing is registered, and lampo says it stopped', async () => {
   const tool = path.join(dir, 'quick.cjs');
   fs.writeFileSync(tool, `require('node:fs').copyFileSync(process.argv[2], 'out.mp4');`);
+  // big enough that a link nobody reads from can't take it all: the bytes are still on their way when it stops
+  const big = path.join(dir, 'renders/big.mp4');
+  fs.writeFileSync(big, crypto.randomBytes(32 * 2 ** 20));
   const before = await versions();
   holding = true;
-  const r = render(tool, rendered);
-  // the tool has ended and the bytes are on their way
-  await until(() => held.length > 0, 'the upload under way');
-  r.p.kill('SIGINT');
-  let exited = false;
-  void r.done.then(() => {
-    exited = true;
-  });
-  await until(() => exited || held.every((h) => h.gone), 'the stop reached the upload', 15_000);
-  holding = false;
-  for (const h of held.splice(0)) h.go();
-  const { code, out } = await r.done;
+  let code: number | null;
+  let out: string;
+  try {
+    const r = render(tool, big);
+    // the tool has ended and the bytes are on their way
+    await until(() => held.length > 0, 'the upload under way');
+    r.p.kill('SIGINT');
+    let exited = false;
+    void r.done.then(() => {
+      exited = true;
+    });
+    await until(() => exited || held.every((h) => h.gone), 'the stop reached the upload', 15_000);
+    ({ code, out } = await r.done);
+  } finally {
+    holding = false;
+    for (const h of held.splice(0)) h.go();
+  }
   assert.equal(code, 130, out);
   assert.match(out, /^Render failed \(exit 130\): stopped\. The person sees it in Lampo\./m);
   assert.equal(await versions(), before, 'nothing registered');
+});
+
+test('a stop once the server took the last byte says the version went up: the server registered it', async () => {
+  const tool = path.join(dir, 'quick-answer.cjs');
+  fs.writeFileSync(tool, `require('node:fs').copyFileSync(process.argv[2], 'out.mp4');`);
+  const other = makeVideo(path.join(dir, 'renders/answer.mp4'), { w: 320, h: 180, fps: 25, dur: 1, pattern: 'testsrc2', freq: 550 });
+  const before = await versions();
+  holdingAnswers = true;
+  let code: number | null;
+  let out: string;
+  try {
+    const r = render(tool, other);
+    // every byte went in and the server answered; the answer waits here
+    await until(() => answers.length > 0, 'the server answered the last bytes');
+    r.p.kill('SIGINT');
+    holdingAnswers = false;
+    for (const a of answers.splice(0)) a.go();
+    ({ code, out } = await r.done);
+  } finally {
+    holdingAnswers = false;
+    for (const a of answers.splice(0)) a.go();
+  }
+  assert.equal(code, 130, out);
+  assert.match(out, new RegExp(`^Stopped, but V${before + 1} was already put up for review\\.$`, 'm'));
+  assert.equal(await versions(), before + 1, 'as the server says');
+});
+
+test('a stop while the server still registers a big render says it goes up, instead of waiting it out as a success', async () => {
+  const tool = path.join(dir, 'quick-pending.cjs');
+  fs.writeFileSync(tool, `require('node:fs').copyFileSync(process.argv[2], 'out.mp4');`);
+  const other = makeVideo(path.join(dir, 'renders/pending.mp4'), { w: 320, h: 180, fps: 25, dur: 1, pattern: 'testsrc', freq: 650 });
+  const before = await versions();
+  // the server answers at once that it goes on in the background, as it does for a render into remote storage
+  const wait = app.ctx.uploadWaitMs;
+  app.ctx.uploadWaitMs = 0;
+  pendingSeen = false;
+  try {
+    const r = render(tool, other);
+    await until(() => pendingSeen, 'the server answered "pending"');
+    r.p.kill('SIGINT');
+    const { code, out } = await r.done;
+    assert.equal(code, 130, out);
+    assert.match(out, new RegExp(`^Stopped, but the server already had the whole file: it puts it up as V${before + 1}\\.$`, 'm'));
+    await until(async () => (await versions()) === before + 1, 'the server put it up');
+  } finally {
+    app.ctx.uploadWaitMs = wait;
+  }
 });

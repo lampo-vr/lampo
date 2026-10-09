@@ -878,10 +878,12 @@ export const CommentCard = memo(function CommentCard({
             />
           ) : c.text ? (
             <p className="c-text">
-              {/* timecodes in the words seek the player (to the note's version, where they were written) */}
+              {/* timecodes in the words seek the player to the note's version, read on its grid (where they were written),
+                  never at the rate of the version on screen */}
               <TimecodeText
                 text={c.text}
-                fps={fps}
+                fps={c.ownGrid?.fps ?? fps}
+                frames={c.ownGrid?.frames}
                 href={(frame) => `#/v/${enc(slug)}?v=${c.v}&f=${frame}`}
                 onSeek={(frame) => window.dispatchEvent(new CustomEvent<GotoFrame>(GOTO_FRAME, { detail: { slug, v: c.v, frame } }))}
               />

@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { ProjectArchivedError } from './archived.ts';
+import { StoppedError } from './backend/types.ts';
 import { cleanChoices } from './choices.ts';
 import { describeShape } from './drawing.ts';
 import { pointersOf } from './elementMaps.ts';
@@ -471,6 +472,48 @@ export interface SyncResult {
   pending?: boolean;
   /** A new render is on disk, but its project is archived (lib/archived.ts): it isn't registered until it is restored. */
   archived?: string;
+  /** The file is what a stopped `lampo render` left in place (setAsideStopped): not a version until it changes again. */
+  stopped?: boolean;
+}
+
+/** Where a linked video's set-aside file is described: its size, mtime and sample, beside review.json. */
+const stoppedFile = (slug: string) => path.join(reviewDir(slug), 'stopped-render.json');
+interface Fingerprint {
+  size: number;
+  mtime: string;
+  sample: string;
+}
+
+/**
+ * A `lampo render` stopped while it wrote the very file a linked video is tracked from: what it left (cut short, or
+ * finished after the stop) is not the next version. Its fingerprint — size, mtime and sample, what renderKey tells
+ * bytes apart by — is written down, and syncVersions (every sync, the app's watcher, `lampo`'s lookups) leaves a file
+ * with it alone until it changes again. The file itself is the person's: it stays as it is.
+ */
+export function setAsideStopped(slug: string): void {
+  const review = loadReview(slug);
+  if (!review || isUpload(review)) return;
+  let st: fs.Stats;
+  try {
+    st = fs.statSync(review.video);
+  } catch {
+    return;
+  }
+  const mark: Fingerprint = { size: st.size, mtime: new Date(st.mtimeMs).toISOString(), sample: sampleHash(review.video, st) };
+  writeAtomic(stoppedFile(slug), JSON.stringify(mark));
+}
+
+/** Whether the file is the one a stopped render left (setAsideStopped); a file that changed since lets the mark go. */
+function setAside(slug: string, file: string, st: fs.Stats): boolean {
+  let mark: Fingerprint;
+  try {
+    mark = JSON.parse(fs.readFileSync(stoppedFile(slug), 'utf8')) as Fingerprint;
+  } catch {
+    return false;
+  }
+  if (mark.size === st.size && mark.mtime === new Date(st.mtimeMs).toISOString() && mark.sample === sampleHash(file, st)) return true;
+  fs.rmSync(stoppedFile(slug), { force: true });
+  return false;
 }
 
 interface NewVersion {
@@ -571,6 +614,8 @@ export function syncVersions(review: Review, { force = false, by = 'system' } = 
     last.mtime = mtime;
     return { changed: true };
   }
+  // what a stopped `lampo render` left in place is no version, whoever asks (force too)
+  if (setAside(slugify(review.video), review.video, st)) return { changed, stopped: true };
   if (!force && Date.now() - st.mtimeMs < 3000) return { changed, pending: true };
   // nothing new in an archived project: the render waits on disk, and comes in as the next version once it is restored
   const shut = archivedProjectOf(review.folder);
@@ -709,6 +754,8 @@ export interface IngestOptions {
   sample?: SampleMark;
   /** The agent that put a new video up (an MCP client's upload URL): the video is its from the first version on. */
   session?: SessionInput | null;
+  /** A stop (`lampo render`): seen before the bytes go in or the version is registered, nothing is (StoppedError). */
+  signal?: AbortSignal;
 }
 
 export interface IngestResult {
@@ -881,6 +928,10 @@ async function ingest(file: string, { slug, video, folder }: ReturnType<typeof u
   const st = fs.statSync(file);
   const hash = quickHash(file, st);
   const sample = sampleHash(file, st);
+  // a big render's probe and hash take a while: a stop that came meanwhile takes nothing in (the hash is synchronous:
+  // a signal during it is handled once the event loop turns)
+  if (o.signal) await new Promise((r) => setImmediate(r));
+  if (o.signal?.aborted) throw new StoppedError();
   const release = reserveUpload(slug);
   try {
     return await ingestReserved(file, { slug, video, folder }, o, { by, meta, st, hash, sample });
@@ -924,6 +975,9 @@ async function ingestReserved(
   const here = store.kind === 'local';
   // a deleted video of this id may still owe keys under it (pendingRemovalsFile): crossed out before the first byte, under
   // this upload's hold, so no retry removes what this upload puts there (its bytes land before its review exists)
+  // A stop seen here takes nothing in (`lampo render`): the last moment before anything is written. On this disk nothing
+  // is awaited from here to the registration (withLock is synchronous); a bucket's bytes, once stored, are registered.
+  if (o.signal?.aborted) throw new StoppedError();
   forgetOwed(slug);
   if (!here) await store.put(bytes, file, { keep: o.keep, contentType: CONTENT_TYPE[ext.toLowerCase()] || 'video/mp4' });
   return withLock(reviewDir(slug), () => {

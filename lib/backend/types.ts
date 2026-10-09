@@ -167,10 +167,18 @@ export interface PlaybookProposalInput {
   by: string;
 }
 
-/** A push stopped by its caller (`signal`): nothing was put up. */
+/**
+ * A push stopped by its caller (`signal`): nothing was put up — unless `arrived`: the server already had the whole file
+ * (a big render into remote storage registers after its last byte), and puts it up whatever the caller does. `unsure`:
+ * every byte had gone, but the server's answer didn't come in time to say what it did with them.
+ */
 export class StoppedError extends Error {
-  constructor() {
-    super('stopped: nothing was put up');
+  arrived: boolean;
+  unsure: boolean;
+  constructor({ arrived = false, unsure = false }: { arrived?: boolean; unsure?: boolean } = {}) {
+    super(arrived ? 'stopped, but the server already had the whole file' : 'stopped: nothing was put up');
+    this.arrived = arrived;
+    this.unsure = unsure;
   }
 }
 
@@ -245,7 +253,13 @@ export interface Backend {
   /** The archived projects (lib/archived.ts), by name: what agents' lists leave out unless asked. None from older servers. */
   archivedProjects(): Promise<Readonly<Record<string, Pick<ArchivedProject, 'at' | 'by'>>>>;
   assign(slug: string, session: SessionInput | null, by: string): Promise<void>;
-  sync(slug: string): Promise<(SyncResult & { review: Review }) | null>;
+  /** `signal`: a stop while it waits for the file to settle registers nothing (StoppedError). */
+  sync(slug: string, o?: { signal?: AbortSignal }): Promise<(SyncResult & { review: Review }) | null>;
+  /**
+   * The file a stopped `lampo render` left where a linked video is tracked is not its next version: syncs (and the app's
+   * watcher) leave it until it changes again. Machine stores only (a hosted server tracks no file).
+   */
+  setAsideStopped?(slug: string): void;
   sessions(): Promise<ClaudeSession[]>;
   qa(review: Review, ver: Version, o: { rerun?: boolean; progress?: (msg: string) => void }): Promise<QaResult>;
   /** What is said in version `ver`, on its frames (heard once per render; waits while it is being heard). */

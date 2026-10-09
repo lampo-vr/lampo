@@ -510,4 +510,6 @@ export interface PlacedComment extends Comment {
   rangeHere: FrameRange | null;
   /** Its own version's frame size, which its screenshots have: the card keeps their room before they arrive. */
   shotSize?: { width: number; height: number };
+  /** Its own version's frame rate and length: a timecode in its words is on that version's grid, not the one on screen. */
+  ownGrid?: { fps: number; frames: number };
 }

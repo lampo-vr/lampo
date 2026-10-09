@@ -86,6 +86,12 @@ export function failedWords(code: number, quote: string): ActivityWords {
   return { text: quote ? `${filled} “${shown}”` : filled, key, vars: { code }, ...(quote ? { quote } : {}) };
 }
 
+/**
+ * One turn of the event loop: a signal that came during synchronous work (a registration's probe and copy) is handled
+ * only then, and `stopped()` asked before it would say no.
+ */
+const signalsHeard = (): Promise<void> => new Promise((r) => setImmediate(r));
+
 /** What a stopped render exits with when its tool said nothing else (0, or no code): 128 + SIGINT, as a shell does. */
 const STOPPED_CODE = 130;
 
@@ -177,11 +183,35 @@ export async function executeRender(job: RenderJob, hooks: RenderHooks): Promise
 
   // A stopped render never goes up, whatever its tool exited with: a wrapper script around ffmpeg (no `set -e`) runs
   // on to exit 0 after a Ctrl-C, and the file it leaves is cut short.
+  // A linked video rendered in place keeps what its tool wrote there (the person's file, never written over), set aside:
+  // no sync takes it in until it changes again (store.setAsideStopped).
   const stoppedFail = (code: number) => {
+    if (job.to?.same)
+      try {
+        hooks.backend.setAsideStopped?.(job.to.slug);
+      } catch {}
     const said = failureWords(result.tail, { home: os.homedir() });
     const why = `stopped${result.signal ? ` (${result.signal})` : ''}${said.quote ? ` · ${said.quote}` : ''}`;
     return fail(code || STOPPED_CODE, why.slice(0, ERROR_MAX), said.line ? `stopped · ${said.line}` : 'stopped');
   };
+  // A stop seen only once the version was in (the store registered it, or the server had every byte): said as it is,
+  // never as a success, and never as if nothing had been put up.
+  const stoppedAfter = (got: number, duplicate: boolean, where = '', video?: string): RenderOutcome => {
+    if (duplicate) return { ok: false, code: STOPPED_CODE, v: got, lines: [`Stopped; V${got} already had these bytes: nothing new was put up.`] };
+    say('upload', words('Put a new version up for review'), { target: `v${got}`, ...(video ? { video } : {}) });
+    return { ok: false, code: STOPPED_CODE, v: got, lines: [oneLine(`Stopped, but V${got} was already put up for review${where}.`)] };
+  };
+  const stoppedArrived = (v: number, where = '', unsure = false): RenderOutcome => ({
+    ok: false,
+    code: STOPPED_CODE,
+    lines: [
+      oneLine(
+        unsure
+          ? `Stopped while the server took the whole file in: it may still put it up as V${v}${where}.`
+          : `Stopped, but the server already had the whole file: it puts it up as V${v}${where}.`,
+      ),
+    ],
+  });
   if (result.startError) return fail(result.code, redact(result.startError), redact(result.startError));
   if (hooks.stopped?.()) return stoppedFail(result.code);
   if (result.code !== 0) {
@@ -195,7 +225,7 @@ export async function executeRender(job: RenderJob, hooks: RenderHooks): Promise
     const why = `it finished, but ${path.basename(job.out)} isn't there: check --out`;
     return fail(1, why, why, words('Stopped with an error', undefined, why));
   }
-  if (job.into) return putUpNew(job, job.into, { hooks, elapsed, frames, sees, say, report, latest, stoppedFail });
+  if (job.into) return putUpNew(job, job.into, { hooks, elapsed, frames, sees, say, report, latest, stoppedFail, stoppedAfter, stoppedArrived });
   if (!job.to) {
     say('render', words('Rendered in {time}', { time: elapsed }));
     const what = job.outShown ? ` ${job.outShown}` : '';
@@ -215,8 +245,12 @@ export async function executeRender(job: RenderJob, hooks: RenderHooks): Promise
       // re-rendered where it is tracked: registered in place (the app's watcher may have been first)
       report({ stage: 'checking', pct: null }, undefined, true);
       const before = to.next - 1;
-      const r = await b.sync(to.slug);
+      const r = await b.sync(to.slug, hooks.abort ? { signal: hooks.abort } : {});
       if (!r) throw new Error(`${to.slug} is no longer under review`);
+      // stopped while it was registered (synchronous: the signal is handled only once the event loop turns): it is in
+      await signalsHeard();
+      if (hooks.stopped?.() && r.version) return stoppedAfter(r.version.v, false);
+      if (hooks.stopped?.()) return stoppedFail(0);
       if (r.archived) throw new Error(`its project ${r.archived} is archived: nothing new goes in until it is restored`);
       if (r.pending) throw new Error('the file is still being written; run lampo sync <video> in a moment');
       review = r.review;
@@ -236,9 +270,11 @@ export async function executeRender(job: RenderJob, hooks: RenderHooks): Promise
       review = r.review;
       got = r.v;
       duplicate = r.duplicate;
+      await signalsHeard();
+      if (hooks.stopped?.()) return stoppedAfter(got, duplicate);
     }
   } catch (e) {
-    if (e instanceof StoppedError) return stoppedFail(0);
+    if (e instanceof StoppedError) return e.arrived ? stoppedArrived(to.next, '', e.unsure) : stoppedFail(0);
     const why = redact(oneLine((e as Error).message)).slice(0, ERROR_MAX);
     say('error', words('Stopped with an error', undefined, why), latest.p ? { progress: latest.p } : {});
     return { ok: false, code: 1, lines: [oneLine(`V${to.next} rendered in ${elapsed}, but putting it up failed: ${why.replace(/[.\s]+$/, '')}.${sees}`)] };
@@ -276,6 +312,8 @@ async function putUpNew(
     report: (r: Reading, b?: number, force?: boolean) => void;
     latest: { p: RunProgress | null };
     stoppedFail: (code: number) => RenderOutcome;
+    stoppedAfter: (got: number, duplicate: boolean, where?: string, video?: string) => RenderOutcome;
+    stoppedArrived: (v: number, where?: string, unsure?: boolean) => RenderOutcome;
   },
 ): Promise<RenderOutcome> {
   const b = ctx.hooks.backend;
@@ -301,13 +339,16 @@ async function putUpNew(
       if (into.session && r.created) await b.assign(slugify(review.video), into.session, job.by);
     }
   } catch (e) {
-    if (e instanceof StoppedError) return ctx.stoppedFail(0);
+    if (e instanceof StoppedError) return e.arrived ? ctx.stoppedArrived(1, ` in ${into.folder}`, e.unsure) : ctx.stoppedFail(0);
     const why = redact(oneLine((e as Error).message)).slice(0, ERROR_MAX);
     ctx.say('error', words('Stopped with an error', undefined, why), ctx.latest.p ? { progress: ctx.latest.p } : {});
     return { ok: false, code: 1, lines: [oneLine(`Rendered in ${ctx.elapsed}, but putting it up failed: ${why.replace(/[.\s]+$/, '')}.${ctx.sees}`)] };
   }
   const ver = review.versions.at(-1);
   const got = ver?.v ?? 1;
+  // stopped while it was taken in (this machine's store registers in one go): it is in, and said so
+  await signalsHeard();
+  if (ctx.hooks.stopped?.()) return ctx.stoppedAfter(got, false, ` in ${review.folder || 'Unsorted'}`, slugify(review.video));
   ctx.say('upload', words('Put a new version up for review'), { target: `v${got}`, video: slugify(review.video) });
   const n = ver?.frames ?? ctx.frames;
   return {

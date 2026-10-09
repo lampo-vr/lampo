@@ -71,6 +71,21 @@ try {
   await api(`/api/review/${enc(long.slug)}/sync`, 'POST', {});
   const longV2 = path.join(dir, 'long-v2.mp4');
   fs.copyFileSync(lfile, longV2);
+  // mixed.mp4: V1 at 30 fps (90 frames), V2 at 24 fps (288) — a timecode in a note is on its own version's grid
+  const mfile = makeVideo(path.join(dir, 'Acme/export/mixed.mp4'), { w: 320, h: 180, fps: 30, dur: 3, pattern: 'testsrc2' });
+  age(mfile);
+  const mixed = (await api('/api/library', 'POST', { path: mfile, folder: 'Acme/Reels' })).video;
+  const mixedV1 = path.join(dir, 'mixed-v1.mp4');
+  fs.copyFileSync(mfile, mixedV1);
+  makeVideo(mfile, { w: 320, h: 180, fps: 24, dur: 12, pattern: 'testsrc2', freq: 770 });
+  age(mfile);
+  await api(`/api/review/${enc(mixed.slug)}/sync`, 'POST', {});
+  const mixedV2 = path.join(dir, 'mixed-v2.mp4');
+  fs.copyFileSync(mfile, mixedV2);
+  const mixedNote = (body) => api(`/api/review/${enc(mixed.slug)}/comments`, 'POST', { severity: 'should', ...body });
+  // 00:02:10 on V1 (30 fps) is frame 70 (at 24 fps it would be 58); 00:08:10 on V2 (24 fps) is frame 202 (at 30: 250)
+  const early = await mixedNote({ v: 1, frame: 5, text: 'Early: 00:02:10 here' });
+  const late = await mixedNote({ v: 2, frame: 5, text: 'Late: 00:08:10 here' });
   const review = async (s = slug) => (await api(`/api/review/${enc(s)}`)).review;
   const note = async (id) => (await review()).comments.find((c) => c.id === id);
 
@@ -195,6 +210,43 @@ try {
     await onV1();
     await page.evaluate((s) => window.dispatchEvent(new CustomEvent('vr-goto-frame', { detail: { slug: s, v: 2, frame: 250 } })), long.slug);
     await settled();
+  });
+
+  await check('a timecode in a note is read at its own version’s frame rate (V1 30 fps, V2 24 fps): the frame ffmpeg decodes', async () => {
+    const vs = (await review(mixed.slug)).versions;
+    assert(
+      vs.length === 2 && vs[0].fps === 30 && vs[1].fps === 24 && vs[1].frames === 288,
+      `V1 30 fps, V2 24 fps: ${JSON.stringify(vs.map((x) => [x.fps, x.frames]))}`,
+    );
+    // the note's card, opened on the other version; its timecode's link and a click on it
+    const follow = async (onV, id, v, f, file, frames, wrong) => {
+      await page.goto('about:blank');
+      await page.goto(`${BASE}/#/v/${enc(mixed.slug)}?v=${onV}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('.note, .side-empty');
+      await page.waitForFunction(() => document.querySelector('.vbox video')?.readyState >= 2, { timeout: 20000 });
+      const card = await openCard(id);
+      const link = await card.$('.c-text a.tc-link');
+      assert(link, 'the timecode is a link');
+      const said = await link.evaluate((a) => ({ frame: Number(a.dataset.frame), href: decodeURIComponent(a.getAttribute('href')) }));
+      assert(said.frame === f && said.href.endsWith(`?v=${v}&f=${f}`), `V${v}'s frame ${f}: ${JSON.stringify(said)}`);
+      await link.click();
+      await until(async () => (await text('[data-testid=version-picker]'))?.startsWith(`V${v}`), `V${v} on screen`);
+      let seen = '';
+      await until(
+        async () => {
+          const px = await shownPicture(page);
+          const right = closestFrame(file, px, f, frames);
+          const off = closestFrame(file, px, wrong, frames);
+          seen = `around ${f}: ${right.line}; around ${wrong}: ${off.line}`;
+          return right.k === f && right.e < off.e;
+        },
+        () => `V${v} f${f} on screen (${seen})`,
+      );
+    };
+    // a V1 note's 00:02:10 while V2 (24 fps) is on screen: V1's frame 70, not 58
+    await follow(2, early.id, 1, 70, mixedV1, 90, 58);
+    // a V2 note's 00:08:10 while V1 (30 fps) is on screen: V2's frame 202, not 250
+    await follow(1, late.id, 2, 202, mixedV2, 288, 250);
   });
 
   await check('compare: B opens side by side against the approved version; wipe, overlay, onion skin, swap, Esc', async () => {

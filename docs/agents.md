@@ -777,9 +777,13 @@ V4 rendered in 3m12s and put up for review (900 frames). Now mark each note fixe
   command itself has ended (a background job it started), and `lampo render` returns when all of it has; a second
   Ctrl-C kills it at once. What leaves that group (`setsid`, a detached spawn, a daemon) is out of a stop's reach.
   A stopped render puts nothing up, whatever your command exits with (a script around ffmpeg
-  may exit 0 with the file cut short), and a stop while the file goes up ends the upload: `Render failed (exit 130):
-  stopped.` One exception: a video linked to its file on this machine is rendered in place, so what your command
-  already wrote there stays, and the app, if it runs, may take it in as a version.
+  may exit 0 with the file cut short), and a stop while the file is taken in or goes up ends that too: `Render failed
+  (exit 130): stopped.` A stop that comes too late for that says what happened instead, and exits 130 as well:
+  `Stopped, but V4 was already put up for review.`, or, while a server registers a big render after its last byte,
+  `Stopped, but the server already had the whole file: it puts it up as V4.` A video linked to its file on this
+  machine is rendered in place: what your command wrote there before the stop stays as it is, but it is set aside —
+  `lampo sync`, the app and every later lookup leave a file with that size, time and content alone (`lampo sync` says
+  so) until it is rendered again.
 - **What it reads:** Remotion (`npx remotion render`, `remotion render`): bundling, rendering and encoding, from the
   lines it prints when its output isn't a terminal. ffmpeg: `lampo render` adds `-progress pipe:3 -nostats` (progress
   flags only; a command that names its own `-progress` keeps it) and measures against the length your arguments give

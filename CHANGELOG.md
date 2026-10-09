@@ -138,10 +138,14 @@ format stays backwards compatible throughout.
   sound didn't arrive, or was refused, says so, keeps what you drew as notes not sent yet, and can always be discarded
   (it used to wait as "Hearing what you said…" for good).
 - A stopped `lampo render` never puts its file up, also when the render command exits as if it had succeeded (a script
-  around ffmpeg does), and a Ctrl-C while the file goes up ends the upload.
+  around ffmpeg does), and a Ctrl-C while the file is taken in or goes up ends that too; a stop that comes too late
+  says the version is up (or going up) instead of claiming success or nothing. What a stopped render left in a linked
+  video's own file stays there, but no later sync takes it in until it is rendered again.
 - `lampo export` no longer stops at a version an agent's run made or a reply written through a review link, and the
   reply's history comes along with it.
 - A voice note longer than ten minutes is refused in plain words instead of being kept with only part of it heard.
+- A timecode written in a note opens the right frame when its version has another frame rate than the one on screen
+  (00:02:10 on a 30 fps V1 opened frame 58 while a 24 fps V2 was showing, instead of 70).
 
 ## [0.2.0] - 2026-10-08
 
