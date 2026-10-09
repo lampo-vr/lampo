@@ -29,6 +29,7 @@ import type {
   RunPhase,
   RunProgress,
 } from '../lib/types.ts';
+import { cleanDenied } from './activity.ts';
 import type { Broadcast } from './events.ts';
 import { fail } from './http.ts';
 
@@ -780,11 +781,13 @@ export function createRuns({ broadcast, actor, notify, ownerOfSession }: RunsOpt
     if (r) change(slug, r.id, (x) => lib.processEnded(x, exit, Date.now()));
   }
 
-  function machineBlocked(info: AgentRunInfo, run: string, denied: { words: ActivityWords; allow: string }) {
+  function machineBlocked(info: AgentRunInfo, run: string, refused: { words: ActivityWords; allow: string }) {
     const slug = info.slug;
     const r = lib.readRuns(slug).find((x) => x.id === run || x.clock.proc === info.id);
     if (!r || r.ended !== null) return;
     const now = Date.now();
+    // it skips the activity feed, so it is cleaned here as every step there is (the step, what it needs, the push)
+    const denied = cleanDenied(refused);
     change(slug, r.id, (x) => {
       const at = new Date(now).toISOString();
       lib.keepStep(x, { ...denied.words, at, type: 'elicitation' });

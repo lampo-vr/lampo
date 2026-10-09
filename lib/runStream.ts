@@ -58,7 +58,16 @@ const short = (s: string, max: number) => {
  * READ_MAX characters are read (a heredoc's command can run to megabytes): far more than is ever shown.
  */
 const READ_MAX = 4096;
-const shared = (s: string, max: number) => short(redact(cutChars(s, READ_MAX)), max);
+/**
+ * The first READ_MAX characters of `s`, without a word the cut runs through: a secret cut short could lose the part
+ * its pattern knows it by, and once what comes before it collapses under redaction, its start would be shown.
+ */
+function readWindow(s: string): string {
+  const cut = cutChars(s, READ_MAX);
+  if (cut.length === s.length || /\s/.test(s.charAt(cut.length))) return cut;
+  return cut.slice(0, Math.max(cut.lastIndexOf(' '), cut.lastIndexOf('\t'), cut.lastIndexOf('\n'), cut.lastIndexOf('\r'), 0));
+}
+const shared = (s: string, max: number) => short(redact(readWindow(s)), max) || '…';
 /** A file the run touches, as the person reads it: relative to the session's folder, else just its name. */
 export function shownPath(file: unknown, cwd: string): string {
   if (typeof file !== 'string' || !file) return 'a file';
@@ -114,10 +123,12 @@ const NOT_PREFIX = /^-|[/=$`'"(){}<>*?]/;
 /**
  * The start of a shell command that says what it runs — the program and up to two words after it (`npx remotion
  * render`, `lampo render`, `ffmpeg`) — without its paths, options or values: what a permission rule allows. Of a chain,
- * the first part that isn't a `cd`; leading variable assignments are left out.
+ * the first part that isn't a `cd`; leading variable assignments are left out. It ends before the first word that
+ * would hold a secret (one `redact()` changes, alone or with the words before it): the team reads this prefix in the
+ * permission a run needs, its rule and the push that asks for it, and a rule with a secret in it allows nothing.
  */
 export function commandPrefix(command: string): string {
-  const parts = command
+  const parts = readWindow(command)
     .split(/&&|\|\||;|\||\n/)
     .map((p) => p.trim())
     .filter(Boolean);
@@ -127,6 +138,8 @@ export function commandPrefix(command: string): string {
   const out: string[] = [];
   for (const w of said) {
     if (out.length >= 3 || (out.length > 0 && NOT_PREFIX.test(w)) || /[`$'"]/.test(w)) break;
+    const next = [...out, w].join(' ');
+    if (redact(next) !== next) break;
     out.push(w);
   }
   return short(out.join(' '), 60);

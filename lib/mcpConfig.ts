@@ -290,7 +290,7 @@ ${codex.text}
 ${chat}
 Then tell me what only I can do: ${signIn}restart you if your client needs it (Claude Code: then claude -c), run a command you aren't allowed to.
 2. Ask me here how we start: from scratch (what, how long, 16:9 or 9:16, which tool, e.g. Remotion, which folder), from my footage (its folder), or my project (its folder, how it renders). Ask before creating or moving files; touch only folders I name. In a chat app, work with what I attach.
-3. ${tell} and follow its instructions to the end: ${named ? '' : 'the project named after the work, '}V1, then my notes until I approve.`;
+3. ${tell} and follow ${BRAND_NAME}'s instructions until I approve: ${named ? '' : 'the project named after the work, '}V1, then my notes.`;
 }
 
 const shellQuote = (s: string) => (/^[\w./@:+-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`);

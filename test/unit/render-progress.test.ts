@@ -420,6 +420,59 @@ test('redaction takes time in step with the line, whatever MySQL clients and quo
   }
 });
 
+test('redaction: a .netrc password, a line the shell continues, redis-cli -a, sshpass -p, --pass, ?key=, -U user%password', () => {
+  const pw = joined('Synth', 'Pw', '0rd9');
+  const cases: [string, string[]][] = [
+    // .netrc: on a machine's line, the default's, or a quoted line (or a line of its own) that is only the password
+    [`machine api.example.test login deploy password ${pw}`, ['machine api.example.test login deploy password ']],
+    [`default login deploy password ${pw}`, ['default login deploy password ']],
+    [`echo "password ${pw}" >> ~/.netrc`, ['echo "password ', '" >> ~/.netrc']],
+    [`machine api.example.test\npassword ${pw}\n`, ['machine api.example.test']],
+    // a value on the line after a backslash
+    [`export API_TOKEN=\\\n${pw} && npm run upload`, ['export API_TOKEN=', '&& npm run upload']],
+    [`PGPASSWORD=\\\n  ${pw} psql -h db`, ['PGPASSWORD=', 'psql -h db']],
+    // a password given to a command
+    [`redis-cli -h cache -p 6379 -a ${pw} ping`, ['redis-cli -h cache -p 6379 -a ', ' ping']],
+    [`sshpass -p ${pw} ssh deploy@host`, ['sshpass -p ', ' ssh deploy@host']],
+    [`sshpass -p${pw} ssh deploy@host`, ['sshpass -p', ' ssh deploy@host']],
+    [`tool --pass ${pw} --verbose`, ['tool --pass ', ' --verbose']],
+    [`tool --pass=${pw}`, ['tool --pass=']],
+    [`curl "https://api.example.test/v1?key=${pw}&q=x"`, ['https://api.example.test/v1?key=', '&q=x"']],
+    [`smbclient //h/s -U deploy%${pw}`, ['smbclient //h/s -U deploy%']],
+  ];
+  for (const [text, kept] of cases) {
+    const out = redact(text);
+    assert.ok(!out.includes(pw), `${JSON.stringify(text)} -> ${JSON.stringify(out)}`);
+    for (const k of kept) assert.ok(out.includes(k), `${k} stays in: ${JSON.stringify(out)}`);
+    assert.equal(redact(out), out, `again the same: ${JSON.stringify(out)}`);
+  }
+  // what reads like them and holds no secret stays word for word
+  for (const text of [
+    'ffmpeg -i in.mov -pix_fmt yuv420p -pass 1 -passlogfile ff out.mp4',
+    'git -u origin main',
+    'mysql: [Warning] Using a password on the command line interface can be insecure.',
+    'Enter the password for the account, then press Return.',
+    'redis-cli -h cache ping',
+    'tool --passes 3 --keyframes 10',
+    'see https://example.test/docs?keyint=250&key_frames=12',
+    'psql -U deploy -d shop',
+    // a continued value redacted, then the lines joined into one (as a step is shown): its backslash is no value
+    'export API_TOKEN=\\ ↵ [redacted] && npm run upload',
+    'npm run render \\',
+  ])
+    assert.equal(redact(text), text);
+});
+
+test('the newer forms take time in step with the line, too', () => {
+  for (const unit of ['redis-cli ', 'redis-cli x ', 'sshpass -x ', '"password x ', 'machine h login u ', 'API_TOKEN=\\\n', '?key=', ' -U a%', '--pass ']) {
+    const text = unit.repeat(Math.ceil(128_000 / unit.length));
+    const t = performance.now();
+    redact(text);
+    const ms = performance.now() - t;
+    assert.ok(ms < 1000, `${JSON.stringify(unit)}: ${ms.toFixed(0)} ms`);
+  }
+});
+
 test('a failure’s words: the last lines that say what went wrong, redacted, at most 300 characters', () => {
   // Remotion: its error, a stack, its own progress before it
   const remotion = [

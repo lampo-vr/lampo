@@ -27,6 +27,14 @@ const MYSQL_PASSWORD = new RegExp(
   String.raw`((?<![^\s;&|\x60("'])${SQL_CLIENT}(?:[ \t]+(?!${SQL_CLIENT})${SHELL_WORD})*?[ \t]+["']?-p)(?!\[redacted\])(?:"[^"\n]*"\S*|'[^'\n]*'\S*|\S+)`,
   'g',
 );
+/**
+ * `name = value` for a name matching `name` (a regular expression's source): `=` or `:`, the name and the value quoted
+ * or not, and a value on the next line of a line the shell continues (`API_TOKEN=\` and a newline). The head, up to the
+ * value, is kept; a value redacted before is never redacted again, nor a continuation's backslash taken for one (also
+ * once the line is joined into one, as a step is shown).
+ */
+const assigned = (name: string) =>
+  new RegExp(String.raw`(["']?\b${name}\b["']?\s*[:=]\s*(?:\\\r?\n[ \t]*)?)(?!\[redacted\])(?!\\(?:\s|$))(?:"[^"]*"|'[^']*'|[^\s,;&"'})\]]+)`, 'gi');
 const RULES: [RegExp, (...m: string[]) => string][] = [
   // a private key block, whole (the patterns here are written so that no line of this file looks like a key itself)
   [/-{5}BEGIN [A-Z ]*PRIVATE[ ]KEY-{5}[\s\S]*?(?:-{5}END [A-Z ]*PRIVATE[ ]KEY-{5}|$)/g, () => CUT],
@@ -35,21 +43,31 @@ const RULES: [RegExp, (...m: string[]) => string][] = [
   // credentials in a URL: scheme://user:password@host, and a password with no user (redis://:password@host)
   [/\b([a-z][a-z0-9+.-]*:\/\/)[^\s/@:]*:[^\s/@]*@/gi, (_m, scheme) => `${scheme}${CUT}@`],
   // name=value, name: value, "name": "value", ?name=value&
-  [new RegExp(String.raw`(["']?\b${SECRET_NAME}\b["']?\s*[:=]\s*)(?!\[redacted\])(?:"[^"]*"|'[^']*'|[^\s,;&"'})\]]+)`, 'gi'), (_m, head) => `${head}${CUT}`],
+  [assigned(SECRET_NAME), (_m, head) => `${head}${CUT}`],
   // --name value
   [new RegExp(String.raw`(--?${SECRET_NAME}\s+)(?!-)\S+`, 'gi'), (_m, head) => `${head}${CUT}`],
   // a name ending in "key" after a separator — OPENAI_KEY=…, stripe.key: …, x-signing-key=… (never keyint= or colorkey=)
-  [/(["']?\b(?:[A-Za-z0-9]+[_.-])+key\b["']?\s*[:=]\s*)(?!\[redacted\])(?:"[^"]*"|'[^']*'|[^\s,;&"'})\]]+)/gi, (_m, head) => `${head}${CUT}`],
+  [assigned('(?:[A-Za-z0-9]+[_.-])+key'), (_m, head) => `${head}${CUT}`],
   // a name with a secret's word glued on (PGPASSWORD=, DBSECRET=) or ending in "pass" after a separator (SMTP_PASS=)
-  [
-    /(["']?\b[A-Za-z0-9]+(?:password|passwd|passphrase|secret|token)\b["']?\s*[:=]\s*)(?!\[redacted\])(?:"[^"]*"|'[^']*'|[^\s,;&"'})\]]+)/gi,
-    (_m, head) => `${head}${CUT}`,
-  ],
-  [/(["']?\b(?:[A-Za-z0-9]+[_.-])+pass\b["']?\s*[:=]\s*)(?!\[redacted\])(?:"[^"]*"|'[^']*'|[^\s,;&"'})\]]+)/gi, (_m, head) => `${head}${CUT}`],
+  [assigned('[A-Za-z0-9]+(?:password|passwd|passphrase|secret|token)'), (_m, head) => `${head}${CUT}`],
+  [assigned('(?:[A-Za-z0-9]+[_.-])+pass'), (_m, head) => `${head}${CUT}`],
   // a MySQL or MariaDB client's password glued to -p (mysql -u root -psecret)
   [MYSQL_PASSWORD, (_m, head) => `${head}${CUT}`],
   // a user and password given to a command: curl -u user:password, --user user:password, --proxy-user …
   [/((?:^|\s)(?:-u|--user|--proxy-user|-U)(?:\s+|=))([^\s:@]+):(?!\/\/)\S+/g, (_m, head, user) => `${head}${user}:${CUT}`],
+  // … or joined by "%" (smbclient -U user%password)
+  [/((?:^|\s)(?:-U|--user)(?:\s+|=))([^\s%:@/]+)%(?!\[redacted\])\S+/g, (_m, head, user) => `${head}${user}%${CUT}`],
+  // --pass value, --pass=value (two dashes: ffmpeg's -pass 1 is the pass of a two-pass encode)
+  [/(--pass\b(?:=|[ \t]+(?!-)))(?!\[redacted\])\S+/g, (_m, head) => `${head}${CUT}`],
+  // a password redis-cli (-a) or sshpass (-p, -pPASSWORD) is given, among its first few options (a bounded number:
+  // no word is read for more than a few clients)
+  [/(\bredis-cli(?:[ \t]+(?!-a\b)[^\s;&|]+){0,8}[ \t]+-a[ \t]+)(?!\[redacted\])(?!-)\S+/g, (_m, head) => `${head}${CUT}`],
+  [/(\bsshpass(?:[ \t]+-[^\sp]\S*){0,4}[ \t]+-p[ \t]*)(?!\[redacted\])(?!-)\S+/g, (_m, head) => `${head}${CUT}`],
+  // a key in a URL's query (?key=…, &key=…)
+  [/([?&]key=)(?!\[redacted\])[^&\s#"'<>]+/gi, (_m, head) => `${head}${CUT}`],
+  // .netrc's password: on a machine's (or the default) line, or on a line, or in quotes, that holds only it
+  [/(\b(?:machine[ \t]+\S+|default)(?:[ \t]+(?:login|account)[ \t]+\S+)*[ \t]+password[ \t]+)(?!\[redacted\])\S+/g, (_m, head) => `${head}${CUT}`],
+  [/((?:^|["'])[ \t]*password[ \t]+)(?!\[redacted\])[^\s"']+(?=[ \t]*(?:["']|$))/gm, (_m, head) => `${head}${CUT}`],
   // webhook addresses are their own credential (Slack, Discord)
   [/\b(https?:\/\/hooks\.slack\.com\/)(?:services|workflows|triggers)\/[A-Za-z0-9/_-]+/gi, (_m, host) => `${host}${CUT}`],
   [/\b(https?:\/\/(?:www\.)?discord(?:app)?\.com\/api\/webhooks\/)\d+\/[A-Za-z0-9_-]+/gi, (_m, host) => `${host}${CUT}`],

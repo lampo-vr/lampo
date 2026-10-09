@@ -85,8 +85,9 @@ format stays backwards compatible throughout.
 - Deleting a video deletes everything stored for it: the copies the player plays (the phone's too) and its references
   go from storage with it, also when it is deleted while such a copy is still being made. Copies another video plays
   from stay.
-- What an agent Lampo started on your machine shows the rest of your team (its steps, what it says and how it ends)
-  and every line of the agents' activity leave out what looks like a password, a token or a key.
+- What an agent Lampo started on your machine shows the rest of your team (its steps, what it says, a permission it
+  waits for and how it ends, and the notification asking for that permission) and every line of the agents' activity
+  leave out what looks like a password, a token or a key, and more of the ways a command can be given one.
 - An app signing in to a hosted server is told only that something went wrong (with a reference to quote) when the
   server itself fails, never details of the server.
 - Recorded feedback keeps no more audio than a recording may hold: audio that runs longer is refused with a plain

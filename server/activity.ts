@@ -14,7 +14,7 @@ import { ERROR_MAX, redact } from '../lib/render/redact.ts';
 import { cleanProgress, RUN_ID } from '../lib/runs.ts';
 import * as store from '../lib/store.ts';
 import { compareTime, oneLine } from '../lib/time.ts';
-import type { AgentActivity, AgentActivityKind, AgentLive } from '../lib/types.ts';
+import type { ActivityWords, AgentActivity, AgentActivityKind, AgentLive } from '../lib/types.ts';
 import type { Broadcast } from './events.ts';
 
 /** Lines kept per agent and video. */
@@ -110,6 +110,28 @@ function cleanVars(v: unknown): Record<string, string | number> | undefined {
   return Object.keys(out).length ? out : undefined;
 }
 
+/**
+ * A step's words as the team reads them: whoever has the agents right reads them (the activity, a run's steps and
+ * what it needs), so what looks like a secret goes first — from the text, the quote and every fill-in, whatever kind
+ * and whatever sent them —, then they are cut to one line of `max` characters (`quoteMax` for the quote). A known
+ * template only; its text is never empty when the words it came with weren't.
+ */
+function cleanedWords(w: Partial<ActivityWords>, max: number, quoteMax: number): ActivityWords {
+  const scrub = (x: unknown) => (typeof x === 'string' ? redact(x) : x);
+  const key = isActivityKey(w.key) ? w.key : undefined;
+  const vars = key ? cleanVars(w.vars) : undefined;
+  const quote = key && typeof w.quote === 'string' ? line(scrub(w.quote), quoteMax) : '';
+  return { text: line(scrub(w.text), max), ...(key ? { key } : {}), ...(vars ? { vars } : {}), ...(quote ? { quote } : {}) };
+}
+
+/**
+ * A permission a run Lampo started was refused (server/runs.ts machineBlocked: the step, what it needs, the push that
+ * asks for it): its words cleaned as every other step's, and the rule that would allow it with nothing secret in it.
+ */
+export function cleanDenied(denied: { words: ActivityWords; allow: string }): { words: ActivityWords; allow: string } {
+  return { words: cleanedWords(denied.words, 160, 60), allow: line(redact(denied.allow), 200) };
+}
+
 /** A clean activity from what a caller sent: known kind and template, one-line words, sane sizes. Null when it is
  * unusable. A failure (`error`) keeps up to ERROR_MAX characters of the tool's words, an agent's status its whole
  * sentence as kept (STATUS_CHARS: the Agent view shows it whole); every other line less. */
@@ -117,27 +139,18 @@ export function cleanActivity(a: ActivityRecord): (AgentActivity & { video?: str
   const agent = agentName(a.agent);
   if (!agent || !KINDS.has(a.kind)) return null;
   const failure = a.kind === 'error';
-  // whoever has the agents right reads it (the activity, a run's steps): what looks like a secret goes, from every
-  // kind — a command it ran, what it said, a tool's last lines —, before anything is cut, whatever sent it
-  const scrub = (x: unknown) => (typeof x === 'string' ? redact(x) : x);
-  const text = line(scrub(a.text), failure ? ERROR_MAX : a.kind === 'status' ? STATUS_CHARS : 160);
-  if (!text) return null;
+  const words = cleanedWords(a, failure ? ERROR_MAX : a.kind === 'status' ? STATUS_CHARS : 160, failure ? ERROR_MAX : 60);
+  if (!words.text) return null;
   const target = typeof a.target === 'string' ? cutChars(a.target, 40) : null;
   const at = typeof a.at === 'string' && !Number.isNaN(Date.parse(a.at)) ? a.at : isoLocal();
   const pct = typeof a.pct === 'number' && Number.isFinite(a.pct) ? Math.max(0, Math.min(100, Math.round(a.pct))) : undefined;
-  const key = isActivityKey(a.key) ? a.key : undefined;
-  const vars = key ? cleanVars(a.vars) : undefined;
-  const quote = key && typeof a.quote === 'string' ? line(scrub(a.quote), failure ? ERROR_MAX : 60) : '';
   const progress = cleanProgress(a.progress);
   return {
     at,
     agent,
     slug: typeof a.slug === 'string' ? a.slug : null,
     kind: a.kind,
-    text,
-    ...(key ? { key } : {}),
-    ...(vars ? { vars } : {}),
-    ...(quote ? { quote } : {}),
+    ...words,
     target,
     ...(pct !== undefined ? { pct } : {}),
     ...(progress ? { progress } : {}),

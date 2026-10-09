@@ -141,3 +141,21 @@ test('a command megabytes long (a heredoc) is read only as far as is ever shown,
   assert.deepEqual(leaked(JSON.stringify(steps)), []);
   assert.match(steps[0]?.text ?? '', /^Running curl -u SynthUser:\[redacted\] https:\/\/api\.example\.test\/uploa…$/);
 });
+
+test('a secret the window cuts through leaves no part of itself, however much before it redaction collapses', () => {
+  // 4 KB of something redaction takes as one secret, then a token across the window's end: shown, the 4 KB collapse
+  // to "[redacted]" and the step would reach the token's first characters, too few for its pattern to know it
+  const blob = (n: number) => Array.from({ length: n }, (_, i) => 'aB3xY7kP9mQ2'[i % 12]).join('');
+  const commands = [
+    `echo "${blob(4072)}" ${glue('gh', 'p_', 'Q1Z', 'abcdefghijklmnopqrstuvwxyz0123456')}`,
+    `echo "${blob(4058)}" | tool ${glue('Q2Z', 'aBcDeFgHiJkLmNoPqRsTuVwXyZ01234567')}`,
+  ];
+  const reader = createRunReader(project);
+  for (const [i, command] of commands.entries()) {
+    const use = { type: 'tool_use', id: `tw${i}`, name: 'Bash', input: { command } };
+    const steps = reader.feed(`${JSON.stringify({ type: 'assistant', message: { id: `w${i}`, content: [use] } })}\n`);
+    assert.equal(steps.length, 1);
+    assert.ok(!/Q\dZ/.test(JSON.stringify(steps)), JSON.stringify(steps));
+    assert.match(steps[0]?.text ?? '', /^Running echo "\[redacted\]"/);
+  }
+});

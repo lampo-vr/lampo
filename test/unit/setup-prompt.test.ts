@@ -10,7 +10,7 @@ import { approxTokens } from '../../bench/tokens/count.ts';
 import { CONNECTOR_STEPS, lampoFor, MCP_NAME, mcpSnippet, type SetupPlace, setupPrompt, stdioCommand } from '../../lib/mcpConfig.ts';
 import { instructionsFor } from '../../mcp/loop.ts';
 
-/** The longest setup prompt may cost (the server's instructions are 480): measured 390–429 with bench/tokens’ count. */
+/** The longest setup prompt may cost (the server's instructions are 480): measured 389–428 with bench/tokens’ count. */
 const BUDGET = 430;
 
 const PLACES: Record<string, SetupPlace> = {
@@ -75,8 +75,10 @@ test('the work: asked how it starts, nothing created or moved unasked, then the 
     assert.match(p, /Ask me here how we start: from scratch .*16:9 or 9:16.*Remotion.*from my footage .*or my project/);
     assert.match(p, /Ask before creating or moving files; touch only folders I name/);
     assert.match(p, /In a chat app, work with what I attach/);
-    // the loop is the server's: the sentence that sets it going, then its instructions
-    assert.ok(p.includes(`${lampoFor(place.project ?? null)} and follow its instructions to the end`));
+    // the loop is the server's: the sentence that sets it going, then Lampo's instructions (never "its": after a
+    // project's name, that would read as the project's)
+    assert.ok(p.includes(`${lampoFor(place.project ?? null)} and follow Lampo's instructions until I approve: `));
+    assert.doesNotMatch(p, /follow its instructions/);
     // asked in the chat because nothing is on a frame yet: the server sends questions about the video to Lampo
     assert.match(instructionsFor('coding'), /Ask about the video in Lampo, never in your chat/);
   }
