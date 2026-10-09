@@ -156,8 +156,8 @@ export function PlayerLoading({ slug, phone, ar, agent = false, versions = 1 }: 
             zoomSlot={setZoomSlot}
           />
         )}
-        <Timeline frames={1} fps={25} frame={0} onSeek={noop} selected={null} onSelect={noop} zoomAt={phone ? undefined : zoomSlot} />
-        {phone && <PhoneTools pb={IDLE} fps={25} presets={presets} preset={preset} onPreset={noop} phone={phoneView} />}
+        <Timeline frames={1} fps={25} frame={0} onSeek={noop} selected={null} onSelect={noop} zoomAt={zoomSlot} />
+        {phone && <PhoneTools pb={IDLE} fps={25} presets={presets} preset={preset} onPreset={noop} phone={phoneView} zoomSlot={setZoomSlot} />}
         {(!phone || versions > 1) && <div className="dock-foot" />}
       </div>
       <NotesPanel

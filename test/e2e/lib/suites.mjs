@@ -32,7 +32,7 @@ const E2E = path.join(ROOT, 'test/e2e');
 const SECONDS = {
   quality: 101,
   'quality-load': 83,
-  mobile: 111,
+  mobile: 125,
   inbox: 104,
   // an agent's work that needs you in the inbox: two servers, the matrix at six widths, both themes and German (measured
   // in a full --changed run, 2026-10-07: 19 s)
@@ -86,7 +86,7 @@ const SECONDS = {
   webkit: 45,
   playbook: 15,
   styleguide: 15,
-  zoom: 14,
+  zoom: 17,
   // a folder's zip, then one version from the player's and a card's ⋯, the menus at 1440 and 390 in both themes
   download: 14,
   status: 12,

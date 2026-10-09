@@ -1,7 +1,17 @@
 // The picture: one or two panes (A/B side by side, or one above the other), each with the video fitted into a canvas
 // box, the safe zones in the right coordinate system, the drawing layer (video pixels) and an optional phone frame at
 // real CSS size, with an app's interface around the picture. The zones and the app are two choices, drawn apart.
-import { type CSSProperties, type ReactNode, type PointerEvent as ReactPointerEvent, type Ref, type RefObject, useLayoutEffect, useRef, useState } from 'react';
+import {
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+  type PointerEvent as ReactPointerEvent,
+  type Ref,
+  type RefObject,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { drawingMarkup, shapeMarkup, simplifyPoints, strokeFor } from '../../../lib/drawing.ts';
 import type { Shape, Tool } from '../api/types.ts';
 import { t } from '../i18n/index.ts';
@@ -256,7 +266,15 @@ interface StageProps {
   stack?: { show: number; onSwipe: (dir: 1 | -1) => void } | null;
   /** Two panes one above the other instead of side by side (a phone comparing two landscape pictures). */
   arrange?: 'row' | 'column';
+  /** A tap on the picture (a phone: play or pause), with the time the finger made it (the event's timeStamp). Not a
+   * press on what has its own (a button over the picture, the wipe's handle, a drawing's stroke). */
+  onTap?: (at: number) => void;
+  /** Laid over the picture, inside the stage's dark ground (a phone held sideways: its bar). */
+  children?: ReactNode;
 }
+
+/** What a tap on the stage leaves alone: it is theirs. */
+const OWN_TAP = 'button, a, input, select, textarea, [role=slider], [role=toolbar], svg.draw';
 
 /** Where the phone stands in the pane and what it shows: its body (scaled to fit), the screen, the picture's area. */
 interface PhonePlace {
@@ -284,6 +302,8 @@ export default function Stage({
   pad = PAD,
   stack = null,
   arrange = 'row',
+  onTap,
+  children,
 }: StageProps) {
   const ref = useRef<HTMLDivElement>(null);
   const size = useSize(ref);
@@ -311,8 +331,16 @@ export default function Stage({
       }
     : {};
 
+  // a click, not the release: a touch's click comes only for a tap, never at the end of a swipe or a drag
+  const tap = onTap
+    ? (e: ReactMouseEvent) => {
+        if (!(e.target as Element).closest(OWN_TAP)) onTap(e.timeStamp);
+      }
+    : undefined;
   return (
-    <div className={stack ? 'stage stacked' : column ? 'stage column' : 'stage'} ref={ref} {...swipeHandlers}>
+    // biome-ignore lint/a11y/useKeyWithClickEvents: the keyboard plays and pauses with Space; a tap is the touch screen's way
+    // biome-ignore lint/a11y/noStaticElementInteractions: as above, the picture itself is what a finger taps
+    <div className={stack ? 'stage stacked' : column ? 'stage column' : 'stage'} ref={ref} onClick={tap} {...swipeHandlers}>
       {message && <div className="stage-msg">{message}</div>}
       {size.w > 0 &&
         panes.map((p, i) => {
@@ -460,6 +488,7 @@ export default function Stage({
             </div>
           );
         })}
+      {children}
     </div>
   );
 }

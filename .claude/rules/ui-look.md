@@ -25,3 +25,6 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - Every grid template names every area its items use (the phone's sideways one too): an item in an unnamed area gets an implicit column, and the layout shrinks beside it.
 - A tap that moves the layout acts on `click`, not the release: a touch's click is aimed after the release re-rendered, at whatever moved under the finger (the notes sheet's handle opened the Agent view).
 - On a phone the keyboard shrinks the visual viewport, not the layout: a one-screen layout fits itself to it (`player/phoneSheet.ts` `useKeyboard`), or its field and buttons sit under the keyboard.
+- A review link's layout rule goes in `guest.css`, not `mobile.css`: guest.css comes later (with its chunk) and wins at equal specificity (the sideways rows lost to its 820 px block on a 750 px iPhone, and the picture got no height).
+- Two buttons that take turns in one place get their own `key`: React keeps the pressed node, and its `:active` scale outlasts the tap (the phone's zoom button measured 42 px).
+- A double tap is told by the events' `timeStamp` (when the finger made them), never by `performance.now()` when they are handled: a busy page handles two quick taps far apart (`player/SidewaysBar.tsx` `usePictureTap`).

@@ -356,11 +356,17 @@
   gap: var(--sp-2);
   min-height: var(--h-sm);
 }
-.draft-where {
+/* the chip gives way to the head's buttons (`.c-tc` doesn't shrink anywhere else): a section's long chip in a phone's
+   bigger type pushed Listen past the card and the notes sideways (Linux's wider letters by 6 px at 390) */
+.draft-head .draft-where {
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.draft-head > :not(.draft-where, .grow) {
+  flex: none;
 }
 .draft-mark {
   display: inline-flex;

@@ -1,6 +1,6 @@
 // The transport on a phone: a readable timecode and thumb-sized steps (−10, −1, play, +1, +10) above the timeline,
-// and everything else (in/out, loop, speed, sound, zoom, safe zones, phone view) in a strip that scrolls
-// sideways under it. Same playback hook as the desktop transport, so stepping stays frame-exact.
+// and under it one row of in, out, loop, speed, sound and the timeline's zoom, the rest behind More. Same playback
+// hook as the desktop transport, so stepping stays frame-exact.
 
 import { useState } from 'react';
 import { timecode } from '../../../lib/time.ts';
@@ -68,14 +68,16 @@ interface PhoneToolsProps {
   preset: Preset;
   onPreset: (id: string) => void;
   phone: PhoneView;
+  /** Where the timeline puts its zoom (Timeline.tsx `zoomAt`): in this row, before More. */
+  zoomSlot?: (el: HTMLDivElement | null) => void;
 }
 
 const zoom = (detail: 'in' | 'out' | 'fit') => window.dispatchEvent(new CustomEvent('vr-zoom', { detail }));
 
-/** One row that fits a phone: in, out, loop, speed and sound where a thumb reaches them, quiet (no box around each), and
- * the rest — the in/out range, the timeline's zoom, safe zones, the phone view — behind More. It used to be one strip
- * of ten boxes that scrolled off the screen's edge. */
-export function PhoneTools({ pb, fps, presets, preset, onPreset, phone }: PhoneToolsProps) {
+/** One row that fits a phone: in, out, loop, speed, sound and the timeline's zoom where a thumb reaches them, quiet (no
+ * box around each), and the rest — the in/out range, the zoom's steps, safe zones, the phone view — behind More. It used
+ * to be one strip of ten boxes that scrolled off the screen's edge; the zoom had a row of its own above the timeline. */
+export function PhoneTools({ pb, fps, presets, preset, onPreset, phone, zoomSlot }: PhoneToolsProps) {
   const { inPt, outPt, loop, muted, rate } = pb;
   // In and Out take the frame on screen when tapped: the row doesn't render per frame for it
   const frame = () => pb.live.get();
@@ -116,6 +118,7 @@ export function PhoneTools({ pb, fps, presets, preset, onPreset, phone }: PhoneT
         aria-pressed={muted}
       />
       <span className="grow" />
+      <div className="tr-zoom-slot" ref={zoomSlot} />
       <Popover
         open={more}
         onOpenChange={setMore}

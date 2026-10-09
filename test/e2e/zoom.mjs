@@ -1,15 +1,18 @@
 #!/usr/bin/env node
 // covers: web/src/player/Timeline.tsx web/src/player/ZoomControl.tsx web/src/player/Transport.tsx web/src/guest/GuestPlayer.tsx web/src/player/timelineView.ts web/src/styles/dock.css web/src/lib/prefs.ts
+// covers: web/src/player/PhoneDock.tsx
 // Browser end-to-end test of the timeline's zoom, in the player and on a review link: a real server (local mode, temp
 // store, free port) + headless Chrome. The control has a place of its own, never on the timeline: in the transport row
-// beside the speed and the sound, in the row's own buttons (on a phone in a row above the ruler); it is labelled, its
+// beside the speed and the sound, in the row's own buttons (on a phone one button: in the player's row of tools, on a
+// review link in a row above the ruler); it is labelled, its
 // buttons are named and carry their keys in the tooltip, the level reads Fit → 2× → frames (the buttons beside it never
 // move) and a click on it fits again; ⌘/ctrl + wheel zooms the timeline (never the page), and so do Safari's pinch
 // gestures; the first time, a tip in the tooltips' neutral material points at the control (its key a key cap) — it
 // covers no part of the timeline, moves nothing, goes with × or with the first zoom, stays gone after a reload, and
 // waits while check mode's card floats over the picture's foot. Nothing of it touches the film strip, the ruler or the
-// timeline at 390–1920 in either theme. On a phone the control is zoom in alone until it is zoomed, the tip says pinch,
-// its buttons are hit across 44 px and two fingers zoom. Screenshots land in VR_SHOTS when it is set.
+// timeline at 390–1920 in either theme. On a phone the control is one button — zoom in, and zoomed, back to the whole
+// video —, the tip says pinch, the button is hit across 44 px and two fingers zoom; in the player it sits in the row of
+// tools, which still fits 360 px, and the zoom has no row of its own. Screenshots land in VR_SHOTS when it is set.
 import path from 'node:path';
 import { age, makeVideo, sleep, until } from '../lib/helpers.ts';
 import { settle } from './layout.mjs';
@@ -102,6 +105,8 @@ try {
         hit,
         inTransport: !!ctl?.closest('.transport'),
         inHead: !!ctl?.closest('.tl-head'),
+        inTools: !!ctl?.closest('.ptools'),
+        head: !!document.querySelector('.tl-head'),
         onTimeline: !!ctl?.closest('.timeline'),
         mute: r(document.querySelector('.transport button[aria-label=Mute], .transport button[aria-label=Unmute]')),
         sideways: document.documentElement.scrollWidth > innerWidth + 1,
@@ -323,56 +328,73 @@ try {
     await p.browserContext().close();
   });
 
-  await check('on a phone: zoom in alone until zoomed, the tip says pinch, 44 px tap areas, two fingers zoom', async () => {
-    const p = await fresh(PHONE);
-    await open(p, GUEST);
-    assert((await hint(p)) === 'Pinch to zoom the timeline', `the tip for fingers: ${await hint(p)}`);
-    assert(!(await p.$('[data-testid=tl-zoom-out]')) && !(await p.$('[data-testid=tl-zoom-level]')), 'only zoom in while the whole video shows');
-    for (const sel of ['[data-testid=tl-zoom-in]', '[data-testid=tl-zoom-hint-x]']) {
-      const a = await tapArea(p, sel);
-      assert(Math.round(a.w) >= 44 && Math.round(a.h) >= 44, `${sel} is hit across 44 px: ${JSON.stringify(a)}`);
-    }
-    const tl = JSON.parse(await box(p, '.timeline'));
-    const ph = await placement(p);
-    // a row of its own above the ruler, the tip beside the control in it: on the screen, off the timeline
-    assert(
-      ph.inHead && !overlaps(ph).length && ph.ctl.bottom <= tl.top && ph.tip.right <= ph.ctl.left && ph.tip.left >= 0 && !ph.sideways,
-      `above the ruler, nothing on the timeline: ${JSON.stringify({ ph, bad: overlaps(ph) })}`,
-    );
-    await shot(p, 'zoom-04-phone');
-    await p.tap('[data-testid=tl-zoom-in]');
-    await until(async () => (await level(p)) === '2×', 'a tap zooms in, and the level shows');
-    assert(!(await hint(p)), 'the tip went with the zoom');
-    for (const sel of ['[data-testid=tl-zoom-out]', '[data-testid=tl-zoom-level]']) {
-      const a = await tapArea(p, sel);
-      assert(Math.round(a.w) >= 44 && Math.round(a.h) >= 44, `${sel} is hit across 44 px: ${JSON.stringify(a)}`);
-    }
-    const zoomedAt = await placement(p);
-    assert(!overlaps(zoomedAt).length, `zoomed, still off the timeline: ${overlaps(zoomedAt)}`);
-    await shot(p, 'zoom-05-phone-zoomed');
-    await p.tap('[data-testid=tl-zoom-level]');
-    await until(async () => !(await view(p)) && !(await p.$('[data-testid=tl-zoom-level]')), 'a tap on the level fits, zoom in alone again');
-    // two fingers spread over the timeline: closer
-    const s = await p.target().createCDPSession();
-    const y = tl.y + tl.height / 2;
-    const cx = tl.x + tl.width / 2;
-    const touch = (type, d) =>
-      s.send('Input.dispatchTouchEvent', {
-        type,
-        touchPoints:
-          type === 'touchEnd'
-            ? []
-            : [
-                { x: cx - d, y, id: 1 },
-                { x: cx + d, y, id: 2 },
-              ],
-      });
-    await touch('touchStart', 30);
-    for (const d of [45, 60, 75, 90]) await touch('touchMove', d);
-    await touch('touchEnd', 0);
-    await until(async () => (await span(p)) < N / 2, 'a pinch spread three times wider shows a third of the video or less');
-    await p.browserContext().close();
-  });
+  // Valentino: "zoom-in moves into the In · Out · loop · speed · sound · ⋯ row, and the separate zoom row goes away on
+  // phones". The review link's transport row has no room for it (it keeps its row above the ruler); both are one button.
+  await check(
+    'on a phone: one button — zoom in, then back to the whole video —, in the player’s row of tools; the tip says pinch, 44 px tap areas, two fingers zoom',
+    async () => {
+      const zoomLevel = (p) => p.$eval('[data-testid=tl-zoom]', (e) => e.dataset.level);
+      let p;
+      let tl;
+      for (const [where, url] of [
+        ['player', PLAYER],
+        ['review link', GUEST],
+      ]) {
+        p = await fresh(PHONE);
+        await open(p, url);
+        assert((await hint(p)) === 'Pinch to zoom the timeline', `${where}: the tip for fingers: ${await hint(p)}`);
+        const only = await p.$$eval('[data-testid=tl-zoom] button', (bs) => bs.map((b) => b.dataset.testid));
+        assert(only.join() === 'tl-zoom-in', `${where}: zoom in alone while the whole video shows: ${only}`);
+        for (const sel of ['[data-testid=tl-zoom-in]', '[data-testid=tl-zoom-hint-x]']) {
+          const a = await tapArea(p, sel);
+          assert(Math.round(a.w) >= 44 && Math.round(a.h) >= 44, `${where}: ${sel} is hit across 44 px: ${JSON.stringify(a)}`);
+        }
+        tl = JSON.parse(await box(p, '.timeline'));
+        const ph = await placement(p);
+        // the player: in the row of tools under the timeline, no row of its own; a review link: a row of its own above the
+        // ruler. The tip beside the control: on the screen, off the timeline.
+        const placed = where === 'player' ? ph.inTools && !ph.head && ph.ctl.top >= tl.bottom : ph.inHead && ph.ctl.bottom <= tl.top;
+        assert(
+          placed && !overlaps(ph).length && ph.tip.right <= ph.ctl.left && ph.tip.left >= 0 && !ph.sideways,
+          `${where}: in its place, nothing on the timeline: ${JSON.stringify({ ph, bad: overlaps(ph) })}`,
+        );
+        await shot(p, `zoom-04-phone-${where.replace(' ', '-')}`);
+        await p.tap('[data-testid=tl-zoom-in]');
+        await until(async () => (await zoomLevel(p)) === '2x', `${where}: a tap zooms in`);
+        assert(!(await hint(p)), `${where}: the tip went with the zoom`);
+        const zoomed = await p.$$eval('[data-testid=tl-zoom] button', (bs) => bs.map((b) => `${b.dataset.testid} ${b.getAttribute('aria-pressed')}`));
+        assert(zoomed.join() === 'tl-zoom-fit true', `${where}: zoomed, the one button is switched on and fits: ${zoomed}`);
+        const a = await tapArea(p, '[data-testid=tl-zoom-fit]');
+        assert(Math.round(a.w) >= 44 && Math.round(a.h) >= 44, `${where}: hit across 44 px: ${JSON.stringify(a)}`);
+        const zoomedAt = await placement(p);
+        assert(!overlaps(zoomedAt).length, `${where}: zoomed, still off the timeline: ${overlaps(zoomedAt)}`);
+        await shot(p, `zoom-05-phone-zoomed-${where.replace(' ', '-')}`);
+        await p.tap('[data-testid=tl-zoom-fit]');
+        await until(async () => !(await view(p)) && !!(await p.$('[data-testid=tl-zoom-in]')), `${where}: a tap fits, zoom in again`);
+        if (where === 'player') await p.browserContext().close();
+      }
+      // two fingers spread over the timeline: closer
+      const s = await p.target().createCDPSession();
+      const y = tl.y + tl.height / 2;
+      const cx = tl.x + tl.width / 2;
+      const touch = (type, d) =>
+        s.send('Input.dispatchTouchEvent', {
+          type,
+          touchPoints:
+            type === 'touchEnd'
+              ? []
+              : [
+                  { x: cx - d, y, id: 1 },
+                  { x: cx + d, y, id: 2 },
+                ],
+        });
+      await touch('touchStart', 30);
+      for (const d of [45, 60, 75, 90]) await touch('touchMove', d);
+      await touch('touchEnd', 0);
+      await until(async () => (await span(p)) < N / 2, 'a pinch spread three times wider shows a third of the video or less');
+      await p.browserContext().close();
+    },
+  );
 
   // The notes sheet pulled up to full takes the dock, and the zoom in it, away: its tip goes with it — placed against
   // nothing it stood half off the top of the screen, over the title — and comes back with it.
@@ -412,6 +434,44 @@ try {
     await p.browserContext().close();
   });
 
+  // The row has room for one more button and no more: at 360 it was 12 px too narrow (the zoom squeezed to 32 px, its
+  // button over More's). Linux's letters are wider than a Mac's: a little letter-spacing stands in for them.
+  await check('a phone’s row of tools holds the zoom at 360 and 390, with wider letters too: each tap area 44 px, side by side, on the screen', async () => {
+    const problems = [];
+    for (const width of [360, 390]) {
+      const p = await fresh({ ...PHONE, width, height: width === 360 ? 780 : 844 });
+      await open(p, PLAYER);
+      for (const spacing of ['0', '0.04em']) {
+        await p.evaluate((sp) => {
+          document.querySelector('#wider-letters')?.remove();
+          const st = document.createElement('style');
+          st.id = 'wider-letters';
+          st.textContent = `.ptools * { letter-spacing: ${sp} !important; }`;
+          document.head.append(st);
+        }, spacing);
+        await settle(p);
+        const m = await p.evaluate(() => {
+          const row = document.querySelector('.ptools');
+          const hits = [...row.querySelectorAll('button')].map((b) => {
+            const r = b.getBoundingClientRect();
+            return { name: b.getAttribute('aria-label'), l: r.left, r: r.right, w: r.width, h: r.height };
+          });
+          return { vw: innerWidth, overflow: row.scrollWidth - row.clientWidth, hits };
+        });
+        const at = `@${width} letter-spacing ${spacing}`;
+        if (m.overflow > 0) problems.push(`${at}: the row is ${m.overflow} px too narrow`);
+        for (const [i, h] of m.hits.entries()) {
+          if (Math.round(h.w) < 44 || Math.round(h.h) < 44) problems.push(`${at}: ${h.name} ${Math.round(h.w)}×${Math.round(h.h)}`);
+          if (h.l < -0.5 || h.r > m.vw + 0.5) problems.push(`${at}: ${h.name} off the screen (${Math.round(h.l)}–${Math.round(h.r)})`);
+          const next = m.hits[i + 1];
+          if (next && next.l < h.r - 0.5) problems.push(`${at}: ${h.name} under ${next.name} (${Math.round(h.r)} > ${Math.round(next.l)})`);
+        }
+      }
+      await p.browserContext().close();
+    }
+    assert(!problems.length, problems.join('\n'));
+  });
+
   await check('at 390, 768, 1440 and 1920, both themes: the zoom and its tip never touch the film strip, the ruler or the timeline', async () => {
     const problems = [];
     for (const [where, url] of [
@@ -430,7 +490,7 @@ try {
           const at = `${where} @${width} ${theme}`;
           for (const bad of overlaps(m)) problems.push(`${at}: ${bad}`);
           if (m.sideways) problems.push(`${at}: the page scrolls sideways`);
-          if (width < 640 ? !m.inHead : !m.inTransport) problems.push(`${at}: not in its place`);
+          if (width < 640 ? !(where === 'player' ? m.inTools && !m.head : m.inHead) : !m.inTransport) problems.push(`${at}: not in its place`);
           if (m.tip) {
             const look = await tipLook(p);
             if (look.bg !== look.wantBg || look.hue > 24) problems.push(`${at}: the tip's look ${JSON.stringify(look)}`);

@@ -196,6 +196,42 @@ try {
     await shot('record-dark-1440-drafts');
     const fit = await fitsAt(page, 'drafts');
     assert(!fit.length, fit.join('\n'));
+    // On a phone every draft's head and foot stay inside its card — with letters a little wider too, as Linux sets them
+    // (CI: the section's chip pushed Listen past the card and the notes 6 px sideways at 390; on a Mac it sat flush)
+    const own = page.viewport();
+    const out = [];
+    for (const width of [360, 390])
+      for (const spacing of ['0', '0.04em']) {
+        await page.setViewport({ width, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+        await page.waitForSelector('[data-testid=drafts][data-state=ready] [data-testid=draft]');
+        const bad = await page.evaluate((spacing) => {
+          let style = document.getElementById('wider-letters');
+          if (!style) {
+            style = document.createElement('style');
+            style.id = 'wider-letters';
+            document.head.append(style);
+          }
+          style.textContent = spacing === '0' ? '' : `[data-testid=drafts] * { letter-spacing: ${spacing} !important; }`;
+          const found = [];
+          for (const card of document.querySelectorAll('[data-testid=draft]')) {
+            const c = card.getBoundingClientRect();
+            for (const el of card.querySelectorAll('.draft-head > *, .draft-foot > *')) {
+              const r = el.getBoundingClientRect();
+              if (r.width && (r.right > c.right + 0.5 || r.left < c.left - 0.5))
+                found.push(
+                  `${el.getAttribute('aria-label') || el.textContent.trim().slice(0, 20)} at ${Math.round(r.left)}–${Math.round(r.right)}, card ${Math.round(c.left)}–${Math.round(c.right)}`,
+                );
+            }
+          }
+          const sc = document.querySelector('.side-scroll');
+          if (sc && sc.scrollWidth > sc.clientWidth + 1) found.push(`the notes scroll sideways (${sc.scrollWidth} > ${sc.clientWidth})`);
+          style.textContent = '';
+          return found;
+        }, spacing);
+        for (const b of bad) out.push(`@${width}${spacing === '0' ? '' : ' wider letters'}: ${b}`);
+      }
+    if (own) await page.setViewport(own);
+    assert(!out.length, out.join('\n'));
   });
 
   let sent = [];

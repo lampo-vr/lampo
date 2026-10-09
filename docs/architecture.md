@@ -287,14 +287,18 @@ button), so desktop layouts never change. The same queries are shared with the c
 | phone | narrower than 640 px, or a touch screen at most 480 px tall | the phone player, dialogs and menus as bottom sheets, 16 px text fields, 44 px tap areas |
 | stacked | at most 820 px wide | the library's sidebar becomes a drawer (the menu button in the top bar); the player stacks |
 | touch | `(hover: none) and (pointer: coarse)` | nothing hides behind hover (folder and card actions show), no keyboard hints |
-| phone landscape | touch, at most 480 px tall, landscape | the picture gets the screen's height; the controls and notes follow when scrolled |
+| phone landscape | touch, at most 480 px tall, landscape | the picture fills the screen with a bar over its foot that comes with a tap; the rest follows when scrolled |
 
 The phone player uses the desktop's playback code, so seeking stays frame-exact; only the controls differ. The
 timecode and thumb-sized steps (−10, −1, play, +1, +10) sit above the timeline, a row under it holds in, out, loop,
-speed and sound with the rest behind *More*, and the notes are a bottom sheet that peeks, covers half the screen or
-most of it. While comparing, before and after lie on top of each other and a sideways swipe switches them. The
-timeline takes a finger like a mouse, pinches to zoom and widens its markers under a finger. Links go to the phone's
-share sheet where there is one.
+speed, sound and the timeline's zoom (one button: zoom in, and zoomed, back to the whole video) with the rest behind
+*More*, and the notes are a bottom sheet that peeks, covers half the screen or most of it. A tap on the picture plays
+or pauses unless a drawing tool is in hand (`Stage`'s `onTap`; two taps closer than 300 ms are one). Held sideways the
+picture fills the screen, and `SidewaysBar` lies over its foot — a frame back, play, a frame on, the timecode, Notes —
+up while the video rests and for 2.5 s after a tap while it plays; its steps go through the same playback hook. While
+comparing, before and after lie on top of each other and a sideways swipe switches them. The timeline takes a finger
+like a mouse, pinches to zoom and widens its markers under a finger. Links go to the phone's share sheet where there
+is one.
 
 On a desktop, the player's top bar has one main control, the stage and its next step (`StageControl`); the version
 picker, compare, the agent button and Share sit quietly beside it. Compare (`CompareBar`, <kbd>B</kbd>) floats over the

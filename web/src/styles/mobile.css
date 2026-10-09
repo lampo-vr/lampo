@@ -615,12 +615,10 @@
     padding-bottom: 0;
   }
   /* A short screen — an iPhone in Safari keeps about 660 px under its bars — can't hold the whole dock and a picture
-     worth looking at (it got 105 px). At rest the zoom's own row steps aside while the timeline is fitted (a pinch
-     zooms, More has the buttons; zoomed, the row is back with zoom out) and the play button is a step smaller; with the
-     notes open the timecode's line and the tags' line step aside too (each note says its time; the tags are in the full
-     sheet), and writing a note the picture keeps a little less. */
+     worth looking at (it got 105 px). At rest the play button is a step smaller; with the notes open the timecode's
+     line and the tags' line step aside too (each note says its time; the tags are in the full sheet), and writing a
+     note the picture keeps a little less. */
   @media (max-height: 760px) {
-    .phone-player .tl-head:has(.zoomctl[data-level='fit']),
     .phone-player.ps-half .ptc,
     .phone-player.ps-half .nsheet .note-tagf {
       display: none;
@@ -826,6 +824,10 @@
   }
   .ptools > .grow {
     flex: 1;
+  }
+  /* the timeline's zoom, one button in the row (ZoomControl.tsx compact), in the row's own slot */
+  .ptools .zoomctl {
+    flex: none;
   }
   .ptools .btn.ghost:not(.on) {
     color: var(--fg-2);
@@ -1039,13 +1041,12 @@
     -webkit-touch-callout: none;
   }
 
-  /* the sheet takes room from the picture, never covers it: half hides the secondary rows (the strip, the tools, the
-     dock's foot, the timeline's zoom row: pinch zooms), full the whole dock; writing a note, the agent's line steps
+  /* the sheet takes room from the picture, never covers it: half hides the secondary rows (the strip, the tools with
+     the timeline's zoom: pinch zooms, the dock's foot), full the whole dock; writing a note, the agent's line steps
      aside too. The sheet starts each move where the picture stays put (phoneSheet.ts useStillPicture). */
   .phone-player.ps-half .p-strip,
   .phone-player.ps-half .ptools,
   .phone-player.ps-half .dock-foot,
-  .phone-player.ps-half .tl-head,
   .phone-player.ps-half.composing .run-slot,
   .phone-player.ps-half.composing .ptc,
   .phone-player.ps-full .p-strip,
@@ -1145,9 +1146,22 @@
   .p-strip .agent-btn .i-down {
     display: none;
   }
+  /* the row of tools: in, out, loop, speed, sound, zoom and More side by side, their tap areas touching (each is 44 px
+     across already), In and Out and the speed's word closer to their edges */
+  .ptools {
+    gap: 0;
+  }
+  .ptools .btn:not(.icon-only) {
+    padding: 0 var(--sp-2);
+  }
+  .ptools button.input.select {
+    padding-left: var(--sp-1);
+  }
 }
 
-/* ---------------------------------------------------------------- landscape phones: watch big, scroll for the rest */
+/* ---------------------------------------------------------------- landscape phones: the picture fills the screen, the
+   rest (the bar with the title, the transport, the notes) follows when scrolled. Its own bar over its foot comes with a
+   tap (player/SidewaysBar.tsx). */
 @media (max-height: 480px) and (hover: none) and (pointer: coarse) and (orientation: landscape) {
   body {
     overflow: auto;
@@ -1157,8 +1171,8 @@
   .player.phone-player {
     height: auto;
     overflow: visible;
-    grid-template-rows: auto calc(100dvh - 58px) auto auto auto auto;
-    grid-template-areas: 'top' 'stage' 'strip' 'run' 'dock' 'side';
+    grid-template-rows: 100dvh auto auto auto auto auto;
+    grid-template-areas: 'stage' 'top' 'strip' 'run' 'dock' 'side';
   }
   /* the notes keep clear of the notch and the rounded corners, as the bars do */
   .phone-player .side.nsheet,
@@ -1188,13 +1202,6 @@
   }
   .phone-player.ps-full .dock {
     display: grid;
-  }
-  /* The client's player too: the picture gets the screen's height, transport and notes follow when scrolled. */
-  .g-player.guest {
-    height: auto;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto calc(100dvh - 54px) auto auto;
-    grid-template-areas: 'top' 'stage' 'dock' 'side';
   }
   .g-player .side {
     border-left: 0;

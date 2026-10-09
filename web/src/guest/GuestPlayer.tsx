@@ -21,6 +21,8 @@ import { CompareBar } from '../player/CompareBar.tsx';
 import { DrawBar } from '../player/DrawBar.tsx';
 import { type FrameStore, useFrame, useFrameValue } from '../player/frameStore.ts';
 import { groupStarts, noteAt } from '../player/noteRows.ts';
+import { useSideways } from '../player/phoneSheet.ts';
+import { SidewaysBar, scrollToNotes, TapFlash, useBarAwake, usePictureTap } from '../player/SidewaysBar.tsx';
 import Stage, { type Pane } from '../player/Stage.tsx';
 import Timeline from '../player/Timeline.tsx';
 import { RATES, usePlayback } from '../player/usePlayback.ts';
@@ -118,7 +120,21 @@ export function GuestPlayer({
   const latest = d.v === d.latest;
   const phone = usePhone();
   const touch = useTouch();
-  // where the timeline's zoom goes: beside the speed and the sound (a phone: the timeline's own row above the ruler)
+  // A tap on a phone's picture plays or pauses, unless a drawing tool is in hand; held sideways the picture fills the
+  // screen, its bar (with the drawing tools) comes with the tap and fades while it plays (player/SidewaysBar.tsx).
+  const watching = useSideways() && phone;
+  const bar = useBarAwake(watching, pb.playing);
+  const [flash, setFlash] = useState<{ n: number; playing: boolean } | null>(null);
+  const tapPicture = usePictureTap(() => {
+    const play = !pb.playing;
+    if (play) pb.play();
+    else pb.pause();
+    setFlash((x) => ({ n: (x?.n ?? 0) + 1, playing: play }));
+    bar.wake();
+  });
+  const mainRef = useRef<HTMLElement>(null);
+  // where the timeline's zoom goes: beside the speed and the sound (a phone, whose transport row is full: a row of its
+  // own above the ruler)
   const [zoomSlot, setZoomSlot] = useState<HTMLDivElement | null>(null);
   const theme = useThemeChoice();
   const sharer = d.reviewer ?? undefined;
@@ -438,8 +454,26 @@ export function GuestPlayer({
     />
   );
 
+  // the drawing tools, for a link that takes notes (placed below, where they go)
+  const drawBar = perms.comment && (phone ? !comparing : !pb.playing) && (
+    <DrawBar
+      tools={GUEST_TOOLS()}
+      tool={tool}
+      onTool={(x) => {
+        if (pb.playing) pb.pause();
+        setTool(tool === x ? 'none' : x);
+      }}
+      onUndo={() => setShapes((x) => x.slice(0, -1))}
+      canUndo={shapes.length > 0}
+      label={t('client::Mark the frame')}
+      undoLabel={t('client::Undo last mark')}
+      under={comparing && !phone}
+    />
+  );
+
   return (
     <main
+      ref={mainRef}
       className={`guest g-player ${perms.comment ? '' : 'view-only'} ${notesPanel ? '' : 'no-notes'}`}
       style={
         {
@@ -571,33 +605,41 @@ export function GuestPlayer({
       <Stage
         preset={null}
         phone={null}
-        pad={phone ? PHONE_PAD : side ? SIDE_PAD : undefined}
+        pad={phone ? (watching ? 0 : PHONE_PAD) : side ? SIDE_PAD : undefined}
         reserveTop={comparing ? COMPARE_ROOM : 0}
-        reserveBottom={phone && perms.comment && !comparing ? TOOLS_ROOM : 0}
+        reserveBottom={phone && perms.comment && !comparing && !watching ? TOOLS_ROOM : 0}
         message={d.media ? null : d.preparing ? t('client::Getting the video ready…') : t('client::This version can’t be played right now.')}
         panes={panes}
         arrange={column ? 'column' : 'row'}
-      />
+        onTap={phone && !(paneA.draw && paneA.draw.tool !== 'none') ? tapPicture : undefined}
+      >
+        {phone && flash && <TapFlash key={flash.n} playing={flash.playing} />}
+        {watching && (
+          <SidewaysBar
+            pb={pb}
+            fps={fps}
+            N={N}
+            shown={bar.shown}
+            onWake={bar.wake}
+            notes={{
+              word: t('client::Notes'),
+              n: notes.length || null,
+              label: notes.length ? `${t('client::Notes')} · ${t('client::{n} note|{n} notes', { n: notes.length })}` : t('client::Notes'),
+            }}
+            onNotes={() => scrollToNotes(mainRef.current?.querySelector(':scope > .side'))}
+            client
+          >
+            {drawBar}
+          </SidewaysBar>
+        )}
+      </Stage>
       {/* the compare bar: over the top of the stage (a phone: the stage's first row) */}
       {compareBar && <div className="g-cmp-layer">{compareBar}</div>}
       {/* the drawing tools, for a link that takes notes: on the picture while it's paused; on a phone in their own strip
-          under it, always there (a tool picked while it plays pauses it). Comparing, they stand over A and draw on it; a
-          phone compares to look (its strip would lie under both pictures): × and they are back. */}
-      {perms.comment && (phone ? !comparing : !pb.playing) && (
-        <DrawBar
-          tools={GUEST_TOOLS()}
-          tool={tool}
-          onTool={(x) => {
-            if (pb.playing) pb.pause();
-            setTool(tool === x ? 'none' : x);
-          }}
-          onUndo={() => setShapes((x) => x.slice(0, -1))}
-          canUndo={shapes.length > 0}
-          label={t('client::Mark the frame')}
-          undoLabel={t('client::Undo last mark')}
-          under={comparing && !phone}
-        />
-      )}
+          under it, always there (a tool picked while it plays pauses it), held sideways in the picture's bar. Comparing,
+          they stand over A and draw on it; a phone compares to look (its strip would lie under both pictures): × and
+          they are back. */}
+      {!watching && drawBar}
       <div className="dock grain">
         <div className="transport g-transport">
           <div className="group">

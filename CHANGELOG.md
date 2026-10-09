@@ -29,6 +29,13 @@ format stays backwards compatible throughout.
   open" — and opens with a tap anywhere on it, with + Note beside it; the handle still drags. Reading a phone at arm's
   length, the player's and the review link's smallest type is a step bigger, and what is a desk's check (loudness,
   freezes, who watched, review mode, an unavailable Record) no longer crowds the phone's screen.
+- **A phone's player plays with a tap, and held sideways it is all picture.** A tap on the picture plays or pauses
+  (with a drawing tool in hand it draws instead), on review links too. Held sideways, the picture fills the screen and
+  a tap brings a slim bar over its foot — a frame back, play, a frame on, the timecode and Notes, which takes you down
+  to them — that fades while the video plays (at once with reduced motion); the steps are the player's own,
+  frame-exact. The rest of the page follows when you scroll. The timeline's zoom is one button in the row of In, Out,
+  loop, speed and sound — zoom in, and zoomed, back to the whole video — so its row above the timeline is gone and the
+  picture has that much more room (a tall or square video shows that much bigger).
 
 ### Added
 - **Start with your agent in one paste.** An empty library, project or folder leads with **Copy prompt for your
@@ -59,8 +66,7 @@ format stays backwards compatible throughout.
 - **The player on a phone keeps its picture.** With the notes open, while you write a note and in check mode the
   picture keeps about a quarter of the screen (on an iPhone it was a strip 62 px tall, in Safari almost nothing), and
   the notes take the rest. Writing a note, the drawing tools sit in their own strip under the picture instead of
-  covering it. On an iPhone in Safari the picture at rest is half as big again: the timeline's zoom row steps aside
-  while the timeline is fitted (pinch, or More, zooms it) and the play button is a step smaller.
+  covering it. On an iPhone in Safari the picture at rest is half as big again, and the play button a step smaller.
 - On a phone, the keyboard no longer covers the note you are typing or its Send: the player fits the room above the
   keyboard while it is up.
 - On a phone, opening, closing or dragging the notes sheet moves the picture once and smoothly: it no longer grows

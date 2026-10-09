@@ -259,8 +259,9 @@ button.tl-mark:focus-visible {
   opacity: 0.7;
 }
 /* The timeline's zoom (ZoomControl.tsx) has a place of its own and never sits on the timeline: in the transport row
-   beside the speed and the sound, in the row's own buttons (zoom out · the level · zoom in); on a phone, where the
-   transport rows are full, in a quiet row above the ruler (.tl-head). The slot is only where the timeline renders it. */
+   beside the speed and the sound, in the row's own buttons (zoom out · the level · zoom in); on a phone one button, in
+   the player's row of tools under the timeline (mobile.css .ptools), on a review link, whose transport row is full, in
+   a quiet row above the ruler (.tl-head). The slot is only where the timeline renders it. */
 .tr-zoom-slot {
   display: contents;
 }
@@ -302,9 +303,9 @@ button.tl-mark:focus-visible {
     display: none;
   }
 }
-/* A phone: the zoom's own row above the ruler, at the right, in reach of a thumb (zoom in alone until it is zoomed).
-   Its buttons are boxes of the desktop's height, each hit across 44 px; the row's margins hold those tap areas, so
-   they reach neither the transport above nor the film strip below, where the playhead's head is. */
+/* A review link on a phone: the zoom's own row above the ruler, at the right, in reach of a thumb. Its button is a box
+   of the desktop's height, hit across 44 px; the row's margins hold that tap area, so it reaches neither the transport
+   above nor the film strip below, where the playhead's head is. */
 .tl-head {
   display: flex;
   justify-content: flex-end;
@@ -320,9 +321,6 @@ button.tl-mark:focus-visible {
   content: '';
   position: absolute;
   inset: calc((var(--h) - var(--h-touch)) / 2) 0;
-}
-.tl-head .zoomctl .zoomctl-level {
-  padding: 0 var(--sp-2);
 }
 /* The one-time tip, in the tooltips' material (ui.css .tip): a small popover pointing at the control, laid over the
    page (ZoomTip places it against the window), so it never takes room. Above the overlays on the picture (z 6), under

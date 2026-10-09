@@ -65,6 +65,7 @@ import { ReviewHud } from './ReviewHud.tsx';
 import { RunStrip } from './RunStrip.tsx';
 import { RecordButton } from './record/RecordButton.tsx';
 import { recordUi, useRecordFeedback } from './record/useRecordFeedback.ts';
+import { SidewaysBar, scrollToNotes, TapFlash, useBarAwake, usePictureTap } from './SidewaysBar.tsx';
 import Stage, { type Pane } from './Stage.tsx';
 import Timeline from './Timeline.tsx';
 import { Transport } from './Transport.tsx';
@@ -338,9 +339,21 @@ function PlayerView({
   // a note on the picture being written: its drawing tools (on a phone in their strip under the picture)
   const drawing = composer && composer.words == null && !composer.whole;
   const drawStrip = phone && !!drawing && !keyboard;
+  // A tap on a phone's picture plays or pauses, unless a drawing tool is in hand (below: Stage's onTap). Held sideways
+  // the picture fills the screen and its bar comes with the tap, fading while it plays (SidewaysBar.tsx).
+  const watching = phone && sideways;
+  const bar = useBarAwake(watching, pb.playing || !!pb.revSpeed);
+  const [flash, setFlash] = useState<{ n: number; playing: boolean } | null>(null);
+  const tapPicture = usePictureTap(() => {
+    const play = !(pb.playing || pb.revSpeed);
+    if (play) pb.play();
+    else pb.pause();
+    setFlash((x) => ({ n: (x?.n ?? 0) + 1, playing: play }));
+    bar.wake();
+  });
   const mainRef = useRef<HTMLElement>(null);
   useStillPicture(mainRef, `${sheet} ${composer ? 'composing' : ''} ${keyboard ? 'kb' : ''}`, upright, drawStrip ? PHONE_TOOLS : 0);
-  // where the timeline's zoom goes: the transport row's slot (a phone: the timeline's own row above the ruler)
+  // where the timeline's zoom goes: the transport row's slot (a phone: the row of tools under the timeline)
   const [zoomSlot, setZoomSlot] = useState<HTMLDivElement | null>(null);
   const [showB, setShowB] = useState(false);
   // Notes or the transcript. The transcript comes back only on the video it was open on, only while speech-to-text
@@ -1378,9 +1391,28 @@ function PlayerView({
           message={message}
           reserveBottom={verify.active && !phone ? 190 : drawStrip ? PHONE_TOOLS : 0}
           reserveTop={ab && !verifying && !phone ? 52 : 0}
-          pad={phone ? 10 : undefined}
+          pad={phone ? (watching ? 0 : 10) : undefined}
           stack={stack}
-        />
+          onTap={phone && !(paneA.draw && paneA.draw.tool !== 'none') ? tapPicture : undefined}
+        >
+          {phone && flash && <TapFlash key={flash.n} playing={flash.playing} />}
+          {/* writing a note, its drawing tools' strip holds the picture's foot: the bar comes back after */}
+          {watching && !drawStrip && (
+            <SidewaysBar
+              pb={pb}
+              fps={fps}
+              N={N}
+              shown={bar.shown}
+              onWake={bar.wake}
+              notes={{
+                word: t('Notes'),
+                n: counts.active || null,
+                label: counts.active ? `${t('Show notes')} · ${t('{n} open', { n: counts.active })}` : t('Show notes'),
+              }}
+              onNotes={() => scrollToNotes(mainRef.current?.querySelector(':scope > .side'))}
+            />
+          )}
+        </Stage>
         <div className="stage-overlay">
           <WalkieHud state={walkie.state} level={walkie.level} timecodeOf={(f) => timecode(f, fps)} />
           {/* the drawing tools sit on the picture while a note is written (not for the transcript's words, not about the
@@ -1447,7 +1479,7 @@ function PlayerView({
             />
           )}
           <Timeline
-            zoomAt={phone ? undefined : zoomSlot}
+            zoomAt={zoomSlot}
             zoomTipWaits={verify.active || !!walk || recorder.active}
             frames={N}
             fps={fps}
@@ -1495,7 +1527,17 @@ function PlayerView({
               else if (c) selectComment(c);
             }}
           />
-          {phone && <PhoneTools pb={pb} fps={fps} presets={presetList} preset={preset} onPreset={(id) => setPref(presetKey, id)} phone={phoneView} />}
+          {phone && (
+            <PhoneTools
+              pb={pb}
+              fps={fps}
+              presets={presetList}
+              preset={preset}
+              onPreset={(id) => setPref(presetKey, id)}
+              phone={phoneView}
+              zoomSlot={setZoomSlot}
+            />
+          )}
           <DockFoot
             analysis={analysis}
             wave={wave}

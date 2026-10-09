@@ -12,14 +12,17 @@
 // phone and on the desk. Then no main screen may scroll sideways, hide a control off-screen, clip a glyph or put grain
 // on a scroller, at three phone and tablet sizes and on a desktop. The phone player keeps its picture with the notes
 // open, a note written and the keyboard up; its notes are one tap away and say how many are open; while a video plays
-// on a phone neither player nor review link renders more than what shows the frame.
+// on a phone neither player nor review link renders more than what shows the frame. A tap on the picture plays and
+// pauses (a double tap is one tap, a drawing tool in hand draws instead), and held sideways the picture fills the
+// screen under a bar that comes with a tap, steps frame-exactly, fades while it plays and leads to the notes.
 // VR_SHOTS=<dir> keeps screenshots (and one of the page for each failed check).
 import path from 'node:path';
+import { timecode } from '../../lib/time.ts';
 import { age, makeVideo, sleep, until } from '../lib/helpers.ts';
 import { bentEdges, clippedText, cutLabels, dataTheme, grainOnScrollers, settle, sideways } from './layout.mjs';
 import { launch, requireChrome, shotsDir } from './lib/browser.mjs';
 import { assert, check, crashed, finish, screenshotFailures } from './lib/checks.mjs';
-import { closestFrame, SH, SW } from './lib/frames.mjs';
+import { closestFrame, SH, SW, shownPicture } from './lib/frames.mjs';
 import { glyphCentre, glyphProblems } from './lib/glyph.mjs';
 import { startServer } from './lib/server.mjs';
 
@@ -901,6 +904,193 @@ try {
     }
     assert(!problems.length, problems.join('\n'));
   });
+
+  // Valentino: "a tap on the video: play/pause on a phone, unless a drawing tool is active; don't break drawing,
+  // double-tap or the sheet's drag". Before: a tap on the picture did nothing.
+  await check(
+    'a tap on a phone’s picture plays and pauses, a double tap is one tap, a drawing tool in hand draws instead (player and review link)',
+    async () => {
+      const share = await api(`/api/review/${encodeURIComponent(slug)}/shares`, { method: 'POST', body: JSON.stringify({ label: 'Taps', comment: true }) });
+      await page.emulate(IPHONE);
+      const paused = () => page.$eval('.vbox video', (v) => v.paused);
+      const tapPicture = async () => {
+        const c = await center('.vbox');
+        await page.touchscreen.tap(c.x, c.y);
+      };
+      // a tap whose click has been handled (a click on the stage acts at once: play() or pause() turns `paused` then)
+      const tapHandled = async () => {
+        await page.evaluate(() => {
+          window.__clicks = 0;
+          document.addEventListener('click', () => window.__clicks++, { capture: true, once: true });
+        });
+        await tapPicture();
+        await page.waitForFunction(() => window.__clicks > 0, { polling: 'raf', timeout: 5000 });
+        await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r())));
+      };
+      for (const [where, url, play] of [
+        ['player', `${BASE}/#/v/${encodeURIComponent(slug)}`, '.pbtns .playbtn'],
+        ['review link', `${BASE}/g/${share.token}`, '.g-transport .playbtn'],
+      ]) {
+        await page.goto('about:blank');
+        await page.goto(url, { waitUntil: 'domcontentloaded' });
+        await page.waitForSelector(`${play}:not([disabled])`);
+        await settled();
+        await settle(page);
+        await page.$eval('.vbox video', (v) => {
+          v.loop = true;
+        });
+        await tapPicture();
+        await until(async () => !(await paused()), `${where}: a tap on the picture plays`);
+        await page.waitForSelector(`${play}.playing`);
+        assert(await page.$('[data-testid=tap-flash][data-playing]'), `${where}: the picture says it plays, for a moment`);
+        // the next tap a moment later, as a person's (two taps closer than a double tap's are one)
+        const t1 = await page.$eval('.vbox video', (v) => v.currentTime);
+        await page.waitForFunction((t1) => document.querySelector('.vbox video').currentTime > t1 + 0.4, { polling: 50, timeout: 15000 }, t1);
+        await tapPicture();
+        await until(paused, `${where}: the next tap pauses`);
+        assert(await page.$('[data-testid=tap-flash]:not([data-playing])'), `${where}: … and says so`);
+        // a double tap: one play, not a play and a pause at once (after the time a double tap takes: that time is what
+        // tells it from two taps, SidewaysBar.tsx DOUBLE_MS)
+        await page.$eval('.vbox video', (v) => {
+          window.__pauses = 0;
+          v.addEventListener('pause', () => window.__pauses++);
+        });
+        await sleep(400);
+        const c = await center('.vbox');
+        // counted from here: the last tap's own pause event comes a task after `paused` turns
+        await page.evaluate(() => {
+          window.__pauses = 0;
+        });
+        // two taps made 60 ms apart (the touches carry when they were made: a loaded machine delivers them later)
+        const cdp = await page.createCDPSession();
+        const made = Date.now() / 1000;
+        const touch = (type, at) =>
+          cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x: c.x, y: c.y }], timestamp: made + at });
+        await touch('touchStart', 0);
+        await touch('touchEnd', 0.02);
+        await touch('touchStart', 0.06);
+        await touch('touchEnd', 0.08);
+        await cdp.detach();
+        const t0 = await page.$eval('.vbox video', (v) => v.currentTime);
+        await page.waitForFunction((t0) => document.querySelector('.vbox video').currentTime > t0 + 0.3, { polling: 50, timeout: 15000 }, t0);
+        const after = await page.$eval('.vbox video', (v) => ({ pauses: window.__pauses, paused: v.paused, at: v.currentTime }));
+        assert(after.pauses === 0 && !after.paused, `${where}: a double tap plays and keeps playing: ${JSON.stringify({ t0, ...after })}`);
+        await page.$eval(play, (b) => b.click());
+        await until(paused, `${where}: paused by its button`);
+        // a drawing tool in hand: a tap draws (or starts to), it never plays
+        if (where === 'player') {
+          await tapText('.nsheet button.primary', 'Note');
+          await page.waitForSelector('.composer textarea');
+          await page.waitForSelector('[data-testid=draw-bar] .btn.on');
+        } else {
+          await tap('[data-testid=draw-bar] button[aria-label="Box"]');
+          await page.waitForSelector('[data-testid=draw-bar] button[aria-label="Box"].on');
+        }
+        await settle(page);
+        await tapHandled();
+        assert(await paused(), `${where}: with a drawing tool in hand a tap on the picture doesn't play`);
+        if (where === 'player') {
+          await page.$eval('.composer-close', (b) => b.click());
+          await page.waitForFunction(() => !document.querySelector('.composer'));
+        } else await tap('[data-testid=draw-bar] button[aria-label="Box"]');
+      }
+    },
+  );
+
+  // Valentino: "sideways: the video fills the screen, with a slim play/frame-step bar that shows on a tap and fades out
+  // (prefers-reduced-motion respected); it stays frame-exact (our player, not the native fullscreen); the notes stay
+  // reachable". Before: the title bar over a picture 332 px tall, the transport and the notes under the fold.
+  await check(
+    'held sideways the picture fills the screen; a tap brings its slim bar — frame steps ffmpeg agrees with, play — which fades while it plays; Notes scrolls to the notes',
+    async () => {
+      const share = await api(`/api/review/${encodeURIComponent(slug)}/shares`, { method: 'POST', body: JSON.stringify({ label: 'Sideways', comment: true }) });
+      const INSET = { top: 0, bottom: 21, left: 47, right: 47 };
+      const cdp = await page.createCDPSession();
+      try {
+        await page.emulate({
+          viewport: { width: 844, height: 390, deviceScaleFactor: 2, isMobile: true, hasTouch: true, isLandscape: true },
+          userAgent: IPHONE.userAgent,
+        });
+        await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: INSET });
+        const shownBar = () => page.$eval('[data-testid=sideways-bar]', (e) => e.dataset.bar === 'shown');
+        const paused = () => page.$eval('.vbox video', (v) => v.paused);
+        for (const [where, url, notes] of [
+          ['player', `${BASE}/#/v/${encodeURIComponent(slug)}`, '.player > .side'],
+          ['review link', `${BASE}/g/${share.token}`, '.g-player > .side'],
+        ]) {
+          await page.goto('about:blank');
+          await page.goto(url, { waitUntil: 'domcontentloaded' });
+          await page.waitForSelector('[data-testid=sideways-bar]');
+          await settled();
+          await settle(page);
+          const m = await page.evaluate(() => {
+            const r = (e) => {
+              const b = e.getBoundingClientRect();
+              return { l: Math.round(b.left), t: Math.round(b.top), r: Math.round(b.right), b: Math.round(b.bottom) };
+            };
+            const bar = document.querySelector('[data-testid=sideways-bar]');
+            return {
+              vw: innerWidth,
+              vh: innerHeight,
+              stage: r(document.querySelector('.stage')),
+              picture: r(document.querySelector('.vbox')),
+              buttons: [...bar.querySelectorAll('button')].map((b) => ({ name: b.getAttribute('aria-label'), ...r(b) })),
+              tools: !!bar.querySelector('[data-testid=draw-bar]'),
+              stray: [...document.querySelectorAll('[data-testid=draw-bar]')].filter((e) => !bar.contains(e)).length,
+            };
+          });
+          assert(
+            m.stage.l === 0 && m.stage.t === 0 && m.stage.r === m.vw && m.stage.b === m.vh && m.picture.t === 0 && m.picture.b === m.vh,
+            `${where}: the picture fills the screen's height: ${JSON.stringify({ stage: m.stage, picture: m.picture })}`,
+          );
+          assert(await shownBar(), `${where}: paused, its bar is up`);
+          const bad = m.buttons.filter((b) => b.r - b.l < 44 || b.b - b.t < 44 || b.l < INSET.left || b.r > m.vw - INSET.right || b.b > m.vh - INSET.bottom);
+          assert(!bad.length, `${where}: the bar's controls are a finger's size and clear the notch and the home indicator: ${JSON.stringify(bad)}`);
+          if (where === 'review link') assert(m.tools && !m.stray, `the review link's drawing tools are in the bar: ${JSON.stringify(m)}`);
+          // frame steps: our player's, checked against ffmpeg's decode (the video is V2, from frame 0)
+          for (let i = 0; i < 3; i++) await tap('[data-testid=sideways-next]');
+          await tap('[data-testid=sideways-prev]');
+          await settled();
+          await until(
+            async () => (await page.$eval('.sideways-tc', (e) => e.textContent)) === timecode(2, 30),
+            `${where}: the bar's timecode follows the steps`,
+          );
+          const best = closestFrame(video, await shownPicture(page), 2, N);
+          assert(best.k === 2, `${where}: three steps on, one back: frame 2 shows (closest ffmpeg frame ${best.k}: ${best.line})`);
+          await shot(`12-sideways-bar-${where.replace(' ', '-')}`);
+          // a tap plays: the bar stays a moment, then fades while it plays
+          await page.$eval('.vbox video', (v) => {
+            v.loop = true;
+          });
+          const c = await center('.vbox');
+          await page.touchscreen.tap(c.x, c.y);
+          await until(async () => !(await paused()), `${where}: a tap on the picture plays`);
+          assert(await shownBar(), `${where}: the tap brings the bar`);
+          await until(async () => !(await shownBar()), `${where}: playing, the bar fades`, 10000);
+          assert(!(await paused()), `${where}: … while the video plays on`);
+          // hidden, the bar takes no tap: where its Notes button stood, a tap is the picture's
+          const notesAt = m.buttons.find((b) => b.name?.startsWith('Notes') || b.name?.startsWith('Show notes'));
+          assert(notesAt, `${where}: the bar has its Notes button: ${JSON.stringify(m.buttons)}`);
+          await page.touchscreen.tap((notesAt.l + notesAt.r) / 2, (notesAt.t + notesAt.b) / 2);
+          await until(paused, `${where}: a tap where the hidden bar stood pauses the picture`);
+          assert((await page.evaluate(() => scrollY)) === 0 && (await shownBar()), `${where}: nothing scrolled; paused, the bar is back`);
+          // the notes: one tap on the bar
+          await tap('[data-testid=sideways-notes]');
+          await until(async () => (await page.$eval(notes, (e) => e.getBoundingClientRect().top)) < 390 / 3, `${where}: Notes scrolls the page to the notes`);
+          // reduced motion: the bar comes and goes at once (the app's reduced motion: no transitions)
+          const fade = await page.$eval('[data-testid=sideways-bar]', (e) => getComputedStyle(e).transitionDuration);
+          assert(fade === '0s', `${where}: with reduced motion the bar doesn't fade: ${fade}`);
+        }
+        await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
+        const fade = await page.$eval('[data-testid=sideways-bar]', (e) => parseFloat(getComputedStyle(e).transitionDuration));
+        assert(fade > 0, `without reduced motion the bar fades: ${fade}s`);
+      } finally {
+        await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+        await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { top: 0, bottom: 0, left: 0, right: 0 } });
+        await page.emulate(IPHONE);
+      }
+    },
+  );
 
   await check('the play button’s glyph stands in its middle, the triangle with its nudge: the phone’s transport and the desk’s', async () => {
     const problems = [];

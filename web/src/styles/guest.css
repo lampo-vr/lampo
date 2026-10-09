@@ -785,3 +785,20 @@
     font-size: var(--fs-2xl, 24px);
   }
 }
+/* Held sideways (a phone, lib/media.ts PHONE turned): the picture fills the screen and its bar comes with a tap
+   (player/SidewaysBar.tsx); the bar with Approve, the transport and the notes follow when scrolled. Here, after the
+   blocks above (a phone held sideways can be under 820 px wide too), so these rows are the ones that count. */
+@media (max-height: 480px) and (hover: none) and (pointer: coarse) and (orientation: landscape) {
+  .g-player.guest,
+  .g-player.guest.no-notes {
+    height: auto;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 100dvh auto auto auto;
+    grid-template-areas: 'stage' 'top' 'dock' 'side';
+  }
+  /* a link without notes ends in its foot (every area its items use is named: one left out gets a column) */
+  .g-player.guest.no-notes {
+    grid-template-areas: 'stage' 'top' 'dock' 'foot';
+  }
+}

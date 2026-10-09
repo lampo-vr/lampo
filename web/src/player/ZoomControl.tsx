@@ -1,7 +1,9 @@
 // The timeline's zoom: zoom out · the level · zoom in, and its one-time tip. It has a place of its own and never sits on
 // the timeline: in the transport row beside the speed and the sound (Transport.tsx, GuestPlayer.tsx: Timeline.tsx
-// renders it into their slot), on a phone in a quiet row above the ruler (`.tl-head`), as the reduced version — zoom in
-// alone until it is zoomed. Its state is the timeline's (Timeline.tsx); the keys (− = Z ⇧Z 0) reach it through 'vr-zoom'.
+// renders it into their slot); on a phone as one button — zoom in, and zoomed, back to the whole video (a pinch zooms
+// in between) — in the player's row of in, out, loop, speed and sound (PhoneDock.tsx), on a review link in a quiet row
+// above the ruler (`.tl-head`: its transport row is full). Its state is the timeline's (Timeline.tsx); the keys
+// (− = Z ⇧Z 0) reach it through 'vr-zoom'.
 import { type CSSProperties, type RefObject, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '../i18n/index.ts';
@@ -40,8 +42,9 @@ export interface ZoomHint {
 
 /**
  * Zoom out, the level (a click fits, or zooms to the section / the playhead), zoom in; each with its key in the tooltip,
- * in the buttons of the row it sits in. `compact` (a phone, the whole video shown): only zoom in, the level and zoom out
- * come once it is zoomed. `hint`: the first time zooming would help, a tip points at it (`ZoomTip`), until it is
+ * in the buttons of the row it sits in. `compact` (a phone, whose rows have room for one more button): one button, zoom
+ * in while the whole video shows, and once zoomed, switched on, back to the whole video (a pinch zooms further; the
+ * player's More has − and +). `hint`: the first time zooming would help, a tip points at it (`ZoomTip`), until it is
  * dismissed or the timeline is zoomed.
  */
 export function ZoomControl({
@@ -93,7 +96,24 @@ export function ZoomControl({
         data-testid="tl-zoom"
         data-level={fit ? 'fit' : level.kind === 'frames' ? `${level.n}f` : `${level.z}x`}
       >
-        {!(compact && fit) && (
+        {/* compact: two buttons in one place, each its own (keyed): the one a finger just pressed doesn't stay pressed */}
+        {compact ? (
+          fit ? (
+            <IconButton key="in" className="btn ghost icon-only" label={inWords} shortcut="=" icon="zoomIn" size={17} onClick={onIn} data-testid="tl-zoom-in" />
+          ) : (
+            <IconButton
+              key="fit"
+              className="btn ghost icon-only on"
+              label={`${toggle} · ${words}`}
+              shortcut="⇧Z"
+              icon="zoomOut"
+              size={17}
+              onClick={onToggle}
+              aria-pressed
+              data-testid="tl-zoom-fit"
+            />
+          )
+        ) : (
           <>
             <IconButton
               className="btn sm icon-only ghost"
@@ -117,18 +137,18 @@ export function ZoomControl({
                 <span>{words}</span>
               </button>
             </Tip>
+            <IconButton
+              className="btn sm icon-only ghost"
+              label={inWords}
+              tip={tip(inWords)}
+              shortcut="="
+              icon="zoomIn"
+              onClick={onIn}
+              disabled={level.kind === 'frames' && level.n <= 10}
+              data-testid="tl-zoom-in"
+            />
           </>
         )}
-        <IconButton
-          className="btn sm icon-only ghost"
-          label={inWords}
-          tip={tip(inWords)}
-          shortcut="="
-          icon="zoomIn"
-          onClick={onIn}
-          disabled={level.kind === 'frames' && level.n <= 10}
-          data-testid="tl-zoom-in"
-        />
       </fieldset>
       {/* after the control, so the control is there (its ref set) when the tip measures it */}
       {hint && <ZoomTip anchor={box} side={compact ? 'left' : 'top'} hint={hint} client={client} />}
@@ -142,8 +162,8 @@ const EDGE = 8;
 
 /**
  * The one-time tip, in the tooltips' material: a small popover pointing at the control — above it in the transport row
- * (over the picture's foot, never over the timeline), left of it in a phone's row above the ruler, where that row is
- * empty. Laid over the page (it is placed against the window, so the dock's stacking and the stage's overlays don't
+ * (over the picture's foot, never over the timeline), left of it on a phone: over the other buttons of the player's row
+ * for as long as it stands, in the empty row above the ruler on a review link. Laid over the page (it is placed against the window, so the dock's stacking and the stage's overlays don't
  * hide it); it never takes room, so nothing moves when it comes or goes.
  */
 function ZoomTip({ anchor, side, hint, client }: { anchor: RefObject<HTMLElement | null>; side: 'top' | 'left'; hint: ZoomHint; client?: boolean }) {

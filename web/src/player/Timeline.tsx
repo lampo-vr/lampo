@@ -182,9 +182,9 @@ interface TimelineProps {
   zoomMemory?: { initial: unknown; onChange: (view: View | null) => void };
   /** The client pages' words. */
   client?: boolean;
-  /** Where the zoom control goes: an element of the transport row (beside the speed and the sound), null while that
-   * element isn't there yet (nothing renders, so nothing jumps), or left out: a row of its own above the ruler (a
-   * phone). Never on the timeline itself. */
+  /** Where the zoom control goes: an element of the transport row (beside the speed and the sound; the player's row of
+   * tools under the timeline on a phone), null while that element isn't there yet (nothing renders, so nothing jumps),
+   * or left out: a row of its own above the ruler (a review link on a phone). Never on the timeline itself. */
   zoomAt?: HTMLElement | null;
   /** The zoom's one-time tip waits: something floats over the picture's foot, where it would stand (check mode's card,
    * a review walk, a recording). It comes back once that is gone, until it is dismissed or used. */

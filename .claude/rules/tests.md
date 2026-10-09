@@ -25,3 +25,7 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
   hook while a later top-level await is pending (`test-files.test.ts`).
 - Tests never run the real `claude` CLI or send mail: the harness's stand-in and the outbox transport.
 - Review a screen with real-shaped data (`test/e2e/lib/insightsStore.ts`) at 390–1920, both themes.
+- A double tap goes through CDP's `Input.dispatchTouchEvent` with each touch's `timestamp`: sent one by one, a loaded
+  machine delivers them apart, and the page's `timeStamp`s follow the stamps (`mobile.mjs`).
+- A row that must fit a phone is also checked with letters a little wider (`letter-spacing: 0.04em`): Linux sets them
+  wider than a Mac, and CI's 390 px overflowed by 6 px where the Mac's fit (`record.mjs`, `zoom.mjs`).
