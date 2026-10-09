@@ -8,6 +8,7 @@
 // a restore), and no answer at all while the log can't be read.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { after, test } from 'node:test';
 import type { CloudModule } from '../../server/extension.ts';
@@ -249,4 +250,51 @@ test('an erasure log that can’t be written refuses the deletion before anythin
   const again = await request('POST', '/api/workspaces/current/delete', { body: { name: 'Heron Films' }, headers: { Cookie: cookieFrom(login), ...origin } });
   assert.equal(again.status, 200, again.text);
   assert.equal(await erased(D), true);
+});
+
+test('the log written but the registry refusing (its lock held): not erased, and a billing round leaves it alone', async () => {
+  const eve = await auth.createUser({ email: 'eve@example.com', name: 'Eve Marsh', password: PASSWORD, role: 'member' });
+  const E = ws.createWorkspace({ name: 'Wren Studio', ownerId: eve.id }).id;
+  if (ws.roleIn('w1', eve.id)) ws.removeMember('w1', eve.id);
+  await objectIn(E, 'v1.mp4');
+  const login = await request('POST', '/api/auth/login', { body: { email: 'eve@example.com', password: PASSWORD }, headers: origin });
+  assert.equal(login.status, 200, login.text);
+  const before = heard.length;
+  // the registry's lock held by another live process (this test's parent): the deletion's line goes to the log, then
+  // the registry refuses after its wait
+  const lock = path.join(path.dirname(ws.WORKSPACES_FILE), '.workspaces', '.lock');
+  fs.mkdirSync(lock, { recursive: true });
+  fs.writeFileSync(path.join(lock, 'owner'), `${process.ppid}@${os.hostname()}`);
+  let r!: Awaited<ReturnType<typeof request>>;
+  try {
+    r = await request('POST', '/api/workspaces/current/delete', { body: { name: 'Wren Studio' }, headers: { Cookie: cookieFrom(login), ...origin } });
+  } finally {
+    fs.rmSync(lock, { recursive: true, force: true });
+  }
+  assert.equal(r.status, 503, r.text);
+  assert.ok(
+    listErasures().some((e) => e.kind === 'workspace' && e.id === E),
+    'the log took the line before the registry refused',
+  );
+  assert.ok(ws.getWorkspace(E), 'still in the registry: its people work on');
+  assert.equal(await erased(E), false, 'a workspace the registry still has is not erased');
+  // the module's hourly round cancels only what the host says is erased (=== true): nothing here
+  const cancelled = [E, B].filter((w) => erased(w) === true);
+  assert.deepEqual(cancelled, [B], 'only the workspace that went');
+  await ctx.extension.idle();
+  assert.equal(heard.length, before, 'billing heard nothing');
+  assert.equal(objectsOf(E).length, 1, 'its files stay');
+  // a logged workspace whose registry can't be read gets no answer
+  const kept = fs.readFileSync(ws.WORKSPACES_FILE);
+  try {
+    fs.writeFileSync(ws.WORKSPACES_FILE, 'not json');
+    await assert.rejects(async () => erased(E));
+  } finally {
+    fs.writeFileSync(ws.WORKSPACES_FILE, kept, { mode: 0o600 });
+  }
+  // deleting it again finishes it, and then it is erased
+  const again = await request('POST', '/api/workspaces/current/delete', { body: { name: 'Wren Studio' }, headers: { Cookie: cookieFrom(login), ...origin } });
+  assert.equal(again.status, 200, again.text);
+  assert.equal(ws.getWorkspace(E), null);
+  assert.equal(await erased(E), true);
 });

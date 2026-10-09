@@ -352,8 +352,9 @@ outside this repository. What such a module may do:
   module's sentence ([api.md](api.md#workspaces-and-plan-limits)). Reviewing, notes, answers, approvals, downloads and the review links
   already sent keep working, and nothing is ever deleted for a plan.
 - **Hear** a workspace made or deleted and a member count changed (after the fact, never in the way), and **ask** whether
-  a workspace it bills was deleted: the erasure log's answer, so a deletion whose message was lost still ends its billing,
-  and a workspace merely missing from the list (a damaged file, a restore) never does.
+  a workspace it bills was deleted: yes only when the erasure log records it and the list of workspaces no longer has it,
+  so a deletion whose message was lost still ends its billing, while a workspace merely missing from the list (a damaged
+  file, a restore) or one whose deletion stopped before it left the list (it still works) never does.
 - **Let a workspace hide the badge.** Review links and embeds show a small *Powered by Lampo*; a module may let a
   workspace's owners and admins hide it (Settings → Review links, on a paid plan). Without a module it always shows.
 - **Answer a sign-up** in place of the server's own: it places the person exactly as the server would ([Sign-up

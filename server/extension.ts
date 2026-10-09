@@ -16,8 +16,8 @@
 // keep working, and nothing is ever deleted for billing reasons.
 // What it hears (after the fact, never blocking): a workspace created, a workspace's member count changed, a workspace
 // deleted (the module stops billing it and forgets its state).
-// What it may ask: whether a workspace it bills was deleted (`workspaceErased`: the erasure log's word, for a deletion
-// whose hook it never heard).
+// What it may ask: whether a workspace it bills was deleted (`workspaceErased`: on record in the erasure log and gone
+// from the registry, for a deletion whose hook it never heard).
 // What it may do: answer a sign-up (`onSignup`, in place of server/signup.ts — it places the person through the host's
 // `placeSignup`, then starts whatever the plan gives a newcomer), email a workspace's people through the app's mailer
 // and layout (`mail`, its own words in each language), and say it provides billing (Settings → Billing then shows
@@ -160,10 +160,12 @@ export interface HostContext {
   /** Queues a message to the workspace's people through the app's mailer; resolves with how many were queued. */
   mail(m: WorkspaceMail): Promise<number>;
   /**
-   * Whether the workspace was deleted, as the erasure log records it (lib/erasure.ts): a module's regular round stops
-   * billing it for good even when the deletion's own `deleted` hook was lost (a deletion interrupted half-way, a
-   * process stopped). True only for a recorded deletion — never for a workspace merely missing from the registry, which
-   * a blip or a restore can make; it throws when the log can't be read, so nothing is decided then.
+   * Whether the workspace was deleted: the erasure log records it (lib/erasure.ts) and the registry no longer has it. A
+   * module's regular round stops billing it for good even when the deletion's own `deleted` hook was lost (a deletion
+   * interrupted half-way, a process stopped). Never for a workspace merely missing from the registry (a blip, a
+   * restore), nor for one the log names that the registry still has (the line is written first, and a registry that
+   * then refused leaves it working). It throws when the log can't be read, and for a logged workspace when the
+   * registry can't be read, so nothing is decided then.
    */
   workspaceErased(workspace: string): boolean;
   /**
@@ -500,8 +502,9 @@ export function hostContext(o: HostOptions): HostContext {
     },
     log,
     placeSignup: async (account, opts) => placeSignupOf(account, opts),
-    // the erasure log alone, never the registry; the server's own workspace is never deleted
-    workspaceErased: (w) => typeof w === 'string' && w !== DEFAULT_WORKSPACE && erasedWorkspaces().has(w),
+    // on record in the erasure log and gone from the registry (read only for a logged one, and strictly: a registry that
+    // can't be read throws); the server's own workspace is never deleted
+    workspaceErased: (w) => typeof w === 'string' && w !== DEFAULT_WORKSPACE && erasedWorkspaces().has(w) && !workspaces.inRegistry(w),
     funnel(workspace, step, o = {}) {
       // a module's mistake is its own: anything but its two steps, a workspace that isn't one, an idle trial — nothing
       if ((step !== 'trial_end' && step !== 'plan_paid') || typeof workspace !== 'string' || !workspaces.getWorkspace(workspace)) return;

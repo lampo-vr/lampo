@@ -21,4 +21,5 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - A deletion is written down first (`writeErasure`, which throws: a log that can't take the line refuses the deletion
   whole; `recordErasure` only logs and is for what is gone already), then the registry drops it and billing is told
   (`workspaceDeleted`), before anything that can fail; what fails later is finished from the erasure log
-  (`finishDeletions`), and only the log says a workspace was erased (`workspaceErased`), never its absence from the registry.
+  (`finishDeletions`). A workspace is erased (`workspaceErased`) only when the log names it and the registry no longer
+  has it: never its absence from the registry alone, never the log line alone (written first, it outlives a refused drop).
