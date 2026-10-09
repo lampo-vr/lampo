@@ -22,6 +22,10 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - ffmpeg runs through `run` / `spawnMedia` (timeout, stderr tail), `incoming: true` for outside files; never `spawn`.
 - ffmpeg someone waits for outside the job queue (a frame, a screenshot, a reference) passes `onDemand: true`; a
   whole-video decode streams into a fixed window of frames, never holds them all; analysis heights go through `analysisRows`.
+- `run()` fails past its `maxBuffer` (`OutputTooLargeError`), never answers with the output cut: a run whose stdout is
+  its answer bounds it (`-t`, `-frames:v`), and a long input is read in windows (`decodePcm`'s `from`/`seconds`).
+- A remote store's working copy is used inside work that holds it (`heavy()`, `holdingWorkFiles`): fetched outside any
+  work, the next download's prune may take it before it is opened (and `AsyncResource.bind` hides a scope set outside).
 - A background job gets a crash-guard key (`heavy(…, { key })`, lib/crashGuard.ts): one that kills the process isn't run on every start.
 - A `select` over a list of frame numbers goes through `selectFrames` (lib/probe.ts): FFmpeg 5.1.9 / 7.1.4 / 8.0.2 and
   later refuse an expression over 100 deep, and `eq(n,a)+eq(n,b)+…` is one level per frame.

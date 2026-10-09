@@ -14,6 +14,7 @@ import { type Audience, shownTo } from '../publicError.ts';
 import { renderKey } from '../renderKey.ts';
 import { wsKey } from '../scope.ts';
 import { grabFrame } from '../shots.ts';
+import { holdingWorkFiles } from '../storage/held.ts';
 import { ensureVersionFile } from '../store.ts';
 import { posterFrame } from '../time.ts';
 import { toSrt } from '../transcript.ts';
@@ -152,12 +153,15 @@ async function encodeFor(post: Post, review: Review, ver: Version): Promise<stri
   try {
     if (fs.readFileSync(stamp, 'utf8') === key && fs.statSync(out).size > 0) return out;
   } catch {}
-  const src = await ensureVersionFile(review, ver.v);
-  if (!src) throw new Error(`V${ver.v}'s file is gone: the kit can't be made`);
-  fs.mkdirSync(dir, { recursive: true });
   const tmp = `${out}.part.mp4`;
-  // no owed work: under the workspace's cap like anyone's job (A12 PUB-4); a send waits and asks again when it is full
-  await heavy(() => run(FFMPEG, encodeArgs(src, tmp, ENCODE_SPECS[post.platform], ver)), PRIORITY.publish);
+  // the final's working copy (a remote store's) stays while the encode waits for its turn (lib/storage/held.ts)
+  await holdingWorkFiles(async () => {
+    const src = await ensureVersionFile(review, ver.v);
+    if (!src) throw new Error(`V${ver.v}'s file is gone: the kit can't be made`);
+    fs.mkdirSync(dir, { recursive: true });
+    // no owed work: under the workspace's cap like anyone's job (A12 PUB-4); a send waits and asks again when it is full
+    await heavy(() => run(FFMPEG, encodeArgs(src, tmp, ENCODE_SPECS[post.platform], ver)), PRIORITY.publish);
+  });
   const size = fs.statSync(tmp).size;
   const spec = ENCODE_SPECS[post.platform];
   if (size > spec.maxBytes) {

@@ -42,18 +42,24 @@ export function yourDataRoutes(ctx: ServerContext): Router {
   };
   const refused = (e: unknown) => (e instanceof workspaces.WorkspaceError ? failFrom(e.status, e) : e);
 
+  // A HEAD (Express answers it with this GET) gets the headers and nothing is made, so it isn't counted either: its
+  // length would take the whole export. A GET builds the files and sends the recordings' audio as it reads it.
   r.get('/api/auth/me/export', requireUser, async (req, res) => {
     const a = person(req);
     query(Nothing, req);
     const wait = exports.retryAfter(a.user.id);
     if (wait) throw Object.assign(fail(429, `you exported your data a few times this hour: try again in ${Math.ceil(wait / 60)} min`), { retryAfter: wait });
-    exports.hit(a.user.id);
-    const plan = exportZip(await accountExport(a.user.id));
     const day = new Date().toISOString().slice(0, 10);
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Length', String(plan.length));
     res.setHeader('Content-Disposition', `attachment; filename="lampo-data-${day}.zip"`);
+    if (req.method === 'HEAD') {
+      res.end();
+      return;
+    }
+    exports.hit(a.user.id);
+    const plan = exportZip(await accountExport(a.user.id));
+    res.setHeader('Content-Length', String(plan.length));
     await sendStreamed(req, res, () => plan.bytes(), 'export');
   });
 

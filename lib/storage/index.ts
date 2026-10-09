@@ -22,6 +22,7 @@ import { CACHE, NotAVideoError, type StorageConfig, VERSIONS, validSlug, workspa
 import { internal } from '../publicError.ts';
 import { currentWorkspace, DEFAULT_WORKSPACE } from '../scope.ts';
 import { createBunnyStore } from './bunny.ts';
+import { holdForWork, isHeld } from './held.ts';
 import { mediaFileUrl } from './mediaHost.ts';
 import { createS3Store } from './s3.ts';
 
@@ -194,7 +195,12 @@ function storedSize(file: string): number | null {
   }
 }
 
-function pruneWorkCache(dir: string, capBytes: number): void {
+/**
+ * Brings the working copies back within `capBytes`, least recently used first. Never one a piece of work holds
+ * (lib/storage/held.ts), nor `keep`, the copy just handed out or stored: a copy bigger than the whole budget stays until
+ * the next prune that finds it unheld.
+ */
+function pruneWorkCache(dir: string, capBytes: number, keep?: string): void {
   const files: { f: string; size: number; at: number }[] = [];
   const walk = (d: string) => {
     let entries: fs.Dirent[] = [];
@@ -216,6 +222,7 @@ function pruneWorkCache(dir: string, capBytes: number): void {
   let total = files.reduce((s, x) => s + x.size, 0);
   for (const x of files.sort((a, b) => a.at - b.at)) {
     if (total <= capBytes) break;
+    if (x.f === keep || isHeld(x.f)) continue;
     fs.rmSync(x.f, { force: true });
     total -= x.size;
   }
@@ -277,8 +284,14 @@ export function createRemoteStorage(store: RemoteStore, { workCacheBytes = 20e9,
   async function upload(key: string, file: string, contentType?: string) {
     await remote.put(key, file, contentType);
     markStored(file);
-    pruneWorkCache(workDir, workCacheBytes);
+    holdForWork(file);
+    pruneWorkCache(workDir, workCacheBytes, file);
   }
+  /** The copy as the caller's work holds it (its own `then`: a download two callers share is held by each). */
+  const held = (p: string | null): string | null => {
+    if (p) holdForWork(p);
+    return p;
+  };
 
   return {
     kind: remote.kind,
@@ -286,14 +299,15 @@ export function createRemoteStorage(store: RemoteStore, { workCacheBytes = 20e9,
     // Registered versions are uploaded before they are registered, so a key the store asks about exists remotely;
     // playback copies are known by their marker.
     has: (key) => fs.existsSync(localPath(key)) || fs.existsSync(marker(localPath(key))) || bareKey(key).startsWith('versions/'),
+    // The copy handed out is held by the work asking (until it ends) and never pruned by its own download.
     ensureLocal(key) {
       const p = localPath(key);
       if (fs.existsSync(p)) {
         touch(p);
-        return Promise.resolve(p);
+        return Promise.resolve(held(p));
       }
       const running = downloads.get(key);
-      if (running) return running;
+      if (running) return running.then(held);
       const job = (async () => {
         const tmp = `${p}.${process.pid}.tmp`;
         fs.mkdirSync(path.dirname(p), { recursive: true });
@@ -301,7 +315,8 @@ export function createRemoteStorage(store: RemoteStore, { workCacheBytes = 20e9,
           await remote.get(key, tmp);
           fs.renameSync(tmp, p);
           markStored(p);
-          pruneWorkCache(workDir, workCacheBytes);
+          holdForWork(p);
+          pruneWorkCache(workDir, workCacheBytes, p);
           return p;
         } catch (e) {
           fs.rmSync(tmp, { force: true });
@@ -310,7 +325,7 @@ export function createRemoteStorage(store: RemoteStore, { workCacheBytes = 20e9,
         }
       })().finally(() => downloads.delete(key));
       downloads.set(key, job);
-      return job;
+      return job.then(held);
     },
     // Upload first: when it fails, the caller still has its file and nothing half-done is left in the cache.
     async put(key, file, { keep = false, contentType } = {}) {
@@ -318,7 +333,8 @@ export function createRemoteStorage(store: RemoteStore, { workCacheBytes = 20e9,
       const p = localPath(key);
       moveFile(file, p, { keep });
       markStored(p);
-      pruneWorkCache(workDir, workCacheBytes);
+      holdForWork(p);
+      pruneWorkCache(workDir, workCacheBytes, p);
     },
     async commit(key, contentType) {
       await upload(key, localPath(key), contentType);

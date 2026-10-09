@@ -1,8 +1,9 @@
-// covers: server/http.ts server/routes/publish.ts server/routes/yourData.ts server/routes/downloads.ts
+// covers: server/http.ts server/routes/publish.ts server/routes/yourData.ts server/routes/downloads.ts lib/accountExport.ts
 // The zips the server makes as it sends them, on a hosted server: a publishing kit's (GET /api/posts/:id/kit/kit.zip,
 // anyone who may draft) and a person's own data (GET /api/auth/me/export), through `sendStreamed` like the folder zips.
-// A HEAD gets the headers and reads nothing; a viewer who goes away halfway ends the answer: no file stays open behind
-// it, no handler waits on for good.
+// A HEAD gets the headers and reads nothing (an export's makes nothing and isn't counted); a person's recordings go out
+// as they are read, never held whole; a viewer who goes away halfway ends the answer: no file stays open behind it, no
+// handler waits on for good.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -21,6 +22,8 @@ const posts = await import('../../lib/publish/posts.ts');
 const kit = await import('../../lib/publish/kit.ts');
 const { avatarKey } = await import('../../lib/avatars.ts');
 const { rootStorage } = await import('../../lib/storage/index.ts');
+const { audioFile, newRecordingId, saveRecording } = await import('../../lib/recordings.ts');
+const { accountExport, exportZip: planExport } = await import('../../lib/accountExport.ts');
 
 const olivia = await auth.createUser({ email: 'o@example.com', name: 'Olivia', password: 'a long password', role: 'owner' });
 const max = await auth.createUser({ email: 'm@example.com', name: 'Max', password: 'a long password', role: 'member' });
@@ -48,6 +51,13 @@ fs.mkdirSync(path.dirname(rootStorage().localPath(avatarKey(picture))), { recurs
 fs.writeFileSync(rootStorage().localPath(avatarKey(picture)), Buffer.alloc(16 * 1024 * 1024, 2));
 auth.setAvatar(max.id, picture);
 const exportZip = '/api/auth/me/export';
+// … and his recordings not sent yet, each with its audio
+const recorded = Array.from({ length: 4 }, (_, i) => {
+  const id = newRecordingId();
+  saveRecording({ id, slug, v: 1, by: 'Max', by_id: max.id, created: '2026-10-09T10:00:00+02:00', duration: 4, state: 'ready', drafts: [], events: [] });
+  fs.writeFileSync(audioFile(slug, id), Buffer.alloc(8 * 1024 * 1024, 3 + i));
+  return audioFile(slug, id);
+});
 
 interface Got {
   status: number;
@@ -97,13 +107,68 @@ test('a HEAD of the kit’s zip answers its headers and reads none of its files;
   assert.equal(full.got.bytes, length, 'every byte of the zip');
 });
 
-test('a HEAD of a person’s export answers its headers and sends nothing', async () => {
-  const h = await send(exportZip, asMax, 'HEAD');
-  assert.equal(h.status, 200);
-  assert.equal(h.headers['content-type'], 'application/zip');
-  assert.equal(h.headers['cache-control'], 'no-store');
-  assert.ok(Number(h.headers['content-length']) > 16 * 1024 * 1024, 'the picture is in it');
-  assert.equal(h.bytes, 0);
+/** Every read of `files` while `fn` runs: whole (readFileSync) or as a stream. */
+async function filesReadDuring<T>(files: string[], fn: () => Promise<T>): Promise<{ got: T; whole: string[]; streamed: string[] }> {
+  const whole: string[] = [];
+  const streamed: string[] = [];
+  const m = fs as { readFileSync: typeof fs.readFileSync; createReadStream: typeof fs.createReadStream };
+  const [readFileSync, createReadStream] = [m.readFileSync, m.createReadStream];
+  m.readFileSync = ((...a: Parameters<typeof fs.readFileSync>) => {
+    if (files.includes(String(a[0]))) whole.push(String(a[0]));
+    return readFileSync.apply(fs, a);
+  }) as typeof fs.readFileSync;
+  m.createReadStream = ((...a: Parameters<typeof fs.createReadStream>) => {
+    if (files.includes(String(a[0]))) streamed.push(String(a[0]));
+    return createReadStream.apply(fs, a);
+  }) as typeof fs.createReadStream;
+  try {
+    return { got: await fn(), whole, streamed };
+  } finally {
+    m.readFileSync = readFileSync;
+    m.createReadStream = createReadStream;
+  }
+}
+
+test('a HEAD of a person’s export answers its headers, makes nothing and counts for nothing', async () => {
+  const pictureFile = rootStorage().localPath(avatarKey(picture));
+  const { got, whole, streamed } = await filesReadDuring([pictureFile, ...recorded], async () => {
+    const heads: Got[] = [];
+    // more than the hour's exports: none of them is one
+    for (let i = 0; i < 8; i++) heads.push(await send(exportZip, asMax, 'HEAD'));
+    return heads;
+  });
+  for (const h of got) {
+    assert.equal(h.status, 200);
+    assert.equal(h.headers['content-type'], 'application/zip');
+    assert.equal(h.headers['cache-control'], 'no-store');
+    assert.match(String(h.headers['content-disposition']), /^attachment; filename="lampo-data-\d{4}-\d\d-\d\d\.zip"$/);
+    assert.equal(h.bytes, 0);
+  }
+  assert.deepEqual([...whole, ...streamed], [], 'neither the picture nor any audio was read');
+  const r = await send(exportZip, asMax);
+  assert.equal(r.status, 200, 'the HEADs left the export for a GET');
+  assert.equal(r.bytes, Number(r.headers['content-length']));
+});
+
+test('a person’s recordings go out as they are read: none is held in memory, none read before the zip is sent', async () => {
+  const { got: plan, whole, streamed } = await filesReadDuring(recorded, async () => planExport(await accountExport(max.id)));
+  assert.deepEqual([...whole, ...streamed], [], 'planning the zip read no audio');
+  assert.ok(plan.length > 4 * 8 * 1024 * 1024, 'the audio is in it');
+  const sent = await filesReadDuring(recorded, async () => {
+    const chunks: Buffer[] = [];
+    for await (const c of plan.bytes()) chunks.push(Buffer.from(c));
+    return Buffer.concat(chunks);
+  });
+  assert.deepEqual(sent.whole, [], 'never read whole');
+  assert.deepEqual(sent.streamed.sort(), [...recorded].sort(), 'each streamed once');
+  assert.equal(sent.got.length, plan.length);
+  // each audio file is in the zip as it is, after its local header
+  for (const [i, f] of recorded.entries()) {
+    const at = sent.got.indexOf(Buffer.from(`recordings/${path.basename(f)}`));
+    assert.ok(at > 0, `${path.basename(f)} is named in the zip`);
+    const data = sent.got.indexOf(Buffer.alloc(1024, 3 + i), at);
+    assert.ok(data > at && sent.got.subarray(data, data + 8 * 1024 * 1024).equals(Buffer.alloc(8 * 1024 * 1024, 3 + i)), 'its bytes follow whole');
+  }
 });
 
 /** Asks for `url` and goes away once the first bytes are in, as a closed tab does. */

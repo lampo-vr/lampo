@@ -102,6 +102,7 @@ export function createReviewServer(options: ReviewServerOptions): McpServer {
       principal: o.principal,
       allowed: (a) => allowed(o.principal, a),
       activity: kit.activity,
+      frameGrabs: o.frameGrabs,
     });
 
   const readInbox = async (uri: URL) => {

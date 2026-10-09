@@ -83,6 +83,20 @@ format stays backwards compatible throughout.
   and every line of the agents' activity leave out what looks like a password, a token or a key.
 - An app signing in to a hosted server is told only that something went wrong (with a reference to quote) when the
   server itself fails, never details of the server.
+- Recorded feedback keeps no more audio than a recording may hold: audio that runs longer is refused with a plain
+  message instead of being stored, and a recording's audio is turned away while the server is short of disk space.
+- Export my data sends your recordings' audio as it reads it instead of loading it all first, so a large export no
+  longer weighs on the server; asking only for the export's headers makes nothing and no longer counts as an export.
+- On a server that keeps its videos in Bunny or S3, work on two versions at once (comparing them, a partial render
+  and its full one) no longer fails when the server's local copies have little room: what a piece of work fetched stays
+  until it is done, and a video bigger than all that room is kept while it is used instead of fetched again each time.
+- A video longer than half an hour gets a transcript to its end: what was said after the first half hour was missing,
+  with nothing to show the transcript stopped early. Such transcripts made before are heard again the next time they
+  are asked for; shorter ones stay as they are.
+- The review card an agent shows over MCP counts the new frames it grabs toward the account's limit, like every other
+  way of asking for a frame.
+- Stopping an agent Lampo started on your machine, or a `lampo render`, now ends everything it started, also what
+  keeps running after the agent or the render tool itself has ended; quitting the app ends them too, and waits for it.
 
 ## [0.2.0] - 2026-10-08
 

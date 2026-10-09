@@ -26,12 +26,20 @@ import { readViews } from './views.ts';
 import * as workspaces from './workspaces.ts';
 import { planZip, type ZipPlan } from './zip.ts';
 
-export interface ExportFile {
+/** A file the export makes itself: the JSON files, the README, the picture (small). */
+export interface MadeFile {
   name: string;
   data: Buffer;
 }
+/** A file on this disk, sent as it is read (a recording's audio): never all of them in memory, none read before the zip goes. */
+export interface DiskFile {
+  name: string;
+  path: string;
+  size: number;
+}
+export type ExportFile = MadeFile | DiskFile;
 
-const json = (name: string, value: unknown): ExportFile => ({ name, data: Buffer.from(`${JSON.stringify(value, null, 2)}\n`) });
+const json = (name: string, value: unknown): MadeFile => ({ name, data: Buffer.from(`${JSON.stringify(value, null, 2)}\n`) });
 
 /** A video as the export names it: its id, its name and its folder (never a path on the server). */
 const videoOf = (r: Review) => ({ id: r.id ?? null, name: r.video.split('/').pop() ?? r.video, folder: r.folder });
@@ -145,7 +153,7 @@ export async function accountExport(userId: string): Promise<ExportFile[]> {
       const replies: unknown[] = [];
       const drafts: unknown[] = [];
       const recordings: unknown[] = [];
-      const audio: ExportFile[] = [];
+      const audio: DiskFile[] = [];
       const verdicts: unknown[] = [];
       const watching: unknown[] = [];
       const uploads: unknown[] = [];
@@ -166,7 +174,8 @@ export async function accountExport(userId: string): Promise<ExportFile[]> {
           const { by: _by, by_id: _id, ...shown } = publicRecording(rec);
           recordings.push({ video, ...shown });
           const file = audioFile(slug, rec.id);
-          if (fs.existsSync(file)) audio.push({ name: `${dir}/recordings/${rec.id}.m4a`, data: fs.readFileSync(file) });
+          const size = sizeOf(file);
+          if (size !== null) audio.push({ name: `${dir}/recordings/${rec.id}.m4a`, path: file, size });
         }
         for (const a of r.approvals ?? []) if (a.party === 'team' && a.by === name) verdicts.push({ video, v: a.v, status: a.status, at: a.at, note: a.note });
         for (const run of readRuns(slug))
@@ -218,17 +227,39 @@ export async function accountExport(userId: string): Promise<ExportFile[]> {
   return files;
 }
 
-/** The files as one store-only zip, every byte known up front. */
+function sizeOf(file: string): number | null {
+  try {
+    return fs.statSync(file).size;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The files as one store-only zip, its length known up front: what was made here with its CRC, a file on this disk
+ * read only while the zip is sent, its CRC after it (a data descriptor, lib/zip.ts). A file that changes meanwhile
+ * (a recording sent or discarded) ends the zip with an error rather than a wrong entry.
+ */
 export function exportZip(files: ExportFile[], at = new Date()): ZipPlan {
   return planZip(
-    files.map((f) => ({
-      name: f.name,
-      size: f.data.length,
-      crc: zlib.crc32(f.data),
-      mtime: at,
-      async *read(start: number, end: number) {
-        yield f.data.subarray(start, end + 1);
-      },
-    })),
+    files.map((f) =>
+      'data' in f
+        ? {
+            name: f.name,
+            size: f.data.length,
+            crc: zlib.crc32(f.data),
+            mtime: at,
+            async *read(start: number, end: number) {
+              yield f.data.subarray(start, end + 1);
+            },
+          }
+        : {
+            name: f.name,
+            size: f.size,
+            crc: null,
+            mtime: at,
+            read: (start: number, end: number) => fs.createReadStream(f.path, { start, end, highWaterMark: 1 << 20 }),
+          },
+    ),
   );
 }

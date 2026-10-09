@@ -7,7 +7,9 @@ import type { FrameRange, TextEdit, Transcript, TranscriptLine, TranscriptRepair
 
 // 2: invented lines dropped and collapsed windows heard again (lib/stt/collapse.ts) — older transcripts may miss speech,
 // so they are heard again the next time someone asks.
-export const TRANSCRIPT_VERSION = 2;
+// 3: a render longer than half an hour is heard to its end (lib/stt hears long audio in windows). A version-2 transcript
+// of a render that long stopped there and is heard again; a shorter one is complete and kept (lib/transcripts.ts).
+export const TRANSCRIPT_VERSION = 3;
 
 /** What an engine gives back: timed words when it can, else only timed segments (sentences). Seconds. */
 export interface HeardWord {

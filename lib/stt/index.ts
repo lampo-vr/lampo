@@ -135,19 +135,56 @@ export function stopStt(): void {
   listener?.stop();
 }
 
-/** Mono 16 kHz float PCM, the format every engine takes. */
-export async function decodePcm(file: string): Promise<Float32Array> {
-  const { stdout } = await run(FFMPEG, ['-v', 'error', '-i', file, '-vn', '-ac', '1', '-ar', '16000', '-f', 'f32le', 'pipe:1'], {
-    maxBuffer: 16000 * 4 * 60 * 30,
-  });
-  return new Float32Array(stdout.buffer.slice(stdout.byteOffset, stdout.byteOffset + stdout.length - (stdout.length % 4)));
+const RATE = 16000;
+/**
+ * How much of a file's audio is decoded and heard at once: 30 minutes of 16 kHz float PCM is 115 MB, held while the
+ * engine hears it. A longer file is heard window after window, never cut at the first.
+ */
+export const PCM_WINDOW_SECONDS = 1800;
+/** The most windows one file is heard in (a day of audio): past that it is refused, never heard in part. */
+export const PCM_WINDOWS_MAX = 48;
+
+/**
+ * Mono 16 kHz float PCM, the format every engine takes: `seconds` of the file from `from` on, and never more (what
+ * follows is the next window's; run() fails rather than cut an answer short).
+ */
+export async function decodePcm(file: string, { from = 0, seconds = PCM_WINDOW_SECONDS }: { from?: number; seconds?: number } = {}): Promise<Float32Array> {
+  const seek = from > 0 ? ['-ss', from.toFixed(3)] : [];
+  const { stdout } = await run(
+    FFMPEG,
+    ['-v', 'error', ...seek, '-i', file, '-t', String(seconds), '-vn', '-ac', '1', '-ar', String(RATE), '-f', 'f32le', 'pipe:1'],
+    {
+      // what -t lets through, and a frame of the resampler's slack
+      maxBuffer: Math.ceil(seconds * RATE) * 4 + 64 * 1024,
+    },
+  );
+  const samples = Math.min(Math.floor(stdout.length / 4), Math.round(seconds * RATE));
+  return new Float32Array(stdout.buffer.slice(stdout.byteOffset, stdout.byteOffset + samples * 4));
+}
+
+/**
+ * A file's audio window after window (where each starts, in seconds, and its samples) until it ends: one window in
+ * memory at a time. Throws past PCM_WINDOWS_MAX windows.
+ */
+async function* pcmWindows(file: string): AsyncGenerator<{ from: number; pcm: Float32Array }> {
+  for (let i = 0; ; i++) {
+    const from = i * PCM_WINDOW_SECONDS;
+    const pcm = await decodePcm(file, { from });
+    if (pcm.length || i === 0) yield { from, pcm };
+    // a window short of full (a second's slack for the resampler) was the last
+    if (pcm.length < (PCM_WINDOW_SECONDS - 1) * RATE) return;
+    if (i + 1 >= PCM_WINDOWS_MAX) throw new Error(`the audio runs longer than ${(PCM_WINDOWS_MAX * PCM_WINDOW_SECONDS) / 3600} hours: too long to hear`);
+  }
 }
 
 // A first voice note may have to wait for the model download; it gets this long before it is saved without a
 // transcript (the download carries on for the next one).
 const FIRST_USE_WAIT_MS = 20_000;
 
-/** Transcript of an audio file; '' for silence; null when no engine is available or it failed (logged). */
+/**
+ * Transcript of an audio file (a voice note: its first window, PCM_WINDOW_SECONDS, is heard); '' for silence; null when
+ * no engine is available or it failed (logged).
+ */
 export async function transcribeFile(file: string, s: SttSettings, log: (m: string) => void = console.error): Promise<string | null> {
   if (!sttAvailable(s)) return null;
   try {
@@ -221,11 +258,43 @@ export async function transcribeTimed(
   }
 }
 
+/** What was heard in a window, on the whole file's clock (`from`: where the window starts, in seconds). */
+function shifted(t: TimedTranscript, from: number): TimedTranscript {
+  if (!from) return t;
+  const on = <T extends { t0: number; t1: number }>(x: T): T => ({ ...x, t0: x.t0 + from, t1: x.t1 + from });
+  return { ...t, words: t.words.map(on), segments: t.segments.map(on), ...(t.repairs ? { repairs: t.repairs.map(on) } : {}) };
+}
+
+/**
+ * The file heard window after window (pcmWindows), each on the file's clock, joined in order: a window that is silence
+ * adds nothing, a failing one fails the whole (nothing heard in part is kept as if it were all). One window (every file
+ * up to PCM_WINDOW_SECONDS) is heard exactly as it always was.
+ */
 async function heardTimed(file: string, s: SttSettings, log: (m: string) => void, opts: { repair?: boolean }): Promise<TimedTranscript> {
-  const pcm = await decodePcm(file);
-  const seconds = pcm.length / 16000;
-  if (isSilent(pcm))
+  const parts: TimedTranscript[] = [];
+  for await (const { from, pcm } of pcmWindows(file)) {
+    if (isSilent(pcm)) continue;
+    parts.push(shifted(await heardWindow(pcm, s, log, opts), from));
+  }
+  const [first] = parts;
+  if (!first)
     return { text: '', language: '', words: [], segments: [], engine: s.backend === 'http' ? `http:${s.http?.model || 'whisper-1'}` : `local:${s.model}` };
+  if (parts.length === 1) return first;
+  const repairs = parts.flatMap((p) => p.repairs ?? []);
+  return {
+    text: joined(parts),
+    language: parts.find((p) => p.language)?.language ?? '',
+    words: parts.flatMap((p) => p.words),
+    segments: parts.flatMap((p) => p.segments),
+    engine: first.engine,
+    ...(parts.some((p) => p.timing === 'line') ? { timing: 'line' as const } : {}),
+    ...(repairs.length ? { repairs } : {}),
+  };
+}
+
+/** One window's audio heard, timed on its own clock (heardTimed puts it on the file's). */
+async function heardWindow(pcm: Float32Array, s: SttSettings, log: (m: string) => void, opts: { repair?: boolean }): Promise<TimedTranscript> {
+  const seconds = pcm.length / 16000;
   const policy = { languages: s.languages, seconds, timed: true };
   const heard = (r: SttResult, engine: string): TimedTranscript & { dropped: Dropped[] } => {
     const { segments, words, dropped } = dropHallucinations(r);

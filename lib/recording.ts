@@ -20,6 +20,8 @@ import type { FrameRange, Point, RecordingDraft, RecordingEvent, Shape } from '.
 /** A recording is at most ten minutes; its event log at most this many entries. */
 export const RECORDING_MAX_SECONDS = 600;
 export const RECORDING_MAX_EVENTS = 40_000;
+/** Its audio as it is sent: ten minutes of a 48 kHz mono WAV fit (what browsers record is compressed, far smaller). */
+export const RECORDING_MAX_BYTES = 64 * 2 ** 20;
 /** How often the recorder writes down the frame while the video plays (seconds), and the pointer (while over it). */
 export const FRAME_SAMPLE = 0.05;
 export const POINTER_SAMPLE = 0.1;

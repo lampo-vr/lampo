@@ -773,7 +773,9 @@ V4 rendered in 3m12s and put up for review (900 frames). Now mark each note fixe
 
 - **What runs:** your command, as an argument list after `--`, on your machine: never through a shell, never on a
   server. It runs in a process group of its own with stdin closed, so Ctrl-C (or a stop) reaches everything it
-  started; a second Ctrl-C kills it.
+  started: what is still there after 5 seconds gets SIGTERM, and SIGKILL 5 seconds after that, also once your
+  command itself has ended (a background job it started), and `lampo render` returns when all of it has; a second
+  Ctrl-C kills it at once.
 - **What it reads:** Remotion (`npx remotion render`, `remotion render`): bundling, rendering and encoding, from the
   lines it prints when its output isn't a terminal. ffmpeg: `lampo render` adds `-progress pipe:3 -nostats` (progress
   flags only; a command that names its own `-progress` keeps it) and measures against the length your arguments give
@@ -910,10 +912,11 @@ The prompt is one line, for example:
   added under the older key is `mcp__video-review__…`.
 - **Limits:** one run per session at a time, stopped after 30 minutes without a sign of it (no output, no call to Lampo:
   `LAMPO_AGENT_RUN_TIMEOUT`, in seconds) and after 3 hours in all; five starts per ten minutes. Stop asks first (SIGINT,
-  as Ctrl-C does), then SIGTERM after 5 seconds, then SIGKILL, always to the run's whole process group. It carries
+  as Ctrl-C does), then SIGTERM after 5 seconds, then SIGKILL, always to the run's whole process group, as long as
+  anything of it is left, also after the run itself has ended. It carries
   `LAMPO_RUN=<run id>` in its environment, and `lampo` and the stdio MCP server name that run with what they report. The person sees the run working in the agent menu, with **Stop** (it ends the run and everything it
   started) and **Log** (`cache/agent-runs/<run>.log`: the run's whole transcript, so readable by you only). A run ends
-  when the app quits.
+  when the app quits, in shorter steps, and the app waits until all of its group has ended.
 - **The request is still a `REQUEST` line**, as always: do the work the usual way and finish with the next render (or
   your answer). `lampo watch` also prints the run's start and end:
 

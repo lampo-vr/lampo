@@ -13,6 +13,7 @@ import { FFMPEG, MEDIA_TIMEOUT_MS, run } from './probe.ts';
 import { renderKey } from './renderKey.ts';
 import { wsKey } from './scope.ts';
 import { seekTime } from './shots.ts';
+import { holdForWork, holdingWorkFiles } from './storage/held.ts';
 import { storage } from './storage/index.ts';
 import * as store from './store.ts';
 import type { MediaMeta, PartSeam, Review, Version, VersionPart } from './types.ts';
@@ -212,8 +213,13 @@ export function ensureSplice(review: Review, ver: Version): Promise<string> {
   const job = wsKey(key);
   const s = storage();
   const running = inflight.get(job);
-  if (running) return running;
-  const p = (async () => {
+  if (running)
+    return running.then((f) => {
+      holdForWork(f);
+      return f;
+    });
+  // its inputs stay among the working copies until it is made (lib/storage/held.ts): it runs outside the job queue
+  const p = holdingWorkFiles(async () => {
     if (s.has(key)) {
       const hit = await s.ensureLocal(key);
       if (hit) return hit;
@@ -247,7 +253,7 @@ export function ensureSplice(review: Review, ver: Version): Promise<string> {
     }
     await s.commit(key, 'video/mp4');
     return out;
-  })().finally(() => inflight.delete(job));
+  }).finally(() => inflight.delete(job));
   inflight.set(job, p);
   return p;
 }

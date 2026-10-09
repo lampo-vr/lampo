@@ -262,7 +262,7 @@ test('what a person asked of agents is in their own export, and nobody else’s'
   assert.equal((await request('POST', `/api/review/${enc(budget())}/request`, { body: { text: 'Make the logo bigger' }, headers: as.mia })).status, 200);
   assert.equal((await request('POST', `/api/review/${enc(budget())}/request`, { body: { text: 'And warmer' }, headers: as.mia })).status, 200);
   const file = (await accountExport(ids.mia as string)).find((f) => f.name === 'workspaces/w1/agent-requests.json');
-  assert.ok(file, 'the file is there');
+  assert.ok(file && 'data' in file, 'the file is there');
   const asked = JSON.parse(file.data.toString()) as { text: string; agent: string; video: { name: string } }[];
   assert.deepEqual(
     asked.map((a) => a.text),
@@ -270,7 +270,7 @@ test('what a person asked of agents is in their own export, and nobody else’s'
   );
   assert.equal(asked[0]?.video.name, 'budget.mp4');
   const eves = (await accountExport(ids.eve as string)).find((f) => f.name === 'workspaces/w1/agent-requests.json');
-  assert.deepEqual(JSON.parse(eves?.data.toString() ?? '[]'), []);
+  assert.deepEqual(JSON.parse(eves && 'data' in eves ? eves.data.toString() : '[]'), []);
 });
 
 test('runs people sent that nobody picked up are bounded per video: the one waiting longest makes room', async () => {

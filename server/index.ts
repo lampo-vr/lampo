@@ -312,7 +312,8 @@ async function stop(sig: NodeJS.Signals) {
     if (!(await drain(ctx.inflight, 30_000))) console.error('stopping: gave up waiting after 30 s');
   }
   ctx.tunnel.stop();
-  ctx.agentRuns.stopAll();
+  // the agents Lampo started end with it, and whatever they left running too: waited for, in short steps
+  await ctx.agentRuns.stopAll();
   // agents' runs not written yet (their steps go out together, about a second after they happen)
   ctx.runs.flushAll();
   stopStt();
@@ -325,6 +326,7 @@ process.on('SIGTERM', stop);
 process.on('SIGINT', stop);
 process.on('exit', () => {
   ctx.tunnel.stop();
-  ctx.agentRuns.stopAll();
+  // an exit that didn't come through stop(): nothing is waited for any more, so at once (after stop(), nothing is left)
+  ctx.agentRuns.endNow();
   stopStt();
 });

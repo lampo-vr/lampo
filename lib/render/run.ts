@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
+import { type GroupStop, groupAlive, stopGroup } from '../processGroup.ts';
 import {
   aerenderReader,
   blenderFrames,
@@ -28,12 +29,17 @@ const PROGRESS_FD = 3;
 const TAIL_LINES = 200;
 /** A known tool that hasn't said how far it is by then: the output file's size stands in. */
 const QUIET_MS = 5000;
+/** A stop: the signal asked for, SIGTERM this long after, SIGKILL as long after that (lib/processGroup.ts). */
+const STOP_GRACE_MS = 5000;
 
 export interface ToolRun {
   /** The process (group) id, once it started. */
   pid: number | undefined;
   tool: RenderTool | null;
-  /** Sends a signal to the whole render: the tool and everything it started. */
+  /**
+   * Stops the whole render, the tool and everything it started: `sig` first, then SIGTERM and SIGKILL to whatever of its
+   * group is left (SIGKILL: at once). `done` then waits for the group to end.
+   */
   signal(sig: NodeJS.Signals): void;
   done: Promise<ToolResult>;
 }
@@ -61,6 +67,8 @@ export interface ToolRunOptions {
   echo?: (chunk: Buffer) => void;
   /** An input's length and rate (ffprobe), for ffmpeg's total. */
   probe?: (file: string) => Promise<{ duration: number; fps: number } | null>;
+  /** A stop's steps apart (STOP_GRACE_MS; tests shorten it). */
+  stopGraceMs?: number;
 }
 
 /** The output's size: a file's, or the files' in a folder of frames (one level). Null when there is nothing yet. */
@@ -193,6 +201,10 @@ export function runTool(o: ToolRunOptions): ToolRun {
   }, 1000);
   ticker.unref();
 
+  // a stop under way: the render has ended only once its whole group has (whatever the tool left behind is stopped too)
+  let stopping: GroupStop | null = null;
+  // the group seen empty after the tool ended: never signalled again (its id may be another's by then)
+  let gone = false;
   const done = new Promise<ToolResult>((resolve) => {
     let settled = false;
     const finish = (code: number, signal: NodeJS.Signals | null, startError?: string) => {
@@ -201,7 +213,10 @@ export function runTool(o: ToolRunOptions): ToolRun {
       clearInterval(ticker);
       outLines.end();
       errLines.end();
-      resolve({ code, signal, ...(startError ? { startError } : {}), tail, elapsedMs: Date.now() - started });
+      void (stopping?.done ?? Promise.resolve()).then(() => {
+        if (!child.pid || !group || !groupAlive(child.pid)) gone = true;
+        resolve({ code, signal, ...(startError ? { startError } : {}), tail, elapsedMs: Date.now() - started });
+      });
     };
     child.on('error', (e: NodeJS.ErrnoException) => {
       const why = e.code === 'ENOENT' ? `command not found: ${cmd}` : e.code === 'EACCES' ? `not allowed to run ${cmd}` : e.message;
@@ -227,15 +242,15 @@ export function runTool(o: ToolRunOptions): ToolRun {
     pid: child.pid,
     tool,
     signal(sig) {
-      if (!child.pid) return;
-      try {
-        if (group) process.kill(-child.pid, sig);
-        else child.kill(sig);
-      } catch {
+      if (!child.pid || gone) return;
+      if (!group) {
         try {
           child.kill(sig);
         } catch {}
+        return;
       }
+      if (!stopping) stopping = stopGroup(child.pid, { first: sig, graceMs: o.stopGraceMs ?? STOP_GRACE_MS, ref: true });
+      else if (sig === 'SIGKILL') stopping.kill();
     },
     done,
   };

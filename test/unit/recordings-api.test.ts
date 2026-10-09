@@ -4,13 +4,14 @@
 // own clip of the audio, the words as heard next to the edited text, `source: recording` and its stretch — and the
 // recording is gone.
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
 import { startApp } from '../lib/app.ts';
-import { isolatedEnv, makeVideo } from '../lib/helpers.ts';
+import { FFMPEG, isolatedEnv, makeVideo } from '../lib/helpers.ts';
 import { cookieFrom, tusUpload } from '../lib/http.ts';
 
 let heardCalls = 0;
@@ -51,6 +52,10 @@ const { EVENTS_FILE: EVENTS } = await import('../../lib/store.ts');
 const video = makeVideo(path.join(dir, 'renders/spot.mp4'), { w: 160, h: 90, fps: 25, dur: 5 });
 // the "microphone": four seconds of tone (the silence gate hears a voice; the stand-in says the words)
 const audio = fs.readFileSync(makeVideo(path.join(dir, 'mic/take.mp4'), { w: 32, h: 32, fps: 5, dur: 4, freq: 330 }));
+// longer than a recording may be, and small: tone as a WAV, well under the body's limit (made before the app runs: a
+// synchronous encode meanwhile would hold its event loop)
+const long = path.join(dir, 'mic/long.wav');
+execFileSync(FFMPEG, ['-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=330:sample_rate=8000:duration=700', '-ac', '1', '-c:a', 'pcm_s16le', '-y', long]);
 
 const { request } = await startApp();
 // Recordings are people's, in the app (a browser session): an API token of the same person gets nowhere with them.
@@ -313,5 +318,17 @@ test('an API token is not the person here: with one, a recording is never listed
     still.some((x: { id: string }) => x.id === rec),
     'untouched, and hers in the app',
   );
+  assert.equal((await request('DELETE', `${base()}/${rec}`, { headers: olivia })).status, 200);
+});
+
+test('audio longer than a recording may be is refused in plain words, and none of it is kept', async () => {
+  const made = await request('POST', base(), { body: { v: 1, duration: 4, events: [] }, headers: olivia });
+  assert.equal(made.status, 200, made.text);
+  const rec = made.json().id;
+  const put = await request('PUT', `${base()}/${rec}/audio`, { body: fs.readFileSync(long), headers: { ...olivia, 'content-type': 'audio/wav' } });
+  assert.equal(put.status, 413, put.text);
+  assert.equal(put.json().error, 'a recording is at most 10 minutes');
+  const kept = fs.readdirSync(path.join(reviewDir(slug), 'recordings')).filter((f) => f.startsWith(rec) && !f.endsWith('.json'));
+  assert.deepEqual(kept, [], 'no audio of it stays, cut or whole');
   assert.equal((await request('DELETE', `${base()}/${rec}`, { headers: olivia })).status, 200);
 });

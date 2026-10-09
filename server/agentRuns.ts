@@ -2,10 +2,11 @@
 // wasn't running (lib/agentRun.ts decides the arguments and the prompt). One run per session at a time, stopped after
 // 30 minutes without a sign of it (its output, or a call it makes through Lampo) and after 3 hours in all, the output
 // in cache/agent-runs/<id>.log, an `agent_run` event when it starts and when it ends, and Stop ends the whole process
-// group (SIGINT first: Claude Code ends its turn cleanly; SIGTERM 5 s later, SIGKILL 5 s after that). A permission the
+// group (SIGINT first: Claude Code ends its turn cleanly; SIGTERM 5 s later, SIGKILL 5 s after that — to what is left
+// of the group, also once the run itself has ended: lib/processGroup.ts). A permission the
 // run is denied (its own output says so) makes it need the person, with the settings rule that would allow it. Each is an agent run (server/runs.ts) with delivery `machine`: its process carries the run's id in LAMPO_RUN,
 // so what it does through `lampo` and the stdio MCP server joins that run. Runs belong to this process: when the app
-// stops, its runs stop with it (nobody would be left to time them out).
+// stops, its runs stop with it (nobody would be left to time them out), the app waiting for their groups to end.
 import { type ChildProcess, spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -16,6 +17,7 @@ import { words } from '../lib/activityText.ts';
 import { claudeRunArgs, RUN_RATE_MAX, RUN_RATE_WINDOW_MS, RUN_TIMEOUT_MS } from '../lib/agentRun.ts';
 import { setting } from '../lib/env.ts';
 import { CACHE, isoLocal } from '../lib/paths.ts';
+import { endGroupsNow, type GroupStop, stopGroup } from '../lib/processGroup.ts';
 import { RateLimit } from '../lib/rateLimit.ts';
 import { createRunReader } from '../lib/runStream.ts';
 import { type Exit, RUN_ID, RUN_TIMES } from '../lib/runs.ts';
@@ -46,6 +48,8 @@ const KEEP_DONE = 20;
 const KEEP_LOGS = 50;
 /** Stop: SIGINT, then SIGTERM this long after, then SIGKILL as long after that. */
 const GRACE_MS = 5000;
+/** The same steps when the app stops: it waits for them, so they are shorter. */
+export const SHUTDOWN_GRACE_MS = 1500;
 /** How often a running run's log is read for its live step and tokens (and the UI told, when something changed). */
 const LIVE_MS = 500;
 /** How long a run took, as its last activity line says it. */
@@ -100,8 +104,13 @@ export interface AgentRuns {
   logFile(id: string): string | null;
   /** Sessions with a run going, as running sessions: the picker and "running" see them at once. */
   sessions(): ClaudeSession[];
-  /** Ends every run (the app is stopping). */
-  stopAll(): void;
+  /**
+   * Ends every run and what is left of their groups (the app is stopping), each step at most `graceMs` apart:
+   * resolves once every group has ended.
+   */
+  stopAll(graceMs?: number): Promise<void>;
+  /** The same at once, without the event loop (the process is exiting): SIGTERM, a moment, SIGKILL. */
+  endNow(): void;
 }
 
 export interface AgentRunOptions {
@@ -133,6 +142,8 @@ export function createAgentRuns({
 }: AgentRunOptions): AgentRuns {
   const runs = new Map<string, Run>();
   const starts = new RateLimit(RUN_RATE_MAX, RUN_RATE_WINDOW_MS, { maxKeys: 1000 });
+  // groups being stopped, until they have ended: a run that ended (and was pruned) may leave some of its group behind
+  const stopping = new Set<GroupStop>();
 
   const going = (sessionId: string) => [...runs.values()].find((r) => r.info.session_id === sessionId && r.info.state === 'running') || null;
   const logPath = (id: string) => path.join(dir, `${id}.log`);
@@ -163,27 +174,26 @@ export function createAgentRuns({
     } catch {}
   }
 
-  // The run and everything it started: the process group (it runs detached, as the group's leader).
-  const killGroup = (r: Run, signal: NodeJS.Signals) => {
-    const pid = r.proc?.pid;
-    if (!pid) return;
-    try {
-      process.kill(-pid, signal);
-    } catch {
-      try {
-        r.proc?.kill(signal);
-      } catch {}
-    }
-  };
-
   // Stop asks first: Claude Code ends its turn cleanly on SIGINT. Whatever is still there (it, or something it started
-  // that ignores SIGINT) gets SIGTERM, then SIGKILL — always the whole group.
+  // that ignores SIGINT) gets SIGTERM, then SIGKILL — always the whole group (it runs detached, as the group's leader),
+  // as long as the group has a member: the run ending first doesn't end what it left behind.
   const end = (r: Run, phase: AgentRunPhase) => {
     if (r.info.state !== 'running' || r.ending) return;
     r.ending = phase;
-    killGroup(r, 'SIGINT');
-    setTimeout(() => r.info.state === 'running' && killGroup(r, 'SIGTERM'), graceMs).unref();
-    setTimeout(() => r.info.state === 'running' && killGroup(r, 'SIGKILL'), 2 * graceMs).unref();
+    const proc = r.proc;
+    const pid = proc?.pid;
+    if (!proc || !pid) return;
+    if (process.platform === 'win32') {
+      // no process groups: the process itself, while it runs
+      const send = (sig: NodeJS.Signals) => r.info.state === 'running' && proc.kill(sig);
+      send('SIGINT');
+      setTimeout(() => send('SIGTERM'), graceMs).unref();
+      setTimeout(() => send('SIGKILL'), 2 * graceMs).unref();
+      return;
+    }
+    const stop = stopGroup(pid, { graceMs });
+    stopping.add(stop);
+    void stop.done.then(() => stopping.delete(stop));
   };
 
   // What the run printed since the last look, into its live step and tokens; each new step is activity too.
@@ -388,8 +398,21 @@ export function createAgentRuns({
           agent: 'claude-code' as const,
         })),
 
-    stopAll() {
+    async stopAll(shutdownMs = SHUTDOWN_GRACE_MS) {
       for (const r of runs.values()) if (r.info.state === 'running') end(r, 'stopped');
+      const all = [...stopping];
+      for (const s of all) s.hurry(shutdownMs);
+      await Promise.all(all.map((s) => s.done));
+    },
+
+    endNow() {
+      if (process.platform === 'win32') {
+        for (const r of runs.values()) if (r.info.state === 'running') r.proc?.kill('SIGKILL');
+        return;
+      }
+      const groups = [...stopping].map((s) => s.pgid);
+      for (const r of runs.values()) if (r.info.state === 'running' && r.proc?.pid) groups.push(r.proc.pid);
+      endGroupsNow(groups);
     },
   };
 }

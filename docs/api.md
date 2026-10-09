@@ -227,7 +227,8 @@ Details:
   tokens' names and dates (never the tokens), apps and devices, and per workspace what you wrote and made (notes with
   your replies, your replies on others' notes by the note's id, drafts, unsent recordings with their audio, decisions,
   the review links you made without their addresses, what you watched, what you uploaded without the videos). A few an
-  hour, then `429` with `Retry-After`. The deletion plan lists the workspaces that go with the account (`goWith`: only
+  hour, then `429` with `Retry-After`; a `HEAD` gets the headers only (no length), makes nothing and doesn't count. The
+  audio goes out as it is read, so the zip carries each recording's CRC after its data (a data descriptor). The deletion plan lists the workspaces that go with the account (`goWith`: only
   you work there), those you leave (`leave`), those you must hand over or delete first (`blockedBy`: others work there
   and you are the last owner), whether a password confirms it (`password`), and `refused` for the machine's own
   account. Deleting needs your password (wrong ones count like failed sign-ins: `403 {password: true}`, then `429`) or,
@@ -621,7 +622,7 @@ and anyone else gets `404`.
 |---|---|
 | `GET /api/review/:slug/recordings` | your recordings of this video that wait to be sent (`RecordingsResponse`: id, v, state `uploading` · `hearing` · `ready` · `failed`, duration, drafts) |
 | `POST /api/review/:slug/recordings` | a new recording's event log: `{v, duration, events}` |
-| `PUT /api/review/:slug/recordings/:id/audio` | its audio, raw (webm, mp4, ogg, wav; 64 MB at most, once) |
+| `PUT /api/review/:slug/recordings/:id/audio` | its audio, raw (webm, mp4, ogg, wav; 64 MB and the recording's 10 minutes at most, once: longer is `413`) |
 | `PATCH /api/review/:slug/recordings/:id` | `{drafts}`: the drafts as the person edited them |
 | `POST /api/review/:slug/recordings/:id/send` | every draft (or `{ids}`) becomes an ordinary note → `{notes, left, error?}` |
 | `POST /api/review/:slug/recordings/:id/hear` | hear a `failed` recording again |

@@ -141,6 +141,18 @@ export interface RunResult {
 export type RunError = Error & RunResult & { code: number | null };
 
 /**
+ * A tool wrote more than its run's `maxBuffer`: it is stopped, and the run fails — never a success with the output cut
+ * (a whole render's audio decoded past the buffer used to come back as its first half, heard as all of it).
+ */
+export class OutputTooLargeError extends Error {
+  maxBuffer: number;
+  constructor(cmd: string, maxBuffer: number) {
+    super(`${path.basename(cmd)} wrote more than ${maxBuffer} bytes and was stopped`);
+    this.maxBuffer = maxBuffer;
+  }
+}
+
+/**
  * Demuxers for files that come from outside: uploaded renders, fix previews, voice notes, and on a hosted instance every
  * input (they all arrived as uploads). Anything else (HLS or concat playlists, image sequences, raw streams, network
  * or device demuxers) is refused by ffmpeg itself before it reads the file as that format.
@@ -289,20 +301,33 @@ function runNow(
     const out: Buffer[] = [];
     const err = tailOf(stderrLimit);
     let size = 0;
+    // past maxBuffer the tool is stopped and the run fails (OutputTooLargeError): what it wrote is never half an answer
+    let over = false;
     p.stdout.on('data', (d: Buffer) => {
+      if (over) return;
       size += d.length;
-      if (size <= maxBuffer) out.push(d);
+      if (size <= maxBuffer) {
+        out.push(d);
+        return;
+      }
+      over = true;
+      out.length = 0;
+      p.kill('SIGKILL');
     });
     p.stderr.on('data', (d: Buffer) => err.push(d));
     p.on('error', reject);
-    // A tool stopped at its deadline whose children still hold its output open (a script, a CLI that forks) would keep
-    // 'close' from coming: what it said so far is all there will be.
+    // A tool stopped at its deadline or past its output whose children still hold its output open (a script, a CLI
+    // that forks) would keep 'close' from coming: what it said so far is all there will be.
     p.on('exit', () => {
-      if (!expired()) return;
+      if (!expired() && !over) return;
       p.stdout.destroy();
       p.stderr.destroy();
     });
     p.on('close', (code) => {
+      if (over) {
+        reject(Object.assign(new OutputTooLargeError(cmd, maxBuffer), { stdout: Buffer.alloc(0), stderr: err.text(), code }));
+        return;
+      }
       const stdout = Buffer.concat(out);
       const stderr = err.text();
       if (code === 0 && !expired()) resolve({ stdout, stderr });

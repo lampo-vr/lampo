@@ -26,6 +26,7 @@
 // (lib/crashGuard.ts): the start-up warm-up queued the same job on every start, a crash loop (A13 MEDIA-1).
 import { CrashedJobError, crashedTooOften, jobEnded, jobStarts } from './crashGuard.ts';
 import { boundToWorkspace, DEFAULT_WORKSPACE, explicitWorkspace } from './scope.ts';
+import { holdingWorkFiles } from './storage/held.ts';
 
 export { CrashedJobError } from './crashGuard.ts';
 
@@ -178,7 +179,18 @@ export function heavy<T>(
     try {
       who = ownerOf(ws);
     } catch {}
-    queue.push({ fn: boundToWorkspace(fn), priority, resolve: resolve as (value: unknown) => void, reject, seq: arrived++, ws, who: who ?? `ws:${ws}`, key });
+    // what the job is handed from a remote store's working copies stays until it ends (lib/storage/held.ts): inside the
+    // bound context, which is the one heavy() was called in
+    queue.push({
+      fn: boundToWorkspace(() => holdingWorkFiles(fn)),
+      priority,
+      resolve: resolve as (value: unknown) => void,
+      reject,
+      seq: arrived++,
+      ws,
+      who: who ?? `ws:${ws}`,
+      key,
+    });
     waitingIn.set(ws, (waitingIn.get(ws) ?? 0) + 1);
     pump();
   });

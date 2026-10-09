@@ -10,11 +10,11 @@ import express, { type Request, type Router } from 'express';
 import { z } from 'zod';
 import { heavy, PRIORITY } from '../../lib/jobs.ts';
 import { cacheDir, isoLocal } from '../../lib/paths.ts';
-import { probeFormat } from '../../lib/probe.ts';
+import { probeAudio, probeFormat } from '../../lib/probe.ts';
 import { shownTo } from '../../lib/publicError.ts';
 import { normalizeRange } from '../../lib/range.ts';
 import { RateLimit } from '../../lib/rateLimit.ts';
-import { RECORDING_MAX_EVENTS, RECORDING_MAX_SECONDS } from '../../lib/recording.ts';
+import { RECORDING_MAX_BYTES, RECORDING_MAX_EVENTS, RECORDING_MAX_SECONDS } from '../../lib/recording.ts';
 import {
   audioFile,
   clipOf,
@@ -39,13 +39,20 @@ import { toM4a } from '../../lib/voice.ts';
 import type { ServerContext } from '../context.ts';
 import { accountOf, getReview, getVersion, isOwn, sanitizeDrawing } from '../helpers.ts';
 import { audienceOf, body, fail, HttpError, router, sendInternal } from '../http.ts';
+import { freeBytes } from '../ready.ts';
 import { prepareNote, shotsToFollow } from './review.ts';
 
 const AUDIO_CONTAINERS = new Set(['matroska', 'webm', 'ogg', 'mov', 'mp4', 'wav']);
-const sec = z
-  .number()
-  .min(0)
-  .max(RECORDING_MAX_SECONDS + 5);
+/** The longest a recording's clock (its events) and its audio may run: the recorder stops at the limit, a moment late. */
+const LONGEST = RECORDING_MAX_SECONDS + 5;
+const TOO_LONG = `a recording is at most ${RECORDING_MAX_SECONDS / 60} minutes`;
+const sec = z.number().min(0).max(LONGEST);
+
+// The audio arrives whole (a body of its own); one over the size a recording may have is refused in the same words as
+// one that runs too long.
+const rawAudio = express.raw({ type: () => true, limit: RECORDING_MAX_BYTES });
+const audioBody: typeof rawAudio = (req, res, next) =>
+  rawAudio(req, res, (e?: unknown) => next((e as { type?: string } | undefined)?.type === 'entity.too.large' ? fail(413, TOO_LONG) : e));
 const unit = z.number().min(0).max(1);
 const frameNo = z.number().int().min(0).max(100_000_000);
 
@@ -266,18 +273,29 @@ export function recordingRoutes(ctx: ServerContext): Router {
   });
 
   // Then its audio: what the browser recorded (webm/opus, mp4/aac, ogg) or a wav; nothing else reaches ffmpeg's decoders.
-  r.put('/api/review/:slug/recordings/:id/audio', express.raw({ type: () => true, limit: '64mb' }), async (req, res) => {
+  // As long as a recording may be and no longer: its header's duration is the sender's word (a browser's webm has none),
+  // so the audio is turned into m4a up to just past the limit, and what reached it is refused, not kept cut.
+  r.put('/api/review/:slug/recordings/:id/audio', audioBody, async (req, res) => {
     const slug = req.params.slug;
     const rec = own(req, slug, req.params.id);
     if (rec.state !== 'uploading') throw fail(409, 'this recording has its audio already');
     if (!Buffer.isBuffer(req.body) || !req.body.length) throw fail(400, 'no audio');
     fs.mkdirSync(recordingsDir(slug), { recursive: true });
+    // the disk keeps its reserve (LAMPO_MIN_FREE) for renders and the store, as for notes' screenshots
+    const free = freeBytes(recordingsDir(slug));
+    if (free !== null && free < (ctx.cfg.min_free_bytes ?? 0) + req.body.length + 64e6)
+      throw fail(507, 'the server has no room for recordings right now: try again later');
     const raw = path.join(recordingsDir(slug), `${rec.id}.raw`);
+    const file = audioFile(slug, rec.id);
     fs.writeFileSync(raw, req.body);
     try {
       const format = await probeFormat(raw);
       if (!format.split(',').some((f) => AUDIO_CONTAINERS.has(f))) throw fail(400, 'not an audio recording');
-      await toM4a(raw, audioFile(slug, rec.id));
+      await toM4a(raw, file, { maxSeconds: LONGEST + 1 });
+      if ((await probeAudio(file)).duration > LONGEST) {
+        fs.rmSync(file, { force: true });
+        throw fail(413, TOO_LONG);
+      }
     } finally {
       fs.rmSync(raw, { force: true });
     }

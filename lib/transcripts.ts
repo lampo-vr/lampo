@@ -9,17 +9,24 @@ import { Memo } from './rateLimit.ts';
 import { renderKey } from './renderKey.ts';
 import { workspaceOfKey, wsKey } from './scope.ts';
 import { writeAtomic } from './store.ts';
-import { transcribeTimed } from './stt/index.ts';
+import { PCM_WINDOW_SECONDS, transcribeTimed } from './stt/index.ts';
 import { buildTranscript, TRANSCRIPT_VERSION, toVtt } from './transcript.ts';
 import type { Transcript, Version } from './types.ts';
 
 const dir = () => path.join(cacheDir(), 'transcripts');
 export const transcriptFile = (hash: string): string => path.join(dir(), `${hash}.json`);
 
+/**
+ * Whether a kept transcript is one to use: made by this version, or by version 2 for a render short enough to have
+ * been heard whole then (version 2 heard the first half hour of any render, and kept it as all of it).
+ */
+const current = (t: Transcript): boolean =>
+  t.transcript_version === TRANSCRIPT_VERSION || (t.transcript_version === 2 && t.fps > 0 && t.frames / t.fps <= PCM_WINDOW_SECONDS - 2);
+
 export function cachedTranscript(ver: Pick<Version, 'hash' | 'sample'>): Transcript | null {
   try {
     const t: Transcript = JSON.parse(fs.readFileSync(transcriptFile(renderKey(ver)), 'utf8'));
-    return t.transcript_version === TRANSCRIPT_VERSION ? t : null;
+    return current(t) ? t : null;
   } catch {
     return null;
   }

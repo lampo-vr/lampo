@@ -13,6 +13,7 @@ import { z } from 'zod';
 import type { Backend } from '../lib/backend/types.ts';
 import { ROOT, slugify } from '../lib/paths.ts';
 import { routeIn } from '../lib/scope.ts';
+import type { GrabCount } from '../lib/shots.ts';
 import { counts } from '../lib/store.ts';
 import { isAgent, noteKind, oneLine, timecode } from '../lib/time.ts';
 import type { Comment, Review, Version } from '../lib/types.ts';
@@ -49,6 +50,8 @@ export interface ReviewAppOptions {
   allowed: (a: Access) => boolean;
   /** The agent showing a review, as live activity (the card stepping frames is the person, not the agent). */
   activity?: (tool: string, args: Record<string, unknown>, ctx: ServerContext) => void;
+  /** The caller's new frames, counted like get_frame's and the API's (none for the machine's own agent). */
+  frameGrabs?: GrabCount;
 }
 
 /** The data the card renders (also the tool's structuredContent, so any host can use it). */
@@ -105,7 +108,8 @@ export function registerReviewApp(server: McpServer, o: ReviewAppOptions): void 
         return { frame: note.frame, timecode: note.timecode, v: note.v, kind: 'marked', note: note.id, image: `data:${img.mimeType};base64,${img.data}` };
       }
     }
-    const png = await b.frame(review, ver, frame);
+    // a frame grabbed now counts for the account like any other; one made before (cached) and a note's screenshot don't
+    const png = await b.frame(review, ver, frame, { count: o.frameGrabs });
     const img = await o.preview(png, width);
     return { frame, timecode: timecode(frame, ver.fps), v: ver.v, kind: 'clean', note: null, image: `data:${img.mimeType};base64,${img.data}` };
   }
