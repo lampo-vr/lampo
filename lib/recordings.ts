@@ -74,14 +74,23 @@ export function publicRecording(r: StoredRecording): Recording {
   return rest;
 }
 
+/** What a recording whose audio went before it was heard says, here and when it is asked to be heard again. */
+export const AUDIO_GONE = 'the audio of this recording is gone';
+
 /**
- * A recording whose audio didn't arrive — refused (not audio, too long, no room) or cut off — as one that couldn't be
- * heard, with `why`: its drawings are its drafts, and nothing waits for audio for good. Returns it as saved, or null
- * when it is gone or no longer waiting for audio.
+ * A recording whose audio didn't arrive — refused (not audio, too long, no room) or cut off — or went before it was
+ * heard (`from: 'hearing'`), as one that couldn't be heard, with `why`: its drawings are its drafts, and nothing waits
+ * for audio for good. Returns it as saved, or null when it is gone or no longer in state `from`.
  */
-export function audioMissed(slug: string, id: string, ver: Pick<Version, 'fps' | 'frames' | 'width' | 'height'>, why: string): StoredRecording | null {
+export function audioMissed(
+  slug: string,
+  id: string,
+  ver: Pick<Version, 'fps' | 'frames' | 'width' | 'height'>,
+  why: string,
+  from: 'uploading' | 'hearing' = 'uploading',
+): StoredRecording | null {
   const r = loadRecording(slug, id);
-  if (r?.state !== 'uploading') return null;
+  if (r?.state !== from) return null;
   const drafts = segmentRecording({ events: r.events, fps: ver.fps, frames: ver.frames, width: ver.width, height: ver.height, newId: newDraftId, words: [] });
   const next: StoredRecording = { ...r, state: 'failed', error: why, audio: false, drafts };
   saveRecording(next);

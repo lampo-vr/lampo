@@ -82,10 +82,18 @@ export function pickVersion(review: Review, v: number | undefined): Version {
   return ver;
 }
 
-/** A position given as frame, timecode (mm:ss:ff) or seconds, as a frame number; null when none was given. */
+/**
+ * A position given as frame, timecode (mm:ss:ff, ;ff drop-frame) or seconds, as a frame number; null when none was
+ * given. A timecode that isn't one is refused by name, never read as the frame its first numbers happen to name.
+ */
 export function framePosition(args: { frame?: number; timecode?: string; seconds?: number }, fps: number): number | null {
   if (Number.isInteger(args.frame)) return args.frame as number;
-  if (args.timecode) return parseFramePosition(String(args.timecode), fps);
+  if (args.timecode) {
+    const frame = parseFramePosition(String(args.timecode), fps);
+    if (frame === null)
+      throw new Error(`bad position "${oneLine(String(args.timecode)).slice(0, 40)}": timecode mm:ss:ff or h:mm:ss:ff (;ff drop-frame at 29.97/59.94 fps)`);
+    return frame;
+  }
   if (args.seconds !== undefined && Number.isFinite(args.seconds)) return timeToFrame(args.seconds, fps);
   return null;
 }

@@ -241,7 +241,7 @@ or the environment variable `LAMPO_BY=agent:<name>` changes that.
 
 | Option | Means |
 |---|---|
-| `--frame N`, `--at mm:ss:ff` or `--t <seconds>` | where; `--overall` instead: about the whole video, no frame |
+| `--frame N`, `--at mm:ss:ff` or `--t <seconds>` | where; `--overall` instead: about the whole video, no frame. A timecode is `mm:ss:ff` or `h:mm:ss:ff`, with `;` before the frames for drop-frame at 29.97 and 59.94 fps (`00:01:00;02`); anything else is refused as a bad position |
 | `--to mm:ss:ff` or `--range IN-OUT` | about a stretch, from the position to that end, both frames included ([Ranges](#ranges-from-012-to-014-the-music-is-too-loud)). `--to` reads like `--at`: a timecode, seconds or `fN`; a bare number is seconds, so write `--to f360` for frame 360. `--range` takes frame numbers |
 | `--kind question\|info\|feedback` | what the note is; `question` is the default for agents ([Asking the reviewer](#asking-the-reviewer)) |
 | `--choice "Yes" --choice "No, cut it"` | a question's likely answers, 2 to 4: the reviewer answers with one click |

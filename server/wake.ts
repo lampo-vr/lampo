@@ -7,6 +7,7 @@ import { matchesSession } from '../lib/sessions.ts';
 import type { AgentRunInfo, Review } from '../lib/types.ts';
 import type { ServerContext } from './context.ts';
 import { fail } from './http.ts';
+import { SessionsUnknownError } from './sessionCache.ts';
 
 /** Throws unless this request comes from the machine itself (the loopback owner) on an app that can start agents. */
 export function requireMachine(req: Request, ctx: ServerContext): void {
@@ -31,8 +32,16 @@ export async function startAgent(req: Request, ctx: ServerContext, slug: string,
   const session = review.session;
   if (!session?.id || !session.cwd) throw fail(409, 'this agent can’t be started from Lampo');
   // asked afresh: the list the app shows may be minutes old (it refreshes when someone looks), or still loading, and
-  // either way can't say whether the person started that session since, or ended it (A14 R30)
-  if ((await ctx.sessions.get({ fresh: true })).some((s) => matchesSession(session, s))) return null;
+  // either way can't say whether the person started that session since, or ended it. A load already on its way when
+  // Start was pressed is waited out and asked again; one that fails is never "not running" (nothing starts then).
+  let now: Awaited<ReturnType<typeof ctx.sessions.current>>;
+  try {
+    now = await ctx.sessions.current();
+  } catch (e) {
+    if (e instanceof SessionsUnknownError) throw fail(503, 'couldn’t tell whether this agent is running already: try again in a moment');
+    throw e;
+  }
+  if (now.some((s) => matchesSession(session, s))) return null;
   const who = ctx.actor(req);
   const prompt = wakePrompt({ who, video: path.basename(review.video), slug, v: review.versions.at(-1)?.v, text });
   return ctx.agentRuns.start({ slug, name: session.name, sessionId: session.id, cwd: session.cwd, by: who, prompt, ...(run ? { run } : {}) });

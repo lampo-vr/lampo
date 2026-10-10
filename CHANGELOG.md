@@ -53,6 +53,19 @@ format stays backwards compatible throughout.
   you list your server's MCP connector there.
 
 ### Fixed
+- A position given to `lampo` (`--at`, `--t`, `--to`) or to an MCP tool's `timecode` reads a drop-frame timecode
+  (`00:00:01;15`) the way a note's text does, and anything that isn't a position (`00:00:01.5`) is refused as a bad
+  position instead of landing on frame 1.
+- Starting a video's agent no longer starts a second copy of a session you had just started yourself while the list
+  of running agents was still being made, and when that list can't be made it says to try again instead of starting.
+- A Ctrl-C while `lampo render` copies a finished render into the store now stops it there, with nothing put up.
+- `npm run link` leaves your own links in `~/.local/bin` alone, also one to a script that is gone or one into another
+  project that happens to share an old name.
+- A new video uploaded under the name of a deleted one removes what is left of the deleted video in the bucket first
+  (its other versions, references and fix previews); while the bucket can't, the upload is asked to try again.
+- A recording whose audio was lost before it was heard keeps its drawings as drafts and says the same as Hear it again.
+  A voice note sent in pieces past the size limit is refused in plain words, and `lampo export` says when an event of
+  the history couldn't come along.
 - A drop-frame timecode in a note (`00:01:23;15`, as editors write them at 29.97 and 59.94 fps) opens its own frame
   at those rates; at any other rate it stays plain text (`00:00:01;15` opened frame 1).
 - An agent Lampo started on your machine that finishes on its own no longer leaves something it started running

@@ -255,6 +255,39 @@ test('voice: a note longer than ten minutes is refused in plain words, and nothi
   assert.deepEqual(fs.readdirSync(path.join(dir, 'cache/voice')), before, 'none of it kept, cut or whole');
 });
 
+test('voice: a body past the limit sent in pieces (no length said first) is refused in the same plain words', async () => {
+  const before = fs.existsSync(path.join(dir, 'cache/voice')) ? fs.readdirSync(path.join(dir, 'cache/voice')) : [];
+  const piece = Buffer.alloc(1024 * 1024);
+  const r = await new Promise<{ status: number; text: string }>((resolve, reject) => {
+    const req = http.request({ host: '127.0.0.1', port, method: 'POST', path: '/api/voice', headers: { 'content-type': 'audio/webm' } }, (res) => {
+      let text = '';
+      res.setEncoding('utf8');
+      res.on('data', (d) => {
+        text += d;
+      });
+      res.on('end', () => resolve({ status: res.statusCode ?? 0, text }));
+    });
+    let answered = false;
+    req.on('response', () => {
+      answered = true;
+    });
+    // the server may stop reading once it has refused: what is still being sent then fails, and that's fine
+    req.on('error', (e) => (answered ? undefined : reject(e)));
+    let sent = 0;
+    const more = () => {
+      while (!answered && sent < 60) {
+        sent++;
+        if (!req.write(piece)) return void req.once('drain', more);
+      }
+      req.end();
+    };
+    more();
+  });
+  assert.equal(r.status, 413, r.text);
+  assert.equal(JSON.parse(r.text).error, 'a voice note is at most 10 minutes');
+  assert.deepEqual(fs.existsSync(path.join(dir, 'cache/voice')) ? fs.readdirSync(path.join(dir, 'cache/voice')) : [], before, 'nothing of it kept');
+});
+
 test('machine endpoints never fall back to the web page', async () => {
   const dist = fs.mkdtempSync(path.join(os.tmpdir(), 'vr-dist-'));
   fs.writeFileSync(path.join(dist, 'index.html'), '<!doctype html><title>app</title>');

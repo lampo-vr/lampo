@@ -3,7 +3,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import express, { type Router } from 'express';
+import express, { type RequestHandler, type Router } from 'express';
 import { CACHE, cacheDir } from '../../lib/paths.ts';
 import { probeAudio, probeFormat } from '../../lib/probe.ts';
 import { VOICE_MAX_SECONDS } from '../../lib/recording.ts';
@@ -17,11 +17,17 @@ import { fail, router } from '../http.ts';
 const AUDIO_CONTAINERS = new Set(['matroska', 'webm', 'ogg', 'mov', 'mp4', 'wav']);
 /** A voice note's longest, with the moment a recorder takes to stop. */
 const VOICE_LONGEST = VOICE_MAX_SECONDS + 5;
+const TOO_LONG = `a voice note is at most ${VOICE_MAX_SECONDS / 60} minutes`;
+
+const rawVoice = express.raw({ type: () => true, limit: '50mb' });
+/** The body, refused past its limit in the same words as a note too long to hear (sent in pieces, it says no length first). */
+const voiceBody: RequestHandler = (req, res, next) =>
+  rawVoice(req, res, (e?: unknown) => next((e as { type?: string } | undefined)?.type === 'entity.too.large' ? fail(413, TOO_LONG) : e));
 
 export function voiceRoutes(ctx: ServerContext): Router {
   const r = router();
 
-  r.post('/api/voice', express.raw({ type: () => true, limit: '50mb' }), async (req, res) => {
+  r.post('/api/voice', voiceBody, async (req, res) => {
     if (!Buffer.isBuffer(req.body) || !req.body.length) throw fail(400, 'no audio');
     const id = crypto.randomBytes(8).toString('hex');
     const dir = path.join(cacheDir(), 'voice');
@@ -42,7 +48,7 @@ export function voiceRoutes(ctx: ServerContext): Router {
       await toM4a(raw, m4a, { maxSeconds: VOICE_LONGEST + 1 });
       if ((await probeAudio(m4a)).duration > VOICE_LONGEST) {
         fs.rmSync(m4a, { force: true });
-        throw fail(413, `a voice note is at most ${VOICE_MAX_SECONDS / 60} minutes`);
+        throw fail(413, TOO_LONG);
       }
       const transcript = await transcribeFile(raw, stt);
       const out: VoiceResponse = { id, transcript, whisper: transcript !== null };

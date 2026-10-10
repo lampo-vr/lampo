@@ -141,6 +141,56 @@ test('a Ctrl-C while the store hashes the render (synchronous work) puts nothing
   }
 });
 
+// The copy into the store, after the last look at the stop before it: a preload holds `lampo`'s copy of the rendered
+// file 3 s (a big render's copy), blocking if it is made synchronously, so the Ctrl-C lands while it runs.
+const copySlow = path.join(dir, 'copy-slow.mjs');
+fs.writeFileSync(
+  copySlow,
+  `import fs from 'node:fs';
+const target = process.env.COPY_SLOW_FILE;
+const arm = process.env.COPY_SLOW_ARM;
+const armed = (src) => target && String(src) === target && fs.existsSync(arm) && (fs.rmSync(arm), fs.writeFileSync(arm + '.hit', ''), true);
+const copySync = fs.copyFileSync;
+fs.copyFileSync = function (src, ...rest) {
+  if (armed(src)) { const t = Date.now(); while (Date.now() - t < 3000) {} }
+  return copySync.call(this, src, ...rest);
+};
+const copy = fs.promises.copyFile;
+fs.promises.copyFile = async function (src, ...rest) {
+  if (armed(src)) await new Promise((r) => setTimeout(r, 3000));
+  return copy.call(this, src, ...rest);
+};
+`,
+);
+test('a Ctrl-C while the store copies the render in puts nothing up, every time', async () => {
+  const ARM = path.join(dir, 'copy-arm');
+  for (let i = 0; i < 2; i++) {
+    const before = versions('pushed.mp4');
+    const out = path.join(work, `copied-${i}.mp4`);
+    fs.rmSync(`${ARM}.hit`, { force: true });
+    fs.writeFileSync(ARM, '');
+    const p = vrAsync(['render', '--to', 'pushed.mp4', '--out', out, '--', process.execPath, quick, clipOf(`k${i}`), out], {
+      ...agentEnv,
+      NODE_OPTIONS: `--import=${pathToFileURL(copySlow).href}`,
+      COPY_SLOW_FILE: out,
+      COPY_SLOW_ARM: ARM,
+    });
+    let said = '';
+    p.stdout.on('data', (d) => {
+      said += d;
+    });
+    const done = new Promise<number | null>((r) => p.on('close', (code) => r(code)));
+    await until(() => fs.existsSync(`${ARM}.hit`), 'lampo copying the render in', 60_000);
+    p.kill('SIGINT');
+    const code = await done;
+    assert.equal(code, 130, said);
+    assert.match(said, /^Render failed \(exit 130\): stopped\. The person sees it in Lampo\./m, `run ${i + 1}`);
+    assert.equal(versions('pushed.mp4'), before, `run ${i + 1}: nothing put up`);
+    const left = (fs.readdirSync(env.VR_DATA as string, { recursive: true }) as string[]).filter((f) => f.endsWith('.tmp'));
+    assert.deepEqual(left, [], 'no half copy left behind');
+  }
+});
+
 test('the same for a detached render stopped with SIGTERM while it is taken in', async () => {
   const before = versions('pushed.mp4');
   const out = path.join(work, 'take-in-detached.mp4');

@@ -16,6 +16,7 @@ import { normalizeRange } from '../../lib/range.ts';
 import { RateLimit } from '../../lib/rateLimit.ts';
 import { RECORDING_MAX_BYTES, RECORDING_MAX_EVENTS, RECORDING_MAX_SECONDS } from '../../lib/recording.ts';
 import {
+  AUDIO_GONE,
   audioFile,
   audioMissed,
   clipOf,
@@ -235,7 +236,7 @@ export function resumeRecordings(ctx: ServerContext): number {
       try {
         if (rec.state === 'uploading') audioMissed(rec.slug, rec.id, getVersion(review, rec.v), AUDIO_CUT_OFF);
         else if (fs.existsSync(audioFile(rec.slug, rec.id))) hearLater(ctx, rec);
-        else saveRecording({ ...rec, state: 'failed', error: 'the audio of this recording is gone' });
+        else audioMissed(rec.slug, rec.id, getVersion(review, rec.v), AUDIO_GONE, 'hearing');
       } catch (e) {
         console.error(`recording ${rec.id}: not taken up again: ${(e as Error).message}`);
       }
@@ -384,7 +385,7 @@ export function recordingRoutes(ctx: ServerContext): Router {
   r.post('/api/review/:slug/recordings/:id/hear', (req, res) => {
     const rec = own(req, req.params.slug, req.params.id);
     if (rec.state !== 'failed') throw fail(409, 'only a recording that could not be heard is heard again');
-    if (!fs.existsSync(audioFile(rec.slug, rec.id))) throw fail(409, 'the audio of this recording is gone');
+    if (!fs.existsSync(audioFile(rec.slug, rec.id))) throw fail(409, AUDIO_GONE);
     const { error: _error, languages: _before, ...rest } = rec;
     const next: StoredRecording = { ...rest, state: 'hearing', ...spoken(req) };
     saveRecording(next);

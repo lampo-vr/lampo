@@ -122,6 +122,9 @@ export const LEFT_OUT = {
   reply: ['share'],
   comment: ['share', 'draft'],
   ref: ['share'],
+  // an event's ties to this machine and its other records: the agent's session, an earlier import's mark, the link it
+  // came through, a Files change's files and bytes, the run and its phase and exit, a publishing post, a Files folder
+  event: ['session_id', 'imported', 'share', 'files', 'bytes', 'run', 'phase', 'exit', 'post', 'folder'],
 } as const satisfies Record<string, readonly string[]>;
 
 /** A copy of `x` without `keys`. */
@@ -419,6 +422,7 @@ export async function exportBundle(o: ExportOptions): Promise<ExportResult> {
   // (a store that was moved itself carries its imported history on: what happened to its videos before)
   const lines: string[] = [];
   let droppedEvents = 0;
+  const unfit: string[] = [];
   for (const logFile of store.historyFiles()) {
     if (!fs.existsSync(logFile)) continue;
     const rl = readline.createInterface({ input: fs.createReadStream(logFile, { encoding: 'utf8' }), crlfDelay: Number.POSITIVE_INFINITY });
@@ -436,20 +440,7 @@ export async function exportBundle(o: ExportOptions): Promise<ExportResult> {
         droppedEvents++;
         continue;
       }
-      const {
-        session_id: _sid,
-        imported: _imp,
-        share: _share,
-        files: _files,
-        bytes: _bytes,
-        run: _run,
-        phase: _phase,
-        exit: _exit,
-        post: _post,
-        folder: _folder,
-        ...rest
-      } = e;
-      const x: ReviewEvent = { ...rest, slug: to.slug, video: to.video };
+      const x: ReviewEvent = { ...without(e, LEFT_OUT.event), slug: to.slug, video: to.video };
       const base = (f: string | null | undefined) => {
         const b = f ? path.basename(f) : null;
         return b && store.NOTE_FILE.test(b) ? b : null;
@@ -466,12 +457,16 @@ export async function exportBundle(o: ExportOptions): Promise<ExportResult> {
       }
       const parsed = BundleEvent.safeParse(mapStrings(x, paths.scrub));
       if (!parsed.success) {
+        // an event of a video that goes along, of a kind a bundle carries: left out only with a word about it
         droppedEvents++;
+        unfit.push(`${e.type}: ${problemOf(parsed.error)}`);
         continue;
       }
       lines.push(JSON.stringify(parsed.data));
     }
   }
+  if (unfit.length)
+    warnings.push(`${unfit.length} event${unfit.length === 1 ? '' : 's'} of the history didn't fit a bundle and stay behind (first: ${unfit[0]})`);
   json.set('events.jsonl', Buffer.from(lines.length ? `${lines.join('\n')}\n` : ''));
   if (paths.count()) warnings.push(`${paths.count()} path${paths.count() === 1 ? '' : 's'} of this machine in text became file names`);
 

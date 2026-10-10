@@ -264,6 +264,59 @@ test('a pass removes only the exact keys written down: never a whole prefix, not
   assert.deepEqual(pending(), [], 'the prefixes crossed out, not removed');
 });
 
+test('a same-name upload first removes the rest of what the deleted video owes; while the bucket refuses, it is refused to be tried again', async () => {
+  // a deleted video with two versions, a draft's reference and a fix preview, removed while the bucket refused
+  const m = await video('trailer.mp4');
+  await store.ingestUpload(other, { name: 'trailer.mp4', folder: 'Acme', by: 'tester', keep: true });
+  const v1 = `versions/${m.slug}/v1.mp4`;
+  const v2 = `versions/${m.slug}/v2.mp4`;
+  const ref = `refs/${m.slug}/r_draft.jpg`;
+  const preview = `previews/${m.slug}/p_fix.mp4`;
+  for (const key of [ref, preview]) await storage().put(key, clip, { keep: true });
+  await deleteRefused(m.slug);
+  owe(ref, preview); // as the deletion writes down a draft's reference and a note's fix preview
+  for (const key of [v1, v2, ref, preview]) assert.ok(pending().includes(key) && bunny.objects.has(key), `${key} owed and still there`);
+
+  // a new video under the same name while the bucket still refuses: refused, nothing of it written, nothing crossed out
+  const fresh = makeVideo(path.join(dir, 'in/trailer-new.mp4'), { dur: 0.5, freq: 660, pattern: 'rgbtestsrc' });
+  const from = bunny.requests.length;
+  bunny.deleteStatus = 403;
+  try {
+    await assert.rejects(store.ingestUpload(fresh, { name: 'trailer.mp4', folder: 'Acme', by: 'tester', keep: true }), (e: Error & { status?: number }) => {
+      assert.equal(e.status, 503, e.message);
+      assert.match(e.message, /upload again in a moment/);
+      return true;
+    });
+  } finally {
+    bunny.deleteStatus = null;
+  }
+  assert.deepEqual(
+    bunny.requests.slice(from).filter((r) => r.method === 'PUT'),
+    [],
+    'not a byte of the new video before what is owed is gone',
+  );
+  assert.equal(store.loadReview(m.slug), null, 'no video made');
+  for (const key of [v2, ref, preview]) assert.ok(pending().includes(key), `${key} still owed`);
+
+  // the bucket answers again: the upload removes the deleted video's other keys first, then writes over its V1
+  const { version } = await store.ingestUpload(fresh, { name: 'trailer.mp4', folder: 'Acme', by: 'tester', keep: true });
+  assert.equal(version.v, 1);
+  for (const key of [v2, ref, preview]) assert.equal(bunny.objects.has(key), false, `${key} of the deleted video is gone`);
+  assert.deepEqual(bunny.objects.get(v1), fs.readFileSync(fresh), 'the new V1 in its place');
+  assert.deepEqual(
+    pending().filter((k) => k.includes(`/${m.slug}/`)),
+    [],
+    'nothing owed under the name any more',
+  );
+  const sent = deletesFrom(from);
+  assert.deepEqual(
+    sent.filter((p) => p.endsWith('/')),
+    [],
+    `exact keys only: ${sent.join(', ')}`,
+  );
+  assert.ok(!sent.some((p) => p.endsWith(v1)), 'the key it writes itself is written over, never removed');
+});
+
 test('each key is crossed out as it goes, not when the pass ends', async () => {
   const k = await video('steps.mp4');
   await deleteRefused(k.slug);

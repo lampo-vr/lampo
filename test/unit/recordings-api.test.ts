@@ -48,6 +48,9 @@ const { dir } = isolatedEnv({ vars: { VR_MODE: 'server', VR_PUBLIC_URL: PUBLIC, 
 const auth = await import('../../lib/auth.ts');
 const { reviewDir } = await import('../../lib/paths.ts');
 const { EVENTS_FILE: EVENTS } = await import('../../lib/store.ts');
+const { audioFile, loadRecording, saveRecording } = await import('../../lib/recordings.ts');
+const { resumeRecordings } = await import('../../server/routes/recordings.ts');
+const { enterProcessWorkspace } = await import('../../lib/scope.ts');
 
 const video = makeVideo(path.join(dir, 'renders/spot.mp4'), { w: 160, h: 90, fps: 25, dur: 5 });
 // the "microphone": four seconds of tone (the silence gate hears a voice; the stand-in says the words)
@@ -57,7 +60,7 @@ const audio = fs.readFileSync(makeVideo(path.join(dir, 'mic/take.mp4'), { w: 32,
 const long = path.join(dir, 'mic/long.wav');
 execFileSync(FFMPEG, ['-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=330:sample_rate=8000:duration=700', '-ac', '1', '-c:a', 'pcm_s16le', '-y', long]);
 
-const { request } = await startApp();
+const { request, ctx } = await startApp();
 // Recordings are people's, in the app (a browser session): an API token of the same person gets nowhere with them.
 let olivia: Record<string, string> = {};
 let max: Record<string, string> = {};
@@ -353,5 +356,39 @@ test('audio the server refuses leaves a recording that says so, its drawing a dr
   assert.equal((await request('POST', `${base()}/${rec}/hear`, { headers: olivia })).status, 409, 'no audio to hear');
   const again = await request('PUT', `${base()}/${rec}/audio`, { body: audio, headers: { ...olivia, 'content-type': 'audio/mp4' } });
   assert.equal(again.status, 409, 'its way in is over');
+  assert.equal((await request('DELETE', `${base()}/${rec}`, { headers: olivia })).status, 200);
+});
+
+test('a recording whose audio went before it was heard keeps its drawings as drafts, and says so as /hear does', async () => {
+  const box = { type: 'box', x: 10, y: 10, w: 40, h: 20 };
+  const made = await request('POST', base(), {
+    body: {
+      v: 1,
+      duration: 3,
+      events: [
+        { t: 0, k: 'frame', f: 30 },
+        { t: 0.5, k: 'stroke', f: 30, shape: box },
+      ],
+    },
+    headers: olivia,
+  });
+  assert.equal(made.status, 200, made.text);
+  const rec = made.json().id;
+  // a stop cut its hearing off, and its audio was gone by the next start
+  enterProcessWorkspace();
+  const stored = loadRecording(slug, rec);
+  assert.ok(stored);
+  saveRecording({ ...stored, state: 'hearing' });
+  fs.rmSync(audioFile(slug, rec), { force: true });
+  resumeRecordings(ctx);
+  const after = (await request('GET', base(), { headers: olivia })).json().recordings.find((x: { id: string }) => x.id === rec);
+  assert.equal(after?.state, 'failed', JSON.stringify(after));
+  assert.equal(after.audio, false, 'nothing to hear again');
+  assert.equal(after.drafts.length, 1, 'the drawing is a draft');
+  assert.equal(after.drafts[0].frame, 30);
+  const hear = await request('POST', `${base()}/${rec}/hear`, { headers: olivia });
+  assert.equal(hear.status, 409);
+  assert.equal(after.error, hear.json().error, 'the same words as Hear it again');
+  assert.equal(after.error, 'the audio of this recording is gone');
   assert.equal((await request('DELETE', `${base()}/${rec}`, { headers: olivia })).status, 200);
 });

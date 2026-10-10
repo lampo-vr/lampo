@@ -68,15 +68,53 @@ test('another program’s lampo or vr in ~/.local/bin is never replaced: the per
   }
 });
 
+/** A folder shaped like a Lampo checkout (before the rename: named video-review, bin/vr only). */
+function checkoutAt(folder: string, name = 'video-review') {
+  for (const f of ['bin/vr', 'lib/store.ts', 'lib/cli.ts', 'server/index.ts']) {
+    fs.mkdirSync(path.dirname(path.join(folder, f)), { recursive: true });
+    fs.writeFileSync(path.join(folder, f), '');
+  }
+  fs.writeFileSync(path.join(folder, 'package.json'), JSON.stringify({ name }));
+}
+
+test('someone’s own link stays: one to a script that is gone, one into another project called video-review', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'vr-link-'));
+  const bin = path.join(home, '.local/bin');
+  try {
+    fs.mkdirSync(bin, { recursive: true });
+    // their vr: a link to a script of theirs that is gone
+    const gone = path.join(home, 'tools/vr-helper.sh');
+    fs.symlinkSync(gone, path.join(bin, 'vr'));
+    // their lampo: a link into a project of theirs that happens to be named video-review (not a Lampo checkout)
+    const other = path.join(home, 'their-project');
+    fs.mkdirSync(path.join(other, 'bin'), { recursive: true });
+    fs.writeFileSync(path.join(other, 'package.json'), JSON.stringify({ name: 'video-review' }));
+    fs.writeFileSync(path.join(other, 'bin/lampo'), '#!/bin/sh\n', { mode: 0o755 });
+    fs.symlinkSync(path.join(other, 'bin/lampo'), path.join(bin, 'lampo'));
+    const r = runAll(home);
+    assert.equal(r.status, 1, r.stdout);
+    assert.match(r.stderr, /\.local\/bin\/lampo is there already and isn’t Lampo’s/);
+    assert.equal(fs.readlinkSync(path.join(bin, 'lampo')), path.join(other, 'bin/lampo'), 'their link to their project stays');
+    assert.equal(fs.readlinkSync(path.join(bin, 'vr')), gone, 'their link to nothing stays');
+    assert.match(r.stdout, /vr is another program’s: left as it is/);
+    // a link to nothing inside a folder that is still there but isn't a checkout: theirs too
+    fs.rmSync(path.join(bin, 'lampo'));
+    fs.rmSync(path.join(other, 'bin/lampo'));
+    fs.symlinkSync(path.join(other, 'bin/lampo'), path.join(bin, 'lampo'));
+    assert.equal(runAll(home).status, 1);
+    assert.equal(fs.readlinkSync(path.join(bin, 'lampo')), path.join(other, 'bin/lampo'));
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
 test('a link from another Lampo checkout, or one to nothing, is replaced', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'vr-link-'));
   const bin = path.join(home, '.local/bin');
   try {
     // an older checkout (before the rename) the links pointed into
     const old = path.join(home, 'old-checkout');
-    fs.mkdirSync(path.join(old, 'bin'), { recursive: true });
-    fs.writeFileSync(path.join(old, 'package.json'), JSON.stringify({ name: 'video-review' }));
-    fs.writeFileSync(path.join(old, 'bin/vr'), '');
+    checkoutAt(old);
     fs.mkdirSync(bin, { recursive: true });
     fs.symlinkSync(path.join(old, 'bin/vr'), path.join(bin, 'vr'));
     fs.symlinkSync(path.join(home, 'moved-away/bin/lampo'), path.join(bin, 'lampo'));

@@ -26,7 +26,10 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
   finished by `finishRemovals`), never a bare `storage().remove` whose failure is only logged and then forgotten.
 - What is written down to remove later is exact keys, never a prefix: a same-name upload's bytes land under the prefix
   before its review exists. A video id's keys go under its upload hold (`reserveUpload`), and anything that puts bytes
-  under an id crosses its owed keys out first (`forgetOwed`); `versions/` is never swept by prefix.
+  under an id crosses its owed keys out first (`forgetOwed`); `versions/` is never swept by prefix. Crossing out is
+  only for the keys it writes over: a new video under a deleted one's id removes the rest first (`clearOwedUnder`,
+  a 503 while the storage refuses), or the deleted video's other versions stay in the bucket for good.
 - The onboarding sample logs no events; Insights, taste, suggestions and `usageOf` skip it.
-- A new field on `Version`, `Comment`, `Reply` or `NoteRef` travels in the bundle's schema or is named in
-  `LEFT_OUT` (lib/bundleExport.ts): one an export doesn't know stops `lampo export` (`bundle-portable.test.ts`).
+- A new field on `Version`, `Comment`, `Reply`, `NoteRef` or `ReviewEvent` travels in the bundle's schema or is named
+  in `LEFT_OUT` (lib/bundleExport.ts): one an export doesn't know stops `lampo export` or drops the event
+  (`bundle-portable.test.ts`), and a dropped event is said in the export's warnings, never only counted.

@@ -241,6 +241,9 @@ const exit = (msg: string): Exit => {
 const die = (msg: string): never => {
   throw exit(msg);
 };
+/** A position (`--at`, `--t`) that isn't one: said so, never read as the frame its first numbers happen to name. */
+const badPosition = (at: string | undefined): string =>
+  `bad position "${at}" (timecode mm:ss:ff or h:mm:ss:ff, ;ff for drop-frame at 29.97/59.94 fps, seconds like 12.5, or fN)`;
 /** A folder named for a write (`--folder`, `lampo move`): refused here, before anything is sent, past 12 levels or 400 characters. */
 const newFolder = (folder: string | undefined): string | undefined => {
   try {
@@ -621,8 +624,7 @@ const commands: Record<string, Command> = {
     const latest = latestOf(await b.review(hit.slug, { wait: true }));
     // As in lampo add: --frame N, --at mm:ss:ff or --t seconds; default: the note's frame in the newest render.
     const at = str(opt.at) ?? str(opt.t);
-    const frame =
-      opt.frame !== undefined ? parseInt(String(opt.frame), 10) : at ? (parseFramePosition(at, latest.fps) ?? die(`bad position "${at}"`)) : undefined;
+    const frame = opt.frame !== undefined ? parseInt(String(opt.frame), 10) : at ? (parseFramePosition(at, latest.fps) ?? die(badPosition(at))) : undefined;
     if (frame !== undefined && !Number.isFinite(frame)) die('--frame expects a number');
     const kind = opt.clip || !/\.(png|jpe?g|webp)$/i.test(file) ? 'clip' : 'still';
     const app = str(opt.app);
@@ -678,11 +680,9 @@ const commands: Record<string, Command> = {
       ? 0
       : opt.frame !== undefined
         ? parseInt(String(opt.frame), 10)
-        : at
-          ? parseFramePosition(at, ver.fps)
-          : t
-            ? parseFramePosition(t, ver.fps)
-            : null;
+        : at || t
+          ? (parseFramePosition((at || t) as string, ver.fps) ?? die(badPosition(at || t)))
+          : null;
     if (frame === null || !Number.isFinite(frame)) throw exit('give the position with --frame N, --at mm:ss:ff or --t seconds (or --overall)');
     if (frame < 0 || frame >= ver.frames) die(`frame ${frame} is outside 0–${ver.frames - 1}`);
     const text = str(opt.text) ?? die('add needs --text "…"');
@@ -768,7 +768,7 @@ const commands: Record<string, Command> = {
       const review = await b.review(res.slug);
       const ver = opt.v ? review.versions.find((x) => x.v === Number(opt.v)) || die(`no v${opt.v}`) : latestOf(review);
       const at = str(opt.at);
-      const frame = opt.frame !== undefined ? parseInt(String(opt.frame), 10) : at ? parseFramePosition(at, ver.fps) : null;
+      const frame = opt.frame !== undefined ? parseInt(String(opt.frame), 10) : at ? (parseFramePosition(at, ver.fps) ?? die(badPosition(at))) : null;
       if (frame === null || !Number.isFinite(frame)) throw exit('a moment needs --frame N or --at mm:ss:ff');
       // --to like --at (mm:ss:ff, 12.1s, f363); a plain number is a frame, as it always was.
       const to = str(opt.to);

@@ -52,18 +52,19 @@ export function timecode(frame: number, fps: number): string {
   return `${h ? `${h}:` : ''}${p(m)}:${p(s)}:${p(ff)}`;
 }
 
-// Parses "12.1", "12.1s", "00:12:03" (mm:ss:ff), "1:00:12:03" (h:mm:ss:ff) or "f363" into a frame number.
+// A position as `lampo` and MCP take it: mm:ss:ff, h:mm:ss:ff, either with `;` before the frames (drop-frame).
+const POSITION_TIMECODE = /^(?:\d{1,2}:)?\d{1,2}:\d{1,2}[:;]\d{1,2}$/;
+
+/**
+ * Parses "12.1", "12.1s", "00:12:03" (mm:ss:ff), "1:00:12:03" (h:mm:ss:ff), "00:00:01;15" (drop-frame, read as
+ * `timecodesIn` reads it) or "f363" into a frame number; null for anything else ("00:00:01.5", a seconds or frames
+ * field past its count, a drop-frame code at a rate that has none): a position that isn't one is never a guess.
+ */
 export function parseFramePosition(str: string | number, fps: number): number | null {
   const s = String(str).trim();
-  if (/^f?\d+$/.test(s) && s.startsWith('f')) return parseInt(s.slice(1), 10);
+  if (/^f\d+$/.test(s)) return parseInt(s.slice(1), 10);
   if (/^\d+(\.\d+)?s?$/.test(s)) return timeToFrame(parseFloat(s), fps);
-  const parts = s.split(':').map((x) => parseInt(x, 10));
-  if (parts.some((n) => Number.isNaN(n))) return null;
-  if (parts.length === 3 || parts.length === 4) {
-    const [h, m, sec, ff] = parts.length === 4 ? parts : [0, ...parts];
-    return Math.ceil((h * 3600 + m * 60 + sec) * fps - 1e-6) + ff;
-  }
-  return null;
+  return POSITION_TIMECODE.test(s) && fps > 0 ? timecodeFrame(s, fps) : null;
 }
 
 /** A timecode written in someone's text: where it is in the text and the frame it names. */
@@ -97,6 +98,20 @@ function dropFrame(h: number, min: number, sec: number, ff: number, { nominal, d
 }
 
 /**
+ * The frame a timecode ("00:12:03", "1:00:12:03", "00:01:23;15") names at this rate, or null when its numbers don't fit
+ * it: seconds or (with hours) minutes past 59, frames past the rate, a drop-frame code at a rate that has none or a
+ * number drop-frame leaves out. The text in someone's note and a position given to `lampo` or MCP read alike.
+ */
+function timecodeFrame(code: string, fps: number): number | null {
+  const parts = code.split(/[:;]/).map(Number);
+  const [h, min, sec, ff] = parts.length === 4 ? parts : [0, ...parts];
+  if ((parts.length === 4 && min >= 60) || sec >= 60 || ff >= Math.ceil(fps - 1e-6)) return null;
+  if (!code.includes(';')) return Math.ceil((h * 3600 + min * 60 + sec) * fps - 1e-6) + ff;
+  const drop = dropOf(fps);
+  return drop ? dropFrame(h, min, sec, ff, drop) : null;
+}
+
+/**
  * The timecodes written in a text that name a frame of a render with these fps and frames: seconds and minutes under
  * 60, frames under the frame rate, inside the render. What doesn't fit ("10:30:00" in a 20-second video — a time of
  * day more likely) stays plain text, and so does a drop-frame timecode for a render at any other rate than 29.97 or
@@ -105,15 +120,8 @@ function dropFrame(h: number, min: number, sec: number, ff: number, { nominal, d
 export function timecodesIn(text: string, fps: number, frames = Number.POSITIVE_INFINITY): TimecodeMention[] {
   const out: TimecodeMention[] = [];
   if (!text || !(fps > 0)) return out;
-  const perSecond = Math.ceil(fps - 1e-6);
   for (const m of text.matchAll(TIMECODE_IN_TEXT)) {
-    const df = m[0].includes(';');
-    const parts = m[0].split(/[:;]/).map(Number);
-    const [h, min, sec, ff] = parts.length === 4 ? parts : [0, ...parts];
-    if ((parts.length === 4 && min >= 60) || sec >= 60 || ff >= perSecond) continue;
-    const drop = df ? dropOf(fps) : null;
-    if (df && !drop) continue;
-    const frame = drop ? dropFrame(h, min, sec, ff, drop) : Math.ceil((h * 3600 + min * 60 + sec) * fps - 1e-6) + ff;
+    const frame = timecodeFrame(m[0], fps);
     if (frame === null || frame >= frames) continue;
     out.push({ start: m.index, end: m.index + m[0].length, text: m[0], frame });
   }

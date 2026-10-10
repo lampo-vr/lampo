@@ -176,17 +176,18 @@ export function createContext({ cfg, lan = false, dev = false, token, loadSessio
   // Server mode lists the agents that connected (in memory, always current); locally `claude agents` plus those, plus
   // the sessions Lampo itself started for a request (running from the moment they start, not the next refresh).
   const sessions = createSessionCache(broadcast, loadSessions);
+  const withOurs = (local: ClaudeSession[]): ClaudeSession[] => {
+    const known = new Set(local.map((s) => s.sessionId));
+    const started = agentRuns.sessions().filter((s) => !known.has(s.sessionId));
+    for (const s of started) known.add(s.sessionId);
+    return [...local, ...started, ...agents.sessions().filter((a) => !known.has(a.sessionId))];
+  };
   const withAgents: SessionCache = server
-    ? { get: async () => agents.sessions(), refresh: async () => agents.sessions(), at: 0, refreshing: false }
+    ? { get: async () => agents.sessions(), current: async () => agents.sessions(), refresh: async () => agents.sessions(), at: 0, refreshing: false }
     : {
         ...sessions,
-        async get(opts) {
-          const local = await sessions.get(opts);
-          const known = new Set(local.map((s) => s.sessionId));
-          const started = agentRuns.sessions().filter((s) => !known.has(s.sessionId));
-          for (const s of started) known.add(s.sessionId);
-          return [...local, ...started, ...agents.sessions().filter((a) => !known.has(a.sessionId))];
-        },
+        get: async (opts) => withOurs(await sessions.get(opts)),
+        current: async () => withOurs(await sessions.current()),
         refresh: sessions.refresh,
         get at() {
           return sessions.at;

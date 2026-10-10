@@ -973,60 +973,88 @@ async function ingestReserved(
   // registers meanwhile (syncVersions, under the same lock) is never written over. A remote store's upload takes too
   // long to hold the lock for; nothing else writes its version keys.
   const here = store.kind === 'local';
-  // a deleted video of this id may still owe keys under it (pendingRemovalsFile): crossed out before the first byte, under
-  // this upload's hold, so no retry removes what this upload puts there (its bytes land before its review exists)
+  // A deleted video of this id may still owe keys under it (pendingRemovalsFile), all under this upload's hold: a new
+  // video removes the rest of the deleted one's first (refused with a 503 while the storage can't), and the key it writes
+  // itself is crossed out right before its first byte (forgetOwed), so no retry removes what this upload puts there (its
+  // bytes land before its review exists).
+  if (!existing) await clearOwedUnder(slug, bytes);
   // A stop seen here takes nothing in (`lampo render`): the last moment before anything is written. On this disk nothing
   // is awaited from here to the registration (withLock is synchronous); a bucket's bytes, once stored, are registered.
   if (o.signal?.aborted) throw new StoppedError();
-  forgetOwed(slug);
-  if (!here) await store.put(bytes, file, { keep: o.keep, contentType: CONTENT_TYPE[ext.toLowerCase()] || 'video/mp4' });
-  return withLock(reviewDir(slug), () => {
-    let review = loadReview(slug);
-    const created = !review;
-    if (!review) {
-      review = {
-        video,
-        source: { kind: 'upload', name: path.basename(video) },
-        project: folder || 'Uploads',
-        fps: 0,
-        width: 0,
-        height: 0,
-        duration: 0,
-        versions: [],
-        comments: [],
-        session: null,
-        folder,
-        added: isoLocal(),
-        added_by: by,
-        frames: 0,
-        ...(o.byId ? { added_by_id: o.byId } : {}),
-        ...(o.sample ? { onboarding_sample: o.sample } : {}),
-        id: newReviewId(),
-      };
+  // A render that stays where it is (`lampo render`, `lampo push`) is copied on this disk before the lock and without
+  // blocking, so a stop during a long copy is heard and asked about after it; under the lock only a rename is left.
+  const staged = here && o.keep ? await stagedCopy(file, store.localPath(bytes)) : null;
+  try {
+    if (staged && o.signal) {
+      await signalsHeard();
+      if (o.signal.aborted) throw new StoppedError();
     }
-    // Another process (a CLI push on the server) registered this number meanwhile: its bytes are what's stored.
-    if ((review.versions.at(-1)?.v || 0) + 1 !== v) throw new Error('another upload of this video finished at the same moment, please upload again');
-    const stored = store.kind === 'local' ? undefined : store.kind;
-    if (part && review.versions.at(-1)?.v !== part.of)
-      throw Object.assign(new Error('another version arrived meanwhile: render the part against it'), { status: 409 });
-    if (here) moveFile(file, store.localPath(bytes), { keep: o.keep });
-    const { version } = registerVersion(review, {
-      hash,
-      sample: key,
-      mtime: new Date(st.mtimeMs).toISOString(),
-      size: st.size,
-      meta,
-      by,
-      stored,
-      uploadedBy: by,
-      ...(part ? { part } : {}),
+    forgetOwed(slug);
+    if (!here) await store.put(bytes, file, { keep: o.keep, contentType: CONTENT_TYPE[ext.toLowerCase()] || 'video/mp4' });
+    return withLock(reviewDir(slug), () => {
+      let review = loadReview(slug);
+      const created = !review;
+      if (!review) {
+        review = {
+          video,
+          source: { kind: 'upload', name: path.basename(video) },
+          project: folder || 'Uploads',
+          fps: 0,
+          width: 0,
+          height: 0,
+          duration: 0,
+          versions: [],
+          comments: [],
+          session: null,
+          folder,
+          added: isoLocal(),
+          added_by: by,
+          frames: 0,
+          ...(o.byId ? { added_by_id: o.byId } : {}),
+          ...(o.sample ? { onboarding_sample: o.sample } : {}),
+          id: newReviewId(),
+        };
+      }
+      // Another process (a CLI push on the server) registered this number meanwhile: its bytes are what's stored.
+      if ((review.versions.at(-1)?.v || 0) + 1 !== v) throw new Error('another upload of this video finished at the same moment, please upload again');
+      const stored = store.kind === 'local' ? undefined : store.kind;
+      if (part && review.versions.at(-1)?.v !== part.of)
+        throw Object.assign(new Error('another version arrived meanwhile: render the part against it'), { status: 409 });
+      if (staged) fs.renameSync(staged, store.localPath(bytes));
+      else if (here) moveFile(file, store.localPath(bytes), { keep: o.keep });
+      const { version } = registerVersion(review, {
+        hash,
+        sample: key,
+        mtime: new Date(st.mtimeMs).toISOString(),
+        size: st.size,
+        meta,
+        by,
+        stored,
+        uploadedBy: by,
+        ...(part ? { part } : {}),
+      });
+      if (created) logEvent({ type: 'added', by, review, v: 1, text: `uploaded (${review.width}×${review.height}, ${review.fps} fps)` });
+      // an agent's own V1 is its video: the person's notes on it go to that agent (a later version keeps whoever it has)
+      if (created && o.session) assignInto(review, o.session, by);
+      saveReview(review);
+      return { review, created, version, duplicate: false };
     });
-    if (created) logEvent({ type: 'added', by, review, v: 1, text: `uploaded (${review.width}×${review.height}, ${review.fps} fps)` });
-    // an agent's own V1 is its video: the person's notes on it go to that agent (a later version keeps whoever it has)
-    if (created && o.session) assignInto(review, o.session, by);
-    saveReview(review);
-    return { review, created, version, duplicate: false };
-  });
+  } finally {
+    if (staged) fs.rmSync(staged, { force: true });
+  }
+}
+
+/** A copy of `file` beside `dst` (so a rename puts it there), made without blocking the event loop; its name is returned. */
+async function stagedCopy(file: string, dst: string): Promise<string> {
+  fs.mkdirSync(path.dirname(dst), { recursive: true });
+  const tmp = `${dst}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`;
+  try {
+    await fs.promises.copyFile(file, tmp, fs.constants.COPYFILE_FICLONE);
+  } catch (e) {
+    fs.rmSync(tmp, { force: true });
+    throw e;
+  }
+  return tmp;
 }
 
 // ---------------------------------------------------------------- mutations
@@ -1657,6 +1685,50 @@ export function forgetOwed(slug: string): void {
     changePending(file, (all) => all.filter((p) => !under(p.key)));
   } catch (e) {
     console.error(`removals: what ${slug} owed not crossed out (${(e as Error).message})`);
+  }
+}
+
+/** The storage didn't take a removal a new video under a deleted one's id waits for: nothing was written, try again. */
+export class OwedRemovalError extends Error {
+  status = 503;
+  constructor() {
+    super('the storage is not answering right now: upload again in a moment');
+  }
+}
+
+/**
+ * A new video is about to take the id of a deleted one (`ingestReserved`, under the upload hold it already has, before
+ * its first byte): the deleted video's keys still owed under that id are removed now, each crossed out once gone, so
+ * its other versions, references and fix previews never stay behind the new video. `writes` (the key the upload writes
+ * over) is left for `forgetOwed`, as is a whole prefix an earlier version wrote down (never removed). A storage that
+ * refuses one refuses the upload (`OwedRemovalError`, 503: a client tries again); a record that can't be read changes
+ * nothing, as in forgetOwed.
+ */
+async function clearOwedUnder(slug: string, writes: string): Promise<void> {
+  const file = pendingRemovalsFile();
+  if (!fs.existsSync(file)) return;
+  let owed: string[];
+  try {
+    owed = readPending(file)
+      .map((p) => p.key)
+      .filter((key) => key !== writes && slugOfKey(key) === slug);
+  } catch (e) {
+    console.error(`removals: what ${slug} owed not read (${(e as Error).message})`);
+    return;
+  }
+  const st = storage();
+  for (const key of owed) {
+    try {
+      await st.remove(key);
+    } catch (e) {
+      console.error(`could not delete what a deleted ${slug} owed before an upload under its name (stays written down):`, (e as Error).message);
+      throw new OwedRemovalError();
+    }
+    try {
+      changePending(file, (all) => all.filter((p) => p.key !== key));
+    } catch (e) {
+      console.error(`removals: ${key} not crossed out (${(e as Error).message})`);
+    }
   }
 }
 

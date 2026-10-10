@@ -25,8 +25,11 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
   before a word `redact()` would change (`commandPrefix`).
 - Text whose lines are ours leaves through `keepLines` (MCP `text()`, `lampo` output): only `\n` ends a line.
 - With `--json`, stdout is one JSON document: a line `lampo` appends after a command (a stop, new notes) goes to stderr.
-- A decision about what runs on the machine (is that session running?) asks afresh (`sessions.get({ fresh: true })`),
-  never from the list the app shows: it is refreshed only when someone looks, and the first look answers with nothing.
+- A decision about what runs on the machine (is that session running?) asks afresh (`sessions.current()`), never from
+  the list the app shows: it is refreshed only when someone looks, and the first look answers with nothing. Only a load
+  begun after the ask counts (one on its way may predate the session), and a load that failed is never "not running".
+- A position an agent gives (`--at`, MCP `timecode`) is parsed whole (`parseFramePosition`): never `parseInt` its
+  parts (`00:00:01;15` and `00:00:01.5` read as frame 1); what isn't a position is "bad position", never a guess.
 - Clean agent names where they come in (`cleanAgentName`) and stored ones on read (`shownName`, `shownEvent`).
 - What a caller posts under an agent's name carries the caller's account (`ownedAgentName`).
 - Agent formats keep their tokens (`lampo` lines, INBOX.md, `CHANGE WORDS`, `PICKED`): append, never reword.
@@ -45,3 +48,5 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - A signal that lands during synchronous work (a registration's probe and copy, a big render's hash) is handled only in
   the next poll phase: ask after an immediate inside an immediate (`signalsHeard`, lib/backend/types.ts), never right
   after the call returns, and never after one `setImmediate` (work that ran in a poll phase gets it before the next poll).
+  Long work after the last such look is made async before the lock (a render's copy: `fs.promises.copyFile` to a temp
+  file, the stop asked after it), so that only a rename is left under the lock: a synchronous copy can't be stopped.
