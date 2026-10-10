@@ -55,7 +55,8 @@ format stays backwards compatible throughout.
 ### Fixed
 - A position given to `lampo` (`--at`, `--t`, `--to`) or to an MCP tool's `timecode` reads a drop-frame timecode
   (`00:00:01;15`) the way a note's text does, and anything that isn't a position (`00:00:01.5`) is refused as a bad
-  position instead of landing on frame 1.
+  position instead of landing on frame 1. Malformed timecodes that used to be guessed at are refused the same way: a
+  frame number at or past the frame rate (`00:00:45` at 30 fps), seconds past 59, three-digit fields, trailing text.
 - Starting a video's agent no longer starts a second copy of a session you had just started yourself while the list
   of running agents was still being made, and when that list can't be made it says to try again instead of starting.
 - A Ctrl-C while `lampo render` copies a finished render into the store now stops it there, with nothing put up.
