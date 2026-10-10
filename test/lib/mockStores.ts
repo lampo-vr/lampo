@@ -41,6 +41,11 @@ export interface MockBunny extends MockStore {
   /** Delay every DELETE's answer by this many ms (a slow bucket: what a stop must wait for). */
   deleteDelayMs: number;
   /**
+   * Answer every DELETE this many ms after the object went: the bucket no longer has the key while its remover still
+   * waits for the answer (and still has its working copy, which it drops once answered).
+   */
+  deleteAnswerDelayMs: number;
+  /**
    * While set, a PUT's bytes are stored at once and its answer waits here (each an answer to send): an upload whose
    * bytes are in the bucket while it is still going on.
    */
@@ -101,13 +106,15 @@ export async function mockBunny({ zone = 'zone', accessKey = 'secret' } = {}): P
             objects.delete(k);
             n++;
           }
-        res.writeHead(n ? 200 : 404).end();
+        const send = () => res.writeHead(n ? 200 : 404).end();
+        if (mock.deleteAnswerDelayMs) setTimeout(send, mock.deleteAnswerDelayMs);
+        else send();
       };
       if (mock.deleteDelayMs) setTimeout(answer, mock.deleteDelayMs);
       else answer();
     } else res.writeHead(405).end();
   });
-  const mock: MockBunny = { ...s, objects, getDelayMs: 0, maxParallelGets: 0, deleteStatus: null, deleteDelayMs: 0, heldPuts: null };
+  const mock: MockBunny = { ...s, objects, getDelayMs: 0, maxParallelGets: 0, deleteStatus: null, deleteDelayMs: 0, deleteAnswerDelayMs: 0, heldPuts: null };
   return mock;
 }
 

@@ -84,8 +84,16 @@ test('a deleted video’s copies go: the scrub copy, a phone’s copy, a proxy, 
   const own = [store.refKey(big.slug, 'r_0123456789ab.jpg'), store.previewKey(big.slug, 'p_0123456789ab.jpg')];
   for (const key of own) await storage().put(key, extra, { keep: true });
 
-  assert.ok(store.removeVideo(big.slug, 'tester'));
-  assert.ok(store.removeVideo(odd.slug, 'tester'));
+  // A key gone from the bucket says nothing yet about its working copy: the remover drops that once the bucket has
+  // answered (storage().remove). With every answer late, the bucket is empty well before the last removal ends.
+  bunny.deleteAnswerDelayMs = 150;
+  try {
+    assert.ok(store.removeVideo(big.slug, 'tester'));
+    assert.ok(store.removeVideo(odd.slug, 'tester'));
+    await store.removalsSettled();
+  } finally {
+    bunny.deleteAnswerDelayMs = 0;
+  }
   await goneFromBucket([...made, ...own, `versions/${big.slug}/v1.mp4`, `versions/${odd.slug}/v1.mov`]);
   for (const key of made) {
     assert.equal(fs.existsSync(storage().localPath(key)), false, `no working copy of ${key}`);
