@@ -149,14 +149,11 @@ test('paid plans are for businesses: said plainly under the plans, net prices an
   assert.equal(billingSaid(refused), refused.message);
   setDictionary('de', de);
   try {
-    // "für Unternehmen", "zzgl. USt." (the app's one word for VAT), du
-    assert.equal(
-      businessLine({}),
-      'Bezahlte Pläne sind für Unternehmen. Die Preise verstehen sich zzgl. USt.; an der Kasse kommt die USt. für deine Rechnungsadresse dazu.',
-    );
+    // "für Unternehmen", "exkl. VAT" (German says VAT too), du
+    assert.equal(businessLine({}), 'Bezahlte Pläne sind für Unternehmen. Preise exkl. VAT; an der Kasse kommt VAT für deine Rechnungsadresse dazu.');
     assert.match(
       businessLine({ reverseCharge: true }),
-      /^Bezahlte Pläne sind für Unternehmen\. .+ ein Unternehmen mit USt-IdNr\. aus einem anderen EU-Land zahlt keine\.$/,
+      /^Bezahlte Pläne sind für Unternehmen\. .+ ein Unternehmen mit USt-IdNr\. aus einem anderen EU-Land kauft ohne VAT\.$/,
     );
     assert.equal(billingSaid(refused), 'Bezahlte Pläne sind für Unternehmen: Bestätige, dass du für dein Unternehmen kaufst, nicht als Privatperson.');
   } finally {

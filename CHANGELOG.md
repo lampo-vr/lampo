@@ -8,6 +8,8 @@ format stays backwards compatible throughout.
 ## [Unreleased]
 
 ### Changed
+- German prices say VAT, like the English ones: "exkl. VAT", "inkl. 19 % VAT", and the checkout's tax line reads
+  "VAT". The VAT ID keeps its German name, "USt-IdNr.".
 - Green marks a state now, never a box: the player's "3 fixes to check" banner is a plain card with the green
   keyframe of a fix waiting for its check and a plain "Check now" button; "Looks right" and "Got it" are plain buttons
   with a green check; a review link's verdict, a For you note, the Publishing settings' return note, Billing's "paid"
@@ -89,7 +91,7 @@ format stays backwards compatible throughout.
   and before a checkout starts you tick "I'm buying for my business, not as a private person": on the plans, at the
   checkout (where the trial's end leads) and in a plan's limit. The button that goes on to pay waits for it, and once
   given it is remembered for the workspace. The checkout asks for the business's name; the VAT ID stays optional.
-  In German: "für Unternehmen", "zzgl. USt.".
+  In German: "für Unternehmen".
 
 ### Added
 - **Start with your agent in one paste.** An empty library, project or folder leads with **Copy prompt for your

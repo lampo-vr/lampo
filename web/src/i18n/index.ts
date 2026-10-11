@@ -150,7 +150,7 @@ const number = (v: number) => (Number.isInteger(v) && Math.abs(v) < 10000 ? Stri
 
 /**
  * Fills `{name}` placeholders; unknown ones stay as they are (a missing param is visible, not silently empty). A value
- * that ends with its own full stop ("24 € zzgl. USt.", "Acme Inc.") takes the place of the sentence's right after it:
+ * that ends with its own full stop ("Acme Inc.", "Nord Ltd.") takes the place of the sentence's right after it:
  * never "..".
  */
 export function fill(message: string, params?: Params): string {

@@ -170,7 +170,7 @@ test('in German, du', () => {
     );
     assert.equal(payLabel('storage', fit, ask, '171,36 €', false), '171,36 € bezahlen und hochladen');
     // German puts a no-break space between the amount and the euro sign
-    if (fit.kind === 'plan') assert.match(priceOf(fit.offer, 'year', 1, 'eur')?.sub ?? '', /^zzgl\. USt\. · 144\s€ jährlich abgerechnet$/);
+    if (fit.kind === 'plan') assert.match(priceOf(fit.offer, 'year', 1, 'eur')?.sub ?? '', /^exkl\. VAT · 144\s€ jährlich abgerechnet$/);
   } finally {
     setDictionary('en', null);
   }

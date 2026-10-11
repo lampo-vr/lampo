@@ -113,17 +113,18 @@ test('t(): placeholders, plurals, contexts, and the German words', () => {
   setDictionary('en', null);
 });
 
-test('a sentence never ends in two full stops when what fills its end has one ("zzgl. USt.", a name)', () => {
+test('a sentence never ends in two full stops when what fills its end has one (a name), and keeps its own otherwise', () => {
   setDictionary('de', de);
+  // German says VAT like the English, without a stop of its own: the sentence ends on its own full stop
   for (const vat of ['{amount} excl. VAT', '{amount} incl. {rate} VAT'] as const) {
     const amount = t(vat, { amount: '24,00 €', rate: '19 %' });
-    assert.match(amount, /USt\.$/);
+    assert.match(amount, /VAT$/);
     for (const said of [
       t('Your trial ends today, and {plan} is billed now: {amount}.', { plan: 'Business', amount }),
       t('It takes effect at once. Your trial ends today, and {plan} is billed now: {amount}.', { plan: 'Business', amount }),
     ]) {
       assert.doesNotMatch(said, /\.\./, said);
-      assert.match(said, /USt\.$/);
+      assert.match(said, /VAT\.$/);
     }
   }
   // the net with what is invoiced now in brackets ends on the bracket: the sentence keeps its own full stop
@@ -131,7 +132,7 @@ test('a sentence never ends in two full stops when what fills its end has one ("
     plan: 'Business',
     amount: t('{amount} excl. VAT ({total} incl. VAT)', { amount: '84,00 €', total: '99,96 €' }),
   });
-  assert.equal(both, 'Deine Testphase endet heute, und Business wird jetzt abgerechnet: 84,00 € zzgl. USt. (99,96 € inkl. USt.).');
+  assert.equal(both, 'Deine Testphase endet heute, und Business wird jetzt abgerechnet: 84,00 € exkl. VAT (99,96 € inkl. VAT).');
   assert.equal(t('On {name}.', { name: 'Acme Inc.' }), 'Auf Acme Inc.');
   assert.equal(t('On {name}.', { name: 'Acme' }), 'Auf Acme.', 'a value without one keeps the sentence’s');
   const html = renderToStaticMarkup(createElement('p', null, rich(message('On {name}.'), { name: 'Acme Inc.' }, [])));

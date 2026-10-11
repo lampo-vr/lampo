@@ -100,9 +100,9 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Paid plans are for businesses: confirm that you’re buying for your business, not as a private person.':
     'Bezahlte Pläne sind für Unternehmen: Bestätige, dass du für dein Unternehmen kaufst, nicht als Privatperson.',
   'Paid plans are for businesses. Prices are excl. VAT; the checkout adds the VAT for your billing address, and a business with a VAT ID from another EU country pays none.':
-    'Bezahlte Pläne sind für Unternehmen. Die Preise verstehen sich zzgl. USt.; an der Kasse kommt die USt. für deine Rechnungsadresse dazu, und ein Unternehmen mit USt-IdNr. aus einem anderen EU-Land zahlt keine.',
+    'Bezahlte Pläne sind für Unternehmen. Preise exkl. VAT; an der Kasse kommt VAT für deine Rechnungsadresse dazu, und ein Unternehmen mit USt-IdNr. aus einem anderen EU-Land kauft ohne VAT.',
   'Paid plans are for businesses. Prices are excl. VAT; the checkout adds the VAT for your billing address.':
-    'Bezahlte Pläne sind für Unternehmen. Die Preise verstehen sich zzgl. USt.; an der Kasse kommt die USt. für deine Rechnungsadresse dazu.',
+    'Bezahlte Pläne sind für Unternehmen. Preise exkl. VAT; an der Kasse kommt VAT für deine Rechnungsadresse dazu.',
   'That VAT ID doesn’t fit the address’s country. Check it, or leave it out.': 'Diese USt-IdNr. passt nicht zum Land der Adresse. Prüf sie, oder lass sie weg.',
   // reverse charge only where the provider offers it; a consumer's yearly plan after its first year: one month's notice
   '{amount} for {days} of {of} days': '{amount} für {days} von {of} Tagen',
@@ -3821,7 +3821,7 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Total per month': 'Gesamt pro Monat',
   'Total per year': 'Gesamt pro Jahr',
   'Use it': 'Übernehmen',
-  VAT: 'USt.',
+  VAT: 'VAT',
   'VAT number': 'USt-IdNr.',
   'Where you are': 'Wo du bist',
   yearly: 'jährlich',
@@ -4868,62 +4868,62 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'This plan ends at the end of its period: one month’s notice is for a consumer’s yearly plan after its first year.':
     'Dieser Plan endet zum Ende seines Zeitraums: Die Kündigung mit einer Frist von einem Monat gilt für den Jahresplan von Verbrauchern nach dem ersten Jahr.',
   // net prices like the website, the total with VAT where it is bought; Send a test says what happened
-  '{amount} a month for the {n} of you, billed yearly, excl. VAT': '{amount} im Monat für euch {n}, jährlich abgerechnet, zzgl. USt.',
-  '{amount} a month for the {n} of you, excl. VAT': '{amount} im Monat für euch {n}, zzgl. USt.',
-  '{amount} excl. VAT': '{amount} zzgl. USt.',
-  '{amount} excl. VAT ({total} incl. VAT)': '{amount} zzgl. USt. ({total} inkl. USt.)',
-  '{amount} incl. {rate} VAT': '{amount} inkl. {rate} USt.',
+  '{amount} a month for the {n} of you, billed yearly, excl. VAT': '{amount} im Monat für euch {n}, jährlich abgerechnet, exkl. VAT',
+  '{amount} a month for the {n} of you, excl. VAT': '{amount} im Monat für euch {n}, exkl. VAT',
+  '{amount} excl. VAT': '{amount} exkl. VAT',
+  '{amount} excl. VAT ({total} incl. VAT)': '{amount} exkl. VAT ({total} inkl. VAT)',
+  '{amount} incl. {rate} VAT': '{amount} inkl. {rate} VAT',
   '{month} a month · {year} billed yearly, {tax}': '{month} im Monat · {year} jährlich, {tax}',
   '{month} a month, billed monthly, {tax}': '{month} im Monat, monatlich, {tax}',
-  '{plan} for {n}: {price} a month, billed yearly, excl. VAT': '{plan} für {n}: {price} im Monat, jährlich abgerechnet, zzgl. USt.',
+  '{plan} for {n}: {price} a month, billed yearly, excl. VAT': '{plan} für {n}: {price} im Monat, jährlich abgerechnet, exkl. VAT',
   '{plan} for {n}: {price} a month, billed yearly, or {monthly} monthly, excl. VAT.':
-    '{plan} für {n}: {price} im Monat bei jährlicher Abrechnung, oder {monthly} monatlich, zzgl. USt.',
-  '{plan}: {amount} a month for {n}, billed yearly, excl. VAT': '{plan}: {amount} im Monat für {n}, jährlich abgerechnet, zzgl. USt.',
-  '{plan}: {price} a month, billed yearly, excl. VAT': '{plan}: {price} im Monat, jährlich abgerechnet, zzgl. USt.',
+    '{plan} für {n}: {price} im Monat bei jährlicher Abrechnung, oder {monthly} monatlich, exkl. VAT.',
+  '{plan}: {amount} a month for {n}, billed yearly, excl. VAT': '{plan}: {amount} im Monat für {n}, jährlich abgerechnet, exkl. VAT',
+  '{plan}: {price} a month, billed yearly, excl. VAT': '{plan}: {price} im Monat, jährlich abgerechnet, exkl. VAT',
   '{plan}: {price} a month, billed yearly, or {monthly} monthly, excl. VAT.':
-    '{plan}: {price} im Monat bei jährlicher Abrechnung, oder {monthly} monatlich, zzgl. USt.',
+    '{plan}: {price} im Monat bei jährlicher Abrechnung, oder {monthly} monatlich, exkl. VAT.',
   '{tax} · billed monthly': '{tax} · monatliche Abrechnung',
   '{tax} · billed yearly, {saving}': '{tax} · jährliche Abrechnung, {saving}',
   'about {amount} a month · {tax}': 'etwa {amount} im Monat · {tax}',
   'After that, {plan} is {price} a month for the {n} of you, billed yearly, excl. VAT.':
-    'Danach kostet {plan} {price} im Monat für euch {n}, jährlich abgerechnet, zzgl. USt.',
-  'After that, {plan} is {price} a month, billed yearly for {n}, excl. VAT.': 'Danach kostet {plan} {price} im Monat, jährlich abgerechnet für {n}, zzgl. USt.',
-  'After that, {plan} is {price} a month, billed yearly, excl. VAT.': 'Danach kostet {plan} {price} im Monat, jährlich abgerechnet, zzgl. USt.',
+    'Danach kostet {plan} {price} im Monat für euch {n}, jährlich abgerechnet, exkl. VAT.',
+  'After that, {plan} is {price} a month, billed yearly for {n}, excl. VAT.': 'Danach kostet {plan} {price} im Monat, jährlich abgerechnet für {n}, exkl. VAT.',
+  'After that, {plan} is {price} a month, billed yearly, excl. VAT.': 'Danach kostet {plan} {price} im Monat, jährlich abgerechnet, exkl. VAT.',
   'Agents and people on review links are free on every plan. More storage on any plan: 1 TB for {amount} a month, {tax}. Business as a contract, on invoice:':
     'Agents und Leute auf Review-Links sind in jedem Plan kostenlos. Mehr Speicher in jedem Plan: 1 TB für {amount} im Monat, {tax}. Business als Vertrag, auf Rechnung:',
   'Billed monthly · {tax}': 'Monatlich · {tax}',
   'Check the connection, then try again.': 'Prüf die Verbindung und versuch es dann noch einmal.',
   'Couldn’t send: {why}': 'Nicht gesendet: {why}',
-  'excl. VAT': 'zzgl. USt.',
-  'excl. VAT · {amount} billed yearly': 'zzgl. USt. · {amount} jährlich abgerechnet',
-  'excl. VAT · {amount} billed yearly · {each} per member': 'zzgl. USt. · {amount} jährlich abgerechnet · {each} pro Mitglied',
-  'excl. VAT · billed monthly · {each} per member · {yearly} if yearly': 'zzgl. USt. · monatlich abgerechnet · {each} pro Mitglied · {yearly} bei jährlich',
-  'excl. VAT · billed monthly · {yearly} if yearly': 'zzgl. USt. · monatlich abgerechnet · {yearly} bei jährlich',
-  'excl. VAT · billed with {plan}': 'zzgl. USt. · mit {plan} abgerechnet',
-  'incl. VAT': 'inkl. USt.',
+  'excl. VAT': 'exkl. VAT',
+  'excl. VAT · {amount} billed yearly': 'exkl. VAT · {amount} jährlich abgerechnet',
+  'excl. VAT · {amount} billed yearly · {each} per member': 'exkl. VAT · {amount} jährlich abgerechnet · {each} pro Mitglied',
+  'excl. VAT · billed monthly · {each} per member · {yearly} if yearly': 'exkl. VAT · monatlich abgerechnet · {each} pro Mitglied · {yearly} bei jährlich',
+  'excl. VAT · billed monthly · {yearly} if yearly': 'exkl. VAT · monatlich abgerechnet · {yearly} bei jährlich',
+  'excl. VAT · billed with {plan}': 'exkl. VAT · mit {plan} abgerechnet',
+  'incl. VAT': 'inkl. VAT',
   'no connection': 'keine Verbindung',
   'Nothing. The difference for the rest of this period is on the invoice of {date}, excl. VAT, paid with {card}.':
-    'Nichts. Die Differenz für den Rest des Zeitraums steht zzgl. USt. auf der Rechnung vom {date} und wird mit {card} bezahlt.',
+    'Nichts. Die Differenz für den Rest des Zeitraums steht exkl. VAT auf der Rechnung vom {date} und wird mit {card} bezahlt.',
   'Nothing. The difference for the rest of this period is on the next invoice, excl. VAT, paid with {card}.':
-    'Nichts. Die Differenz für den Rest des Zeitraums steht zzgl. USt. auf der nächsten Rechnung und wird mit {card} bezahlt.',
+    'Nichts. Die Differenz für den Rest des Zeitraums steht exkl. VAT auf der nächsten Rechnung und wird mit {card} bezahlt.',
   'Nothing. The difference for the rest of this period, {amount} excl. VAT, is on the invoice of {date}, paid with {card} like {plan}.':
-    'Nichts. Die Differenz für den Rest des Zeitraums, {amount} zzgl. USt., steht auf der Rechnung vom {date} und wird wie {plan} mit {card} bezahlt.',
+    'Nichts. Die Differenz für den Rest des Zeitraums, {amount} exkl. VAT, steht auf der Rechnung vom {date} und wird wie {plan} mit {card} bezahlt.',
   'per member a month': 'pro Mitglied im Monat',
   'save up to {share}': 'bis zu {share} sparen',
   'Sent, but not shown here': 'Gesendet, aber hier nicht angezeigt',
   'Sent: check your notifications': 'Gesendet: Schau in deine Benachrichtigungen',
   'The difference for the rest of this period goes on the invoice of {date}, excl. VAT.':
-    'Die Differenz für den Rest des Zeitraums kommt zzgl. USt. auf die Rechnung vom {date}.',
+    'Die Differenz für den Rest des Zeitraums kommt exkl. VAT auf die Rechnung vom {date}.',
   'The difference for the rest of this period goes on the next invoice, excl. VAT.':
-    'Die Differenz für den Rest des Zeitraums kommt zzgl. USt. auf die nächste Rechnung.',
+    'Die Differenz für den Rest des Zeitraums kommt exkl. VAT auf die nächste Rechnung.',
   'The difference for the rest of this period, {amount} excl. VAT, is on the invoice of {date}.':
-    'Die Differenz für den Rest des Zeitraums, {amount} zzgl. USt., steht auf der Rechnung vom {date}.',
+    'Die Differenz für den Rest des Zeitraums, {amount} exkl. VAT, steht auf der Rechnung vom {date}.',
   'the push service refused it': 'der Push-Dienst hat abgelehnt',
   'The push service took it, but this browser hasn’t shown it yet. If it never comes, turn notifications off and on here.':
     'Der Push-Dienst hat sie angenommen, aber dieser Browser hat sie noch nicht angezeigt. Kommt sie nie an, schalte Benachrichtigungen hier aus und wieder an.',
   'The rest of this period goes on the next invoice, on {date}, prorated, excl. VAT.':
-    'Der Rest des Zeitraums kommt anteilig, zzgl. USt., auf die nächste Rechnung am {date}.',
-  'The rest of this period goes on the next invoice, prorated, excl. VAT.': 'Der Rest des Zeitraums kommt anteilig, zzgl. USt., auf die nächste Rechnung.',
+    'Der Rest des Zeitraums kommt anteilig, exkl. VAT, auf die nächste Rechnung am {date}.',
+  'The rest of this period goes on the next invoice, prorated, excl. VAT.': 'Der Rest des Zeitraums kommt anteilig, exkl. VAT, auf die nächste Rechnung.',
   'the server refused it': 'der Server hat abgelehnt',
   'This browser didn’t show it: allow notifications for this site in its settings.':
     'Dieser Browser hat sie nicht angezeigt: Erlaube Benachrichtigungen für diese Seite in seinen Einstellungen.',

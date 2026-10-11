@@ -413,14 +413,14 @@ try {
     assert(new Set(rows.map((r) => Math.round(r.line))).size > 1 || rows.some((r) => r.line > 20), `a line wraps in German: ${JSON.stringify(rows)}`);
     for (const k of ['price', 'billed', 'facts', 'note'])
       assert(new Set(rows.map((r) => r[k])).size === 1, `the tiles' ${k} rows line up: ${rows.map((r) => r[k]).join(', ')}`);
-    // "für Unternehmen", "zzgl. USt.": the box and the plain line in German (du)
+    // "für Unternehmen", "exkl. VAT": the box and the plain line in German (du)
     assert(
       (await text('[data-testid=billing-pick-bar] [data-testid=billing-business]')) === 'Ich kaufe für mein Unternehmen, nicht als Privatperson',
       await text('[data-testid=billing-pick-bar] [data-testid=billing-business]'),
     );
     assert(
       (await text('[data-testid=billing-vat]')) ===
-        'Bezahlte Pläne sind für Unternehmen. Die Preise verstehen sich zzgl. USt.; an der Kasse kommt die USt. für deine Rechnungsadresse dazu.',
+        'Bezahlte Pläne sind für Unternehmen. Preise exkl. VAT; an der Kasse kommt VAT für deine Rechnungsadresse dazu.',
       await text('[data-testid=billing-vat]'),
     );
     const de = await layoutMatrix(page, { 'billing (German)': null }, { widths: [390, 1440], themes: ['light'] });
