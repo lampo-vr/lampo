@@ -10,11 +10,11 @@ import path from 'node:path';
 import type { ActivityRecord, ActivitySink } from '../activity.ts';
 import { type ActivityKey, excerpt, words } from '../activityText.ts';
 import { type Backend, StoppedError, signalsHeard } from '../backend/types.ts';
-import { stillOpenLine, WATCH_NOW_LINE } from '../handoff.ts';
+import { stillOpenLine, WATCH_NOW_LINE, workLeft } from '../handoff.ts';
 import { isoLocal, slugify } from '../paths.ts';
 import { probe } from '../probe.ts';
 import type { SessionInput } from '../store.ts';
-import { isRequired, oneLine } from '../time.ts';
+import { oneLine } from '../time.ts';
 import type { ActivityWords, AgentActivityKind, Review, RunProgress } from '../types.ts';
 import { etaOf } from './eta.ts';
 import { ERROR_MAX, failureWords, redact } from './redact.ts';
@@ -277,7 +277,8 @@ export async function executeRender(job: RenderJob, hooks: RenderHooks): Promise
   say('upload', words('Put a new version up for review'), { target: `v${got}` });
   if (duplicate) return { ok: true, code: 0, v: got, lines: [`V${got} rendered in ${elapsed}: unchanged, the same bytes as V${got}.`, WATCH_NOW_LINE] };
   const n = review.versions.find((x) => x.v === got)?.frames ?? frames;
-  const open = review.comments.filter((c) => c.status === 'open' && isRequired(c)).length;
+  // notes it answered wait for the person: not left to mark (lib/handoff.ts workLeft)
+  const open = workLeft(review.comments);
   return {
     ok: true,
     code: 0,

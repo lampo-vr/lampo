@@ -85,6 +85,7 @@ const SECONDS = {
   // an agent's reply in the open player without a reload: this machine, two tabs, a hosted server's second workspace
   // (measured in a run of ten, 2026-10-11)
   'agent-reply': 28,
+  'agent-listening': 70,
   // frame-exact in WebKit on an iPhone, the review link at 390 and 430, a big version's phone copy (made, then played)
   webkit: 45,
   playbook: 15,

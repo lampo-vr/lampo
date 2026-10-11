@@ -398,11 +398,15 @@ Connect an agent and Connected agents ("connected", "waiting for your notes", "w
 |---|---|
 | listening | it waits for new notes now (or is about to call the next wait), or it follows them with `lampo watch` |
 | working | its last wait handed it notes a few minutes ago, and it is still calling: it listens again when it's done |
-| not listening | connected, but nothing makes it look: new notes wait until you start it |
+| not listening | connected, but nothing makes it look: new notes wait until you start it; also an agent that handed the next step to you (a question, its last fix) and didn't start waiting within 45 seconds |
 | not connected | an agent connected over MCP that hasn't called for over a minute: the same |
 
 When a note goes to an agent that doesn't listen, the player says once how to start it (with the command to copy);
-the agent menu says it as long as the agent doesn't listen. On your own machine, a Claude Code session that Lampo
+the agent menu says it as long as the agent doesn't listen. **An agent that stopped in the middle** — it asked, or
+put up a version, and then ended its turn instead of waiting (a chat app asking in its chat) — while something waits
+on it (your answer to its question, notes you sent since): the agent's line above the notes and the agent menu say
+"Claude isn't listening — tell it “go on” in Claude", with "go on" to copy. It waits again with the cursor it had, and the
+line goes by itself. On your own machine, a Claude Code session that Lampo
 sees (not one connected over MCP) can also be started by Lampo itself
 ([agents.md](agents.md#when-youre-not-running-the-machine-can-start-you)).
 
@@ -455,8 +459,11 @@ and a third line: `The person's notes arrive together when they press Send: call
 After 30 minutes of nothing but that (waits that follow each other; a pause of more than two minutes starts the count
 again, and any real answer does), the third line tells the agent to stop and say so instead, and `structuredContent`
 carries `stop: true`: `30 min with nothing new: stop waiting now. Tell the person you stopped listening; the watch
-prompt (/lampo:watch in Claude Code) starts you again.` The count is kept per agent (over HTTP: the connected agent,
-else the token or app) in memory, bounded.
+prompt (/lampo:watch in Claude Code) starts you again.` A chat app (Claude, ChatGPT, Cowork) limits a turn, and every
+wait is a call in it: it stops after 12 waits in a row with nothing new (about ten minutes), while it can still say so,
+and its last line in the chat is the one the person needs: `Nothing new for a while: stop waiting now, and end your
+turn with only this line to the person: "I'm waiting for your answer in Lampo — answer there, then tell me 'go on'
+here."` The count is kept per agent (over HTTP: the connected agent, else the token or app) in memory, bounded.
 
 One answer holds at most 20 events, the oldest first. When more arrived it says so (`more: true`), and the next call
 with its cursor returns the rest at once. The full events, with paths and screenshot URLs, are in
@@ -480,15 +487,20 @@ Details:
 
 ### Wait right after handing over
 
-An agent hears notes only while it waits, so every answer that hands work to the person ends with one line saying to
-wait now, with a cursor from that very moment: a note written before the agent's next call is still heard.
+An agent hears notes only while it waits, so every answer that hands work to the person, or leaves the agent waiting
+on them, ends with one line saying to wait now, with a cursor from that very moment: a note written before the agent's
+next call is still heard. A question is asked in Lampo, never also in the chat, and the answer comes only while the
+agent waits: an agent that asks and ends its turn leaves the answer to nobody.
 
 | Answer | Its last line |
 |---|---|
 | `track_video` (a render put up, a part too) | `Now call wait_for_feedback with since "<cursor>": the person's notes arrive together when they press Send.` |
-| `mark_fixed`, `wont_fix` | the same once none of the video's notes is open (ideas and your questions don't count); before that `2 notes still open on this video.` |
+| `mark_fixed`, `wont_fix`, an agent's `reply`, `add_note` with kind question, `ask_options`, `attach_preview` | the same once none of the video's notes is left to work (ideas, your questions and notes you answered with a reply don't count: they wait for the person); before that `2 notes still open on this video.` |
 | `request_upload`'s `PUT` (and the `GET` after it) | the JSON carries `cursor` and `next` (that line) |
-| `lampo track`, `lampo push`, `lampo fix`, `lampo wontfix` | `Now listen with lampo watch (keep it running): …` (`lampo watch` takes no cursor; `lampo push --json` has `next`) |
+| `lampo track`, `lampo push`, `lampo fix`, `lampo wontfix`, an agent's `lampo reply`, a question with `lampo add`, `lampo ask` | `Now listen with lampo watch (keep it running): …` (`lampo watch` takes no cursor; `lampo push --json` has `next`; with `--json` the line goes to stderr) |
+
+An answer that ends with this line tells the app the next step is the person's: unless the agent starts waiting within
+45 seconds, it shows as not listening (above).
 
 ```
 PUT → {"slug":"…","v":2,"created":false,"duplicate":false,"video":"…",

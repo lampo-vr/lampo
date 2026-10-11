@@ -9,9 +9,9 @@ import type { AskItemRequest } from '../../lib/backend/types.ts';
 import { askPrompt, askText, folderName, localPath, optionId, optionLabel, refData, refUrl, refVideo } from '../../lib/inputs.ts';
 import { OPTION_LIMITS, optionsSummary } from '../../lib/options.ts';
 import { REF_LIMITS } from '../../lib/refs.ts';
-import { oneLine } from '../../lib/time.ts';
+import { isAgent, oneLine } from '../../lib/time.ts';
 import { allowed } from '../access.ts';
-import { ok, pickVersion, text } from '../format.ts';
+import { afterHandBack, ok, pickVersion, text } from '../format.ts';
 import type { ToolKit } from '../toolkit.ts';
 
 export function registerAskTools({ b, o, tool, author, accountOf, byArg }: ToolKit): void {
@@ -143,6 +143,8 @@ export function registerAskTools({ b, o, tool, author, accountOf, byArg }: ToolK
         ];
         // a command to run for agents with a shell; a chat client is told what the URL takes (mcp/loop.ts)
         for (const [key, t] of urls) lines.push(`${key}: PUT its file once (until ${t.expires}): ${o.way === 'chat' ? t.url : `curl -fT <file> '${t.url}'`}`);
+        // the pick is the person's: what is left to work on the video, or (none, or a folder) wait now for it
+        if (isAgent(who)) lines.push(await afterHandBack(b, made.slug ?? null));
         return ok(text(lines.join('\n')));
       } finally {
         for (const d of scratch) fs.rmSync(d, { recursive: true, force: true });

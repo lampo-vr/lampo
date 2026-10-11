@@ -94,6 +94,9 @@ format stays backwards compatible throughout.
   In German: "für Unternehmen".
 
 ### Added
+- When an agent stops listening while something waits on it — your answer to its question, notes you sent — the
+  player says so calmly in the agent's line above the notes and in the agent menu: "Claude isn't listening — tell it
+  “go on” in Claude", with "go on" to copy. Told that, it picks up where it was, and the line goes by itself.
 - **Start with your agent in one paste.** An empty library, project or folder leads with **Copy prompt for your
   agent**: paste it into Claude Code, Codex, Cursor, ChatGPT, Claude or any other agent, and it connects itself to
   Lampo, tells you the one step only you can do (signing in, a restart), asks how you want to start — from scratch,
@@ -109,6 +112,10 @@ format stays backwards compatible throughout.
   you list your server's MCP connector there.
 
 ### Fixed
+- An agent that asks you something waits for your answer in Lampo instead of stopping: a reply, a question on a frame
+  and options to pick now tell it to wait there (and never to ask again in its chat), so your answer reaches it. A chat
+  app that has waited a while without news ends with one line: "I'm waiting for your answer in Lampo — answer there,
+  then tell me 'go on' here."
 - On a hosted server, an agent's reply, new note or fix made through the MCP connection now shows in the open player
   right away, in every workspace. Outside a server's first workspace it showed only after a reload: an open note
   didn't show the reply, and a closed note's reply count stayed as it was.

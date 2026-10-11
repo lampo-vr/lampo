@@ -225,12 +225,15 @@ export function LiveSection({
   run,
   enabled,
   noteAt,
+  listening = null,
 }: {
   slug: string;
   agent: string;
   run: AgentRunInfo | null;
   enabled: boolean;
   noteAt?: NoteAt;
+  /** Whether it hears notes now (server/agents.ts; null: Lampo can't tell): a wait it stopped is said as past. */
+  listening?: boolean | null;
 }) {
   const [all, setAll] = useState(false);
   const mine = pick(useAgentActivity(slug, agent, enabled), agent);
@@ -238,7 +241,10 @@ export function LiveSection({
   const going = run?.state === 'running';
   const now = useNow(recent.length > 0 || going);
   const head = recent[0] ?? null;
-  const working = going || fresh(head, now);
+  // An agent that isn't listening is doing nothing now, whatever it did a moment ago: its last action is the latest,
+  // not live — "Waiting for your answer · since 12:41" was true only until it stopped.
+  const stale = listening === false;
+  const working = going || (fresh(head, now) && !stale);
   const total = Math.min(recent.length, TIMELINE + 1);
   if (!head && !run) return null;
   // While a run goes, its own step is the newest thing known (the activity follows within a second).
@@ -252,7 +258,9 @@ export function LiveSection({
       {(head || step) && (
         <div className="am-now" data-testid="agent-now">
           <KeyGlyph shape={working ? 'ease' : 'outline'} className={`nav-kg ${working ? 'live' : ''}`} />
-          <span className="am-now-text">{step ? say(step, noteAt) : head && activityLine(head, noteAt)}</span>
+          <span className="am-now-text">
+            {step ? say(step, noteAt) : head && (stale && head.kind === 'wait' ? say(head, noteAt) : activityLine(head, noteAt))}
+          </span>
           {head && !step && <span className="am-when">{ago(head.at)}</span>}
         </div>
       )}

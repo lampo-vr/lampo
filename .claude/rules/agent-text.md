@@ -43,6 +43,11 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - Every way the app ends runs that stop: SIGTERM, Ctrl-C and SIGHUP (a closed terminal; without a handler the app died
   by the signal and its `exit` handler never ran), and a run that ended on its own gets it for what it left running.
 - An answer that hands work to the person ends with `lib/handoff.ts`'s line (wait now, cursor from that moment).
+- An answer that leaves the agent waiting on the person ends with the wait line too — a reply, a question, options, a
+  fix's preview (`afterHandBack`; `lampo`: `WATCH_NOW_LINE`) — and a note it answered is no work left (`workLeft`):
+  `reply` said only "reply added", a chat agent asked again in its chat and ended its turn, and the person's answer in
+  Lampo reached nobody. That line also tells the app (`onHandBack` → server/agents.ts `handedBack`): no wait within
+  `graceMs`, and the app says it isn't listening.
 - A stopped render is decided by the stop, never by the tool's exit code (a wrapper script runs on to exit 0 with its
   file cut short), and the same stop aborts the upload that follows (`hooks.abort`, lib/render/job.ts).
 - A signal that lands during synchronous work (a registration's probe and copy, a big render's hash) is handled only in

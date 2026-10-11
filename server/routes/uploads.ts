@@ -587,6 +587,11 @@ export function uploadRoutes(ctx: ServerContext): Router {
     const job = ctx.inflight.track(work).then(
       (result) => {
         const present = t.present;
+        // the agent's render is the person's to review now: unless the agent waits soon, the app shows it isn't listening
+        if (target.kind === 'render' && target.agent) {
+          const agent = target.agent;
+          inWorkspace(t.ws, () => ctx.agents.handedBack(agent));
+        }
         t.outcome = {
           status: 'done',
           result:

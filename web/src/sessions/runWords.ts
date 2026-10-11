@@ -13,7 +13,7 @@ import { edgeOf, fixing, LOOK, type Phase, phaseOf, progressOf, type RunLike, ty
 export { isOpen, phaseOf, planCounts, type RunLike, runShort } from './runState.ts';
 
 /** What the person can do from the line (gated by the caller: Stop, Try again and Nudge need the agents right). */
-export type RunAction = 'answer' | 'check' | 'log' | 'retry' | 'nudge' | 'stop' | 'cancel' | 'again' | 'copy' | 'allow';
+export type RunAction = 'answer' | 'check' | 'log' | 'retry' | 'nudge' | 'stop' | 'cancel' | 'again' | 'copy' | 'go_on' | 'allow';
 
 export interface RunSaid {
   phase: Phase;
@@ -214,6 +214,15 @@ export function idleSaid(name: string, reachable: boolean, canCopy: boolean): Ru
         edge: null,
         actions: canCopy ? ['copy'] : [],
       };
+}
+
+/**
+ * The agent stopped listening while something waits on it (an answer to its question, notes sent since it handed
+ * over): the line says to tell it "go on" where it runs (`words`: sessions/listening.tsx goOnWords), calmly, with that to
+ * copy. It replaces whatever the work said last ("Waiting for your answer" was the agent's word from before it stopped).
+ */
+export function stalledSaid(words: string): RunSaid {
+  return { phase: 'not_listening', ...LOOK.not_listening, name: null, words, figure: null, edge: null, actions: ['go_on'] };
 }
 
 /** A note's line under its row while it is in a run's plan: nothing before the agent reaches it. */

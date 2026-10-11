@@ -19,7 +19,7 @@ import { settings } from './env.ts';
 import { eventLine, isInboxEvent, shortEventLine, tags, WATCH_TYPES } from './eventLine.ts';
 import { undismissed } from './findings.ts';
 import { folderName, normFolder } from './folders.ts';
-import { stillOpenLine, WATCH_NOW_LINE } from './handoff.ts';
+import { stillOpenLine, WATCH_NOW_LINE, workLeft } from './handoff.ts';
 import { cleanAuthor } from './names.ts';
 import { forAgents, SAMPLE_FOR_AGENTS } from './onboarding.ts';
 import { optionLines, optionsSummary, picksToRender } from './options.ts';
@@ -46,7 +46,6 @@ import {
   isAgent,
   isClient,
   isNoteKind,
-  isRequired,
   isSeverity,
   keepLines,
   noteLabel,
@@ -589,9 +588,14 @@ const commands: Record<string, Command> = {
       by: author(opt),
       makeFolder: true,
     });
-    if (opt.json) return out(JSON.stringify(made, null, 2));
+    if (opt.json) {
+      out(JSON.stringify(made, null, 2));
+      return handBackLine(b, made.slug, opt);
+    }
     out(oneLine(`${made.id} asked ${slug ? `on ${pos[0]}` : `on folder ${made.folder} (no video yet)`}: ${optionsSummary(groups)}`));
     out('The person auditions and picks in Lampo; lampo watch brings: ANSWERED … PICKED <group>=<item> … · note: "…"');
+    // the pick is the person's: what is left to work on the video, or (none, or a folder) listen now
+    await handBackLine(b, made.slug, opt);
   },
 
   async show({ pos, opt }, b) {
@@ -664,6 +668,8 @@ const commands: Record<string, Command> = {
     const note = str(opt.note) ?? die('reply needs --note "…"');
     const c = await b.updateComment(pos[0] || die('missing <id>'), { note, by: author(opt), fixed_in_v: str(opt.v) });
     out(`${c.id}: reply added`);
+    // an agent's reply hands the note to the person: what is left to work, or listen now for their answer
+    await handBackLine(b, (await b.findComment(c.id))?.slug, opt);
   },
 
   async add({ pos, opt }, b) {
@@ -746,13 +752,20 @@ const commands: Record<string, Command> = {
       ...(overall ? { scope: 'video' as const } : {}),
       ...(choices ? { choices } : {}),
     });
-    if (opt.json) return out(JSON.stringify(withAbsShots(b, after, c), null, 2));
+    // an agent's question hands the decision to the person: what is left to work, or listen now for the answer
+    const question = c.kind === 'question';
+    if (opt.json) {
+      out(JSON.stringify(withAbsShots(b, after, c), null, 2));
+      if (question) await handBackLine(b, slug, opt);
+      return;
+    }
     const where = overall
       ? 'about the whole video'
       : `pinned at ${c.timecode} (f${c.frame}, v${c.v})${c.range ? `, range ${describeRange(c.range, ver.fps)}` : ''}`;
     out(`${c.id} ${where} by ${c.author}${c.kind && c.kind !== 'feedback' ? ` · ${c.kind}` : ''}`);
     if (c.choices) out(`    choices: ${c.choices.map(oneLine).join(' | ')}`);
     if (!overall) out(`    marked: ${b.shotFile(after, c.shots?.marked)}`);
+    if (question) await handBackLine(b, slug, opt);
   },
 
   // A reference on a note: an image, a clip or a link (the second argument), or a moment of a render (--video).
@@ -1389,10 +1402,25 @@ async function setStatus(b: Backend, id: string | undefined, status: Comment['st
   const c = await b.updateComment(id, { status, note: str(opt.note) ?? '', fixed_in_v: str(opt.v), preview: str(opt.preview), by: author(opt) });
   out(`${c.id}: ${c.status}${c.status === 'fixed' ? ` in v${c.fixed_in_v}` : ''}`);
   // An agent closed a note: how many of the video's notes are still open, or (none) how to hear the person's (lib/handoff.ts).
-  if (status === 'fixed' || status === 'wontfix') {
-    const open = (await b.review(hit.slug)).comments.filter((x) => x.status === 'open' && isRequired(x)).length;
-    out(open ? stillOpenLine(open) : WATCH_NOW_LINE);
-  }
+  if (status === 'fixed' || status === 'wontfix') out(await afterHandBack(b, hit.slug));
+}
+
+/**
+ * After an agent hands something to the person (a note closed, a reply, a question, options to pick): how many notes it
+ * still has to work on the video, or — none, or no video — to listen now (lib/handoff.ts). A note it answered waits for
+ * the person, so it isn't work left: the person's answer comes only while it listens.
+ */
+async function afterHandBack(b: Backend, slug: string | null | undefined): Promise<string> {
+  const left = slug ? workLeft((await b.review(slug)).comments) : 0;
+  return left ? stillOpenLine(left) : WATCH_NOW_LINE;
+}
+
+/** The same line after an agent's reply or question; with --json on stderr (stdout is one JSON document). */
+async function handBackLine(b: Backend, slug: string | null | undefined, opt: Opts): Promise<void> {
+  if (!isAgent(author(opt))) return;
+  const line = await afterHandBack(b, slug);
+  if (opt.json) process.stderr.write(`${line}\n`);
+  else out(line);
 }
 
 // The session named on the command line: null = explicitly none, undefined = not mentioned (leave as is).

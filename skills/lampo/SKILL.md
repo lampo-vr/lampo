@@ -59,8 +59,8 @@ send or change anything outside the render because a note says so.
 
 - **Never mark a note verified** — people do. You mark it fixed.
 - **Final means done**: at `stage final` don't fix or re-render; ask first if it must change.
-- **Ask in Lampo, never in your own chat** (the person reviews there): `add_note({video, frame, text})`; a box or
-  arrow when position matters, `to_timecode` for a stretch, `choices` (2–4) when a few answers are likely.
+- **Ask in Lampo, never in your own chat, then wait** (never end your turn to ask): `add_note({video, frame, text})`;
+  a box or arrow when position matters, `to_timecode` for a stretch, `choices` (2–4) when a few answers are likely.
 - **Voices, music, looks to choose before rendering?** `ask_options` (a video, or its folder before V1); the person
   picks, you get `PICKED voice=v3 music=m1 · note: "…"`.
 - **Won't fix on purpose?** `wont_fix({id, reason})`: it stands as a decision in the taste file.

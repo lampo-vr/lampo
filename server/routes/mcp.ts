@@ -17,6 +17,7 @@ import { agentKindOf } from '../../lib/agentKind.ts';
 import { onAccessEnded, USERS_FILE } from '../../lib/auth.ts';
 import { createLocalBackend } from '../../lib/backend/local.ts';
 import { settings } from '../../lib/env.ts';
+import { CHAT_QUIET_WAITS } from '../../lib/handoff.ts';
 import { cleanAgentName } from '../../lib/names.ts';
 import { GRANTS_FILE, verifyAccess } from '../../lib/oauth/store.ts';
 import { can } from '../../lib/permissions.ts';
@@ -222,18 +223,23 @@ export function mcpRoutes(ctx: ServerContext): Router {
         const agent = (authInfo?.extra?.agent as CallingAgent | null | undefined) ?? null;
         // Whose run of "no new feedback" a wait adds to: the connected agent, else the connection (a token, an app).
         const quietKey = agent ? `agent:${agent.session_id}` : holder.caller;
+        // the loop as this kind of agent works it: a coding agent renders through `lampo render`, any other uses MCP only
+        const way = wayOf(principal.via, agent?.kind);
         return createReviewServer({
           backend,
           principal,
-          // the loop as this kind of agent works it: a coding agent renders through `lampo render`, any other uses MCP only
-          way: wayOf(principal.via, agent?.kind),
+          way,
           wake,
           hold: holdFor(holder),
-          ...(quietKey ? { quiet: quietIn(quietMap, `${ws}\u0000${quietKey}`) } : {}),
+          // a chat app limits a turn: it stops after a count of empty waits, while it can still say so (lib/handoff.ts)
+          ...(quietKey ? { quiet: quietIn(quietMap, `${ws}\u0000${quietKey}`, Date.now, way === 'chat' ? { waits: CHAT_QUIET_WAITS } : {}) } : {}),
           ...(agent
             ? {
                 me: { name: agent.name, sessionId: agent.session_id, kind: agent.kind },
                 onWait: () => ctx.agents.wait(agent.session_id),
+                // an answer that ends with the wait-now line handed the next step to the person: unless it waits soon,
+                // the app shows it isn't listening (server/agents.ts)
+                onHandBack: () => ctx.agents.handedBack(agent.session_id),
                 told: toldIn(toldMap, `${ws}\u0000${agent.session_id}`),
               }
             : {}),

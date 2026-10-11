@@ -132,8 +132,9 @@ export function registerVideoTools({ b, o, tool, author, accountOf, byArg, me }:
       async ({ filename, folder, video, part_at, handles }) => {
         const slug = video ? (await b.resolve(video)).slug : null;
         if (part_at !== undefined && !slug) throw new Error('a part needs the video it patches (video)');
-        // a new video the agent puts up (its V1) is assigned to it: the person's notes on it go to this agent
-        const who = slug ? null : me();
+        // a new video the agent puts up (its V1) is assigned to it: the person's notes on it go to this agent; any version
+        // it puts up hands the next step to the person (the app then watches for its wait: server/agents.ts)
+        const who = me();
         const t = requestUpload({
           filename,
           folder,

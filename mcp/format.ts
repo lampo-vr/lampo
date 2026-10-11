@@ -8,7 +8,7 @@ import { cacheRoot } from '../lib/backend/credentials.ts';
 import type { Backend } from '../lib/backend/types.ts';
 import { describeShape } from '../lib/drawing.ts';
 import { onWords } from '../lib/elements.ts';
-import { cursorAt, nothingWaitingLine, stillOpenLine, waitNowLine } from '../lib/handoff.ts';
+import { cursorAt, nothingWaitingLine, stillOpenLine, waitNowLine, workLeft } from '../lib/handoff.ts';
 import { SAMPLE_FOR_AGENTS } from '../lib/onboarding.ts';
 import { optionLines } from '../lib/options.ts';
 import { partLine, partOk, partOkWords } from '../lib/part.ts';
@@ -18,7 +18,7 @@ import { FFMPEG, run } from '../lib/probe.ts';
 import { describeRange, stripFrames } from '../lib/range.ts';
 import { describeRef } from '../lib/refLine.ts';
 import { counts, describeSource } from '../lib/store.ts';
-import { CLIENT_NOTE_FLAG, instant, isAgent, isClient, isRequired, keepLines, noteLabel, oneLine, parseFramePosition, timeToFrame } from '../lib/time.ts';
+import { CLIENT_NOTE_FLAG, instant, isAgent, isClient, keepLines, noteLabel, oneLine, parseFramePosition, timeToFrame } from '../lib/time.ts';
 import { textEditLine } from '../lib/transcript.ts';
 import type { AskView, Comment, NotePointer, Rect, Review, Shape, StageInfo, Version } from '../lib/types.ts';
 
@@ -63,10 +63,15 @@ export const isIdle = (r: CallToolResult): boolean => idleAnswers.has(r);
 /** The next step after such an answer: put up any version, then wait, from this moment (lib/handoff.ts). */
 export const nextStep = async (b: Backend): Promise<string> => nothingWaitingLine(await cursorNow(b));
 
-/** After a note is closed by its agent (fixed, won't fix): how many of the video's notes are still open, or wait now. */
-export async function afterClosed(b: Backend, slug: string): Promise<string> {
-  const open = (await b.review(slug)).comments.filter((c) => c.status === 'open' && isRequired(c)).length;
-  return open ? stillOpenLine(open) : handOff(b);
+/**
+ * After an agent hands something to the person (a note fixed or left as it is, a reply, a question, options to pick, a
+ * fix's preview): how many notes it still has to work on the video, or — none, or no video — wait now. A note it
+ * answered waits for the person, so it isn't work left (lib/handoff.ts workLeft): after its last answer it waits,
+ * rather than ending its turn with the person's answer coming in where nobody listens.
+ */
+export async function afterHandBack(b: Backend, slug: string | null): Promise<string> {
+  const left = slug ? workLeft((await b.review(slug)).comments) : 0;
+  return left ? stillOpenLine(left) : handOff(b);
 }
 
 /** The MCP client's name: per request on 2026-07-28 (`_meta` envelope), from the initialize handshake on 2025. */

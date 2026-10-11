@@ -170,8 +170,9 @@ try {
   // How agents used to ask ("nice" because nothing fit): without a kind it is a question now.
   res = await call('add_note', { video: 'clip.mp4', frame: 80, text: 'Absicht?', severity: 'nice', by: 'agent:promo-edit' });
   const id2 = must(/(c_[0-9a-f]{6})/.exec(textOf(res)))[1];
-  assert.match(textOf(res), /\nkind: question$/);
-  log(`add_note (by agent:promo-edit) → ${id2}, a question by default`);
+  // …and a question hands the decision to the person: what is left to work (the note above) before waiting
+  assert.match(textOf(res), /\nkind: question\n1 note still open on this video\.$/);
+  log(`add_note (by agent:promo-edit) → ${id2}, a question by default, then what is left to work`);
 
   // The notes are a second old when the agent reads them: `since` below is exact to the second.
   await new Promise((r) => setTimeout(r, 1100));
@@ -287,8 +288,12 @@ try {
   assert.equal(best[0], 45, `get_frame returned frame ${best[0]} (${JSON.stringify(errs)})`);
   log(`get_frame f45 → exact (MAE vs f44/45/46: ${errs.map((e) => e[1].toFixed(1)).join(' / ')})`);
 
-  await call('reply', { id: id1, note: 'Schaue ich mir an' });
-  log('reply');
+  // an agent's reply hands the note to the person: its last line says what is left to work, or to wait now
+  res = await call('reply', { id: id1, note: 'Schaue ich mir an' });
+  const [said, next] = textOf(res).split('\n');
+  assert.equal(said, `${id1}: reply added`);
+  assert.match(next ?? '', /^(\d+ notes? still open on this video\.|Now call wait_for_feedback with since "\S+": .+)$/);
+  log('reply → what is left to work, or wait now');
 
   // Since the first read: id1 has a reply and idQ is new; id2 is only named.
   res = await call('get_open_notes', { video: 'clip.mp4', since: asOf });
@@ -531,6 +536,8 @@ try {
     ],
     prompt: 'Anything for the end card?',
   });
+  // the pick is the person's, on a folder before any render: it waits now, from this moment
+  assert.match(textOf(askedRes).split('\n').at(-1) ?? '', /^Now call wait_for_feedback with since "\S+": /);
   const askId = must(
     /^(c_[0-9a-f]{6}) asked on folder Launch \(no video yet\): voice \(one of 2\), look \(one of 2\)$/m.exec(textOf(askedRes))?.[1],
     textOf(askedRes),

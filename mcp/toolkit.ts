@@ -8,6 +8,7 @@ import { agentName, ownedAgentName, toolActivity } from '../lib/activityText.ts'
 import type { OptionTarget } from '../lib/askOptions.ts';
 import type { Backend } from '../lib/backend/types.ts';
 import { settings } from '../lib/env.ts';
+import { endsWaitNow } from '../lib/handoff.ts';
 import { byName } from '../lib/inputs.ts';
 import { cleanAuthor, wellFormed } from '../lib/names.ts';
 import { isoLocal } from '../lib/paths.ts';
@@ -97,6 +98,11 @@ export interface ReviewServerOptions {
   me?: { name: string; sessionId: string | null; kind?: AgentKind } | null;
   /** A wait_for_feedback started: the app shows the agent as listening until the release (server/agents.ts). */
   onWait?: () => (o?: { handed?: boolean }) => void;
+  /**
+   * An answer ended with the wait-now line (lib/handoff.ts): the agent handed the next step to the person, and the app
+   * shows it isn't listening unless a wait follows soon (server/agents.ts).
+   */
+  onHandBack?: () => void;
   /** What a wait already told this agent was waiting for it (mcp/feedback.ts Told): each thing once. */
   told?: Told;
   /** How long this agent has heard only "no new feedback" in a row (mcp/feedback.ts Quiet): after 30 min, stop. */
@@ -181,7 +187,11 @@ export function createToolKit(server: McpServer, o: ReviewServerOptions): ToolKi
           noteActivity(name, given as Record<string, unknown>, ctx) ||
           newsFor(name, given as Record<string, unknown>, ctx) ||
           (isIdle(out) && offers('wait_for_feedback') && agentOf(ctx) ? await nextStep(b).catch(() => null) : null);
-        return line ? { ...out, content: [...out.content, { type: 'text', text: line }] } : out;
+        const answer = line ? { ...out, content: [...out.content, { type: 'text' as const, text: line }] } : out;
+        // the next step is the person's now: the agent should be waiting soon (the app watches for it)
+        const last = answer.content.at(-1);
+        if (o.onHandBack && last?.type === 'text' && endsWaitNow(last.text)) o.onHandBack();
+        return answer;
       } catch (e) {
         // a tool's answer is an agent's to read: a plan's refusal in plain words, never the plan's pitch (lib/planWords.ts)
         return fail(agentText(e, publicMessage(e, audienceOf(o.principal), { status: 400, where: `mcp ${name}` })));

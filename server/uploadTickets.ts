@@ -103,7 +103,14 @@ export type Outcome =
  * a fix preview, or a reference on a note.
  */
 export type TicketTarget =
-  | { kind: 'render'; meta: UploadMeta; byId?: string; session?: store.SessionInput }
+  | {
+      kind: 'render';
+      meta: UploadMeta;
+      byId?: string;
+      session?: store.SessionInput;
+      /** The connected agent that asked for the URL (its session id): told once the render is in (server/agents.ts). */
+      agent?: string;
+    }
   | { kind: 'preview'; preview: PreviewTarget }
   | { kind: 'ref'; ref: RefTarget }
   /** The file of an item a question with options offers (lib/askOptions.ts). */
@@ -284,9 +291,11 @@ export function createUploadTickets({ origin = null }: { origin?: string | null 
       // nothing new in an archived project: no URL for it at all (the upload checks again when it lands)
       if (meta.slug) checkReviewOpen(store.loadReview(meta.slug));
       else checkNotArchived(meta.folder);
-      // the agent that asked: a new video it puts up is its own (only a new one: a next version keeps its agent)
+      // the agent that asked: a new video it puts up is its own (only a new one: a next version keeps its agent); either
+      // hands the next step to the person once it is in (server/agents.ts handedBack)
       const own = session && !meta.slug ? { session } : {};
-      return issued(mint({ kind: 'render', meta, ...(byId ? { byId } : {}), ...own }, by, base, guard));
+      const agent = session?.sessionId ? { agent: session.sessionId } : {};
+      return issued(mint({ kind: 'render', meta, ...(byId ? { byId } : {}), ...own, ...agent }, by, base, guard));
     },
     issuePreview(target, by, base, guard) {
       const hit = store.findComment(target.comment);

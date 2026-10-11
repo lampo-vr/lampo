@@ -3,16 +3,19 @@
 // knows that from its open waits (server/agents.ts) — and one command starts it: the server's `watch` prompt, which
 // Claude Code shows as /lampo:watch. A Claude Code session on this machine is told apart by Lampo itself (Wake.tsx).
 import { useEffect, useRef } from 'react';
-import { agentKindOfRef } from '../../../lib/agentKind.ts';
+import { AGENT_KIND_LABELS, agentKindOfRef, agentShown, namesItsKind } from '../../../lib/agentKind.ts';
 import { MCP_NAME } from '../../../lib/brand.ts';
+import { instant, isAgent, isQuestion } from '../../../lib/time.ts';
 import type { AgentListenState } from '../../../lib/types.ts';
 import { useAgents } from '../api/auth.ts';
 import { useInfo } from '../api/queries.ts';
-import type { SessionRef } from '../api/types.ts';
+import type { Review, SessionRef } from '../api/types.ts';
 import { t } from '../i18n/index.ts';
 import { usePainted } from '../lib/lazy.ts';
 import { copyText, toast } from '../lib/toast.ts';
+import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { IconButton } from '../ui/primitives.tsx';
+import '../styles/listening.css';
 
 /** Claude Code lists the server's `watch` prompt as this command (typing /mcp__lampo__watch runs it too). */
 export const WATCH_COMMAND = `/${MCP_NAME}:watch`;
@@ -49,6 +52,81 @@ export function listenLine(state: Listen): string {
 
 /** Whether new notes wait for the person to start the agent. */
 export const waitsForStart = (state: Listen | null): boolean => state === 'idle' || state === 'offline';
+
+/**
+ * What sets an agent that stopped listening going again, typed where it runs: it waits again with the cursor it last
+ * had (mcp/loop.ts). Agent-facing, so in English whatever the UI's language.
+ */
+export const GO_ON = 'go on';
+
+/**
+ * The note the assigned agent owes its next step: the newest one whose last word is a person's, said after the agent's
+ * own last word on the video (a note or reply of its, a version it put up) — an answer to its question, a note sent
+ * since it handed over. Null when nothing waits on it, and before it said or put up anything here (starting an agent
+ * that hasn't begun is StartListening's).
+ */
+export function waitingOnAgent(review: Pick<Review, 'comments' | 'versions'>): string | null {
+  let spoke = Number.NEGATIVE_INFINITY;
+  for (const v of review.versions) if (v.run || isAgent(v.by)) spoke = Math.max(spoke, instant(v.registered));
+  for (const c of review.comments) {
+    if (isAgent(c.author)) spoke = Math.max(spoke, instant(c.created));
+    for (const r of c.replies ?? []) if (isAgent(r.by)) spoke = Math.max(spoke, instant(r.at));
+  }
+  if (!Number.isFinite(spoke)) return null;
+  let owed: string | null = null;
+  let newest = spoke;
+  for (const c of review.comments) {
+    const last = c.replies?.at(-1);
+    if (isAgent(last?.by ?? c.author)) continue;
+    const at = instant(last?.at ?? c.created);
+    // the person answered the agent on this very note: its place in the thread says it came after
+    const answered = !!last && (isAgent(c.author) || (c.replies ?? []).some((r) => isAgent(r.by)));
+    // a note still open, or a question of its own the person answered (an answer closes it)
+    const owes = c.status === 'open' || (answered && isAgent(c.author) && isQuestion(c));
+    // after the agent's last word; times are to the second, so a tie counts only for an answer in its own thread (a
+    // note of the same second elsewhere may have come first)
+    if (owes && (at > newest || (at === newest && answered))) {
+      owed = c.id;
+      newest = at;
+    }
+  }
+  return owed;
+}
+
+/**
+ * "Claude isn't listening — tell it “go on” in Claude": the agent by its shown name (an app's own id by its kind's name
+ * alone: whose it is goes without saying here), where to say it by its kind's.
+ */
+export function goOnWords(session: SessionRef): string {
+  const kind = agentKindOfRef(session);
+  const shown = agentShown(session.name, kind);
+  const name = namesItsKind(shown, kind) ? AGENT_KIND_LABELS[kind] : shown;
+  return kind === 'mcp' || kind === 'api' || kind === 'cli'
+    ? t('{name} isn’t listening — tell it “go on”', { name })
+    : t('{name} isn’t listening — tell it “go on” in {app}', { name, app: AGENT_KIND_LABELS[kind] });
+}
+
+/** Copies "go on", and says where it goes. */
+export async function copyGoOn(session: SessionRef): Promise<void> {
+  if (await copyText(GO_ON)) toast(t('Copied: paste it into {name}', { name: AGENT_KIND_LABELS[agentKindOfRef(session)] ?? session.name }), 'ok');
+}
+
+/**
+ * An agent that stopped listening while something waits on it (waitingOnAgent): calm, a muted line with the outline
+ * keyframe — nothing is wrong, it only has to be told to go on —, and "go on" to copy. The agent menu's state line; the
+ * run strip says the same in its own line (RunStrip.tsx), once per view: never again on the note it owes. It goes by
+ * itself once the agent waits again (the agents' state comes live: server/agents.ts → `sessions`).
+ */
+export function GoOn({ session, className = '' }: { session: SessionRef; className?: string }) {
+  const words = goOnWords(session);
+  return (
+    <div className={`go-on ${className}`} data-testid="go-on">
+      <KeyGlyph shape="outline" className="nav-kg run-kg quiet" />
+      <span className="go-on-words">{words}</span>
+      <IconButton className="btn sm ghost icon-only" label={t('Copy “go on”')} icon="copy" size={14} onClick={() => void copyGoOn(session)} />
+    </div>
+  );
+}
 
 /** What starts it: the command in Claude Code, a sentence for any other agent. */
 export function startWith(session: SessionRef): { claude: boolean; text: string } {

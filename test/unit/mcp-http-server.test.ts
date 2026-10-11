@@ -76,7 +76,12 @@ test('with a token: the hosted tool set, no paths, and authorship that cannot be
   assert.ok(byPath.isError, 'a hosted server never adds files from its own disk');
 
   const added = (await c.callTool({ name: 'add_note', arguments: { video: 'spot.mp4', frame: 4, text: 'Frage vom Agenten' } })) as Result;
-  assert.match(textOf(added), /pinned at .* by agent:hosted-test\nkind: question$/, "an agent's note is a question by default");
+  // a question hands the decision to the person: its answer ends with the wait line (lib/handoff.ts)
+  assert.match(
+    textOf(added),
+    /pinned at .* by agent:hosted-test\nkind: question\nNow call wait_for_feedback with since "\S+": /,
+    "an agent's note is a question by default",
+  );
   assert.ok(!textOf(added).includes(dir), 'no screenshot path from the server');
 });
 

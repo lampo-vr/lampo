@@ -6,7 +6,8 @@
 // "What agents read"); each fits test/unit/token-budget.test.ts.
 import { BRAND_NAME, MCP_NAME } from './brand.ts';
 import { isFeedback } from './eventLine.ts';
-import type { ReviewEvent } from './types.ts';
+import { isAgent, isRequired } from './time.ts';
+import type { Comment, ReviewEvent } from './types.ts';
 
 /** The words every line here shares: notes come when the person sends them, together. */
 const ON_SEND = "the person's notes arrive together when they press Send";
@@ -44,5 +45,25 @@ export const PENDING_LINE = `${ON_SEND.charAt(0).toUpperCase()}${ON_SEND.slice(1
 /** After QUIET_STOP_MIN minutes of only that: stop, and tell the person how to start listening again. */
 export const QUIET_STOP_MIN = 30;
 export const STOP_LINE = `${QUIET_STOP_MIN} min with nothing new: stop waiting now. Tell the person you stopped listening; the watch prompt (/${MCP_NAME}:watch in Claude Code) starts you again.`;
-/** The same for a chat client (Claude, ChatGPT): no command or other app to name, the person asks again in the chat. */
-export const CHAT_STOP_LINE = `${QUIET_STOP_MIN} min with nothing new: stop waiting now. Tell the person you stopped listening; asking you to use ${BRAND_NAME} again starts you again.`;
+/**
+ * A chat app (Claude, ChatGPT, Cowork) limits a turn, and every wait is a call in it: after CHAT_QUIET_WAITS waits in a
+ * row with nothing new (about ten minutes at the 50 s default; Framejam calls its wait 12 times) the agent stops while
+ * it still can say so, instead of being cut off mid-wait with the person's answer coming in Lampo to nobody.
+ */
+export const CHAT_QUIET_WAITS = 12;
+/** What a chat agent says last when it stops waiting: one line that sends the person to the app and back. */
+export const CHAT_WAIT_WORDS = `"I'm waiting for your answer in ${BRAND_NAME} — answer there, then tell me 'go on' here."`;
+/** The same for a chat client: no command or other app to name; "go on" in the chat sets it waiting again. */
+export const CHAT_STOP_LINE = `Nothing new for a while: stop waiting now, and end your turn with only this line to the person: ${CHAT_WAIT_WORDS}`;
+
+/** Whether an answer's last line is the wait-now line: the agent handed the next step to the person (server/agents.ts). */
+export const endsWaitNow = (text: string): boolean => /(^|\n)Now call wait_for_feedback with since "[^"\n]+": [^\n]*$/.test(text);
+
+/**
+ * The notes an agent still has to work on a video: open ones to fix whose last reply isn't an agent's. A note it
+ * answered with a reply (a question, a why) waits for the person, so it isn't work left: after its last such answer it
+ * waits. (One an agent wrote, as feedback on footage it reviewed, is work like a person's until someone answers it.)
+ */
+export function workLeft(comments: readonly Comment[]): number {
+  return comments.filter((c) => c.status === 'open' && isRequired(c) && !isAgent(c.replies?.at(-1)?.by)).length;
+}

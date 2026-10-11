@@ -106,7 +106,7 @@ try {
           counts.stages >= 8 &&
           counts.logo === 1 &&
           counts.marks >= 12 &&
-          counts.strips === 15 &&
+          counts.strips === 16 &&
           counts.sections === blocks.length,
         JSON.stringify(counts),
       );

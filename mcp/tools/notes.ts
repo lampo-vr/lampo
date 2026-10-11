@@ -16,7 +16,7 @@ import { REF_LIMITS } from '../../lib/refs.ts';
 import { isAgent, NOTE_KINDS, oneLine, SEVERITIES, TAGS } from '../../lib/time.ts';
 import type { Comment, FixPreview, NoteKind, NoteRef, Severity, Shape } from '../../lib/types.ts';
 import { allowed } from '../access.ts';
-import { afterClosed, finalNotice, framePosition, ok, pickVersion, text } from '../format.ts';
+import { afterHandBack, finalNotice, framePosition, ok, pickVersion, text } from '../format.ts';
 import type { ToolKit } from '../toolkit.ts';
 
 export function registerNoteTools({ b, o, tool, author, accountOf, byArg }: ToolKit): void {
@@ -42,7 +42,7 @@ export function registerNoteTools({ b, o, tool, author, accountOf, byArg }: Tool
       await b.review(hit.slug, { wait: true });
       const c = await b.updateComment(id, { status: 'fixed', note, fixed_in_v: v, preview: pid, by: author(by, ctx) });
       // the last line: how many of the video's notes are still open, or (none) to wait for the person now
-      return ok(text(`${c.id}: fixed in v${c.fixed_in_v}${pid ? ` (shown on preview ${pid})` : ''}\n${await afterClosed(b, hit.slug)}`));
+      return ok(text(`${c.id}: fixed in v${c.fixed_in_v}${pid ? ` (shown on preview ${pid})` : ''}\n${await afterHandBack(b, hit.slug)}`));
     },
   );
 
@@ -173,9 +173,10 @@ export function registerNoteTools({ b, o, tool, author, accountOf, byArg }: Tool
         const t = requestPreviewUpload({ comment: args.id, request }, who);
         return ok(text(`PUT the ${request.kind} to this URL once (valid until ${t.expires}):\n${t.url}${example(t.url)}`));
       } else throw new Error(onThisMachine ? 'give the file as path or data' : 'give the file as base64 data');
+      // the reviewer checks the fix on it: what is left to work, or wait now for their word
       return ok(
         text(
-          `${done.comment.id}: preview ${describePreview(done.preview)}${args.fixed ? ' · marked fixed' : ''}\nThe reviewer can verify the fix on it; the next render is compared with it automatically.`,
+          `${done.comment.id}: preview ${describePreview(done.preview)}${args.fixed ? ' · marked fixed' : ''}\nThe reviewer can verify the fix on it; the next render is compared with it automatically.${isAgent(who) ? `\n${await afterHandBack(b, hit.slug)}` : ''}`,
         ),
       );
     },
@@ -195,14 +196,17 @@ export function registerNoteTools({ b, o, tool, author, accountOf, byArg }: Tool
     },
     async ({ id, note, references, by }, ctx) => {
       const who = author(by, ctx);
+      // An agent's reply hands the note to the person (a question, a why): the last line says what is left to work, or
+      // to wait now for their answer, which comes only while it waits.
+      const next = async () => (isAgent(who) ? [await afterHandBack(b, (await b.findComment(id))?.slug ?? null)] : []);
       if (!references?.length) {
         const c = await b.updateComment(id, { note, by: who });
-        return ok(text(`${c.id}: reply added`));
+        return ok(text([`${c.id}: reply added`, ...(await next())].join('\n')));
       }
       // The first reference carries the reply's text; the rest join the same note.
       const lines = [`${id}: reply added`];
       for (const [i, a] of references.entries()) lines.push(refResult(id, await attachOne(id, a, who, i === 0 ? note : undefined)));
-      return ok(text(lines.join('\n')));
+      return ok(text([...lines, ...(await next())].join('\n')));
     },
   );
 
@@ -218,7 +222,7 @@ export function registerNoteTools({ b, o, tool, author, accountOf, byArg }: Tool
       const lock = hit ? finalNotice(b.stage(hit.review), hit.review) : null;
       if (lock) throw new Error(`${lock}: nothing to close until the reviewer reopens it`);
       const c = await b.updateComment(id, { status: 'wontfix', note: reason, by: author(by, ctx) });
-      return ok(text(`${c.id}: wontfix${hit ? `\n${await afterClosed(b, hit.slug)}` : ''}`));
+      return ok(text(`${c.id}: wontfix${hit ? `\n${await afterHandBack(b, hit.slug)}` : ''}`));
     },
   );
 
@@ -323,9 +327,11 @@ export function registerNoteTools({ b, o, tool, author, accountOf, byArg }: Tool
       const at = args.overall
         ? 'about the whole video'
         : `pinned at ${c.timecode} (f${c.frame}, v${c.v})${c.range ? `, range ${describeRange(c.range, ver.fps)}` : ''}`;
+      // An agent's question hands the decision to the person: what is left to work, or wait now for the answer.
+      const next = c.kind === 'question' && isAgent(who) ? `\n${await afterHandBack(b, slug)}` : '';
       return ok(
         text(
-          `${c.id} ${at} by ${c.author}${where}\nkind: ${c.kind || 'feedback'}${c.choices ? `\nchoices: ${c.choices.map(oneLine).join(' | ')}` : args.choices ? '\nchoices: not kept (only a question offers choices)' : ''}${lock ? `\nnote: ${lock}; this note waits until someone reopens it` : ''}${refs.length ? `\n${refs.join('\n')}` : ''}`,
+          `${c.id} ${at} by ${c.author}${where}\nkind: ${c.kind || 'feedback'}${c.choices ? `\nchoices: ${c.choices.map(oneLine).join(' | ')}` : args.choices ? '\nchoices: not kept (only a question offers choices)' : ''}${lock ? `\nnote: ${lock}; this note waits until someone reopens it` : ''}${refs.length ? `\n${refs.join('\n')}` : ''}${next}`,
         ),
       );
     },

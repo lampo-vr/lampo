@@ -11,8 +11,8 @@ import type { SessionRef } from '../api/types.ts';
 import { t } from '../i18n/index.ts';
 import { useLang } from '../i18n/T.tsx';
 import { copyText, toast, toastError } from '../lib/toast.ts';
-import { startWith } from '../sessions/listening.tsx';
-import { idleSaid, type RunAction, type RunLike, type RunSaid, runSaid, type Say } from '../sessions/runWords.ts';
+import { copyGoOn, goOnWords, startWith } from '../sessions/listening.tsx';
+import { idleSaid, type RunAction, type RunLike, type RunSaid, runSaid, type Say, stalledSaid } from '../sessions/runWords.ts';
 import { AgentMark, I } from '../ui/icons.tsx';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { SkLine } from '../ui/Skeleton.tsx';
@@ -40,6 +40,8 @@ export interface RunStripProps {
   reachable: boolean;
   /** An agent connected over MCP (its start command can be copied). */
   copyable: boolean;
+  /** It stopped listening while something waits on it: the line says to tell it "go on" (sessions/listening.tsx). */
+  stalled?: boolean;
   /** Fixes waiting to be checked: done offers Check fixes while there are some. */
   toCheck: number;
   nextV: number;
@@ -105,11 +107,14 @@ export const RunStrip = memo(function RunStrip(p: RunStripProps) {
   const counting = !!run && (run.state === 'queued' || run.state === 'starting' || (run.state === 'working' && !run.progress?.pct));
   const ticked = useTick(counting && p.still === undefined);
   const now = p.still ?? ticked;
-  const said: RunSaid | null = run
-    ? runSaid(run, { now, asOf: p.asOf, nextV: p.nextV, say: p.say, toCheck: p.toCheck })
-    : p.session
-      ? idleSaid(p.session.name, p.reachable, p.copyable)
-      : null;
+  const said: RunSaid | null =
+    p.stalled && p.session
+      ? stalledSaid(goOnWords(p.session))
+      : run
+        ? runSaid(run, { now, asOf: p.asOf, nextV: p.nextV, say: p.say, toCheck: p.toCheck })
+        : p.session
+          ? idleSaid(p.session.name, p.reachable, p.copyable)
+          : null;
   if (!said) return null;
   const kind = run ? run.agent.kind : p.session ? agentKindOfRef(p.session) : null;
   const actions = said.actions.filter((a) => allowedFor(a, p.canSteer, p.canCheck));
@@ -121,6 +126,7 @@ export const RunStrip = memo(function RunStrip(p: RunStripProps) {
     if (a === 'check') return p.onCheck();
     if (a === 'allow' || (a === 'log' && !(run && 'log' in run && run.log))) return p.onOpen();
     if (a === 'log' && run) return void window.open(`/api/runs/${enc(run.id)}/log`, '_blank', 'noopener');
+    if (a === 'go_on' && p.session) return void copyGoOn(p.session);
     if (a === 'copy' && p.session) {
       const how = startWith(p.session);
       return void copyText(how.text).then((ok) => ok && toast(t('Copied: paste it into {name}', { name: p.session?.name ?? '' }), 'ok'));
@@ -165,9 +171,9 @@ export const RunStrip = memo(function RunStrip(p: RunStripProps) {
           onClick={() => act(a)}
           disabled={busy && !primary(a)}
           data-testid={`run-${a}`}
-          aria-label={a === 'copy' && p.session ? t('Copy what starts {name}', { name: p.session.name }) : undefined}
+          aria-label={a === 'copy' && p.session ? t('Copy what starts {name}', { name: p.session.name }) : a === 'go_on' ? t('Copy “go on”') : undefined}
         >
-          {a === 'copy' ? <I name="copy" size={14} /> : actionLabel(a)}
+          {a === 'copy' || a === 'go_on' ? <I name="copy" size={14} /> : actionLabel(a)}
         </button>
       ))}
       {said.edge !== null && <span className="run-edge" data-testid="run-edge" style={{ '--edge': said.edge } as CSSProperties} aria-hidden="true" />}

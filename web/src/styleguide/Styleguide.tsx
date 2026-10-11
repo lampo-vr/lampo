@@ -10,6 +10,7 @@ import type { RunPlanItem, Stage } from '../../../lib/types.ts';
 import { toast, toastUndo } from '../lib/toast.ts';
 import { RunStrip, RunStripPending } from '../player/RunStrip.tsx';
 import { say } from '../sessions/activityWords.ts';
+import { GoOn } from '../sessions/listening.tsx';
 import { RunLine } from '../sessions/RunLine.tsx';
 import { planSaid } from '../sessions/runWords.ts';
 import { Code } from '../settings/parts.tsx';
@@ -179,7 +180,7 @@ const PLAN: RunPlanItem[] = [
 function AgentAtWork() {
   const [now] = useState(() => Date.now());
   const runs = runFixtures('sg', ['n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7'], 3, now);
-  const strip = (key: string, run: (typeof runs)[keyof typeof runs]['run'] | null, reachable = true) => (
+  const strip = (key: string, run: (typeof runs)[keyof typeof runs]['run'] | null, reachable = true, stalled = false) => (
     <div key={key} className="sg-strip" data-state={key}>
       <span className="sg-label">{key}</span>
       <div className="sg-strip-box">
@@ -190,6 +191,7 @@ function AgentAtWork() {
           session={SESSION}
           reachable={reachable}
           copyable
+          stalled={stalled}
           toCheck={run?.state === 'done' ? 5 : 0}
           nextV={4}
           canSteer
@@ -209,6 +211,8 @@ function AgentAtWork() {
       <div className="sg-strips" data-testid="sg-strips">
         {strip('ready', null)}
         {strip('unreachable', null, false)}
+        {/* it asked, then stopped listening, and the person answered: the line says to tell it "go on" */}
+        {strip('not listening', runs.working.run, false, true)}
         {RUN_STATES.map((k) => strip(k, runs[k].run))}
       </div>
       <Row label="card line">
@@ -240,6 +244,14 @@ function AgentAtWork() {
               </div>
             );
           })}
+        </div>
+      </Row>
+      <Row
+        label="isn’t listening"
+        note="The agent menu’s state line while the agent isn’t listening and something waits on it (an answer to its question, a note sent since it handed over): calm, the outline keyframe, “go on” to copy. The run strip says the same in its own line, once per view: never again on the note. It goes once the agent waits again."
+      >
+        <div className="sg-lines" data-testid="sg-go-on">
+          <GoOn session={SESSION} />
         </div>
       </Row>
     </>

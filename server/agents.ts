@@ -17,9 +17,11 @@ export const isMcpId = (sessionId: string): boolean => /^mcp-/i.test(cleanAgentN
 /**
  * `betweenMs`: after a wait whose time ran out the agent still listens while it calls the next one. `workingMs`: after
  * a wait that handed it notes, it works on them this long at most before it reads as idle (unless it waits again).
- * Tests lower them.
+ * `graceMs`: after an answer that handed the next step to the person (a question, its last fix: it ends with the
+ * wait-now line), it has this long to start waiting; past it, it isn't listening — a chat agent that asked and ended
+ * its turn. Tests lower them.
  */
-export const LISTEN_TIMES = { betweenMs: 20_000, workingMs: 10 * 60_000 };
+export const LISTEN_TIMES = { betweenMs: 20_000, workingMs: 10 * 60_000, graceMs: 45_000 };
 
 export interface AgentRegistry {
   /**
@@ -35,6 +37,11 @@ export interface AgentRegistry {
    * ends — `handed`: it returned something to work on.
    */
   wait(sessionId: string): (o?: { handed?: boolean }) => void;
+  /**
+   * An agent of this workspace handed the next step to the person (its answer ended with the wait-now line): working
+   * for LISTEN_TIMES.graceMs, then not listening unless a wait began meanwhile.
+   */
+  handedBack(sessionId: string): void;
   list(): ConnectedAgent[];
   /** The same agents in the shape of `claude agents` sessions, for the session picker. */
   sessions(): ClaudeSession[];
@@ -45,6 +52,8 @@ interface Waits {
   /** When the last wait ended (0: none yet), and whether it handed out something to work on. */
   ended: number;
   handed: boolean;
+  /** When it last handed the next step to the person (0: not since it last waited). */
+  back: number;
 }
 
 export function createAgentRegistry(broadcast: Broadcast): AgentRegistry {
@@ -60,6 +69,8 @@ export function createAgentRegistry(broadcast: Broadcast): AgentRegistry {
     if (w?.open) return { state: 'listening', listened: isoLocal(new Date(now)) };
     const listened = w?.ended ? isoLocal(new Date(w.ended)) : null;
     if (listens) return { state: 'listening', listened: isoLocal(new Date(now)) };
+    // it handed the next step to the person and hasn't waited since: a moment to start, then it isn't listening
+    if (w?.back) return { state: now - w.back < LISTEN_TIMES.graceMs ? 'working' : 'idle', listened };
     if (w?.ended && w.handed && now - w.ended < LISTEN_TIMES.workingMs) return { state: 'working', listened };
     if (w?.ended && now - w.ended < LISTEN_TIMES.betweenMs) return { state: 'listening', listened };
     return { state: 'idle', listened };
@@ -115,10 +126,26 @@ export function createAgentRegistry(broadcast: Broadcast): AgentRegistry {
       const key = `${currentWorkspace()}\u0000${cleanAgentName(sessionId, 200) || 'agent'}`;
       return agents.has(key) ? accounts.get(key) : undefined;
     },
+    handedBack(sessionId) {
+      const key = `${currentWorkspace()}\u0000${cleanAgentName(sessionId, 200) || 'agent'}`;
+      const w = waits.get(key) ?? { open: 0, ended: 0, handed: false, back: 0 };
+      // already waiting (a render it put up from its sandbox while its wait runs): it hears the person anyway
+      if (w.open) return;
+      w.back = Date.now();
+      waits.set(key, w);
+      tell(key);
+      // when the moment to start waiting has passed without a wait: it isn't listening (live, through `sessions`)
+      setTimeout(
+        boundToWorkspace(() => tell(key)),
+        LISTEN_TIMES.graceMs + 50,
+      ).unref();
+    },
     wait(sessionId) {
       const key = `${currentWorkspace()}\u0000${cleanAgentName(sessionId, 200) || 'agent'}`;
-      const w = waits.get(key) ?? { open: 0, ended: 0, handed: false };
+      const w = waits.get(key) ?? { open: 0, ended: 0, handed: false, back: 0 };
       w.open++;
+      // waiting: what it handed back is heard from now on
+      w.back = 0;
       waits.set(key, w);
       tell(key);
       let done = false;

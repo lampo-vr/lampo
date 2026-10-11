@@ -176,7 +176,8 @@ export const ownTold = (): Told => toldIn(new Recent<number>(5000), '');
 /**
  * An agent that hears only "no new feedback" for `stopMs` in a row is told to stop waiting and say so: nobody is
  * reviewing, and its client runs on (tokens, a turn every 50 s) for nothing. A pause of more than `gapMs` between two
- * waits (it worked on something else, or stopped and was started again) begins the count again.
+ * waits (it worked on something else, or stopped and was started again) begins the count again. A chat client stops
+ * sooner, by its count of waits (quietIn `waits`).
  */
 export const QUIET = { stopMs: QUIET_STOP_MIN * 60_000, gapMs: 2 * 60_000 };
 
@@ -189,25 +190,33 @@ export interface Quiet {
   something(): void;
 }
 
-/** A run of nothing: when it began, and when its last wait ended. */
+/** A run of nothing: when it began, when its last wait ended, and how many waits it holds. */
 export interface QuietRun {
   since: number;
   last: number;
+  /** Absent in a run counted before waits were (a chat client's run then counts from its next wait). */
+  waits?: number;
 }
 
-/** One agent's Quiet in a map shared by many (bounded: forgetting one only starts its count again). */
-export function quietIn(map: Recent<QuietRun>, agent: string, now: () => number = Date.now): Quiet {
+/**
+ * One agent's Quiet in a map shared by many (bounded: forgetting one only starts its count again). `waits`: a chat
+ * client stops after that many waits in a row with nothing new (lib/handoff.ts CHAT_QUIET_WAITS), as well as after the
+ * time — its app limits a turn, and every wait is a call in it.
+ */
+export function quietIn(map: Recent<QuietRun>, agent: string, now: () => number = Date.now, { waits: most }: { waits?: number } = {}): Quiet {
   return {
     now,
     nothing(from) {
       const t = now();
       const run = map.get(agent);
-      const since = run && from - run.last <= QUIET.gapMs ? run.since : from;
-      if (t - since >= QUIET.stopMs) {
+      const goesOn = !!run && from - run.last <= QUIET.gapMs;
+      const since = goesOn && run ? run.since : from;
+      const waits = (goesOn ? (run?.waits ?? 0) : 0) + 1;
+      if (t - since >= QUIET.stopMs || (most !== undefined && waits >= most)) {
         map.delete(agent);
         return true;
       }
-      map.set(agent, { since, last: t });
+      map.set(agent, { since, last: t, waits });
       return false;
     },
     something: () => map.delete(agent),
@@ -215,7 +224,7 @@ export function quietIn(map: Recent<QuietRun>, agent: string, now: () => number 
 }
 
 /** A Quiet for one agent alone (stdio: the process is the agent). */
-export const ownQuiet = (now?: () => number): Quiet => quietIn(new Recent<QuietRun>(1), '', now);
+export const ownQuiet = (now?: () => number, o?: { waits?: number }): Quiet => quietIn(new Recent<QuietRun>(1), '', now, o);
 
 /** When a person last changed a note (written, edited, answered, given a reference): an agent's own reply is no news to it. */
 function peopleChangedAt(c: Comment): number {

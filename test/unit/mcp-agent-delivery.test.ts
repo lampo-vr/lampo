@@ -266,6 +266,37 @@ test('the app shows whether the assigned agent listens: from its open waits, not
   }
 });
 
+test('an agent that asks and then doesn’t wait isn’t listening once its moment to wait has passed; its next wait listens again', async () => {
+  const was = { ...LISTEN_TIMES };
+  // working on what a wait handed it would otherwise read as working for 10 minutes: the hand-back says sooner
+  LISTEN_TIMES.graceMs = 1000;
+  LISTEN_TIMES.betweenMs = 1000;
+  try {
+    const slug = await upload('reel-q.mp4');
+    const c = await agent('agent-q');
+    await assign(slug, 'agent-q');
+    // it listens, an Auto-check-like note comes, the wait hands it over: working
+    const waiting = c.callTool({ name: 'wait_for_feedback', arguments: { timeout_s: 20 } }) as Promise<Result>;
+    await until(async () => (await listed('agent-q')).status === 'listening', 'listening');
+    const n = await note(slug, 1, 'Too dark in the first second');
+    await waiting;
+    assert.equal((await listed('agent-q')).status, 'working');
+    // it asks with a reply: the answer says to wait now, so the next step is the person's
+    const asked = (await c.callTool({ name: 'reply', arguments: { id: n.id, note: 'Leave it or brighten it?' } })) as Result;
+    assert.match(textOf(asked), /\nNow call wait_for_feedback with since "\S+": /, textOf(asked));
+    assert.equal((await listed('agent-q')).status, 'working', 'a moment to start waiting');
+    // …and it ends its turn instead (a chat app asking in the chat): not listening, well before the 10 minutes
+    await until(async () => (await listed('agent-q')).status === 'idle', 'not listening once the moment passed');
+    assert.equal((await summaryOf(slug)).sessionListening, false);
+    // told "go on", it waits: listening again
+    const again = c.callTool({ name: 'wait_for_feedback', arguments: { timeout_s: 5 } }) as Promise<Result>;
+    await until(async () => (await listed('agent-q')).status === 'listening', 'listening again');
+    await again;
+  } finally {
+    Object.assign(LISTEN_TIMES, was);
+  }
+});
+
 test('the watch prompt sets an agent to work and keeps it listening, in one command', async () => {
   const c = await agent('agent-f');
   const { prompts } = await c.listPrompts();
@@ -280,7 +311,7 @@ test('the watch prompt sets an agent to work and keeps it listening, in one comm
   const one = await c.getPrompt({ name: 'watch', arguments: { video: 'reel-a.mp4' } });
   assert.match(promptText(one), /Only this video: reel-a\.mp4/);
   // The server's instructions tell the same loop, so "use Lampo" is enough without it: wait again after every answer.
-  assert.match(c.getInstructions() ?? '', /wait_for_feedback with the cursor the last answer gave, and again after every answer/);
+  assert.match(c.getInstructions() ?? '', /wait_for_feedback with the last answer's cursor, again after every answer/);
 });
 
 test('one log line per tool call: the agent, the tool, how long, how a wait ended — never what was said', async () => {

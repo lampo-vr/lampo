@@ -25,7 +25,9 @@ export type Phase =
   | 'lost'
   // no run going: the agent is there and hears notes, or it isn't running
   | 'ready'
-  | 'unreachable';
+  | 'unreachable'
+  // it stopped listening while something waits on it: tell it "go on" (sessions/listening.tsx)
+  | 'not_listening';
 
 /** How a line looks: the glyph's colour (never the brand orange; working wears the agents' terracotta as today). */
 export type Tone = 'live' | 'ask' | 'ok' | 'err' | 'warn' | 'quiet';
@@ -45,6 +47,7 @@ export const LOOK: Record<Phase, { shape: Shape; tone: Tone }> = {
   lost: { shape: 'outline', tone: 'warn' },
   ready: { shape: 'outline', tone: 'quiet' },
   unreachable: { shape: 'outline', tone: 'quiet' },
+  not_listening: { shape: 'outline', tone: 'quiet' },
 };
 
 /** Still going (the server ends it: done, failed, stopped). */
@@ -182,6 +185,7 @@ const URGENCY: Record<Phase, number> = {
   stopped: 8,
   ready: 9,
   unreachable: 9,
+  not_listening: 9,
 };
 export function mostUrgent<T extends RunLike>(runs: T[]): T | null {
   let best: T | null = null;

@@ -14,7 +14,7 @@ import { usePainted } from '../lib/lazy.ts';
 import { copyText, toast, toastError } from '../lib/toast.ts';
 import { type NoteAt, say } from '../sessions/activityWords.ts';
 import { activityShort, LiveSection, stepLine, useAgentNow } from '../sessions/Live.tsx';
-import { listenLine, StartListening, useListening, waitsForStart } from '../sessions/listening.tsx';
+import { GoOn, goOnWords, listenLine, StartListening, useListening, waitsForStart } from '../sessions/listening.tsx';
 import { fullWords, LOOK, phaseOf, type RunLike, tightOf } from '../sessions/runState.ts';
 import { SessionPicker } from '../sessions/Sessions.tsx';
 import { useAgentRuns, useWakeChoice, WakeAsk } from '../sessions/Wake.tsx';
@@ -62,6 +62,9 @@ interface AgentMenuProps {
   noteAt?: NoteAt;
   /** What the run strip speaks of (RunStrip.tsx): the button's glyph and words follow it. */
   run?: RunLike | null;
+  /** Something on the video waits on the agent (sessions/listening.tsx waitingOnAgent): while it isn't listening, the
+   * menu says to tell it "go on". */
+  owed?: boolean;
 }
 
 /** What a request says to the agent; a partial render's opt-in rides along (the server adds its PART RENDER OK line). */
@@ -85,6 +88,7 @@ export function AgentMenu({
   fps = 25,
   noteAt,
   run: work = null,
+  owed = false,
 }: AgentMenuProps) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<'menu' | 'assign'>('menu');
@@ -99,11 +103,15 @@ export function AgentMenu({
   const wake = useWakeChoice(session, sessionActive, home);
   // An agent connected over MCP: whether it listens (null for a Claude Code session on this machine).
   const listen = useListening(session, { active: sessionActive, listening: sessionListening });
+  // it stopped listening while something waits on it: tell it "go on" where it runs, rather than how to start it
+  const stalled = owed && waitsForStart(listen);
+  // the agent as people read it ("Claude · Mia Lang", not its client's id "claude-ai · Mia Lang"), as the header says it
+  const shown = session ? agentShown(session.name, agentKindOfRef(session)) : '';
   // What it is doing now: in the button (after the first paint) and, with its last actions, in the popover.
   const idle = usePainted();
   const run = useAgentRuns(slug, wake.here && open)[0] ?? null;
   const now = useAgentNow(slug, session?.name ?? null, canAsk && idle && !!session);
-  const working = (listen ? !waitsForStart(listen) : active) || !!now || run?.state === 'running';
+  const working = !stalled && ((listen ? !waitsForStart(listen) : active) || !!now || run?.state === 'running');
   const openChange = (o: boolean) => {
     setOpen(o);
     if (o) setPartAt(frameNow ? frameNow() : null);
@@ -123,12 +131,12 @@ export function AgentMenu({
       const r = await request.mutateAsync({ text: ask.text, ...(way === 'start' ? { start: true } : {}), ...(ask.part ? { part: ask.part } : {}) });
       toast(
         r.run
-          ? t('Started {name} with your request', { name: session.name })
+          ? t('Started {name} with your request', { name: shown })
           : waitsForStart(listen)
-            ? t('Sent to {name}. It isn’t listening: it gets this once you start it.', { name: session.name })
+            ? t('Sent to {name}. It isn’t listening: it gets this once you start it.', { name: shown })
             : active || way === 'start' || listen
-              ? t('Sent to {name}', { name: session.name })
-              : t('Sent to {name}. It isn’t running: it gets this when it starts.', { name: session.name }),
+              ? t('Sent to {name}', { name: shown })
+              : t('Sent to {name}. It isn’t running: it gets this when it starts.', { name: shown }),
         'ok',
       );
       setText('');
@@ -139,7 +147,7 @@ export function AgentMenu({
   };
   const copy = async () => {
     if (await copyText(await api<string>(`/api/review/${enc(slug)}/prompt`)))
-      toast(session ? t('Copied: paste it into {name}', { name: session.name }) : t('Copied for an agent'), 'ok');
+      toast(session ? t('Copied: paste it into {name}', { name: shown }) : t('Copied for an agent'), 'ok');
     openChange(false);
   };
   const onAssign = async (pick: SessionPick | null) => {
@@ -156,19 +164,20 @@ export function AgentMenu({
   // "rendering V4" · "42%"): a tight place, so never the step it is on or its own sentence ("rendering v4 (…)") — the
   // strip right below says those, and the button's title and accessible name say it all. With no work open on the
   // video, what it does now in a word ("working"); while it only waits for notes, its name.
-  const look = work ? LOOK[phaseOf(work)] : null;
-  const tight = work ? tightOf(work) : now && now.kind !== 'wait' ? activityShort(now) : null;
-  const full = work ? fullWords(work, (w) => say(w, noteAt)) : now ? stepLine(now, noteAt) : null;
+  // It stopped listening while something waits on it: whatever its work said last ("wrapping up") is not going on.
+  const look = stalled ? LOOK.not_listening : work ? LOOK[phaseOf(work)] : null;
+  const tight = stalled ? { words: t('not listening'), figure: null } : work ? tightOf(work) : now && now.kind !== 'wait' ? activityShort(now) : null;
+  const full = stalled && session ? goOnWords(session) : work ? fullWords(work, (w) => say(w, noteAt)) : now ? stepLine(now, noteAt) : null;
   const label = session
     ? full
-      ? t('Agent {name}: {step}', { name: session.name, step: full })
+      ? t('Agent {name}: {step}', { name: shown, step: full })
       : listen
         ? waitsForStart(listen)
-          ? t('Agent {name}, not listening', { name: session.name })
-          : t('Agent {name}, listening', { name: session.name })
+          ? t('Agent {name}, not listening', { name: shown })
+          : t('Agent {name}, listening', { name: shown })
         : active
-          ? t('Agent {name}, running', { name: session.name })
-          : t('Agent {name}, not running', { name: session.name })
+          ? t('Agent {name}, running', { name: shown })
+          : t('Agent {name}, not running', { name: shown })
     : t('Agent');
   const trigger = (
     <button
@@ -196,7 +205,7 @@ export function AgentMenu({
                 )}
               </>
             ) : (
-              <span className="agent-name ellipsis">{agentShown(session.name, agentKindOfRef(session))}</span>
+              <span className="agent-name ellipsis">{shown}</span>
             ))}
         </>
       ) : (
@@ -262,12 +271,23 @@ export function AgentMenu({
                   <span className="am-who">
                     <AgentState active={working} />
                     <AgentMark kind={agentKindOfRef(session)} size={15} />
-                    <b className="ellipsis">{agentShown(session.name, agentKindOfRef(session))}</b>
+                    <b className="ellipsis">{shown}</b>
                   </span>
-                  <span className="am-sub" data-testid="agent-listen">
-                    {listen ? listenLine(listen) : active ? t('Running: new notes reach it right away') : t('Not running: it gets the notes when it starts')}
-                  </span>
-                  {canAsk && waitsForStart(listen) && <StartListening session={session} />}
+                  {/* stopped while something waits on it: what to do says where it stands ("…until you start it" would not) */}
+                  {canAsk && stalled ? (
+                    <GoOn session={session} />
+                  ) : (
+                    <>
+                      <span className="am-sub" data-testid="agent-listen">
+                        {listen
+                          ? listenLine(listen)
+                          : active
+                            ? t('Running: new notes reach it right away')
+                            : t('Not running: it gets the notes when it starts')}
+                      </span>
+                      {canAsk && waitsForStart(listen) && <StartListening session={session} />}
+                    </>
+                  )}
                 </>
               ) : (
                 <>
@@ -276,7 +296,9 @@ export function AgentMenu({
                 </>
               )}
             </div>
-            {session && canAsk && <LiveSection slug={slug} agent={session.name} run={run} enabled={open} noteAt={noteAt} />}
+            {session && canAsk && (
+              <LiveSection slug={slug} agent={session.name} run={run} enabled={open} noteAt={noteAt} listening={listen ? !waitsForStart(listen) : null} />
+            )}
             {session && canAsk && asking !== null && (
               <WakeAsk
                 name={session.name}
@@ -287,8 +309,8 @@ export function AgentMenu({
               />
             )}
             {session && canAsk && asking === null && (
-              <section className="am-ask" aria-label={t('Ask {name}', { name: session.name })}>
-                <div className="label">{t('Ask {name}', { name: session.name })}</div>
+              <section className="am-ask" aria-label={t('Ask {name}', { name: shown })}>
+                <div className="label">{t('Ask {name}', { name: shown })}</div>
                 {/* What people ask most, as quiet answers to pick (the notes panel's Choices), then anything else. */}
                 <div className="choices">
                   {QUICK(latestV).map(([req, label]) => (
@@ -301,7 +323,7 @@ export function AgentMenu({
                   <input
                     className="input grow"
                     placeholder={t('Or ask something else…')}
-                    aria-label={t('Ask {name}', { name: session.name })}
+                    aria-label={t('Ask {name}', { name: shown })}
                     value={text}
                     onChange={(e) => setText(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && text.trim() && send(text)}

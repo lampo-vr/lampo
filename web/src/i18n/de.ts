@@ -2181,6 +2181,10 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
     '{name} hört nicht zu: Er bekommt deine Notizen, sobald du {cmd} in Claude Code eingibst.',
   '{name} isn’t listening: it gets your notes once you tell it to work on them.':
     '{name} hört nicht zu: Er bekommt deine Notizen, sobald du ihm sagst, dass er sie bearbeiten soll.',
+  // "go on" is what the agent reads (in English, whatever the UI's language): it stays as it is
+  '{name} isn’t listening — tell it “go on”': '{name} hört nicht zu – sag ihm „go on“',
+  '{name} isn’t listening — tell it “go on” in {app}': '{name} hört nicht zu – sag ihm „go on“ in {app}',
+  'Copy “go on”': '„go on“ kopieren',
   'Share a review link': 'Einen Review-Link teilen',
   'The open notes with their frames and pictures, to paste into any agent': 'Die offenen Notizen mit Frames und Bildern, zum Einfügen in jeden Agenten',
   'Why? It is kept in the history with your decision.': 'Warum? Das steht mit deiner Entscheidung im Verlauf.',

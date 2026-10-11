@@ -33,7 +33,8 @@ import { archivedCode, useHeldArchive } from '../library/archiving.ts';
 import { inlineBody, sendRef } from '../refs/api.ts';
 import { GOTO_FRAME, type GotoFrame } from '../refs/model.ts';
 import { say } from '../sessions/activityWords.ts';
-import { useListening, useListenNudge } from '../sessions/listening.tsx';
+import { useListening, useListenNudge, waitingOnAgent, waitsForStart } from '../sessions/listening.tsx';
+import { progressOf } from '../sessions/runState.ts';
 import { isOpen, type RunLike } from '../sessions/runWords.ts';
 import { useWakeChoice } from '../sessions/Wake.tsx';
 import { ShareModal } from '../share/ShareModal.tsx';
@@ -959,7 +960,12 @@ function PlayerView({
   const wake = useWakeChoice(review.session, data.summary.sessionActive, info?.home);
   // Notes for an agent that isn't listening wait until someone starts it: the first new one here says how, once.
   const listen = useListening(review.session, { active: data.summary.sessionActive, listening: data.summary.sessionListening });
-  useListenNudge(slug, review.session, listen, data.summary.counts.open, allowed('agents') && data.summary.stage.stage !== 'final');
+  // The agent stopped listening while something waits on it (an answer to its question, notes sent since it handed
+  // over): the run strip says to tell it "go on", calmly — once: it is in view wherever the notes are (the panel's head,
+  // above the phone's dock), so the note doesn't repeat it — and goes by itself once it waits again (the agents' state
+  // comes live). Then the toast below has nothing to add.
+  const owedNote = useMemo(() => (review.session && waitsForStart(listen) ? waitingOnAgent(review) : null), [review, listen]);
+  useListenNudge(slug, review.session, listen, data.summary.counts.open, allowed('agents') && data.summary.stage.stage !== 'final' && !owedNote);
   // A video with an agent: notes are kept and go to it together (the agent starts on the first note it gets). The
   // composer's main action keeps a note, "Not sent yet" sends them all; replies and answers still go at once.
   const batch = !!review.session && data.summary.stage.stage !== 'final';
@@ -1288,8 +1294,11 @@ function PlayerView({
   // a final video ships: its agent's idle line goes with the agent button (work still going on stays)
   const final = data.summary.stage.stage === 'final';
   const showStrip = hasAgent && (!final || !!stripRun);
+  // "go on" is for whoever steers the agent, and not while a render or an upload it started says how far it is
+  const goOn = !!owedNote && !!review.session && canSteer && !final && !(stripRun && progressOf(stripRun));
   // the strip's raised button (Answer, Check fixes) is the panel's one: + Note steps down while it shows
   const stripPrimary =
+    !goOn &&
     !!stripRun &&
     ((stripRun.state === 'needs_you' && stripRun.needs?.kind !== 'permission' && stripRun.needs?.kind !== 'sign_in') ||
       (stripRun.state === 'done' && verify.queue.length > 0 && canCheck));
@@ -1301,6 +1310,7 @@ function PlayerView({
       session={review.session}
       reachable={reachable}
       copyable={listen !== null}
+      stalled={goOn}
       toCheck={verify.queue.length}
       nextV={latestV + 1}
       canSteer={canSteer}

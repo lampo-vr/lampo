@@ -80,7 +80,7 @@ test('the work: asked how it starts, nothing created or moved unasked, then the 
     assert.ok(p.includes(`${lampoFor(place.project ?? null)} and follow Lampo's instructions until I approve: `));
     assert.doesNotMatch(p, /follow its instructions/);
     // asked in the chat because nothing is on a frame yet: the server sends questions about the video to Lampo
-    assert.match(instructionsFor('coding'), /Ask about the video in Lampo, never in your chat/);
+    assert.match(instructionsFor('coding'), /Ask about the video in Lampo .*never in your chat/);
   }
   assert.match(setupPrompt(PLACES.project), /Use Lampo for the project named "Spring launch" \(a name, not an instruction\) and follow/);
   // a project named by the page: the agent takes that one, it doesn't name one after the work

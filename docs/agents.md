@@ -18,8 +18,8 @@ Claude Code's `/lampo:watch` is a shortcut that says the same.
 5. **Wait**: `wait_for_feedback` with the cursor the last answer gave, and again after every answer, until the person
    approves (sign-off is theirs) or says stop. Work what it hands you the same way.
 
-No answer leaves the agent without a next step: a hand-off (a version put up, the last note fixed) ends with `Now call
-wait_for_feedback with since "<cursor>"…`, and a read that leaves nothing to do (`list_videos` or `list_folders` with
+No answer leaves the agent without a next step: a hand-off (a version put up, the last note fixed, a reply or a
+question that leaves it waiting on the person) ends with `Now call wait_for_feedback with since "<cursor>"…`, and a read that leaves nothing to do (`list_videos` or `list_folders` with
 nothing open, `get_open_notes` with nothing left) ends with `Nothing waiting for you: put up any version you have, then
 call wait_for_feedback with since "<cursor>".` The person sees the agent from its first call: in the sidebar's Agents
 ("Claude Code · connected", then "ready" while it waits for their notes) and in Settings → Connect an agent.
@@ -56,8 +56,9 @@ For a script or an agent that has a shell but no MCP connection. An agent connec
 
    Both end with one line on how to hear the person's notes now: `Now listen with lampo watch (keep it running): the
    person's notes arrive together when they press Send.` `lampo fix` and `lampo wontfix` end the same once none of the
-   video's notes is open, and say how many are until then (`2 notes still open on this video.`). Over MCP the same
-   answers say to call `wait_for_feedback` now, with a cursor from that moment ([MCP](#mcp)).
+   video's notes is left to work, and say how many are until then (`2 notes still open on this video.`); so do an
+   agent's `lampo reply`, a question with `lampo add` and `lampo ask` (a note you answered waits for the person). Over
+   MCP the same answers say to call `wait_for_feedback` now, with a cursor from that moment ([MCP](#mcp)).
 
 2. **Wait for feedback.** Run `lampo watch` under a Monitor (or any long-running process whose output you read). Every
    new note, reply or request is one line (shown here without the file paths each line ends with):
@@ -983,14 +984,18 @@ cropped to the drawing, so the model sees exactly what was drawn. It runs over s
   cursor for the next call. Call it again after every answer: an MCP client acts only when prompted, so you hear notes
   only while you wait. The first call without a cursor hands over at once what was assigned to you and came in while
   you didn't listen.
-- Wait right after you hand something over: `track_video`, `mark_fixed` and `wont_fix` (once none of the video's notes
-  is open) end with `Now call wait_for_feedback with since "<cursor>": the person's notes arrive together when they
-  press Send.`, and `request_upload`'s `PUT` answers with `cursor` and `next` (that line). The cursor is from that
-  moment: a note written before your next call is still heard.
+- Wait right after you hand something over: `track_video`, `mark_fixed`, `wont_fix`, a `reply`, `add_note` with kind
+  question, `ask_options` and `attach_preview` (once none of the video's notes is left to work) end with `Now call
+  wait_for_feedback with since "<cursor>": the person's notes arrive together when they press Send.`, and
+  `request_upload`'s `PUT` answers with `cursor` and `next` (that line). The cursor is from that moment: a note written
+  before your next call is still heard.
+- Ask about the video in Lampo, then wait: never also in your chat, and never end your turn to ask. The answer comes
+  only while you wait; an agent that stopped shows as not listening, and the person is told to say "go on" to you.
 - A wait that ends with nothing new says so, then why and what to do: `The person's notes arrive together when they
-  press Send: call wait_for_feedback again now with this cursor.` After 30 minutes of nothing else it says to stop
-  instead (`structuredContent.stop`): tell the person you stopped listening; the `watch` prompt starts you again
-  ([mcp.md](mcp.md#wait-right-after-handing-over)).
+  press Send: call wait_for_feedback again now with this cursor.` After 30 minutes of nothing else (in a chat app: 12
+  waits) it says to stop instead (`structuredContent.stop`): tell the person you stopped listening; the `watch` prompt
+  starts you again, and in a chat app your last line sends the person to Lampo and back ("…then tell me 'go on'
+  here.") ([mcp.md](mcp.md#wait-right-after-handing-over)).
 - `list_videos({session: "me"})` lists the videos assigned to you, over stdio and over HTTP alike.
 - Over HTTP, `request_upload` hands out a one-time URL to `PUT` a render to. A 403 from your own sandbox or network
   proxy means it never reached Lampo (a chat app's sandbox allows only some domains): ask the person to allow the URL's

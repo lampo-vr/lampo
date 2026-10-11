@@ -1,14 +1,16 @@
 // What an agent is told when it hands work to the person, and while it waits for their notes (lib/handoff.ts): the
-// hand-off answers (track_video, mark_fixed, wont_fix; vr track, push, fix, wontfix) end with "wait now" — over MCP
-// with a cursor from that moment, so a note written before the agent's next call is still heard —, a wait that ends
-// with nothing new says why and to call again, and an agent that heard only that for 30 minutes in a row is told to
-// stop and say so (a clock of its own here: never a real half hour).
+// hand-off answers (track_video, mark_fixed, wont_fix, a reply, a question, options to pick, a fix's preview; vr track,
+// push, fix, wontfix, reply, add, ask) end with "wait now" — over MCP with a cursor from that moment, so a note written
+// before the agent's next call is still heard — or with what is left to work (a note it answered waits for the person,
+// so it isn't), a wait that ends with nothing new says why and to call again, and an agent that heard only that for 30
+// minutes in a row (a chat app: 12 waits) is told to stop and say so (a clock of its own here: never a real half hour).
 import assert from 'node:assert/strict';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import type { ReviewEvent } from '../../lib/types.ts';
-import { age, isolatedEnv, makeVideo, slugOf, vr } from '../lib/helpers.ts';
+import { age, FFMPEG, isolatedEnv, makeVideo, slugOf, VR, vr } from '../lib/helpers.ts';
 
 const { dir, env } = isolatedEnv({ config: { user: 'Sam Rivera' }, vars: { VR_STT: 'off' } });
 const store = await import('../../lib/store.ts');
@@ -16,7 +18,8 @@ const { createLocalBackend } = await import('../../lib/backend/local.ts');
 const { createReviewServer } = await import('../../mcp/core.ts');
 const { ownQuiet, QUIET, quietIn } = await import('../../mcp/feedback.ts');
 const { Recent } = await import('../../lib/rateLimit.ts');
-const { cursorAt, PENDING_LINE, STOP_LINE, stillOpenLine, WATCH_NOW_LINE, waitNowLine } = await import('../../lib/handoff.ts');
+const { CHAT_QUIET_WAITS, CHAT_STOP_LINE, CHAT_WAIT_WORDS, cursorAt, endsWaitNow, PENDING_LINE, STOP_LINE, stillOpenLine, WATCH_NOW_LINE, waitNowLine } =
+  await import('../../lib/handoff.ts');
 const { Client } = await import('@modelcontextprotocol/client');
 const { InMemoryTransport } = await import('@modelcontextprotocol/server');
 
@@ -25,7 +28,10 @@ type Result = { content: { type: string; text?: string }[]; structuredContent?: 
 const said = (r: unknown) => ((r as Result).content ?? []).map((x) => x.text ?? '').join('\n');
 
 /** An agent on this machine talking to the MCP server in this process (a clock of its own for `quiet`). */
-async function mcp<T>(fn: (c: InstanceType<typeof Client>) => Promise<T>, o: { quiet?: Quiet } = {}): Promise<T> {
+async function mcp<T>(
+  fn: (c: InstanceType<typeof Client>) => Promise<T>,
+  o: { quiet?: Quiet; way?: 'machine' | 'coding' | 'chat'; onHandBack?: () => void } = {},
+): Promise<T> {
   const server = createReviewServer({ backend: createLocalBackend(), principal: { via: 'local', name: 'Sam Rivera', role: 'owner' }, ...o });
   const [a, b] = InMemoryTransport.createLinkedPair();
   await server.connect(b);
@@ -129,6 +135,104 @@ test('mark_fixed and wont_fix say how many notes are still open, then (none left
   assert.equal(stillOpenLine(1), '1 note still open on this video.');
 });
 
+test('a reply, a question, options to pick and a fix’s preview hand the next step to the person: what is left, else "wait now" with a cursor', async () => {
+  const f = film('asked.mp4');
+  const slug = slugOf(f);
+  store.createOrGetReview(f, { by: 'Sam Rivera' });
+  // two Auto-check-like notes to work, and a third that comes later
+  const dark = person(slug, 'Too dark in the first second');
+  const logo = person(slug, 'Logo too early');
+  let handedBack = 0;
+  await mcp(
+    async (c) => {
+      // a reply that asks: one note is still the agent's to work
+      let answer = said(await call(c, 'reply', { id: dark.id, note: 'Leave it or brighten it?' }));
+      assert.equal(answer, `${dark.id}: reply added\n${stillOpenLine(1)}`);
+      assert.equal(handedBack, 0, 'work is left: no hand-back yet');
+      // a question pinned to the frame: the same, the answered note is no work left
+      answer = said(await call(c, 'add_note', { video: f, frame: 2, text: 'Should the logo come in on the beat?', choices: ['On the beat', 'As it is'] }));
+      assert.match(answer, /\nkind: question\n/);
+      assert.equal(lastLine(answer), stillOpenLine(1), answer);
+      // its last answer: nothing is left to work, so it waits now, from this moment
+      answer = said(await call(c, 'reply', { id: logo.id, note: 'Is 4 frames later right?' }));
+      let cursor = /since "(\S+)"/.exec(answer)?.[1] as string;
+      assert.equal(answer, `${logo.id}: reply added\n${waitNowLine(cursor)}`);
+      assert.equal(handedBack, 1, 'the app is told the next step is the person’s (server/agents.ts)');
+      // the person answers meanwhile: the wait with that cursor hears it
+      store.updateComment(dark.id, { note: 'Brighten it a little', by: 'Mia Hartmann' });
+      const got = said(await call(c, 'wait_for_feedback', { since: cursor, timeout_s: 5 }));
+      assert.match(got, /^1 new:\n/, got);
+      assert.ok(got.includes(dark.id), got);
+      // a note it fixed or left closes like before; one it answered isn't counted as open work
+      answer = said(await call(c, 'mark_fixed', { id: dark.id, note: 'Brightened by 10 %' }));
+      assert.ok(endsWaitNow(answer), answer);
+      // options to pick, on a folder before any render: the pick is the person's, so it waits
+      answer = said(
+        await call(c, 'ask_options', {
+          folder: 'Acme/Reels',
+          text: 'Which music?',
+          groups: [
+            {
+              id: 'music',
+              label: 'Music',
+              items: [
+                { id: 'a', label: 'Calm' },
+                { id: 'b', label: 'Driving' },
+              ],
+            },
+          ],
+        }),
+      );
+      cursor = /since "(\S+)"/.exec(answer)?.[1] as string;
+      assert.equal(lastLine(answer), waitNowLine(cursor), answer);
+      assert.match(answer, /PICKED <group>=<item>/, 'the line agents parse stays');
+      // a fix shown on a preview: the person checks it, so (nothing else left) it waits
+      const next = person(slug, 'Cut the end 6 frames sooner');
+      // the render's own frame shape (a preview of another shape is another picture)
+      const png = path.join(dir, 'fix.png');
+      execFileSync(FFMPEG, ['-v', 'error', '-f', 'lavfi', '-i', 'color=c=gray:s=160x90', '-frames:v', '1', '-y', png]);
+      answer = said(await call(c, 'attach_preview', { id: next.id, path: png }));
+      assert.ok(endsWaitNow(answer), answer);
+    },
+    { onHandBack: () => handedBack++ },
+  );
+  // a person's own reply through MCP hands nothing over: no line after it
+  const own = person(slug, 'One more');
+  await mcp(async (c) => assert.equal(said(await call(c, 'reply', { id: own.id, note: 'Noted for myself', by: 'Mia Hartmann' })), `${own.id}: reply added`));
+});
+
+test('a chat app stops after 12 waits with nothing new and ends its turn with one line that sends the person to Lampo and back', async () => {
+  let clock = Date.parse('2026-10-05T10:00:00Z');
+  const quiet = ownQuiet(() => clock, { waits: CHAT_QUIET_WAITS });
+  await mcp(
+    async (c) => {
+      const wait = async () => (await call(c, 'wait_for_feedback', { timeout_s: 0 })) as Result;
+      for (let i = 1; i < CHAT_QUIET_WAITS; i++, clock += 50_000) assert.equal(lastLine(said(await wait())), PENDING_LINE, `wait ${i}`);
+      const stop = await wait();
+      assert.equal(lastLine(said(stop)), CHAT_STOP_LINE, said(stop));
+      assert.equal(stop.structuredContent?.stop, true);
+    },
+    { quiet, way: 'chat' },
+  );
+  assert.equal(CHAT_QUIET_WAITS, 12);
+  assert.ok(CHAT_STOP_LINE.endsWith(CHAT_WAIT_WORDS));
+  assert.equal(CHAT_WAIT_WORDS, `"I'm waiting for your answer in Lampo — answer there, then tell me 'go on' here."`);
+});
+
+test('every way of telling the loop says it: questions go to Lampo and the agent then waits, never asks in the chat or ends its turn', async () => {
+  const { instructionsFor } = await import('../../mcp/loop.ts');
+  for (const way of ['machine', 'coding', 'chat'] as const) {
+    const told = instructionsFor(way);
+    assert.match(
+      told,
+      /in Lampo \(reply, or add_note kind question with choices; ask_options to pick before a render\), then wait_for_feedback: never (also here|in your chat), never by ending your turn\./,
+      way,
+    );
+  }
+  // the chat app's last line when it must stop waiting
+  assert.ok(instructionsFor('chat').includes(`When you must stop waiting, say only: ${CHAT_WAIT_WORDS}`));
+});
+
 test('a wait that ends with nothing new says what is going on, after the two lines agents parse', async () => {
   await mcp(async (c) => {
     const r = await call(c, 'wait_for_feedback', { timeout_s: 0 });
@@ -218,4 +322,44 @@ test('vr track, push, fix and wontfix end with how to hear the person’s notes:
   assert.equal(pushed.next, WATCH_NOW_LINE);
   const again = vr(['push', path.join(dir, 'Acme/export/pushed.mp4'), '--folder', 'Acme/Reels', '--by', 'agent:cli'], env);
   assert.match(again.out, /^unchanged: .*\nNow listen with lampo watch/, again.err);
+});
+
+test('lampo reply, a question with lampo add and lampo ask end with what is left, else how to hear the answer; --json keeps stdout one document', () => {
+  const f = film('cli-asked.mp4');
+  assert.equal(vr(['track', f, '--by', 'agent:cli'], env).code, 0);
+  const slug = slugOf(f);
+  const a = person(slug, 'Too dark');
+  const b = person(slug, 'Logo late');
+  const asked = vr(['reply', a.id, '--note', 'Leave it or brighten it?', '--by', 'agent:cli'], env);
+  assert.equal(asked.out, `${a.id}: reply added\n${stillOpenLine(1)}\n`, asked.err);
+  const last = vr(['reply', b.id, '--note', 'Is 4 frames later right?', '--by', 'agent:cli'], env);
+  assert.equal(last.out, `${b.id}: reply added\n${WATCH_NOW_LINE}\n`, last.err);
+  // a question pinned to a frame (an agent's note is a question unless it says otherwise)
+  const q = vr(['add', f, '--frame', '2', '--text', 'On the beat?', '--by', 'agent:cli'], env);
+  assert.equal(q.code, 0, q.err);
+  assert.equal(lastLine(q.out), WATCH_NOW_LINE, q.out);
+  // (vr() keeps stderr only for a failure: this one reads both)
+  const json = spawnSync(process.execPath, [VR, 'add', f, '--frame', '3', '--text', 'Warmer?', '--json', '--by', 'agent:cli'], { env, encoding: 'utf8' });
+  assert.equal(JSON.parse(json.stdout).kind, 'question');
+  assert.equal(json.stderr.trim(), WATCH_NOW_LINE);
+  // options to pick: the pick is the person's
+  const groups = path.join(dir, 'music.json');
+  fs.writeFileSync(
+    groups,
+    JSON.stringify([
+      {
+        id: 'music',
+        items: [
+          { id: 'a', label: 'Calm' },
+          { id: 'b', label: 'Driving' },
+        ],
+      },
+    ]),
+  );
+  const ask = vr(['ask', f, '--text', 'Which music?', '--options', groups, '--by', 'agent:cli'], env);
+  assert.equal(ask.code, 0, ask.err);
+  assert.equal(lastLine(ask.out), WATCH_NOW_LINE, ask.out);
+  // a person's reply, and a person's note (`lampo` writes as an agent unless --by names someone), hand nothing over
+  assert.equal(vr(['reply', a.id, '--note', 'Brighten it', '--by', 'Mia Hartmann'], env).out, `${a.id}: reply added\n`);
+  assert.doesNotMatch(vr(['add', f, '--frame', '4', '--text', 'Cut sooner', '--by', 'Mia Hartmann'], env).out, /lampo watch/);
 });

@@ -13,6 +13,7 @@ import { backToLibrary, crumbs } from '../lib/nav.ts';
 import { copyText, toast, toastError } from '../lib/toast.ts';
 import { ArchivedBanner } from '../library/ArchivedBanner.tsx';
 import { downloadVersion } from '../library/downloadVersion.ts';
+import { waitingOnAgent } from '../sessions/listening.tsx';
 import type { RunLike } from '../sessions/runWords.ts';
 import { SessionChip } from '../sessions/Sessions.tsx';
 import { StageControl, StageLine } from '../status/StageControl.tsx';
@@ -140,6 +141,7 @@ export const PlayerTopbar = memo(function PlayerTopbar({
       fps={review.versions.at(-1)?.fps}
       noteAt={(id) => review.comments.find((c) => c.id === id)?.timecode ?? null}
       run={run}
+      owed={!!review.session && !!waitingOnAgent(review)}
     />
   ) : (
     review.session && <SessionChip session={review.session} active={summary.sessionActive} listening={summary.sessionListening} disabled />

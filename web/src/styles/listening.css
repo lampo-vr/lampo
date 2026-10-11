@@ -1,0 +1,28 @@
+/* An agent that stopped listening while something waits on it (sessions/listening.tsx GoOn): one calm line — muted, the
+   outline keyframe, nothing alarming — and "go on" to copy, as the agent menu's state line (the run strip says it in its
+   own line). Imported by its component, not styles/index.css (a page that never shows it never loads it). */
+.go-on {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  font: var(--fw-text) var(--fs-sm) / var(--lh-ui) var(--ui);
+  color: var(--muted);
+}
+.go-on .kg {
+  --kg-size: 8px;
+  flex: none;
+}
+.go-on-words {
+  flex: 1;
+  min-width: 0;
+}
+/* the copy button sits in the line without making it taller */
+.go-on .btn.icon-only {
+  flex: none;
+  margin-block: calc(var(--sp-1) * -1);
+}
+/* in the agent menu: under where it stands */
+.am-status > .go-on {
+  margin-top: var(--sp-1);
+}
