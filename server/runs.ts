@@ -657,7 +657,8 @@ export function createRuns({ broadcast, actor, notify, ownerOfSession }: RunsOpt
         for (const r of runs)
           if (r.ended === null && r.plan.some((p) => p.id === e.id))
             change(slug, r.id, (x) => {
-              const moved = lib.noteMoved(x, e.id as string, to, now);
+              // the version the note records its fix in (lib/runs.ts noteMoved)
+              const moved = lib.noteMoved(x, e.id as string, to, now, to === 'fixed' ? e.reply?.fixed_in_v : undefined);
               return lib.checkDone(x, now) ? ['ended'] : moved;
             });
       if (e.status === 'verified' && e.kind === 'question' && !isAgent(e.by)) resolve(slug, e.id);
@@ -677,10 +678,13 @@ export function createRuns({ broadcast, actor, notify, ownerOfSession }: RunsOpt
       return;
     }
     if (e.type === 'reply' && e.id && isAgent(e.by)) {
+      // a fix marked before its version (lib/store.ts updateComment): fixed, in no version yet (a sign that said
+      // "Fixed" first gave it the run's newest)
+      const early = e.reply?.status === 'fixed' && !e.reply.fixed_in_v;
       for (const r of runs)
-        if (r.ended === null && r.plan.some((p) => p.id === e.id && (p.state === 'todo' || p.state === 'doing')))
+        if (r.ended === null && r.plan.some((p) => p.id === e.id && (early || p.state === 'todo' || p.state === 'doing')))
           change(slug, r.id, (x) => {
-            const moved = lib.noteMoved(x, e.id as string, 'replied', now);
+            const moved = early ? lib.noteMoved(x, e.id as string, 'fixed', now, null) : lib.noteMoved(x, e.id as string, 'replied', now);
             return lib.checkDone(x, now) ? ['ended'] : moved;
           });
       return;

@@ -233,17 +233,23 @@ export function stalledSaid(words: string): RunSaid {
   return { phase: 'not_listening', ...LOOK.not_listening, name: null, words, figure: null, edge: null, actions: ['go_on'] };
 }
 
-/** A note's line under its row while it is in a run's plan: nothing before the agent reaches it. */
-export function planSaid(p: RunPlanItem, name: string, latestV: number): { shape: Shape; tone: Tone; words: string } | null {
+/**
+ * A note's line under its row while it is in a run's plan: nothing before the agent reaches it. `noteV`: the version the
+ * note records its fix in (its own `fixed_in_v`; null: marked before its version), which the line says over the plan's
+ * — the row, check mode and this line name one version.
+ */
+export function planSaid(p: RunPlanItem, name: string, latestV: number, noteV?: number | null): { shape: Shape; tone: Tone; words: string } | null {
   switch (p.state) {
     case 'doing':
       return { shape: 'ease', tone: 'live', words: t('{name} is on it', { name }) };
-    case 'fixed':
-      return p.v
-        ? p.v <= latestV
-          ? { shape: 'half', tone: 'ok', words: t('fixed in V{v} · check it', { v: p.v }) }
-          : { shape: 'half', tone: 'ok', words: t('fixed · in V{v}', { v: p.v }) }
+    case 'fixed': {
+      const v = noteV !== undefined ? noteV : p.v;
+      return v
+        ? v <= latestV
+          ? { shape: 'half', tone: 'ok', words: t('fixed in V{v} · check it', { v }) }
+          : { shape: 'half', tone: 'ok', words: t('fixed · in V{v}', { v }) }
         : { shape: 'half', tone: 'ok', words: t('fixed · the version is coming') };
+    }
     case 'asked':
       return { shape: 'diamond', tone: 'ask', words: t('asked you') };
     case 'wontfix':

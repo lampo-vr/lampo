@@ -33,9 +33,10 @@ test('vr push --part-at: only with its video, only with the length it replaces',
   // 00:01:15 at 25 fps is frame 40
   const r = vr(['push', part, '--to', 'spot.mp4', '--part-at', '00:01:15'], env);
   assert.equal(r.code, 0, r.err);
+  // the note inside its stretch is neither marked nor answered: marking what the part fixed comes before the wait
   assert.match(
     r.out,
-    /^new version: .*spot\.mp4 \(v2, a part: frames 40–79 of v1\) · seams clean\n {4}a part is never final: send a full render once it is approved\nNow listen with lampo watch \(keep it running\): the person's notes arrive together when they press Send\.\n$/,
+    /^new version: .*spot\.mp4 \(v2, a part: frames 40–79 of v1\) · seams clean\n {4}a part is never final: send a full render once it is approved\n1 note still open on this video: mark what this version fixed \(lampo fix <id>\)\.\n$/,
   );
   const json = JSON.parse(vr(['push', part, '--to', 'spot.mp4', '--part-at', '40', '--json'], env).out);
   assert.equal(json.duplicate, true);

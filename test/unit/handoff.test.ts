@@ -56,6 +56,12 @@ const film = (name: string) => {
 };
 const person = (slug: string, text: string, o: Record<string, unknown> = {}) =>
   store.addComment(slug, { frame: 3, text, severity: 'must', author: 'Mia Hartmann', ...o });
+/** The agent's next render of the file, as V2: a fix marked now is in a version that has it (lib/store.ts). */
+const rerender = (f: string) => {
+  makeVideo(f, { w: 160, h: 90, dur: 1, freq: 990 });
+  age(f);
+  store.sync(slugOf(f));
+};
 
 test('cursorAt: this second, and the people’s events of it the log holds (every video’s: the wait it asks for hears them all)', () => {
   const at = '2026-10-05T10:00:07.000Z';
@@ -123,14 +129,15 @@ test('mark_fixed and wont_fix say how many notes are still open, then (none left
   const w = person(slug, 'Music too loud', { severity: 'nice' });
   person(slug, 'Maybe a warmer grade', { severity: 'idea' });
   store.addComment(slug, { frame: 5, text: 'Is the logo final?', kind: 'question', author: 'agent:handoff-agent' });
+  rerender(f);
   await mcp(async (c) => {
     let answer = said(await call(c, 'mark_fixed', { id: a.id, note: 'Logo 4 frames later' }));
-    assert.equal(answer, `${a.id}: fixed in v1\n${stillOpenLine(2)}`);
+    assert.equal(answer, `${a.id}: fixed in v2\n${stillOpenLine(2)}`);
     answer = said(await call(c, 'wont_fix', { id: w.id, reason: 'The client wants it loud' }));
     assert.equal(answer, `${w.id}: wontfix\n${stillOpenLine(1)}`);
     answer = said(await call(c, 'mark_fixed', { id: b.id, note: 'Title 20 % bigger' }));
     const cursor = /since "(\S+)"/.exec(answer)?.[1] as string;
-    assert.equal(answer, `${b.id}: fixed in v1\n${waitNowLine(cursor)}`);
+    assert.equal(answer, `${b.id}: fixed in v2\n${waitNowLine(cursor)}`);
   });
   assert.equal(stillOpenLine(1), '1 note still open on this video.');
 });
@@ -163,7 +170,8 @@ test('a reply, a question, options to pick and a fix’s preview hand the next s
       const got = said(await call(c, 'wait_for_feedback', { since: cursor, timeout_s: 5 }));
       assert.match(got, /^1 new:\n/, got);
       assert.ok(got.includes(dark.id), got);
-      // a note it fixed or left closes like before; one it answered isn't counted as open work
+      // a note it fixed (in the version it rendered since) or left closes like before; one it answered isn't open work
+      rerender(f);
       answer = said(await call(c, 'mark_fixed', { id: dark.id, note: 'Brightened by 10 %' }));
       assert.ok(endsWaitNow(answer), answer);
       // options to pick, on a folder before any render: the pick is the person's, so it waits
@@ -312,8 +320,9 @@ test('vr track, push, fix and wontfix end with how to hear the person’s notes:
   const slug = slugOf(f);
   const a = person(slug, 'Cut later');
   const b = person(slug, 'Fade out');
+  rerender(f);
   const fix = vr(['fix', a.id, '--note', 'Cut 3 frames later', '--by', 'agent:cli'], env);
-  assert.equal(fix.out, `${a.id}: fixed in v1\n${stillOpenLine(1)}\n`, fix.err);
+  assert.equal(fix.out, `${a.id}: fixed in v2\n${stillOpenLine(1)}\n`, fix.err);
   const last = vr(['wontfix', b.id, '--note', 'It is meant to stop dead', '--by', 'agent:cli'], env);
   assert.equal(last.out, `${b.id}: wontfix\n${WATCH_NOW_LINE}\n`, last.err);
   // a person's own verdicts hand nothing over

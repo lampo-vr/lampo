@@ -10,12 +10,14 @@
 //        changes         → in_progress while an agent works on it, else changes
 //   3. no verdict on the newest version:
 //        required notes open → in_progress while an agent works on it, else changes
+//        fixes marked before their version (fix_pending) → the same: the next version is due
 //        fixes waiting       → check_fixes
 //        fixes verified only on a fix preview (no render has them yet) → in_progress / changes: the next render is due
 //        otherwise           → to_review (flags: approval_stale, identical_to_approved)
 //   Fixes verified on a preview are resolved for the reviewer, but a video can't be final while one isn't rendered.
 //   A partial render (lib/part.ts) is a new version to review like any other ("V8 (part)"), but never final: where
 //   "Mark final" would be next, a full render is.
+import { fixWaits } from './handover.ts';
 import { ago, compareTime, isQuestion, isRequired, oneLine } from './time.ts';
 import type { ApprovalEntry, ApprovalParty, NextStep, PublishedSignal, Review, ShareSignal, Stage, StageInfo } from './types.ts';
 
@@ -132,9 +134,13 @@ export function stageOf(
   let toVerify = 0;
   let questions = 0;
   let onPreview = 0;
+  // A fix marked before its version (lib/handover.ts fixWaits) is no open work, and nothing to check either: the next
+  // version brings it. Until then the video is being fixed.
+  let waiting = 0;
   for (const c of review.comments) {
     if (c.status === 'verified' && c.verified_on && c.verified_on.v >= v) onPreview++;
     if (c.status === 'fixed') toVerify++;
+    else if (fixWaits(c)) waiting++;
     else if (c.status === 'open') {
       if (isRequired(c)) open++;
       else if (isQuestion(c)) questions++;
@@ -158,6 +164,7 @@ export function stageOf(
     final_superseded: null as number | null,
     open,
     to_verify: toVerify,
+    ...(waiting ? { waiting } : {}),
     questions,
     on_preview: onPreview,
     linked: !!ctx.linked || !!ctx.share,
@@ -214,8 +221,12 @@ export function stageOf(
   }
   if (verdict?.status === 'changes') return working(`Changes requested on ${V(v)} (${who(verdict)})${verdict.note ? `: ${oneLine(verdict.note)}` : ''}`);
 
-  // 3. no verdict on the newest version
-  if (open) return working(`${open} note${open === 1 ? '' : 's'} open on ${V(v)}`);
+  // 3. no verdict on the newest version. While work is open, fixes already in a version are said too: one view never
+  // says "in progress" and "fixes to check" as if they disagreed (the player's line and the stage come from these counts).
+  const alsoToCheck = toVerify ? ` · ${toVerify} fix${toVerify === 1 ? '' : 'es'} to check in ${V(v)}` : '';
+  const alsoRiding = waiting ? ` · ${waiting} fix${waiting === 1 ? '' : 'es'} coming in V${v + 1}` : '';
+  if (open) return working(`${open} note${open === 1 ? '' : 's'} open on ${V(v)}${alsoToCheck}${alsoRiding}`);
+  if (waiting) return working(`${waiting} fix${waiting === 1 ? '' : 'es'} coming in V${v + 1}${alsoToCheck}`);
   if (toVerify)
     return make('check_fixes', `${toVerify} fix${toVerify === 1 ? '' : 'es'} to check in ${V(v)}`, {
       kind: 'verify',

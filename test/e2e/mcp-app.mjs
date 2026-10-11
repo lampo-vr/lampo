@@ -118,10 +118,13 @@ try {
     await card.waitForFunction(() => [...document.querySelectorAll('.reply')].some((p) => p.textContent.includes('Schaue ich mir an')), { timeout: 10000 });
     await card.type('.note-body textarea', 'Logo 12 Frames später');
     await card.$$eval('.actions .btn', (btns) => btns.find((b) => b.textContent === 'Mark fixed').click());
-    await card.waitForFunction(() => document.querySelector('.note')?.classList.contains('fixed'), { timeout: 10000 });
+    // V1 is the only version: the fix rides with the next one (lib/handover.ts), and the card says so
+    await card.waitForFunction(() => document.querySelector('.note')?.classList.contains('riding'), { timeout: 10000 });
+    const tag = await card.$eval('.note .tag', (e) => e.textContent);
+    assert(tag === 'fixed · waiting for v2', tag);
     const { review } = await api(`/api/review/${encodeURIComponent(added.slug)}`);
     const c = review.comments.find((x) => x.id === note.id);
-    assert(c.status === 'fixed', c.status);
+    assert(c.status === 'open' && c.fix_pending === true, JSON.stringify({ status: c.status, fix_pending: c.fix_pending }));
     assert(
       c.replies.some((r) => r.text === 'Schaue ich mir an' && r.by === 'agent:mcp-app-e2e'),
       JSON.stringify(c.replies),

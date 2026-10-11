@@ -8,7 +8,8 @@ import { cacheRoot } from '../lib/backend/credentials.ts';
 import type { Backend } from '../lib/backend/types.ts';
 import { describeShape } from '../lib/drawing.ts';
 import { onWords } from '../lib/elements.ts';
-import { cursorAt, nothingWaitingLine, stillOpenLine, waitNowLine, workLeft } from '../lib/handoff.ts';
+import { cursorAt, nothingWaitingLine, putUpNextLine, riding, stillOpenLine, waitNowLine, workLeft } from '../lib/handoff.ts';
+import { fixWaits, ridingFlag } from '../lib/handover.ts';
 import { SAMPLE_FOR_AGENTS } from '../lib/onboarding.ts';
 import { optionLines } from '../lib/options.ts';
 import { partLine, partOk, partOkWords } from '../lib/part.ts';
@@ -70,8 +71,12 @@ export const nextStep = async (b: Backend): Promise<string> => nothingWaitingLin
  * rather than ending its turn with the person's answer coming in where nobody listens.
  */
 export async function afterHandBack(b: Backend, slug: string | null): Promise<string> {
-  const left = slug ? workLeft((await b.review(slug)).comments) : 0;
-  return left ? stillOpenLine(left) : handOff(b);
+  const comments = slug ? (await b.review(slug)).comments : [];
+  const left = workLeft(comments);
+  if (left) return stillOpenLine(left);
+  // fixes marked before their version: the version comes first, and its answer says to wait
+  const ride = riding(comments);
+  return ride ? putUpNextLine(ride) : handOff(b);
 }
 
 /** The MCP client's name: per request on 2026-07-28 (`_meta` envelope), from the initialize handshake on 2025. */
@@ -243,6 +248,7 @@ export function noteLines(
   const flags: string[] = [];
   if (c.check_again) flags.push(`CHECK AGAIN in v${c.carried_to}`);
   if (c.status === 'fixed') flags.push(`fixed in v${c.fixed_in_v}`);
+  if (fixWaits(c)) flags.push(ridingFlag(review.versions));
   if (c.verified_on) flags.push(`verified on preview ${c.verified_on.preview}: the next render must contain it`);
   if (c.scope === 'video') flags.push('OVERALL: about the whole video, not frame 0');
   if (isAgent(c.author)) flags.push(`by ${c.author}`);

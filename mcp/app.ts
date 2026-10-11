@@ -11,6 +11,7 @@ import { RESOURCE_MIME_TYPE, registerAppResource, registerAppTool } from '@model
 import type { CallToolResult, McpServer, ServerContext } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import type { Backend } from '../lib/backend/types.ts';
+import { fixWaits } from '../lib/handover.ts';
 import { ROOT, slugify } from '../lib/paths.ts';
 import { routeIn } from '../lib/scope.ts';
 import type { GrabCount } from '../lib/shots.ts';
@@ -76,6 +77,8 @@ export interface ReviewCard {
     author: string;
     agent: boolean;
     v: number;
+    /** Marked fixed before a version had it: it comes with the next one (lib/handover.ts). */
+    riding?: boolean;
     replies: { by: string; text: string; status: string | null }[];
   }[];
   selected: string | null;
@@ -141,6 +144,7 @@ export function registerReviewApp(server: McpServer, o: ReviewAppOptions): void 
           author: c.author,
           agent: isAgent(c.author),
           v: c.v,
+          ...(fixWaits(c) ? { riding: true } : {}),
           replies: (c.replies || []).slice(-3).map((r) => ({ by: r.by, text: r.text || '', status: r.status || null })),
         })),
       selected,

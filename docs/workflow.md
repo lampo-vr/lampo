@@ -192,8 +192,11 @@ The first rule that matches wins:
      that is still active, else *Approved* (see "Shared is not seen" below);
    - someone requested changes: *In progress* while an agent works on it, else *Changes requested*.
 3. **No decision on the newest version:**
-   - required notes open: *In progress* or *Changes requested*, as above;
-   - fixes waiting: *Check fixes*;
+   - required notes open, or fixes marked before the version that has them: *In progress* or *Changes requested*, as
+     above ("2 notes open on V2 · 1 fix to check in V2", "1 fix coming in V3");
+   - fixes waiting: *Check fixes*. Only what an agent marked fixed, in a version that exists, is a fix to check: a new
+     version leaves the other notes open (a quiet "V3 changed here" where its diff saw a change at a note), and never
+     asks about a question or a note outside a part;
    - fixes checked only on a fix preview, not rendered yet: *In progress* or *Changes requested* ("2 fixes checked on
      a preview · V4 to render");
    - otherwise: *To review*.

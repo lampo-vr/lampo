@@ -967,6 +967,9 @@ button.c-tc:hover {
   font-size: var(--fs-sm);
   color: var(--muted);
 }
+.verify-cta .still {
+  white-space: nowrap;
+}
 .composer {
   position: relative;
   /* the foot's severity word gives way before anything wraps (narrow panels) */

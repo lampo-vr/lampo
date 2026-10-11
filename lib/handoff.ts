@@ -6,8 +6,9 @@
 // "What agents read"); each fits test/unit/token-budget.test.ts.
 import { BRAND_NAME, MCP_NAME } from './brand.ts';
 import { isFeedback } from './eventLine.ts';
+import { fixBase, fixWaits, inPart } from './handover.ts';
 import { isAgent, isRequired } from './time.ts';
-import type { Comment, ReviewEvent } from './types.ts';
+import type { Comment, Review, ReviewEvent } from './types.ts';
 
 /** The words every line here shares: notes come when the person sends them, together. */
 const ON_SEND = "the person's notes arrive together when they press Send";
@@ -39,6 +40,18 @@ export const WATCH_NOW_LINE = `Now listen with lampo watch (keep it running): ${
 /** A fix handed over while more of the video's work is open: no waiting yet. */
 export const stillOpenLine = (n: number): string => `${n} note${n === 1 ? '' : 's'} still open on this video.`;
 
+/**
+ * A version put up while the video's notes are still open (neither marked nor answered): marking what it fixed comes
+ * first, the wait after the last mark (its answer says so). A fix marked before the version rode with it already
+ * (lib/store.ts registerVersion). `how`: the way this agent marks one (`mark_fixed`, `lampo fix <id>`).
+ */
+export const markWhatItFixedLine = (n: number, how: string): string =>
+  `${n} note${n === 1 ? '' : 's'} still open on this video: mark what this version fixed (${how}).`;
+
+/** After a hand-back with no note left to work but fixes marked before their version: the version is next, not the wait. */
+export const putUpNextLine = (n: number): string =>
+  `${n} fix${n === 1 ? '' : 'es'} marked before ${n === 1 ? 'its' : 'their'} version: put the version up now; its answer says when to wait.`;
+
 /** A wait that ended with nothing new: the normal case while the person reviews. */
 export const PENDING_LINE = `${ON_SEND.charAt(0).toUpperCase()}${ON_SEND.slice(1)}: call wait_for_feedback again now with this cursor.`;
 
@@ -63,7 +76,21 @@ export const endsWaitNow = (text: string): boolean => /(^|\n)Now call wait_for_f
  * The notes an agent still has to work on a video: open ones to fix whose last reply isn't an agent's. A note it
  * answered with a reply (a question, a why) waits for the person, so it isn't work left: after its last such answer it
  * waits. (One an agent wrote, as feedback on footage it reviewed, is work like a person's until someone answers it.)
+ * A fix marked before its version is no work left either: it rides with the next version (lib/handover.ts).
  */
 export function workLeft(comments: readonly Comment[]): number {
-  return comments.filter((c) => c.status === 'open' && isRequired(c) && !isAgent(c.replies?.at(-1)?.by)).length;
+  return comments.filter((c) => c.status === 'open' && !fixWaits(c) && isRequired(c) && !isAgent(c.replies?.at(-1)?.by)).length;
+}
+
+/** Fixes marked before their version (lib/handover.ts fixWaits): the agent's next version takes them along. */
+export const riding = (comments: readonly Comment[]): number => comments.filter(fixWaits).length;
+
+/**
+ * After a version is put up: the notes it may have fixed that nobody marked or answered yet — those older than it (a
+ * note written on it, or found still wrong in it, is about it), and a part's only inside its stretch. While there are
+ * any, its answer says to mark them (`markWhatItFixedLine`), not to wait.
+ */
+export function unmarkedAfter(review: Pick<Review, 'comments' | 'versions'>, part?: { at: number; frames: number } | null): number {
+  const newest = review.versions.at(-1)?.v ?? 0;
+  return workLeft(review.comments.filter((c) => fixBase(review.versions, c) < newest && (!part || inPart(c, part))));
 }

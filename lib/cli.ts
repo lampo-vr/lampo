@@ -19,7 +19,8 @@ import { settings } from './env.ts';
 import { eventLine, isInboxEvent, shortEventLine, tags, WATCH_TYPES } from './eventLine.ts';
 import { undismissed } from './findings.ts';
 import { folderName, normFolder } from './folders.ts';
-import { stillOpenLine, WATCH_NOW_LINE, workLeft } from './handoff.ts';
+import { markWhatItFixedLine, putUpNextLine, riding, stillOpenLine, unmarkedAfter, WATCH_NOW_LINE, workLeft } from './handoff.ts';
+import { fixWaits, handedOverLines, ridingFlag } from './handover.ts';
 import { cleanAuthor } from './names.ts';
 import { forAgents, SAMPLE_FOR_AGENTS } from './onboarding.ts';
 import { optionLines, optionsSummary, picksToRender } from './options.ts';
@@ -341,6 +342,13 @@ function sessionFilter(opt: Opts): SessionFilter | null {
   return null;
 }
 
+/** `lampo open --json`: the fixes handed over, as ids (marked before their version; waiting for the person's check). */
+function handedOverIds(comments: readonly Comment[]): { riding?: string[]; to_check?: string[] } {
+  const ride = comments.filter(fixWaits).map((c) => c.id);
+  const check = comments.filter((c) => c.status === 'fixed').map((c) => c.id);
+  return { ...(ride.length ? { riding: ride } : {}), ...(check.length ? { to_check: check } : {}) };
+}
+
 const latestOf = (review: Review) => review.versions.at(-1) || die(`${review.video} has no versions`);
 
 // ---------------------------------------------------------------- formatting
@@ -355,6 +363,7 @@ function commentLines(b: Backend, review: Review, c: Comment, { full = false, br
   const flags: string[] = [];
   if (c.check_again) flags.push(`CHECK AGAIN in v${c.carried_to}`);
   if (c.status === 'fixed') flags.push(`fixed in v${c.fixed_in_v}`);
+  if (fixWaits(c)) flags.push(ridingFlag(review.versions));
   if (c.verified_on) flags.push(`verified on preview ${c.verified_on.preview}: the next render must contain it`);
   if (c.scope === 'video') flags.push('OVERALL: about the whole video, not frame 0');
   if (isAgent(c.author)) flags.push(`by ${c.author}`);
@@ -517,9 +526,11 @@ const commands: Record<string, Command> = {
     }
     // Picks answered since the newest render stay listed: they are what the next render is made of.
     const newest = review.versions.at(-1)?.registered;
+    // A fix marked before its version is no work: said after the list, with the fixes the person checks (lib/handover.ts).
     const list = review.comments
-      .filter((c) => (opt.all ? true : c.status === 'open' || picksToRender(c, newest)))
+      .filter((c) => (opt.all ? true : (c.status === 'open' && !fixWaits(c)) || picksToRender(c, newest)))
       .sort((a, c) => (opt.all ? a.t - c.t : noteRank(a) - noteRank(c) || a.t - c.t));
+    const handed = opt.all ? [] : handedOverLines(review.comments);
     await b.fetchShots(review, list);
     const pointers = await b.pointers(review, list);
     if (opt.json)
@@ -535,6 +546,7 @@ const commands: Record<string, Command> = {
             session: review.session,
             stage: b.stage(review),
             comments: list.map((c) => withAbsShots(b, review, c, pointers)),
+            ...(opt.all ? {} : handedOverIds(review.comments)),
           },
           null,
           2,
@@ -545,8 +557,9 @@ const commands: Record<string, Command> = {
     out(header(b, review, legendLine(Object.values(pointers.notes), pointers.names)));
     if (shots) out(`  shots: ${path.dirname(shots)}/<id>_marked.png · <id>_clean.png · <id>_range.jpg (lampo show <id>: one note in full)`);
     out('');
-    if (!list.length) return out(opt.all ? 'no comments.' : 'no open comments.');
+    if (!list.length) out(opt.all ? 'no comments.' : 'no open comments.');
     for (const c of list) out(`${commentLines(b, review, c, { brief, pointers })}\n`);
+    for (const l of handed) out(l);
   },
 
   async ask({ pos, opt }, b) {
@@ -842,6 +855,9 @@ const commands: Record<string, Command> = {
       } catch (e) {
         die(`v${r.v} is up, but its elements map was refused: ${(e as Error).message} (fix it, then: lampo elements <video> ${elements.name} --v ${r.v})`);
       }
+    // Notes it may have fixed that nobody marked or answered: marking them comes before the wait (lib/handoff.ts).
+    const left = r.duplicate ? 0 : unmarkedAfter(r.review, r.part);
+    const next = left ? markWhatItFixedLine(left, 'lampo fix <id>') : WATCH_NOW_LINE;
     if (opt.json)
       return out(
         JSON.stringify(
@@ -853,7 +869,7 @@ const commands: Record<string, Command> = {
             duplicate: r.duplicate,
             ...(r.part ? { part: r.part } : {}),
             ...(attached ? { elements: attached } : {}),
-            next: WATCH_NOW_LINE,
+            next,
           },
           null,
           2,
@@ -874,14 +890,15 @@ const commands: Record<string, Command> = {
         ),
       );
       out('    a part is never final: send a full render once it is approved');
-      out(WATCH_NOW_LINE);
+      out(next);
       return;
     }
     out(oneLine(`${r.created ? 'added' : `new version`}: ${r.review.video} (v${r.v})${r.review.folder ? `  [${r.review.folder}]` : ''}`));
-    const carried = r.review.comments.filter((c) => c.status === 'open' && c.carried_to === r.v).length;
-    if (carried) out(`    ${carried} open comment(s) carried forward: check them against v${r.v}`);
+    // fixes marked before it came with it (lib/store.ts registerVersion); open notes stay open until marked
+    const took = r.review.comments.filter((c) => c.status === 'fixed' && c.fixed_in_v === r.v).length;
+    if (took) out(`    ${took} fix${took === 1 ? '' : 'es'} marked before it now in v${r.v}: the person checks them`);
     if (mapLine) out(mapLine);
-    out(WATCH_NOW_LINE);
+    out(next);
   },
 
   async elements({ pos, opt }, b) {
@@ -945,7 +962,7 @@ const commands: Record<string, Command> = {
     const { slug } = await b.resolve(pos[0] || die('missing <video>'));
     const r = (await b.sync(slug)) || die(`no review for ${slug}`);
     const latest = latestOf(r.review);
-    if (r.version) out(`registered v${latest.v}${r.carried ? `, ${r.carried} open comment(s) carried forward` : ''}`);
+    if (r.version) out(`registered v${latest.v}${r.carried ? `, ${r.carried} fix${r.carried === 1 ? '' : 'es'} marked before it now in it` : ''}`);
     // a new render waits on disk: nothing new in an archived project
     else if (r.archived) die(archivedWords(r.archived));
     else if (r.pending) out(`the file is still being written; try again in a moment (current v${latest.v})`);
@@ -1400,7 +1417,8 @@ async function setStatus(b: Backend, id: string | undefined, status: Comment['st
   if (lock) die(`${lock}: nothing to fix until the reviewer reopens it.`);
   if (status === 'fixed') await b.review(hit.slug, { wait: true });
   const c = await b.updateComment(id, { status, note: str(opt.note) ?? '', fixed_in_v: str(opt.v), preview: str(opt.preview), by: author(opt) });
-  out(`${c.id}: ${c.status}${c.status === 'fixed' ? ` in v${c.fixed_in_v}` : ''}`);
+  // marked before its version: it rides with the next one (lib/store.ts updateComment)
+  out(fixWaits(c) ? `${c.id}: fixed · rides with your next version` : `${c.id}: ${c.status}${c.status === 'fixed' ? ` in v${c.fixed_in_v}` : ''}`);
   // An agent closed a note: how many of the video's notes are still open, or (none) how to hear the person's (lib/handoff.ts).
   if (status === 'fixed' || status === 'wontfix') out(await afterHandBack(b, hit.slug));
 }
@@ -1411,8 +1429,12 @@ async function setStatus(b: Backend, id: string | undefined, status: Comment['st
  * the person, so it isn't work left: the person's answer comes only while it listens.
  */
 async function afterHandBack(b: Backend, slug: string | null | undefined): Promise<string> {
-  const left = slug ? workLeft((await b.review(slug)).comments) : 0;
-  return left ? stillOpenLine(left) : WATCH_NOW_LINE;
+  const comments = slug ? (await b.review(slug)).comments : [];
+  const left = workLeft(comments);
+  if (left) return stillOpenLine(left);
+  // fixes marked before their version: the version comes first, and its output says to listen
+  const ride = riding(comments);
+  return ride ? putUpNextLine(ride) : WATCH_NOW_LINE;
 }
 
 /** The same line after an agent's reply or question; with --json on stderr (stdout is one JSON document). */

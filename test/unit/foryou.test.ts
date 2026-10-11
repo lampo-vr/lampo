@@ -28,14 +28,20 @@ const kinds = (r: ForYouResponse) => r.items.map((i) => i.kind);
 
 const question = store.addComment(A, { frame: 3, text: 'Soll das Logo hier schon stehen?', author: 'agent:promo-edit' });
 const toFix = store.addComment(A, { frame: 5, text: 'Logo zu früh', author: 'tester' });
+// marked before its version: a fix to check only once V2 has it
 store.updateComment(toFix.id, { status: 'fixed', note: 'Logo kommt jetzt bei 0:10', by: 'agent:promo-edit' });
+makeVideo(a, { dur: 1, freq: 550 });
+age(a);
+store.sync(A);
 const client = store.addComment(A, { frame: 7, text: 'Bitte heller', author: 'guest:Mia' });
 const mine = store.addComment(A, { frame: 9, text: 'Musik leiser', author: 'tester' });
 store.updateComment(mine.id, { note: 'Mache ich im nächsten Render', by: 'agent:promo-edit' });
-store.addComment(B, { frame: 4, text: 'Übergang zu hart', author: 'tester' });
+const old = store.addComment(B, { frame: 4, text: 'Übergang zu hart', author: 'tester' });
 makeVideo(b, { dur: 1, freq: 880 });
 age(b);
 store.sync(B);
+// A store from before fixes were tied to versions: V2 carried the open note to be checked again (new versions don't).
+store.mutate(B, (r) => Object.assign(r.comments.find((c) => c.id === old.id) ?? {}, { check_again: true, carried_to: 2 }));
 // A re-render that hands nothing over (no open notes carried) is not inbox-worthy.
 const bumper = makeVideo(path.join(dir, 'Acme/export/bumper.mp4'), { dur: 1 });
 age(bumper);

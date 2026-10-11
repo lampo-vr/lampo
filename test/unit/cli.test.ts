@@ -94,7 +94,10 @@ test('vr ls / open / show / prompt', () => {
 });
 
 test('vr fix / reply / wontfix and the inbox', () => {
-  assert.match(vr(['fix', id, '--note', 'Logo 4 Frames später', '--by', 'agent:test'], env).out, new RegExp(`${id}: fixed in v1`));
+  // V1 is the only version: the fix rides with the next one, which is the agent's next step (not a wait)
+  const fixed = vr(['fix', id, '--note', 'Logo 4 Frames später', '--by', 'agent:test'], env).out;
+  assert.match(fixed, new RegExp(`${id}: fixed · rides with your next version\\n1 fix marked before its version: put the version up now`));
+  assert.equal(vr(['fix', id, '--v', '3', '--by', 'agent:test'], env).code, 1, 'a version that does not exist is refused');
   assert.match(vr(['reply', id, '--note', 'siehe v1', '--by', 'agent:test'], env).out, /reply added/);
   assert.equal(vr(['wontfix', id], env).code, 1, 'wontfix needs a reason');
   assert.match(vr(['inbox'], env).out, /NEW MUST \[timing,graphic\]/);

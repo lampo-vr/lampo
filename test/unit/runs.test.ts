@@ -279,6 +279,36 @@ test('the done rule, first match wins: an exit, a wait after handing back, the f
   assert.equal(i.needs?.note, 'c_dddd01');
 });
 
+test('a fix is in the version its note records: one marked before its version keeps the run open until that version', () => {
+  // V2 came from this run; then both notes are marked fixed before its next version (lib/store.ts: no fixed_in_v yet)
+  const r = fresh();
+  runs.applySign(r, sign(T0, 'read'));
+  runs.versionLanded(r, 2, T0 + 1000);
+  runs.noteMoved(r, 'c_aaaa01', 'fixed', T0 + 2000, null);
+  // a sign says "Fixed" first (the run's newest, as before), then the store's word: in no version yet
+  runs.applySign(r, sign(T0 + 3000, 'fix', words('Fixed {id}', { id: 'c_aaaa02' }), { target: 'c_aaaa02' }));
+  runs.noteMoved(r, 'c_aaaa02', 'fixed', T0 + 3500, null);
+  assert.deepEqual(
+    r.plan.map((p) => [p.state, p.v]),
+    [
+      ['fixed', undefined],
+      ['fixed', undefined],
+    ],
+  );
+  assert.equal(r.ended, null, 'every note answered and V2 here, but the fixes ride with the next version');
+  assert.equal(runs.checkDone(r, T0 + 4000), false);
+  assert.deepEqual(runs.versionLanded(r, 3, T0 + 5000), ['ended'], 'V3 has them');
+  assert.deepEqual(
+    r.plan.map((p) => p.v),
+    [3, 3],
+  );
+  // the store's version wins over the run's newest: fixed in V3 while the run's result says V2
+  const s = fresh();
+  runs.versionLanded(s, 2, T0);
+  runs.noteMoved(s, 'c_aaaa01', 'fixed', T0 + 1000, 3);
+  assert.equal(s.plan[0]?.v, 3);
+});
+
 test('failed from an error; stopped by the person; nothing moves a run that ended', () => {
   const r = fresh();
   runs.applySign(r, sign(T0, 'render', words('Rendering a new version'), { progress: { what: 'render', stage: 'rendering', pct: 50 } }));

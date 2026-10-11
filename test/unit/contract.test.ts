@@ -68,6 +68,7 @@ const { makeShots } = await import('../../lib/shots.ts');
 const { reviewDir } = await import('../../lib/paths.ts');
 const { WATCH_TYPES } = await import('../../lib/eventLine.ts');
 const { isAgent } = await import('../../lib/time.ts');
+const { waitsForCheck } = await import('../../lib/handover.ts');
 
 /** `fn` on a fixed clock: what it writes carries this time instead of now. */
 function at<T>(iso: string, fn: () => T): T {
@@ -135,6 +136,15 @@ test('the app starts on the old store: reviews, notes, sign-off, versions and fo
       return { id, v, frame, timecode, t, range, text, tags, severity, status, author, created, replies, drawing, voice, fixed_in_v };
     };
     assert.deepEqual(got.review.comments.map(note), old.comments.map(note), `${slug}: notes keep their ids, frames, text and threads`);
+    // Open notes a new version carried "to check again", before fixes were tied to versions, still read so: the player
+    // asks about them as fixes to check (new versions carry none).
+    const carried = got.review.comments.filter((c) => c.check_again);
+    assert.deepEqual(
+      carried.map((c) => [c.id, c.carried_to]),
+      old.comments.filter((c) => c.check_again).map((c) => [c.id, c.carried_to]),
+    );
+    assert.ok(carried.every(waitsForCheck), `${slug}: carried notes are fixes to check`);
+    if (slug === TEASER) assert.equal(carried.length, 2, 'the teaser has two');
     assert.deepEqual(got.review.approval, old.approval, 'the legacy field stays as written');
     const a = must(old.approval);
     assert.deepEqual(got.approvals, [{ party: a.by.startsWith('guest:') ? 'client' : 'team', status: a.status, v: a.v, by: a.by, at: a.at, note: a.note }]);

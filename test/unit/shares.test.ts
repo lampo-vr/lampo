@@ -432,6 +432,12 @@ test('fix checks: a fixed note can be confirmed or reopened by the client, nothi
   const id = notes.find((n: { text: string }) => n.text === 'Farbe kippt').id;
   assert.equal((await guest('POST', `/api/g/${l.token}/comments/${id}/check`, { name: 'Mia', verdict: 'confirm' })).status, 409);
   store.updateComment(id, { status: 'fixed', note: 'regraded', by: 'agent:edit' });
+  // marked before the version that has it: nothing to check until it is up
+  assert.equal((await guest('POST', `/api/g/${l.token}/comments/${id}/check`, { name: 'Mia', verdict: 'confirm' })).status, 409);
+  const file = path.join(dir, 'proj/export/other.mp4');
+  makeVideo(file, { w: 160, h: 90, dur: 1, freq: 990 });
+  age(file);
+  store.sync(other);
   const confirm = await guest('POST', `/api/g/${l.token}/comments/${id}/check`, { name: 'Mia', verdict: 'confirm', text: 'passt' });
   assert.equal(confirm.json().status, 'verified');
   assert.equal(must(store.findComment(id)).comment.status, 'verified');

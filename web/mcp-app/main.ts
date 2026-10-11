@@ -14,6 +14,8 @@ interface Note {
   author: string;
   agent: boolean;
   v: number;
+  /** Marked fixed before a version had it: it comes with the next one. */
+  riding?: boolean;
   replies: { by: string; text: string; status: string | null }[];
 }
 interface Still {
@@ -204,14 +206,14 @@ function render(): void {
 function noteItem(n: Note, open: boolean): HTMLElement {
   const li = h(
     'li',
-    { class: `note ${n.status} sev-${n.severity}${open ? ' open' : ''}` },
+    { class: `note ${n.riding ? 'fixed riding' : n.status} sev-${n.severity}${open ? ' open' : ''}` },
     h(
       'button',
       { class: 'note-head', type: 'button', onclick: () => show({ note: n.id }), 'aria-expanded': open ? 'true' : 'false' },
       h('span', { class: 'dot', 'aria-hidden': 'true' }),
       h('span', { class: 'tc' }, n.timecode),
       h('span', { class: 'text' }, n.text || '(drawing only)'),
-      h('span', { class: 'tag' }, n.status === 'fixed' ? `fixed` : n.severity),
+      h('span', { class: 'tag' }, n.riding ? `fixed · waiting for v${(card?.v ?? 0) + 1}` : n.status === 'fixed' ? `fixed` : n.severity),
     ),
   );
   if (!open) return li;
@@ -225,7 +227,7 @@ function noteItem(n: Note, open: boolean): HTMLElement {
         'div',
         { class: 'actions' },
         button('Reply', () => ta.value.trim() && reply(n, ta.value.trim())),
-        card.canAct && n.status === 'open'
+        card.canAct && n.status === 'open' && !n.riding
           ? button('Mark fixed', () => markFixed(n, ta.value.trim() || 'fixed'), 'After the re-render: say what changed', 'primary')
           : null,
       ),

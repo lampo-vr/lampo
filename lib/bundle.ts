@@ -336,6 +336,7 @@ const comment = z.strictObject({
   check_again: z.boolean().optional(),
   carried_to: count.optional(),
   fixed_in_v: count.optional(),
+  fix_pending: z.boolean().optional(),
   edited: time.optional(),
   previews: z.array(fixPreview).max(1000).optional(),
   refs: z.array(noteRef).max(100).optional(),

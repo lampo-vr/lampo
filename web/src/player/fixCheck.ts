@@ -1,5 +1,5 @@
 // Check mode's queue (useVerify.ts), pure. The notes are the one source of truth: a fix is in the queue while it waits
-// to be checked (marked fixed, or carried to a new version to look at again), wherever it is settled — the check card,
+// to be checked (marked fixed in a version that exists; in an older store, carried to look at again), wherever it is settled — the check card,
 // the note's card in the panel, another person, an agent — it leaves at once. A session only remembers the order it
 // started with and where it stands; everything else is read from the notes as they are now.
 import type { CommentStatus as Status } from '../../../lib/types.ts';
@@ -9,8 +9,10 @@ import { t } from '../i18n/index.ts';
  * unit tests import this file). */
 export type Verdict = { status: 'verified' | 'open'; note: string } | { ack: true; note: string };
 
-/** A fix to check: marked fixed, or an open note carried to a new version to look at again. */
-export const waitsForCheck = (c: { status: Status; check_again?: boolean }): boolean => c.status === 'fixed' || (c.status === 'open' && !!c.check_again);
+/** A fix to check: marked fixed in a version that exists (or, in an older store, an open note carried to a new version
+ * to look at again); never a question, never a fix still riding with the next version — the rule the stage and what
+ * agents read count by too (lib/handover.ts). */
+export { waitsForCheck } from '../../../lib/handover.ts';
 
 /**
  * The write for a verdict on a fix to check — the same from check mode's card and the note's card in the panel. Looks

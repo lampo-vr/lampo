@@ -736,15 +736,31 @@ export function needsPermission(r: StoredRun, now: number, needs: { text: Activi
   return was !== 'needs_you' ? 'needs_you' : null;
 }
 
-/** A plan note's status as it now is (by anyone on the editor's side, through any way in). */
-export function noteMoved(r: StoredRun, id: string, to: RunPlanItem['state'], now: number): boolean {
+/**
+ * A plan note's status as it now is (by anyone on the editor's side, through any way in). `v`: the version a fix is in
+ * as the note records it (its `fixed_in_v`; null: marked before its version, none yet — lib/store.ts updateComment),
+ * which wins over the run's newest: the store's word comes after a sign's, and the done rule waits for every fix's
+ * version. A sign alone (`v` undefined) takes the run's newest, as before.
+ */
+export function noteMoved(r: StoredRun, id: string, to: RunPlanItem['state'], now: number, v?: number | null): boolean {
   const p = r.plan.find((x) => x.id === id);
-  if (!p || p.state === to) return false;
+  if (!p) return false;
+  if (p.state === to) {
+    // the note's own record of a fix it holds already: in no version yet, or now in one
+    if (to !== 'fixed' || v === undefined || p.v === (v ?? undefined)) return false;
+    if (v === null) delete p.v;
+    else p.v = v;
+    return true;
+  }
   // reading a note never takes back what was done to it
   if (to === 'doing' && p.state !== 'todo') return false;
   p.state = to;
   p.at = at(now);
-  if (to === 'fixed' && r.result?.v) p.v = r.result.v;
+  if (to === 'fixed') {
+    const inV = v === undefined ? r.result?.v : v;
+    if (inV) p.v = inV;
+    else delete p.v;
+  }
   if (to === 'todo') delete p.v;
   refreshResult(r);
   return true;
@@ -819,11 +835,12 @@ const handedBack = (r: Run) => !!r.result?.v || (r.plan.length > 0 && allAnswere
 
 /**
  * The done rule, 4 — for agents Lampo can't see end: every plan note answered and a version arrived since the run
- * opened. A question still open ends it as needing you. True when it ended.
+ * opened, with every fix in it (a fix marked before its version waits for that one). A question still open ends it as
+ * needing you. True when it ended.
  */
 export function checkDone(r: StoredRun, now: number): boolean {
   if (r.ended !== null || handsOwnEnd(r) || r.state === 'queued') return false;
-  if (!r.result?.v || !allAnswered(r)) return false;
+  if (!r.result?.v || !allAnswered(r) || r.plan.some((p) => p.state === 'fixed' && !p.v)) return false;
   endRun(r, r.state === 'needs_you' ? 'needs_you' : 'done', now);
   return true;
 }

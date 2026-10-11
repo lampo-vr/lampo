@@ -201,13 +201,19 @@ test('vr watch follows the server live and heartbeats its session', async () => 
   }
 });
 
-test('vr fix, then a new render goes up as v2 and carries the open note', async () => {
-  assert.match((await vr(['fix', noteId, '--note', 'Logo 4 Frames später', '--by', 'agent:remote'])).out, new RegExp(`${noteId}: fixed in v1`));
+test('vr fix before the render: the fix rides with v2; the push then says to mark what else it fixed', async () => {
+  assert.match(
+    (await vr(['fix', noteId, '--note', 'Logo 4 Frames später', '--by', 'agent:remote'])).out,
+    new RegExp(`^${noteId}: fixed · rides with your next version\\n1 note still open on this video\\.\\n$`),
+  );
   const v2 = makeVideo(path.join(dir, 'renders/clip-v2.mp4'), { w: 320, h: 180, dur: 1, freq: 700 });
-  const r = await vr(['push', v2, '--to', 'clip.mp4']);
+  const r = await vr(['push', v2, '--to', 'clip.mp4', '--by', 'agent:remote']);
   assert.equal(r.code, 0, r.err);
   assert.match(r.out, /new version: \/@uploads\/Acme\/Reels\/clip\.mp4 \(v2\)/);
-  assert.match(r.out, /1 open comment\(s\) carried forward/);
+  assert.match(r.out, /\n {4}1 fix marked before it now in v2: the person checks them\n/);
+  assert.match(r.out, /\n1 note still open on this video: mark what this version fixed \(lampo fix <id>\)\.\n$/);
+  const shown = JSON.parse((await vr(['show', noteId, '--json'])).out);
+  assert.deepEqual([shown.status, shown.fixed_in_v, shown.fix_pending], ['fixed', 2, undefined]);
   assert.match((await vr(['inbox'])).out, /NEW SHOULD .*Farbe kälter/);
   assert.match((await vr(['status', 'clip.mp4', 'rendering v3', '--by', 'agent:remote'])).out, /status: "rendering v3"/);
 });

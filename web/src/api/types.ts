@@ -223,6 +223,8 @@ export interface Comment {
   carried_to?: number;
   /** The render the agent says fixed it. */
   fixed_in_v?: number;
+  /** Marked fixed before a version had the fix: it comes with the next one (lib/handover.ts), not a fix to check yet. */
+  fix_pending?: boolean;
   /** Stills and clips of the fix, made before it was rendered (lib/previews.ts). */
   previews?: FixPreview[];
   /** Verified on a fix preview; no render has the fix yet. */

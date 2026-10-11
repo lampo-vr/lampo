@@ -73,6 +73,9 @@ const SECONDS = {
   publish: 19,
   refs: 19,
   thread: 19,
+  // what the person is asked to check once fixes belong to their version: two videos, five widths (measured alone,
+  // 2026-10-11: 4 s; the version diff it waits for can take longer on a loaded machine)
+  'loop-fixes': 8,
   drafts: 17,
   onboarding: 23,
   'onboarding-setup': 26,

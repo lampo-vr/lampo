@@ -55,3 +55,7 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
   after the call returns, and never after one `setImmediate` (work that ran in a poll phase gets it before the next poll).
   Long work after the last such look is made async before the lock (a render's copy: `fs.promises.copyFile` to a temp
   file, the stop asked after it), so that only a rename is left under the lock: a synchronous copy can't be stopped.
+- A version an agent puts up says to mark what it fixed while notes older than it are neither marked nor answered
+  (`unmarkedAfter`, `markWhatItFixedLine`), never "wait now" before the marks (a hasty agent waited and marked nothing);
+  a hand-back with only early fixes left says to put the version up (`putUpNextLine`). A version an agent names that
+  doesn't exist is "bad version", never taken as given.

@@ -7,6 +7,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import type { RefInput } from '../../lib/backend/types.ts';
 import { CHOICE_MAX, CHOICES_MAX, CHOICES_MIN } from '../../lib/choices.ts';
+import { fixWaits } from '../../lib/handover.ts';
 import { noteText, previewData, projectTime, refCaption, refData, refUrl, refVideo, sourceName, tagList } from '../../lib/inputs.ts';
 import { slugify } from '../../lib/paths.ts';
 import { describePreview, PREVIEW_LIMITS } from '../../lib/previews.ts';
@@ -25,7 +26,7 @@ export function registerNoteTools({ b, o, tool, author, accountOf, byArg }: Tool
     {
       title: 'Mark a note fixed',
       description:
-        'After you put up the next version: mark a note fixed, saying what you changed and where (e.g. "caption moved to y 1392"). Uses the newest version unless v; waits for a render still being written. Never verify: the reviewer does.',
+        'Mark a note fixed, saying what you changed and where (e.g. "caption moved to y 1392"): in the newest version, or v; marked before its version is up, it rides with your next one. Never verify: the reviewer does.',
       inputSchema: z.object({
         id: z.string(),
         note: noteText,
@@ -41,8 +42,12 @@ export function registerNoteTools({ b, o, tool, author, accountOf, byArg }: Tool
       if (lock) throw new Error(`${lock}: nothing to fix until the reviewer reopens it`);
       await b.review(hit.slug, { wait: true });
       const c = await b.updateComment(id, { status: 'fixed', note, fixed_in_v: v, preview: pid, by: author(by, ctx) });
-      // the last line: how many of the video's notes are still open, or (none) to wait for the person now
-      return ok(text(`${c.id}: fixed in v${c.fixed_in_v}${pid ? ` (shown on preview ${pid})` : ''}\n${await afterHandBack(b, hit.slug)}`));
+      // the last line: how many of the video's notes are still open, or (none) to wait for the person now — or, a fix
+      // marked before its version (lib/store.ts updateComment), to put that version up first
+      const said = fixWaits(c)
+        ? `${c.id}: fixed · rides with your next version`
+        : `${c.id}: fixed in v${c.fixed_in_v}${pid ? ` (shown on preview ${pid})` : ''}`;
+      return ok(text(`${said}\n${await afterHandBack(b, hit.slug)}`));
     },
   );
 

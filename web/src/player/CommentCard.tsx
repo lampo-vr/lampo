@@ -400,6 +400,8 @@ interface CommentCardProps {
    * until the agent reaches it), and the agent's name for it. */
   plan?: RunPlanItem;
   planName?: string;
+  /** An open note from an earlier version where the version on screen changed (its diff): a quiet hint, no fix. */
+  changedIn?: number;
 }
 
 // Memoised: the player re-renders on every frame during playback, the cards only when their own props change.
@@ -426,6 +428,7 @@ export const CommentCard = memo(function CommentCard({
   checkMode = false,
   plan,
   planName = '',
+  changedIn,
 }: CommentCardProps) {
   useLang(); // memo'd: renders again on a language switch by itself
   const [mode, setMode] = useState<Mode | null>(null);
@@ -652,14 +655,16 @@ export const CommentCard = memo(function CommentCard({
             : t('Checked')
           : c.status === 'wontfix'
             ? t("Won't fix")
-            : c.check_again
-              ? t('Check again')
-              : asks
-                ? t('Question')
-                : null;
+            : c.fix_pending
+              ? t('Fixed · waiting for V{v}', { v: latestV + 1 })
+              : c.check_again
+                ? t('Check again')
+                : asks
+                  ? t('Question')
+                  : null;
     const said = (c.replies || []).filter((r) => !r.status).length;
     const ghost = c.rangeHere && c.scope !== 'video' ? c.rangeHere : null;
-    const planLine = plan ? planSaid(plan, planName, latestV) : null;
+    const planLine = plan ? planSaid(plan, planName, latestV, c.fix_pending ? null : c.fixed_in_v) : null;
     const show = () => {
       setPeek(true);
       if (ghost) setRangeHint({ ghost });
@@ -711,7 +716,7 @@ export const CommentCard = memo(function CommentCard({
             <span className="nr-text">
               {c.text_edit ? <WordsChange edit={c.text_edit} inline /> : c.text ? firstLine(c.text) : <span className="muted">{t('(marked frame)')}</span>}
             </span>
-            {(status || said > 0 || c.v !== currentV || !!ghost) && (
+            {(status || said > 0 || c.v !== currentV || !!ghost || !!changedIn) && (
               <span className="nr-meta">
                 {ghost && fps && <span className="nr-len">{formatSeconds(rangeSeconds(ghost, fps))}</span>}
                 {c.v !== currentV && <span className="nr-v">V{c.v}</span>}
@@ -721,7 +726,18 @@ export const CommentCard = memo(function CommentCard({
                     {said}
                   </span>
                 )}
-                {status && <span className={`nr-state nr-${c.status}${c.check_again && c.status === 'open' ? ' again' : ''}`}>{status}</span>}
+                {changedIn && !status && (
+                  <span className="nr-changed" data-testid="note-changed">
+                    {t('V{v} changed here', { v: changedIn })}
+                  </span>
+                )}
+                {status && (
+                  <span
+                    className={`nr-state ${c.fix_pending && c.status === 'open' ? 'riding' : `nr-${c.status}`}${c.check_again && c.status === 'open' && !c.fix_pending ? ' again' : ''}`}
+                  >
+                    {status}
+                  </span>
+                )}
               </span>
             )}
             {plan && (
@@ -825,7 +841,12 @@ export const CommentCard = memo(function CommentCard({
           {c.status === 'fixed' && (
             <Badge size="sm" tone="ok" className="note-state">
               {t('Fixed')}
-              {lastFix?.preview ? t(' · preview') : lastFix?.fixed_in_v ? ` · V${lastFix.fixed_in_v}` : ''}
+              {lastFix?.preview ? t(' · preview') : (c.fixed_in_v ?? lastFix?.fixed_in_v) ? ` · V${c.fixed_in_v ?? lastFix?.fixed_in_v}` : ''}
+            </Badge>
+          )}
+          {c.status === 'open' && c.fix_pending && (
+            <Badge size="sm" className="note-state">
+              {t('Fixed · waiting for V{v}', { v: latestV + 1 })}
             </Badge>
           )}
           {c.status === 'verified' && (

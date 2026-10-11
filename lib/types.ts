@@ -398,10 +398,17 @@ export interface Comment {
   author_id?: string;
   created: string;
   replies: Reply[];
-  /** Open note carried to a newer render: look again. */
+  /** Open note carried to a newer render: look again. Stores before fixes were tied to versions (lib/handover.ts); new
+   * versions no longer set it, and a note that has it still reads so. */
   check_again?: boolean;
   carried_to?: number;
   fixed_in_v?: number;
+  /**
+   * Marked fixed before a version that carries the fix existed: the note stays `open` (nothing to check yet), its last
+   * `fixed` reply has no `fixed_in_v`, and the next version put up on the video takes the fix along (lib/store.ts
+   * registerVersion: then `fixed`, with `fixed_in_v`). A part takes only the notes inside its stretch.
+   */
+  fix_pending?: boolean;
   edited?: string;
   /** Client notes: the public id of the review link it came through (see Share.id). */
   share?: string;
@@ -796,6 +803,8 @@ export interface Counts {
   ideas: number;
   /** Open questions from agents, waiting for the reviewer. */
   questions: number;
+  /** Notes marked fixed before a version carried the fix: they ride with the next version (not in `open`). */
+  waiting?: number;
 }
 
 // ---------------------------------------------------------------- events.jsonl
@@ -2562,6 +2571,8 @@ export interface StageInfo {
   open: number;
   /** Fixes waiting for verification. */
   to_verify: number;
+  /** Fixes marked before their version: they come with the next one (absent: none, or an older server). */
+  waiting?: number;
   /** Questions from agents waiting for an answer. */
   questions: number;
   /** Notes verified on a fix preview whose fix no render contains yet (optional: absent from older servers). */
@@ -4191,7 +4202,8 @@ export interface UploadResult {
   part?: VersionPart;
   /**
    * An upload URL's answer (PUT /api/uploads/direct/:ticket): a wait_for_feedback cursor from the moment the render was
-   * taken, and the line that says to wait now with it (lib/handoff.ts). Absent elsewhere.
+   * taken, and the line that says to wait now with it (lib/handoff.ts). While notes the version may have fixed are
+   * neither marked nor answered, no cursor: `next` says to mark what it fixed first. Absent elsewhere.
    */
   cursor?: string;
   next?: string;

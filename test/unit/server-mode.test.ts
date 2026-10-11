@@ -188,7 +188,7 @@ test('a hosted server never touches its own disk for clients', async () => {
   assert.equal((await request('PUT', '/api/review/..%2F..%2Ftmp/approval', { body: { status: 'approved' }, headers: bearer })).status, 404);
 });
 
-test('uploads: first upload creates the review, the next one is v2 with notes carried, same bytes are a no-op', async () => {
+test('uploads: first upload creates the review, the next one is v2 (open notes stay open), same bytes are a no-op', async () => {
   const bearer = { Authorization: `Bearer ${ownerToken}` };
   const a = makeVideo(path.join(dir, 'in/spot.mp4'), { w: 320, h: 180, dur: 1 });
   const up = await tusUpload(request, a, { filename: '../../spot.mp4', folder: 'Acme/Reels' }, bearer);
@@ -226,7 +226,9 @@ test('uploads: first upload creates the review, the next one is v2 with notes ca
   assert.equal(v2.status, 200, v2.text);
   assert.deepEqual([v2.json().v, v2.json().created, v2.json().slug], [2, false, res.slug]);
   const after = store.loadReview(res.slug);
-  assert.equal(after?.comments.find((c) => c.id === note.json().id)?.check_again, true);
+  // nobody marked it fixed: open work, never a fix to check (it was "carried, check again" before fixes had versions)
+  const kept = after?.comments.find((c) => c.id === note.json().id);
+  assert.deepEqual([kept?.status, kept?.check_again, kept?.carried_to], ['open', undefined, undefined]);
 
   const media = await request('GET', `/media/${encodeURIComponent(res.slug)}/v2`, { headers: { ...bearer, Range: 'bytes=0-99' } });
   assert.equal(media.status, 206);

@@ -111,9 +111,15 @@ test('comments: create with a drawing, patch, validate, delete', async () => {
   assert.equal(malformed.status, 400, 'broken JSON is a 400 with a JSON error');
   assert.ok(malformed.json().error);
 
+  // a fix in a version that doesn't exist is refused, never a guess
+  const nowhere = await request('PATCH', `/api/comments/${comment.id}`, { body: { status: 'fixed', note: 'moved', fixed_in_v: 7 } });
+  assert.equal(nowhere.status, 400, nowhere.text);
+  assert.match(nowhere.json().error, /bad version: there is no v7/);
+  // V1 is the only version: the fix rides with the next one (open, nothing to check yet)
   const fixed = await request('PATCH', `/api/comments/${comment.id}`, { body: { status: 'fixed', note: 'moved' } });
   assert.equal(fixed.status, 200, fixed.text);
-  assert.equal(fixed.json().status, 'fixed');
+  assert.equal(fixed.json().status, 'open');
+  assert.equal(fixed.json().fix_pending, true);
   assert.equal((await request('PATCH', '/api/comments/not-an-id', { body: { note: 'x' } })).status, 400);
   assert.equal((await request('PATCH', `/api/comments/${comment.id}`, { body: { status: 'done' } })).status, 400);
 

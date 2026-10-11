@@ -23,6 +23,16 @@ format stays backwards compatible throughout.
 - One way into checking fixes at a time: the top bar's "Check 2 fixes" is the raised one and the agent's line says it
   quietly (on a phone, whose top bar has no room for it, the agent's line is the one), and in check mode neither asks
   again.
+- A fix belongs to the version that has it. "Fixes to check" lists only what an agent said it fixed, in a version
+  that exists: a new version no longer asks you to check every open note again, nor a question or a note outside a
+  partial render. The notes nobody worked on stay open, with a quiet "V3 changed here" where the new version differs
+  at their spot, and the banner says how many are still open beside the fixes to check. A fix an agent marks before
+  its version is up reads "Fixed · waiting for V3" and comes to be checked with that version. The note's row, check
+  mode and the agent's line under the row name the same version. Notes an older version carried over still read
+  "Check again" until you check them.
+- Agents hear the same: a version they put up while notes it may have fixed are unmarked tells them to mark what it
+  fixed before it says to wait; a version number that doesn't exist is refused instead of taken as given; their list
+  of open notes names the fixes waiting for your check and those riding with their next version apart from the work.
 - German prices say VAT, like the English ones: "exkl. VAT", "inkl. 19 % VAT", and the checkout's tax line reads
   "VAT". The VAT ID keeps its German name, "USt-IdNr.".
 - Green marks a state now, never a box: the player's "3 fixes to check" banner is a plain card with the green

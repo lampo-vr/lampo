@@ -315,7 +315,8 @@ try {
     await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: SHOTS ? 2 : 1, isMobile: false, hasTouch: false });
     await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
     const fix = await api(`/api/review/${enc(slug)}/comments`, 'POST', { v: 1, frame: 50, text: 'The title is too small', severity: 'should' });
-    await api(`/api/comments/${fix.id}`, 'PATCH', { status: 'fixed', note: 'Title at 120 pt now', by: 'agent:launch-edit' });
+    // (one version only: the seeded fix names it, or it would ride with the next version)
+    await api(`/api/comments/${fix.id}`, 'PATCH', { status: 'fixed', note: 'Title at 120 pt now', by: 'agent:launch-edit', fixed_in_v: 1 });
     // a fresh load: a hash change alone keeps the player as it was
     await page.goto('about:blank');
     await page.goto(`${BASE}/#/v/${enc(slug)}?verify=${fix.id}`, { waitUntil: 'domcontentloaded' });
@@ -347,7 +348,7 @@ try {
     assert(inbox.includes('Warmer colours here. And bigger.'), `vr inbox: ${inbox}`);
     // on a small phone the field, its microphone and Reopen fit the check card
     const next = await api(`/api/review/${enc(slug)}/comments`, 'POST', { v: 1, frame: 80, text: 'Too dark here', severity: 'should' });
-    await api(`/api/comments/${next.id}`, 'PATCH', { status: 'fixed', note: 'Brighter now', by: 'agent:launch-edit' });
+    await api(`/api/comments/${next.id}`, 'PATCH', { status: 'fixed', note: 'Brighter now', by: 'agent:launch-edit', fixed_in_v: 1 });
     await page.setViewport({ width: 360, height: 780, deviceScaleFactor: SHOTS ? 3 : 1, isMobile: true, hasTouch: true });
     await page.goto('about:blank');
     await page.goto(`${BASE}/#/v/${enc(slug)}?verify=${next.id}`, { waitUntil: 'domcontentloaded' });

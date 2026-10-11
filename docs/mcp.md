@@ -494,9 +494,9 @@ agent waits: an agent that asks and ends its turn leaves the answer to nobody.
 
 | Answer | Its last line |
 |---|---|
-| `track_video` (a render put up, a part too) | `Now call wait_for_feedback with since "<cursor>": the person's notes arrive together when they press Send.` |
-| `mark_fixed`, `wont_fix`, an agent's `reply`, `add_note` with kind question, `ask_options`, `attach_preview` | the same once none of the video's notes is left to work (ideas, your questions and notes you answered with a reply don't count: they wait for the person); before that `2 notes still open on this video.` |
-| `request_upload`'s `PUT` (and the `GET` after it) | the JSON carries `cursor` and `next` (that line) |
+| `track_video` (a render put up, a part too) | `Now call wait_for_feedback with since "<cursor>": the person's notes arrive together when they press Send.`; while notes the version may have fixed (older than it; a part's, inside it) are neither marked nor answered, `2 notes still open on this video: mark what this version fixed (mark_fixed).` instead |
+| `mark_fixed`, `wont_fix`, an agent's `reply`, `add_note` with kind question, `ask_options`, `attach_preview` | the same once none of the video's notes is left to work (ideas, your questions and notes you answered with a reply don't count: they wait for the person); before that `2 notes still open on this video.`; with none left but fixes marked before their version, `1 fix marked before its version: put the version up now; its answer says when to wait.` |
+| `request_upload`'s `PUT` (and the `GET` after it) | the JSON carries `cursor` and `next` (that line); with notes to mark, only `next` (the mark line) |
 | `lampo track`, `lampo push`, `lampo fix`, `lampo wontfix`, an agent's `lampo reply`, a question with `lampo add`, `lampo ask` | `Now listen with lampo watch (keep it running): …` (`lampo watch` takes no cursor; `lampo push --json` has `next`; with `--json` the line goes to stderr) |
 
 An answer that ends with this line tells the app the next step is the person's: unless the agent starts waiting within
@@ -606,8 +606,9 @@ anything elsewhere.
   drawing over most of the frame shows the whole frame). `all` shows every note's marked frame, range strip and
   references; `none` no pictures. `max_images` defaults to 6. The answer ends with `as of <time>`: pass that as
   `since` next time and you get only the notes that changed since (new, edited, answered, given a reference), the
-  others by id, and the notes no longer open. `all: true` lists every status. Older clients' `include_images` still
-  works (`true` = `all`, `false` = `none`).
+  others by id, and the notes no longer open. `all: true` lists every status. After the work, by id: `Fixed, riding
+  with your next version` (marked before their version) and `Fixed, waiting for the person's check`; neither is work.
+  Older clients' `include_images` still works (`true` = `all`, `false` = `none`).
 - **`get_note({id, clean?})`.** `clean: true` adds the untouched frame. On the machine itself it names the screenshots'
   files; for anyone else it doesn't, and a clip reference plays from its URL.
 - **`get_frame({video, frame | timecode | seconds, v?})`.** The frame comes straight from the file (ffmpeg,
@@ -627,9 +628,11 @@ anything elsewhere.
 - **`show_review({video, note?, frame?})`.** Opens on `note`, on `frame`, else the first open note.
 - **`propose_playbook_change({video | folder, section, content, reason, evidence?})`.** `section`: `brief`, `rules` or
   `skill`. `content` is the whole new section (for a skill, its whole SKILL.md). `evidence` lists note ids.
-- **`mark_fixed({id, note, v?, preview?})`.** The newest version unless `v`; it waits for a render that is still being
-  written. `preview`: the fix preview that shows it. The answer ends with how many notes are still open, or (none) to
-  wait now ([Wait right after handing over](#wait-right-after-handing-over)).
+- **`mark_fixed({id, note, v?, preview?})`.** The newest version unless `v` (one that doesn't exist is refused: `bad
+  version`); it waits for a render that is still being written. `preview`: the fix preview that shows it. A fix marked
+  before a version newer than the note is up rides with the next version put up (`<id>: fixed · rides with your next
+  version`): the person checks it once that version is there. The answer ends with how many notes are still open, or
+  (none) to wait now ([Wait right after handing over](#wait-right-after-handing-over)).
 - **`wont_fix({id, reason})`** and **`reply({id, note, references?})`.**
 - **`add_note({video, frame | timecode | seconds, text, …})`.** `kind`: `question` (the default for agents: what only
   the reviewer can decide), `info` (what you changed or decided), or `feedback` with a `severity` (only when you

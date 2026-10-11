@@ -33,3 +33,7 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - A new field on `Version`, `Comment`, `Reply`, `NoteRef` or `ReviewEvent` travels in the bundle's schema or is named
   in `LEFT_OUT` (lib/bundleExport.ts): one an export doesn't know stops `lampo export` or drops the event
   (`bundle-portable.test.ts`), and a dropped event is said in the export's warnings, never only counted.
+- A fix is in the version that carries it (lib/handover.ts): only `updateComment` with a version that exists, or the
+  next `registerVersion` for a `fix_pending` note (a part: notes `inPart`), sets `fixed_in_v`; never a new version
+  for open notes (`check_again` is read for old stores, never set), never the run's newest for a plan line. One rule
+  says what is to check (`waitsForCheck`, `fixWaits`): the stage, the player's queue and agents count with it.

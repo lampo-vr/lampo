@@ -300,6 +300,7 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   ' · {n} fix checked on a preview, not rendered yet| · {n} fixes checked on a preview, not rendered yet':
     ' · {n} Korrektur an einer Vorschau geprüft, noch nicht gerendert| · {n} Korrekturen an Vorschauen geprüft, noch nicht gerendert',
   ' · {n} note still open| · {n} notes still open': ' · {n} Notiz noch offen| · {n} Notizen noch offen',
+  '{n} note still open|{n} notes still open': '{n} Notiz noch offen|{n} Notizen noch offen',
   ' · {n} retime| · {n} retimes': ' · {n} Timing-Änderung| · {n} Timing-Änderungen',
   ' · preview': ' · Vorschau',
   ' · resumed': ' · fortgesetzt',
@@ -4449,6 +4450,8 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   fixed: 'behoben',
   'fixed · in V{v}': 'behoben · in V{v}',
   'fixed · the version is coming': 'behoben · die Version kommt',
+  'Fixed · waiting for V{v}': 'Behoben · wartet auf V{v}',
+  'V{v} changed here': 'Hier in V{v} geändert',
   'fixed in V{v} · check it': 'in V{v} behoben · prüfen',
   'fixing {n} of {total}': 'behebt {n} von {total}',
   'from your {n} note of {time}|from your {n} notes of {time}': 'aus deiner {n} Notiz von {time}|aus deinen {n} Notizen von {time}',

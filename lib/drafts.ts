@@ -11,7 +11,7 @@ import path from 'node:path';
 import { isoLocal, reviewDir } from './paths.ts';
 import { storage } from './storage/index.ts';
 import * as store from './store.ts';
-import type { Comment, NoteRef, Review, Severity, Version } from './types.ts';
+import type { Comment, NoteRef, Review, Severity } from './types.ts';
 
 /** How many drafts one person keeps on one video. */
 export const DRAFTS_MAX = 200;
@@ -222,10 +222,10 @@ function place(from: string, to: string): boolean {
 
 /**
  * A draft as the note it becomes: written now (created = when it was sent, which is what `since` compares), files
- * beside the review under its id (a new one when another note took the draft's meanwhile), carried to the newest
- * version when one arrived after it was written.
+ * beside the review under its id (a new one when another note took the draft's meanwhile). One written on a version
+ * older than the newest stays open work on its own version (lib/handover.ts: never a fix to check).
  */
-function promote(slug: string, d: Comment, id: string, latest: number): Comment {
+function promote(slug: string, d: Comment, id: string): Comment {
   const named = (f: string) => (f.startsWith(d.id) ? `${id}${f.slice(d.id.length)}` : f);
   const moved = (f: string) => place(path.join(draftsDir(slug), f), path.join(reviewDir(slug), named(f)));
   const c: Comment = { ...d, id, created: isoLocal(), replies: [] };
@@ -240,10 +240,6 @@ function promote(slug: string, d: Comment, id: string, latest: number): Comment 
       : null;
   }
   if (d.voice?.file) c.voice = moved(d.voice.file) ? { ...d.voice, file: named(d.voice.file) } : null;
-  if (c.v < latest) {
-    c.check_again = true;
-    c.carried_to = latest;
-  }
   return c;
 }
 
@@ -263,13 +259,12 @@ export function sendDrafts(slug: string, owner: string, o: { ids?: string[] | nu
       sent = mine.filter((d) => !pick || pick.has(d.id));
       keep = mine.filter((d) => !sent.includes(d));
       const taken = new Set([...store.listReviews().flatMap((r) => r.comments.map((c) => c.id)), ...review.comments.map((c) => c.id)]);
-      const latest = (review.versions.at(-1) as Version).v;
       const notes: Comment[] = [];
       for (const d of sent) {
         let id = d.id;
         while (taken.has(id)) id = store.reservedCommentId();
         taken.add(id);
-        notes.push(promote(slug, d, id, latest));
+        notes.push(promote(slug, d, id));
       }
       for (const input of o.also || []) notes.push(store.buildComment(review, input));
       for (const c of notes) {

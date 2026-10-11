@@ -254,7 +254,7 @@ test('with start, the video’s agent is started once for the whole batch', asyn
   assert.match(argv, /3 new notes: c_[0-9a-f]{6}, c_[0-9a-f]{6}, c_[0-9a-f]{6}/);
 });
 
-test('a draft written on V1 is sent onto V1 and carried to V2 when V2 arrived meanwhile', async () => {
+test('a draft written on V1 is sent onto V1 as open work when V2 arrived meanwhile, never a fix to check', async () => {
   const d = await api<Comment>('POST', `/api/review/${e(slug)}/drafts`, { v: 1, frame: 10, text: 'draftmark-epsilon' });
   assert.equal(d.check_again, undefined);
   makeVideo(video, { w: 320, h: 180, dur: 2, pattern: 'smptebars' });
@@ -263,8 +263,10 @@ test('a draft written on V1 is sent onto V1 and carried to V2 when V2 arrived me
   assert.equal(store.loadReview(slug)?.versions.length, 2);
   const [c] = (await api<{ notes: Comment[] }>('POST', `/api/review/${e(slug)}/drafts/send`, {})).notes;
   assert.equal(c.v, 1);
-  assert.equal(c.check_again, true);
-  assert.equal(c.carried_to, 2);
+  assert.equal(c.status, 'open');
+  // nobody fixed it: V2 asks nothing about it (it was "carried, check again" before fixes were tied to versions)
+  assert.equal(c.check_again, undefined);
+  assert.equal(c.carried_to, undefined);
 });
 
 test('one send is one write to the event log, however many notes it holds', async () => {

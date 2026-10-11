@@ -115,7 +115,9 @@ test('its author changes a reply’s words; agents read them as they are now', a
   assert.equal(now.text, 'the swoosh can be a bit louder');
   assert.equal(now.at, before[0].at, 'it keeps when it was written');
   assert.ok(now.edited, 'and says it was edited');
-  assert.equal(r.json().status, 'fixed', 'the note’s status is untouched');
+  // (Olivia's fix came before a V2: it rides with the next version, the note open until then)
+  assert.deepEqual([r.json().status, r.json().fix_pending], [note.status, note.fix_pending], 'the note’s status is untouched');
+  assert.equal(note.fix_pending, true);
   // the event agents wait for: the reply as it reads now, on its note; whose account it was stays out of it
   const e = lastEvent();
   assert.ok(e);

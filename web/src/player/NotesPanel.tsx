@@ -100,6 +100,10 @@ interface NotesPanelProps {
   quietNew?: boolean;
   onCompose: () => void;
   verifyCount: number;
+  /** Required notes nobody has answered (lib/handover.ts handover().withAgent): said beside the fixes to check. */
+  stillOpen?: number;
+  /** Open notes from an earlier version where the version on screen changed (its diff): a hint on their rows. */
+  changedHere?: ReadonlySet<string>;
   /** An archived project's video (lib/archived.ts): its notes are read, nothing new is written. */
   readOnly?: boolean;
   verifying: boolean;
@@ -512,7 +516,16 @@ export function NotesPanel(p: NotesPanelProps) {
                   <KeyGlyph shape="half" />
                   <span className="grow">
                     <b>{t('{n} fix to check|{n} fixes to check', { n: p.verifyCount })}</b>
-                    <span>{t('before and after, on V{latestV}', { latestV: p.latestV })}</span>
+                    <span>
+                      {t('before and after, on V{latestV}', { latestV: p.latestV })}
+                      {/* the rest of the work, whole on its line where the banner wraps */}
+                      {p.stillOpen ? (
+                        <>
+                          {' · '}
+                          <span className="still">{t('{n} note still open|{n} notes still open', { n: p.stillOpen })}</span>
+                        </>
+                      ) : null}
+                    </span>
                   </span>
                   <button type="button" className="btn sm" onClick={p.onVerify}>
                     {t('Check now')} {!sheet && <Kbd>⇧V</Kbd>}
@@ -546,6 +559,7 @@ export function NotesPanel(p: NotesPanelProps) {
                         (p.planPending && (c.status === 'open' || c.status === 'fixed') && (!c.kind || c.kind === 'feedback') ? PLAN_PENDING : undefined)
                       }
                       planName={p.planName}
+                      changedIn={p.changedHere?.has(c.id) ? p.v : undefined}
                     />
                   )}
                 />

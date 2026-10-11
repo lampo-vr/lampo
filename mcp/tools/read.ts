@@ -6,6 +6,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import { archivedIn } from '../../lib/archived.ts';
 import { legendLine, pointerFields, pointerIn } from '../../lib/elements.ts';
+import { fixWaits, handedOverLines } from '../../lib/handover.ts';
 import { folderName } from '../../lib/inputs.ts';
 import { forAgents } from '../../lib/onboarding.ts';
 import { picksToRender } from '../../lib/options.ts';
@@ -114,8 +115,9 @@ export function registerReadingTools({ b, o, tool, openReview, me }: ToolKit): v
       // Picks answered since the newest render: what the next one is made of (lib/options.ts picksToRender).
       const newest = review.versions.at(-1)?.registered;
       const picked = (c: Comment) => c.status !== 'open' && picksToRender(c, newest);
+      // A fix marked before its version is no work: named after the work, with the fixes the person checks (lib/handover.ts).
       const kept = review.comments
-        .filter((c) => all || c.status === 'open' || picked(c))
+        .filter((c) => all || (c.status === 'open' && !fixWaits(c)) || picked(c))
         .sort((a, c) => (all ? a.t - c.t : noteRank(a) - noteRank(c) || a.t - c.t));
       const list = kept.filter(changed);
       await b.fetchShots(review, list);
@@ -135,6 +137,7 @@ export function registerReadingTools({ b, o, tool, openReview, me }: ToolKit): v
         if (ideas.length) parts.push(`Ideas (optional — your call): suggestions to consider, not required changes.\n\n${lines(ideas)}`);
         if (questions.length) parts.push(`Questions to the reviewer, not answered yet: no work item; wait for the answer.\n\n${lines(questions)}`);
         if (picks.length) parts.push(`Picked since the last render: render with these.\n\n${lines(picks)}`);
+        parts.push(...handedOverLines(review.comments));
         list.splice(0, list.length, ...required, ...ideas, ...questions, ...picks);
         body = parts.join('\n\n');
       }
@@ -186,7 +189,8 @@ export function registerReadingTools({ b, o, tool, openReview, me }: ToolKit): v
       }
       const answer = { ...ok(content), structuredContent: structured };
       // nothing left to work on here (no work item, no idea, no pick to render with): the next step (mcp/toolkit.ts)
-      const left = b.stage(review).stage !== 'final' && review.comments.some((c) => (c.status === 'open' && (isRequired(c) || isIdea(c))) || picked(c));
+      const left =
+        b.stage(review).stage !== 'final' && review.comments.some((c) => (c.status === 'open' && !fixWaits(c) && (isRequired(c) || isIdea(c))) || picked(c));
       return left ? answer : idle(answer);
     },
   );

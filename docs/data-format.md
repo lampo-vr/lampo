@@ -279,8 +279,9 @@ render is never final.
 | `author_id` | the account that wrote it, when a signed-in person did, through the app or `/mcp` (optional; absent on older notes, agents', visitors' and local `lampo` writes). When present it decides who may edit or delete the note: a renamed account keeps its notes, and a new account with a deleted person's name gets none. Otherwise `author` decides |
 | `created`, `edited` | when it was written, and when it was last edited: its text, tags, severity, drawing or words, or a reference's caption or removal (optional) |
 | `replies` | `{by, text, status?, fixed_in_v?, preview?, refs?, at, by_id?, edited?, share?}`. Every status change adds a reply with the new `status`. `preview` names the fix preview a fix or check refers to; `refs` the references that came with the reply (their ids; the references themselves are in the note's `refs`). `by_id`: the account of a signed-in person who wrote it; `edited`: when its author last changed its words (only plain replies change; `at` stays); `share`: the review link a visitor wrote it through (a link that shows only its own visitors' notes shows only their replies too) |
-| `check_again`, `carried_to` | an open note carried into a newer render that nobody has checked again yet |
-| `fixed_in_v` | the version a fix landed in |
+| `check_again`, `carried_to` | stores from before fixes were tied to versions: an open note carried into a newer render that nobody has checked again yet (still read so; new versions don't set it) |
+| `fixed_in_v` | the version a fix landed in: the one named (it must exist), else the newest when it is newer than the note (or than the version it was found still wrong in) |
+| `fix_pending` | marked fixed before a version that has the fix existed (optional): the note stays `open`, its last `fixed` reply has no `fixed_in_v`, and the next version registered takes it along (`fixed`, with `fixed_in_v` on the note and that reply; a part only the notes inside its stretch) |
 | `share` | client notes: the public id of the review link they came through (optional) |
 | `previews` | fix previews, newest last (optional): `{id: "p_…", kind: "still" \| "clip", frame, frames?, v, by, at, width, height, fps?, file, bytes, source?, confirmed?, mismatch?}`. `frame` is a frame of render `v` (a clip's first). `file` is in `previews/` in the review's folder. `confirmed` or `mismatch` is `{v, diff, at}` (a mismatch adds `reason`): a later render compared with it |
 | `verified_on` | `{preview, v}`: checked on that preview while V`v` was the newest render, so the fix isn't in a render yet (optional; removed once a later render matches) |
@@ -360,7 +361,7 @@ Every event has `at`, `type`, `by`, `video`, `slug` and `session` (the assigned 
 | `added` | a video was added or uploaded |
 | `assigned` | the video was assigned to an agent, or unassigned |
 | `comment` | a new note |
-| `reply` | a reply that doesn't change the status (also references added with a reply) |
+| `reply` | a reply that doesn't change the status (also references added with a reply, and a fix marked before its version: `reply.status` `fixed` without `fixed_in_v`; its `status` event follows when the version arrives) |
 | `status` | a note's status changed; the event carries the reply |
 | `edit` | a note's text, tags, severity, drawing or words changed, or one of its references got a caption or was removed |
 | `delete` | a note was deleted |

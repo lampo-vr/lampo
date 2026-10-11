@@ -872,7 +872,7 @@ try {
     // The page comes from the inbox view, whose preview cached film's review before this fix exists: the verify link
     // must still open verify mode at it (the player tries again on the refetched review).
     const c = await note(film, { frame: 30, text: 'Logo too small', severity: 'should' });
-    await api(`/api/comments/${c.id}`, 'PATCH', { status: 'fixed', note: 'Bigger logo', by: 'agent:brand-film' });
+    await api(`/api/comments/${c.id}`, 'PATCH', { status: 'fixed', note: 'Bigger logo', by: 'agent:brand-film', fixed_in_v: 2 });
     await page.goto(`${BASE}/#/v/${encodeURIComponent(film)}?verify=${c.id}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('[data-testid=verify-note]', { timeout: 20000 });
     await page.click('[data-testid="inbox-bell"]');
@@ -894,7 +894,9 @@ try {
   const pf1 = await note(promo, { frame: 30, text: 'Price card too small', severity: 'must' });
   const pf2 = await note(promo, { frame: 40, text: 'Jump cut at the end', severity: 'should' });
   const pf3 = await note(promo, { frame: 15, text: 'Logo off centre', severity: 'should' });
-  for (const c of [pf1, pf2, pf3]) await api(`/api/comments/${c.id}`, 'PATCH', { status: 'fixed', note: `Fixed: ${c.text}`, by: 'agent:promo-cut' });
+  // (seeded fixes name their version: marked now with one version only, a fix would ride with the next one)
+  for (const c of [pf1, pf2, pf3])
+    await api(`/api/comments/${c.id}`, 'PATCH', { status: 'fixed', note: `Fixed: ${c.text}`, by: 'agent:promo-cut', fixed_in_v: 1 });
   const pmine = await note(promo, { frame: 5, text: 'Music under the voice?' });
   await api(`/api/comments/${pmine.id}`, 'PATCH', { note: 'Ducked it by 6 dB', by: 'agent:promo-cut' });
   const pg = (sel = '') => view(`[data-testid="inbox-vgroup"][aria-label="promo.mp4"] ${sel}`);
@@ -1551,7 +1553,7 @@ try {
       };
     });
     const c = await note(spot, { frame: 12, text: 'Grade the sky a touch cooler', severity: 'should' });
-    await api(`/api/comments/${c.id}`, 'PATCH', { status: 'fixed', note: 'cooler', by: 'agent:spot-edit' });
+    await api(`/api/comments/${c.id}`, 'PATCH', { status: 'fixed', note: 'cooler', by: 'agent:spot-edit', fixed_in_v: 1 });
     await p.goto(`${BASE}/#/inbox`, { waitUntil: 'domcontentloaded' });
     await p.waitForSelector(VIEW_READY, { timeout: 20000 });
     const listed = () => p.evaluate((text) => !!document.querySelector('[data-testid="inbox-view"]')?.textContent.includes(text), c.text);

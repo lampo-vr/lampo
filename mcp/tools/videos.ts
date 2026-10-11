@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 import { ELEMENT_LIMITS, readElementMap } from '../../lib/elements.ts';
+import { markWhatItFixedLine, unmarkedAfter } from '../../lib/handoff.ts';
 import { fileName, folderName, localPath, projectFps, sourceName, startFrame, statusText } from '../../lib/inputs.ts';
 import { MAX_HANDLES } from '../../lib/part.ts';
 import { seamLine } from '../../lib/parts.ts';
@@ -75,8 +76,10 @@ export function registerVideoTools({ b, o, tool, author, accountOf, byArg, me }:
           const { slug } = await b.resolve(part_of);
           const r = await b.push(path.resolve(p), { by: who, to: slug, part: { at: part_at, ...(handles !== undefined ? { handles } : {}) } });
           const latest = r.review.versions.at(-1);
-          // what the person reviews now (an unchanged one too): the last line says to wait for their notes
-          const wait = await handOff(b);
+          // what the person reviews now (an unchanged one too): the last line says to wait for their notes — once what it
+          // fixed is marked (lib/handoff.ts)
+          const left = r.duplicate ? 0 : unmarkedAfter(r.review, r.part);
+          const wait = left ? markWhatItFixedLine(left, 'mark_fixed') : await handOff(b);
           if (r.duplicate || !r.part || !latest) return ok(text(`unchanged: v${r.v} already has these bytes\n${wait}`));
           return ok(
             text(
@@ -100,11 +103,13 @@ export function registerVideoTools({ b, o, tool, author, accountOf, byArg, me }:
           const a = await b.putElements(slugify(review.video), review.versions.at(-1)?.v, map);
           attached = ` · elements ${a.elements} on v${a.v}`;
         }
+        // its next render (tracked already): what that fixed is marked before the wait (lib/handoff.ts)
+        const left = created ? 0 : unmarkedAfter(review);
         return ok(
           text(
             `${oneLine(
               `${created ? 'added' : 'already under review'}: ${review.video} (v${review.versions.at(-1)?.v}) · folder ${review.folder || 'Unsorted'} · session ${review.session?.name || '-'}${attached}`,
-            )}\n${await handOff(b)}`,
+            )}\n${left ? markWhatItFixedLine(left, 'mark_fixed') : await handOff(b)}`,
           ),
         );
       },

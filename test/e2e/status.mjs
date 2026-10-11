@@ -102,7 +102,8 @@ try {
   });
 
   await check('the agent fixes it: "Check 1 fix" opens verify mode', async () => {
-    await api(`/api/comments/${noteId}`, 'PATCH', { status: 'fixed', note: 'moved to 1:10', by: 'agent:promo-edit' });
+    // (one version only: the seeded fix names it, or it would ride with the next version)
+    await api(`/api/comments/${noteId}`, 'PATCH', { status: 'fixed', note: 'moved to 1:10', by: 'agent:promo-edit', fixed_in_v: 1 });
     await expectStage('check_fixes', '1 fix waiting');
     await openPlayer();
     await clickNext('Check 1 fix');

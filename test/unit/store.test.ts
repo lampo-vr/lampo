@@ -93,7 +93,7 @@ test('addComment writes exact-frame screenshots and all derived files', async ()
   assert.deepEqual(types, ['added', 'comment', 'comment']);
 });
 
-test('a render still being written is left alone, a settled one becomes v2 and carries open comments', () => {
+test('a render still being written is left alone, a settled one becomes v2; open notes stay open, nobody fixed them', () => {
   makeVideo(video, { dur: 1.2, pattern: 'testsrc2', freq: 660 });
   const pending = must(store.sync(slug));
   assert.equal(pending.pending, true);
@@ -102,12 +102,13 @@ test('a render still being written is left alone, a settled one becomes v2 and c
   age(video);
   const res = must(store.sync(slug));
   assert.equal(res.version?.v, 2);
-  assert.equal(res.carried, 2);
+  assert.equal(res.carried, 0, 'no fix was marked before it');
   const review = load();
   assert.equal(review.frames, 36);
   for (const c of review.comments) {
-    assert.equal(c.check_again, true);
-    assert.equal(c.carried_to, 2);
+    assert.equal(c.status, 'open');
+    assert.equal(c.check_again, undefined);
+    assert.equal(c.carried_to, undefined);
   }
   // v1 keeps its own bytes although the file on disk was overwritten
   assert.equal(quickHash(must(store.versionFile(review, 1))), review.versions[0].hash);

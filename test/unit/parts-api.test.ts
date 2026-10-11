@@ -93,6 +93,12 @@ test('a part nobody allowed, or one that changed its length, is refused with 409
 
 test('the part arrives, plays as the whole video, and is never final', async () => {
   const p = cutFrames(fixed, 28, 92, path.join(dir, 'parts/fixed.mp4'));
+  // marked fixed before the part is up: the note inside its stretch rides with it
+  const logo = store.loadReview(slug)?.comments.find((c) => c.text === 'Logo missing');
+  assert.ok(logo);
+  const early = await request('PATCH', `/api/comments/${logo.id}`, { body: { status: 'fixed', note: 'Logo back in' }, headers: owner });
+  assert.equal(early.status, 200, early.text);
+  assert.equal(early.json().fix_pending, true);
   const up = await tusUpload(request, p, { filename: 'part.mp4', slug, part_at: '40', handles: '12' }, owner);
   assert.equal(up.status, 200, up.text);
   assert.equal(up.json().v, 2);
@@ -109,14 +115,17 @@ test('the part arrives, plays as the whole video, and is never final', async () 
   const bytes = await request('GET', media.url, { headers: { ...reviewer, Range: 'bytes=0-99' } });
   assert.equal(bytes.status, 206);
   const review = (await request('GET', `/api/review/${s()}`, { headers: reviewer })).json();
-  // the note it fixes is still open: the person looks at V2 next
-  assert.equal(review.summary.stage.detail, '1 note open on V2 (part)');
+  // the fix it carries is the person's to check on V2
+  assert.equal(review.summary.stage.detail, '1 fix to check in V2 (part)');
   assert.deepEqual(review.summary.stage.part, { of: 1, at: 40, frames: 40 });
-  // the inbox lists it as the new version it is, a part (the carried note asks to be checked again on it)
+  assert.deepEqual(
+    review.review.comments.filter((c: { id: string }) => c.id === logo.id).map((c: { status: string; fixed_in_v?: number }) => [c.status, c.fixed_in_v]),
+    [['fixed', 2]],
+  );
+  // the inbox lists it as that fix, in V2
   const fy = await request('GET', '/api/for-you', { headers: await cookieOwner() });
   const item = fy.json().items.find((i: { slug: string; v?: number }) => i.slug === slug && i.v === 2);
-  assert.equal(item?.kind, 'version', fy.text);
-  assert.equal(item?.part, true);
+  assert.equal(item?.kind, 'verify', fy.text);
   // the team may approve it, but it can't ship
   assert.equal((await request('PUT', `/api/review/${s()}/approval`, { body: { status: 'approved' }, headers: await cookieOwner() })).status, 200);
   const fin = await request('PUT', `/api/review/${s()}/final`, { body: { confirm: true }, headers: await cookieOwner() });

@@ -785,7 +785,8 @@ try {
   await check('verify: a second Y while the first is saved answers nothing, and no fix is skipped', async () => {
     const fixedNote = async (frame, text) => {
       const c = await add({ v: 2, frame, text });
-      await api(`/api/comments/${c.id}`, 'PATCH', { status: 'fixed', note: 'done', by: 'agent:promo-edit' });
+      // (written on V2, the newest: a fix marked now names V2, or it would ride with the next version)
+      await api(`/api/comments/${c.id}`, 'PATCH', { status: 'fixed', note: 'done', by: 'agent:promo-edit', fixed_in_v: 2 });
       return c;
     };
     const first = await fixedNote(88, 'Double press first');

@@ -72,10 +72,24 @@ test('a fresh render is to review; a note makes it changes; a fix makes it check
   const changes = await stageNow();
   assert.equal(changes.stage, 'changes');
   assert.equal(changes.open, 1);
+  // fixed before a version has it: nothing to check yet, the next version is due
   assert.equal((await api('PATCH', `/api/comments/${noteId}`, { status: 'fixed', note: 'moved to 1:10' })).status, 200);
-  assert.equal((await stageNow()).stage, 'check_fixes');
+  const early = await stageNow();
+  assert.deepEqual([early.stage, early.open, early.to_verify, early.waiting, early.detail], ['changes', 0, 0, 1, '1 fix coming in V2']);
   assert.equal((await api('PATCH', `/api/comments/${noteId}`, { status: 'verified' })).status, 200);
   assert.equal((await stageNow()).stage, 'to_review');
+  // the same on a video of its own whose V2 then arrives: the fix rides with it, and V2 is to check
+  const cut = makeVideo(path.join(dir, 'proj/export/fixes.mp4'), { w: 320, h: 180, dur: 1 });
+  age(cut);
+  store.createOrGetReview(cut, { by: 'alex' });
+  const s = slugOf(cut);
+  const n = (await api('POST', `/api/review/${enc(s)}/comments`, { frame: 5, text: 'Logo später', severity: 'should' })).json.id;
+  assert.equal((await api('PATCH', `/api/comments/${n}`, { status: 'fixed', note: 'moved to 1:10', by: 'agent:fix' })).status, 200);
+  rerender(cut, 660);
+  const ready = await stageNow(s);
+  assert.deepEqual([ready.stage, ready.to_verify, ready.waiting, ready.detail], ['check_fixes', 1, undefined, '1 fix to check in V2']);
+  assert.equal((await api('PATCH', `/api/comments/${n}`, { status: 'verified' })).status, 200);
+  assert.equal((await stageNow(s)).stage, 'to_review');
 });
 
 test('team approval, a review link, the client approves: history per party, event texts name the party', async () => {

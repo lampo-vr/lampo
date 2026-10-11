@@ -128,7 +128,14 @@ test('the first video, link and fix: the funnel’s steps, once per workspace', 
 
 test('the first fix Max checks on a video of their own waits for Max as the loop, once; seen, it never waits again', async () => {
   const n = ws.inWorkspace('w1', () => store.addComment(slug, { frame: 3, text: 'Logo later', author: 'Mia' }));
+  const m = ws.inWorkspace('w1', () => store.addComment(slug, { frame: 4, text: 'Brighter', author: 'Mia' }));
   ws.inWorkspace('w1', () => store.updateComment(n.id, { status: 'fixed', note: 'moved', by: 'agent:spot' }));
+  ws.inWorkspace('w1', () => store.updateComment(m.id, { status: 'fixed', note: 'done', by: 'agent:spot' }));
+  // the version with the fixes: they are the person's to check once it is up
+  const v2 = makeVideo(path.join(dir, 'in/spot-v2.mp4'), { dur: 1, freq: 770 });
+  age(v2);
+  const next = await tusUpload(request, v2, { filename: 'spot.mp4', slug }, token);
+  assert.equal(next.status, 200, next.text);
   const check = await request('PATCH', `/api/comments/${n.id}`, { body: { status: 'verified' }, headers: maxs });
   assert.equal(check.status, 200, check.text);
   assert.ok(steps().fix_checked_first, 'the funnel’s step');
@@ -140,8 +147,6 @@ test('the first fix Max checks on a video of their own waits for Max as the loop
   assert.deepEqual((await request('POST', '/api/moments/loop/seen', { headers: maxs })).json(), { ok: true });
   assert.deepEqual((await request('GET', '/api/moments', { headers: maxs })).json().pending, []);
   // a second fix checked: the workspace had its loop
-  const m = ws.inWorkspace('w1', () => store.addComment(slug, { frame: 4, text: 'Brighter', author: 'Mia' }));
-  ws.inWorkspace('w1', () => store.updateComment(m.id, { status: 'fixed', note: 'done', by: 'agent:spot' }));
   assert.equal((await request('PATCH', `/api/comments/${m.id}`, { body: { status: 'verified' }, headers: laptop })).status, 200);
   assert.deepEqual((await request('GET', '/api/moments', { headers: laptop })).json().pending, []);
   assert.equal((await request('POST', '/api/moments/nope/seen', { headers: maxs })).status, 400);

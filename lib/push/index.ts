@@ -210,7 +210,8 @@ export function bucketOf(e: ReviewEvent): Bucket | null {
   if (e.by.startsWith('guest:') && CLIENT_TYPES.has(e.type)) return 'client';
   if (e.type === 'comment' && isAgent(e.by) && isQuestion({ kind: e.kind, author: e.by })) return 'question';
   if ((e.type === 'status' && e.status === 'fixed') || e.type === 'version') return 'release';
-  if (e.type === 'reply' && isAgent(e.by)) return 'answer';
+  // a fix marked before its version (no fixed_in_v) is nothing to look at yet: its version's release says it
+  if (e.type === 'reply' && isAgent(e.by)) return e.reply?.status === 'fixed' && !e.reply.fixed_in_v ? null : 'answer';
   // a post that went out (or will, at its time) or failed: the person who published it wants to know
   if (e.type === 'post' && (e.post?.state === 'posted' || e.post?.state === 'scheduled' || e.post?.state === 'failed')) return 'post';
   return null;

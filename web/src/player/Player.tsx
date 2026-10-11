@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { projectOfFolder } from '../../../lib/archived.ts';
 import { stretchOf } from '../../../lib/findings.ts';
+import { handover } from '../../../lib/handover.ts';
 import { isOwner } from '../../../lib/ownership.ts';
 import { rangeOnGrid } from '../../../lib/range.ts';
 import { renderKey } from '../../../lib/renderKey.ts';
@@ -467,9 +468,25 @@ function PlayerView({
     () => withTag(byStatus[filter], tag).sort((a, b) => Number(b.scope === 'video') - Number(a.scope === 'video') || a.frameHere - b.frameHere),
     [byStatus, filter, tag],
   );
+  // What the agent handed over, counted as the stage and agents count it (lib/handover.ts): fixes to check, fixes riding
+  // with the next version, notes still with the agent.
+  const handed = useMemo(() => handover(placed), [placed]);
+  // Open notes from an earlier version where the version on screen changed (its diff against the one before): a quiet
+  // "V3 changed here" on their rows — a hint, never a fix to check (only what an agent marks fixed is one).
+  const changedHere = useMemo(() => {
+    const at = new Set<string>();
+    if (!changes.length) return at;
+    for (const c of placed) {
+      if (c.status !== 'open' || c.fix_pending || c.check_again || c.v >= ver.v || c.scope === 'video' || !isRequired(c)) continue;
+      const from = c.rangeHere ? c.rangeHere.in : c.frameHere;
+      const to = c.rangeHere ? c.rangeHere.out : c.frameHere;
+      if (changes.some((r) => r.in <= to && r.out >= from)) at.add(c.id);
+    }
+    return at;
+  }, [placed, changes, ver.v]);
   const counts = useMemo(
     () => ({
-      open: placed.filter((c) => c.status === 'open' && isRequired(c)).length,
+      open: placed.filter((c) => c.status === 'open' && !c.fix_pending && isRequired(c)).length,
       fixed: placed.filter((c) => c.status === 'fixed').length,
       active: byStatus.active.length,
       mine: byStatus.mine.length,
@@ -1633,6 +1650,8 @@ function PlayerView({
           verifyInStrip={stripRun?.state === 'done' && verify.queue.length > 0 && canCheck && showStrip}
           onCompose={openComposer}
           verifyCount={frozen ? 0 : verify.queue.length}
+          stillOpen={handed.withAgent}
+          changedHere={changedHere}
           verifying={verify.active}
           onVerify={verify.start}
           onReview={() => (walk ? setWalk(null) : stepReview(1))}

@@ -18,7 +18,7 @@ import { getUser } from '../../lib/auth.ts';
 import { checkTargetRoom, FileError, type FileTarget, ingestFile } from '../../lib/files.ts';
 import { FILE_LIMITS, nameOf } from '../../lib/fileText.ts';
 import { checkNotArchived, checkReviewOpen } from '../../lib/folderIds.ts';
-import { cursorAt, waitNowLine } from '../../lib/handoff.ts';
+import { cursorAt, markWhatItFixedLine, unmarkedAfter, waitNowLine } from '../../lib/handoff.ts';
 import { unlessBusy } from '../../lib/jobs.ts';
 import { ingestPart } from '../../lib/parts.ts';
 import { CACHE, isoLocal, slugify } from '../../lib/paths.ts';
@@ -494,15 +494,27 @@ export function uploadRoutes(ctx: ServerContext): Router {
   /**
    * A render an agent put up with an upload URL is now the person's to review: its answer (read from curl's output)
    * says to wait for their notes now, with a wait_for_feedback cursor from this moment (lib/handoff.ts). The log is
-   * read before the clock, so an event of this second that lands meanwhile is heard.
+   * read before the clock, so an event of this second that lands meanwhile is heard. While notes it may have fixed are
+   * neither marked nor answered, it marks what this version fixed first: no cursor yet, the last mark's answer has it.
    */
-  const handedOver = (ws: string): { cursor?: string; next?: string } => {
+  const handedOver = (ws: string, left: number): { cursor?: string; next?: string } => {
+    if (left) return { next: markWhatItFixedLine(left, 'mark_fixed') };
     try {
       const events = inWorkspace(ws, () => store.readEvents({ limit: 200, tailBytes: 256 * 1024 }));
       const cursor = cursorAt(events, Date.now());
       return { cursor, next: waitNowLine(cursor) };
     } catch {
       return {}; // the render is in either way: only the hint is missing
+    }
+  };
+  /** The notes a new version may have fixed that are neither marked nor answered (lib/handoff.ts unmarkedAfter). */
+  const unmarked = (ws: string, r: UploadResult): number => {
+    if (r.duplicate) return 0;
+    try {
+      const review = inWorkspace(ws, () => store.loadReview(r.slug));
+      return review ? unmarkedAfter(review, r.part) : 0;
+    } catch {
+      return 0;
     }
   };
 
@@ -587,8 +599,10 @@ export function uploadRoutes(ctx: ServerContext): Router {
     const job = ctx.inflight.track(work).then(
       (result) => {
         const present = t.present;
+        const left = target.kind === 'render' ? unmarked(t.ws, result as UploadResult) : 0;
         // the agent's render is the person's to review now: unless the agent waits soon, the app shows it isn't listening
-        if (target.kind === 'render' && target.agent) {
+        // (not while it still marks what the version fixed: its last mark hands over)
+        if (target.kind === 'render' && target.agent && !left) {
           const agent = target.agent;
           inWorkspace(t.ws, () => ctx.agents.handedBack(agent));
         }
@@ -598,7 +612,7 @@ export function uploadRoutes(ctx: ServerContext): Router {
             present && target.kind === 'ref'
               ? inWorkspace(t.ws, () => present(result as RefAttached))
               : target.kind === 'render'
-                ? { ...(result as UploadResult), ...handedOver(t.ws) }
+                ? { ...(result as UploadResult), ...handedOver(t.ws, left) }
                 : result,
         };
       },

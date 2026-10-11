@@ -249,7 +249,8 @@ function fromEvents(events: ReviewEvent[], reviews: Map<string, Review>, viewer:
         by: e.by.slice(6),
         dismissible: true,
       });
-    else if (e.type === 'reply' && isAgent(e.by) && e.id && recent(e, 'answer')) {
+    // (a fix marked before its version is a reply with a status: no answer, it comes as a fix to check with its version)
+    else if (e.type === 'reply' && isAgent(e.by) && e.id && !e.reply?.status && recent(e, 'answer')) {
       const note = r.comments.find((c) => c.id === e.id);
       if (!note || !ownNote(note, viewer, server)) continue;
       out.push({

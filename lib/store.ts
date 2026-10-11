@@ -18,6 +18,7 @@ import { pointersOf } from './elementMaps.ts';
 import { legendLine, onWords, pointerIn } from './elements.ts';
 import { isInboxEvent, statusLabel } from './eventLine.ts';
 import { archivedProjectOf, checkReviewOpen } from './folderIds.ts';
+import { fixBase, fixWaits, inPart, ridingFlag } from './handover.ts';
 import { cleanAgentName, cleanFolderLine, cutChars, shownName } from './names.ts';
 import { answeredAlready, checkPicks, cleanPrompt, OPTION_LIMITS, optionLines, optionRefs, picksLine, picksToRender } from './options.ts';
 import { changeableReply } from './ownership.ts';
@@ -538,7 +539,11 @@ export const setVersionRunProvider = (fn: (slug: string, by: string) => string |
   versionRun = fn;
 };
 
-// Appends the next version and carries open comments forward to it ("check again").
+/**
+ * Appends the next version. Open notes stay open: a new version is no fix (lib/handover.ts), so nothing asks the person
+ * to check a note nobody worked on. Fixes marked before a version carried them ride with this one (`fix_pending`): they
+ * become fixed in it — a part takes only the notes inside its stretch. `carried`: how many it took along.
+ */
 function registerVersion(review: Review, n: NewVersion): { version: Version; carried: number } {
   const v = (review.versions.at(-1)?.v || 0) + 1;
   // the run an agent is at on this video made it ("V4 by Claude Code · 12 min · 5 fixed"), never a guess from names alone
@@ -572,18 +577,31 @@ function registerVersion(review: Review, n: NewVersion): { version: Version; car
   Object.assign(review, { fps: whole.fps, width: whole.width, height: whole.height, duration: whole.duration, frames: whole.frames });
   if (!base) review.meta = { codec: meta.codec, pix_fmt: meta.pix_fmt, color_space: meta.color_space, color_range: meta.color_range, audio: meta.audio };
   delete review.agent_status;
-  let carried = 0;
+  const carried: { c: Comment; reply: Reply | null }[] = [];
   if (v > 1) {
     for (const c of review.comments) {
-      if (c.status !== 'open') continue;
-      c.check_again = true;
-      c.carried_to = v;
-      carried++;
+      if (!fixWaits(c) || (n.part && !inPart(c, n.part))) continue;
+      c.status = 'fixed';
+      c.fixed_in_v = v;
+      delete c.fix_pending;
+      delete c.check_again;
+      delete c.carried_to;
+      // the fix it was marked with (and any said again before the version came) is in this version
+      let reply: Reply | null = null;
+      for (const r of c.replies)
+        if (r.status === 'fixed' && !r.fixed_in_v) {
+          r.fixed_in_v = v;
+          reply = r;
+        }
+      carried.push({ c, reply });
     }
     const what = n.part ? ` (a part: frames ${n.part.at}–${n.part.at + n.part.frames - 1} of v${n.part.of})` : '';
-    logEvent({ type: 'version', by: n.by, review, v, text: `v${v} registered${what}${carried ? `, ${carried} open comment(s) carried forward` : ''}` });
+    const took = carried.length ? `, ${carried.length} fix${carried.length === 1 ? '' : 'es'} marked before it now in it` : '';
+    logEvent({ type: 'version', by: n.by, review, v, text: `v${v} registered${what}${took}` });
+    // each fix it carries is a fix to check now, told as such (runs, push, webhooks), by whoever marked it
+    for (const { c, reply } of carried) logEvent({ type: 'status', by: reply?.by ?? n.by, review, comment: c, ...(reply ? { reply } : {}) });
   }
-  return { version, carried };
+  return { version, carried: carried.length };
 }
 
 // Registers a new version when the file behind review.video changed. Uploads get new versions by being uploaded
@@ -1226,8 +1244,8 @@ const cleanTextEdit = (e: TextEdit | undefined): TextEdit | null => {
 
 /**
  * A note as it is kept, built against the review it goes into (not added to it): its frame inside its version, the
- * kind and severity rules, a note on an older version carried to the newest. addComment and drafts (lib/drafts.ts) both
- * build notes with it.
+ * kind and severity rules. A note written on an older version is open work like any other (never a fix to check: nobody
+ * fixed it). addComment and drafts (lib/drafts.ts) both build notes with it.
  */
 export function buildComment(review: Review, input: CommentInput): Comment {
   const latest = review.versions.at(-1) as Version;
@@ -1281,10 +1299,6 @@ export function buildComment(review: Review, input: CommentInput): Comment {
   }
   const part = input.scope === 'video' ? null : cleanPart(input.part, ver.frames);
   if (part) c.part = part;
-  if (v < latest.v) {
-    c.check_again = true;
-    c.carried_to = latest.v;
-  }
   return c;
 }
 
@@ -1360,6 +1374,12 @@ export function attachShots(slug: string, id: string, shots: Shots): boolean {
   });
 }
 
+/** A fix said to be in a version that doesn't exist: refused, never a guess (a 400 with the way out). */
+const badVersion = (v: number, latest: number): Error =>
+  Object.assign(new Error(`bad version: there is no v${v} (the newest is v${latest}); leave the version out and the fix rides with the next version`), {
+    status: 400,
+  });
+
 export function updateComment(id: string, patch: CommentPatch): Comment {
   const hit = findComment(id);
   if (!hit) throw new Error(`no comment ${id}`);
@@ -1391,17 +1411,36 @@ export function updateComment(id: string, patch: CommentPatch): Comment {
       c.edited = isoLocal();
       logEvent({ type: 'edit', by, review, comment: c });
     }
-    if (patch.status && patch.status !== c.status) {
+    // The version a fix is in: the one named (it must exist: never a guess), else the newest when it is newer than what
+    // the note is about (its own version, or the one it was found still wrong in: lib/handover.ts fixBase), else none
+    // yet — the fix rides with the next version (`fix_pending`). A fix shown on a preview is checked on that preview,
+    // and a note that isn't open keeps the newest, both as before.
+    const named = patch.fixed_in_v !== undefined && patch.fixed_in_v !== null && patch.fixed_in_v !== '' ? Number(patch.fixed_in_v) : null;
+    if (named !== null && !review.versions.some((x) => x.v === named)) throw badVersion(named, latest);
+    const fixIn = named ?? (patch.preview || c.status !== 'open' || latest > fixBase(review.versions, c) ? latest : null);
+    if (patch.status === 'fixed' && fixIn === null) {
+      // Fixed before a version carries it: the note stays open (nothing to check yet) and the next version takes it along.
+      const reply: Reply = { by, text: (patch.note || '').trim(), status: 'fixed', at: isoLocal() };
+      if (patch.by_id) reply.by_id = patch.by_id;
+      if (patch.share) reply.share = patch.share;
+      c.fix_pending = true;
+      delete c.check_again;
+      delete c.carried_to;
+      c.replies.push(reply);
+      logEvent({ type: 'reply', by, review, comment: c, reply });
+    } else if (patch.status && (patch.status !== c.status || (patch.status === 'open' && c.fix_pending))) {
+      // (reopening a fix marked before its version takes the fix back: open, as it was)
       const reply: Reply = { by, text: (patch.note || '').trim(), status: patch.status, at: isoLocal() };
       if (patch.by_id) reply.by_id = patch.by_id;
       if (patch.share) reply.share = patch.share;
       if (answer) reply.answer = answer;
       if (patch.preview) reply.preview = patch.preview;
       if (patch.status === 'fixed') {
-        reply.fixed_in_v = Number(patch.fixed_in_v) || latest;
+        reply.fixed_in_v = fixIn ?? latest;
         c.fixed_in_v = reply.fixed_in_v;
       }
       if (patch.status === 'open') delete c.fixed_in_v;
+      delete c.fix_pending;
       // Verified on a preview: the fix is in the project, not in a render yet (the next render is compared with it).
       if (patch.status === 'verified' && patch.preview) c.verified_on = { preview: patch.preview, v: latest };
       else delete c.verified_on;
@@ -2688,6 +2727,7 @@ export function counts(review: Review): Counts {
   const n: Counts = { open: 0, fixed: 0, verified: 0, wontfix: 0, must: 0, check_again: 0, done: 0, total: 0, ideas: 0, questions: 0 };
   for (const c of review.comments) {
     if (c.status !== 'open') n[c.status] = (n[c.status] || 0) + 1;
+    else if (fixWaits(c)) n.waiting = (n.waiting ?? 0) + 1;
     else if (isRequired(c)) {
       n.open++;
       if (c.severity === 'must') n.must++;
@@ -2715,6 +2755,7 @@ export function commentBlock(review: Review, c: Comment, { heading = '###', file
   const flags: string[] = [];
   if (c.check_again) flags.push(`check again in v${c.carried_to || latest}`);
   if (c.status === 'fixed') flags.push(`fixed in v${c.fixed_in_v}, waiting for verification`);
+  if (fixWaits(c)) flags.push(ridingFlag(review.versions));
   if (isAgent(c.author)) flags.push(isQuestion(c) ? `asked by ${c.author}` : `by ${c.author}`);
   if (c.scope === 'video') flags.push('overall: about the whole video, not frame 0');
   lines.push(`${heading} ${c.id} · ${noteLabel(c)} · ${tagList(c.tags)} · ${where}${flags.length ? ` · ${flags.join(' · ')}` : ''}`);
@@ -2745,8 +2786,9 @@ export function renderReviewMd(review: Review, { files = 'paths' }: { files?: Md
   const latest = review.versions.at(-1);
   const slug = slugify(review.video);
   const bySev = (a: Comment, b: Comment) => noteRank(a) - noteRank(b) || a.t - b.t;
-  const openAll = review.comments.filter((c) => c.status === 'open').sort(bySev);
+  const openAll = review.comments.filter((c) => c.status === 'open' && !fixWaits(c)).sort(bySev);
   const open = openAll.filter(isRequired);
+  const riding = review.comments.filter(fixWaits).sort((a, b) => a.t - b.t);
   const ideas = openAll.filter(isIdea);
   const fromAgents = openAll.filter((c) => !isRequired(c) && !isIdea(c));
   const fixed = review.comments.filter((c) => c.status === 'fixed').sort((a, b) => a.t - b.t);
@@ -2785,12 +2827,13 @@ export function renderReviewMd(review: Review, { files = 'paths' }: { files?: Md
     ...(open.length ? open.map((c) => commentBlock(review, c, { files })) : ['_None._', '']),
     ...(ideas.length ? [`## Ideas — optional, your call (${ideas.length})`, '', ...ideas.map((c) => commentBlock(review, c, { files }))] : []),
     ...(fromAgents.length
-      ? [`## Questions and notes from agents, waiting for ${USER} (${fromAgents.length})`, '', ...fromAgents.map((c) => commentBlock(review, c, { files }))]
+      ? [`## Questions and notes from agents, waiting for the person (${fromAgents.length})`, '', ...fromAgents.map((c) => commentBlock(review, c, { files }))]
       : []),
     ...(picked.length
       ? [`## Picked since the last render — render with these (${picked.length})`, '', ...picked.map((c) => commentBlock(review, c, { files }))]
       : []),
-    `## Fixed, waiting for ${USER} to verify (${fixed.length})`,
+    ...(riding.length ? [`## Fixed, riding with the next version (${riding.length})`, '', ...riding.map((c) => commentBlock(review, c, { files }))] : []),
+    `## Fixed, waiting for the person's check (${fixed.length})`,
     '',
     ...(fixed.length ? fixed.map((c) => commentBlock(review, c, { files })) : ['_None._', '']),
     `## Closed (${closed.length})`,

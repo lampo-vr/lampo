@@ -15,6 +15,8 @@ Claude Code's `/lampo:watch` is a shortcut that says the same.
    sent to that agent.
 3. **Read** `get_playbook` (and `get_taste`) before rendering, then `get_open_notes`.
 4. **Fix**, put up the next version of the same video, then `mark_fixed` each note with what changed. Never verify.
+   Only what you mark fixed is the person's to check, in the version that has it; a note marked fixed before its
+   version is up rides with the next version you put up.
 5. **Wait**: `wait_for_feedback` with the cursor the last answer gave, and again after every answer, until the person
    approves (sign-off is theirs) or says stop. Work what it hands you the same way.
 
@@ -58,7 +60,10 @@ For a script or an agent that has a shell but no MCP connection. An agent connec
    person's notes arrive together when they press Send.` `lampo fix` and `lampo wontfix` end the same once none of the
    video's notes is left to work, and say how many are until then (`2 notes still open on this video.`); so do an
    agent's `lampo reply`, a question with `lampo add` and `lampo ask` (a note you answered waits for the person). Over
-   MCP the same answers say to call `wait_for_feedback` now, with a cursor from that moment ([MCP](#mcp)).
+   MCP the same answers say to call `wait_for_feedback` now, with a cursor from that moment ([MCP](#mcp)). A next
+   version put up while notes it may have fixed are neither marked nor answered says that first (`2 notes still open on
+   this video: mark what this version fixed (lampo fix <id>).`), and a fix marked before its version says to put the
+   version up (`1 fix marked before its version: put the version up now; its answer says when to wait.`).
 
 2. **Wait for feedback.** Run `lampo watch` under a Monitor (or any long-running process whose output you read). Every
    new note, reply or request is one line (shown here without the file paths each line ends with):
@@ -79,9 +84,10 @@ For a script or an agent that has a shell but no MCP connection. An agent connec
    questions that wait for an answer. Look at each note's marked frame first; the clean frame is the same moment
    without the drawing. An **idea** is the reviewer's optional suggestion: consider it, but it isn't required work.
 
-5. **Fix it and re-render to the same path.** The new file becomes the next version, and the open notes carry over to
-   it, marked to be checked again. With uploads, push the new file under the same name into the same folder, or name
-   the video with `lampo push <file> --to <video>`.
+5. **Fix it and re-render to the same path.** The new file becomes the next version; the open notes stay open until
+   you mark what it fixed (`lampo fix`). With uploads, push the new file under the same name into the same folder, or
+   name the video with `lampo push <file> --to <video>`. `lampo open` lists your open work, then the fixes riding with
+   your next version and those waiting for the person's check, by id.
 
 6. **Check your own work.**
    - `lampo diff <video>` shows what changed from the version before: picture changes with their place on screen, audio
@@ -216,7 +222,7 @@ or the environment variable `LAMPO_BY=agent:<name>` changes that.
 
 | Command | Does |
 |---|---|
-| `lampo fix <id> --note "…" [--v N] [--preview p_…]` | mark a note fixed, saying what changed. The newest version unless `--v`; a render that was just written is picked up first |
+| `lampo fix <id> --note "…" [--v N] [--preview p_…]` | mark a note fixed, saying what changed. The newest version unless `--v` (a version that doesn't exist is refused); a render that was just written is picked up first. Marked before a version newer than the note is up, it rides with the next one (`fixed · rides with your next version`) |
 | `lampo wontfix <id> --note "reason"` | close a note as a deliberate choice; it becomes a "decision that stands" in the taste |
 | `lampo reply <id> --note "…"` | reply without changing the status |
 | `lampo add <video> --frame N --text "…"` | pin a question for the reviewer to a frame, with both screenshots (options below) |

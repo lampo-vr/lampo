@@ -84,7 +84,8 @@ try {
     choices: ['Yes, cut it', 'No, keep it'],
   });
   const fix = await note(launchV, 12, 'Logo enters a beat late');
-  await api(`/api/comments/${fix.id}`, 'PATCH', { status: 'fixed', note: 'Moved the entry to frame 300', by: 'agent:Claude Code' });
+  // (a seeded fix names its version: marked now with one version only, it would ride with the next one)
+  await api(`/api/comments/${fix.id}`, 'PATCH', { status: 'fixed', note: 'Moved the entry to frame 300', by: 'agent:Claude Code', fixed_in_v: 1 });
   const promoNotes = [(await note(promo, 20, 'Wrong font in the title')).id, (await note(promo, 50, 'Music too loud')).id];
   const teaserNotes = [(await note(teaser, 15, 'Render at 1080×1920')).id];
   const springNotes = [

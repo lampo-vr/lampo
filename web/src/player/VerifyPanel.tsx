@@ -232,7 +232,7 @@ export function VerifyPanel({
             </b>
             <span className="verify-fix-done">
               <I name="fixed" size={12} />
-              {t('fixed in V{v}', { v: fix.fixed_in_v ?? after })}
+              {t('fixed in V{v}', { v: item.fixed_in_v ?? fix.fixed_in_v ?? after })}
             </span>
             {/* one "More" for the card's long words, at the end of this line: it takes no line of its own */}
             {moreInFix && (

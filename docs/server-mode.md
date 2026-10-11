@@ -626,8 +626,8 @@ When the last byte arrives, the server checks the file and registers it:
 - It must be a QuickTime/MP4 or Matroska/WebM file with frames (`.mp4`, `.mov`, `.m4v`, `.webm`, `.mkv`), within
   the [limits](configuration.md#uploads-and-disk).
 - The first upload of a name in a folder creates the video.
-- The next upload of the same name (or to the same video) becomes **V2, V3, …**, and open notes are carried forward
-  to be checked again, exactly like a re-render on disk.
+- The next upload of the same name (or to the same video) becomes **V2, V3, …**, exactly like a re-render on disk:
+  open notes stay open until the agent marks what it fixed, and fixes marked before it are in it.
 - The same bytes again change nothing.
 
 The finishing request answers with `{slug, v, created, duplicate, video}`. A render that takes longer than 45 seconds

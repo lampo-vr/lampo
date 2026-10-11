@@ -44,7 +44,8 @@ try {
     [60, 'Music too loud under the voice', 'Ducked the music by 6 dB'],
   ]) {
     const c = await note(film, { frame, text, severity: 'must' });
-    await api(`/api/comments/${c.id}`, 'PATCH', { status: 'fixed', note: change, by: 'agent:brand-film' });
+    // (a seeded fix names its version: marked now with one version only, it would ride with the next one)
+    await api(`/api/comments/${c.id}`, 'PATCH', { status: 'fixed', note: change, by: 'agent:brand-film', fixed_in_v: 1 });
     fixes.push(c);
   }
 

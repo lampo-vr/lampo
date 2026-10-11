@@ -538,6 +538,10 @@ try {
       headers: { Cookie: jonas, ...origin },
     });
     assert(fixed.status === 200, fixed.text);
+    // the version that has the fix: marked before it, the fix rides with it and is Mia's to check once it is up
+    const v2 = makeVideo(path.join(media, 'coast-film-60s-v2.mp4'), { w: 640, h: 360, fps: 25, dur: 2, pattern: 'smptebars' });
+    const next = await tusUpload(request, v2, { filename: 'coast-film-60s.mp4', folder: 'Coast Campaign' }, { Cookie: jonas, ...origin });
+    assert(next.status === 204 || next.status === 200, `V2: ${next.status} ${next.text}`);
     await fresh(`#/v/${encodeURIComponent(slug)}`);
     await page.waitForSelector('.stage-overlay');
     await settle(page);

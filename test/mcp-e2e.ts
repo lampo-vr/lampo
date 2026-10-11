@@ -488,8 +488,13 @@ try {
   })) as CallToolResult;
   assert.ok(longer.isError && /the length changed: .* send a full render/.test(textOf(longer)), textOf(longer));
   res = await call('track_video', { path: cutFrames(FIXED, 28, 92, path.join(tmp, 'renders', 'part.mp4')), part_of: 'shots.mp4', part_at: 40 });
-  assert.match(textOf(res), /^v2: a part, frames 40–79 of v1 · seams clean · never final\nNow call wait_for_feedback with since "\S+": /);
-  await call('mark_fixed', { id: pn.id, note: 'Logo drin', v: 2 });
+  // the note inside its stretch is neither marked nor answered: marking what the part fixed comes before the wait
+  assert.equal(
+    textOf(res),
+    'v2: a part, frames 40–79 of v1 · seams clean · never final\n1 note still open on this video: mark what this version fixed (mark_fixed).',
+  );
+  res = await call('mark_fixed', { id: pn.id, note: 'Logo drin', v: 2 });
+  assert.match(textOf(res), new RegExp(`^${pn.id}: fixed in v2\\nNow call wait_for_feedback with since "\\S+": `));
   const shotsReview = st.loadReview(shotsSlug);
   assert.deepEqual(
     shotsReview?.versions.map((x) => x.part?.of ?? null),

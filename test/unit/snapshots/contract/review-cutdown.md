@@ -22,7 +22,7 @@ Audio pops at the cut
 - marked: <store>/data/__home__alex__work__demo__export__cutdown.mp4/c_6d58d9_marked.png
 - clean: <store>/data/__home__alex__work__demo__export__cutdown.mp4/c_6d58d9_clean.png
 
-## Fixed, waiting for alex to verify (0)
+## Fixed, waiting for the person's check (0)
 
 _None._
 

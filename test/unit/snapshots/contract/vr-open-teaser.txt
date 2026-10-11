@@ -22,3 +22,4 @@ c_a5b4dc  OPEN     NICE   00:00:20  f20  v1  [color]  CHECK AGAIN in v2
     clean:  <store>/data/__@uploads__Demo__Reels__teaser.mp4/c_a5b4dc_clean.png
     ↳ agent:fixture-edit: Will try a warmer LUT in v3
 
+Fixed, waiting for the person's check (no work item): c_1d55b9 (v2)
