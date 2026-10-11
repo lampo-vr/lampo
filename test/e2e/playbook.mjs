@@ -226,6 +226,17 @@ try {
   });
 
   await check('the skill’s instructions grow with the text until the dialog is full, then scroll inside; Write and Preview are one box', async () => {
+    // the saves before stack their toasts over the window's foot, where the skill's row can sit: the row is brought to
+    // the middle first, and clicked once nothing lies over it
+    await page.$eval('[data-testid=pb-skill-row]', (el) => el.scrollIntoView({ block: 'center' }));
+    await until(
+      () =>
+        page.$eval('[data-testid=pb-skill-row]', (el) => {
+          const r = el.getBoundingClientRect();
+          return el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
+        }),
+      'the skill’s row clear of the toasts',
+    );
     await page.click('[data-testid=pb-skill-row]');
     await page.waitForSelector('[data-testid=pb-skill-dialog]');
     await page.click('.pb-skill > .seg button:first-child');

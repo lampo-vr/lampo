@@ -6,10 +6,10 @@
 // Keys: ↑↓ (⇧ to pick), ↵ opens, Space looks, ⌫ trashes with Undo, ⌘A picks all, Esc. A file opens beside the list
 // (FileSheet.tsx). Reviewers never see this (the tab isn't there, the API answers 404). Loaded on demand with its styles.
 import { useQueryClient } from '@tanstack/react-query';
-import { type KeyboardEvent, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { dirOf, nameOf } from '../../../lib/fileText.ts';
 import { can as roleCan } from '../../../lib/permissions.ts';
-import type { FileAreaInfo, FileDirInfo, FileKind, FilesTrash, TrashedDirInfo } from '../../../lib/types.ts';
+import type { BillingInfo, FileAreaInfo, FileDirInfo, FileKind, FilesTrash, TrashedDirInfo } from '../../../lib/types.ts';
 import { useAuthStatus, useCan, useLikelyRole } from '../api/auth.ts';
 import { useSSE } from '../api/events.ts';
 import { useBilling, useInfo } from '../api/queries.ts';
@@ -19,9 +19,7 @@ import { ago, pct } from '../lib/format.ts';
 import { useScrollEdges } from '../lib/hooks.ts';
 import { usePhone, useTouch } from '../lib/media.ts';
 import { copyText, later, toast, toastError, toastUndo } from '../lib/toast.ts';
-import { Code } from '../settings/parts.tsx';
 import { I } from '../ui/icons.tsx';
-import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { KindIcon } from '../ui/kindIcons.tsx';
 import { IconButton, Menu, type MenuEntry, Segmented, Tip } from '../ui/primitives.tsx';
 import { SkeletonRegion, SkLine } from '../ui/Skeleton.tsx';
@@ -67,6 +65,9 @@ import { filesHref, noteOpen, useFilesAt } from './route.ts';
 import { bindFileUploads, type FileUpload, useFileUploads } from './uploadStore.ts';
 import '../styles/files.css';
 
+// a folder's page asks for what its Files tab shows first once it has painted (Library.tsx)
+export { prefetchArea } from './api.ts';
+
 // ---------------------------------------------------------------- small pieces
 
 const SORT_KEY = 'vr.files.sort';
@@ -104,70 +105,91 @@ type Row =
 
 type Dialog = { kind: 'rename'; row: Row } | { kind: 'move'; keys: string[] } | { kind: 'new' } | null;
 
-/** The page's numbers on one line: this area's files and size, then what it inherits (each a way there). */
-function Count({ areas, area }: { areas: FileAreaInfo[] | undefined; area: string }) {
-  const own = areas?.find((a) => a.area === area);
-  const above = areas?.filter((a) => a.area !== area && a.files > 0) ?? [];
+/**
+ * The list's heading, as a section of the Videos tab has one: where it is in the area (its name, then the folders down
+ * to here, each a way back up), what it holds, and — on the right — what the plan's storage holds. One line whatever
+ * it says, so the rows under it never move when its numbers arrive.
+ */
+function PlaceHead({ area, path, trash, facts, store }: { area: string; path: string; trash: boolean; facts: ReactNode; store?: ReactNode }) {
+  const parts = crumbsOf(path);
+  const top = !parts.length && !trash;
   return (
-    <p className="pf-count" data-testid="files-count">
-      {own ? (
-        <>
-          <b>{own.files}</b> {t('file|files', { n: own.files })}
-          {own.files > 0 && (
-            <>
-              {' · '}
-              <b>{size(own.bytes)}</b>
-            </>
-          )}
-        </>
-      ) : areas ? (
-        t('No files yet')
-      ) : (
-        <SkLine w="9em" />
-      )}
-      {above.map((a) => (
-        <span key={a.area} className="pf-count-up">
-          {' · '}
-          <a href={filesHref(a.area)} title={t('{n} file from {area}|{n} files from {area}', { n: a.files, area: areaName(a.area) })}>
-            {areaName(a.area)} <b>{a.files}</b>
+    <div className="pf-shead">
+      <span className="pf-shead-lead" aria-hidden="true">
+        <I name={trash ? 'trash' : 'files'} size={14} />
+      </span>
+      <nav className="pf-crumbs" aria-label={t('Where in the files')}>
+        {top ? (
+          <span className="pf-crumb here" aria-current="page">
+            {areaName(area)}
+          </span>
+        ) : (
+          <a className="pf-crumb" href={filesHref(area)}>
+            {areaName(area)}
           </a>
-        </span>
-      ))}
-    </p>
+        )}
+        {parts.map(([name, to], i) => (
+          <span key={to} className="pf-crumb-step">
+            <I name="right" size={12} className="pf-crumb-sep" />
+            {i === parts.length - 1 && !trash ? (
+              <span className="pf-crumb here" aria-current="page">
+                {name}
+              </span>
+            ) : (
+              <a className="pf-crumb" href={filesHref(area, { path: to })}>
+                {name}
+              </a>
+            )}
+          </span>
+        ))}
+        {trash && (
+          <span className="pf-crumb-step">
+            <I name="right" size={12} className="pf-crumb-sep" />
+            <span className="pf-crumb here" aria-current="page">
+              {t('Trash')}
+            </span>
+          </span>
+        )}
+      </nav>
+      <span className="pf-facts" data-testid="files-count">
+        {facts}
+      </span>
+      {store}
+    </div>
   );
 }
 
-/** Where the page is in the area: its name, then the folders down to here, each a way back up. */
-function Crumbs({ area, path, trash }: { area: string; path: string; trash: boolean }) {
-  const parts = crumbsOf(path);
+/**
+ * What the plan's storage holds (where a billing provider runs): one quiet line at the end of the list's heading, a
+ * way to Settings → Billing. Near the end it says so; its tooltip (and its name) splits it into files and videos.
+ */
+function Storage({ billing }: { billing: BillingInfo | undefined }) {
+  const usage = billing?.usage;
+  const limit = billing?.limits.bytes ?? null;
+  if (!usage || limit === null) return null;
+  const share = usage.bytes / limit;
+  const near = share >= 0.8;
+  const used = t('{used} of {limit} in use', { used: size(usage.bytes), limit: size(limit) });
+  const split = usage.files
+    ? `${t('Files {files} · videos {videos} · {used} of {limit} in use', {
+        files: size(usage.files.bytes),
+        videos: size(Math.max(0, usage.bytes - usage.files.bytes)),
+        used: size(usage.bytes),
+        limit: size(limit),
+      })}${usage.files.kept > 0 ? t(' · trash and older versions {size}, not counted', { size: size(usage.files.kept) }) : ''}`
+    : used;
   return (
-    <nav className="pf-crumbs" aria-label={t('Where in the files')}>
-      <a className={`pf-crumb ${!parts.length && !trash ? 'here' : ''}`} href={filesHref(area)} aria-current={!parts.length && !trash ? 'page' : undefined}>
-        <I name="files" size={14} />
-        {areaName(area)}
+    <Tip content={split}>
+      <a
+        className={`pf-store ${near ? 'near' : ''}`}
+        href="#/settings/billing"
+        aria-label={near ? `${split} · ${t('{pct} of storage used', { pct: pct(share) })}` : split}
+        data-testid="files-usage"
+      >
+        <span className="pf-store-bar" style={{ '--v': Math.min(1, share) } as CSSProperties} aria-hidden="true" />
+        {near ? <span data-testid="files-quota-near">{share >= 1 ? t('Storage full') : t('{pct} of storage used', { pct: pct(share) })}</span> : used}
       </a>
-      {parts.map(([name, to], i) => (
-        <span key={to} className="pf-crumb-step">
-          <I name="right" size={12} className="pf-crumb-sep" />
-          <a
-            className={`pf-crumb ${i === parts.length - 1 ? 'here' : ''}`}
-            href={filesHref(area, { path: to })}
-            aria-current={i === parts.length - 1 ? 'page' : undefined}
-          >
-            {name}
-          </a>
-        </span>
-      ))}
-      {trash && (
-        <span className="pf-crumb-step">
-          <I name="right" size={12} className="pf-crumb-sep" />
-          <span className="pf-crumb here" aria-current="page">
-            <I name="trash" size={14} />
-            {t('Trash')}
-          </span>
-        </span>
-      )}
-    </nav>
+    </Tip>
   );
 }
 
@@ -658,25 +680,42 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
     if (g.picked.length || g.junk.length) setCheck({ gathered: g, dir: path });
   };
 
-  // ---- the plan and the trash, in numbers
+  // ---- the numbers: the area's (at its top), a folder's (from its listing), what a search found
   const own = summary.data?.areas.find((a) => a.area === area);
-  // (the plan's storage counts files too; `files` says how much of it they are)
-  const usage = billing?.usage;
-  const limit = billing?.limits.bytes ?? null;
-  const share = limit && usage ? usage.bytes / limit : null;
-  const near = share !== null && share >= 0.8;
-
   const loading = !pending && !at.trash && !pages && !list.error;
   const showCols = !phone;
   const empty = !!pages && !rows.length && !searching;
-  const inherited = !path && !searching && !at.trash ? (summary.data?.areas.filter((a) => a.area !== area && a.files > 0) ?? []) : [];
+  // what the area inherits, folded under its own rows — once the rows are here, so they never push it down
+  const inherited = !path && !searching && !at.trash && pages ? (summary.data?.areas.filter((a) => a.area !== area && a.files > 0) ?? []) : [];
+  const facts = ((): ReactNode => {
+    if (at.trash)
+      return trash.data ? (
+        t('{n} file · {size} · kept up to 30 days, not counted|{n} files · {size} · kept up to 30 days, not counted', {
+          n: trash.data.files.length,
+          size: size(trash.data.bytes),
+        })
+      ) : (
+        <SkLine w="14em" />
+      );
+    const sum = (n: number, bytes: number | null) => `${t('{n} file|{n} files', { n })}${n > 0 && bytes !== null ? ` · ${size(bytes)}` : ''}`;
+    if (searching || path) {
+      const first = pages?.[0];
+      // (a list that didn't load says so under the heading: no numbers wait for it)
+      if (!first) return list.error ? null : <SkLine w="7em" />;
+      if (searching) return t('{n} file|{n} files', { n: first.total });
+      // everything under this folder: its folders' (they count all inside them) and its own, whose sizes are all here
+      // once every page is
+      const bytes = list.hasNextPage ? null : first.dirs.reduce((s, d) => s + d.bytes, 0) + files.reduce((s, f) => s + f.size, 0);
+      return sum(first.total + first.dirs.reduce((s, d) => s + d.files, 0), bytes);
+    }
+    return own ? sum(own.files, own.bytes) : summary.error ? null : <SkLine w="7em" />;
+  })();
   const [kindsRef, kindsEdges] = useScrollEdges<HTMLDivElement>();
   // the kinds there are here: the area's, or inside a folder the kinds of its top folder (the summary's tops)
   const tops = summary.data?.areas.find((a) => a.area === area)?.tops ?? [];
   const top = path ? `${path.split('/')[0]}/` : null;
   const present = new Set(tops.filter((x) => !top || x.path === top).flatMap((x) => x.kinds));
   const kinds = KINDS.filter((k) => present.has(k) || k === kind);
-  const kindsWait = !summary.data && !summary.error;
   const selected = [...checked].filter((k) => byKey.has(k));
   const selectedBytes = selected.reduce((s, k) => {
     const r = byKey.get(k);
@@ -709,17 +748,16 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
         data-testid="files-input-folder"
       />
       <div className="pf-main">
-        <div className="pf-head">
-          <Count areas={summary.data?.areas} area={area} />
-          {near && (
-            <a className="pf-quota" href="#/settings/billing" data-testid="files-quota-near">
-              <KeyGlyph shape={share >= 1 ? 'diamond' : 'half'} size={10} />
-              {share >= 1 ? t('Storage full') : t('{pct} of storage used', { pct: pct(share) })}
+        {/* the tab's first row, the Videos tab's toolbar: search, the kinds as its quick views, the order, Add files */}
+        <div className="lib-toolbar pf-toolbar" role="toolbar" aria-label={t('Files view')} data-tab-row>
+          {at.trash ? (
+            // (the trash has no search: it is one short list)
+            <a className="btn pf-back" href={filesHref(area, { path })}>
+              <I name="back" size={14} />
+              {t('Back to the files')}
             </a>
-          )}
-          {/* (the trash has no search: it is one short list) */}
-          {!at.trash && (
-            <label className="pf-search">
+          ) : (
+            <label className="lib-filter pf-search">
               <I name="search" size={15} />
               <input
                 ref={search}
@@ -740,11 +778,41 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
                 data-testid="files-search"
               />
               {typed ? (
-                <IconButton className="pf-search-clear" label={t('Clear the search')} shortcut="Esc" icon="x" size={13} onClick={() => setTyped('')} />
+                <IconButton className="lib-filter-clear" label={t('Clear the search')} shortcut="Esc" icon="x" size={13} onClick={() => setTyped('')} />
               ) : (
                 <kbd className="kbd">/</kbd>
               )}
             </label>
+          )}
+          {!at.trash && (
+            <div className={`lib-lanes pf-kinds ${kindsEdges}`} ref={kindsRef}>
+              {/* All stands from the first paint; the kinds there are join it when the summary says (nothing moves) */}
+              <Segmented
+                label={t('Kind')}
+                className="chips pf-kind-chips"
+                value={kind || 'all'}
+                onChange={(k) => setKind(k === 'all' ? '' : (k as FileKind))}
+                options={[{ value: 'all', label: t('All') }, ...(kinds.length > 1 ? kinds : []).map((k) => ({ value: k, label: kindWords(k) }))]}
+              />
+            </div>
+          )}
+          <span className="grow" />
+          {!at.trash && (
+            <Menu
+              trigger={
+                <Tip content={t('Order')}>
+                  <button type="button" className="btn lib-display pf-sort" aria-label={t('Order')} data-testid="files-sort">
+                    <I name="sortable" size={14} />
+                    <span className="lib-display-label">{sort === 'size' ? t('Size') : sort === 'changed' ? t('Last changed') : t('Name')}</span>
+                  </button>
+                </Tip>
+              }
+              items={[
+                { label: t('Name'), checked: sort === 'name', onClick: () => setSort('name') },
+                { label: t('Size'), checked: sort === 'size', onClick: () => setSort('size') },
+                { label: t('Last changed'), checked: sort === 'changed', onClick: () => setSort('changed') },
+              ]}
+            />
           )}
           {mayAdd && !at.trash && (
             <div className="pf-add">
@@ -761,186 +829,132 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
             </div>
           )}
         </div>
-        <div className="pf-bar">
-          <Crumbs area={area} path={path} trash={at.trash} />
-          {!at.trash && (
-            <>
-              <div className={`pf-kinds ${kindsEdges}`} ref={kindsRef}>
-                {/* until the summary says which kinds there are, All holds their line (a phone's own: nothing moves) */}
-                {(kinds.length > 1 || kindsWait) && (
-                  <Segmented
-                    label={t('Kind')}
-                    className="pf-kind-chips"
-                    value={kind || 'all'}
-                    onChange={(k) => setKind(k === 'all' ? '' : (k as FileKind))}
-                    options={[{ value: 'all', label: t('All') }, ...(kinds.length > 1 ? kinds : []).map((k) => ({ value: k, label: kindWords(k) }))]}
-                  />
-                )}
-              </div>
-              <Menu
-                trigger={
-                  <Tip content={t('Order')}>
-                    <button type="button" className="btn ghost sm pf-sort" aria-label={t('Order')} data-testid="files-sort">
-                      <I name="sortable" size={14} />
-                      <span className="pf-sort-label">{sort === 'size' ? t('Size') : sort === 'changed' ? t('Last changed') : t('Name')}</span>
-                    </button>
-                  </Tip>
-                }
-                items={[
-                  { label: t('Name'), checked: sort === 'name', onClick: () => setSort('name') },
-                  { label: t('Size'), checked: sort === 'size', onClick: () => setSort('size') },
-                  { label: t('Last changed'), checked: sort === 'changed', onClick: () => setSort('changed') },
-                ]}
-              />
-            </>
-          )}
-        </div>
 
-        {at.trash ? (
-          <TrashList area={area} write={write} data={trash.data} error={trash.error} onOpen={(id) => open(id)} />
-        ) : list.error && !pages ? (
-          <EmptyState
-            art="error"
-            titleAs="h2"
-            title={t('The files didn’t load')}
-            action={
-              <Button variant="primary" icon="refresh" onClick={() => void list.refetch()}>
-                {t('Try again')}
-              </Button>
-            }
-          >
-            {list.error.message}
-          </EmptyState>
-        ) : empty ? (
-          <Empty area={area} path={path} write={write} onAdd={() => pickFiles.current?.click()} small={inherited.length > 0} />
-        ) : (
-          <div
-            ref={grid}
-            className={`pf-list ${checked.size ? 'picking' : ''}`}
-            role="listbox"
-            aria-label={t('Files')}
-            aria-multiselectable="true"
-            aria-activedescendant={active && rowIds.has(active) ? rowId(active) : undefined}
-            tabIndex={0}
-            onKeyDown={onKey}
-            onFocus={() => !active && order[0] && setActive(order[0])}
-            data-testid="files-list"
-          >
-            {showCols && <Columns />}
-            {loading || pending ? (
-              <SkeletonRegion label={t('Loading the files')} className="pf-wait">
-                {['9em', '12em', '7em', '10em', '8em', '11em'].map((w) => (
-                  <RowPending key={w} w={w} />
-                ))}
-              </SkeletonRegion>
-            ) : !rows.length ? (
-              <EmptyState
-                art="filter"
-                size="sm"
-                titleAs="h2"
-                title={t('Nothing matches')}
-                action={
-                  <Button
-                    icon="x"
-                    onClick={() => {
-                      setTyped('');
-                      setKind('');
-                    }}
-                  >
-                    {t('Clear the search')}
-                  </Button>
-                }
-              >
-                {t('Try another word, or every kind.')}
-              </EmptyState>
-            ) : (
-              rows.map((r) => {
-                const look = { active: active === r.key, picked: r.kind === 'file' && opened?.id === r.f.id, checked: checked.has(r.key) };
-                if (r.kind === 'going') return <GoingRowView key={r.key} u={r.u} id={`pf-${r.key}`} />;
-                if (r.kind === 'dir')
+        {/* the content, from where the Videos tab's first section starts: the list's heading, then its rows — or, for an
+            empty area, the empty state in their place */}
+        <div className="pf-body" data-tab-body>
+          {!(empty && !path && !at.trash) && (
+            <PlaceHead area={area} path={path} trash={at.trash} facts={facts} store={at.trash ? null : <Storage billing={billing} />} />
+          )}
+          {at.trash ? (
+            <TrashList area={area} write={write} data={trash.data} error={trash.error} onOpen={(id) => open(id)} />
+          ) : list.error && !pages ? (
+            <EmptyState
+              art="error"
+              titleAs="h2"
+              title={t('The files didn’t load')}
+              action={
+                <Button variant="primary" icon="refresh" onClick={() => void list.refetch()}>
+                  {t('Try again')}
+                </Button>
+              }
+            >
+              {list.error.message}
+            </EmptyState>
+          ) : empty ? (
+            <Empty area={area} path={path} write={write} touch={touch} onAdd={() => pickFiles.current?.click()} small={inherited.length > 0} />
+          ) : (
+            <div
+              ref={grid}
+              className={`pf-list ${checked.size ? 'picking' : ''}`}
+              role="listbox"
+              aria-label={t('Files')}
+              aria-multiselectable="true"
+              aria-activedescendant={active && rowIds.has(active) ? rowId(active) : undefined}
+              tabIndex={0}
+              onKeyDown={onKey}
+              onFocus={() => !active && order[0] && setActive(order[0])}
+              data-testid="files-list"
+            >
+              {showCols && <Columns />}
+              {loading || pending ? (
+                <SkeletonRegion label={t('Loading the files')} className="pf-wait">
+                  {['9em', '12em', '7em', '10em', '8em', '11em'].map((w) => (
+                    <RowPending key={w} w={w} />
+                  ))}
+                </SkeletonRegion>
+              ) : !rows.length ? (
+                <EmptyState
+                  art="filter"
+                  size="sm"
+                  titleAs="h2"
+                  title={t('Nothing matches')}
+                  action={
+                    <Button
+                      icon="x"
+                      onClick={() => {
+                        setTyped('');
+                        setKind('');
+                      }}
+                    >
+                      {t('Clear the search')}
+                    </Button>
+                  }
+                >
+                  {t('Try another word, or every kind.')}
+                </EmptyState>
+              ) : (
+                rows.map((r) => {
+                  const look = { active: active === r.key, picked: r.kind === 'file' && opened?.id === r.f.id, checked: checked.has(r.key) };
+                  if (r.kind === 'going') return <GoingRowView key={r.key} u={r.u} id={`pf-${r.key}`} />;
+                  if (r.kind === 'dir')
+                    return (
+                      <DirRowView
+                        key={r.key}
+                        id={rowId(r.key)}
+                        d={r.d}
+                        going={r.going}
+                        {...look}
+                        onPress={(e) => press(r, e)}
+                        onCheck={write || !phone ? () => toggle(r.key) : undefined}
+                        menu={dirMenu(r)}
+                      />
+                    );
                   return (
-                    <DirRowView
+                    <FileRowView
                       key={r.key}
                       id={rowId(r.key)}
-                      d={r.d}
-                      going={r.going}
+                      f={r.f}
+                      upload={r.upload}
+                      showDir={searching}
                       {...look}
                       onPress={(e) => press(r, e)}
-                      onCheck={write || !phone ? () => toggle(r.key) : undefined}
-                      menu={dirMenu(r)}
+                      onCheck={() => toggle(r.key)}
+                      menu={fileMenu(r.f)}
+                      quick={
+                        <IconButton
+                          className="btn ghost sm icon-only pf-dl"
+                          label={t('Download {name}', { name: nameOf(r.f.path) })}
+                          icon="download"
+                          size={14}
+                          tabIndex={-1}
+                          onClick={() => download(r.f.id)}
+                        />
+                      }
                     />
                   );
-                return (
-                  <FileRowView
-                    key={r.key}
-                    id={rowId(r.key)}
-                    f={r.f}
-                    upload={r.upload}
-                    showDir={searching}
-                    {...look}
-                    onPress={(e) => press(r, e)}
-                    onCheck={() => toggle(r.key)}
-                    menu={fileMenu(r.f)}
-                    quick={
-                      <IconButton
-                        className="btn ghost sm icon-only pf-dl"
-                        label={t('Download {name}', { name: nameOf(r.f.path) })}
-                        icon="download"
-                        size={14}
-                        tabIndex={-1}
-                        onClick={() => download(r.f.id)}
-                      />
-                    }
-                  />
-                );
-              })
-            )}
-            {list.hasNextPage && (
-              <button type="button" className="pf-more-rows" onClick={() => void list.fetchNextPage()} disabled={list.isFetchingNextPage}>
-                {t('Show more · {n} in all', { n: pages?.[0]?.total ?? 0 })}
-              </button>
-            )}
-          </div>
-        )}
+                })
+              )}
+              {list.hasNextPage && (
+                <button type="button" className="pf-more-rows" onClick={() => void list.fetchNextPage()} disabled={list.isFetchingNextPage}>
+                  {t('Show more · {n} in all', { n: pages?.[0]?.total ?? 0 })}
+                </button>
+              )}
+            </div>
+          )}
 
-        {!at.trash && inherited.map((a, i) => <Inherited key={a.area} info={a} here={i === 0 ? area : null} onOpen={(id) => open(id, { area: a.area })} />)}
+          {!at.trash && inherited.map((a, i) => <Inherited key={a.area} info={a} here={i === 0 ? area : null} onOpen={(id) => open(id, { area: a.area })} />)}
 
-        {/* (once the area's numbers are here: nothing under the rows moves while they load) */}
-        {summary.data && (
-          <div className="pf-foot">
-            {at.trash ? (
-              <a className="pf-foot-link" href={filesHref(area, { path })}>
-                <I name="back" size={14} />
-                {t('Back to the files')}
+          {/* the area's trash, at its top, under everything (once the rows are here: nothing under them moves) */}
+          {!at.trash && !path && pages && own && own.trash > 0 && (
+            <div className="pf-foot">
+              <a className="pf-foot-link" href={filesHref(area, { trash: true })} data-testid="files-trash-link">
+                <I name="trash" size={14} />
+                {t('Trash · {n} file · {size}, not counted|Trash · {n} files · {size}, not counted', { n: own.trash, size: size(own.trash_bytes) })}
               </a>
-            ) : (
-              // the area's trash, at its top
-              !path &&
-              own &&
-              own.trash > 0 && (
-                <a className="pf-foot-link" href={filesHref(area, { trash: true })} data-testid="files-trash-link">
-                  <I name="trash" size={14} />
-                  {t('Trash · {n} file · {size}, not counted|Trash · {n} files · {size}, not counted', { n: own.trash, size: size(own.trash_bytes) })}
-                </a>
-              )
-            )}
-            {usage && limit !== null && (
-              <span className={`pf-usage ${near ? 'near' : ''}`} data-testid="files-usage">
-                {usage.files
-                  ? t('Files {files} · videos {videos} · {used} of {limit} in use', {
-                      files: size(usage.files.bytes),
-                      videos: size(Math.max(0, usage.bytes - usage.files.bytes)),
-                      used: size(usage.bytes),
-                      limit: size(limit),
-                    })
-                  : t('{used} of {limit} in use', { used: size(usage.bytes), limit: size(limit) })}
-                {usage.files && usage.files.kept > 0 && (
-                  <span className="pf-usage-kept">{t(' · trash and older versions {size}, not counted', { size: size(usage.files.kept) })}</span>
-                )}
-              </span>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
         {selected.length > 0 && (
           <div className="pf-selbar" role="toolbar" aria-label={t('{n} selected', { n: selected.length })} data-testid="files-selbar">
             <span className="pf-selbar-n">
@@ -1041,7 +1055,7 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
 
 // ---------------------------------------------------------------- empty, inherited, trash
 
-function Empty({ area, path, write, onAdd, small }: { area: string; path: string; write: boolean; onAdd: () => void; small: boolean }) {
+function Empty({ area, path, write, touch, onAdd, small }: { area: string; path: string; write: boolean; touch: boolean; onAdd: () => void; small: boolean }) {
   if (path)
     return (
       <EmptyState
@@ -1063,32 +1077,46 @@ function Empty({ area, path, write, onAdd, small }: { area: string; path: string
         {t('Files you add here keep this folder in their path.')}
       </EmptyState>
     );
+  // (where the Videos tab's empty project stands, as big; the way from a terminal is its quiet last line — not on a
+  // touch screen, where no terminal is)
+  const push = pushCommand(area, '', './<folder>');
   return (
-    <div className="pf-empty" data-testid="files-empty">
-      <EmptyState
-        art="folder"
-        size={small ? 'sm' : 'md'}
-        titleAs="h2"
-        title={t('No files yet')}
-        action={
-          write && (
-            // the head's Add files is the page's one primary
-            <Button icon="upload" onClick={onAdd}>
-              {t('Add files')}
-            </Button>
-          )
-        }
-        tips={write ? [t('Drop files and folders anywhere on this page')] : undefined}
-      >
-        {t('Footage, music, fonts and project files: your team and its agents work from the same material.')}
-      </EmptyState>
-      {write && (
-        <div className="pf-empty-cli">
-          <p>{t('From a terminal, or an agent:')}</p>
-          <Code>{pushCommand(area, '', './<folder>')}</Code>
-        </div>
-      )}
-    </div>
+    <EmptyState
+      art="folder"
+      size={small ? 'sm' : 'md'}
+      titleAs="h2"
+      className="pf-empty"
+      testId="files-empty"
+      title={t('No files yet')}
+      action={
+        write && (
+          // the toolbar's Add files is the page's one primary
+          <Button icon="upload" onClick={onAdd}>
+            {t('Add files')}
+          </Button>
+        )
+      }
+      tips={write ? [t('Drop files and folders anywhere on this page')] : undefined}
+      foot={
+        write &&
+        !touch && (
+          <span className="pf-push" data-testid="files-push">
+            {t('From a terminal, or an agent:')} <code>{push}</code>
+            <IconButton
+              className="btn ghost icon-only pf-push-copy"
+              label={t('Copy')}
+              icon="copy"
+              size={13}
+              onClick={async () => {
+                if (await copyText(push)) toast(t('Copied'), 'ok');
+              }}
+            />
+          </span>
+        )
+      }
+    >
+      {t('Footage, music, fonts and project files: your team and its agents work from the same material.')}
+    </EmptyState>
   );
 }
 
@@ -1132,14 +1160,16 @@ function Inherited({ info, here, onOpen }: { info: FileAreaInfo; here: string | 
   ];
   return (
     <section className={`pf-inh ${open ? 'open' : ''}`} aria-label={t('From {area}', { area: name })} data-testid="files-inherited" data-area={info.area}>
+      {/* a section's heading, as the Videos tab's: the fold, whose it is, what it holds, and who wins */}
       <button type="button" className="pf-inh-head" aria-expanded={open} onClick={() => setOpen((o) => !o)} data-testid="files-inherited-head">
-        <KeyGlyph shape="half" size={10} />
+        <span className="pf-shead-lead" aria-hidden="true">
+          <I name="right" size={13} className="pf-inh-chev" />
+        </span>
         <span className="pf-inh-from">{t('From {area}', { area: name })}</span>
         <span className="pf-inh-facts">
           {t('{n} file|{n} files', { n: info.files })} · {size(info.bytes)}
         </span>
         <span className="pf-inh-note">{here !== null ? t('{area} wins where a path is the same', { area: areaName(here) }) : ''}</span>
-        <I name="down" size={14} className={`pf-inh-chev ${open ? 'up' : ''}`} />
       </button>
       {open && (
         <div
@@ -1255,17 +1285,8 @@ function TrashList({
       </button>
     );
   return (
+    // (what it holds is said in the heading above it)
     <div className="pf-list trash" data-testid="files-trash">
-      <p className="pf-trash-note">
-        {data ? (
-          t('{n} file · {size} · kept up to 30 days, not counted|{n} files · {size} · kept up to 30 days, not counted', {
-            n: data.files.length,
-            size: size(data.bytes),
-          })
-        ) : (
-          <SkLine w="14em" />
-        )}
-      </p>
       <Columns trash />
       {!files ? (
         ['9em', '7em', '11em'].map((w) => <RowPending key={w} w={w} />)

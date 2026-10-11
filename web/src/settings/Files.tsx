@@ -13,7 +13,8 @@ export function HouseFiles() {
         <h1>{t('Files')}</h1>
         <p>{t('The House’s files: the fonts, logos and music every project uses. Every project and folder inherits them.')}</p>
       </header>
-      <Suspense fallback={null}>
+      {/* while the page's code arrives, its toolbar's room (library.css): nothing under the heading moves */}
+      <Suspense fallback={<div className="lib-toolbar tab-room" aria-busy="true" />}>
         <FilesPage area="" />
       </Suspense>
     </>

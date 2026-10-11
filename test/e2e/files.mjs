@@ -228,8 +228,11 @@ try {
     for (const n of ['Brief', 'Footage', 'Graphics', 'Music', 'Project', 'Renders for review', 'subtitles_de.srt'])
       assert(names.includes(n), `a row for ${n}: ${names.join(', ')}`);
     assert(names.indexOf('Footage') < names.indexOf('subtitles_de.srt'), 'folders first');
+    // the list's heading: where it is and what it holds (what it inherits is folded under the rows, each a section)
     const count = await page.$eval('[data-testid=files-count]', (x) => x.textContent);
-    assert(/18 files · [\d.]+ GB/.test(count ?? '') && /Acme 4/.test(count ?? '') && /House 3/.test(count ?? ''), `the numbers line: ${count}`);
+    assert(/^18 files · [\d.]+ GB$/.test(count ?? ''), `the heading's numbers: ${count}`);
+    const from = await page.$$eval('[data-testid=files-inherited]', (els) => els.map((x) => x.textContent));
+    assert(/From Acme4 files/.test(from[0] ?? '') && /From House3 files/.test(from[1] ?? ''), `inherited: ${from.join(' | ')}`);
     await shot('files-campaign-1440');
   });
 
@@ -648,11 +651,14 @@ try {
     plan = billingOf(2.18 * TB, 2.5 * TB, { bytes: 1.31 * TB, kept: 18e9 });
     try {
       await open(campaign());
-      const usage = await page.$eval('[data-testid=files-usage]', (x) => x.textContent);
+      // the storage at the end of the list's heading: near the end in words, split into files and videos in its name
+      // (and its tooltip)
+      const usage = await page.$eval('[data-testid=files-usage]', (x) => x.getAttribute('aria-label'));
       assert(/Files 1\.31 TB · videos 870 GB · 2\.18 TB of 2\.5 TB in use/.test(usage ?? ''), `usage: ${usage}`);
       assert(/trash and older versions 18 GB, not counted/.test(usage ?? ''), usage ?? '');
       const pill = await page.$eval('[data-testid=files-quota-near]', (x) => x.textContent);
-      assert(pill === '87% of storage used', `the pill near the end: ${pill}`);
+      assert(pill === '87% of storage used', `near the end: ${pill}`);
+      assert(await page.$('.pf-shead [data-testid=files-usage]'), 'the storage is in the list’s heading');
       await shot('files-quota-1440');
       // a refusal for room: the plan's own sheet, with what fills it
       refuseNext = true;
@@ -868,7 +874,7 @@ try {
     const where = () =>
       p.evaluate(() =>
         Object.fromEntries(
-          ['.pf-head', '.pf-bar', '.pf-cols', '[data-testid=files-search]', '[data-testid=files-add]'].map((s) => [
+          ['.pf-toolbar', '.pf-shead', '.pf-cols', '[data-testid=files-search]', '[data-testid=files-add]'].map((s) => [
             s,
             Math.round(document.querySelector(s)?.getBoundingClientRect().top ?? -1),
           ]),

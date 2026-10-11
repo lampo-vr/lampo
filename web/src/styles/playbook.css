@@ -7,16 +7,18 @@
 .pb {
   container: pb / inline-size;
   display: grid;
-  gap: var(--sp-4);
   min-width: 0;
-  max-width: 1400px;
   padding-bottom: var(--sp-12);
 }
-/* the loading layout: the same boxes, waiting */
+/* the loading layout: the same boxes, there at once (a tab switched to never flashes empty); only the bars for what
+   the playbook says fade in after a beat, as a busy region does (ui.css .sk-region) */
 .pb-wait {
   display: grid;
-  gap: var(--sp-4);
   min-width: 0;
+  animation: none;
+}
+.pb-sk {
+  animation: fade 0.3s var(--ease-out) 0.12s both;
 }
 
 /* ---------------------------------------------------------------- where it stands */
@@ -24,6 +26,8 @@
 /* One line whatever it holds (its height never depends on the data, so the document under it doesn't move when the
    playbook arrives): what it inherits shrinks first (what a playbook holds gives way to an ellipsis, the names never),
    then the note. Under 640 px of room: two lines, what it inherits over the links. */
+/* It is the tab's first row (a folder's Videos · Files · Playbook): where the Videos tab's toolbar stands, as tall, and
+   the document starts where the first section of videos does (library.css .lib-toolbar, .lib-section). */
 .pb-meta {
   display: grid;
   grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto;
@@ -31,8 +35,35 @@
   gap: var(--sp-1) var(--sp-3);
   min-width: 0;
   min-height: var(--h);
+  margin-top: var(--sp-4);
   font-size: var(--fs-sm);
   color: var(--muted);
+}
+/* where the toolbar takes two rows (its field and buttons, then the quick views: mobile.css), so does the line: what it
+   inherits in the first, as tall as the field (a finger's height on a touch screen and on a phone), the links in the
+   second, as tall as the quick views */
+@media (max-width: 820px) {
+  .pb-meta {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: var(--h) var(--h);
+    row-gap: var(--sp-3);
+  }
+  .pb-meta-note {
+    display: none;
+  }
+  .pb-meta .pb-meta-links {
+    justify-content: flex-start;
+  }
+}
+@media (max-width: 820px) and (hover: none) and (pointer: coarse), (max-width: 639px) {
+  .pb-meta {
+    grid-template-rows: var(--h-touch) var(--h);
+  }
+}
+@media (max-width: 639px) {
+  .pb-meta {
+    margin-top: var(--sp-3);
+  }
 }
 /* the playbooks it reads, from the House down: chips on a dashed track, like keyframes on a timeline */
 .pb-lineage {
@@ -149,9 +180,6 @@ a.pb-layer-chip:focus-visible {
   }
 }
 @container pb (max-width: 639px) {
-  .pb-meta {
-    grid-template-columns: minmax(0, 1fr);
-  }
   /* one row of links: this playbook's own suggestions first; the ones further down are in the inbox and on the tab */
   .pb-meta-link.waiting ~ .pb-meta-link.below {
     display: none;
@@ -159,9 +187,6 @@ a.pb-layer-chip:focus-visible {
   .pb-meta-note,
   .pb-meta-when {
     display: none;
-  }
-  .pb-meta-links {
-    justify-content: flex-start;
   }
 }
 /* quiet links: there only when they have something */
@@ -233,6 +258,7 @@ a.pb-layer-chip:focus-visible {
   gap: var(--sp-4);
   align-items: start;
   min-width: 0;
+  margin-top: var(--sp-6);
 }
 .pb-pane {
   display: none;
@@ -255,6 +281,10 @@ a.pb-layer-chip:focus-visible {
 .pb-sheet {
   display: grid;
   min-width: 0;
+}
+/* as wide as the other tabs (their toolbars and lists reach the page's edge), its prose keeps a reading measure */
+.pb-sheet .pb-md {
+  max-width: 80ch;
 }
 /* a section: its keyframe (written here ◆, only inherited ◈, empty ◇), title, what it holds, its actions; then its
    content, under the title */

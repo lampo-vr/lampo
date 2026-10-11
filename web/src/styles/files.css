@@ -16,7 +16,6 @@
 }
 .pf-main {
   container: pf / inline-size;
-  margin-top: var(--sp-4);
   flex: 1 1 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -28,102 +27,18 @@
   --pf-row: var(--h-lg);
 }
 
-/* ---------------------------------------------------------------- the head: numbers, search, Add files */
+/* ---------------------------------------------------------------- the toolbar: the Videos tab's, its parts its own */
 
-.pf-head {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  min-width: 0;
-  min-height: var(--h);
+/* The tab's first row is the library's toolbar (library.css .lib-toolbar, mobile.css): the same place under the tabs,
+   the same height, the same field and buttons, the same two rows on tablets and phones (the kinds take the quick
+   views' line). Its margin is the toolbar's, inside .pf-main's grid; what follows keeps its own. */
+.pf-toolbar.lib-toolbar {
+  margin-bottom: 0;
 }
-.pf-count {
-  flex: 1 1 auto;
-  min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--fs-md);
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-}
-.pf-count b {
-  font-weight: var(--fw-ui);
-  color: var(--fg);
-}
-.pf-count-up a {
-  color: var(--muted);
-  text-decoration: none;
-}
-.pf-count-up a b {
-  color: var(--fg-2);
-}
-.pf-count-up a:hover,
-.pf-count-up a:focus-visible {
-  color: var(--fg);
-  text-decoration: underline;
-  text-decoration-color: var(--line-4);
-  text-underline-offset: 2px;
-}
-/* near the plan's end: a quiet pill in the head, to Settings → Billing */
-.pf-quota {
+/* the trash's way back where the search stands */
+.pf-back {
   flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  height: var(--h-sm);
-  padding: 0 var(--sp-2);
-  border-radius: var(--r-full);
-  box-shadow: 0 0 0 1px var(--line-2);
-  font-size: var(--fs-sm);
-  color: var(--fg-2);
   text-decoration: none;
-  white-space: nowrap;
-}
-.pf-quota .kg {
-  color: var(--should);
-}
-.pf-quota:hover {
-  background: var(--sel);
-}
-.pf-search {
-  position: relative;
-  flex: 0 1 240px;
-  min-width: 150px;
-  display: flex;
-  align-items: center;
-}
-.pf-search > .icon {
-  position: absolute;
-  left: var(--sp-3);
-  color: var(--faint);
-  pointer-events: none;
-}
-.pf-search .input {
-  width: 100%;
-  height: var(--h);
-  padding: 0 var(--sp-8);
-}
-.pf-search > .kbd,
-.pf-search-clear {
-  position: absolute;
-  right: var(--sp-2);
-}
-.pf-search-clear {
-  display: grid;
-  place-items: center;
-  width: var(--h-xs);
-  height: var(--h-xs);
-  padding: 0;
-  border: 0;
-  border-radius: var(--r-sm);
-  background: var(--ink-3);
-  color: var(--muted);
-  cursor: pointer;
-}
-.pf-search-clear:hover {
-  color: var(--fg);
 }
 /* Add files, and its other ways (a folder, a new folder) behind the chevron: one control in the brand's colour */
 .pf-add {
@@ -141,102 +56,143 @@
   border-left: 1px solid color-mix(in srgb, var(--on-brand) 24%, transparent);
 }
 
-/* ---------------------------------------------------------------- where in the area, its kinds, the order */
+/* ---------------------------------------------------------------- the content: the list's heading, then the rows */
 
-.pf-bar {
+/* where the Videos tab's first section starts (library.css .lib-section) */
+.pf-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  min-width: 0;
+  margin-top: var(--sp-6);
+}
+/* the list's heading, a section's (library.css .shead): where it is, what it holds, and the storage at its end */
+.pf-shead {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
+  gap: var(--sp-2);
   min-width: 0;
-  min-height: var(--h);
-  margin: var(--sp-3) 0 var(--sp-2);
+  height: var(--h-sm);
+  margin-bottom: var(--sp-2);
+}
+/* the heading's glyph slot, as wide as a section's fold in the Videos tab: the files' glyph, an inherited section's fold */
+.pf-shead-lead {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--h-xs);
+  height: var(--h-xs);
+  border-radius: var(--r-sm);
+  color: var(--faint);
 }
 .pf-crumbs {
   flex: 0 1 auto;
   display: flex;
   align-items: center;
+  gap: var(--sp-1);
   min-width: 0;
   overflow: hidden;
 }
 .pf-crumb-step {
   display: flex;
   align-items: center;
+  gap: var(--sp-1);
   min-width: 0;
 }
 .pf-crumb {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
   min-width: 0;
-  height: var(--h-sm);
-  padding: 0 var(--sp-2);
-  border-radius: var(--r);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--fs-md);
+  font: var(--fw-ui) var(--fs-md) / var(--lh-ui) var(--ui);
   color: var(--muted);
   text-decoration: none;
 }
 a.pf-crumb:hover,
 a.pf-crumb:focus-visible {
-  background: var(--sel);
   color: var(--fg);
+  text-decoration: underline;
+  text-decoration-color: var(--line-4);
+  text-underline-offset: 3px;
 }
 .pf-crumb.here {
-  font-weight: var(--fw-ui);
+  flex: 0 1 auto;
+  font-weight: var(--fw-strong);
   color: var(--fg);
-}
-.pf-crumb .icon {
-  flex: none;
 }
 .pf-crumb-sep {
   flex: none;
   color: var(--faint);
 }
-/* the kinds take what the row has left and scroll sideways in it (a soft edge says there is more) */
-.pf-kinds {
-  flex: 0 1 auto;
-  min-width: 0;
-  margin-left: auto;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.pf-kinds::-webkit-scrollbar {
-  display: none;
-}
-.seg.pf-kind-chips {
-  padding: 0;
-  gap: var(--sp-1);
-  border: 0;
-  background: none;
-  box-shadow: none;
-}
-.seg.pf-kind-chips button {
-  height: var(--h-sm);
-  padding: 0 var(--sp-3);
-  border-radius: var(--r-full);
-  border: 1px solid transparent;
-  background: transparent;
-  font-size: var(--fs-sm);
-  color: var(--muted);
+.pf-facts {
+  flex: none;
+  margin-left: var(--sp-1);
   white-space: nowrap;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
 }
-.seg.pf-kind-chips button:hover {
+/* what the plan's storage holds: a short meter and its words, a way to Settings → Billing */
+.pf-store {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: var(--h-sm);
+  margin: 0 calc(-1 * var(--sp-2)) 0 auto;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r);
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  text-decoration: none;
+}
+.pf-store:hover,
+.pf-store:focus-visible {
   background: var(--sel);
   color: var(--fg);
 }
-.seg.pf-kind-chips button.on {
-  background: var(--raise-sheen), var(--ink-3);
-  border-color: var(--line-2);
-  color: var(--fg);
-  box-shadow: var(--raise);
-}
-.pf-sort.btn {
+.pf-store-bar {
+  position: relative;
   flex: none;
+  width: var(--sp-8);
+  height: var(--sp-1);
+  border-radius: var(--r-full);
+  background: var(--line-2);
+  overflow: hidden;
+}
+.pf-store-bar::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--v, 0) * 100%);
+  min-width: var(--sp-0_5);
+  border-radius: inherit;
+  background: var(--fg-2);
+}
+/* near the plan's end: said in words, the meter in the colour of a should-fix */
+.pf-store.near {
+  color: var(--fg-2);
+}
+.pf-store.near .pf-store-bar::before {
+  background: var(--should);
+}
+/* the way from a terminal: the empty state's quiet last line (system.css .empty-foot) with a copy of its own */
+.pf-push code {
+  user-select: all;
+}
+.pf-push-copy.btn,
+.pf-push-copy {
+  width: var(--h-xs);
+  min-width: 0;
+  height: var(--h-xs);
+  margin-left: var(--sp-1);
+  padding: 0;
+  vertical-align: middle;
   color: var(--muted);
 }
-.pf-sort.btn:hover {
+.pf-push-copy:hover {
   color: var(--fg);
 }
 
@@ -561,48 +517,48 @@ a.pf-crumb:focus-visible {
 
 /* ---------------------------------------------------------------- what it inherits, folded */
 
+/* each a section under the area's own, its heading the list's (.pf-shead): the fold where the files glyph stands, whose
+   it is, what it holds; then, open, its top-level rows */
 .pf-inh {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  margin-top: var(--sp-2);
-  border-top: 1px solid var(--line);
-}
-.pf-list + .pf-inh,
-.pf-empty + .pf-inh {
-  margin-top: var(--sp-4);
+  margin-top: var(--sp-6);
 }
 .pf-inh + .pf-inh {
-  margin-top: 0;
+  margin-top: var(--sp-2);
+}
+.pf-inh.open + .pf-inh {
+  margin-top: var(--sp-4);
 }
 .pf-inh-head {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
   min-width: 0;
-  height: var(--h-lg);
-  padding: 0 var(--sp-2);
+  height: var(--h-sm);
+  margin: 0;
+  padding: 0;
   border: 0;
   border-radius: var(--r);
   background: transparent;
-  font: var(--fw-text) var(--fs-md) / var(--lh-ui) var(--ui);
+  font: var(--fw-text) var(--fs-sm) / var(--lh-ui) var(--ui);
   color: var(--muted);
   text-align: left;
   cursor: pointer;
 }
-.pf-inh-head:hover {
-  background: var(--sel);
-}
-.pf-inh-head .kg {
-  flex: none;
-  color: var(--muted);
+.pf-inh-head:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 .pf-inh-from {
   flex: none;
-  font-weight: var(--fw-ui);
+  font: var(--fw-strong) var(--fs-md) / var(--lh-ui) var(--ui);
+  letter-spacing: var(--track-title);
   color: var(--fg);
 }
 .pf-inh-facts {
   flex: none;
+  margin-left: var(--sp-1);
   font-variant-numeric: tabular-nums;
 }
 .pf-inh-note {
@@ -612,19 +568,21 @@ a.pf-crumb:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: right;
-  font-size: var(--fs-sm);
 }
 .pf-inh-chev {
-  flex: none;
-  color: var(--faint);
-  transition: transform var(--dur) var(--ease-out);
+  transition: transform var(--dur-fast) var(--ease-out);
 }
-.pf-inh-chev.up {
-  transform: rotate(180deg);
+.pf-inh-head[aria-expanded='true'] .pf-inh-chev {
+  transform: rotate(90deg);
+}
+.pf-inh-head:hover .pf-shead-lead {
+  background: var(--ink-3);
+  color: var(--fg);
 }
 .pf-inh-list {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  margin-top: var(--sp-2);
   padding-bottom: var(--sp-2);
   border-radius: var(--r);
 }
@@ -653,16 +611,13 @@ a.pf-crumb:focus-visible {
   color: var(--fg);
 }
 
-/* ---------------------------------------------------------------- the foot: the trash, what the plan holds */
+/* ---------------------------------------------------------------- the foot: the area's trash */
 
 .pf-foot {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-2) var(--sp-4);
   min-height: var(--h);
-  margin-top: var(--sp-4);
+  margin-top: var(--sp-6);
   font-size: var(--fs-sm);
   color: var(--muted);
 }
@@ -683,36 +638,8 @@ a.pf-crumb:focus-visible {
   background: var(--sel);
   color: var(--fg);
 }
-.pf-usage {
-  margin-left: auto;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
-.pf-usage.near {
-  color: var(--fg-2);
-}
-.pf-usage-kept {
-  color: var(--muted);
-}
-.pf-trash-note {
-  margin: 0 0 var(--sp-2);
-  font-size: var(--fs-sm);
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-}
 
-/* ---------------------------------------------------------------- empty */
-
-.pf-empty {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--sp-4);
-}
-.pf-empty-cli {
-  justify-self: center;
-  width: min(100%, 560px);
-}
-.pf-empty-cli > p,
+/* the check sheet's way from a terminal (Check.tsx) */
 .pf-ck-cli > p {
   margin: 0 0 var(--sp-2);
   font-size: var(--fs-sm);
@@ -832,6 +759,8 @@ a.pf-crumb:focus-visible {
     bottom: auto;
     z-index: 1;
     flex: none;
+    /* level with the toolbar beside it */
+    margin-top: var(--sp-4);
     width: 380px;
     max-height: calc(100dvh - 54px - var(--sp-8));
     border: 1px solid var(--line-2);
@@ -1298,23 +1227,10 @@ a.pf-crumb:focus-visible {
   .pf-inh-note {
     display: none;
   }
-  .pf-usage {
-    margin-left: 0;
-    text-align: left;
-  }
 }
-/* the head on a phone: the numbers over the field and the button */
+/* a phone's toolbar: Add files beside the field, its glyph says it (its name stays its accessible name); the storage
+   gives the heading's room to the place (Settings → Billing has it) unless the plan is near its end */
 @container pf (max-width: 520px) {
-  .pf-head {
-    flex-wrap: wrap;
-  }
-  .pf-count {
-    flex-basis: 100%;
-  }
-  .pf-search {
-    flex: 1 1 auto;
-  }
-  /* Add files beside the field: its glyph says it (its name stays its accessible name) */
   .pf-add-label {
     position: absolute;
     width: 1px;
@@ -1323,40 +1239,40 @@ a.pf-crumb:focus-visible {
     clip-path: inset(50%);
     white-space: nowrap;
   }
-  .pf-bar {
-    flex-wrap: wrap;
-    row-gap: var(--sp-2);
-  }
-  .pf-kinds {
-    order: 3;
-    flex-basis: 100%;
-    margin-left: 0;
-  }
-  .pf-sort {
-    margin-left: auto;
-  }
-  .pf-sort-label {
+  .pf-store:not(.near),
+  .pf-store-bar {
     display: none;
   }
 }
-/* a phone's crumbs are finger-sized: the bar is that tall already (its sort button) */
-@media (max-width: 639px), (hover: none) and (pointer: coarse) {
-  .pf-crumb {
-    height: var(--h-touch);
-  }
-}
+/* touch: a finger's height for the toolbar's buttons, the crumbs (the heading is that tall), the folds and the links */
 @media (hover: none) and (pointer: coarse) {
-  .pf-search .input {
-    height: var(--h-touch);
-    font-size: var(--fs-touch);
-  }
-  .pf-add .btn {
+  .pf-add .btn,
+  .pf-back {
     height: var(--h-touch);
   }
   .pf-add-more.btn {
     width: var(--h-touch);
   }
-  .pf-search > .kbd {
-    display: none;
+  .pf-shead {
+    height: var(--h-touch);
+    margin-bottom: 0;
+  }
+  a.pf-crumb {
+    min-width: var(--h-touch);
+    line-height: var(--h-touch);
+  }
+  .pf-inh-head {
+    height: var(--h-touch);
+  }
+  .pf-store,
+  .pf-foot-link,
+  .pf-push-copy {
+    position: relative;
+  }
+  .pf-store::after,
+  .pf-foot-link::after {
+    content: '';
+    position: absolute;
+    inset: min(0px, calc(50% - 22px));
   }
 }

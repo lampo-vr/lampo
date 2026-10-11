@@ -1,6 +1,6 @@
 // Playbooks on the server (lib/playbooks.ts): one query per playbook, the list for badges, one suggestion; every
 // write answers with the playbook as it now stands, which goes straight into the cache (the stream settles the rest).
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { type QueryClient, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { NoteRef, Playbook, PlaybookRevision, PlaybookSkillView, PlaybookSummary, PlaybookView } from '../../../lib/types.ts';
 import { api, enc } from './client.ts';
 import { keys } from './queries.ts';
@@ -11,8 +11,12 @@ export const playbookKeys = {
   list: ['playbooks'] as const,
 };
 
-export const usePlaybook = (scope: string, enabled = true) =>
-  useQuery({ queryKey: playbookKeys.one(scope), queryFn: () => api<PlaybookView>(`/api/playbook?folder=${enc(scope)}`), enabled });
+const playbookQuery = (scope: string) => ({ queryKey: playbookKeys.one(scope), queryFn: () => api<PlaybookView>(`/api/playbook?folder=${enc(scope)}`) });
+
+export const usePlaybook = (scope: string, enabled = true) => useQuery({ ...playbookQuery(scope), enabled });
+
+/** A folder's playbook asked for before its tab is opened (once the folder's page has painted): the tab opens drawn. */
+export const prefetchPlaybook = (qc: QueryClient, scope: string) => void qc.prefetchQuery({ ...playbookQuery(scope), staleTime: 30_000 });
 
 /** Every playbook with content or suggestions waiting (the folder tabs' badge). */
 export const usePlaybooks = (enabled = true) =>

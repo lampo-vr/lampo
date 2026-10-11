@@ -16,6 +16,12 @@ format stays backwards compatible throughout.
   stands beside the button that goes on to pay (for example "€571.20 incl. 19% VAT"), and the checkout works out the
   VAT for your billing address. Every price elsewhere in the app (the trial, a plan's limit, an invite beyond the plan)
   says "excl. VAT" too; a switch that ends a trial says what is charged now with VAT.
+- A project's Videos, Files and Playbook tabs are one page: each starts with a toolbar in the same place and of the
+  same height, and its content starts at the same edge, so switching tabs moves nothing — not while a tab loads either.
+- The Files page looks like the Videos tab: search, the kinds as quick views, the order and Add files in one toolbar;
+  the list under a heading that says where you are, what it holds and how much of the plan's storage is in use; an
+  empty project gets the Videos tab's empty state, with the terminal command as its quiet last line.
+- A project's Files and Playbook tabs open drawn: the page asks for them once it is idle.
 - The command for Claude Code adds Lampo for every folder you open (`claude mcp add --scope user …`), not only the
   one you were in when you added it.
 - Safe zones and the phone view are two separate choices. The safe-zones button (G) draws only the zones, the phone

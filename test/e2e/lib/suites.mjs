@@ -85,6 +85,8 @@ const SECONDS = {
   // frame-exact in WebKit on an iPhone, the review link at 390 and 430, a big version's phone copy (made, then played)
   webkit: 45,
   playbook: 15,
+  // a folder's tabs switched round, every frame measured: two projects, six sizes (measured alone, 2026-10-10: 23 s)
+  'folder-tabs': 25,
   styleguide: 15,
   zoom: 17,
   // a folder's zip, then one version from the player's and a card's ⋯, the menus at 1440 and 390 in both themes

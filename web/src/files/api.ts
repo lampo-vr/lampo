@@ -26,26 +26,38 @@ export const fileKeys = {
 
 export type Listing = Omit<FilesListing, 'files'> & { files: FileRow[] };
 
+const summaryQuery = (area: string) => ({
+  queryKey: fileKeys.summary(area),
+  queryFn: () => api<FilesSummary>(`/api/files/summary?folder=${enc(area)}`),
+});
+
 /** The area in numbers and the chain above it, deepest first, with their top-level entries. */
-export const useFilesSummary = (area: string, enabled = true) =>
-  useQuery({ queryKey: fileKeys.summary(area), queryFn: () => api<FilesSummary>(`/api/files/summary?folder=${enc(area)}`), enabled });
+export const useFilesSummary = (area: string, enabled = true) => useQuery({ ...summaryQuery(area), enabled });
+
+const listQuery = (area: string, l: ListArgs) => ({
+  queryKey: fileKeys.list(area, l),
+  queryFn: ({ pageParam }: { pageParam: string }) => {
+    const q = new URLSearchParams({ folder: area, own: '1', path: l.path, limit: String(FILE_LIMITS.page) });
+    if (l.q || l.kind) q.set('deep', '1');
+    if (l.q) q.set('q', l.q);
+    if (l.kind) q.set('kind', l.kind);
+    if (pageParam) q.set('cursor', pageParam);
+    return api<Listing>(`/api/files?${q}`);
+  },
+  initialPageParam: '',
+  getNextPageParam: (last: Listing) => last.cursor || undefined,
+});
 
 /** The area's own files at `path` (with `q` or `kind`: every file under it that matches), a page at a time. */
-export function useFilesList(area: string, l: ListArgs, enabled = true) {
-  return useInfiniteQuery({
-    queryKey: fileKeys.list(area, l),
-    queryFn: ({ pageParam }) => {
-      const q = new URLSearchParams({ folder: area, own: '1', path: l.path, limit: String(FILE_LIMITS.page) });
-      if (l.q || l.kind) q.set('deep', '1');
-      if (l.q) q.set('q', l.q);
-      if (l.kind) q.set('kind', l.kind);
-      if (pageParam) q.set('cursor', pageParam);
-      return api<Listing>(`/api/files?${q}`);
-    },
-    initialPageParam: '',
-    getNextPageParam: (last) => last.cursor || undefined,
-    enabled,
-  });
+export const useFilesList = (area: string, l: ListArgs, enabled = true) => useInfiniteQuery({ ...listQuery(area, l), enabled });
+
+/**
+ * What the Files tab shows first (the area's numbers and its top), asked for before the tab is opened: a folder's page
+ * does it once it has painted, so switching to its files draws them at once. Answers already here are not asked again.
+ */
+export function prefetchArea(qc: QueryClient, area: string) {
+  void qc.prefetchQuery({ ...summaryQuery(area), staleTime: 30_000 });
+  void qc.prefetchInfiniteQuery({ ...listQuery(area, { path: '', q: '', kind: '' }), staleTime: 30_000 });
 }
 
 /** Every file of the area under `path` (paged through): what an upload replaces. At most `cap` files. */

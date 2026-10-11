@@ -42,3 +42,4 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
   newest first swaps them. Never assume which of two such items comes next; open the one the check is about
   (`inbox.mjs` "Still wrong").
 - A price that keeps both intervals in the page (the plans' roll) is read with `innerText`: the one rolled away is `visibility: hidden`, still in `textContent` (billing.mjs `seen`).
+- A click on something near the window's foot can land on the toasts stacked there (puppeteer clicks the point, not the element): bring it to the middle and wait until `elementFromPoint` is inside it (`playbook.mjs`, the skill's row after three saves).

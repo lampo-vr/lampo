@@ -104,7 +104,7 @@ function Doc({ view, scope }: { view: PlaybookView; scope: string }) {
         onAgents={() => show('agents')}
         onHistory={() => show('history')}
       />
-      <div className="pb-layout">
+      <div className="pb-layout" data-tab-body>
         <article className="panel panel-base pad-lg pb-sheet" aria-label={t('{name} playbook', { name: label(scope) })}>
           <BriefSection view={view} scope={scope} edit={edit} waiting={of('brief')} draft={drafts.brief} onDraft={onDraft} />
           <RulesSection view={view} scope={scope} edit={edit} waiting={of('rules')} draft={drafts.rules} onDraft={onDraft} topic={topic} />
@@ -149,7 +149,7 @@ function Lineage({
   const own = factsOf(p);
   const below = !scope ? (books ?? []).filter((b) => b.scope && b.rev > 0) : [];
   return (
-    <div className="pb-meta" data-testid="pb-lineage">
+    <div className="pb-meta" data-testid="pb-lineage" data-tab-row>
       <ol className="pb-lineage" aria-label={t('What agents read here, from the House down')}>
         {scope && !view.layers.length && (
           <li>

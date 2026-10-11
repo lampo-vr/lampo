@@ -47,7 +47,7 @@ export function Toolbar(p: ToolbarProps) {
   const phone = usePhone();
   useCarriedFocus(p.filterRef, 'library-filter');
   return (
-    <div className="lib-toolbar" role="toolbar" aria-label={t('Library view')}>
+    <div className="lib-toolbar" role="toolbar" aria-label={t('Library view')} data-tab-row>
       <label className="lib-filter">
         <I name="search" size={15} />
         <input

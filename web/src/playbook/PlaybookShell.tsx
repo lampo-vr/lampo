@@ -38,11 +38,15 @@ export function PlaybookPending({ scope }: { scope: string }) {
   );
 }
 
-/** The page's own boxes with their words waiting: what the page renders until its playbook arrives. */
+/**
+ * The page's own boxes with their words waiting: what the page renders until its playbook arrives. The line, the
+ * document and the pane stand at once, where they will (a tab switched to never flashes empty); only the bars for what
+ * the playbook says fade in after a beat (.pb-sk).
+ */
 export function PlaybookSkeleton() {
   return (
     <SkeletonRegion label={t('Loading the playbook')} className="pb-wait">
-      <div className="pb-meta">
+      <div className="pb-meta" data-tab-row>
         <span className="pb-lineage">
           <span className="pb-layer-chip">
             <KeyGlyph shape="outline" size={10} />
@@ -57,7 +61,7 @@ export function PlaybookSkeleton() {
           </span>
         </span>
       </div>
-      <div className="pb-layout">
+      <div className="pb-layout" data-tab-body>
         <div className="panel panel-base pad-lg pb-sheet">
           {sectionTitles().map((title, i) => (
             <section key={title} className="pb-sec">
@@ -65,7 +69,7 @@ export function PlaybookSkeleton() {
                 <KeyGlyph shape="outline" size={12} className="pb-sec-key" />
                 <h2 className="pb-sec-title">{title}</h2>
               </header>
-              <div className="pb-sec-body">
+              <div className="pb-sec-body pb-sk">
                 <SkeletonText lines={i < 2 ? 3 : 1} w={i < 2 ? '100%' : '60%'} />
               </div>
             </section>
@@ -77,7 +81,7 @@ export function PlaybookSkeleton() {
               <h2 className="pb-pane-title">{t('What agents read')}</h2>
               <p className="pb-pane-sub mono">get_playbook · lampo playbook</p>
             </div>
-            <div className="pb-agent">
+            <div className="pb-agent pb-sk">
               <SkeletonText lines={10} />
             </div>
           </div>

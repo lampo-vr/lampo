@@ -11,7 +11,7 @@ import { compareTime } from '../../../lib/time.ts';
 import { useAuthStatus, useCan, useLikelyRole } from '../api/auth.ts';
 import { useSettle, useVideoActions } from '../api/mutations.ts';
 import { keptFromBefore } from '../api/persist.ts';
-import { usePlaybooks } from '../api/playbooks.ts';
+import { prefetchPlaybook, usePlaybooks } from '../api/playbooks.ts';
 import { useBilling, useFolderSuggestion, useInfo, useLibrary } from '../api/queries.ts';
 import type { VideoSummary } from '../api/types.ts';
 import { billingCode } from '../billing/code.ts';
@@ -23,7 +23,7 @@ import { InboxViewPending } from '../inbox/ViewPending.tsx';
 import { chromeLibrary, rememberLibrary } from '../lib/chromeHint.ts';
 import { isProject } from '../lib/folders.ts';
 import { fileName } from '../lib/format.ts';
-import { loader, screen, useLoaded, usePainted } from '../lib/lazy.ts';
+import { loader, screen, useLoaded, usePainted, whenIdle } from '../lib/lazy.ts';
 import { crumbs, goView, type LibraryView, leaf, viewHash } from '../lib/nav.ts';
 import { readPrefs, usePrefs } from '../lib/prefs.ts';
 import { toast, toastError, toastUndo } from '../lib/toast.ts';
@@ -652,8 +652,17 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
   const onBoard = layout === 'board';
   const BoardCode = useLoaded(boardCode, onBoard || painted);
   const InsightsFrame = useLoaded(insightsFrameCode, view.kind === 'insights' || painted);
-  // a folder's Files tab opens at once: its code comes after the folder's first paint (for whoever sees files)
-  useLoaded(filesCode, painted && folderPage !== null && !!likelyRole && roleCan(likelyRole, 'files'));
+  // A folder's other tabs open drawn: the Files tab's code comes after the folder's first paint (for whoever sees
+  // files), and once the browser is idle the answers each tab shows first are asked for — switching shows them at once.
+  const seesFiles = !!likelyRole && roleCan(likelyRole, 'files');
+  const FilesCode = useLoaded(filesCode, painted && folderPage !== null && seesFiles);
+  useEffect(() => {
+    if (!painted || folderPage === null || pending) return;
+    return whenIdle(() => {
+      prefetchPlaybook(qc, folderPage);
+      if (seesFiles) FilesCode?.prefetchArea(qc, folderPage);
+    });
+  }, [painted, folderPage, pending, seesFiles, FilesCode, qc]);
   const kit = useMemo<CardKit>(() => ({ can, actions: actionsRef, move: moveTo, board: onBoard }), [can, moveTo, onBoard]);
   const group = pick<GroupBy>(prefs.group, ['folder', 'stage', 'none'], 'folder');
   const sort = pick<SortBy>(prefs.sort, ['recent', 'name', 'stage', 'open'], 'recent');
@@ -937,7 +946,13 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
 
   const libContent = (
     // biome-ignore lint/a11y/noStaticElementInteractions: arrow keys move between the items inside (each one focusable)
-    <div className={`lib-content layout-${layout}`} onKeyDown={arrowNav} data-testid="library-content" data-layout={layout}>
+    <div
+      className={`lib-content layout-${layout}`}
+      onKeyDown={arrowNav}
+      data-testid="library-content"
+      data-layout={layout}
+      data-tab-body={page.folder ? '' : undefined}
+    >
       {videos && folderAsk.known ? (
         <>
           {/* a question waiting in an archived project waits as it is: nothing is answered there until it is restored */}
@@ -961,7 +976,8 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
           onNav={bare || unseen ? null : !videos ? 'wait' : () => setNavOpen(true)}
           onAdd={videos && mayUpload ? add : undefined}
           locked={locked}
-          quiet={!!folderAsk.lead || agentLed}
+          // (the Files tab's Add files is its page's one primary)
+          quiet={!!folderAsk.lead || agentLed || view.kind === 'files'}
         >
           <input
             ref={picker}
@@ -1062,8 +1078,9 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
                       <PlaybookPage scope={view.id} pending={pending} />
                     </Suspense>
                   ) : view.kind === 'files' && noFiles === null ? (
-                    // (its code is here before the first render, or came after the folder's first paint)
-                    <Suspense fallback={null}>
+                    // (its code is here before the first render, or came after the folder's first paint; a click before
+                    // that finds the toolbar's room held)
+                    <Suspense fallback={<div className="lib-toolbar tab-room" data-tab-row aria-busy="true" />}>
                       <FilesPage area={view.id} pending={pending} readOnly={!!shutHere} />
                     </Suspense>
                   ) : (

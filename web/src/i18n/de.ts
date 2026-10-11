@@ -821,6 +821,7 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Let it in?': 'Reinlassen?',
   Library: 'Bibliothek',
   'Library view': 'Bibliotheksansicht',
+  'Files view': 'Dateiansicht',
   licence: 'Lizenz',
   Light: 'Hell',
   'Light theme': 'Helles Design',
@@ -4575,7 +4576,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
     '{n} Datei · {size} · bis zu 30 Tage aufbewahrt, nicht mitgezählt|{n} Dateien · {size} · bis zu 30 Tage aufbewahrt, nicht mitgezählt',
   '{n} file changed since you added it|{n} files changed since you added them':
     '{n} Datei hat sich geändert, seit du sie hinzugefügt hast|{n} Dateien haben sich geändert, seit du sie hinzugefügt hast',
-  '{n} file from {area}|{n} files from {area}': '{n} Datei aus {area}|{n} Dateien aus {area}',
   '{n} file on its way|{n} files on their way': '{n} Datei unterwegs|{n} Dateien unterwegs',
   '{n} is already in Lampo: nothing to upload for it|{n} are already in Lampo: nothing to upload for them':
     '{n} ist schon in Lampo: dafür wird nichts hochgeladen|{n} sind schon in Lampo: dafür wird nichts hochgeladen',
@@ -4649,7 +4649,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Empty folder': 'Leerer Ordner',
   'Figma file': 'Figma-Datei',
   file: 'Datei',
-  'file|files': 'Datei|Dateien',
   'Files {files} · videos {videos} · {used} of {limit} in use': 'Dateien {files} · Videos {videos} · {used} von {limit} belegt',
   'Files from {area}': 'Dateien aus {area}',
   'Files of': 'Dateien von',
