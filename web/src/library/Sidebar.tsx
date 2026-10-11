@@ -570,13 +570,13 @@ export function Sidebar({ videos: loaded, folders: all = NONE, archived = NO_ARC
         </div>
       </ScrollArea>
 
-      {/* The foot, one row each (theme.css .nav-row): Get started while the first run has steps open
-          (onboarding/Row.tsx), the trial while one runs, and Settings — the one way in on a phone (the account chip isn't
-          there) and a visible one at a desk (the account menu and ⌘, are the others). The theme is a setting
-          (Appearance), with a quick row in the account menu; the language lives in Settings. */}
+      {/* The foot (theme.css): Get started's box while the first run has steps open (onboarding/Row.tsx), the trial's box
+          while one runs — each holding its height from the first paint —, then Settings as a row: the one way in on a
+          phone (the account chip isn't there) and a visible one at a desk (the account menu and ⌘, are the others). The
+          theme is a setting (Appearance), with a quick row in the account menu; the language lives in Settings. */}
       <div className="nav-foot">
         <StartRow {...start} />
-        {trialLineDue(billing) && (Trial && billing ? <Trial billing={billing} /> : <span className="nav-row nav-trial" aria-hidden="true" />)}
+        {trialLineDue(billing) && (Trial && billing ? <Trial billing={billing} /> : <span className="nav-trial" aria-hidden="true" />)}
         <a className="nav-row nav-settings" href="#/settings" data-testid="settings-link">
           <span className="nav-row-ic">
             <I name="settings" size={15} />

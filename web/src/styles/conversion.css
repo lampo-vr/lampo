@@ -1,14 +1,105 @@
 /* The conversion moments (web/src/conversion/: the trial's row and card, the banner at the trial's end, the read-only
    Add video's popover, the moments of value), in the chunk that brings them (billing/Banner.tsx). Their rooms in the
-   first paint are in theme.css (.nav-row) and library.css (.lib-banner-room): the boxes here keep those sizes. */
+   first paint are in theme.css (.nav-trial) and library.css (.lib-banner-room): the boxes here keep those sizes. */
 
-/* ---------------------------------------------------------------- the trial's row at the sidebar's foot (theme.css
-   .nav-row): its hourglass turns half and amber in the last three days, the days left come forward */
-.nav-trial.last .nav-row-ic {
+/* ---------------------------------------------------------------- the trial's box at the sidebar's foot (theme.css
+   holds its height): the hourglass, its name and the days left, and under them the days as small keyframes, the
+   website's trial strip — the days gone filled, today under the brand's playhead, the rest hollow; amber in the last
+   three days */
+button.nav-trial {
+  display: grid;
+  grid-template-rows: var(--h-xs) var(--sp-3);
+  align-content: center;
+  gap: var(--sp-1);
+  width: 100%;
+  padding: 0 var(--sp-3);
+  border: 0;
+  border-radius: var(--r-lg);
+  background: radial-gradient(ellipse 80% 120% at 90% 0%, var(--gs-a), transparent), var(--gs-b);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  color: var(--fg-2);
+  font: var(--fw-ui) var(--fs-md) / var(--lh-ui) var(--ui);
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow var(--dur-fast);
+}
+button.nav-trial:hover:where(:not(:disabled)),
+button.nav-trial[aria-expanded='true'] {
+  box-shadow: inset 0 0 0 1px var(--line-4);
+}
+button.nav-trial:focus-visible {
+  outline: var(--focus-width) solid var(--fg);
+  outline-offset: var(--focus-offset);
+}
+.cv-box-top {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.cv-box-top .grow {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cv-box-kg {
+  display: grid;
+  place-items: center;
+  width: 15px;
+  color: var(--fg-2);
+}
+.cv-box-kg .kg {
+  --kg-size: 10px;
+}
+.cv-box-left {
+  flex: none;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.nav-trial.last :is(.cv-box-kg, .cv-box-left) {
   color: var(--should);
 }
-.nav-trial.last .nav-row-meta {
+.cv-days {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+  align-items: center;
+  justify-items: center;
+}
+.cv-days .kg {
+  --kg-size: 7px;
+  color: var(--line-4);
+}
+.cv-days .kg.gone {
+  color: var(--muted);
+}
+.cv-days .kg.today {
   color: var(--fg-2);
+}
+.nav-trial.last .cv-days .kg:not(.gone) {
+  color: var(--should);
+}
+.cv-days-ph {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--brand);
+}
+.cv-days-ph::before {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: -2px;
+  width: 6px;
+  height: 4px;
+  background: var(--brand);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
 }
 
 /* the ruler: the days as frames on a timeline, today the playhead, the end a keyframe */

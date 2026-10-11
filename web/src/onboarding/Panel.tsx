@@ -53,17 +53,34 @@ export function fromMenu(qc: QueryClient): void {
   if (o?.dismissed || (!here && o?.hidden)) comeBack(qc, !here).catch(toastError);
 }
 
-/** The row's face — a row of the foot like Settings: the keyframe of where it stands, the words, the count — in the room
- * Row.tsx held for it. */
-function RowFace({ count, all, pop, ...button }: { count: { done: number; of: number }; all?: boolean; pop?: boolean } & ComponentProps<'button'>) {
+/**
+ * Get started's face at the sidebar's foot, in the room Row.tsx held for it: a box of its own, set apart from the trial's
+ * box and Settings — on top the words and where it stands ("GET STARTED ━━── 2 of 5"), under them the next step as the
+ * box's raised button (the brand's keyframe, the step's name, ›: the one thing to do next). The whole box opens the steps.
+ */
+function RowFace({
+  count,
+  all,
+  pop,
+  next,
+  ...button
+}: { count: { done: number; of: number }; all?: boolean; pop?: boolean; next?: string | null } & ComponentProps<'button'>) {
+  const share = `${((count.done / Math.max(1, count.of)) * 100).toFixed(1)}%`;
   return (
-    <button type="button" className={`nav-row ob-side-row ${all ? 'ob-all' : ''}`} aria-haspopup="dialog" data-testid="ob-row" {...button}>
-      <span className="nav-row-ic">
-        <KeyGlyph key={count.done} shape={all ? 'diamond' : count.done ? 'half' : 'outline'} pop={pop} />
+    <button type="button" className={`ob-sn ob-side-row ${all ? 'ob-all' : ''}`} aria-haspopup="dialog" data-testid="ob-row" {...button}>
+      <span className="ob-sn-top">
+        <span className="ob-side-label">{all ? t('You’re set') : t('Get started')}</span>
+        <span className="ob-sn-line" aria-hidden="true">
+          <i style={{ width: share }} />
+        </span>
+        <span data-testid="ob-row-count">{t('{done} of {n}', { done: count.done, n: count.of })}</span>
       </span>
-      <span className="grow ob-side-label">{all ? t('You’re set') : t('Get started')}</span>
-      <span className="nav-row-meta" data-testid="ob-row-count">
-        {t('{done} of {n}', { done: count.done, n: count.of })}
+      <span className="ob-sn-step" data-testid="ob-row-next">
+        <span className="ob-sn-kg">
+          <KeyGlyph key={count.done} shape="diamond" pop={pop} />
+        </span>
+        <b className="grow">{all ? t('Everything is set up.') : (next ?? t('Get started'))}</b>
+        <I name="right" size={14} />
       </span>
     </button>
   );
@@ -152,6 +169,7 @@ export function SideRow(props: GetStartedProps) {
             count={count}
             all={all}
             pop={popped}
+            next={run.next ? titleOf(run.next, run.o?.agent ?? null, !!props.upload) : null}
             aria-expanded={!!open}
             onClick={(e) => {
               // from the drawer a sheet; at a desk the popover's own toggle

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // covers: web/src/onboarding/Row.tsx web/src/onboarding/Panel.tsx web/src/onboarding/state.ts web/src/onboarding/data.ts web/src/onboarding/GetStarted.tsx web/src/styles/startpanel.css web/src/styles/onboarding.css web/src/library/Sidebar.tsx web/src/auth/UserMenu.tsx web/src/lib/chromeHint.ts server/routes/onboarding.ts lib/onboarding.ts
 // Get started at the sidebar's foot (onboarding/Row.tsx, Panel.tsx), for a hosted server's owner (five steps) and on
-// someone's own machine (four): the row says "2 of 5" beside a half keyframe, a row of the foot like Settings, on every
-// library page, never in the orange; a click opens the steps above it — one height from step to step, Esc and a click
+// someone's own machine (four): a box of its own at the foot says "GET STARTED 2 of 5" and holds the next step as its
+// raised button with the brand's keyframe, on every library page; a click opens the steps above it — one height from step to step, Esc and a click
 // outside close it, the focus back on the row; a review link made in the panel ticks the row at once; the card's × leaves
 // the row, "Hide for good" takes both (Undo brings them back and sends nothing, the account hears it once the toast is
 // gone), the account menu reads the same count and opens the panel at a desk, or brings the card back from Settings;
@@ -107,38 +107,52 @@ try {
 
   // ---------------------------------------------------------------- the row
   const p = await fresh();
-  await check('the row at the sidebar’s foot: “Get started 2 of 5”, a row of the foot like Settings, its keyframe half, no orange', async () => {
+  await check('Get started’s box at the sidebar’s foot: “GET STARTED 2 of 5”, the next step as its raised button with the brand’s keyframe', async () => {
     await open(p);
     assert((await countOf(p)) === '2 of 5', await countOf(p));
-    const row = await p.$eval('[data-testid=ob-row]', (b) => {
+    const box = await p.$eval('[data-testid=ob-row]', (b) => {
       const r = b.getBoundingClientRect();
+      const step = b.querySelector('[data-testid=ob-row-next]');
+      const s = step.getBoundingClientRect();
       const settings = document.querySelector('.nav .nav-settings');
       const probe = document.createElement('span');
       probe.style.color = 'var(--brand)';
       document.body.append(probe);
       const brand = getComputedStyle(probe).color;
       probe.remove();
-      const colours = [b, ...b.querySelectorAll('*')].flatMap((e) => {
-        const s = getComputedStyle(e);
-        return [s.color, s.backgroundColor, s.backgroundImage];
-      });
+      // the room the first paint holds for it, measured beside it
+      const room = document.createElement('div');
+      room.className = 'ob-side ob-side-room';
+      b.closest('.nav-foot').append(room);
+      const roomH = room.getBoundingClientRect().height;
+      room.remove();
+      const next = b.closest('[data-testid=ob-row-wrap]').nextElementSibling.getBoundingClientRect();
       return {
         label: b.querySelector('.ob-side-label').textContent,
-        mark: b.querySelector('.nav-row-ic .kg')?.dataset.shape,
-        // one look with Settings: its height, the words starting where Settings' do
-        h: Math.round(r.height),
-        settingsH: Math.round(settings.getBoundingClientRect().height),
-        dx: Math.abs(b.querySelector('.grow').getBoundingClientRect().left - settings.querySelector('.grow').getBoundingClientRect().left),
-        orange: colours.some((c) => c.includes(brand)),
+        shown: getComputedStyle(b.querySelector('.ob-side-label')).textTransform,
+        next: step.textContent,
+        kg: getComputedStyle(step.querySelector('.ob-sn-kg')).color === brand,
+        raised: getComputedStyle(step).boxShadow !== 'none',
+        // the button sits in the box, its corner the box's less the inset
+        inset: Math.round(s.left - r.left),
+        bottom: Math.round(r.bottom - s.bottom),
+        R: Number.parseFloat(getComputedStyle(b).borderTopLeftRadius),
+        rr: Number.parseFloat(getComputedStyle(step).borderTopLeftRadius),
+        h: r.height,
+        roomH,
+        gap: Math.round(next.top - r.bottom),
         aboveSettings: r.bottom <= settings.getBoundingClientRect().top,
         inFoot: !b.closest('.nav-sa'),
       };
     });
-    assert(row.label === 'Get started', row.label);
-    assert(row.mark === 'half', `two of five done: a half keyframe (${row.mark})`);
-    assert(row.h === row.settingsH && row.dx < 0.5, `a row like Settings: ${JSON.stringify(row)}`);
-    assert(!row.orange, 'the row never wears the orange');
-    assert(row.aboveSettings && row.inFoot, 'at the foot, above Settings, out of the scrolling list');
+    assert(box.label === 'Get started' && box.shown === 'uppercase', JSON.stringify(box));
+    const next = steps0.find((s) => !s.done).id;
+    assert(next === 'agent' ? /^Connect /.test(box.next) : box.next.length > 0, `the next step on its button: ${box.next}`);
+    assert(box.kg && box.raised, `the brand's keyframe on a raised button: ${JSON.stringify(box)}`);
+    assert(box.inset === box.bottom && Math.abs(box.rr - (box.R - box.inset)) < 0.5, `concentric: ${JSON.stringify(box)}`);
+    assert(Math.abs(box.h - box.roomH) < 0.5, `the room the first paint holds is the box's height: ${box.roomH} vs ${box.h}`);
+    assert(box.gap === 8, `an even gap to what follows: ${box.gap}`);
+    assert(box.aboveSettings && box.inFoot, 'at the foot, above Settings, out of the scrolling list');
   });
 
   await check('the row shows on every library page with a sidebar (the inbox, Insights, a folder)', async () => {
@@ -200,7 +214,12 @@ try {
     await p.click('.ob-sp-pane [data-slot=share] [data-testid=ob-make-link]');
     await p.waitForSelector('.ob-sp-pane [data-testid=ob-share-link]', { timeout: 10000 });
     await p.waitForFunction(() => document.querySelector('[data-testid=ob-row-count]')?.textContent.trim() === '3 of 5', { timeout: 5000 });
-    assert(await p.$('[data-testid=ob-row] .nav-row-ic .kg[data-shape=half]'), 'still half: three of five');
+    assert(
+      (await p.$eval('[data-testid=ob-row] .ob-sn-line i', (i) =>
+        Math.round((i.getBoundingClientRect().width / i.parentElement.getBoundingClientRect().width) * 100),
+      )) === 60,
+      'the line: three of five done',
+    );
     assert((await p.$eval('[data-testid=ob-sp-count]', (e) => e.textContent)) === '3 of 5', 'the panel counts it too');
     // once its tick has popped, the step is still the one open: the link it made stays in view
     await p.waitForFunction(() => !document.querySelector('.ob-sp-row.ob-ticked'), { timeout: 5000 });

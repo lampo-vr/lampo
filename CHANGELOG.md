@@ -8,9 +8,10 @@ format stays backwards compatible throughout.
 ## [Unreleased]
 
 ### Changed
-- The sidebar's foot is one calm list: Get started, the trial and Settings are rows of the same shape — a mark, the
-  words, what they say on the right ("2 of 5", "10 days left", ⌘,) — in the phone's menu too. The trial's days as a
-  ruler are in its card, a click away; in its last three days the trial's mark turns amber.
+- The sidebar's foot shows what to do next. Get started is a box of its own — "Get started · 2 of 5" over the next
+  step as a button ("Connect your agent ›") — and the trial a box with its days as steps, the website's way: the days
+  gone filled, today under the playhead, amber in the last three. Settings stays a row below them, in the phone's menu
+  too; once Get started is done or put away and the trial is over, the foot is just Settings.
 - Billing shows the plans the way the website does: prices without VAT, said "excl. VAT · billed yearly, save 20%",
   and the switch between yearly and monthly slides, with each price rolling to the other. What you would pay with VAT
   stands beside the button that goes on to pay (for example "€571.20 incl. 19% VAT"), and the checkout works out the

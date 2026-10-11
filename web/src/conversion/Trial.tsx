@@ -1,10 +1,10 @@
-// The trial, visible all along (conversion spec §1): a calm row of the sidebar's foot like Settings — an hourglass
-// keyframe, "Team trial", "10 days left" on the right (the keyframe half and amber in the last three days, never red,
-// never a dot) — and, on a click only, its popover: the trial's days as a ruler (today the playhead, the end a keyframe),
-// what the trial includes with the workspace's own numbers, the day it ends, and one way on (Choose a plan, for the
-// people who choose it). A bottom sheet on a phone. The account
-// menu carries the same line and opens the same card under the account chip. The grace week after a trial is the same
-// line on a 7-day ruler. Loaded after the first paint (billing/due.ts billingCode); the line's room is held before.
+// The trial, visible all along (conversion spec §1): a box at the sidebar's foot — an hourglass keyframe, "Team trial",
+// "10 days left", and under them the trial's days as small keyframes, the website's way: the days gone filled, today
+// under the brand's playhead, the rest hollow (amber in the last three days, never red, never a dot) — and, on a click
+// only, its popover: the trial's days as a ruler with its dates, what the trial includes with the workspace's own
+// numbers, the day it ends, and one way on (Choose a plan, for the people who choose it). A bottom sheet on a phone. The
+// account menu carries the same line and opens the same card under the account chip. The grace week after a trial is
+// the same box over its 7 days. Loaded after the first paint (billing/due.ts billingCode); the box's room is held before.
 
 import { Dialog, Popover } from 'radix-ui';
 import { type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
@@ -33,6 +33,25 @@ export function Ruler({ day, of, last, lg }: { day: number; of: number; last?: b
         <span className="cv-ph" style={{ left: `${(at * 100).toFixed(2)}%` }} />
       </span>
       <KeyGlyph shape={last ? 'half' : 'outline'} className={`cv-end ${last ? 'last' : ''}`} />
+    </span>
+  );
+}
+
+/** The days as steps, the website's trial strip in small: a keyframe a day, the days gone filled, today under the
+ * playhead, the rest hollow. */
+function DaySteps({ day, of }: { day: number; of: number }) {
+  const at = Math.min(1, Math.max(0, (day - 0.5) / of));
+  return (
+    <span className="cv-days" style={{ '--n': of } as CSSProperties} aria-hidden="true">
+      {Array.from({ length: of }, (_, i) => (
+        <KeyGlyph
+          // biome-ignore lint/suspicious/noArrayIndexKey: a day's step is its place
+          key={i}
+          shape={i < day - 1 ? 'diamond' : 'outline'}
+          className={i < day - 1 ? 'gone' : i === day - 1 ? 'today' : undefined}
+        />
+      ))}
+      <span className="cv-days-ph" style={{ left: `${(at * 100).toFixed(2)}%` }} />
     </span>
   );
 }
@@ -81,7 +100,7 @@ const useWhere = () =>
     () => where,
   );
 
-/** The sidebar's line (the drawer's foot on a phone): opens the card beside the sidebar, bottom-aligned. */
+/** The sidebar's trial box (the drawer's foot on a phone): opens the card beside the sidebar, bottom-aligned. */
 export function TrialLine({ billing }: { billing: BillingInfo }) {
   const phone = usePhone();
   const w = useWhere();
@@ -91,17 +110,17 @@ export function TrialLine({ billing }: { billing: BillingInfo }) {
   const ref = useRef<HTMLButtonElement>(null);
   const [inDrawer, setInDrawer] = useState(false);
   useLayoutEffect(() => setInDrawer(!!ref.current?.closest('.drawer')), []);
-  if (!line) return <span className="nav-row nav-trial" aria-hidden="true" />;
+  if (!line) return <span className="nav-trial" aria-hidden="true" />;
   const mine: Where = inDrawer ? 'drawer' : 'sidebar';
   const open = w === mine;
   const sheet = phone || inDrawer;
-  // a row of the foot like Settings: the hourglass (time passing; half and amber in the last days), the trial's name,
-  // the days left on the right. Its days as a ruler are the card's.
+  // a box of the foot: the hourglass (time passing; half and amber in the last days), the trial's name, the days left on
+  // the right, and its days as steps under them
   const button = (
     <button
       ref={ref}
       type="button"
-      className={`nav-row nav-trial ${line.last ? 'last' : ''}`}
+      className={`nav-trial ${line.last ? 'last' : ''}`}
       aria-label={`${line.title}: ${line.words}`}
       aria-expanded={open}
       aria-haspopup="dialog"
@@ -109,11 +128,14 @@ export function TrialLine({ billing }: { billing: BillingInfo }) {
       // as a popover's trigger, Radix toggles it (onOpenChange)
       onClick={sheet ? () => setWhere(open ? null : mine) : undefined}
     >
-      <span className="nav-row-ic">
-        <KeyGlyph shape={line.last ? 'half' : 'ease'} />
+      <span className="cv-box-top">
+        <span className="cv-box-kg">
+          <KeyGlyph shape={line.last ? 'half' : 'ease'} />
+        </span>
+        <span className="grow">{line.title}</span>
+        <span className="cv-box-left">{line.words}</span>
       </span>
-      <span className="grow">{line.title}</span>
-      <span className="nav-row-meta">{line.words}</span>
+      <DaySteps day={line.day} of={line.of} />
     </button>
   );
   if (sheet)

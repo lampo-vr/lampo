@@ -466,23 +466,110 @@
 }
 
 /* ---------------------------------------------------------------- Get started at the sidebar's foot (onboarding/Row.tsx)
-   A row of the foot (theme.css .nav-row) above the trial's: its keyframe says where it stands (hollow, half, whole), the
-   count on the right, never the orange. Its room in the first paint is that one row; its panel's styles come with the
-   panel's code (startpanel.css). */
+   A box of its own above the trial's (Panel.tsx RowFace): on top its words and where it stands ("GET STARTED ━━── 2 of
+   5"), under them the next step as the box's raised button with the brand's keyframe — the one thing to do next. The
+   box's height is held from the first paint (`.ob-side` is the room and the real one's wrapper alike); its panel's
+   styles come with the panel's code (startpanel.css). */
 .ob-side {
+  height: calc(var(--h-xs) + var(--h-lg) + var(--sp-1) * 3);
+}
+.ob-sn {
+  display: grid;
+  grid-template-rows: var(--h-xs) minmax(0, 1fr);
+  gap: var(--sp-1);
+  width: 100%;
+  height: 100%;
+  padding: var(--sp-1);
+  border: 0;
+  border-radius: var(--r-lg);
+  background: radial-gradient(ellipse 80% 120% at 90% 0%, var(--gs-a), transparent), var(--gs-b);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  color: var(--fg);
+  font: var(--fw-ui) var(--fs-md) / var(--lh-ui) var(--ui);
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow var(--dur-fast);
+}
+.ob-sn:hover:where(:not(:disabled)),
+.ob-sn[aria-expanded='true'] {
+  box-shadow: inset 0 0 0 1px var(--line-4);
+}
+.ob-sn:focus-visible {
+  outline: var(--focus-width) solid var(--fg);
+  outline-offset: var(--focus-offset);
+}
+/* the words line up with the button's: its inset and its own padding */
+.ob-sn-top {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: 0 var(--sp-2);
+  font: var(--fw-ui) var(--fs-xs) / var(--lh-ui) var(--ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ob-sn-top .ob-side-label {
+  letter-spacing: var(--track-eyebrow);
+  text-transform: uppercase;
+}
+.ob-sn-line {
+  flex: 1;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--line-2);
   overflow: hidden;
 }
-.ob-side.ob-side-room {
-  height: var(--h);
+.ob-sn-line i {
+  display: block;
+  height: 100%;
+  border-radius: 1px;
+  background: var(--fg-2);
 }
-.ob-side-row .nav-row-ic {
-  color: var(--fg-2);
+.ob-sn.ob-all .ob-sn-line i {
+  background: var(--ok);
 }
-.ob-side-row.ob-all .nav-row-ic {
+/* the next step: the box's raised button, its corner the box's less the inset (concentric) */
+.ob-sn-step {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: 0 var(--sp-2);
+  border-radius: calc(var(--r-lg) - var(--sp-1));
+  background: var(--raise-sheen), var(--ink-3);
+  box-shadow: var(--raise);
+  transition: background var(--dur-fast);
+}
+.ob-sn:hover:where(:not(:disabled)) .ob-sn-step,
+.ob-sn[aria-expanded='true'] .ob-sn-step {
+  background: var(--raise-sheen), var(--ink-4);
+}
+.ob-sn-step b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--fw-strong);
+}
+.ob-sn-step .icon {
+  color: var(--muted);
+}
+.ob-sn-kg {
+  display: grid;
+  place-items: center;
+  width: 15px;
+  color: var(--brand);
+}
+.ob-sn-kg .kg {
+  --kg-size: 11px;
+}
+.ob-sn.ob-all .ob-sn-kg {
   color: var(--ok);
 }
 @media (hover: none) {
-  .ob-side.ob-side-room {
-    height: var(--h-touch);
+  .ob-side {
+    height: calc(var(--h-xs) + var(--h-touch) + var(--sp-1) * 3);
   }
 }

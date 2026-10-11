@@ -190,6 +190,13 @@ const NESTED: { file: string; outer: string; inner: string; inset: () => number;
   { file: 'cards.css', outer: '.film-poster', inner: '.vchip', inset: () => px(decl('cards.css', '.film-over', 'left') ?? 'NaN') },
   { file: 'notes.css', outer: '.verify-cta', inner: '.verify-cta > .btn', inset: () => firstOf(decl('notes.css', '.verify-cta', 'padding')) },
   { file: 'library.css', outer: '.lane', inner: '.bcard', inset: () => firstOf(decl('library.css', '.lane', 'padding')) },
+  // Get started's box at the sidebar's foot: the next step is its raised button, inset by the box's padding
+  {
+    file: 'onboarding.css',
+    outer: '.ob-sn',
+    inner: '.ob-sn-step',
+    inset: () => edgeOf('onboarding.css', '.ob-sn') + firstOf(decl('onboarding.css', '.ob-sn', 'padding')),
+  },
   // billing's switch: one raised thumb that slides in the segmented track
   {
     file: 'billing.css',

@@ -229,69 +229,88 @@ try {
   console.log(`conversion e2e against ${BASE} (store ${srv.dir})`);
   await signIn(mia);
 
-  await check('the trial all along: a row of the sidebar’s foot like Settings, its card with the ruler and the workspace’s numbers, one way on', async () => {
-    await library('trial');
-    await page.waitForSelector('[data-testid=trial-line]');
-    const line = await text('[data-testid=trial-line]');
-    assert(/Team trial\s*10 days left/.test(line), line);
-    // one row of the foot: Settings' height, its words where Settings' start, an hourglass keyframe, no ruler of its own
-    const row = await page.$eval('aside.nav [data-testid=trial-line]', (b) => {
-      const s = document.querySelector('aside.nav .nav-settings');
-      const words = (el) => el.querySelector('.grow').getBoundingClientRect().left;
-      return {
-        h: b.getBoundingClientRect().height,
-        settingsH: s.getBoundingClientRect().height,
-        dx: Math.abs(words(b) - words(s)),
-        mark: b.querySelector('.nav-row-ic .kg')?.dataset.shape,
-        ruler: !!b.querySelector('.cv-ruler'),
-      };
-    });
-    assert(Math.abs(row.h - row.settingsH) < 0.5 && row.dx < 0.5, `one look with Settings: ${JSON.stringify(row)}`);
-    assert(row.mark === 'ease' && !row.ruler, JSON.stringify(row));
-    await page.click('[data-testid=trial-line]');
-    await page.waitForSelector('[data-testid=trial-pop]');
-    await settle(page);
-    const card = await text('[data-testid=trial-pop]');
-    for (const w of [
-      'Day 5 of 14',
-      'Ends ',
-      '10 days left. No card until you choose a plan.',
-      'Everything in Team, for Northwind Studio',
-      'Members4 of 50',
-      'Review linksin your name',
-      'moves to Free unless you choose a plan. Nothing is deleted.',
-      'Choose a plan',
-      'Team for 4: €80 a month, billed yearly, excl. VAT',
-    ])
-      assert(card.includes(w), `“${w}” in: ${card}`);
-    // the card's ruler of the trial's 14 days: the 4 elapsed filled, today the playhead, the end a hollow keyframe
-    const ruler = await page.$eval('[data-testid=trial-pop] .cv-ruler', (r) => ({
-      cells: r.querySelectorAll('.cv-ruler-cells i').length,
-      past: r.querySelectorAll('.cv-ruler-cells i.p').length,
-      today: r.querySelectorAll('.cv-ruler-cells i.t').length,
-      end: r.querySelector('.cv-end')?.dataset.shape,
-    }));
-    assert(ruler.cells === 14 && ruler.past === 4 && ruler.today === 1 && ruler.end === 'outline', JSON.stringify(ruler));
-    // beside the sidebar, bottom-aligned with the line
-    const box = await page.evaluate(() => {
-      const pop = document.querySelector('[data-testid=trial-pop]').getBoundingClientRect();
-      const line = document.querySelector('[data-testid=trial-line]').getBoundingClientRect();
-      return { left: pop.left, lineRight: line.right, bottom: pop.bottom, lineBottom: line.bottom };
-    });
-    assert(box.left >= box.lineRight && Math.abs(box.bottom - box.lineBottom) < 2, JSON.stringify(box));
-    // one orange: Choose a plan is the card's own action
-    assert(await page.$('[data-testid=trial-pop] a.btn.primary[data-testid=trial-choose]'), 'Choose a plan is the card’s action');
-    await page.keyboard.press('Escape');
-    await page.waitForFunction(() => !document.querySelector('[data-testid=trial-pop]'));
-    // the focus goes back to the line it came from (keyboard and focus right)
-    await page.waitForFunction(() => document.activeElement?.dataset.testid === 'trial-line', { timeout: 5000 });
-    // and the keyboard opens it again
-    await page.keyboard.press('Enter');
-    await page.waitForSelector('[data-testid=trial-pop]');
-    const fit = await fitsAt(page, 'the trial’s card');
-    assert(!fit.length, fit.join('\n'));
-    await page.keyboard.press('Escape');
-  });
+  await check(
+    'the trial all along: a box at the sidebar’s foot with its days as steps, its card with the ruler and the workspace’s numbers, one way on',
+    async () => {
+      await library('trial');
+      await page.waitForSelector('[data-testid=trial-line]');
+      const line = await text('[data-testid=trial-line]');
+      assert(/Team trial\s*10 days left/.test(line), line);
+      // a box of its own: the hourglass keyframe, its words, and the trial's 14 days as steps, the website's way — the 4
+      // gone filled, today under the brand's playhead, the rest hollow; an even gap to Settings below it
+      const tbox = await page.$eval('aside.nav [data-testid=trial-line]', (b) => {
+        const probe = document.createElement('span');
+        probe.style.color = 'var(--brand)';
+        document.body.append(probe);
+        const brand = getComputedStyle(probe).color;
+        probe.remove();
+        const steps = [...b.querySelectorAll('.cv-days .kg')];
+        const ph = b.querySelector('.cv-days-ph').getBoundingClientRect();
+        const today = b.querySelector('.cv-days .kg.today').getBoundingClientRect();
+        const r = b.getBoundingClientRect();
+        return {
+          mark: b.querySelector('.cv-box-kg .kg')?.dataset.shape,
+          steps: steps.length,
+          gone: steps.filter((k) => k.classList.contains('gone') && k.dataset.shape === 'diamond').length,
+          hollow: steps.filter((k) => k.dataset.shape === 'outline').length,
+          playhead: getComputedStyle(b.querySelector('.cv-days-ph')).backgroundColor === brand,
+          onToday: Math.abs(ph.left + ph.width / 2 - (today.left + today.width / 2)) < 1,
+          inside: [...steps, b.querySelector('.cv-days-ph')].every((e) => {
+            const x = e.getBoundingClientRect();
+            return x.left >= r.left && x.right <= r.right;
+          }),
+          gap: Math.round(b.nextElementSibling.getBoundingClientRect().top - r.bottom),
+          radius: getComputedStyle(b).borderTopLeftRadius,
+        };
+      });
+      assert(tbox.mark === 'ease' && tbox.steps === 14 && tbox.gone === 4 && tbox.hollow === 10, JSON.stringify(tbox));
+      assert(tbox.playhead && tbox.onToday && tbox.inside, `today under the brand's playhead, every step inside the box: ${JSON.stringify(tbox)}`);
+      assert(tbox.gap === 8 && tbox.radius !== '0px', JSON.stringify(tbox));
+      await page.click('[data-testid=trial-line]');
+      await page.waitForSelector('[data-testid=trial-pop]');
+      await settle(page);
+      const card = await text('[data-testid=trial-pop]');
+      for (const w of [
+        'Day 5 of 14',
+        'Ends ',
+        '10 days left. No card until you choose a plan.',
+        'Everything in Team, for Northwind Studio',
+        'Members4 of 50',
+        'Review linksin your name',
+        'moves to Free unless you choose a plan. Nothing is deleted.',
+        'Choose a plan',
+        'Team for 4: €80 a month, billed yearly, excl. VAT',
+      ])
+        assert(card.includes(w), `“${w}” in: ${card}`);
+      // the card's ruler of the trial's 14 days: the 4 elapsed filled, today the playhead, the end a hollow keyframe
+      const ruler = await page.$eval('[data-testid=trial-pop] .cv-ruler', (r) => ({
+        cells: r.querySelectorAll('.cv-ruler-cells i').length,
+        past: r.querySelectorAll('.cv-ruler-cells i.p').length,
+        today: r.querySelectorAll('.cv-ruler-cells i.t').length,
+        end: r.querySelector('.cv-end')?.dataset.shape,
+      }));
+      assert(ruler.cells === 14 && ruler.past === 4 && ruler.today === 1 && ruler.end === 'outline', JSON.stringify(ruler));
+      // beside the sidebar, bottom-aligned with the line
+      const box = await page.evaluate(() => {
+        const pop = document.querySelector('[data-testid=trial-pop]').getBoundingClientRect();
+        const line = document.querySelector('[data-testid=trial-line]').getBoundingClientRect();
+        return { left: pop.left, lineRight: line.right, bottom: pop.bottom, lineBottom: line.bottom };
+      });
+      assert(box.left >= box.lineRight && Math.abs(box.bottom - box.lineBottom) < 2, JSON.stringify(box));
+      // one orange: Choose a plan is the card's own action
+      assert(await page.$('[data-testid=trial-pop] a.btn.primary[data-testid=trial-choose]'), 'Choose a plan is the card’s action');
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(() => !document.querySelector('[data-testid=trial-pop]'));
+      // the focus goes back to the line it came from (keyboard and focus right)
+      await page.waitForFunction(() => document.activeElement?.dataset.testid === 'trial-line', { timeout: 5000 });
+      // and the keyboard opens it again
+      await page.keyboard.press('Enter');
+      await page.waitForSelector('[data-testid=trial-pop]');
+      const fit = await fitsAt(page, 'the trial’s card');
+      assert(!fit.length, fit.join('\n'));
+      await page.keyboard.press('Escape');
+    },
+  );
 
   await check('the account menu: the trial’s line opens the same card, Billing carries a quiet “Trial”', async () => {
     await page.click('.topbar .user-chip');
@@ -314,7 +333,7 @@ try {
     // the room and the line are one box: the placeholder painted first is exactly the line's height
     const heights = await page.evaluate(() => {
       const ph = document.createElement('span');
-      ph.className = 'nav-row nav-trial';
+      ph.className = 'nav-trial';
       document.querySelector('aside.nav .nav-foot')?.append(ph);
       const h = [ph.getBoundingClientRect().height, document.querySelector('[data-testid=trial-line]').getBoundingClientRect().height];
       ph.remove();
@@ -350,9 +369,19 @@ try {
     // one orange per view: Add video keeps it, the banner's button is the neutral one
     assert(await page.$('.topbar .add-video.primary'), 'Add video is the view’s orange');
     assert(!(await page.$('[data-testid=billing-banner] .btn.primary')), 'no orange in the banner');
-    // the row at the sidebar's foot: its hourglass turns half and amber, the words stay calm
+    // the box at the sidebar's foot: its hourglass turns half and amber, the days left and the days to come too
     assert(/3 days left/.test(await text('[data-testid=trial-line]')), await text('[data-testid=trial-line]'));
-    assert(await page.$('[data-testid=trial-line].last .nav-row-ic .kg[data-shape=half]'), 'the keyframe is half in the last three days');
+    assert(await page.$('[data-testid=trial-line].last .cv-box-kg .kg[data-shape=half]'), 'the keyframe is half in the last three days');
+    const amber = await page.$eval('[data-testid=trial-line]', (b) => {
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--should)';
+      document.body.append(probe);
+      const should = getComputedStyle(probe).color;
+      probe.remove();
+      const c = (sel) => getComputedStyle(b.querySelector(sel)).color === should;
+      return { mark: c('.cv-box-kg'), left: c('.cv-box-left'), today: c('.cv-days .kg.today') };
+    });
+    assert(amber.mark && amber.left && amber.today, `amber in the last three days: ${JSON.stringify(amber)}`);
     await kept();
     const shift = await shiftOnReload('main.lib-scroll', '[data-testid=billing-banner]');
     assert(shift < 0.005, `the library didn't move for the banner (layout shift ${shift.toFixed(4)})`);

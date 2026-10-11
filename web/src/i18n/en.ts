@@ -1672,6 +1672,7 @@ export const EN = [
   'Everything in {plan}, for {workspace}',
   'Everything in {plan}, plus',
   'Everything is in a project',
+  'Everything is set up.',
   'Everything stays as it was in the trial, from the moment it’s paid.',
   'Everything the plan has, with no limits; nothing is ever billed while it lasts.',
   'Everything works until {date}',

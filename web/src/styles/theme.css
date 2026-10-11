@@ -51,16 +51,16 @@
   box-shadow: inset 0 0 0 1px var(--line-3);
 }
 
-/* the library sidebar's foot (on a phone the drawer's way in): Get started while its steps are open, the trial while one
-   runs, Settings. One look for the three, a row each like the ones above them: its mark, its words, what it says on the
-   right. The two rows whose code comes after the first paint (onboarding/Panel.tsx, conversion/Trial.tsx) are held
-   here at their size, one row each, so nothing moves when they arrive */
+/* the library sidebar's foot (on a phone the drawer's way in): Get started's box while its steps are open, the trial's
+   box while one runs, then Settings as a row like the ones above it (its mark, its words, its key on the right), an even
+   gap between the three. The boxes' code comes after the first paint (onboarding/Panel.tsx, conversion/Trial.tsx):
+   their heights are held from the start (the trial's here, Get started's in onboarding.css), so nothing moves */
 .nav:has(> .nav-foot) {
   grid-template-rows: minmax(0, 1fr) auto;
 }
 .nav-foot {
   display: grid;
-  gap: 1px;
+  gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-2) calc(var(--sp-2) + env(safe-area-inset-bottom));
   border-top: 1px solid var(--line);
 }
@@ -117,6 +117,11 @@
 }
 .nav-settings .kbd {
   color: var(--muted);
+}
+/* the trial's box (conversion.css draws it): two lines, its words and its days as steps */
+.nav-trial {
+  display: block;
+  height: calc(var(--sp-2) * 2 + var(--h-xs) + var(--sp-1) + var(--sp-3));
 }
 @media (hover: none) {
   .nav-row {

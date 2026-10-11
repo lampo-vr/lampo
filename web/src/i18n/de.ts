@@ -3522,6 +3522,7 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
     'Als Beispiel markiert: Nichts davon erreicht deinen Agent. Mit einem Klick entfernt.',
   'name@company.com': 'name@firma.de',
   'Next:': 'Als Nächstes:',
+  'Everything is set up.': 'Alles ist eingerichtet.',
   'No agent for now.': 'Vorerst kein Agent.',
   'no card': 'ohne Karte',
   'No mail relay yet.': 'Noch kein Mail-Relay.',
