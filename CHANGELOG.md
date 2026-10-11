@@ -113,6 +113,10 @@ format stays backwards compatible throughout.
   you list your server's MCP connector there.
 
 ### Fixed
+- Back from Settings goes back to where you opened it from. From a video, Settings' back button returned to the
+  library; now it and the browser's back both land on the video, with the dialog you came from open again and scrolled
+  as it was: the Share dialog's "All links" and "Add your name", the agent picker's "How agents get notes", a limit
+  sheet's card "Change". Settings opened directly still goes back to the library.
 - An agent that asks you something waits for your answer in Lampo instead of stopping: a reply, a question on a frame
   and options to pick now tell it to wait there (and never to ask again in its chat), so your answer reaches it. A chat
   app that has waited a while without news ends with one line: "I'm waiting for your answer in Lampo — answer there,

@@ -181,3 +181,59 @@ export const backToLibrary = () => {
   } catch {}
   location.hash = h;
 };
+
+// The way back. A page opened from inside the app — Settings from a video, from a dialog on it, from the library — goes
+// back to where it was opened from, by its own back button as by the browser's: each history entry that comes into
+// Settings is stamped with how many entries back that place is (`vrBack`, the sections looked at on the way counted
+// too), and the button steps back that far, onto the very entry the browser's back reaches. A dialog left for such a
+// page opens again there (`leaveFor`: `vrReopen` on the entry it was open on). Settings opened from nowhere in the app
+// (a bookmark, an email's link) has nothing to go back to: the library, as before.
+
+/** What a dialog needs to open again (its host reads it with `takeReopen`): plain values, kept with the history entry. */
+export type Reopen = { kind: string } & Record<string, string | number | boolean | null>;
+interface Stamp {
+  /** This entry was seen: a new one (a link followed) has no state yet. */
+  vrSeen?: true;
+  vrBack?: number;
+  vrReopen?: Reopen;
+}
+const stamps = (): Stamp => (history.state && typeof history.state === 'object' ? history.state : {});
+const stampWith = (s: Stamp) => history.replaceState(s, '');
+let before: { route: Route; back: number | null } | null = null;
+// where a way back may lead: the screens a person works in (never a sign-in or setup screen the entry replaced)
+const returnable = (r: Route) => r.name === 'player' || r.name === 'library';
+
+/** App, at the start and after every move of the address: a new entry into Settings is stamped with its way back. */
+export function arrived(route: Route): void {
+  const s = stamps();
+  if (!s.vrSeen) {
+    const settings = route.name === 'settings' && route.section !== 'operator';
+    const back = !settings || !before ? null : before.route.name === 'settings' ? (before.back ? before.back + 1 : null) : returnable(before.route) ? 1 : null;
+    stampWith({ ...s, vrSeen: true, ...(back ? { vrBack: back } : {}) });
+  }
+  before = { route, back: stamps().vrBack ?? null };
+}
+
+/** Whether Settings' back returns where it was opened from (else it is the library's). */
+export const hasWayBack = (): boolean => !!stamps().vrBack;
+
+/** Settings' back: where it was opened from, the same entry as the browser's back; the library when opened directly. */
+export function settingsBack(): void {
+  const n = stamps().vrBack;
+  if (n) history.go(-n);
+  else backToLibrary();
+}
+
+/** Leaves a dialog for another page (`hash`): coming back to this entry, by any back, opens it again (`reopen`). */
+export function leaveFor(hash: string, reopen?: Reopen | null): void {
+  if (reopen) stampWith({ ...stamps(), vrReopen: reopen });
+  location.hash = hash;
+}
+
+/** The dialog of `kind` to open again on this entry, if one was left for another page: taken, so it opens once. */
+export function takeReopen(kind: string): Reopen | null {
+  const { vrReopen, ...rest } = stamps();
+  if (!vrReopen || vrReopen.kind !== kind) return null;
+  stampWith(rest);
+  return vrReopen;
+}

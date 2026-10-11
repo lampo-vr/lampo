@@ -12,7 +12,7 @@ import { perLang, t } from '../i18n/index.ts';
 import { InboxBell } from '../inbox/InboxBell.tsx';
 import { useScrollEdges } from '../lib/hooks.ts';
 import { loader, screen, useLoaded } from '../lib/lazy.ts';
-import { backToLibrary, type SettingsSection } from '../lib/nav.ts';
+import { hasWayBack, type SettingsSection, settingsBack } from '../lib/nav.ts';
 import { I, type IconName } from '../ui/icons.tsx';
 import { IconButton } from '../ui/primitives.tsx';
 import { RowsSkeleton, SkeletonRegion, SkLine } from '../ui/Skeleton.tsx';
@@ -152,7 +152,15 @@ function Sections({ section }: { section: SettingsSection | null }) {
   return (
     <div className="page">
       <div className="topbar grain">
-        <IconButton className="btn ghost sm icon-only" label={t('Back to the library')} icon="back" size={17} onClick={backToLibrary} side="bottom" />
+        {/* back where Settings was opened from (a video, a dialog on it), as the browser's back goes; else the library */}
+        <IconButton
+          className="btn ghost sm icon-only"
+          label={hasWayBack() ? t('Back') : t('Back to the library')}
+          icon="back"
+          size={17}
+          onClick={settingsBack}
+          side="bottom"
+        />
         {/* where this instance runs is About's to say, not the title's */}
         <div className="p-title grow">
           <b>{t('Settings')}</b>

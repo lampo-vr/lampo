@@ -5,7 +5,7 @@ import { useForYou } from './api/queries.ts';
 import { AuthGate } from './auth/AuthGate.tsx';
 import { workspacesCode } from './auth/workspacesCode.ts';
 import { loader, screen, useIdle, useLoaded } from './lib/lazy.ts';
-import { canonicalHash, isOldOpenNotes, parseRoute, type Route, rememberLibrary, takeWorkspace } from './lib/nav.ts';
+import { arrived, canonicalHash, isOldOpenNotes, parseRoute, type Route, rememberLibrary, takeWorkspace } from './lib/nav.ts';
 import { storePref } from './lib/prefs.ts';
 import { rememberOpened } from './lib/recent.ts';
 import { transitionTo } from './lib/transition.ts';
@@ -105,6 +105,8 @@ export default function App() {
   const current = useRef(route);
   const parsedFrom = useRef(location.hash);
   useEffect(() => {
+    // each entry knows its way back (lib/nav.ts): this one as the app starts, each new one as the address moves
+    arrived(current.current);
     const f = () => {
       const w = takeWorkspace();
       if (w) setWanted(w);
@@ -112,6 +114,7 @@ export default function App() {
       const next = parseRoute(location.hash, location.pathname);
       const prev = current.current;
       current.current = next;
+      arrived(next);
       // The new screen must be on the page when the transition takes its "after" picture: render it synchronously.
       transitionTo(prev, next, () => flushSync(() => setRoute(next)));
     };

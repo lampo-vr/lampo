@@ -24,7 +24,8 @@ import { chromeLibrary, rememberLibrary } from '../lib/chromeHint.ts';
 import { isProject } from '../lib/folders.ts';
 import { fileName } from '../lib/format.ts';
 import { loader, screen, useLoaded, usePainted, whenIdle } from '../lib/lazy.ts';
-import { crumbs, goView, type LibraryView, leaf, viewHash } from '../lib/nav.ts';
+import { useReopen } from '../lib/leave.tsx';
+import { crumbs, goView, type LibraryView, leaf, type Reopen, viewHash } from '../lib/nav.ts';
 import { readPrefs, usePrefs } from '../lib/prefs.ts';
 import { toast, toastError, toastUndo } from '../lib/toast.ts';
 import { WINDOW_FROM } from '../lib/windowing.ts';
@@ -549,6 +550,9 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
   const painted = usePainted(!pending);
   const Add = useLoaded(addVideoCode, painted || adding);
   const [sharingFolder, setSharingFolder] = useState<string | null>(null);
+  // back from a page a Share dialog was left for (a card's menu, the inbox, Insights, a folder's): it opens again here
+  const [reshare, setReshare] = useState<Reopen | null>(null);
+  useReopen('share', setReshare);
   // Phones and small tablets: the sidebar lives in a drawer; any navigation closes it.
   const [navOpen, setNavOpen] = useState(false);
   useEffect(() => {
@@ -1173,6 +1177,15 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
           </Suspense>
         )}
         {sharingFolder && <LazyShareModal folder={sharingFolder} onClose={() => setSharingFolder(null)} />}
+        {reshare && (
+          <LazyShareModal
+            slug={typeof reshare.slug === 'string' ? reshare.slug : undefined}
+            name={typeof reshare.name === 'string' ? reshare.name : undefined}
+            folder={typeof reshare.folder === 'string' ? reshare.folder : undefined}
+            top={typeof reshare.top === 'number' ? reshare.top : undefined}
+            onClose={() => setReshare(null)}
+          />
+        )}
         {adding && Add && (
           <Add.default
             onClose={() => setAdding(false)}

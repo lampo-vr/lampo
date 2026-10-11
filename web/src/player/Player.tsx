@@ -26,6 +26,7 @@ import { clamp, fileName } from '../lib/format.ts';
 import { useHiddenNotes } from '../lib/hidden.ts';
 import { useStableCallback } from '../lib/hooks.ts';
 import { loader, useLoaded, usePainted } from '../lib/lazy.ts';
+import { useReopen } from '../lib/leave.tsx';
 import { usePhone } from '../lib/media.ts';
 import { backToLibrary } from '../lib/nav.ts';
 import { errorMessage, toast, toastError } from '../lib/toast.ts';
@@ -320,6 +321,13 @@ function PlayerView({
   useEffect(() => setTag(null), [slug]);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
+  // back from a page the Share dialog was left for (Settings → Review links): open again, scrolled as it was
+  const [shareTop, setShareTop] = useState<number | undefined>(undefined);
+  useReopen('share', (r) => {
+    if (r.slug !== slug) return;
+    setShareTop(typeof r.top === 'number' ? r.top : undefined);
+    setSharing(true);
+  });
   // the publishing composer: open on a post (its id) or the first ("1"); the address can ask for it (?publish=, read here
   // rather than by the app's router: nothing of publishing in the first paint)
   const publishAt = new URLSearchParams(location.hash.split('?')[1] ?? '').get('publish');
@@ -1731,7 +1739,17 @@ function PlayerView({
           }
         />
 
-        {sharing && <ShareModal slug={slug} name={fileName(review.video)} onClose={() => setSharing(false)} />}
+        {sharing && (
+          <ShareModal
+            slug={slug}
+            name={fileName(review.video)}
+            top={shareTop}
+            onClose={() => {
+              setSharing(false);
+              setShareTop(undefined);
+            }}
+          />
+        )}
         {publishing && Publishing && <Publishing data={data} focus={publishing} live={pb.live} onClose={closePublish} />}
         {lightbox && (
           // biome-ignore lint/a11y/useKeyWithClickEvents: click anywhere to close; Esc closes it too (useShortcuts)

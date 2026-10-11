@@ -28,6 +28,7 @@ import {
 import { flushSync } from 'react-dom';
 import { t } from '../i18n/index.ts';
 import { loader, useLoaded } from '../lib/lazy.ts';
+import { ReopenScope, useReopen } from '../lib/leave.tsx';
 import { usePhone } from '../lib/media.ts';
 import { claimToasts, type LimitAsk, releaseToasts, type ToastItem } from '../lib/toast.ts';
 import { Spinner } from './feedback.tsx';
@@ -747,6 +748,9 @@ const dismissed = (acted: Set<number>, t: ToastItem) => {
 const lifetime = (t: ToastItem) => t.duration ?? (t.kind === 'error' ? 7000 : t.action ? 6500 : 3200);
 // A limit reached opens its sheet instead of a toast (conversion/limits/): its code comes the first time one is asked for.
 const limitCode = loader(() => import('../conversion/limits/LimitSheet.tsx'));
+// The sheets of this page's life by id, the newest few: one left for Settings → Billing (its card's Change) opens again
+// when its entry is back. What it asks holds what to do once there is room (`retry`), so it stays here, not in history.
+const limitsShown = new Map<number, LimitAsk>();
 
 /** Toasts (Radix Toast: announced to screen readers, paused while hovered or focused, swipe to dismiss, F8 jumps to
  * them), including the ones asked for before this layer arrived. */
@@ -755,6 +759,10 @@ export function Toaster() {
   // the limit asked about now (a newer one takes its place), and its sheet's code once here
   const [limit, setLimit] = useState<{ id: number; ask: LimitAsk } | null>(null);
   const Limit = useLoaded(limitCode, !!limit);
+  useReopen('limit', (r) => {
+    const ask = typeof r.id === 'number' ? limitsShown.get(r.id) : undefined;
+    if (ask) setLimit({ id: r.id as number, ask });
+  });
   // Phones: toasts drop in under the top bar (and are swiped up), clear of the notes sheet and the transport.
   const phone = usePhone();
   const shown = useRef<ToastItem[]>([]);
@@ -763,7 +771,11 @@ export function Toaster() {
   const acted = useRef(new Set<number>());
   useEffect(() => {
     const add = (t: ToastItem) => {
-      if (t.limit) return setLimit({ id: t.id, ask: t.limit });
+      if (t.limit) {
+        limitsShown.set(t.id, t.limit);
+        for (const old of [...limitsShown.keys()].slice(0, -5)) limitsShown.delete(old);
+        return setLimit({ id: t.id, ask: t.limit });
+      }
       // The oldest make room; a deferred change they carried goes through now.
       const next = [...shown.current, t];
       for (const old of next.slice(0, Math.max(0, next.length - MAX))) dismissed(acted.current, old);
@@ -839,7 +851,11 @@ export function Toaster() {
         </Toast.Root>
       ))}
       <Toast.Viewport className="toasts" />
-      {limit && Limit && <Limit.LimitSheet key={limit.id} ask={limit.ask} onClose={() => setLimit(null)} />}
+      {limit && Limit && (
+        <ReopenScope reopen={{ kind: 'limit', id: limit.id }} close={() => setLimit(null)}>
+          <Limit.LimitSheet key={limit.id} ask={limit.ask} onClose={() => setLimit(null)} />
+        </ReopenScope>
+      )}
     </Toast.Provider>
   );
 }

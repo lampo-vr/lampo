@@ -9,6 +9,7 @@ import { useFolderShares, useInfo, useShares, useTunnel } from '../api/queries.t
 import type { ShareInfo, ShareInput } from '../api/types.ts';
 import { isProject } from '../lib/folders.ts';
 import { useTouch } from '../lib/media.ts';
+import { leaveFor } from '../lib/nav.ts';
 import { copyText, toast, toastError } from '../lib/toast.ts';
 import { Spinner } from '../ui/feedback.tsx';
 import { I } from '../ui/icons.tsx';
@@ -97,6 +98,7 @@ export function ShareModal({
   name,
   folder,
   edit,
+  top,
   onClose,
 }: {
   slug?: string;
@@ -104,6 +106,8 @@ export function ShareModal({
   folder?: string;
   /** A link of this video or folder to open for changing (from Settings → Review links). */
   edit?: string;
+  /** Opened again after a page it was left for (lib/nav.ts leaveFor): scrolled as it was once its links are there. */
+  top?: number;
   onClose: () => void;
 }) {
   const target = folder ? { folder } : { slug: slug as string };
@@ -334,11 +338,46 @@ export function ShareModal({
 
   // The link being changed, as the list has it (gone from it: revoked elsewhere, the page goes back).
   const changing = editing ? (d?.shares.find((x) => x.token === editing.token) ?? null) : null;
+  // Settings → Review links or Profile from here: their way back (Settings' back, the browser's) opens this dialog again,
+  // over the same page, scrolled where it was (lib/nav.ts leaveFor; the host reads it with useReopen('share')).
+  // (a state, not a ref: the dialog's own code can arrive after this mounted, and its body with it)
+  const [views, setViews] = useState<HTMLDivElement | null>(null);
+  const leaveTo = (hash: string) => {
+    const scrolled = views?.closest('.modal-body')?.scrollTop ?? 0;
+    onClose();
+    leaveFor(hash, { kind: 'share', slug: slug ?? null, name: name ?? null, folder: folder ?? null, top: scrolled });
+  };
+  const restored = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    const body = views?.closest('.modal-body');
+    if (!top || !d || !views || !body || restored.current) return;
+    // The list it was scrolled to lays out after it arrives, and the dialog then focuses its first field, which scrolls
+    // it into view: for a moment the place is put back after any scroll that isn't the person's, until they act
+    // themselves (a wheel, a touch, a key, the scrollbar) or a second and a half has passed.
+    const PERSON = ['wheel', 'touchstart', 'keydown', 'pointerdown'];
+    const place = () => {
+      if (Math.abs(body.scrollTop - top) > 1) body.scrollTop = top;
+    };
+    const grown = new ResizeObserver(place);
+    const timer = setTimeout(() => stop(), 1500);
+    const stop = () => {
+      grown.disconnect();
+      clearTimeout(timer);
+      body.removeEventListener('scroll', place);
+      for (const ev of PERSON) body.removeEventListener(ev, stop);
+    };
+    restored.current = stop;
+    for (const ev of PERSON) body.addEventListener(ev, stop, { passive: true });
+    body.addEventListener('scroll', place, { passive: true });
+    grown.observe(views);
+    requestAnimationFrame(place);
+  }, [top, d, views]);
+  useEffect(() => () => restored.current?.(), []);
 
   return (
     <Modal title={title} onClose={onClose} width={660}>
       {/* The links and the page of one link being changed share one cell: the dialog keeps its height between them. */}
-      <div className="link-views">
+      <div className="link-views" ref={setViews}>
         <div className="link-view" inert={!!changing} aria-hidden={changing ? true : undefined}>
           <p className="link-intro">
             {folder
@@ -356,14 +395,7 @@ export function ShareModal({
             ) : (
               <>
                 <span>{t('Visitors won’t see who shared it.')}</span>
-                <button
-                  type="button"
-                  className="btn-link"
-                  onClick={() => {
-                    onClose();
-                    location.hash = '#/settings/profile';
-                  }}
-                >
+                <button type="button" className="btn-link" onClick={() => leaveTo('#/settings/profile')}>
                   {t('Add your name')}
                 </button>
               </>
@@ -386,15 +418,7 @@ export function ShareModal({
                   <h3>
                     {here === 'folder' ? t('Links to this folder') : t('Links to this video')} <span className="link-made-n">{d.shares.length}</span>
                   </h3>
-                  <button
-                    type="button"
-                    className="btn sm ghost"
-                    onClick={() => {
-                      onClose();
-                      location.hash = '#/settings/links';
-                    }}
-                    data-testid="link-all"
-                  >
+                  <button type="button" className="btn sm ghost" onClick={() => leaveTo('#/settings/links')} data-testid="link-all">
                     {t('All links')} <I name="right" size={12} />
                   </button>
                 </div>

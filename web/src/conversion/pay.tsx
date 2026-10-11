@@ -13,6 +13,7 @@ import { useBillingAccount } from '../billing/api.ts';
 import { CheckoutStep } from '../billing/Checkout.tsx';
 import { billedNow, billingSaid } from '../billing/words.ts';
 import { t } from '../i18n/index.ts';
+import { LeaveLink } from '../lib/leave.tsx';
 import { Spinner } from '../ui/feedback.tsx';
 import { I } from '../ui/icons.tsx';
 import { trialEndNet } from './facts.ts';
@@ -96,9 +97,9 @@ export function SavedCard({ card, sub }: { card: BillingMethod | null; sub: stri
         <b>{card ? cardLabel(card) : t('The card on file')}</b>
         <small>{sub}</small>
       </span>
-      <a className="btn ghost sm" href="#/settings/billing">
+      <LeaveLink className="btn ghost sm" href="#/settings/billing">
         {t('Change')}
-      </a>
+      </LeaveLink>
     </div>
   );
 }

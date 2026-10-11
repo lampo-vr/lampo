@@ -1270,6 +1270,107 @@ try {
     }
   });
 
+  // A page opened from inside a video or a dialog on it returns there: Settings' own back and the browser's alike land on
+  // the video, the dialog open again as it was (Valentino: Share → "All links" → back, and he wasn't back).
+  await check(
+    'the way back: the share dialog’s "All links", then on the video again, the dialog open and scrolled as it was, by Settings’ back and the browser’s',
+    async () => {
+      for (const label of ['First cut for Mia', 'Agency review', 'Sound check'])
+        await api(`/api/review/${encodeURIComponent(spot.slug)}/shares`, 'POST', { label });
+      const at = `#/v/${encodeURIComponent(spot.slug)}`;
+      const hash = () => page.evaluate(() => location.hash);
+      const settingsBack = '.page .topbar button[aria-label^="Back"]';
+      // the dialog, scrolled down to its list of links: where it stands is noted to compare with when it is back (with
+      // "All links" in view, so the click doesn't scroll it there first: puppeteer brings what it clicks into view)
+      const openShare = async () => {
+        await page.waitForSelector('[data-testid=share-button]', { timeout: 15000 });
+        await page.click('[data-testid=share-button]');
+        await page.waitForSelector('[data-testid=link-all]', { visible: true });
+        await page.$eval('[data-testid=link-all]', (e) => e.scrollIntoView({ block: 'start' }));
+        const at = await page.$eval('.modal-body', (b) => ({ top: b.scrollTop, room: b.scrollHeight - b.clientHeight }));
+        // a dialog with room to scroll stands scrolled, or "as it was" would hold of any dialog
+        assert(at.top > 0 || at.room < 40, `the dialog stands scrolled: ${JSON.stringify(at)}`);
+        return at.top;
+      };
+      const backOnTheVideo = async (top, how) => {
+        await until(
+          async () => (await hash()) === at,
+          async () => `${how}: back on the video (${await hash()})`,
+          10000,
+        );
+        await page.waitForSelector('[data-testid=link-all]', { visible: true, timeout: 10000 }).catch(() => {
+          throw new Error(`${how}: the share dialog is open again`);
+        });
+        await until(
+          () => page.$eval('.modal-body', (b, top) => Math.abs(b.scrollTop - top) <= 2, top),
+          async () => `${how}: scrolled as it was (${top}, now ${await page.$eval('.modal-body', (b) => b.scrollTop)})`,
+          5000,
+        );
+        await page.keyboard.press('Escape');
+        await page.waitForSelector('.modal-body', { hidden: true });
+      };
+      await page.goto(`${BASE}/${at}`, { waitUntil: 'domcontentloaded' });
+      // Settings' back, after a look at another section on the way
+      let top = await openShare();
+      await page.click('[data-testid=link-all]');
+      await page.waitForSelector('[data-testid=links-list]', { timeout: 15000 });
+      await clickText('.set-nav a', 'Appearance');
+      await until(async () => (await hash()) === '#/settings/appearance', 'Appearance is open');
+      await page.waitForSelector(settingsBack, { visible: true, timeout: 15000 });
+      await page.click(settingsBack);
+      await backOnTheVideo(top, 'Settings’ back');
+      // the browser's back
+      top = await openShare();
+      await page.click('[data-testid=link-all]');
+      await page.waitForSelector('[data-testid=links-list]', { timeout: 15000 });
+      await page.goBack();
+      await backOnTheVideo(top, 'the browser’s back');
+    },
+  );
+
+  await check(
+    'the way back: the agent menu’s "How agents get notes", then on the video with the agent picker open; Settings opened directly goes back to the library',
+    async () => {
+      const at = `#/v/${encodeURIComponent(spot.slug)}`;
+      const hash = () => page.evaluate(() => location.hash);
+      await page.goto('about:blank');
+      await page.goto(`${BASE}/${at}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('[data-testid=agent-button]', { timeout: 15000 });
+      await page.click('[data-testid=agent-button]');
+      await page.waitForSelector('[data-testid=assign-agent-open]', { visible: true });
+      await page.click('[data-testid=assign-agent-open]');
+      await page.waitForSelector('[data-testid=agent-picker] .how-agents', { visible: true });
+      await page.click('[data-testid=agent-picker] .how-agents');
+      await until(
+        async () => (await hash()) === '#/settings/mcp',
+        async () => `Connect an agent is open (${await hash()})`,
+      );
+      await page.waitForSelector('.page .topbar button[aria-label^="Back"]', { visible: true, timeout: 15000 });
+      await page.click('.page .topbar button[aria-label^="Back"]');
+      await until(
+        async () => (await hash()) === at,
+        async () => `back on the video (${await hash()})`,
+        10000,
+      );
+      await page.waitForSelector('[data-testid=agent-picker]', { visible: true, timeout: 10000 }).catch(() => {
+        throw new Error('the agent picker is open again');
+      });
+      await page.keyboard.press('Escape');
+      // opened from nowhere in the app (a bookmark): back is the library, as before
+      await page.goto('about:blank');
+      await page.goto(`${BASE}/#/settings/links`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('[data-testid=links-list]', { timeout: 15000 });
+      await page.waitForSelector('.page .topbar button[aria-label^="Back"]', { visible: true, timeout: 15000 });
+      await page.click('.page .topbar button[aria-label^="Back"]');
+      await until(
+        async () => (await hash()) === '#/' || (await hash()).startsWith('#/folder/'),
+        async () => `the library (${await hash()})`,
+        10000,
+      );
+      assert(await page.evaluate(() => location.origin + location.pathname).then((u) => u.startsWith(BASE)), 'still in the app');
+    },
+  );
+
   await check('no page errors along the way', async () => {
     assert(!errors.length, errors.join(' | '));
   });

@@ -11,6 +11,7 @@ import { usePartSuggestion } from '../api/queries.ts';
 import type { PartRequest, SessionPick, SessionRef } from '../api/types.ts';
 import { t } from '../i18n/index.ts';
 import { usePainted } from '../lib/lazy.ts';
+import { ReopenScope, useReopen } from '../lib/leave.tsx';
 import { copyText, toast, toastError } from '../lib/toast.ts';
 import { type NoteAt, say } from '../sessions/activityWords.ts';
 import { activityShort, LiveSection, stepLine, useAgentNow } from '../sessions/Live.tsx';
@@ -98,6 +99,12 @@ export function AgentMenu({
   // The frame on screen when the menu opened: a quick check renders only the shots around it.
   const [partAt, setPartAt] = useState<number | null>(null);
   const request = useRequest(slug);
+  // back from Connect an agent, left from the picker ("How agents get notes"): the picker opens again
+  useReopen('agent-picker', (r) => {
+    if (r.slug !== slug) return;
+    setMode('assign');
+    setOpen(true);
+  });
   const { assign } = useVideoActions();
   const active = !!sessionActive;
   const wake = useWakeChoice(session, sessionActive, home);
@@ -261,7 +268,9 @@ export function AgentMenu({
               <IconButton className="btn ghost sm icon-only" label={t('Back')} icon="back" size={15} onClick={() => setMode('menu')} />
               <span className="label">{t('Agent for this video')}</span>
             </div>
-            <SessionPicker video={video} current={session} onAssign={onAssign} home={home} />
+            <ReopenScope reopen={{ kind: 'agent-picker', slug }}>
+              <SessionPicker video={video} current={session} onAssign={onAssign} home={home} />
+            </ReopenScope>
           </div>
         ) : (
           <div className="am" data-testid="agent-menu">

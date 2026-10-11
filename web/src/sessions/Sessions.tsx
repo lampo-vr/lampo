@@ -7,6 +7,7 @@ import { useInfo, useSessions } from '../api/queries.ts';
 import type { Session, SessionPick, SessionRef } from '../api/types.ts';
 import { t } from '../i18n/index.ts';
 import { tilde } from '../lib/format.ts';
+import { LeaveLink } from '../lib/leave.tsx';
 import { Spinner } from '../ui/feedback.tsx';
 import { AgentMark, I } from '../ui/icons.tsx';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
@@ -25,12 +26,12 @@ const kindLabel = (s: Session) =>
       : t('listening')
     : [s.kind === 'background' ? 'background' : null, s.status].filter(Boolean).join(' · ');
 
-/** Where agents get their notes explained: Settings → Connect an agent. */
+/** Where agents get their notes explained: Settings → Connect an agent; its way back opens the picker it was in again. */
 export function HowAgentsGetNotes() {
   return (
-    <a className="how-agents" href="#/settings/mcp">
+    <LeaveLink className="how-agents" href="#/settings/mcp">
       {t('How agents get notes')}
-    </a>
+    </LeaveLink>
   );
 }
 
