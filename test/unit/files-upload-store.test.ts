@@ -2,8 +2,8 @@
 // The Files tab's uploads without a browser, against a stand-in API and tus: a big drop asks for its ways in a few files
 // ahead of what is being sent (a way in lives 15 minutes), so none runs out waiting its turn, and a thousand and one
 // files go without ever looking like "no more versions today"; a way in that ran out as its file started is asked for
-// once more; a 429 for too many open ways in waits and asks again, while a file's day of versions waits in the tray;
-// and signing out empties the store.
+// once more; a 429 for too many open ways in waits and asks again (its timer ends the wait, not the wall clock), while a
+// file's day of versions waits in the tray; and signing out empties the store.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { DetailedError } from 'tus-js-client';
@@ -147,6 +147,28 @@ test('too many ways in open (429 tickets): nothing waits in “later”, they ar
     10_000,
   );
   assert.equal(f.asks.length, 1, 'asked again after the wait');
+});
+
+test('the wait after a 429 ends when its timer runs, whatever Date.now() says: with the clock behind, they still arrive', async () => {
+  store.resetFileUploads();
+  const f = fakes();
+  f.refusals.push(new ApiError('too many upload URLs are open here right now', 429, 1, { reason: 'tickets', retry_after: 1 }));
+  drop(['a.mov', 'b.mov']);
+  // The refusal is answered in microtasks, so the wait has begun by the next turn. Then Date.now() falls behind the
+  // timers' clock: Node fires a timer up to 1 ms before Date.now() gets there, a computer's clock can be set back.
+  await new Promise((r) => setImmediate(r));
+  const now = Date.now;
+  Date.now = () => now() - 2_000;
+  try {
+    await until(
+      () => uploads().every((u) => u.state === 'done'),
+      () => JSON.stringify(uploads()),
+      10_000,
+    );
+  } finally {
+    Date.now = now;
+  }
+  assert.equal(f.asks.length, 1, 'asked again once the wait was over');
 });
 
 test('a file’s day of versions (429 versions) waits in the tray as “later”', async () => {

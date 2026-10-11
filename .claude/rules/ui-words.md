@@ -15,6 +15,7 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
   `rich`): end a sentence with `{amount}.` and let the filler decide, never a second template without the stop.
 - An async step that starts something (tus's `start()`) checks after every await that it still owns it (`running.get(id)
   === upload`): a cancel or a sign-out meanwhile would be undone (tus revives an aborted upload).
+- A wait that a timer ends is over when that timer runs (a handle set, then cleared in its callback), never by `Date.now() < until`: a timer can run before Date.now() gets there (Node's by up to 1 ms, a clock set back by more), and the step it turned away has no timer left to wake it (`files/uploadStore.ts` `holdAsking`: a 429's files stayed "waiting" for good).
 - `npm run i18n` reads only literal keys: a key picked by a condition (`t(a ? 'x' : 'y')`, `<T k={…}>`) is one call per branch.
 - Kept data and per-account localStorage are cleared in `afterSignOut`; none for review links.
 - Inbox work never has "Got it": it leaves when done; dismissals only hide what informs.

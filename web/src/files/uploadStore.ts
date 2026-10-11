@@ -92,9 +92,8 @@ const running = new Map<string, Upload>();
 const queue: string[] = [];
 const subs = new Set<() => void>();
 let qc: QueryClient | null = null;
-/** A way-in request in flight (one at a time), and no new one before `heldUntil` (a 429 that isn't a file's day). */
+/** A way-in request in flight (one at a time), and no new one while `holdTimer` runs (a 429 that isn't a file's day). */
 let asking = false;
-let heldUntil = 0;
 let holdTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** What the store talks to: the API and tus (a unit test stands in for both). */
@@ -211,14 +210,17 @@ function noRoom(id: string, keys: string[], error: string, details: Record<strin
 /** A 429 that is a file's day of versions (the tray's 'later'); any other only means: not now. */
 const isDay = (json: Record<string, unknown> | null | undefined) => json?.reason === 'versions';
 
-/** A 429 that isn't a file's day (too many ways in open, a rate limit): no new asking until it says, then again. */
+/**
+ * A 429 that isn't a file's day (too many ways in open, a rate limit): no new asking until it says, then again. Its
+ * timer ends the wait, never Date.now(): a timer can run before Date.now() gets there (Node's by up to 1 ms, a clock set
+ * back by more), and asking the wall clock turned away had no timer left to wake it: the files stayed "waiting".
+ */
 function holdAsking(wait: number) {
-  heldUntil = Date.now() + Math.max(1, wait) * 1000;
   if (holdTimer) clearTimeout(holdTimer);
   holdTimer = setTimeout(() => {
     holdTimer = null;
     pump();
-  }, heldUntil - Date.now());
+  }, Math.max(1, wait) * 1000);
 }
 
 /** Ways in of a batch not asked for yet: all of them wait for room when the plan has none. */
@@ -368,7 +370,7 @@ function pump() {
 
 /** Ways in for the next files, so AHEAD of them wait ready beside the ones being sent (one request at a time). */
 async function topUp() {
-  if (asking || Date.now() < heldUntil) return;
+  if (asking || holdTimer) return;
   const room = AT_ONCE + AHEAD - running.size - queue.length;
   if (room <= 0) return;
   const first = state.uploads.find((u) => u.state === 'waiting' && !slots.has(u.key) && files.has(u.key));
@@ -631,7 +633,6 @@ export function resetFileUploads() {
   stalled.clear();
   dirty.clear();
   asking = false;
-  heldUntil = 0;
   if (holdTimer) clearTimeout(holdTimer);
   holdTimer = null;
   set({ batches: [], uploads: [] });

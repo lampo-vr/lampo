@@ -227,6 +227,9 @@ format stays backwards compatible throughout.
   ended.
 - An upload you cancel, or one that signing out stops, while it is still looking for an earlier try of itself no
   longer starts after all.
+- Files dropped into the Files tab while the server had too many uploads open no longer can stay waiting for good:
+  once the wait the server asked for is over, they go on. The wait was checked against the computer's clock, and a
+  clock a moment behind the page's timers (or one set back meanwhile) left them waiting.
 - In the Files tab, F2 renames the file or folder the keys are on: a folder could be renamed only with the pointer.
 - A folder moved to another project's files leaves the open view of the project it came from at once; moving it back
   (or Undo) updates both views too.

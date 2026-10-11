@@ -34,6 +34,10 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - A key gone from a mock bucket is not its removal ended: the remover drops the working copy once the bucket has
   answered. Read working copies after `store.removalsSettled()`, never right after the bucket looks empty
   (`playback-copies-deleted.test.ts`; mockBunny's `deleteAnswerDelayMs` widens that gap).
+- Something left "waiting" a timer should have woken, about 1 run in 100: look for a `Date.now()` check of the timer's
+  deadline (Node fires timers up to 1 ms before Date.now() gets there). Force it by setting `Date.now` back once the
+  timer is set (after a `setImmediate`, the microtasks that set it have run) and restore it in `finally`
+  (`files-upload-store.test.ts`).
 - A negative substring check ("B's answer never says X") uses a probe that can't occur in a token: a space or a letter
   outside ASCII (`'Mia Kovač'`), never a short ASCII name. Links, ids and hashes are base64url or hex, and "Mia" turned
   up inside a random video id about once in 7,000 runs (`shares.test.ts`). Check the parsed fields too, and that the
