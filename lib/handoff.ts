@@ -47,7 +47,7 @@ export const QUIET_STOP_MIN = 30;
 export const STOP_LINE = `${QUIET_STOP_MIN} min with nothing new: stop waiting now. Tell the person you stopped listening; the watch prompt (/${MCP_NAME}:watch in Claude Code) starts you again.`;
 /**
  * A chat app (Claude, ChatGPT, Cowork) limits a turn, and every wait is a call in it: after CHAT_QUIET_WAITS waits in a
- * row with nothing new (about ten minutes at the 50 s default; Framejam calls its wait 12 times) the agent stops while
+ * row with nothing new (about ten minutes at the 50 s default, near a chat app's own wait loop) the agent stops while
  * it still can say so, instead of being cut off mid-wait with the person's answer coming in Lampo to nobody.
  */
 export const CHAT_QUIET_WAITS = 12;
