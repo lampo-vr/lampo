@@ -11,7 +11,7 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - Every size and colour is a token in `base.css`; stylesheets define only their own classes.
 - No `var()` inside a `@keyframes` timing function: Safari ignores it and runs linear.
 - Implicit grid and auto columns: `minmax(0, 1fr)`; they grow to their content otherwise.
-- One layer order: overlay 50 < sheet 51 < dialog 52 < menu 55; never patch a single case.
+- One layer order: overlay 50 < sheet 51 < the float layer 55 (`--z-layer`: dialogs, menus, popovers, hover cards alike, so the one opened last is on top) < palette, uploads, toasts, tooltips; never patch a single case. A static sample of a float sets `z-index: auto` (a grid item takes a z-index unpositioned).
 - No `grain` on a scrolling box; phone bars fit, they don't scroll; a strip that scrolls uses `useScrollEdges`.
 - `pre-wrap` still breaks after `-` and `/`: a token, URL or path to copy goes through `Code` (nowrap `.set-code-w`).
 - Status is a keyframe glyph (`KeyGlyph`), never a coloured dot; selection never wears the orange.
@@ -36,4 +36,7 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - A focus rule takes `--focus-width` / `--focus-offset` / `--focus-inset` (0 for an item in a track), never a literal: Chrome rounds an outline down to whole device pixels, so the old 1.5 px ring drew 1 px on a 1× screen beside 2 px ones.
 - An icon in a control family gets its size and stroke from `ui.css` (zero specificity), whatever `size` the markup passes; a component that means another size (40 px tools) says so in a rule of its own.
 - A hover look is written `:hover:where(:not(:disabled))` (same specificity), so nothing disabled lights up; disabled fades by `--disabled-o`, a filled button lies flat instead, a busy one (`aria-busy`) keeps its look.
+- An agent's colour is the tone `agent` and `--agent` / `--agent-bg` / `--agent-2` / `--agent-3` / `--on-agent`: the thing is the Agent; "claude" names only the product and its logo (`agentMarks`, AgentChoice). `--claude*` stay in base.css as the website's aliases until it moves, unused by the app (theme.test.ts).
+- Green marks a state (a glyph, a dot, one word), never a surface or an outline: a banner is the neutral one with the green `KeyGlyph`, a confirmation is the plain button with a green check (`.btn.ok`); `theme.test.ts` lists the few green fills allowed (small marks, meters, inserted words).
+- A chosen state keeps its colours under hover, focus and press: a generic hover says `:where(:not(:disabled, .on))` and the chosen one gets a hover of its own (`--raise-sheen-hi`). `button.chip:hover` (0,2,1) out-specified `.chip.on` (0,2,0) and wrote `--fg` on the `--fg` fill; styleguide.mjs holds every sample to 3:1 in every state.
 - The styleguide shows hover, pressed and focus with `.sg-hover` / `.sg-active` / `.sg-focus` (`styleguide/pseudo.ts` copies the app's own rules onto them); never a look made only for the styleguide.

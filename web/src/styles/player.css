@@ -47,7 +47,7 @@
   color: var(--fg);
 }
 .claude-btn .spark {
-  color: var(--claude-2);
+  color: var(--agent-2);
 }
 /* The stage control is the one thing that must read in full: the title gives way first, and below 1180 px the quiet
  * tools drop their words (their names stay in the tooltips). */

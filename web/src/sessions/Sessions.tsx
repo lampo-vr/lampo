@@ -72,7 +72,7 @@ export function SessionList({ sessions, selected, onSelect, home, refreshing, on
                 <span className="session-name ellipsis" title={s.name}>
                   {agentShown(s.name, s.agent)}
                 </span>
-                {top === s && <span className="badge claude">{t('SUGGESTED')}</span>}
+                {top === s && <span className="badge agent">{t('SUGGESTED')}</span>}
                 {current && s === rows[0] && <span className="badge">{t('CURRENT')}</span>}
               </span>
               <span className="session-sub ellipsis">

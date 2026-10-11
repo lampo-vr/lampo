@@ -9,6 +9,7 @@ import test from 'node:test';
 import { THEME_BOOT } from '../../lib/themeBoot.ts';
 import { THEME_BOOT_HASH } from '../../server/guard.ts';
 import { BRAND_ORANGE } from '../../web/src/ui/brandMark.ts';
+import { parseCss } from '../lib/css.ts';
 
 const STYLES = path.join(import.meta.dirname, '../../web/src/styles');
 const base = fs.readFileSync(path.join(STYLES, 'base.css'), 'utf8');
@@ -22,7 +23,75 @@ function block(selectorStart: string): Record<string, string> {
   return vars;
 }
 const dark = block(':root,\n');
-const light = { ...dark, ...block('body.printing {') };
+
+// An agent's colour is --agent (the thing is the Agent, not one product); --claude and its tints stay in base.css only as
+// aliases for the website until it moves, and nothing in the app uses them.
+test('the agent tone is --agent: the old --claude names are the website’s aliases, unused by the app', () => {
+  const uses: string[] = [];
+  const web = path.join(import.meta.dirname, '../../web/src');
+  const walk = (dir: string) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (/\.(css|tsx?)$/.test(e.name) && e.name !== 'base.css')
+        for (const [i, line] of fs.readFileSync(p, 'utf8').split('\n').entries())
+          if (/--(on-)?claude\b/.test(line)) uses.push(`${path.relative(web, p)}:${i + 1}`);
+    }
+  };
+  walk(web);
+  assert.deepEqual(uses, [], 'use --agent, --agent-bg, --agent-2, --agent-3, --on-agent');
+  for (const old of ['--claude', '--claude-bg', '--claude-2', '--claude-3'])
+    assert.match(base, new RegExp(`\\n\\s*${old}: var\\(--agent${old.slice('--claude'.length)}\\);`), `${old} stays an alias of the --agent token`);
+});
+
+// Green marks a state — a glyph, a dot, one word — never a surface or an outline (Valentino on the check-fixes banner
+// and the setup's "connected" box). What may still fill or edge in green: small marks, a meter's fill, and inserted
+// words in a diff.
+const GREEN_MARKS = new Set([
+  // small marks: a label, a tag, a pill of one word, a dot, a poster's chip, a step's tick
+  '.badge.ok',
+  '.bill-tag.ok',
+  '.bill-save',
+  '.dot.ok',
+  '.vchip.ok',
+  '.set-fresh-mark',
+  '.cv-eye',
+  '.cv-eye::after',
+  '.st-party.client',
+  // a meter's or a scrubber's fill
+  '.room-meter span',
+  '.inbox-scrub-mark.k-verify',
+  '.ob-sn.ob-all .ob-sn-line i',
+  // inserted words in a diff
+  '.tr-diff ins',
+  '.pb-diff-line.add',
+  '.c-edit-to',
+]);
+test('green paints a mark, never a surface or an outline', () => {
+  const off: string[] = [];
+  for (const f of fs.readdirSync(STYLES).filter((x) => x.endsWith('.css') && x !== 'base.css'))
+    for (const r of parseCss(path.join(STYLES, f)))
+      for (const d of r.decls)
+        if (/^(background|background-color|box-shadow|border|border-color|outline)/.test(d.prop) && /--ok-bg|var\(--ok\)/.test(d.value))
+          for (const s of r.selectors) if (!GREEN_MARKS.has(s)) off.push(`${f}:${d.line} ${s} { ${d.prop}: ${d.value} }`);
+  assert.deepEqual(off, [], 'a neutral surface (a card, the banner); green only in the mark (a KeyGlyph in --ok, a check, one word)');
+});
+
+// The website builds its tokens from this file (site/lib/tokens.ts, outside this repository): it finds three blocks by
+// how they start, any whitespace standing for any whitespace. A selector put between those words (the theme islands)
+// broke its build.
+test('base.css keeps the three token blocks where the website looks for them', () => {
+  const at = (start: string) => base.search(new RegExp(start.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*')));
+  for (const start of [":root,\n:root[data-theme='light'] :is(", ':root {\n  /* Shadows cast onto the page', ":root[data-theme='light'],\nbody.printing"]) {
+    const i = at(start);
+    assert.ok(i >= 0, `the website looks for a block starting ${JSON.stringify(start)}`);
+    // the match is a rule's selector, not words in a comment
+    assert.ok(base.lastIndexOf('/*', i) <= base.lastIndexOf('*/', i), `the first ${JSON.stringify(start)} is words in a comment`);
+  }
+  assert.match(base.slice(at(':root {\n  /* Shadows cast onto the page')), /^:root\s*\{[^}]*--cast:/, 'the scales block holds the derived tokens');
+  assert.match(base.slice(at(":root[data-theme='light'],\nbody.printing")), /^[^{]*\{[^}]*--ink-1:/, 'the light block holds the light set');
+});
+const light = { ...dark, ...block('body.printing,\n.theme-light {') };
 const THEMES = { dark, light };
 
 type RGBA = [number, number, number, number];
@@ -62,8 +131,8 @@ function failures(theme: keyof typeof THEMES, pairs: Pair[]): string[] {
 }
 
 const SURFACES = ['--ink-0', '--ink-1', '--ink-2', '--ink-3'];
-const STATUS = ['--must', '--should', '--nice', '--idea', '--ok', '--claude'];
-const TINTED = ['--must', '--should', '--idea', '--ok', '--claude'];
+const STATUS = ['--must', '--should', '--nice', '--idea', '--ok', '--agent'];
+const TINTED = ['--must', '--should', '--idea', '--ok', '--agent'];
 
 test('status colours read as text (WCAG AA 4.5:1) on every surface and on their own tint, in both themes', () => {
   const plain = STATUS.flatMap((s) => SURFACES.map((bg): Pair => [s, [bg], 4.5]));
@@ -84,11 +153,11 @@ test('light: body text passes AA on every surface, faint text 3:1, filled button
     ['--on-nice', ['--nice'], 4.5],
     ['--on-idea', ['--idea'], 4.5],
     ['--on-ok', ['--ok'], 4.5],
-    ['--on-claude', ['--claude'], 4.5],
+    ['--on-agent', ['--agent'], 4.5],
     ['--must-2', ['--must-bg', '--ink-2'], 4.5],
     ['--ok-2', ['--ok-bg', '--ink-2'], 4.5],
-    ['--claude-2', ['--claude-bg', '--ink-2'], 4.5],
-    ['--claude-3', ['--ink-2'], 4.5],
+    ['--agent-2', ['--agent-bg', '--ink-2'], 4.5],
+    ['--agent-3', ['--ink-2'], 4.5],
     ['--edge', ['--ink-1'], 4.5],
     ['--edge-2', ['--ink-2'], 4.5],
     ['--danger-hi', ['--ink-2'], 4.5],
@@ -98,7 +167,7 @@ test('light: body text passes AA on every surface, faint text 3:1, filled button
   assert.deepEqual(failures('light', pairs), []);
 });
 
-test('both themes: primary buttons, the brand-orange way in and the count badges (--ink-0 on --claude) pass AA', () => {
+test('both themes: primary buttons, the brand-orange way in and the count badges (--ink-0 on --agent) pass AA', () => {
   const pairs: Pair[] = [
     ['--on-fg', ['--fg'], 4.5],
     // ink on the brand orange (the styleguide's swatch), and the brand buttons' white label on their deeper orange
@@ -107,7 +176,7 @@ test('both themes: primary buttons, the brand-orange way in and the count badges
     ['--on-brand', ['--brand-deep'], 4.5],
     // the destructive button's white label on its crimson
     ['--on-must', ['--danger'], 4.5],
-    ['--ink-0', ['--claude'], 4.5],
+    ['--ink-0', ['--agent'], 4.5],
     ['--ink-0', ['--must'], 4.5],
   ];
   assert.deepEqual([...failures('dark', pairs), ...failures('light', pairs)], []);
@@ -130,7 +199,7 @@ test('light: markers, lines and focus rings stay visible (3:1 non-text contrast)
 });
 
 // Colour blindness (Machado et al. 2009, full severity): the colours of the timeline's triangles and the Insights
-// severity tiles must stay apart. Agent notes (--claude) differ by shape, so they are not in the set.
+// severity tiles must stay apart. Agent notes (--agent) differ by shape, so they are not in the set.
 const CVD: Record<string, number[]> = {
   protanopia: [0.152286, 1.052583, -0.204868, 0.114503, 0.786281, 0.099216, -0.003882, -0.048116, 1.051998],
   deuteranopia: [0.367322, 0.860646, -0.227968, 0.280085, 0.672501, 0.047413, -0.01182, 0.04294, 0.968881],
@@ -160,7 +229,7 @@ test('severity and status colours stay apart for colour-blind viewers (CIELAB Δ
 });
 
 test('the dark islands redeclare every colour the light theme changes, so the picture keeps its dark surround', () => {
-  const lightOnly = Object.keys(block('body.printing {')).filter((k) => !['--cast', '--cast-k'].includes(k));
+  const lightOnly = Object.keys(block('body.printing,\n.theme-light {')).filter((k) => !['--cast', '--cast-k'].includes(k));
   const missing = lightOnly.filter((k) => !(k in dark));
   assert.deepEqual(missing, [], 'declare these in the dark block (it doubles as the islands)');
   // (the formatter breaks the island list over lines once it is long)

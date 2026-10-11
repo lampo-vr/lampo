@@ -299,7 +299,8 @@
   margin: 0;
   padding: var(--sp-2) var(--sp-2);
   border-radius: var(--r);
-  background: var(--ok-bg);
+  /* a quiet block; green is only its word ("Changed", .fy-changed) */
+  background: var(--sel);
   color: var(--fg-2);
   font-size: var(--fs-md);
 }

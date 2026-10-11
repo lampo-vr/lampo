@@ -469,7 +469,7 @@
   color: var(--must);
 }
 .tally .q b {
-  color: var(--claude-2);
+  color: var(--agent-2);
 }
 .tally .ok b {
   color: var(--ok);
@@ -608,7 +608,7 @@
   background: transparent;
   white-space: nowrap;
 }
-.seg.chips button:hover {
+.seg.chips button:hover:where(:not(:disabled, .on)) {
   border-color: var(--line-3);
 }
 .seg.chips button.on {
@@ -616,6 +616,10 @@
   border-color: var(--fg);
   color: var(--on-fg);
   box-shadow: var(--raise);
+}
+/* the chosen quick view under the pointer keeps its colours; its sheen lights a touch (a chosen chip's hover) */
+.seg.chips button.on:hover {
+  background: var(--raise-sheen-hi), var(--fg);
 }
 /* two digits' room whatever the count: a chip doesn't widen (and push the next one) when its number arrives */
 .seg-count {
@@ -1267,7 +1271,7 @@ button.shead-title:hover {
   color: var(--should);
 }
 .lane[data-lane='fixing'] .kg {
-  color: var(--claude);
+  color: var(--agent);
 }
 .lane[data-lane='approved'] .kg {
   color: var(--ok);
@@ -1671,7 +1675,7 @@ button.shead-title:hover {
   color: var(--should);
 }
 .bcard-ghost-hint[data-lane='fixing'] .kg {
-  color: var(--claude);
+  color: var(--agent);
 }
 .bcard-ghost-hint[data-lane='approved'] .kg {
   color: var(--tip-ok);
@@ -1718,7 +1722,7 @@ button.shead-title:hover {
   color: var(--should);
 }
 .lane-mark[data-lane='fixing'] .kg {
-  color: var(--claude);
+  color: var(--agent);
 }
 .lane-mark[data-lane='approved'] .kg {
   color: var(--ok);

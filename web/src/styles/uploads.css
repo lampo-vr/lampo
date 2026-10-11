@@ -131,8 +131,8 @@
   color: var(--muted);
 }
 .up-row.done .up-tile {
+  /* the tile stays neutral; its check is the green */
   color: var(--ok);
-  background: var(--ok-bg);
 }
 .up-row.failed .up-tile {
   color: var(--must);

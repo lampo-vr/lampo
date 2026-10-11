@@ -1071,6 +1071,42 @@ try {
     await kctx.close();
   });
 
+  // Dialogs, menus, popovers and hover cards are one layer where the one opened last is on top (base.css --z-layer):
+  // a hover card open under the pointer when a key opens a dialog stays open, and sat above the dialog at 60 over 52.
+  await check('a dialog covers what was open before it: an agent’s hover card stays open while A opens the add dialog over it', async () => {
+    await api(`/api/review/${enc(spot)}/session`, 'PUT', { name: 'Claude Code', sessionId: 'mcp-layers', agent: 'claude-code' });
+    await page.setViewport({ width: 1440, height: 900 });
+    await open();
+    // the grid, where a card wears its agent's chip
+    await page.keyboard.press('1');
+    await until(async () => (await layout()) === 'grid', 'the grid');
+    const chip = await page.waitForSelector(`.film[data-slug="${spot}"] .session-chip`, { timeout: 15000 });
+    await chip.hover();
+    await page.waitForSelector('.hovercard[data-state=open]', { timeout: 10000 });
+    await page.evaluate(() => document.activeElement?.blur());
+    await page.keyboard.press('a');
+    await page.waitForSelector('.modal', { timeout: 10000 });
+    await page.waitForFunction(() => !document.querySelector('.modal').getAnimations().length && !document.querySelector('.backdrop').getAnimations().length);
+    const r = await page.evaluate(() => {
+      // what is painted on top, not what takes the pointer (a modal dialog turns the page's pointer-events off)
+      const see = document.createElement('style');
+      see.textContent = '*{pointer-events:auto!important}';
+      document.head.append(see);
+      const card = document.querySelector('.hovercard[data-state=open]');
+      const modal = document.querySelector('.modal');
+      const at = (box) => document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+      const b = card?.getBoundingClientRect();
+      const out = { open: !!card, cardOnTop: !!card?.contains(at(b)), modalOnTop: modal.contains(at(modal.getBoundingClientRect())) };
+      see.remove();
+      return out;
+    });
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.querySelector('.modal'), { timeout: 5000 });
+    await api(`/api/review/${enc(spot)}/session`, 'PUT', {});
+    assert(r.open, 'the hover card stayed open (the case this is about)');
+    assert(r.modalOnTop && !r.cardOnTop, `the dialog is on top of everything open before it: ${JSON.stringify(r)}`);
+  });
+
   await check('no page errors along the way', async () => {
     assert(!errors.length, errors.join(' | '));
   });

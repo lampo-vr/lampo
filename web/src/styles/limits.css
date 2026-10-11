@@ -481,7 +481,7 @@
   color: var(--ok);
 }
 .lim-ins-list .lim-ins-agent {
-  color: var(--claude);
+  color: var(--agent);
 }
 .lim-ins-acts {
   display: flex;

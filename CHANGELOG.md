@@ -8,6 +8,10 @@ format stays backwards compatible throughout.
 ## [Unreleased]
 
 ### Changed
+- Green marks a state now, never a box: the player's "3 fixes to check" banner is a plain card with the green
+  keyframe of a fix waiting for its check and a plain "Check now" button; "Looks right" and "Got it" are plain buttons
+  with a green check; a review link's verdict, a For you note, the Publishing settings' return note, Billing's "paid"
+  note, an upload's done tile and the checkout's amount due lost their green tint and keep green only in their mark.
 - The sidebar's foot shows what to do next. Get started is a box of its own — "Get started · 2 of 5" over the next
   step as a button ("Connect your agent ›") — and the trial a box with its days as steps, the website's way: the days
   gone filled, today under the playhead, amber in the last three. Settings stays a row below them, in the phone's menu
@@ -97,6 +101,9 @@ format stays backwards compatible throughout.
   you list your server's MCP connector there.
 
 ### Fixed
+- A dialog covers whatever was open before it: an agent's card left open under the pointer no longer sits on top of
+  the dialog a key opens, and neither do the bars that float over a page (picking a cover, dropping into Files).
+- Files, moving a file: the chosen folder keeps its own shade while the pointer is over it.
 - Settings → Notifications, "Send a test": the card no longer flashes grey while a test or a choice is saved, and the
   button itself says what happened — "Sent: check your notifications" once the push service has it, or "Couldn't send"
   and why. Once this browser has shown it, the line beside it says where to look if it isn't on screen (on a Mac, the

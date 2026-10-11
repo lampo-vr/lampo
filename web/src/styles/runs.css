@@ -8,7 +8,7 @@
   --kg-size: 9px;
 }
 .run-kg.ask {
-  color: var(--claude-2);
+  color: var(--agent-2);
 }
 .run-kg.ok {
   color: var(--ok);

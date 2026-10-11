@@ -142,7 +142,7 @@
   color: var(--ok);
 }
 .av-word.ask {
-  color: var(--claude-2);
+  color: var(--agent-2);
 }
 .av-go {
   color: var(--faint);

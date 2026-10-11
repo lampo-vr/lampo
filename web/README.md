@@ -131,8 +131,10 @@ surface), a `--float-line` hairline, `--shadow-float` (a lit top edge and three 
 the pointer or keys take `--float-sel`, separators `--float-line`. The page behind a dialog dims (`--backdrop`), it
 isn't blurred. Tooltips and toasts are passing messages (`--tip-*`): ink on paper, a lifted step in the dark. Motion:
 dialogs rise a little and settle (`--dur-slow`, ease-out), menus and popovers grow out of their trigger (`--dur-fast` /
-`--dur`), everything leaves faster than it came, all instant under reduced motion. Layers: a dialog (`--z-dialog`)
-sits above the sheet or drawer it was opened from, a menu or popover (`--z-menu`) above whatever opened it. On phones
+`--dur`), everything leaves faster than it came, all instant under reduced motion. Layers: dialogs, questions, menus,
+popovers, hover cards and selects are one layer (`--z-layer`; `--z-dialog`, `--z-menu`, `--z-float` name it), where the
+one opened last is on top — a dialog covers a popover or hover card open before it, a menu opened in a dialog covers
+the dialog — above the sheet or drawer they came from. On phones
 dialogs and menus are sheets from the bottom edge (menus over a `--shadow-scrim`), popovers stay on the screen. Key
 caps drawn inside buttons — a dialog's last primary shows ⌘↵, any `.btn[data-keys="Esc"]` its keys — are CSS with
 empty alt text, so a button's name stays its words; `--keys` draws ⌘ ⇧ ⌥ ↵ from the system face.
@@ -183,8 +185,8 @@ never `.btn` or `.btn.special`), and no two sheets define the same class. A vari
 | `toast`, `toastUndo`, `later` (`lib/toast.ts`) | Feedback after an action (Radix Toast in `layers.tsx`; a toast asked for before the layer arrived waits for it: announced, paused on hover, swipe away; at the bottom on desktop, under the top bar on phones; an Escape meant for an open dialog or popover clears them first). Reversible actions don't ask first: do it, then `toastUndo('Archived x', undo)`. Deletions that can't be undone on the server are deferred with `later({ apply, revert, commit })`: off the screen now, sent when the toast is gone (or the tab closes). |
 | `Modal`, `Drawer`, `Popover`, `HoverCard` | Dialogs (sheets on phones; ⌘↵ anywhere in one presses the last primary in its `foot`, whose key cap shows — a field's own Enter must leave ⌘↵ alone), the phone sidebar, anchored panels, and details on hover (pointer only: never the only way to a fact). |
 | `Select` (`select.tsx`), `Segmented`, `Switch`, `Checkbox` | Choices. `Switch` for settings that apply at once, `Checkbox` for choices submitted later. `Segmented` options may carry a `count` (filter chips: `className="chips"`); `iconOnly` turns labels into tooltips with the option's `shortcut` (the library's layouts). |
-| `Progress` | Determinate (`value` 0–100) or indeterminate (`null`) bar; `tone` = ok / claude / must. |
-| `Badge` (`Badge.tsx`) | A calm status label: a keyframe glyph and words, `tone` (must, should, nice, idea, ok, claude) or a workflow `stage`; sizes `sm` / `md`. The glyph pops when the value changes. `StatusPill` (status/) is the stage badge. |
+| `Progress` | Determinate (`value` 0–100) or indeterminate (`null`) bar; `tone` = ok / agent / must. |
+| `Badge` (`Badge.tsx`) | A calm status label: a keyframe glyph and words, `tone` (must, should, nice, idea, ok, agent: an agent's, `--agent`) or a workflow `stage`; sizes `sm` / `md`. The glyph pops when the value changes. `StatusPill` (status/) is the stage badge. |
 | `KeyGlyph`, `useChanged` (`KeyGlyph.tsx`, shapes in `glyphs.ts`) | Every status mark is a keyframe glyph, never a coloured dot: `<KeyGlyph shape={SEVERITY_SHAPE.must} />` in the current text colour. Shape carries the meaning (`SEVERITY_SHAPE`, `STAGE_SHAPE`, `LANE_SHAPE`, `TONE_SHAPE`, `KIND_SHAPE`), a status token tints it, nothing glows. CSS pseudo-elements use the same shapes through `--kg-*` masks in `base.css`, the timeline canvas through `Path2D`; `test/unit/keyglyph.test.ts` keeps all three identical. |
 | `Avatar`, `initials` | People, agents (their mark) and visitors of review links (initials, warm tint) at a glance. |
 | `ScrollArea` | Panels that scroll (sidebar, inbox list): native scrolling with a thin scrollbar that shows while the pointer is on the panel. Give the old scroller's class to `viewportClassName`. |

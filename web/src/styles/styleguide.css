@@ -613,8 +613,8 @@
 .sg .sg-kg.ok {
   color: var(--ok);
 }
-.sg .sg-kg.claude {
-  color: var(--claude);
+.sg .sg-kg.agent {
+  color: var(--agent);
 }
 
 .sg .sg-panels {
@@ -662,8 +662,15 @@
   gap: var(--sp-6);
   align-items: start;
 }
-.sg .sg-float {
+/* Static: in the page's flow and its stacking, never a layer. The real ones' z-index still counted on these grid items
+   (a grid item takes its z-index without being positioned), and a live dialog opened under the static menu, popover,
+   hover card and tooltip. */
+.sg .sg-float,
+.sg .sg-float-col > * {
   position: static;
+  z-index: auto;
+}
+.sg .sg-float {
   width: auto;
   min-width: 0;
   max-width: none;

@@ -7,7 +7,7 @@ import type { Stage } from '../../../lib/types.ts';
 import { STAGE_SHAPE, TONE_SHAPE } from './glyphs.ts';
 import { KeyGlyph, useChanged } from './KeyGlyph.tsx';
 
-export type Tone = 'neutral' | 'must' | 'should' | 'nice' | 'idea' | 'ok' | 'claude';
+export type Tone = 'neutral' | 'must' | 'should' | 'nice' | 'idea' | 'ok' | 'agent';
 
 interface BadgeProps {
   children: ReactNode;

@@ -32,13 +32,13 @@ export const COLOUR_GROUPS: Group[] = [
   {
     name: 'Status',
     note: 'Severity and state: as text, as marks, as tints. Never the only sign: a glyph’s shape says it too.',
-    tokens: ['--must', '--should', '--nice', '--idea', '--ok', '--claude'],
+    tokens: ['--must', '--should', '--nice', '--idea', '--ok', '--agent'],
     text: true,
   },
   {
     name: 'Tints',
     note: 'A status as a ground, and the text that sits on it.',
-    tokens: ['--must-bg', '--should-bg', '--idea-bg', '--ok-bg', '--claude-bg', '--must-2', '--ok-2', '--claude-2', '--claude-3'],
+    tokens: ['--must-bg', '--should-bg', '--idea-bg', '--ok-bg', '--agent-bg', '--must-2', '--ok-2', '--agent-2', '--agent-3'],
   },
   {
     name: 'Selection and floats',

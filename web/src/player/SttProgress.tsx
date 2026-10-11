@@ -22,7 +22,7 @@ export function SttProgress({ active }: { active: boolean }) {
         {words[stt.state]}
         {pct != null && <b> · {pct}%</b>}
       </span>
-      <Progress value={pct} label={words[stt.state]} tone="claude" />
+      <Progress value={pct} label={words[stt.state]} tone="agent" />
     </div>
   );
 }

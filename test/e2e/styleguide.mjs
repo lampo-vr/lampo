@@ -110,6 +110,13 @@ try {
           counts.sections === blocks.length,
         JSON.stringify(counts),
       );
+      // the orange tone is an agent's, not a product's: the glyph table's column and the tone badges say "agent"
+      const tones = await page.evaluate(() => ({
+        glyphs: [...document.querySelectorAll('[data-testid=sg-glyphs] > .sg-label')].map((e) => e.textContent.trim()),
+        badges: [...document.querySelectorAll('.sbadge[data-tone]')].map((e) => e.dataset.tone),
+      }));
+      const TONES = JSON.stringify(['neutral', 'must', 'should', 'nice', 'idea', 'ok', 'agent']);
+      assert(JSON.stringify(tones.glyphs) === TONES && JSON.stringify(tones.badges) === TONES, JSON.stringify(tones));
       await page.close();
     },
   );
@@ -291,6 +298,117 @@ try {
       for (const l of looks)
         if (!/gradient/.test(l.img) || !/inset/.test(l.shadow)) out.push(`${theme}: ${l.who} is flat (${l.img.slice(0, 40)} | ${l.shadow.slice(0, 60)})`);
       await page.close();
+    }
+    assert(!out.length, out.join('\n        '));
+  });
+
+  // The static samples of the floats sat above a live dialog (their z-index counted on grid items): a modal covers
+  // everything, the samples included.
+  await check('a live question covers the static floats: its centre and corners, and the samples under its dimmed page', async () => {
+    const out = [];
+    for (const theme of ['dark', 'light']) {
+      const page = await open(theme, { width: 1440, height: 900 });
+      await page.$eval('[data-testid=sg-confirm]', (el) => el.scrollIntoView({ block: 'center' }));
+      await page.evaluate(() =>
+        [...document.querySelectorAll('[data-testid=sg-live] button')].find((b) => b.textContent.trim() === 'Ask before deleting').click(),
+      );
+      await page.waitForSelector('[role=alertdialog]');
+      // once it holds still (CALM turns its entrance off)
+      await page.waitForFunction(() => !document.querySelector('[role=alertdialog]').getAnimations().length);
+      const hits = await page.evaluate(() => {
+        // what is painted on top, not what takes the pointer: a modal dialog turns the page's pointer-events off, and
+        // hit-testing would then skip whatever lies over the dialog's dimmed page
+        const see = document.createElement('style');
+        see.textContent = '*{pointer-events:auto!important}';
+        document.head.append(see);
+        const dialog = document.querySelector('[role=alertdialog]');
+        const r = dialog.getBoundingClientRect();
+        const at = (x, y) => document.elementFromPoint(x, y);
+        const inset = 6;
+        const points = {
+          centre: [r.left + r.width / 2, r.top + r.height / 2],
+          'top-left': [r.left + inset, r.top + inset],
+          'top-right': [r.right - inset, r.top + inset],
+          'bottom-left': [r.left + inset, r.bottom - inset],
+          'bottom-right': [r.right - inset, r.bottom - inset],
+        };
+        const bad = Object.entries(points)
+          .filter(([, [x, y]]) => !dialog.contains(at(x, y)))
+          .map(([k, [x, y]]) => `${k}: ${at(x, y)?.className || at(x, y)?.tagName}`);
+        // the static samples in view: what is at their middles is the dialog's dimmed page or the dialog, never them
+        for (const s of document.querySelectorAll('.sg-floats .sg-float, .sg-float-col > *')) {
+          const b = s.getBoundingClientRect();
+          if (b.bottom < 0 || b.top > innerHeight) continue;
+          const hit = at(b.left + b.width / 2, b.top + b.height / 2);
+          if (hit && s.contains(hit)) bad.push(`the static ${String(s.className).split(' ').slice(0, 2).join('.')} is on top`);
+        }
+        see.remove();
+        return bad;
+      });
+      for (const h of hits) out.push(`${theme}: ${h}`);
+      await page.keyboard.press('Escape');
+      await page.close();
+    }
+    assert(!out.length, out.join('\n        '));
+  });
+
+  // A hover, focus or press rule that out-specifies a chosen state (`.on`, pressed) and sets its colour put the
+  // chosen chip's words in its own fill's colour (fg on fg): every sample, in every state, keeps its words readable.
+  await check('hovered, focused and pressed, every control keeps its words readable on its own ground (3:1), in both themes and both islands', async () => {
+    const out = [];
+    for (const theme of ['dark', 'light']) {
+      const page = await open(theme, { width: 1440, height: 900 });
+      const found = await page.evaluate(() => {
+        const rgba = (c) => {
+          const m = c.match(/^rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?\)$/);
+          if (m) return [+m[1], +m[2], +m[3], m[4] === undefined ? 1 : +m[4]];
+          const s = c.match(/^color\(srgb ([\d.e-]+) ([\d.e-]+) ([\d.e-]+)(?: \/ ([\d.e-]+))?\)$/);
+          if (s) return [s[1] * 255, s[2] * 255, s[3] * 255, s[4] === undefined ? 1 : +s[4]];
+          return [0, 0, 0, 0];
+        };
+        const over = (top, below) => [0, 1, 2].map((k) => top[k] * top[3] + below[k] * (1 - top[3])).concat(1);
+        // what the words stand on: the backgrounds from the element up, until one is opaque
+        const ground = (el) => {
+          const layers = [];
+          for (let n = el; n; n = n.parentElement) {
+            const c = rgba(getComputedStyle(n).backgroundColor);
+            if (c[3] > 0) layers.push(c);
+            if (c[3] >= 1) break;
+          }
+          return layers.reverse().reduce((below, top) => over(top, below), [255, 255, 255, 1]);
+        };
+        const lum = ([r, g, b]) => {
+          const lin = (v) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4);
+          return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+        };
+        const ratio = (a, b) => {
+          const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+          return (x + 0.05) / (y + 0.05);
+        };
+        const ownWords = (el) => [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+        const who = (el) =>
+          `${el.tagName.toLowerCase()}.${String(el.className).trim().split(/\s+/).slice(0, 3).join('.')} "${el.textContent.trim().slice(0, 16)}"`;
+        const controls = [...document.querySelectorAll('.sg-block :is(button, a[href], [role=radio], [role=tab])')].filter(
+          (el) => !el.disabled && ownWords(el) && el.getBoundingClientRect().width > 0,
+        );
+        const bad = [];
+        for (const el of controls)
+          for (const state of ['', 'sg-hover', 'sg-active', 'sg-focus']) {
+            if (state) el.classList.add(state);
+            const s = getComputedStyle(el);
+            const bg = ground(el);
+            const r = ratio(over(rgba(s.color), bg), bg);
+            if (state) el.classList.remove(state);
+            if (r < 3)
+              bad.push(
+                `${who(el)}${state ? ` ${state.slice(3)}` : ''} ${r.toFixed(2)}:1${el.closest('.theme-dark') ? ' (dark island)' : el.closest('.theme-light') ? ' (light island)' : ''}`,
+              );
+          }
+        return { n: controls.length, bad };
+      });
+      await page.close();
+      assert(found.n > 100, `${theme}: only ${found.n} controls with words`);
+      for (const b of found.bad) out.push(`${theme}: ${b}`);
     }
     assert(!out.length, out.join('\n        '));
   });

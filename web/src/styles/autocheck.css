@@ -105,7 +105,7 @@
 }
 .ac-icon {
   flex: none;
-  color: var(--claude-2);
+  color: var(--agent-2);
 }
 .autocheck.clear .ac-icon {
   color: var(--ok);

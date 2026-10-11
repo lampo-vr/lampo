@@ -10,8 +10,8 @@
   --st-bg: var(--should-bg);
 }
 [data-stage='in_progress'] {
-  --st: var(--claude);
-  --st-bg: var(--claude-bg);
+  --st: var(--agent);
+  --st-bg: var(--agent-bg);
 }
 [data-stage='check_fixes'] {
   --st: var(--nice);
@@ -105,17 +105,6 @@
 .signoff .so-split .so-main {
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
-}
-/* an approval as the next step is the primary action in green: the raised material, filled */
-.signoff .so-split .btn.ok {
-  background: var(--raise-sheen), var(--ok);
-  border-color: var(--ok);
-  color: var(--on-ok);
-  font-weight: var(--fw-strong);
-  box-shadow: var(--raise);
-}
-.signoff .so-split .btn.ok:not(:disabled):active {
-  box-shadow: var(--press);
 }
 .signoff .so-split .so-main + * .so-more,
 .signoff .so-split .so-main + .so-more {

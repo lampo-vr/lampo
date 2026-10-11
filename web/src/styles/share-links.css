@@ -497,7 +497,7 @@ button.link-title:focus-visible {
 }
 
 /* ---------------------------------------------------------------- link expiry (LinkSettings.tsx ExpiryPicker) */
-/* Above the share dialog it opens from (the dialog's backdrop sits at 50). */
+/* Above the share dialog it opens from: the dialog's layer, and opened after it. */
 [data-radix-popper-content-wrapper] > .popover.expiry-pop {
   z-index: var(--z-float);
   width: auto;

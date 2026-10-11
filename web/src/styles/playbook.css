@@ -222,7 +222,7 @@ a.pb-layer-chip:focus-visible {
   color: var(--fg);
 }
 .pb-meta-link.waiting .kg {
-  color: var(--claude);
+  color: var(--agent);
 }
 /* suggestions waiting in a playbook further down ("Reels · 5 suggestions waiting →"): quieter than this one's own */
 .pb-meta-link.below {
@@ -693,7 +693,7 @@ a.pb-layer-chip:focus-visible {
 }
 .pb-suggest-key {
   flex: none;
-  color: var(--claude);
+  color: var(--agent);
   transform: translateY(1px);
 }
 
@@ -1134,7 +1134,7 @@ a.pb-layer-chip:focus-visible {
 }
 .pb-prop-note-key {
   flex: none;
-  color: var(--claude);
+  color: var(--agent);
   transform: translateY(1px);
 }
 .pb-prop-note.changed {

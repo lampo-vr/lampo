@@ -147,8 +147,8 @@
   box-shadow: none;
 }
 .vchip.q {
-  background: var(--claude);
-  color: var(--on-claude);
+  background: var(--agent);
+  color: var(--on-agent);
   box-shadow: none;
 }
 .vchip.agent {
@@ -379,7 +379,7 @@
   }
 }
 .session-chip:hover {
-  border-color: color-mix(in srgb, var(--claude) 60%, transparent);
+  border-color: color-mix(in srgb, var(--agent) 60%, transparent);
   color: var(--fg);
 }
 .session-chip.none {
@@ -391,7 +391,7 @@
 }
 /* "Assign to an agent": the invitation in the agents' colour; an assigned agent's mark stays in the text colour */
 .session-chip.none .icon {
-  color: var(--claude);
+  color: var(--agent);
 }
 .empty {
   max-width: 540px;

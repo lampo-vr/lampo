@@ -21,7 +21,7 @@
   box-shadow: 0 0 0 2px var(--ink-1);
   display: grid;
   place-items: center;
-  background: var(--claude);
+  background: var(--agent);
   color: var(--ink-0);
   font: var(--fw-strong) var(--fs-xs) / var(--lh-tight) var(--mono);
   pointer-events: none;
@@ -804,7 +804,7 @@ a.inbox-vhead-name:focus-visible {
   top: calc(-1 * var(--sp-0_5));
   bottom: calc(-1 * var(--sp-0_5));
   border-radius: var(--r-sm);
-  background: color-mix(in srgb, var(--claude) 40%, transparent);
+  background: color-mix(in srgb, var(--agent) 40%, transparent);
 }
 .inbox-scrub-mark {
   position: absolute;
@@ -818,7 +818,7 @@ a.inbox-vhead-name:focus-visible {
   pointer-events: none;
 }
 .inbox-scrub-mark.k-question {
-  background: var(--claude);
+  background: var(--agent);
 }
 .inbox-scrub-mark.k-verify {
   background: var(--ok);

@@ -31,7 +31,7 @@ import { Colours } from './Colours.tsx';
 import { usePseudoStates } from './pseudo.ts';
 import { RUN_STATES, runFixtures } from './runStates.ts';
 
-const TONES: Tone[] = ['neutral', 'must', 'should', 'nice', 'idea', 'ok', 'claude'];
+const TONES: Tone[] = ['neutral', 'must', 'should', 'nice', 'idea', 'ok', 'agent'];
 const STAGES: [Stage, string][] = [
   ['to_review', 'To review'],
   ['changes', 'Changes'],
@@ -112,9 +112,7 @@ const LAYERS = [
   ['z-toast', 80, 'toasts'],
   ['z-uploads', 70, 'the upload tray'],
   ['z-palette', 61, 'the ⌘K palette'],
-  ['z-float', 60, 'hover cards'],
-  ['z-menu', 55, 'menus and popovers: above whatever opened them'],
-  ['z-dialog', 52, 'dialogs: above the sheet they came from'],
+  ['z-layer', 55, 'dialogs, menus, popovers, hover cards (--z-dialog, --z-menu, --z-float): one layer, the one opened last on top'],
   ['z-sheet', 51, 'sheets and the drawer'],
   ['z-overlay', 50, 'a drawer’s scrim'],
   ['z-inbox', 45, 'the inbox layer'],
@@ -137,7 +135,7 @@ const SHAPES: [Shape, string][] = [
   ['ease', 'someone on it, time passing'],
   ['hold', 'nothing moves any more'],
 ];
-const KG_TONES = ['', 'must', 'should', 'nice', 'idea', 'ok', 'claude'] as const;
+const KG_TONES = ['', 'must', 'should', 'nice', 'idea', 'ok', 'agent'] as const;
 const SEVERITIES = ['must', 'should', 'nice', 'idea', 'question', 'info', 'agent'] as const;
 /** A picture for an avatar that has one (drawn here: no request). */
 const PICTURE = `data:image/svg+xml,${encodeURIComponent(
@@ -757,6 +755,14 @@ export default function Styleguide() {
                 Open the docs
               </Button>
             </Row>
+            <Row label="a confirmation" note="Looks right, Got it: the plain button, only its check in green (.btn.ok).">
+              <button type="button" className="btn sm ok">
+                <I name="check" size={14} /> Looks right <Kbd>Y</Kbd>
+              </button>
+              <button type="button" className="btn sm">
+                <I name="x" size={14} /> Still wrong <Kbd>N</Kbd>
+              </button>
+            </Row>
             <Row label="wide (a gate)">
               <div className="sg-gate">
                 <input className="input" type="password" placeholder="Password" aria-label="Password" />
@@ -1045,7 +1051,7 @@ export default function Styleguide() {
               <span className="badge warn">TRIAL</span>
               <span className="badge idea">IDEA</span>
               <span className="badge danger">DISABLED</span>
-              <span className="badge claude">SUGGESTED</span>
+              <span className="badge agent">SUGGESTED</span>
               <span className="badge ok">
                 <I name="freeze" size={12} /> no freezes
               </span>
@@ -1158,7 +1164,7 @@ export default function Styleguide() {
                 <Progress value={100} label="Done" tone="ok" />
               </div>
               <div className="sg-w">
-                <Progress value={null} label="Working" tone="claude" />
+                <Progress value={null} label="Working" tone="agent" />
               </div>
               <div className="sg-w">
                 <Progress value={64} label="Failed" tone="must" />
@@ -1206,14 +1212,14 @@ export default function Styleguide() {
                 <p className="sg-p">Menus, popovers and dialogs cast the one floating shadow.</p>
               </Panel>
             </div>
-            <Row label="banners in use">
+            <Row label="banners in use" note="A banner is the neutral surface; green marks a state (a glyph, a dot, one word), never a surface or an outline.">
               <div className="verify-cta sg-cta">
-                <I name="fixed" size={18} />
+                <KeyGlyph shape="half" />
                 <span className="grow">
                   <b>3 fixes to check</b>
                   <span>before and after, on V4</span>
                 </span>
-                <button type="button" className="btn sm ok">
+                <button type="button" className="btn sm">
                   Check now <Kbd>⇧V</Kbd>
                 </button>
               </div>

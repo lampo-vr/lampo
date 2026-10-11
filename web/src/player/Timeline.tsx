@@ -63,7 +63,7 @@ const TOKENS = {
   ok: '--ok',
   verified: '--tl-verified',
   closed: '--tl-closed',
-  agent: '--claude',
+  agent: '--agent',
   ivory: '--playhead',
   segA: '--tl-seg-a',
   segB: '--tl-seg-b',

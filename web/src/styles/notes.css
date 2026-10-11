@@ -232,7 +232,7 @@
 }
 .nr-kind.nr-question,
 .nr-kind.nr-agent {
-  color: var(--claude-2);
+  color: var(--agent-2);
 }
 .nr-kind.nr-info {
   color: var(--muted);
@@ -265,7 +265,7 @@
   text-overflow: ellipsis;
 }
 .nr-plan[data-state='asked'] {
-  color: var(--claude-2);
+  color: var(--agent-2);
 }
 .nr-plan[data-state='fixed'] {
   color: var(--fg-2);
@@ -310,7 +310,7 @@
   color: var(--should);
 }
 .nr-state.nr-open:not(.again) {
-  color: var(--claude-2);
+  color: var(--agent-2);
 }
 /* the picture, only while the pointer (or the focus) is on the row: over its end, so the row keeps its shape */
 .nr-thumb {
@@ -829,8 +829,8 @@ button.c-tc:hover {
 .act-should .act-line .icon {
   color: var(--should);
 }
-.act-claude .act-line .icon {
-  color: var(--claude-2);
+.act-agent .act-line .icon {
+  color: var(--agent-2);
 }
 .act-text {
   margin: 0 0 0 var(--sp-6);
@@ -918,12 +918,9 @@ button.c-tc:hover {
   align-items: center;
 }
 .c-note.agent b {
-  color: var(--claude-2);
+  color: var(--agent-2);
 }
-.c-note.fix {
-  background: var(--ok-bg);
-  color: var(--ok-2);
-}
+/* a fix's note: the quiet block like any other; only its word ("Fixed") is green */
 .c-note.fix b {
   color: var(--ok);
 }
@@ -938,17 +935,19 @@ button.c-tc:hover {
 }
 
 /* ---------------------------------------------------------------- above the list */
+/* Fixes to check: the neutral banner (a card's surface and hairline); green only in its mark, the "half" keyframe of a
+   fix waiting for its check. Its button is a plain one: the top bar's "Check N fixes" is the page's primary. */
 .verify-cta {
   display: flex;
   align-items: center;
   gap: var(--sp-3);
   padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
   border-radius: var(--radius);
-  background: var(--ok-bg);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 22%, transparent);
+  background: var(--ink-2);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
-.verify-cta > .icon {
-  flex: none;
+.verify-cta > .kg {
+  --kg-size: 12px;
   color: var(--ok);
 }
 /* its button sits --sp-2 inside the banner's corner: concentric with it */

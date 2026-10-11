@@ -161,7 +161,7 @@
   min-width: 0;
 }
 .agent-btn.none .spark {
-  color: var(--claude-2);
+  color: var(--agent-2);
 }
 /* While the agent works the button says where it stands in a word or two, in the name's place, never the agent's own
  * sentence: one width for any state, so the bar doesn't shift with each (the bar's 150/200 px cap still holds). The

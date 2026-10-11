@@ -298,8 +298,8 @@
   border-color: var(--line-3);
 }
 .session.sel {
-  border-color: color-mix(in srgb, var(--claude) 70%, transparent);
-  background: linear-gradient(90deg, var(--claude-bg), transparent 70%), var(--ink-1);
+  border-color: color-mix(in srgb, var(--agent) 70%, transparent);
+  background: linear-gradient(90deg, var(--agent-bg), transparent 70%), var(--ink-1);
 }
 .session .radio {
   width: 16px;
@@ -310,14 +310,14 @@
   place-items: center;
 }
 .session.sel .radio {
-  border-color: var(--claude);
+  border-color: var(--agent);
 }
 .session.sel .radio::after {
   content: '';
   width: 8px;
   height: 8px;
   border-radius: var(--r-full);
-  background: var(--claude);
+  background: var(--agent);
 }
 /* minmax(0, …) and min-width: 0 all the way down, or a long session name widens the column and runs under the status */
 .session-main {

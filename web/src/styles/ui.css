@@ -329,8 +329,8 @@
 .progress.ok {
   --fill: var(--ok);
 }
-.progress.claude {
-  --fill: var(--claude);
+.progress.agent {
+  --fill: var(--agent);
 }
 .progress.must {
   --fill: var(--must);
@@ -392,8 +392,8 @@
   user-select: none;
 }
 .avatar.agent {
-  --av-bg: var(--claude-bg);
-  --av-fg: var(--claude-3);
+  --av-bg: var(--agent-bg);
+  --av-fg: var(--agent-3);
 }
 .avatar.client {
   --av-bg: var(--should-bg);
@@ -617,8 +617,8 @@
 .sbadge[data-tone='ok'] {
   --st: var(--ok);
 }
-.sbadge[data-tone='claude'] {
-  --st: var(--claude);
+.sbadge[data-tone='agent'] {
+  --st: var(--agent);
 }
 /* Final: settled and locked {
   background: transparent;

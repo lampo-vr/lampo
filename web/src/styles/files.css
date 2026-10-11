@@ -1125,7 +1125,7 @@ a.pf-crumb:focus-visible {
   flex: none;
   color: var(--muted);
 }
-.pf-dlg-dir:hover:not(:disabled) {
+.pf-dlg-dir:hover:not(:disabled, .on) {
   background: var(--float-sel);
 }
 .pf-dlg-dir.on {

@@ -169,7 +169,7 @@ export function FolderPicker({ folders, value, onChange, suggestion, autoFocus =
             >
               <I name={e.create ? 'plus' : e.f ? 'folder' : 'archive'} size={14} />
               <span className="grow ellipsis">{e.label}</span>
-              {e.badge && <span className="badge claude">{e.badge}</span>}
+              {e.badge && <span className="badge agent">{e.badge}</span>}
               {!!q && at === active && <kbd>↵</kbd>}
               {!e.create && value === e.f && <I name="check" size={14} className="fp-check" />}
             </button>
@@ -261,7 +261,7 @@ export function FolderField({ folders, value, onChange, suggestion, note }: Fold
     <button ref={field} type="button" className="folder-field" aria-haspopup="listbox" onClick={() => setOpen(true)} data-testid="folder-field">
       <I name={value === null ? 'archive' : 'folder'} size={15} />
       <span className="grow ellipsis">{value ? crumbs(value) : value === null ? t('No project') : '…'}</span>
-      {value && !folders.includes(value) && <span className="badge claude">{t('NEW')}</span>}
+      {value && !folders.includes(value) && <span className="badge agent">{t('NEW')}</span>}
       {note && <span className="folder-field-note ellipsis">{note}</span>}
       <I name="down" size={14} className="folder-field-chev" />
     </button>

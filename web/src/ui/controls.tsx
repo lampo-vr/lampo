@@ -30,7 +30,7 @@ export function Checkbox({ checked, onCheckedChange, disabled, id, label }: Togg
 // ---------------------------------------------------------------- progress
 
 /** A thin bar; `value` null is indeterminate (a sweep). `tone` colours the fill. */
-export function Progress({ value, label, tone, className = '' }: { value: number | null; label: string; tone?: 'ok' | 'claude' | 'must'; className?: string }) {
+export function Progress({ value, label, tone, className = '' }: { value: number | null; label: string; tone?: 'ok' | 'agent' | 'must'; className?: string }) {
   const v = value === null ? null : Math.max(0, Math.min(100, value));
   return (
     <ProgressPrimitive.Root className={`progress ${tone || ''} ${className}`} value={v} max={100} aria-label={label}>

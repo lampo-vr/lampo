@@ -505,13 +505,13 @@ export function NotesPanel(p: NotesPanelProps) {
               {p.top}
               {p.recording}
               {p.verifyCount > 0 && filter !== 'closed' && !p.verifying && !p.verifyInStrip && (
-                <div className="verify-cta">
-                  <I name="fixed" size={18} />
+                <div className="verify-cta" data-testid="verify-cta">
+                  <KeyGlyph shape="half" />
                   <span className="grow">
                     <b>{t('{n} fix to check|{n} fixes to check', { n: p.verifyCount })}</b>
                     <span>{t('before and after, on V{latestV}', { latestV: p.latestV })}</span>
                   </span>
-                  <button type="button" className="btn sm ok" onClick={p.onVerify}>
+                  <button type="button" className="btn sm" onClick={p.onVerify}>
                     {t('Check now')} {!sheet && <Kbd>⇧V</Kbd>}
                   </button>
                 </div>

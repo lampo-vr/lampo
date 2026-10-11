@@ -49,7 +49,7 @@ export const TONE_SHAPE: Record<string, Shape> = {
   nice: 'outline',
   idea: 'circle',
   ok: 'diamond',
-  claude: 'ease',
+  agent: 'ease',
 };
 
 /** Notes that aren't feedback: a question waits (hourglass), an info note just is (hold); agent notes of old stores too. */

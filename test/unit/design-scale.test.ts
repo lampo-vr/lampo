@@ -247,7 +247,7 @@ test('a theme island (.theme-dark, .theme-light) takes its theme’s colours and
   };
   assert.match(selectorsOf('--ink-0: #070707'), /\.theme-dark/, 'the dark set applies to .theme-dark');
   assert.match(selectorsOf('--ink-0: #e9e5dc'), /\.theme-light/, 'the light set applies to .theme-light');
-  assert.match(selectorsOf('--cast: #000'), /:root, \.theme-dark, \.theme-light/, 'the derived tokens are worked out again on an island');
+  assert.match(selectorsOf('--cast: #000'), /\.theme-dark, \.theme-light, :root/, 'the derived tokens are worked out again on an island');
 });
 
 test('the scale check catches what it should', () => {

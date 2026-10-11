@@ -14,9 +14,9 @@
   box-shadow: 0 0 0 1px var(--line);
   color: var(--fg);
 }
-.bill-note.ok {
-  background: var(--ok-bg);
-  box-shadow: none;
+/* paid: the same quiet line; green only in its check */
+.bill-note.ok > .icon {
+  color: var(--ok);
 }
 .bill-note > span,
 .bill-banner > span {

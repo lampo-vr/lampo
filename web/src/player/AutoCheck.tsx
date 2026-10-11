@@ -380,7 +380,7 @@ function AutoCheckFindings({
         )}
       </header>
       <div className="ac-body">
-        {pending && <Progress value={pct} label={t('Auto-check progress')} tone="claude" />}
+        {pending && <Progress value={pct} label={t('Auto-check progress')} tone="agent" />}
         {main.length > 0 && <ul className="ac-list">{main.map(row)}</ul>}
         {/* the fold only under findings that look like problems: alone, the minor ones are the list */}
         {minor.length > 0 && main.length > 0 && (

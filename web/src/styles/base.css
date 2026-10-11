@@ -1,7 +1,7 @@
 /* Lampo — "cutting room" design system.
    The chrome is strictly achromatic (neutral ink + ivory) so it never tints how colour in the video is perceived.
    Colour only carries meaning: severity (grease-pencil red / amber / cyan / violet for ideas), status (green),
-   Claude (terracotta). Kinds that are not feedback (questions, info) also differ in shape, not only in colour.
+   an agent's (terracotta, --agent). Kinds that are not feedback (questions, info) also differ in shape, not only in colour.
    One exception: the brand orange (--brand; buttons --brand-deep with --on-brand), the window of the logo's frame o, for brand
    moments only — the logo, the client's invitation — never for state or severity. */
 
@@ -58,20 +58,20 @@
   --nice: #5ac8fa;
   --idea: #bf5af2;
   --ok: #3ddc97;
-  --claude: #d97757;
+  --agent: #d97757;
   --must-bg: rgba(255, 69, 58, 0.12);
   --should-bg: rgba(255, 192, 67, 0.12);
   --idea-bg: rgba(191, 90, 242, 0.12);
   --ok-bg: rgba(61, 220, 151, 0.1);
-  --claude-bg: rgba(217, 119, 87, 0.12);
+  --agent-bg: rgba(217, 119, 87, 0.12);
   --sel: rgba(238, 235, 228, 0.07);
   /* a row that is the current one (the item in a preview, rows picked for a bar): a step deeper than --sel, still flat */
   --sel-on: rgba(238, 235, 228, 0.12);
   /* colours as text on light-on-dark tints, and text on filled buttons */
   --must-2: #ff8f86;
   --ok-2: #c9f6e2;
-  --claude-2: #e8977a;
-  --claude-3: #f0a58a;
+  --agent-2: #e8977a;
+  --agent-3: #f0a58a;
   --edge: #8a6d2c;
   --edge-2: #c9a24a;
   --danger-hi: #ff5b51;
@@ -91,7 +91,7 @@
   --on-nice: #032030;
   --on-idea: #1c0626;
   --on-ok: #032417;
-  --on-claude: #2a0f06;
+  --on-agent: #2a0f06;
   --scroll: #2a2a2c;
   /* behind a dialog: dimmed, not blacked out — the page stays readable as the place the dialog came from */
   --backdrop: rgba(0, 0, 0, 0.56);
@@ -180,13 +180,22 @@
 
 /* A theme island (.theme-dark / .theme-light: the styleguide shows both themes side by side) takes a theme's colours
    and works out everything made from them (the shadows, the float's lines, the raised material) for itself; the dark
-   islands above keep the page's. */
-:root,
+   islands above keep the page's. The website finds this block by its root selector and first comment, and the light
+   one by its first two selectors (site/lib/tokens.ts): an island's selector goes before or after those, never between
+   them (design-scale.test.ts holds the shapes). */
 .theme-dark,
-.theme-light {
+.theme-light,
+:root {
   /* Shadows cast onto the page: dark islands don't redeclare these, so a film strip on paper casts a paper shadow. */
   --cast: #000;
   --cast-k: 1;
+  /* The old names of --agent and its tints: the site's names until it moves to --agent (site/assets/site.css); the app
+     uses none of them. Remove once the website has moved. Declared here, where the theme and every island work them out
+     again, so each is the --agent of the theme it stands in. */
+  --claude: var(--agent);
+  --claude-bg: var(--agent-bg);
+  --claude-2: var(--agent-2);
+  --claude-3: var(--agent-3);
   /* a sheet on the light table: the frames' mat (the setup's pictures) */
   --fr-bg: var(--fb-mat);
   --fr-edge: var(--fb-edge);
@@ -298,6 +307,8 @@
      soft drop. Pressed sinks in. Two tones share it: strong (the ink fill of a primary button) and surface (the
      lightest surface, for a selected item inside a sunken track). */
   --raise-sheen: linear-gradient(to bottom, color-mix(in srgb, var(--hi) 12%, transparent), transparent 60%);
+  /* a chosen one under the pointer: the same sheen lit a touch (its own colours stay) */
+  --raise-sheen-hi: linear-gradient(to bottom, color-mix(in srgb, var(--hi) 24%, transparent), transparent 70%);
   --raise-edge:
     inset 0 1px 0 color-mix(in srgb, var(--hi) 38%, transparent), inset 0 -1px 0 color-mix(in srgb, var(--cast) calc(22% * var(--cast-k)), transparent);
   --raise-drop:
@@ -337,10 +348,15 @@
   --z-inbox: 45;
   --z-overlay: 50;
   --z-sheet: 51;
-  /* a dialog sits above the sheet or drawer it was opened from; a menu or popover above whatever opened it */
-  --z-dialog: 52;
-  --z-menu: 55;
-  --z-float: 60;
+  /* Everything that floats over the page — dialogs and questions, menus, popovers, hover cards, selects — is one layer,
+     where the one opened last is on top: they share a z-index and each one's content is added at the end of <body> when
+     it opens, and equal z-indexes paint in document order. So a dialog covers whatever was open before it (a popover,
+     a hover card), and a menu or popover opened inside a dialog covers the dialog. (A menu at 55 over a dialog at 52
+     kept a popover opened before the dialog on top of it.) Above the sheet or drawer they come from. */
+  --z-layer: 55;
+  --z-dialog: var(--z-layer);
+  --z-menu: var(--z-layer);
+  --z-float: var(--z-layer);
   --z-palette: 61;
   --z-uploads: 70;
   --z-toast: 80;
@@ -370,8 +386,8 @@
 /* Light: warm paper, ink-black type, the film details kept; status colours deepened to pass WCAG AA as text.
    The print sheet is paper in both themes, so it always takes these. */
 :root[data-theme='light'],
-.theme-light,
-body.printing {
+body.printing,
+.theme-light {
   color-scheme: light;
   --cast: #3a2e1c;
   --cast-k: 0.32;
@@ -394,18 +410,18 @@ body.printing {
   --nice: #00679a;
   --idea: #8b2db8;
   --ok: #157548;
-  --claude: #a3461f;
+  --agent: #a3461f;
   --must-bg: rgba(179, 20, 52, 0.09);
   --should-bg: rgba(154, 79, 4, 0.1);
   --idea-bg: rgba(139, 45, 184, 0.09);
   --ok-bg: rgba(21, 117, 72, 0.09);
-  --claude-bg: rgba(163, 70, 31, 0.1);
+  --agent-bg: rgba(163, 70, 31, 0.1);
   --sel: rgba(28, 27, 25, 0.06);
   --sel-on: rgba(28, 27, 25, 0.1);
   --must-2: #9a1030;
   --ok-2: #0f5f39;
-  --claude-2: #924020;
-  --claude-3: #86391c;
+  --agent-2: #924020;
+  --agent-3: #86391c;
   --edge: #7a5a17;
   --edge-2: #7a5a17;
   --danger-hi: #9a1030;
@@ -423,7 +439,7 @@ body.printing {
   --on-nice: #f0faff;
   --on-idea: #fbf3ff;
   --on-ok: #f2fff8;
-  --on-claude: #fff6f1;
+  --on-agent: #fff6f1;
   --scroll: #cbc5b8;
   --backdrop: rgba(42, 34, 22, 0.2);
   /* on paper, tooltips and toasts are ink: a passing message in the page's own type colour */

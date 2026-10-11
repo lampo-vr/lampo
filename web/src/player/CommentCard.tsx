@@ -63,9 +63,9 @@ const roleOf = (by: string) => (isAgent(by) ? t('agent') : by.startsWith('guest:
 // What a note is, as one calm label: feedback shows its severity, other notes their kind.
 const KIND = perLang(
   (): Record<Exclude<NoteLook, 'feedback'>, [string, Tone]> => ({
-    question: [t('Question'), 'claude'],
+    question: [t('Question'), 'agent'],
     info: [t('Info'), 'neutral'],
-    agent: [t('Agent note'), 'claude'],
+    agent: [t('Agent note'), 'agent'],
   }),
 );
 
@@ -80,7 +80,7 @@ function activity(r: Reply, asks: boolean): { icon: IconName; verb: string; tone
     };
   if (r.status === 'verified')
     return asks
-      ? { icon: 'reply', verb: 'answered', tone: 'claude' }
+      ? { icon: 'reply', verb: 'answered', tone: 'agent' }
       : { icon: 'verified', verb: r.preview ? t('checked it on the preview') : t('checked the fix'), tone: 'ok' };
   if (r.status === 'wontfix') return { icon: 'wontfix', verb: t("won't fix it"), tone: 'muted' };
   return { icon: 'reopen', verb: t('reopened it'), tone: 'should' };
