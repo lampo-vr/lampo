@@ -101,6 +101,11 @@ format stays backwards compatible throughout.
   you list your server's MCP connector there.
 
 ### Fixed
+- Auto-check no longer calls a dark shot a black gap. A frame counts as black only when it is black, not when it is
+  dark (a night sky, a dark grade, low light), and a few black frames are a "black gap between shots" only where the
+  picture changes across them like a cut; black frames the shot goes on through aren't listed. A gap between two dark
+  shots is found now too, and a fade to black and back is still a dip. Versions checked before are checked again when
+  their Auto-check is next opened (or `lampo qa` asks).
 - A dialog covers whatever was open before it: an agent's card left open under the pointer no longer sits on top of
   the dialog a key opens, and neither do the bars that float over a page (picking a cover, dropping into Files).
 - Files, moving a file: the chosen folder keeps its own shade while the pointer is over it.

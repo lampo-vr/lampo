@@ -32,6 +32,10 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - A background job gets a crash-guard key (`heavy(…, { key })`, lib/crashGuard.ts): one that kills the process isn't run on every start.
 - A `select` over a list of frame numbers goes through `selectFrames` (lib/probe.ts): FFmpeg 5.1.9 / 7.1.4 / 8.0.2 and
   later refuse an expression over 100 deep, and `eq(n,a)+eq(n,b)+…` is one level per frame.
+- An Auto-check finding that names an edit ("between shots") checks for one against the frames around it
+  (`blackBetweenShots`, `cutLike`), and "black" is near zero and flat (`BLACK`, lib/findings.ts): 98 % of the picture
+  below a tenth of full luma read a dark night sky as black gaps. A change to what it finds bumps `QA_VERSION`; kinds
+  and keys (`black:<first frame>`) stay, so dismissals keep holding.
 - Outbound requests (webhooks, OAuth metadata) go through `lib/netguard.ts`; publishing's through `lib/publish/net.ts` on top of it.
 - An unsafe hosted setting is a refusal in `startupProblems`: one line, never a stack trace.
 - Hosted jobs: `needJobRoom` before a start, `unlessBusy` for warm-ups, `mustRun` for owed work.

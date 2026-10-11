@@ -7,8 +7,8 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { cutsFromDiffs, writeCuts } from './cuts.ts';
-import { FREEZE, holdListing, holdVerdict, LIMITS, SOUND_PEAK, stallMark, type Verdict } from './findings.ts';
+import { CUT, cutLike, cutsFromDiffs, motionOf, writeCuts } from './cuts.ts';
+import { BLACK, FREEZE, holdListing, holdVerdict, LIMITS, SOUND_PEAK, stallMark, type Verdict } from './findings.ts';
 import { analysis, projectTracks } from './media.ts';
 import { cacheDir, dataDir } from './paths.ts';
 import { analysisRows, FFMPEG, lower, runBg, STDERR_KEEP, selectFrames, spawnMedia } from './probe.ts';
@@ -26,7 +26,9 @@ import { REELS_CHECKS, REELS_CROP } from './zones.ts';
 // 2: findings say what they rest on (likely, why, holds, word/guess/line, value) and how the spelling went.
 // 3: a freeze is judged by the motion at its edges (a stall vs motion coming to rest), and a small thing moving on a
 //    still screen isn't one.
-export const QA_VERSION = 3;
+// 4: a black frame is black, not dark (lib/findings.ts BLACK), and a few of them are a gap only between shots: a
+//    dark shot read as black gaps.
+export const QA_VERSION = 4;
 
 const cacheFile = (hash: string) => path.join(cacheDir(), 'qa', `${hash}.json`);
 const sha = (s: string) => crypto.createHash('sha1').update(s).digest('hex').slice(0, 8);
@@ -320,12 +322,45 @@ const overlap = (a: Rect, b: Rect) =>
 
 // ---------------------------------------------------------------- passes
 
+/** Two or more black frames in a row (lib/findings.ts `BLACK`), and whether they sit between shots (`blackBetweenShots`). */
+interface BlackRun extends FrameRange {
+  between: boolean;
+}
+
 interface PictureScan {
   cuts: { frame: number; score: number }[];
   /** Frames decoded. */
   n: number;
-  black: FrameRange[];
+  black: BlackRun[];
+  /** Two or more frames in a row that are at least 98 % below a tenth of full luma: too dim to judge a hold's motion in. */
+  dark: FrameRange[];
   flashes: (FrameRange & { score: number; back: number })[];
+}
+
+/** Runs of two or more frames `on`. */
+function runsOf(on: readonly boolean[]): FrameRange[] {
+  const runs: FrameRange[] = [];
+  for (let i = 0; i < on.length; i++) {
+    if (!on[i]) continue;
+    let j = i;
+    while (j + 1 < on.length && on[j + 1]) j++;
+    if (j - i + 1 >= 2) runs.push({ in: i, out: j });
+    i = j;
+  }
+  return runs;
+}
+
+/**
+ * Whether a run of black frames sits between shots (lib/findings.ts `BLACK`): the picture before it and the picture
+ * after it differ like a cut (`across`, their mean RGB difference; null at an end of the video), or both its edges
+ * jump against the motion beside them. Neither: the shot goes on through it (a dark moment of a dark shot, a fade).
+ */
+function blackBetweenShots(run: FrameRange, diffs: readonly number[], across: number | null): boolean {
+  const before = motionOf(diffs, run.in - BLACK.motionFrames, run.in - 1);
+  const after = motionOf(diffs, run.out + 2, run.out + 1 + BLACK.motionFrames);
+  if (across !== null && cutLike(across, Math.max(before, after))) return true;
+  const jumps = (step: number | undefined, motion: number) => step !== undefined && step >= CUT.ratio * Math.max(motion, CUT.still);
+  return run.in >= 1 && jumps(diffs[run.in], before) && jumps(diffs[run.out + 1], after);
 }
 
 // One small RGB decode for shot cuts and black frames. ffmpeg's scdet/scene scores deliberately cancel out
@@ -340,6 +375,11 @@ function scanPicture(file: string, ver: Version): Promise<PictureScan> {
     lower(p.pid);
     const diffs = [0];
     const dark: boolean[] = [];
+    const black: boolean[] = [];
+    // A black run as it is read: where it began, the frame before it, and the difference across it once it ends.
+    let runIn = -1;
+    let runBefore: Buffer | null = null;
+    const across = new Map<number, number>();
     const flashes: PictureScan['flashes'] = [];
     const maxFlash = Math.max(2, Math.round(ver.fps * 0.07));
     const ring: Buffer[] = []; // last maxFlash + 2 frames
@@ -355,13 +395,24 @@ function scanPicture(file: string, ver: Version): Promise<PictureScan> {
       while (buf.length >= size) {
         const cur = buf.subarray(0, size);
         let sum = 0;
-        let black = 0;
+        let luma = 0;
+        let lit = 0;
+        let dim = 0;
         for (let i = 0; i < size; i += 3) {
           if (prev) sum += Math.abs(cur[i] - prev[i]) + Math.abs(cur[i + 1] - prev[i + 1]) + Math.abs(cur[i + 2] - prev[i + 2]);
-          if (0.2126 * cur[i] + 0.7152 * cur[i + 1] + 0.0722 * cur[i + 2] < 25.5) black++;
+          const y = 0.2126 * cur[i] + 0.7152 * cur[i + 1] + 0.0722 * cur[i + 2];
+          luma += y;
+          if (y >= BLACK.lit) lit++;
+          if (y < 25.5) dim++;
         }
         if (prev) diffs.push(sum / size);
-        dark.push(black / (w * h) >= 0.98);
+        dark.push(dim / (w * h) >= 0.98);
+        const isBlack = luma / (w * h) <= BLACK.mean && lit / (w * h) <= BLACK.litShare;
+        if (isBlack && !black.at(-1)) {
+          runIn = black.length;
+          runBefore = prev;
+        } else if (!isBlack && black.at(-1) && runBefore) across.set(runIn, mad(runBefore, cur));
+        black.push(isBlack);
         const frame = Buffer.from(cur);
         prev = frame;
         ring.push(frame);
@@ -382,18 +433,11 @@ function scanPicture(file: string, ver: Version): Promise<PictureScan> {
         buf = buf.subarray(size);
       }
     });
-    p.on('error', () => resolve({ cuts: [], black: [], flashes: [], n: 0 }));
+    p.on('error', () => resolve({ cuts: [], black: [], dark: [], flashes: [], n: 0 }));
     p.on('close', () => {
       const cuts: PictureScan['cuts'] = cutsFromDiffs(diffs);
-      const black: FrameRange[] = [];
-      for (let i = 0; i < dark.length; i++) {
-        if (!dark[i]) continue;
-        let j = i;
-        while (j + 1 < dark.length && dark[j + 1]) j++;
-        if (j - i + 1 >= 2) black.push({ in: i, out: j });
-        i = j;
-      }
-      resolve({ cuts, black, flashes, n: dark.length });
+      const runs = runsOf(black).map((r) => ({ ...r, between: blackBetweenShots(r, diffs, across.get(r.in) ?? null) }));
+      resolve({ cuts, black: runs, dark: runsOf(dark), flashes, n: dark.length });
     });
   });
 }
@@ -871,15 +915,20 @@ function flashItems(pic: PictureScan, fps: number): QaItem[] {
   });
 }
 
-/** Black frames inside the video (fades at the very start and end are fine). */
+/**
+ * Black frames inside the video (fades at the very start and end are fine): a few of them between shots are a gap in
+ * the edit, more of them a dip to black. A few black frames the shot goes on through aren't listed.
+ */
 function blackItems(pic: PictureScan, ver: Version): QaItem[] {
   const fps = ver.fps;
   const edge = Math.round(LIMITS.edgeSeconds * fps);
+  const gapMax = Math.round(fps * LIMITS.blackGapSeconds); // a few frames: a gap between clips; longer: a dip to black
   return pic.black
     .filter((b) => b.in >= edge && b.out < ver.frames - edge)
+    .filter((b) => b.between || b.out - b.in + 1 > gapMax)
     .map((b): QaItem => {
       const n = b.out - b.in + 1;
-      const gap = n <= Math.round(fps * LIMITS.blackGapSeconds); // a few frames: a gap between clips; longer: a dip to black
+      const gap = n <= gapMax;
       return {
         key: `black:${b.in}`,
         kind: 'black-frames',
@@ -981,11 +1030,12 @@ function holdText(why: QaWhy, n: number, sec: number, mark: ReturnType<typeof st
 
 /**
  * Freezes (the grain-robust detector from media.ts), each judged by lib/findings.ts `holdVerdict` from the motion at
- * its edges and the sound under it: holds on the first or last frames open or close the video and aren't listed; holds
- * over black are the black frames' finding; a few repeated frames of a stall become one summary (they stay visible on
- * the timeline); the rest are listed one by one — what looks like a problem as `should`, what looks intended as minor —
- * unless there are many (one summary: motion graphics and screen recordings pause on purpose), or a hold that looks
- * intended is too short for a pause or a still shot longer than FREEZE.stillSeconds.
+ * its edges and the sound under it: holds on the first or last frames open or close the video and aren't listed; nor are
+ * holds over black or near it (`dark`: the black frames' finding, or motion too dim to judge); a few repeated frames of a
+ * stall become one summary (they stay visible on the timeline); the rest are listed one by one — what looks like a
+ * problem as `should`, what looks intended as minor — unless there are many (one summary: motion graphics and screen
+ * recordings pause on purpose), or a hold that looks intended is too short for a pause or a still shot longer than
+ * FREEZE.stillSeconds.
  */
 function freezeItems(ranges: FreezeRange[], pic: PictureScan, aud: AudioScan | null, ver: Version): QaItem[] {
   const fps = ver.fps;
@@ -998,7 +1048,7 @@ function freezeItems(ranges: FreezeRange[], pic: PictureScan, aud: AudioScan | n
     return on / (r.out - r.in + 1);
   };
   const holds: { r: FreezeRange; v: Verdict; listing: ReturnType<typeof holdListing> }[] = ranges
-    .filter((r) => !pic.black.some((b) => b.in <= r.out && r.in <= b.out))
+    .filter((r) => !pic.dark.some((b) => b.in <= r.out && r.in <= b.out))
     .map((r) => {
       const v = holdVerdict(r, { frames: ver.frames, fps, sound: soundOf(r), fromCut: cuts.some((c) => Math.abs(c - r.in) <= 1), motion: r.motion });
       return { r, v, listing: holdListing(r, v, fps) };

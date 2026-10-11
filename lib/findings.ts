@@ -70,6 +70,31 @@ export const LIMITS = {
   peakDb: -1,
 } as const;
 
+/**
+ * What a black frame is: black, not dark. Measured on the picture Auto-check scans (64 px wide, RGB, luma 0–255).
+ * Encoders' black reads a mean of 0 at limited range (H.264, HEVC, VP9, ProRes, 8 and 10 bit, a starved bitrate right
+ * after a cut too), 1.4 at full range, 3.3 under heavy grain. The darkest pictures measured that are not black read 5.5
+ * and up (a navy night sky with a streak, a grade at 6 %); a night sky at an average luma of 28 as signalstats reads it
+ * (Y, limited range) reads 11–14. Grain on black lit no pixel to 16 at this size, and what sits over a hole in the edit
+ * lights a little: a handle 0.4 %, a corner logo 0.7 %, a caption 1.4 % (the earlier rule let 2 % through too). Small
+ * stars all but vanish at this size: stars on pure black read black, and the shot-change rule keeps them from a gap.
+ */
+export const BLACK = {
+  /** A black frame's mean luma is at most this. */
+  mean: 4,
+  /** A pixel at this luma or brighter is lit: picture, not black level. */
+  lit: 16,
+  /** At most this share of a black frame is lit (whatever sits over a hole in the edit). */
+  litShare: 0.02,
+  /**
+   * A run of black frames is part of its shot unless the picture changes across it like a cut (lib/cuts.ts `cutLike`,
+   * the frame before it against the frame after it), or both its edges jump: the step into the run and the step out of
+   * it are each at least `CUT.ratio` times the motion of the `motionFrames` frames beside them (`CUT.still` at least).
+   * Without a cut's floor of `CUT.min`: a step to black is no bigger than the picture is bright, 10–20 from a dark shot.
+   */
+  motionFrames: 4,
+} as const;
+
 /** Frames from which a hold is listed on its own (6 at 25/30 fps, 12 at 60). */
 export const listFrames = (fps: number): number => Math.max(FREEZE.listFrames, Math.round(fps * FREEZE.listSeconds));
 

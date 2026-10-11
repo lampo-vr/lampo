@@ -19,8 +19,26 @@ interface CutsFile {
 }
 
 /**
+ * What a cut is, in the mean RGB difference of two frames (0–255, 64 px wide): at least `min`, and at least `ratio`
+ * times the motion around it (the median difference of the frames next to it, taken as `still` when less) — fast
+ * motion raises the median, cuts don't.
+ */
+export const CUT = { min: 30, ratio: 3, still: 2 } as const;
+
+/** A difference `d` between two frames looks like a cut against the motion around it. */
+export const cutLike = (d: number, motion: number): boolean => d >= CUT.min && d >= CUT.ratio * Math.max(motion, CUT.still);
+
+/** The median of `diffs[from…to]` (clipped to the frames there are; diffs[0] is no difference): how much a stretch moves. */
+export function motionOf(diffs: readonly number[], from: number, to: number): number {
+  const win: number[] = [];
+  for (let j = Math.max(1, from); j <= Math.min(diffs.length - 1, to); j++) win.push(diffs[j] as number);
+  win.sort((a, b) => a - b);
+  return win.length ? (win[Math.floor(win.length / 2)] as number) : 0;
+}
+
+/**
  * Cuts from the mean difference of each frame to the one before (`diffs[i]` compares frame i with i − 1; diffs[0] is
- * 0): a frame whose difference is ≥ 30 and ≥ 3× the local median — fast motion raises the median, cuts don't.
+ * 0): a frame whose difference looks like a cut (`cutLike`) against the median of the five frames on either side.
  */
 export function cutsFromDiffs(diffs: readonly number[]): { frame: number; score: number }[] {
   const out: { frame: number; score: number }[] = [];
@@ -30,7 +48,7 @@ export function cutsFromDiffs(diffs: readonly number[]): { frame: number; score:
     win.sort((a, b) => a - b);
     const med = win.length ? (win[Math.floor(win.length / 2)] as number) : 0;
     const d = diffs[i] as number;
-    if (d >= 30 && d >= 3 * Math.max(med, 2)) out.push({ frame: i, score: Math.round(d * 10) / 10 });
+    if (cutLike(d, med)) out.push({ frame: i, score: Math.round(d * 10) / 10 });
   }
   return out;
 }
