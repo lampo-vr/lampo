@@ -44,6 +44,8 @@ export interface RunStripProps {
   stalled?: boolean;
   /** Fixes waiting to be checked: done offers Check fixes while there are some. */
   toCheck: number;
+  /** Check fixes as a quiet button: the view's raised door to checking is another (the top bar's, on a desk). */
+  quietCheck?: boolean;
   nextV: number;
   /** May steer agents (Stop, Try again, Nudge, copy the start): the `agents` right. */
   canSteer: boolean;
@@ -135,7 +137,7 @@ export const RunStrip = memo(function RunStrip(p: RunStripProps) {
     const write = a === 'stop' || a === 'cancel' ? p.act.stop : a === 'nudge' ? p.act.nudge : p.act.retry;
     write(run.id).then(() => a === 'nudge' && toast(t('Nudged {name}', { name: run.agent.name }), 'ok'), toastError);
   };
-  const primary = (a: RunAction) => a === 'answer' || a === 'check';
+  const primary = (a: RunAction) => a === 'answer' || (a === 'check' && !p.quietCheck);
   return (
     <div className={`run-strip${p.phone ? ' phone' : ''}${p.open ? ' open' : ''}`} data-testid="run-strip" data-phase={said.phase} data-run={run?.id}>
       <button

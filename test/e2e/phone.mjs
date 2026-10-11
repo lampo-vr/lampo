@@ -131,11 +131,11 @@ try {
     const link = await (await fixItem(fixes[1])).$('a.btn.primary');
     assert((await link.evaluate((a) => a.getAttribute('href'))).endsWith(`?verify=${fixes[1].id}`), 'link carries the note');
     await link.tap();
-    await phone.waitForSelector('.verify .c-text', { timeout: 20000 });
-    const text = await phone.$eval('.verify .c-text', (e) => e.textContent);
+    await phone.waitForSelector('[data-testid=verify-note]', { timeout: 20000 });
+    const text = await phone.$eval('[data-testid=verify-note]', (e) => e.textContent);
     assert(text === fixes[1].text, `verify opened at "${text}"`);
     // The queue runs in timeline order: the later frame is the second of two.
-    assert((await phone.$eval('.verify-head .eyebrow', (e) => e.textContent)).includes('2 / 2'), 'second in the queue');
+    assert((await phone.$eval('[data-testid=verify-step]', (e) => e.textContent)).includes('2 of 2'), 'second in the queue');
     await sleep(400);
     await phoneShot('02-verify-from-for-you');
   });

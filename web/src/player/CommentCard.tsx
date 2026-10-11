@@ -6,6 +6,7 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import { memo, type ReactNode, useEffect, useId, useState } from 'react';
+import { agentShown } from '../../../lib/agentKind.ts';
 import { optionsSeen } from '../../../lib/options.ts';
 import { changeableReply, isOwner } from '../../../lib/ownership.ts';
 import { formatSeconds, rangeSeconds, rangeTimecodes } from '../../../lib/range.ts';
@@ -55,7 +56,13 @@ let sampleAgentAs: string | null = null;
 export const showSampleAgentAs = (name: string | null) => {
   sampleAgentAs = name;
 };
-export const displayName = (by: string) => (sampleAgentAs && isSampleAgent(by) ? sampleAgentAs : by.replace(/^(guest|agent):/, ''));
+/** Who wrote it, as people read it: an agent's client id by its kind's name ("claude-code" → "Claude Code", lib/agentKind.ts
+ * agentShown), a review link's visitor by the name they gave. */
+export const displayName = (by: string) => {
+  if (sampleAgentAs && isSampleAgent(by)) return sampleAgentAs;
+  const name = by.replace(/^(guest|agent):/, '');
+  return isAgent(by) ? agentShown(name) : name;
+};
 // beside a writer's name: an agent, or someone writing through a review link (never "client": the vocabulary's word is
 // the link; the bare words weren't translated either)
 const roleOf = (by: string) => (isAgent(by) ? t('agent') : by.startsWith('guest:') ? t('via review link') : null);

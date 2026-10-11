@@ -1060,28 +1060,7 @@
     display: none;
   }
 
-  /* verify panel inside the sheet */
-  .nsheet .verify {
-    position: static;
-    transform: none;
-    width: auto;
-    box-shadow: none;
-  }
-  .verify-side {
-    width: 100%;
-  }
-  .nsheet .verify-head {
-    flex-wrap: wrap;
-    row-gap: var(--sp-1);
-  }
-  .nsheet .verify-head .eyebrow {
-    white-space: nowrap;
-  }
-  .verify-side button {
-    flex: 1;
-    justify-content: center;
-    min-height: 40px;
-  }
+  /* check mode's card inside the sheet: styles/check.css */
 }
 
 /* ---------------------------------------------------------------- an upright phone's notes, at rest

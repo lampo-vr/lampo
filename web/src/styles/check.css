@@ -1,0 +1,247 @@
+/* Check mode's card (player/VerifyPanel.tsx). One order: what is being checked (the note, in its writer's words, in the
+   reading size), then how it was answered (an inset, quieter, its long words folded to three lines), then the decision.
+   It floats in the stage's own material — the review HUD's and the compare bar's: the stage's ink at 90 %, a hairline
+   ring, --shadow-float — dark in both themes as the stage is (base.css lists `.stage-overlay > .verify` among the dark
+   islands), at the stage's foot, which keeps the card's room free (Player.tsx `verifyRoom`): the before and after
+   aren't covered. On a phone it is the notes sheet's content, in the sheet's own theme. Colour marks a state only (the
+   severity's glyph, the fix's small ✓), never the card or its edge. Tokens only: theme.test.ts refuses a colour
+   literal here, design-scale.test.ts a size off the scales. Imported by VerifyPanel.tsx. */
+.verify {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--sp-4);
+  margin-inline: auto;
+  width: min(640px, calc(100% - var(--sp-8)));
+  display: grid;
+  /* the card's width decides, never its widest row (an auto column grows to its content on a narrow phone) */
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--ink-2) 90%, transparent);
+  box-shadow:
+    0 0 0 1px var(--line-2),
+    var(--shadow-float);
+  backdrop-filter: blur(14px) saturate(1.2);
+  color: var(--fg);
+  animation: pop var(--dur) var(--ease-out);
+}
+
+/* the head, one line: where you are in the fixes (quiet, with dots), the note's severity, moment and versions, and the
+   way out */
+.verify-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-3);
+  min-width: 0;
+  margin-block: calc(-1 * var(--sp-0_5));
+}
+.verify-step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font: var(--fw-ui) var(--fs-sm) / var(--lh-ui) var(--ui);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.verify-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+.verify-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--line-2);
+}
+.verify-dots i.on {
+  background: var(--fg-2);
+}
+
+/* the severity, the moment, the versions: one height */
+.verify-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.verify-meta .c-tc {
+  display: inline-flex;
+  align-items: center;
+  height: var(--h-xs);
+  padding-block: 0;
+}
+.verify-vs {
+  font: var(--fw-ui) var(--fs-sm) / var(--lh-ui) var(--ui);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* what is being checked: the person's words, first and in the reading size */
+.verify-note {
+  display: grid;
+  justify-items: start;
+  gap: var(--sp-1);
+}
+.verify-note-text {
+  margin: 0;
+  max-width: 70ch;
+  font: var(--fw-text) var(--fs-lg) / var(--lh-body) var(--ui);
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+
+/* how it was answered: an inset, quieter — the writer's mark and name, "fixed in V2" with the one green mark */
+.verify-fix {
+  display: grid;
+  justify-items: start;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  border-radius: var(--r);
+  background: var(--ink-1);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.verify-fix-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  justify-self: stretch;
+  min-width: 0;
+  font: var(--fw-ui) var(--fs-sm) / var(--lh-ui) var(--ui);
+  color: var(--muted);
+}
+.verify-fix-head b {
+  min-width: 0;
+  font-weight: var(--fw-strong);
+  color: var(--fg-2);
+}
+.verify-fix-done {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex: none;
+}
+.verify-fix-done .icon {
+  color: var(--ok);
+}
+.verify-fix-text {
+  margin: 0;
+  max-width: 70ch;
+  font: var(--fw-text) var(--fs-md) / var(--lh-body) var(--ui);
+  color: var(--fg-2);
+  overflow-wrap: anywhere;
+}
+
+/* long words fold to a few lines; "More" unfolds them in place (the card grows upwards: the decision stays put), and
+   past a dozen lines they scroll inside, so the buttons never leave the window */
+.folded {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.folded.open {
+  display: block;
+  max-height: calc(var(--fs-md) * var(--lh-body) * 12);
+  overflow-y: auto;
+}
+.verify-more {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: var(--fw-ui) var(--fs-sm) / var(--lh-ui) var(--ui);
+  color: var(--fg-2);
+  text-decoration: underline;
+  text-decoration-color: var(--line-2);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.verify-more:hover:where(:not(:disabled)) {
+  color: var(--fg);
+  text-decoration-color: currentColor;
+}
+
+/* a fix carried to a new version with no answer: is it still there? */
+.verify-again {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font: var(--fw-ui) var(--fs-sm) / var(--lh-ui) var(--ui);
+  color: var(--fg-2);
+}
+.verify-again .icon {
+  color: var(--should);
+}
+
+/* a fix shown on a preview of the project, not rendered yet */
+.verify-preview {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border-radius: var(--r);
+  background: var(--ink-1);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.verify-preview > .icon {
+  flex: none;
+  color: var(--ok);
+}
+.verify-preview .grow {
+  display: grid;
+  gap: var(--sp-0_5);
+  min-width: 0;
+}
+.verify-preview b {
+  color: var(--fg);
+  font-weight: var(--fw-strong);
+}
+.verify-preview .grow span {
+  color: var(--muted);
+}
+
+/* the decision: Looks right raised (the view's one), Still wrong plain, Skip ghost at the end */
+
+/* a phone: the card is the notes sheet's content (NotesPanel.tsx), the sheet its surface — no float of its own (only a
+   phone's player has the sheet) */
+.nsheet .verify {
+  position: static;
+  width: auto;
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  animation: none;
+}
+/* the decision stays in reach at the sheet's visible foot, whatever the half-open sheet leaves of the card above it */
+.nsheet .verify .verify-actions {
+  position: sticky;
+  /* to the sheet's very foot (its scroller keeps --sp-6 of room under its content) and across its full width (the
+     scroller's --sp-3 and the card's --sp-4 at each side), so nothing shows under it */
+  bottom: calc(-1 * var(--sp-6));
+  z-index: 1;
+  margin-inline: calc(-1 * (var(--sp-4) + var(--sp-3)));
+  padding: var(--sp-2) calc(var(--sp-4) + var(--sp-3)) calc(var(--sp-3) + var(--sp-6));
+  background: var(--ink-2);
+  box-shadow: 0 -1px 0 var(--line);
+}
+/* its head in two lines: where you are and the way out, then the note's severity, moment and versions */
+.nsheet .verify-meta {
+  order: 1;
+  flex-basis: 100%;
+}
+/* before or after, on a phone's stacked stage */
+.verify-side {
+  width: 100%;
+}
+.verify-side button {
+  flex: 1;
+  justify-content: center;
+  min-height: 40px;
+}

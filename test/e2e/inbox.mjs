@@ -503,8 +503,19 @@ try {
       await presents(page, filmFile, fixAt + 2, 90);
       await page.keyboard.press('Enter');
       await page.waitForFunction((id) => location.hash.includes(`verify=${id}`), { timeout: 5000 }, viewFix.id);
-      await page.waitForSelector('.verify .c-text', { timeout: 20000 });
+      await page.waitForSelector('[data-testid=verify-note]', { timeout: 20000 });
       await landsAt(fixAt + 2);
+      // check mode's card from the inbox: the note first, who answered it and how, and Looks right the one raised button
+      const card = await page.evaluate(() => ({
+        note: document.querySelector('.verify [data-testid=verify-note]')?.textContent.trim(),
+        by: document.querySelector('.verify [data-testid=verify-fix-by]')?.textContent.trim(),
+        fix: document.querySelector('.verify .verify-fix-text')?.textContent.trim(),
+        raised: [...document.querySelectorAll('.btn.primary')]
+          .filter((b) => b.getBoundingClientRect().width > 0 && !(b.closest('.so-split') && !b.textContent.trim()))
+          .map((b) => b.textContent.trim()),
+      }));
+      assert(card.note === 'Title a touch lower' && card.by === 'brand-film' && card.fix === 'Lowered the title', JSON.stringify(card));
+      assert(card.raised.length === 1 && /Looks right/.test(card.raised[0]), `one raised button: ${JSON.stringify(card.raised)}`);
       await inboxView();
     },
   );
@@ -863,7 +874,7 @@ try {
     const c = await note(film, { frame: 30, text: 'Logo too small', severity: 'should' });
     await api(`/api/comments/${c.id}`, 'PATCH', { status: 'fixed', note: 'Bigger logo', by: 'agent:brand-film' });
     await page.goto(`${BASE}/#/v/${encodeURIComponent(film)}?verify=${c.id}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('.verify .c-text', { timeout: 20000 });
+    await page.waitForSelector('[data-testid=verify-note]', { timeout: 20000 });
     await page.click('[data-testid="inbox-bell"]');
     await page.waitForSelector(row('verify'));
     await page.focus('[data-testid="inbox-list"]');

@@ -8,6 +8,14 @@ format stays backwards compatible throughout.
 ## [Unreleased]
 
 ### Changed
+- Checking fixes reads calmly. The card over the picture says first what you asked for, in your words, then how it
+  was answered — the agent by its name ("Claude Code"), "fixed in V2" and its words, folded to three lines with More —
+  and Looks right is its one raised button. It no longer wears a green box or edge, and it sits under the before and
+  after instead of over them. "Check 1 of 2" says where you are, with a dot per fix. On a phone the card is the notes
+  sheet, its decision always in reach.
+- One way into checking fixes at a time: the top bar's "Check 2 fixes" is the raised one and the agent's line says it
+  quietly (on a phone, whose top bar has no room for it, the agent's line is the one), and in check mode neither asks
+  again.
 - German prices say VAT, like the English ones: "exkl. VAT", "inkl. 19 % VAT", and the checkout's tax line reads
   "VAT". The VAT ID keeps its German name, "USt-IdNr.".
 - Green marks a state now, never a box: the player's "3 fixes to check" banner is a plain card with the green

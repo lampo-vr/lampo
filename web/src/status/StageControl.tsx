@@ -226,7 +226,8 @@ export function StageControl({ data, latestV, onShare, onVerify, onPublish, comp
               </span>
             )}
             {stageNote(info) && <span className="so-note">{stageNote(info)}</span>}
-            {waiting && <span className="so-wait">· {waiting}</span>}
+            {/* never the same words twice (check mode leaves the stage saying "Check 2 fixes" and nothing to press) */}
+            {waiting && waiting !== status && <span className="so-wait">· {waiting}</span>}
           </span>
         </Tip>
       )}

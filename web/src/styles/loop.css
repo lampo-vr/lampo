@@ -53,33 +53,7 @@
   transform-origin: center;
   transition: transform 0.08s;
 }
-.verify {
-  position: absolute;
-  left: 50%;
-  bottom: 16px;
-  transform: translateX(-50%);
-  width: min(620px, calc(100% - 32px));
-  display: grid;
-  /* the card's width decides, never its widest row (an auto column grows to its content on a narrow phone) */
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--sp-2);
-  padding: var(--sp-3) var(--sp-3);
-  border-radius: var(--r-lg);
-  background: rgba(19, 19, 20, 0.94);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(61, 220, 151, 0.4);
-  box-shadow: var(--shadow);
-  animation: pop 0.25s var(--ease);
-}
-.verify-head {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-}
-.verify-body {
-  display: grid;
-  gap: var(--sp-2);
-}
+/* The decision on a fix (player/CheckDecision.tsx): check mode's card (styles/check.css) and a note's card in the panel. */
 .verify-actions {
   display: flex;
   align-items: center;
@@ -88,32 +62,6 @@
 /* Still wrong's reason, typed or said: the field gives way to its microphone and Reopen on a narrow card */
 .verify-reason .input {
   min-width: 0;
-}
-.verify-preview {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-2);
-  border-radius: var(--r);
-  background: var(--ink-3);
-  font-size: var(--fs-sm);
-  color: var(--fg-2);
-}
-.verify-preview > .icon {
-  flex: none;
-  color: var(--ok);
-}
-.verify-preview .grow {
-  display: grid;
-  gap: var(--sp-0_5);
-  min-width: 0;
-}
-.verify-preview b {
-  color: var(--fg);
-  font-weight: var(--fw-strong);
-}
-.verify-preview .grow span {
-  color: var(--muted);
 }
 .stamp {
   display: inline-flex;

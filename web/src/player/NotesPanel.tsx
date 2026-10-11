@@ -331,6 +331,8 @@ export function NotesPanel(p: NotesPanelProps) {
   }, [selected]);
   const style: CSSProperties | undefined = sheet && live !== null ? { height: live, transition: 'none' } : undefined;
   const words = p.view === 'transcript';
+  // a phone in check mode: the sheet is check mode's card (p.top) and nothing else; on a desk the card floats on the stage
+  const checking = !!sheet && !!p.verifying && !!p.top;
   const agent = p.view === 'agent';
   // the Agent tab, where the video has an agent; a phone's sheet shows it only while it is open (the strip above the dock
   // is the way in there, and the sheet's head has no room for a third view beside its thumb-sized tools)
@@ -435,7 +437,7 @@ export function NotesPanel(p: NotesPanelProps) {
             )}
           </div>
           {p.strip}
-          {agent ? null : words ? (
+          {agent || checking ? null : words ? (
             <TranscriptTools find={find} setFind={setFind} v={p.v} base={base} />
           ) : (
             <div className="note-filters">
@@ -501,10 +503,11 @@ export function NotesPanel(p: NotesPanelProps) {
         {!words && !agent && (
           <Tabs.Content value={filter} asChild>
             <div className="side-scroll" ref={scroller}>
-              {!n && <NoteRowsPending />}
-              {p.top}
-              {p.recording}
-              {p.verifyCount > 0 && filter !== 'closed' && !p.verifying && !p.verifyInStrip && (
+              {checking ? p.top : null}
+              {!checking && !n && <NoteRowsPending />}
+              {!checking && p.top}
+              {!checking && p.recording}
+              {!checking && p.verifyCount > 0 && filter !== 'closed' && !p.verifying && !p.verifyInStrip && (
                 <div className="verify-cta" data-testid="verify-cta">
                   <KeyGlyph shape="half" />
                   <span className="grow">
@@ -516,36 +519,38 @@ export function NotesPanel(p: NotesPanelProps) {
                   </button>
                 </div>
               )}
-              {p.composer}
-              <NoteRows
-                list={p.list}
-                reveal={following ? here : p.selected}
-                note={(c) => (
-                  <CommentCard
-                    key={c.id}
-                    c={c}
-                    slug={p.slug}
-                    videoName={p.videoName}
-                    currentV={p.v}
-                    latestV={p.latestV}
-                    here={here === c.id}
-                    selected={p.selected === c.id}
-                    groupHead={starts.has(c.id)}
-                    onSelect={p.onSelect}
-                    onLightbox={p.onLightbox}
-                    fps={p.fps}
-                    onPlayRange={p.onPlayRange}
-                    looping={!!p.rangeLoop && !!c.rangeHere && p.rangeLoop.in === c.rangeHere.in && p.rangeLoop.out === c.rangeHere.out}
-                    checkMode={!!p.verifying}
-                    plan={
-                      p.plans?.get(c.id) ??
-                      (p.planPending && (c.status === 'open' || c.status === 'fixed') && (!c.kind || c.kind === 'feedback') ? PLAN_PENDING : undefined)
-                    }
-                    planName={p.planName}
-                  />
-                )}
-              />
-              {n && !p.list.length && !p.composer && !p.recording && p.tag && (
+              {!checking && p.composer}
+              {!checking && (
+                <NoteRows
+                  list={p.list}
+                  reveal={following ? here : p.selected}
+                  note={(c) => (
+                    <CommentCard
+                      key={c.id}
+                      c={c}
+                      slug={p.slug}
+                      videoName={p.videoName}
+                      currentV={p.v}
+                      latestV={p.latestV}
+                      here={here === c.id}
+                      selected={p.selected === c.id}
+                      groupHead={starts.has(c.id)}
+                      onSelect={p.onSelect}
+                      onLightbox={p.onLightbox}
+                      fps={p.fps}
+                      onPlayRange={p.onPlayRange}
+                      looping={!!p.rangeLoop && !!c.rangeHere && p.rangeLoop.in === c.rangeHere.in && p.rangeLoop.out === c.rangeHere.out}
+                      checkMode={!!p.verifying}
+                      plan={
+                        p.plans?.get(c.id) ??
+                        (p.planPending && (c.status === 'open' || c.status === 'fixed') && (!c.kind || c.kind === 'feedback') ? PLAN_PENDING : undefined)
+                      }
+                      planName={p.planName}
+                    />
+                  )}
+                />
+              )}
+              {!checking && n && !p.list.length && !p.composer && !p.recording && p.tag && (
                 <EmptyState
                   size="sm"
                   className="side-empty"
@@ -558,7 +563,7 @@ export function NotesPanel(p: NotesPanelProps) {
                   }
                 />
               )}
-              {n && !p.list.length && !p.composer && !p.recording && !p.tag && (
+              {!checking && n && !p.list.length && !p.composer && !p.recording && !p.tag && (
                 <EmptyState
                   size="sm"
                   className="side-empty"

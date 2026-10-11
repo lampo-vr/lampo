@@ -89,13 +89,13 @@ try {
     await page.keyboard.up('Control');
   };
   const checkCard = () => text('.verify');
-  const counter = () => text('.verify-head .eyebrow');
+  const counter = () => text('[data-testid=verify-step]');
 
   await check('a fix reopened on its card in the panel leaves check mode at once; the card keeps the fix it is on', async () => {
     await page.setViewport({ width: 1440, height: 900 });
     await open(`?verify=${notes.one.id}`);
     await until(async () => /Swoosh on the first title/.test((await checkCard()) || ''), 'check mode on the first fix');
-    assert((await counter()) === 'Check 1 / 5', `starts at 1 of 5: ${await counter()}`);
+    assert((await counter()) === 'Check 1 of 5', `starts at 1 of 5: ${await counter()}`);
     // the third fix opened in the panel: while check mode runs, its card over the picture asks Looks right · Still
     // wrong, and this one says where the note stands without asking again (one decision on screen, not two)
     await openCard(notes.three.id);
@@ -110,7 +110,7 @@ try {
     await until(async () => (await note(notes.three.id)).status === 'open', 'reopened on the server');
     // at once on the check card: still the first fix, and the reopened one counted as done
     await until(
-      async () => (await counter()) === 'Check 2 / 5',
+      async () => (await counter()) === 'Check 2 of 5',
       async () => `the queue moved on: ${await counter()}`,
     );
     assert(/Swoosh on the first title/.test((await checkCard()) || ''), 'the card keeps the fix it is on');
@@ -120,11 +120,14 @@ try {
       await page.evaluate(() => document.activeElement?.blur());
       const before = await checkCard();
       seen.push(before);
+      // the card shows the next fix before the server has the last verdict, and a Y meanwhile is refused (one verdict at
+      // a time, useVerify.ts `deciding`): on a loaded machine the press came while the first was still being saved
+      await page.waitForSelector('.verify [data-testid=check-right]:not(:disabled)');
       await page.keyboard.press('y');
       await until(async () => (await checkCard()) !== before, 'on to the next fix');
     }
     assert(!seen.some((s) => /A subtle sound/.test(s || '')), `the reopened fix never came up: ${seen.join(' / ')}`);
-    assert(/Hold the end card longer/.test((await checkCard()) || '') && (await counter()) === 'Check 5 / 5', `the last one: ${await counter()}`);
+    assert(/Hold the end card longer/.test((await checkCard()) || '') && (await counter()) === 'Check 5 of 5', `the last one: ${await counter()}`);
   });
 
   await check('a fix reopened in check mode shows on its card in the panel at once', async () => {

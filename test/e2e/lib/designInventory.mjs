@@ -19,9 +19,10 @@ export const SCALE = {
 /**
  * Runs in the page: returns { fontSize, fontWeight, radius, controlHeight, icon } → [{ value, who }] for values off the
  * scale.
- * `allow` lists selectors whose sizes are drawn, not set (an avatar's initials scale with it, a phone mock).
+ * `allow` lists selectors whose sizes are drawn, not set (an avatar's initials scale with it, a phone mock); `root`, a
+ * selector, looks only inside that element (one component: check mode's card).
  */
-export function inventory({ scale, allow }) {
+export function inventory({ scale, allow, root = null }) {
   const CONTROLS = '.btn, .input, .select, .seg > button, .tabs > button, .chip, .vpick, .session-chip, .lib-display';
   const vis = (el) => {
     const r = el.getBoundingClientRect();
@@ -43,7 +44,8 @@ export function inventory({ scale, allow }) {
     if (!m.has(value)) m.set(value, new Set());
     m.get(value).add(who(el));
   };
-  for (const el of document.querySelectorAll('body *')) {
+  const scope = root ? document.querySelector(root) : document.body;
+  for (const el of scope ? scope.querySelectorAll('*') : []) {
     if (!vis(el) || allowed(el) || el.closest('svg')) continue;
     const s = getComputedStyle(el);
     const r = el.getBoundingClientRect();
@@ -68,7 +70,7 @@ export function inventory({ scale, allow }) {
   }
   // an icon in a control family takes its size step (the family's own, whatever a screen asked for)
   const ICONS = ':is(.btn, .seg > button, .tabs > button, .menu button, .ch, .badge, .toast, .toast-act) > svg.icon';
-  for (const ic of document.querySelectorAll(ICONS)) {
+  for (const ic of scope ? scope.querySelectorAll(ICONS) : []) {
     if (!vis(ic) || allowed(ic)) continue;
     // its box as set, not as drawn this moment (a toast scales in from 94 %)
     const w = parseFloat(getComputedStyle(ic).width);
@@ -80,14 +82,78 @@ export function inventory({ scale, allow }) {
 }
 
 /**
+ * Runs in the page: the colours the elements inside `root` paint themselves (text, fill, edge; not what they inherit
+ * unchanged, not a picture's) that are no token's — every custom property of the page resolved where `root` stands
+ * (an island has its own) — and no token's mix with transparency (`color-mix(…, transparent)` keeps a token's hue).
+ * Returns [{ who, prop, value }].
+ */
+export function offTokens({ root }) {
+  const box = document.querySelector(root);
+  if (!box) return [{ who: root, prop: 'root', value: 'missing' }];
+  // every token, resolved as a colour at the component (a probe takes its colour from it)
+  const names = new Set();
+  for (const sheet of document.styleSheets) {
+    let rules;
+    try {
+      rules = sheet.cssRules;
+    } catch {
+      continue;
+    }
+    const walk = (list) => {
+      for (const r of list) {
+        if (r.style) for (const p of r.style) if (p.startsWith('--')) names.add(p);
+        if (r.cssRules) walk(r.cssRules);
+      }
+    };
+    walk(rules);
+  }
+  const probe = document.createElement('i');
+  box.append(probe);
+  const rgb = (c) => {
+    const m = /\d*\.?\d+/g;
+    const v = c.match(m)?.map(Number) ?? [];
+    return c.startsWith('color(srgb') ? v.slice(0, 3).map((x) => Math.round(x * 255)) : v.slice(0, 3);
+  };
+  const ok = [];
+  for (const n of names) {
+    probe.style.color = '';
+    probe.style.color = `var(${n})`;
+    const c = getComputedStyle(probe).color;
+    if (c) ok.push(rgb(c));
+  }
+  probe.remove();
+  const near = (a, b) => a.length === 3 && b.length === 3 && a.every((x, i) => Math.abs(x - b[i]) <= 1);
+  const known = (c) => ok.some((k) => near(k, rgb(c)));
+  const clear = (c) => !c || c === 'transparent' || /rgba\([^)]*,\s*0\)$/.test(c) || /\/\s*0\)$/.test(c);
+  const who = (el) => {
+    const c = typeof el.className === 'string' ? el.className : el.className?.baseVal || '';
+    return `${el.tagName.toLowerCase()}${c.trim() ? `.${c.trim().split(/\s+/).slice(0, 2).join('.')}` : ''}`;
+  };
+  const out = [];
+  for (const el of [box, ...box.querySelectorAll('*')]) {
+    if (el.closest('svg') || el.matches('img, video, canvas')) continue;
+    const s = getComputedStyle(el);
+    const parent = el.parentElement ? getComputedStyle(el.parentElement) : null;
+    const seen = [
+      ['color', s.color, parent && s.color === parent.color],
+      ['background-color', s.backgroundColor, false],
+      ['border-color', +parseFloat(s.borderTopWidth) > 0 && s.borderTopStyle !== 'none' ? s.borderTopColor : '', false],
+    ];
+    for (const [prop, value, inherited] of seen) if (!inherited && !clear(value) && !known(value)) out.push({ who: who(el), prop, value });
+  }
+  return out;
+}
+
+/**
  * Runs in the page: corners that don't follow the curve around them. A rounded surface inset p inside a rounded
  * surface of radius R, within reach of its corner (p < R), gets the radius R − p (concentric: the gap stays even all
  * the way round — the segmented control's raised item in its track, a row in a menu, a chip on a poster's corner).
  * Further in, a corner is free. Controls whose fill shows on hover (buttons, segments, tabs, menu rows, chips) count as
  * surfaces at rest too. A container that clips (overflow) and holds its content flush needs nothing. Returns
- * [{ who, in, corners }]; `allow` lists selectors left out (drawings at their own scale).
+ * [{ who, in, corners }]; `allow` lists selectors left out (drawings at their own scale); `root`, a selector, looks only
+ * inside that element (and measures against the surfaces up to it).
  */
-export function concentric({ allow = [], tolerance = 0.75 } = {}) {
+export function concentric({ allow = [], tolerance = 0.75, root = null } = {}) {
   const HOVER_FILL =
     '.btn, .seg > button, .tabs > button, .menu button, .menu [role=menuitem], .menu [role=menuitemcheckbox], .select-item, .chip, button.list-row';
   const px = parseFloat;
@@ -114,7 +180,8 @@ export function concentric({ allow = [], tolerance = 0.75 } = {}) {
     return `${el.tagName.toLowerCase()}${c.trim() ? `.${c.trim().split(/\s+/).slice(0, 2).join('.')}` : ''}`;
   };
   const out = new Map();
-  for (const el of document.querySelectorAll('body *')) {
+  const scope = root ? document.querySelector(root) : document.body;
+  for (const el of scope ? scope.querySelectorAll('*') : []) {
     if (el.closest('svg') || allow.some((sel) => el.closest(sel))) continue;
     const s = getComputedStyle(el);
     const r = el.getBoundingClientRect();

@@ -15,7 +15,7 @@
 :root[data-theme='light']
   :is(
     .stage,
-    .verify,
+    .stage-overlay > .verify,
     .walkie,
     .rec-bar,
     .draw-bar,

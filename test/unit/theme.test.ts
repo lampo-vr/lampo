@@ -240,7 +240,7 @@ test('the dark islands redeclare every colour the light theme changes, so the pi
 // film stock is drawn (dark in both themes), in masks, and on the print sheet (paper in both themes).
 // The onboarding's pictures (lighttable.css) draw the brand film's frames: inside them the same rule holds.
 const LITERAL_OK =
-  /^(\.poster-|\.scrub-head|\.vchip|\.reel-|\.c-thumb|\.lightbox|\.qr|\.stage|\.crop|\.vbox|\.wipe-handle|\.phone|\.leader-|\.walkie|\.rec-dot|\.verify|\.up-tray::before|\.link-qr|\.ob-(lp|fr-img|ttl|ov-chip|safe|smp-thumb|loop-done))/;
+  /^(\.poster-|\.scrub-head|\.vchip|\.reel-|\.c-thumb|\.lightbox|\.qr|\.stage|\.crop|\.vbox|\.wipe-handle|\.phone|\.leader-|\.walkie|\.rec-dot|\.up-tray::before|\.link-qr|\.ob-(lp|fr-img|ttl|ov-chip|safe|smp-thumb|loop-done))/;
 test('the dark islands set their text colour, so inherited text is light on their dark ground', () => {
   const block = base.slice(base.indexOf(':root,'), base.indexOf('}', base.indexOf(':root,')));
   assert.match(block, /\n\s*color: var\(--fg\);/, 'the dark block (doubling as the islands) sets color: var(--fg)');

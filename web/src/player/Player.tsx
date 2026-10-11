@@ -83,6 +83,9 @@ import { VerifyPanel } from './VerifyPanel.tsx';
 import { WalkieHud } from './WalkieHud.tsx';
 import { orientOf, presetById, presetsFor } from './zones.ts';
 
+/** Under the check card (styles/check.css: --sp-4 to the stage's foot) and above it (--sp-3 to the pictures). */
+const CARD_OFFSET = 16 + 12;
+
 /** The side panel's Agent view: loaded when it is first opened (or the strip is pointed at). */
 const agentViewCode = loader(() => import('./AgentView.tsx'));
 /** A day: how long work that ended badly (failed, stopped) stays on the strip. */
@@ -1304,7 +1307,8 @@ function PlayerView({
   const showStrip = hasAgent && (!final || !!stripRun);
   // "go on" is for whoever steers the agent, and not while a render or an upload it started says how far it is
   const goOn = !!owedNote && !!review.session && canSteer && !final && !(stripRun && progressOf(stripRun));
-  // the strip's raised button (Answer, Check fixes) is the panel's one: + Note steps down while it shows
+  // + Note steps down while the view's raised door is another: the strip's Answer, or checking the fixes (the top bar's
+  // Check N fixes on a desk, the strip's on a phone, the card's Looks right in check mode)
   const stripPrimary =
     !goOn &&
     !!stripRun &&
@@ -1319,7 +1323,10 @@ function PlayerView({
       reachable={reachable}
       copyable={listen !== null}
       stalled={goOn}
-      toCheck={verify.queue.length}
+      // checking the fixes: one raised door per view — the top bar's on a desk (the strip's is quiet), the strip's on a
+      // phone (its top bar has none), and none while check mode runs (its card decides)
+      toCheck={verify.active ? 0 : verify.queue.length}
+      quietCheck={!phone}
       nextV={latestV + 1}
       canSteer={canSteer}
       canCheck={canCheck}
@@ -1356,6 +1363,10 @@ function PlayerView({
       />
     ) : null;
 
+  // the room the check card takes at the stage's foot (its height as it rests, its offset and a gap above it), so it
+  // covers neither picture; 190 until it has been measured
+  const [verifyRoom, setVerifyRoom] = useState(190);
+  const roomForCard = useCallback((h: number) => setVerifyRoom(h + CARD_OFFSET), []);
   const verifyPanel = verify.active && verify.item && (
     <VerifyPanel
       item={verify.item}
@@ -1376,6 +1387,7 @@ function PlayerView({
       onSide={phone && stack ? (x) => setShowB(x === 'before') : undefined}
       fps={fps}
       onPlayRange={verify.item.rangeHere ? () => verify.item?.rangeHere && pb.playSegments([verify.item.rangeHere]) : undefined}
+      onRoom={phone ? undefined : roomForCard}
     />
   );
   return (
@@ -1399,7 +1411,7 @@ function PlayerView({
           onCompareWith={compareWith}
           strip={phone && ab && !verifying ? compareBar : null}
           onShare={onShare}
-          onVerify={verify.start}
+          onVerify={verify.active ? undefined : verify.start}
           onPublish={allowed('post') ? onPublish : undefined}
           frameNow={pb.live.get}
           runs={runs}
@@ -1422,7 +1434,7 @@ function PlayerView({
           phone={device}
           app={phoneView.app?.app ?? null}
           message={message}
-          reserveBottom={verify.active && !phone ? 190 : drawStrip ? PHONE_TOOLS : 0}
+          reserveBottom={verify.active && !phone ? verifyRoom : drawStrip ? PHONE_TOOLS : 0}
           reserveTop={ab && !verifying && !phone ? 52 : 0}
           pad={phone ? (watching ? 0 : 10) : undefined}
           stack={stack}
@@ -1614,7 +1626,7 @@ function PlayerView({
           rangeLoop={pb.rangeLoop}
           canCompose={!composer && !!m?.ready && !recorder.active}
           readOnly={frozen}
-          quietNew={(unsentShown && unsent.count > 0) || stripPrimary}
+          quietNew={(unsentShown && unsent.count > 0) || stripPrimary || verify.active}
           strip={phone ? null : strip}
           agentTab={showStrip || runs?.length ? { live: !!stripRun && isOpen(stripRun) && stripRun.state !== 'needs_you' && stripRun.state !== 'lost' } : null}
           agentView={agentView}

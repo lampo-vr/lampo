@@ -345,7 +345,8 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Agents that use lampo instead: sign in on their machine and paste the token when it asks.':
     'Agenten, die stattdessen lampo nutzen: Melde dich auf ihrem Rechner an und füge das Token ein, wenn danach gefragt wird.',
   '(marked frame)': '(markierter Frame)',
-  '{displayName} · fixed in V{fixed_in_v}': '{displayName} · korrigiert in V{fixed_in_v}',
+  'fixed in V{v}': 'korrigiert in V{v}',
+  'Check {n} of {total}': 'Prüfung {n} von {total}',
   '{email} · since {when} · {n} token|{email} · since {when} · {n} tokens': '{email} · seit {when} · {n} Token|{email} · seit {when} · {n} Tokens',
   '{id} copied': '{id} kopiert',
   '{kindLabel} note at {timecodeHere}': '{kindLabel}-Notiz bei {timecodeHere}',

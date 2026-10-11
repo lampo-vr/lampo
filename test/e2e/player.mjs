@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// covers: web/src/player/ web/src/styles/player.css web/src/styles/notes.css web/src/styles/dock.css
+// covers: web/src/player/ web/src/styles/player.css web/src/styles/notes.css web/src/styles/dock.css web/src/styles/check.css
 // covers: web/src/styles/drawbar.css web/src/styles/autocheck.css server/routes/review.ts server/routes/analysis.ts
 // covers: server/routes/previews.ts server/routes/media.ts lib/diff.ts lib/qa.ts lib/previews.ts lib/range.ts
 // Browser end-to-end test of the player's review tools: a real server (local mode, temp store, free port) + headless
@@ -22,6 +22,7 @@ import { bentEdges, layoutMatrix } from './layout.mjs';
 import { jsonApi } from './lib/api.mjs';
 import { launch, requireChrome, shotsDir } from './lib/browser.mjs';
 import { assert, check, crashed, finish } from './lib/checks.mjs';
+import { concentric, inventory, offTokens, SCALE } from './lib/designInventory.mjs';
 import { closestFrame, shownPicture } from './lib/frames.mjs';
 import { startServer } from './lib/server.mjs';
 
@@ -803,6 +804,193 @@ try {
     page.off('request', slow);
     await page.setRequestInterception(false);
     assert(/Double press second/.test((await text('.verify')) || ''), `on to the second fix, not past it: ${await text('.verify')}`);
+  });
+
+  // ---------------------------------------------------------------- check mode's card and the doors to it
+  // A video an agent fixed: two notes, V2, both marked fixed by an agent's client ("claude-code", shown "Claude Code"),
+  // one with a long answer, and the agent's work as the server keeps it (done, 2 fixed).
+  const LONG_FIX =
+    'I lifted the shadows on the opening shot with a soft curve rather than raising exposure, so the night mood stays and the highlights on the bottle do not clip. The bottle now separates from the background from the first frame, and the logo reads clearly at full size and on a phone. I also matched the second shot to the new level, because the jump between them became visible once the first one was brighter. If you still find it too dark, I can lift the midtones a little more, but anything beyond that starts to flatten the image and loses the contrast you asked to keep.';
+  const cfile = makeVideo(path.join(dir, 'Acme/export/card.mp4'), { w: 320, h: 180, fps: 25, dur: 3, pattern: 'smptebars' });
+  age(cfile);
+  const card = (await api('/api/library', 'POST', { path: cfile, folder: 'Acme/Reels' })).video.slug;
+  await api(`/api/review/${enc(card)}/session`, 'PUT', { name: 'Claude Code', sessionId: 'mcp-card-agent', agent: 'claude-code' });
+  const cnote = async (frame, text, severity) => (await api(`/api/review/${enc(card)}/comments`, 'POST', { v: 1, frame, text, severity })).id;
+  const longFix = await cnote(12, 'The first second is far too dark: the product disappears into the background.', 'should');
+  const shortFix = await cnote(50, 'The logo comes in before the beat.', 'must');
+  makeVideo(cfile, { w: 320, h: 180, fps: 25, dur: 3, pattern: 'testsrc2' });
+  age(cfile);
+  await api(`/api/review/${enc(card)}/sync`, 'POST', {});
+  await until(async () => (await review(card)).versions.length === 2, 'card.mp4 V2');
+  await api(`/api/comments/${longFix}`, 'PATCH', { status: 'fixed', note: LONG_FIX, by: 'agent:claude-code', fixed_in_v: 2 });
+  await api(`/api/comments/${shortFix}`, 'PATCH', { status: 'fixed', note: 'Moved the logo 6 frames later.', by: 'agent:claude-code', fixed_in_v: 2 });
+  const ago = (s) => new Date(Date.now() - s * 1000).toISOString();
+  const done = {
+    id: 'run_c4ec4c000001',
+    slug: card,
+    agent: { name: 'Claude Code', kind: 'claude-code', session_id: 'mcp-card-agent' },
+    opened_by: { who: 'Sam', how: 'send' },
+    delivery: 'listening',
+    state: 'done',
+    started: ago(700),
+    ended: ago(90),
+    seen: ago(90),
+    worked_s: 600,
+    plan: [
+      { id: longFix, state: 'fixed', at: ago(120), v: 2 },
+      { id: shortFix, state: 'fixed', at: ago(100), v: 2 },
+    ],
+    now: null,
+    result: { v: 2, fixed: 2, asked: 0, wontfix: 0 },
+    steps: [],
+    clock: { tick: ago(90), began: ago(700) },
+  };
+  fs.writeFileSync(path.join(dir, 'data', card, 'runs.jsonl'), `${JSON.stringify(done)}\n`);
+  /** The raised buttons in view: one per view (a split button's chevron is the same door). */
+  const raised = () =>
+    page.$$eval('.btn.primary', (bs) =>
+      bs
+        .filter((b) => !(b.closest('.so-split') && !b.textContent.trim()))
+        .filter((b) => {
+          const r = b.getBoundingClientRect();
+          return r.width > 0 && r.height > 0 && getComputedStyle(b).visibility !== 'hidden';
+        })
+        .map((b) => b.textContent.trim()),
+    );
+
+  await check(
+    'fixes waiting after an agent’s work: one raised door to checking them — the top bar’s; the strip’s is quiet, the banner steps back',
+    async () => {
+      await page.setViewport({ width: 1440, height: 900 });
+      await openPlayer(card);
+      await page.waitForSelector('[data-testid=run-strip][data-phase=done] [data-testid=run-check]', { timeout: 20000 });
+      const doors = await page.evaluate(() => ({
+        top: document.querySelector('[data-testid=stage-next]')?.className ?? null,
+        strip: document.querySelector('[data-testid=run-check]')?.className ?? null,
+        banner: !!document.querySelector('[data-testid=verify-cta]'),
+        note: document.querySelector('[data-testid=new-note]')?.className ?? null,
+      }));
+      assert(/\bprimary\b/.test(doors.top ?? '') && /\bghost\b/.test(doors.strip ?? '') && !/\bprimary\b/.test(doors.strip ?? ''), JSON.stringify(doors));
+      assert(!doors.banner && !/\bprimary\b/.test(doors.note ?? ''), `the banner steps back, + Note too: ${JSON.stringify(doors)}`);
+      const up = await raised();
+      assert(up.length === 1 && /Check 2 fixes/.test(up[0]), `one raised door: ${JSON.stringify(up)}`);
+      await shot('check-doors');
+    },
+  );
+
+  for (const theme of ['dark', 'light'])
+    await check(
+      `check mode's card (${theme}): the note first, the agent's answer second and quieter, folded; colour only in marks, tokens only; the pictures uncovered`,
+      async () => {
+        await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: theme }]);
+        await page.setViewport({ width: 1440, height: 900 });
+        await page.goto('about:blank');
+        await page.goto(`${BASE}/#/v/${enc(card)}?verify=${longFix}`, { waitUntil: 'domcontentloaded' });
+        await page.waitForSelector('[data-testid=verify-card] [data-testid=verify-fix]', { timeout: 20000 });
+        await page.waitForFunction(() => !document.querySelector('.verify')?.getAnimations().length);
+        await sleep(300);
+        const c = await page.evaluate(() => {
+          const q = (s) => document.querySelector(`.verify ${s}`);
+          const st = (s) => (q(s) ? getComputedStyle(q(s)) : null);
+          const lh = (s) => parseFloat(st(s)?.lineHeight ?? '0');
+          const right = q('[data-testid=check-right]');
+          const pictures = [...document.querySelectorAll('.stage .vbox')].map((v) => v.getBoundingClientRect().bottom);
+          return {
+            step: q('[data-testid=verify-step]')?.textContent.trim(),
+            dots: [...document.querySelectorAll('.verify-dots i')].map((i) => i.className),
+            noteSize: parseFloat(st('.verify-note-text')?.fontSize ?? '0'),
+            fixSize: parseFloat(st('.verify-fix-text')?.fontSize ?? '0'),
+            noteColor: st('.verify-note-text')?.color,
+            fixColor: st('.verify-fix-text')?.color,
+            by: q('[data-testid=verify-fix-by]')?.textContent.trim(),
+            fixLines: Math.round(q('.verify-fix-text').getBoundingClientRect().height / lh('.verify-fix-text')),
+            more: !!q('[data-testid=verify-more]'),
+            right: right?.className,
+            wrong: q('[data-testid=check-wrong]')?.className,
+            skip: q('[data-testid=verify-skip]')?.className,
+            rightAt: right ? Math.round(right.getBoundingClientRect().top) : null,
+            cardTop: document.querySelector('.verify').getBoundingClientRect().top,
+            pictures,
+            ok: getComputedStyle(document.querySelector('.verify')).getPropertyValue('--ok').trim(),
+          };
+        });
+        assert(c.step === 'Check 1 of 2' && c.dots.length === 2 && c.dots.filter((d) => d === 'on').length === 1, `where you are: ${JSON.stringify(c)}`);
+        assert(c.noteSize > c.fixSize && c.noteColor !== c.fixColor, `the note reads first, the answer quieter: ${JSON.stringify(c)}`);
+        assert(c.by === 'Claude Code', `the agent by its shown name: ${c.by}`);
+        assert(c.fixLines <= 3 && c.more, `the long answer folds to three lines with More: ${JSON.stringify(c)}`);
+        assert(
+          /\bprimary\b/.test(c.right) && !/\b(primary|ghost)\b/.test(c.wrong) && /\bghost\b/.test(c.skip),
+          `Looks right raised, Still wrong plain, Skip quiet: ${JSON.stringify(c)}`,
+        );
+        const up = await raised();
+        assert(up.length === 1 && /Looks right/.test(up[0]), `in check mode the card's Looks right is the one raised button: ${JSON.stringify(up)}`);
+        assert(c.pictures.length === 2 && c.pictures.every((b) => b <= c.cardTop + 1), `the card covers neither picture: ${JSON.stringify(c)}`);
+        // colour marks a state only: nothing in the card wears the green as a fill or an edge, only the fix's small ✓
+        const green = await page.evaluate(() => {
+          const probe = document.createElement('i');
+          probe.style.color = 'var(--ok)';
+          document.querySelector('.verify').append(probe);
+          const ok = getComputedStyle(probe).color;
+          probe.remove();
+          const same = (c) => c.replace(/\s/g, '').startsWith(ok.replace(/\s/g, '').replace(/\)$/, ''));
+          return [...document.querySelectorAll('.verify, .verify *')]
+            .filter((e) => {
+              const s = getComputedStyle(e);
+              return (
+                same(s.backgroundColor) ||
+                (parseFloat(s.borderTopWidth) > 0 && same(s.borderTopColor)) ||
+                (/rgb|color/.test(s.boxShadow) && s.boxShadow.includes(ok))
+              );
+            })
+            .map((e) => e.className?.baseVal ?? e.className);
+        });
+        assert(!green.length, `no green box or edge: ${JSON.stringify(green)}`);
+        // the card from the design system alone: its colours tokens', its sizes and corners on the scales, concentric
+        const colours = await page.evaluate(offTokens, { root: '.verify' });
+        assert(!colours.length, `colours no token gives: ${JSON.stringify(colours)}`);
+        const inv = await page.evaluate(inventory, { scale: SCALE, allow: [], root: '.verify' });
+        const offScale = Object.entries(inv).filter(([, v]) => v.length);
+        assert(!offScale.length, `off the scales: ${JSON.stringify(offScale)}`);
+        const nested = await page.evaluate(concentric, { root: '.verify' });
+        assert(!nested.length, `corners that don't follow the curve around them: ${JSON.stringify(nested)}`);
+        await shot(`check-card-${theme}`);
+        // More unfolds in place: the card grows upwards, the decision stays where it was and in the window
+        await page.click('[data-testid=verify-more]');
+        await page.waitForFunction(() => document.querySelector('.verify-fix-text')?.classList.contains('open'));
+        const open = await page.evaluate(() => {
+          const r = document.querySelector('[data-testid=check-right]').getBoundingClientRect();
+          return { top: Math.round(r.top), bottom: r.bottom, h: innerHeight, more: document.querySelector('[data-testid=verify-more]')?.textContent };
+        });
+        assert(
+          Math.abs(open.top - c.rightAt) <= 1 && open.bottom <= open.h && open.more === 'Less',
+          `the decision stays put and in view: ${JSON.stringify({ open, before: c.rightAt })}`,
+        );
+        await page.keyboard.press('Escape');
+        await page.waitForFunction(() => !document.querySelector('.verify'), { timeout: 5000 });
+      },
+    );
+  await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
+
+  await check('check mode on a phone: the card is the notes sheet’s content, its decision within reach', async () => {
+    await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+    await page.goto('about:blank');
+    await page.goto(`${BASE}/#/v/${enc(card)}?verify=${longFix}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.nsheet .verify [data-testid=check-right]', { timeout: 20000 });
+    await sleep(600);
+    const s = await page.evaluate(() => {
+      const sheet = document.querySelector('.nsheet');
+      const r = document.querySelector('.nsheet [data-testid=check-right]').getBoundingClientRect();
+      return {
+        rows: sheet.querySelectorAll('[data-testid=note-row]').length,
+        filters: !!sheet.querySelector('.note-filters'),
+        right: { top: r.top, bottom: r.bottom, h: innerHeight },
+      };
+    });
+    assert(s.rows === 0 && !s.filters, `only the card in the sheet: ${JSON.stringify(s)}`);
+    assert(s.right.top >= 0 && s.right.bottom <= s.right.h, `Looks right in view: ${JSON.stringify(s.right)}`);
+    await shot('check-card-phone');
+    await page.keyboard.press('Escape');
+    await page.setViewport({ width: 1440, height: 900 });
   });
 
   await check('no coloured edge bends along a rounded box in the player', async () => {

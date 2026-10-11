@@ -319,7 +319,7 @@ try {
     // a fresh load: a hash change alone keeps the player as it was
     await page.goto('about:blank');
     await page.goto(`${BASE}/#/v/${enc(slug)}?verify=${fix.id}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('.verify .c-text', { timeout: 20000 });
+    await page.waitForSelector('[data-testid=verify-note]', { timeout: 20000 });
     await page.keyboard.press('n');
     await page.waitForSelector('[data-testid=verify-reason] input');
     const asked = heard;
@@ -351,7 +351,7 @@ try {
     await page.setViewport({ width: 360, height: 780, deviceScaleFactor: SHOTS ? 3 : 1, isMobile: true, hasTouch: true });
     await page.goto('about:blank');
     await page.goto(`${BASE}/#/v/${enc(slug)}?verify=${next.id}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('.verify .c-text', { timeout: 20000 });
+    await page.waitForSelector('[data-testid=verify-note]', { timeout: 20000 });
     await page.keyboard.press('n');
     await page.waitForSelector('[data-testid=verify-reason] [data-testid=voice]');
     const inside = await page.$eval('.verify', (v) => {

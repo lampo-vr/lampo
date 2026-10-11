@@ -33,8 +33,13 @@ export function CheckDecision({
   small = false,
   rightLabel,
   initial = '',
+  primary = false,
   children,
 }: {
+  /** Check mode's card: Looks right is the view's one raised decision (brand primary, as the inbox's), Still wrong the
+   * plain one beside it. In the panel's list it stays the plain button with its green check (the view's raised door is
+   * the top bar's). */
+  primary?: boolean;
   /** The note: a new one starts a new reason. */
   id: string;
   /** Marked fixed (Still wrong reopens it), else carried to a new version (Still wrong keeps it open). */
@@ -64,10 +69,10 @@ export function CheckDecision({
     );
   return (
     <div className="verify-actions check-decision" data-testid="check-decision">
-      <button type="button" className={`btn ok${sm}`} onClick={onRight} disabled={busy}>
+      <button type="button" className={`btn ${primary ? 'primary' : 'ok'}${sm}`} onClick={onRight} disabled={busy} data-testid="check-right">
         <I name="check" size={small ? 14 : 15} /> {rightLabel ?? t('Looks right')} {keys && <Kbd>Y</Kbd>}
       </button>
-      <button type="button" className={`btn${sm}`} onClick={() => onReopening(true)} disabled={busy}>
+      <button type="button" className={`btn${sm}`} onClick={() => onReopening(true)} disabled={busy} data-testid="check-wrong">
         <I name="x" size={small ? 13 : 14} /> {t('Still wrong')} {keys && <Kbd>N</Kbd>}
       </button>
       {children}
