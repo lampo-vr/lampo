@@ -44,7 +44,7 @@ export interface RunStripProps {
   stalled?: boolean;
   /** Fixes waiting to be checked: done offers Check fixes while there are some. */
   toCheck: number;
-  /** Check fixes as a quiet button: the view's raised door to checking is another (the top bar's, on a desk). */
+  /** Check fixes as a quiet button: the view's raised door to checking is another (the top bar's "Check N fixes"). */
   quietCheck?: boolean;
   nextV: number;
   /** May steer agents (Stop, Try again, Nudge, copy the start): the `agents` right. */

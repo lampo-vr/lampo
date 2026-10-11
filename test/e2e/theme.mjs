@@ -362,18 +362,42 @@ try {
         return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
       };
       const out = [];
-      for (const cls of ['verify', 'compare-bar', 'review-hud', 'lightbox']) {
+      // check mode's card is dark where it floats, on the stage's overlay; on a phone it is the notes sheet's content
+      // and takes the sheet's theme (base.css lists `.stage-overlay > .verify`), so it is built where it floats
+      for (const cls of ['stage-overlay > verify', 'compare-bar', 'review-hud', 'lightbox']) {
+        const path = cls.split(' > ');
         const island = document.createElement('div');
-        island.className = cls;
+        island.className = path[0];
         island.style.cssText = 'position:fixed;left:-9999px;top:0';
+        let inner = island;
+        for (const c of path.slice(1)) {
+          const el = document.createElement('div');
+          el.className = c;
+          inner.append(el);
+          inner = el;
+        }
         const text = document.createElement('div');
         text.textContent = 'text';
-        island.append(text);
+        inner.append(text);
         document.body.append(island);
         const l = lum(getComputedStyle(text).color);
         if (l < 0.5) out.push(`${cls}: text luminance ${l.toFixed(2)}`);
         island.remove();
       }
+      // and in the sheet's theme on a phone: the page's ink in light, never the stage's
+      const sheet = document.createElement('div');
+      sheet.className = 'nsheet';
+      sheet.style.cssText = 'position:fixed;left:-9999px;top:0';
+      const card = document.createElement('div');
+      card.className = 'verify';
+      const words = document.createElement('div');
+      words.textContent = 'text';
+      card.append(words);
+      sheet.append(card);
+      document.body.append(sheet);
+      const inSheet = lum(getComputedStyle(words).color);
+      if (inSheet >= 0.5) out.push(`verify in the notes sheet: text luminance ${inSheet.toFixed(2)} (light text on the light sheet)`);
+      sheet.remove();
       const stage = document.querySelector('.stage');
       if (stage) {
         const text = document.createElement('div');

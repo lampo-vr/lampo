@@ -214,7 +214,11 @@ try {
     await until(async () => (await api('/api/onboarding')).onboarding.setup_done, 'the setup is over');
     await a.waitForSelector('[data-testid=check-decision]', { timeout: 15000 });
     const t = await textOf(a);
-    assert(t.includes('The title covers the car') && t.includes('Claude Code · fixed in V2'), t.slice(0, 1200));
+    // the check card: the note first, then the fix by the agent picked, by its name, "fixed in V2"
+    const note = await textOf(a, '[data-testid=verify-note]');
+    const by = (await textOf(a, '[data-testid=verify-fix-by]')).trim();
+    const fix = await textOf(a, '[data-testid=verify-fix]');
+    assert(note.includes('The title covers the car') && by === 'Claude Code' && fix.includes('fixed in V2'), JSON.stringify({ note, by, fix }));
     assert(!t.includes('Sample agent'), 'the stored name never shows');
     await shot(a, '04-sample-check');
   });

@@ -21,8 +21,8 @@ format stays backwards compatible throughout.
   after instead of over them. "Check 1 of 2" says where you are, with a dot per fix. On a phone the card is the notes
   sheet, its decision always in reach.
 - One way into checking fixes at a time: the top bar's "Check 2 fixes" is the raised one and the agent's line says it
-  quietly (on a phone, whose top bar has no room for it, the agent's line is the one), and in check mode neither asks
-  again.
+  quietly; while notes are still open the top bar waits on the agent, and the agent's line is the one. In check mode
+  neither asks again.
 - A fix belongs to the version that has it. "Fixes to check" lists only what an agent said it fixed, in a version
   that exists: a new version no longer asks you to check every open note again, nor a question or a note outside a
   partial render. The notes nobody worked on stay open, with a quiet "V3 changed here" where the new version differs

@@ -325,8 +325,12 @@ try {
       const [re, acts0] = want[st];
       if (!re.test(words)) out.push(`${st}: "${words}"`);
       if (acts.join() !== acts0.join()) out.push(`${st}: actions ${acts.join() || 'none'}, not ${acts0.join() || 'none'}`);
+      // one raised door per view to checking the fixes: five notes are still open here, so the top bar waits on the
+      // agent and offers no "Check N fixes" — the strip's is the door, raised (with every note answered the top bar's
+      // is, and the strip says it quietly: player.mjs)
       const raised = acts0.filter((a) => a === 'answer' || a === 'check');
       if (primary.join() !== raised.join()) out.push(`${st}: raised ${primary.join() || 'none'}`);
+      if (st === 'done' && (await page.$('[data-testid=stage-next][data-kind=verify]'))) out.push('done: the top bar offers Check fixes as well');
     }
     // the percentage stands at the line's end, never cut
     await go(page, 'rendering');

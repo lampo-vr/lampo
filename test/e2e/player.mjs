@@ -972,27 +972,39 @@ try {
     );
   await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
 
-  await check('check mode on a phone: the card is the notes sheet’s content, its decision within reach', async () => {
-    await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
-    await page.goto('about:blank');
-    await page.goto(`${BASE}/#/v/${enc(card)}?verify=${longFix}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('.nsheet .verify [data-testid=check-right]', { timeout: 20000 });
-    await sleep(600);
-    const s = await page.evaluate(() => {
-      const sheet = document.querySelector('.nsheet');
-      const r = document.querySelector('.nsheet [data-testid=check-right]').getBoundingClientRect();
-      return {
-        rows: sheet.querySelectorAll('[data-testid=note-row]').length,
-        filters: !!sheet.querySelector('.note-filters'),
-        right: { top: r.top, bottom: r.bottom, h: innerHeight },
-      };
-    });
-    assert(s.rows === 0 && !s.filters, `only the card in the sheet: ${JSON.stringify(s)}`);
-    assert(s.right.top >= 0 && s.right.bottom <= s.right.h, `Looks right in view: ${JSON.stringify(s.right)}`);
-    await shot('check-card-phone');
-    await page.keyboard.press('Escape');
-    await page.setViewport({ width: 1440, height: 900 });
-  });
+  await check(
+    'on a phone too one raised door to checking (the row under the bar’s Check); in check mode the card is the notes sheet’s content, its decision within reach',
+    async () => {
+      await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+      await page.goto('about:blank');
+      // the phone's row under its bar says "Check" (the stage's next step), and the agent's line says it quietly
+      await page.goto(`${BASE}/#/v/${enc(card)}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('[data-testid=run-strip][data-phase=done] [data-testid=run-check]', { timeout: 20000 });
+      await page.waitForSelector('[data-testid=stage-next][data-kind=verify]', { timeout: 20000 });
+      const door = await page.$eval('[data-testid=run-check]', (b) => b.className);
+      assert(!/\bprimary\b/.test(door), `the strip's Check fixes is quiet beside the bar's Check: ${door}`);
+      const up = await raised();
+      assert(up.length === 1 && /^Check$/.test(up[0]), `one raised door on a phone: ${JSON.stringify(up)}`);
+      await page.goto('about:blank');
+      await page.goto(`${BASE}/#/v/${enc(card)}?verify=${longFix}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('.nsheet .verify [data-testid=check-right]', { timeout: 20000 });
+      await sleep(600);
+      const s = await page.evaluate(() => {
+        const sheet = document.querySelector('.nsheet');
+        const r = document.querySelector('.nsheet [data-testid=check-right]').getBoundingClientRect();
+        return {
+          rows: sheet.querySelectorAll('[data-testid=note-row]').length,
+          filters: !!sheet.querySelector('.note-filters'),
+          right: { top: r.top, bottom: r.bottom, h: innerHeight },
+        };
+      });
+      assert(s.rows === 0 && !s.filters, `only the card in the sheet: ${JSON.stringify(s)}`);
+      assert(s.right.top >= 0 && s.right.bottom <= s.right.h, `Looks right in view: ${JSON.stringify(s.right)}`);
+      await shot('check-card-phone');
+      await page.keyboard.press('Escape');
+      await page.setViewport({ width: 1440, height: 900 });
+    },
+  );
 
   await check('no coloured edge bends along a rounded box in the player', async () => {
     await openPlayer();

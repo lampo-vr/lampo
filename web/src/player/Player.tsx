@@ -1322,8 +1322,12 @@ function PlayerView({
   const showStrip = hasAgent && (!final || !!stripRun);
   // "go on" is for whoever steers the agent, and not while a render or an upload it started says how far it is
   const goOn = !!owedNote && !!review.session && canSteer && !final && !(stripRun && progressOf(stripRun));
+  // The top bar offers "Check N fixes" (status/StageControl.tsx; a phone's "Check" in the row under its bar) while
+  // checking is the stage's next step: not with notes still open (it waits on the agent then), not on an archived
+  // project's video (its banner stands there), not while a phone's row is the compare bar.
+  const topChecks = !frozen && data.summary.stage.next.kind === 'verify' && !(phone && ab && !verifying);
   // + Note steps down while the view's raised door is another: the strip's Answer, or checking the fixes (the top bar's
-  // Check N fixes on a desk, the strip's on a phone, the card's Looks right in check mode)
+  // Check N fixes or the strip's, the card's Looks right in check mode)
   const stripPrimary =
     !goOn &&
     !!stripRun &&
@@ -1338,10 +1342,10 @@ function PlayerView({
       reachable={reachable}
       copyable={listen !== null}
       stalled={goOn}
-      // checking the fixes: one raised door per view — the top bar's on a desk (the strip's is quiet), the strip's on a
-      // phone (its top bar has none), and none while check mode runs (its card decides)
+      // checking the fixes: one raised door per view — the top bar's where it offers it (the strip says it quietly then),
+      // else the strip's, and none while check mode runs (its card decides)
       toCheck={verify.active ? 0 : verify.queue.length}
-      quietCheck={!phone}
+      quietCheck={topChecks}
       nextV={latestV + 1}
       canSteer={canSteer}
       canCheck={canCheck}
