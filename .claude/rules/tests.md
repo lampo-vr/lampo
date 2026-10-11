@@ -41,3 +41,4 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - Times in the store are to the second (`isoLocal`): two writes in a row land in one second or two, and a list sorted
   newest first swaps them. Never assume which of two such items comes next; open the one the check is about
   (`inbox.mjs` "Still wrong").
+- A price that keeps both intervals in the page (the plans' roll) is read with `innerText`: the one rolled away is `visibility: hidden`, still in `textContent` (billing.mjs `seen`).

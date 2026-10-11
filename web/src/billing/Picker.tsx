@@ -7,7 +7,7 @@
 // changes the bill. Free and the rest in one row and one line below. Consumers may buy: where the provider
 // names the VAT a consumer pays (BillingInfo.vat), every price here is shown with it (PAngV), and the foot says that the
 // checkout works the tax out for the billing address.
-import { useState } from 'react';
+import { type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { BillingInfo, BillingOffer, BillingPreview } from '../../../lib/types.ts';
 import { trialEndNet } from '../conversion/facts.ts';
 import { contractMail } from '../conversion/limits/model.ts';
@@ -20,7 +20,7 @@ import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { useConfirm } from '../ui/primitives.tsx';
 import { type PlanChoice, toastRefusal, useChangePlan, usePlanPreview, useSwitchEndsTrial } from './api.ts';
 import { checkoutHash } from './Checkout.tsx';
-import { dayOf, daysUntil, gross, money, monthly, planLine, saving, size, unitsFor, vatRate } from './words.ts';
+import { billedNow, dayOf, daysUntil, gross, money, monthly, planLine, saving, savingNote, size, taxWord, unitsFor, vatOf, vatRate } from './words.ts';
 
 /** What the address brought: a plan picked on the website, with its interval and currency when it said them. */
 export interface Picked {
@@ -111,19 +111,14 @@ export function Picker({
   const left = b.trialEndsAt ? daysUntil(b.trialEndsAt) : 0;
   const units = sel ? unitsFor(sel, n) : 1;
   const unit = sel ? (monthly(sel, interval, currency) ?? 0) : 0;
-  // what a consumer pays: with VAT where the provider names it (the tax on the whole, as the invoice reckons it)
-  const year = gross(sel ? (sel.prices[currency]?.year ?? 0) * units : 0, b);
-  const month = gross(Math.round(unit * units), b);
-  const withVat = !!b.vat?.rate;
-  const plusVat = !withVat && b.tax !== 'included';
-  // a switch that ends the trial bills the plan now: said as this page says its prices (with VAT where it names a rate,
-  // else plus VAT), or the provider's own total where the plan's price can't say it (conversion/facts.ts trialEndNet)
-  const chargedNow = (o: BillingOffer, p: BillingPreview): string => {
-    const net = trialEndNet(b, o, interval, p.currency);
-    if (net === null) return money(p.amount, p.currency, { cents: true });
-    if (withVat) return t('{amount} incl. VAT', { amount: money(gross(net, b), p.currency, { cents: true }) });
-    return plusVat ? t('{amount} plus VAT', { amount: money(net, p.currency, { cents: true }) }) : money(net, p.currency, { cents: true });
-  };
+  // the prices as the provider sells them, net, said "excl. VAT" like the website's (taxWord); what a consumer pays in
+  // all comes beside the one action, before anyone commits (PAngV): the period's total with the VAT the provider names
+  const year = sel ? (sel.prices[currency]?.year ?? 0) * units : 0;
+  const month = Math.round(unit * units);
+  const rate = vatOf(b);
+  const tax = taxWord(b);
+  // a switch that ends the trial bills the plan now: its net and what the provider invoices now (words.ts billedNow)
+  const chargedNow = (o: BillingOffer, p: BillingPreview): string => billedNow(trialEndNet(b, o, interval, p.currency), p);
   const who = !sel
     ? ''
     : sel.perMember
@@ -131,16 +126,11 @@ export function Picker({
       : t('{plan} for one person', { plan: sel.name });
   const cost =
     interval === 'year'
-      ? withVat
-        ? t('{month} a month · {year} billed yearly, incl. VAT', { month: money(month, currency), year: money(year, currency) })
-        : plusVat
-          ? t('{month} a month · {year} billed yearly, plus VAT', { month: money(month, currency), year: money(year, currency) })
-          : t('{month} a month · {year} billed yearly', { month: money(month, currency), year: money(year, currency) })
-      : withVat
-        ? t('{month} a month, billed monthly, incl. VAT', { month: money(month, currency) })
-        : plusVat
-          ? t('{month} a month, billed monthly, plus VAT', { month: money(month, currency) })
-          : t('{month} a month, billed monthly', { month: money(month, currency) });
+      ? t('{month} a month · {year} billed yearly, {tax}', { month: money(month, currency), year: money(year, currency), tax })
+      : t('{month} a month, billed monthly, {tax}', { month: money(month, currency), tax });
+  const total = !sel || rate === null ? null : gross(interval === 'year' ? year : month, b);
+  const inAll =
+    total === null || rate === null ? null : t('{amount} incl. {rate} VAT', { amount: money(total, currency, { cents: true }), rate: vatRate(rate) });
   const when = !sel
     ? ''
     : subscribed
@@ -159,29 +149,30 @@ export function Picker({
   const pickedOffer = picked ? offers.find((o) => o.plan === picked.plan) : null;
 
   return (
-    <section className="bill-picker" id="billing-picker" aria-label={t('Plans')} data-testid="billing-plans">
+    // the interval on the section: every price rolls between its yearly and monthly amounts (billing.css .bill-roll)
+    <section className="bill-picker" id="billing-picker" aria-label={t('Plans')} data-interval={interval} data-testid="billing-plans">
       <header className="bill-pk-head">
         <h2 className="section-title">{subscribed ? t('Change plan') : t('Choose a plan')}</h2>
         <div className="bill-pk-ctl">
-          <fieldset className="seg bill-seg">
-            <legend className="sr-only">{t('Billing interval')}</legend>
-            <button type="button" className={interval === 'year' ? 'on' : ''} aria-pressed={interval === 'year'} onClick={() => setPeriod('year')}>
-              {t('Yearly')}
-              {sel && <i className="bill-save">{saving(sel, currency)}</i>}
-            </button>
-            <button type="button" className={interval === 'month' ? 'on' : ''} aria-pressed={interval === 'month'} onClick={() => setPeriod('month')}>
-              {t('Monthly')}
-            </button>
-          </fieldset>
+          <Slide
+            label={t('Billing interval')}
+            value={interval}
+            onChange={setPeriod}
+            options={[
+              {
+                v: 'year',
+                text: (
+                  <>
+                    {t('Yearly')}
+                    <i className="bill-save">{savingNote(offers, currency)}</i>
+                  </>
+                ),
+              },
+              { v: 'month', text: t('Monthly') },
+            ]}
+          />
           {currencies.length > 1 && (
-            <fieldset className="seg bill-seg">
-              <legend className="sr-only">{t('Currency')}</legend>
-              {currencies.map((c) => (
-                <button key={c} type="button" className={currency === c ? 'on' : ''} aria-pressed={currency === c} onClick={() => setCurrency(c)}>
-                  {c.toUpperCase()}
-                </button>
-              ))}
-            </fieldset>
+            <Slide label={t('Currency')} value={currency} onChange={setCurrency} options={currencies.map((c) => ({ v: c, text: c.toUpperCase() }))} />
           )}
           <div className="bill-stepper" title={t('{ws} has {n} today', { ws, n: b.usage.members })} data-testid="billing-stepper">
             <button type="button" className="bill-step" aria-label={t('One member fewer')} disabled={n <= 1} onClick={() => setN(n - 1)}>
@@ -211,12 +202,12 @@ export function Picker({
         {offers.map((o, i) => (
           <Tile
             key={o.plan}
+            i={i}
             o={o}
             prev={i > 0 ? offers[i - 1] : null}
             b={b}
             ws={ws}
             n={n}
-            interval={interval}
             currency={currency}
             on={sel?.plan === o.plan}
             fits={fitsNow(o, n)}
@@ -228,7 +219,17 @@ export function Picker({
       <div className="bill-pick-bar" data-testid="billing-pick-bar">
         <div className="bill-pk-sum">
           <b>{who}</b>
-          <span>{cost}</span>
+          <span>
+            {cost}
+            {inAll && (
+              <>
+                {' · '}
+                <em className="bill-pk-gross" data-testid="billing-gross">
+                  {inAll}
+                </em>
+              </>
+            )}
+          </span>
           <small>{when}</small>
         </div>
         {isCurrent ? (
@@ -258,24 +259,25 @@ export function Picker({
         </div>
         <p className="bill-fine">
           {t(
-            'Agents and people on review links are free on every plan. More storage on any plan: 1 TB for {amount} a month. Business as a contract, on invoice:',
-            {
-              amount: money(gross(1000, b), currency),
-            },
+            'Agents and people on review links are free on every plan. More storage on any plan: 1 TB for {amount} a month, {tax}. Business as a contract, on invoice:',
+            { amount: money(1000, currency), tax },
           )}{' '}
           <a className="bill-u" href={contractMail()}>
             {t('talk to us')}
           </a>
           .
         </p>
-        {withVat && b.vat && (
+        {rate !== null && (
           <p className="bill-fine" data-testid="billing-vat">
             {/* a business abroad pays no VAT only where the provider offers reverse charge (its seller has a VAT ID) */}
             {b.reverseCharge
-              ? t('Prices include {rate} VAT. At the checkout it follows your billing address: a business with a VAT ID from another EU country pays none.', {
-                  rate: vatRate(b.vat.rate),
-                })
-              : t('Prices include {rate} VAT. At the checkout it follows your billing address.', { rate: vatRate(b.vat.rate) })}
+              ? t(
+                  'Prices excl. VAT; the total beside the button includes {rate}. At the checkout the VAT follows your billing address: a business with a VAT ID from another EU country pays none.',
+                  { rate: vatRate(rate) },
+                )
+              : t('Prices excl. VAT; the total beside the button includes {rate}. At the checkout the VAT follows your billing address.', {
+                  rate: vatRate(rate),
+                })}
           </p>
         )}
       </div>
@@ -285,34 +287,36 @@ export function Picker({
 }
 
 function Tile({
+  i,
   o,
   prev,
   b,
   ws,
   n,
-  interval,
   currency,
   on,
   fits,
   picked,
   onSelect,
 }: {
+  /** Its place in the row: the prices roll one card after another. */
+  i: number;
   o: BillingOffer;
   prev: BillingOffer | null;
   b: BillingInfo;
   ws: string;
   n: number;
-  interval: 'month' | 'year';
   currency: string;
   on: boolean;
   fits: boolean;
   picked: boolean;
   onSelect: () => void;
 }) {
-  // with VAT where the provider names it (PAngV): what a consumer pays
-  const perMonth = monthly(o, interval, currency);
-  const unit = perMonth === null ? null : gross(perMonth, b);
-  const year = gross(o.prices[currency]?.year ?? 0, b);
+  // per month and unit, net, as the website shows them: billed yearly (the year's price ÷ 12) and billed monthly — both
+  // in the page, the section's interval says which one stands (the other rolled away)
+  const yearly = monthly(o, 'year', currency);
+  const perMonth = monthly(o, 'month', currency);
+  const tax = taxWord(b);
   const facts = [
     o.members.max === 1
       ? t('{n} member|{n} members', { n: 1 })
@@ -343,7 +347,12 @@ function Tile({
           ? t('Billed for at least {n} members.', { n: o.members.min })
           : '';
   return (
-    <label className={`bill-tile ${on ? 'on' : ''} ${fits ? '' : 'off'}`} data-plan={o.plan} data-testid={`billing-offer-${o.plan}`}>
+    <label
+      className={`bill-tile ${on ? 'on' : ''} ${fits ? '' : 'off'}`}
+      style={{ '--i': i } as CSSProperties}
+      data-plan={o.plan}
+      data-testid={`billing-offer-${o.plan}`}
+    >
       <input type="radio" name="bill-plan" className="sr-only" value={o.plan} checked={on} disabled={!fits} onChange={() => fits && onSelect()} />
       <span className="bill-t-h">
         <span className="bill-radio" aria-hidden="true" />
@@ -354,25 +363,17 @@ function Tile({
       </span>
       <span className="bill-t-line">{planLine(o.plan)}</span>
       <span className="bill-t-price">
-        <b>{unit === null ? '—' : money(unit, currency)}</b>
-        <span>
-          {o.perMember ? (
-            <>
-              {t('per member')}
-              <br />
-              {t('a month')}
-            </>
-          ) : (
-            t('a month')
-          )}
+        <span className="bill-roll">
+          <b className="p-year">{yearly === null ? '—' : money(yearly, currency)}</b>
+          <b className="p-month">{perMonth === null ? '—' : money(perMonth, currency)}</b>
         </span>
+        <span className="bill-t-unit">{o.perMember ? t('per member a month') : t('a month')}</span>
       </span>
       <span className="bill-t-billed">
-        {interval === 'year'
-          ? o.perMember
-            ? t('{amount} per member billed yearly · {saving}', { amount: money(year, currency), saving: saving(o, currency) })
-            : t('{amount} billed yearly · {saving}', { amount: money(year, currency), saving: saving(o, currency) })
-          : t('Billed monthly · {amount} if yearly', { amount: money(Math.round(year / 12), currency) })}
+        <span className="bill-roll">
+          <span className="p-year">{t('{tax} · billed yearly, {saving}', { tax, saving: saving(o, currency) })}</span>
+          <span className="p-month">{t('{tax} · billed monthly', { tax })}</span>
+        </span>
       </span>
       <span className="bill-t-facts">
         {prev && <span className="bill-t-plus">{t('Everything in {plan}, plus', { plan: prev.name })}</span>}
@@ -385,5 +386,57 @@ function Tile({
       </span>
       <span className="bill-t-note">{note}</span>
     </label>
+  );
+}
+
+/**
+ * A switch of the picker's (yearly or monthly, the currency) as the website has it: the picked side is one raised thumb
+ * that slides there (its place and width from the picked button, measured; placed at once the first time, then moved
+ * with the springy ease), the buttons stay where they are. Without motion it simply stands under the picked one.
+ */
+/** Puts a switch's thumb under its picked button: at once the first time (no slide in from the left), then with the slide. */
+function placeThumb(seg: HTMLElement | null) {
+  const on = seg?.querySelector<HTMLElement>('button[aria-pressed="true"]');
+  const th = seg?.querySelector<HTMLElement>('.bill-thumb');
+  if (!on?.offsetWidth || !th) return;
+  const first = !th.style.getPropertyValue('--w');
+  if (first) th.classList.add('still');
+  th.style.setProperty('--x', `${on.offsetLeft}px`);
+  th.style.setProperty('--w', `${on.offsetWidth}px`);
+  if (first) requestAnimationFrame(() => requestAnimationFrame(() => th.classList.remove('still')));
+}
+
+function Slide<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: { v: T; text: ReactNode }[];
+  onChange: (v: T) => void;
+}) {
+  const box = useRef<HTMLFieldSetElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: placed again whenever the picked side changes
+  useLayoutEffect(() => placeThumb(box.current), [value]);
+  // the buttons' widths follow the fonts, the window and the words (the yearly note's)
+  useEffect(() => {
+    const seg = box.current;
+    if (!seg) return;
+    const sizes = new ResizeObserver(() => placeThumb(seg));
+    for (const b of seg.querySelectorAll('button')) sizes.observe(b);
+    return () => sizes.disconnect();
+  }, []);
+  return (
+    <fieldset className="seg bill-seg slides" ref={box}>
+      <legend className="sr-only">{label}</legend>
+      <span className="bill-thumb" aria-hidden="true" />
+      {options.map((o) => (
+        <button key={o.v} type="button" className={value === o.v ? 'on' : ''} aria-pressed={value === o.v} onClick={() => onChange(o.v)}>
+          {o.text}
+        </button>
+      ))}
+    </fieldset>
   );
 }

@@ -486,8 +486,9 @@ test('MEDIA-4: a push goes to the address that was checked (never resolved again
 // ---------------------------------------------------------------- the API
 
 const ctx = createContext({ cfg: loadConfig(), token: 't', loadSessions: async () => [] });
-const svc = service();
-ctx.push = push.createPush({ subject: 'mailto:ops@example.com', fetchImpl: svc.fetchImpl, resolve: PUBLIC });
+// a device whose push service ended its subscription answers 410, one that refuses for any other reason 403
+const svc = service((u) => (u.includes('/gone-') ? 410 : u.includes('/refuses-') ? 403 : 201));
+ctx.push = push.createPush({ subject: 'mailto:ops@example.com', fetchImpl: svc.fetchImpl, resolve: PUBLIC, log: () => {} });
 const { port } = await startApp({ ctx });
 const api = (method: string, url: string, body?: unknown) =>
   fetch(`http://127.0.0.1:${port}${url}`, {
@@ -521,4 +522,22 @@ test('API: key, subscribe, preferences, a test notification, unsubscribe', async
   assert.equal(b.read(svc.got.at(-1)?.body as Buffer).title, 'Notifications are on');
   assert.equal(((await (await api('POST', '/api/push/unsubscribe', { endpoint: b.endpoint })).json()) as PushState).devices, 0);
   assert.equal((await api('POST', '/api/push/test', { endpoint: b.endpoint })).status, 404);
+});
+
+test('API: a test says why it didn’t go out — a subscription its push service ended is forgotten (410), a refusal keeps the device (502)', async () => {
+  reset();
+  const gone = browser('https://fcm.googleapis.com/fcm/send/gone-device');
+  const refuses = browser('https://fcm.googleapis.com/fcm/send/refuses-device');
+  for (const d of [gone, refuses])
+    assert.equal((await api('POST', '/api/push/subscribe', { subscription: { endpoint: d.endpoint, keys: d.keys } })).status, 200);
+  const ended = await api('POST', '/api/push/test', { endpoint: gone.endpoint });
+  assert.equal(ended.status, 410);
+  assert.match(((await ended.json()) as { error: string }).error, /subscription has ended/);
+  // forgotten here too: the page that asks next shows notifications off on that device
+  const after = (await (await api('GET', `/api/push?endpoint=${encodeURIComponent(gone.endpoint)}`)).json()) as PushState;
+  assert.equal(after.subscription, null);
+  assert.equal(after.devices, 1);
+  const refused = await api('POST', '/api/push/test', { endpoint: refuses.endpoint });
+  assert.equal(refused.status, 502);
+  assert.notEqual(((await (await api('GET', `/api/push?endpoint=${encodeURIComponent(refuses.endpoint)}`)).json()) as PushState).subscription, null);
 });

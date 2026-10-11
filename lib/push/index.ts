@@ -417,9 +417,15 @@ export interface Push {
   flush(): void;
   /** Resolves when every send started so far has finished. */
   idle(): Promise<void>;
-  /** A sample notification to one device. */
-  test(endpoint: string, user: string | null): Promise<boolean>;
+  /**
+   * A sample notification to one device: what its push service said — took it (`sent`), the subscription is gone for good
+   * (`gone`: the device is forgotten here too) or anything else (`refused`).
+   */
+  test(endpoint: string, user: string | null): Promise<Delivery>;
 }
+
+/** What a push service made of one notification. */
+export type Delivery = 'sent' | 'gone' | 'refused';
 
 const WINDOWS: Record<Bucket, number> = { question: 4000, release: 20_000, client: 30_000, answer: 8000, post: 2000, agent: 3000, quiet: 3000 };
 
@@ -456,7 +462,7 @@ export function createPush(o: PushOptions): Push {
     return p;
   };
 
-  async function deliver(id: string, sub: StoredSub, payload: object, topic: string, urgency: 'normal' | 'high'): Promise<boolean> {
+  async function deliver(id: string, sub: StoredSub, payload: object, topic: string, urgency: 'normal' | 'high'): Promise<Delivery> {
     const body = JSON.stringify({ ...payload, count: o.count ? o.count(sub) : undefined });
     for (let attempt = 0; attempt < 2; attempt++) {
       if (attempt) await new Promise((r) => setTimeout(r, retryDelay));
@@ -471,27 +477,27 @@ export function createPush(o: PushOptions): Push {
         });
         if (res.ok) {
           patchSub(id, (s) => ({ ...s, last_ok: isoLocal() }));
-          return true;
+          return 'sent';
         }
         if (res.gone) {
           patchSub(id, () => null);
-          return false;
+          return 'gone';
         }
         if (res.status !== 429 && res.status < 500) {
           log(`push to ${sub.name}: HTTP ${res.status}`);
-          return false;
+          return 'refused';
         }
       } catch (e) {
         // A push service whose name now resolves into a private network: said once, not asked again; the device stays
         // (the name may resolve elsewhere tomorrow).
         if (e instanceof PushRefused) {
           log(`push to ${sub.name}: refused, ${e.message}`);
-          return false;
+          return 'refused';
         }
         if (attempt) log(`push to ${sub.name}: ${(e as Error).message}`);
       }
     }
-    return false;
+    return 'refused';
   }
 
   function send(msg: PushMessage) {

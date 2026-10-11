@@ -122,11 +122,11 @@ export function priceOf(o: BillingOffer, interval: 'month' | 'year', members: nu
     sub:
       interval === 'year'
         ? o.perMember
-          ? t('{amount} billed yearly · {each} per member', { amount: money(period, currency), each })
-          : t('{amount} billed yearly', { amount: money(period, currency) })
+          ? t('excl. VAT · {amount} billed yearly · {each} per member', { amount: money(period, currency), each })
+          : t('excl. VAT · {amount} billed yearly', { amount: money(period, currency) })
         : o.perMember
-          ? t('Billed monthly · {each} per member · {yearly} if yearly', { each, yearly: money(yearly, currency) })
-          : t('Billed monthly · {yearly} if yearly', { yearly: money(yearly, currency) }),
+          ? t('excl. VAT · billed monthly · {each} per member · {yearly} if yearly', { each, yearly: money(yearly, currency) })
+          : t('excl. VAT · billed monthly · {yearly} if yearly', { yearly: money(yearly, currency) }),
   };
 }
 

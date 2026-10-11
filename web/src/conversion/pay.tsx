@@ -11,7 +11,7 @@ import type { BillingInfo, BillingMethod, BillingOffer, BillingPreview } from '.
 import { api } from '../api/client.ts';
 import { useBillingAccount } from '../billing/api.ts';
 import { CheckoutStep } from '../billing/Checkout.tsx';
-import { billingSaid } from '../billing/words.ts';
+import { billedNow, billingSaid } from '../billing/words.ts';
 import { t } from '../i18n/index.ts';
 import { Spinner } from '../ui/feedback.tsx';
 import { I } from '../ui/icons.tsx';
@@ -219,11 +219,10 @@ export function useSwitchPreview(plan: string | null, interval: 'month' | 'year'
   return key && preview?.for === key ? preview.p : undefined;
 }
 
-/** "€84.00 plus VAT" (trialEndNet), or the provider's total ("€99.96") when that can't be said. */
-export const trialEndWords = (b: BillingInfo, offer: BillingOffer, interval: 'month' | 'year', p: BillingPreview): string => {
-  const net = trialEndNet(b, offer, interval, p.currency);
-  return net === null ? money(p.amount, p.currency, true) : t('{amount} plus VAT', { amount: money(net, p.currency, true) });
-};
+/** "€84.00 excl. VAT (€99.96 incl. VAT)": the net (trialEndNet) and what the provider invoices now, or the provider's total
+ * alone ("€99.96") when the net can't be said (billing/words.ts billedNow). */
+export const trialEndWords = (b: BillingInfo, offer: BillingOffer, interval: 'month' | 'year', p: BillingPreview): string =>
+  billedNow(trialEndNet(b, offer, interval, p.currency), p);
 
 /**
  * "€17.60": the switch's own part of the next invoice — only what a step up costs; a credit, nothing, or a sum the

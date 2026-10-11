@@ -100,7 +100,7 @@ const SECONDS = {
   // trash, picking by touch, the plan, phone, keys, loading, and the matrix at six widths in both themes and German
   files: 85,
   wake: 9,
-  phone: 8,
+  phone: 10,
   run: 8,
   'mcp-app': 6,
   oauth: 5,

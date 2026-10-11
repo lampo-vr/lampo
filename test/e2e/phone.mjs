@@ -208,6 +208,95 @@ try {
     assert(n.icon.endsWith('/icons/icon-192.png'), n.icon);
   });
 
+  await check('Settings → Notifications, “Send a test”: the card never greys out, and the button says what happened', async () => {
+    // This device, as the server knows it: subscribed under a push service's address (a headless browser has none of
+    // its own, so the page's subscription is that one). The push service's part is played here: the server's answer to
+    // the test (held until the push is delivered, then 200; or a refusal), and the push itself through the DevTools
+    // protocol to the app's real service worker, which shows it and tells the page.
+    const EP = 'https://fcm.googleapis.com/fcm/send/phone-e2e-test';
+    const KEYS = { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' };
+    await api('/api/push/subscribe', 'POST', { subscription: { endpoint: EP, keys: KEYS }, name: 'Mac' });
+    const stub = await page.evaluateOnNewDocument((ep) => {
+      const sub = { endpoint: ep, toJSON: () => ({ endpoint: ep, keys: {} }), unsubscribe: async () => true };
+      PushManager.prototype.getSubscription = async () => sub;
+      const own = window.fetch;
+      // what the server answers to the test, set by the check (`ok` once the push is out, or a refusal)
+      window.fetch = (input, init) =>
+        String(input).endsWith('/api/push/test')
+          ? new Promise((done) => {
+              const t = setInterval(() => {
+                const said = sessionStorage.getItem('test.push.answer');
+                if (!said) return;
+                clearInterval(t);
+                sessionStorage.removeItem('test.push.answer');
+                const [status, error] = said.split('|');
+                done(
+                  new Response(JSON.stringify(error ? { error } : { ok: true }), { status: Number(status), headers: { 'content-type': 'application/json' } }),
+                );
+              }, 20);
+            })
+          : own(input, init);
+    }, EP);
+    try {
+      // a new document, so the stand-ins above are in it (a goto that changes only the hash keeps the page)
+      await page.goto('about:blank');
+      await page.goto(`${BASE}/#/settings/notifications`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('[data-testid="push-settings"][data-state="on"]:not([aria-busy])', { timeout: 20000 });
+      await page.waitForFunction(() => navigator.serviceWorker?.controller, { timeout: 20000 });
+      // nothing in the card turns grey while the test is on its way (every switch and button did: the flash)
+      await page.evaluate(() => {
+        window.__greyed = 0;
+        new MutationObserver((list) => {
+          for (const m of list) if (m.target.disabled || m.target.getAttribute('aria-disabled') === 'true') window.__greyed++;
+        }).observe(document.querySelector('[data-testid="push-settings"]'), {
+          subtree: true,
+          attributes: true,
+          attributeFilter: ['disabled', 'aria-disabled'],
+        });
+      });
+      const said = () => page.$eval('[data-testid="push-test"]', (b) => b.textContent.trim());
+      await page.click('[data-testid="push-test"]');
+      await page.waitForFunction(() => document.querySelector('[data-testid="push-test"]')?.textContent.includes('Sending'), { timeout: 5000 });
+      // the push service takes it: the server says so, the push reaches this browser, its worker shows it
+      await page.evaluate(() => sessionStorage.setItem('test.push.answer', '200'));
+      const payload = { title: 'Notifications are on', body: 'This is how Lampo tells you when something needs you.', url: '#/inbox', tag: 'vr:test' };
+      await cdp.send('ServiceWorker.deliverPushMessage', { origin: BASE, registrationId, data: JSON.stringify(payload) });
+      await page.waitForFunction(() => document.querySelector('[data-testid="push-test"]')?.textContent === 'Sent: check your notifications', {
+        timeout: 15000,
+      });
+      // the worker showed it and told the page: the line beside the button says where to look if it isn't on screen
+      await page.waitForFunction(
+        () => /showed it\. Nothing (on screen|there)\?/.test(document.querySelector('[data-testid="push-test-said"]')?.textContent ?? ''),
+        {
+          timeout: 15000,
+        },
+      );
+      const shown = await page.evaluate(async () => (await (await navigator.serviceWorker.ready).getNotifications({ tag: 'vr:test' })).length);
+      assert(shown === 1, `the test notification is up: ${shown}`);
+      assert((await said()) === 'Sent: check your notifications', await said());
+      assert((await page.evaluate(() => window.__greyed)) === 0, 'no switch or button greyed out for the test');
+      assert(!(await page.$$eval('.toast', (ts) => ts.some((t) => /sent/i.test(t.textContent)))), 'said on the button, not in a toast');
+      await shot('05-push-test-sent');
+      // the push service refuses: the button says so, and what to do
+      await page.click('[data-testid="push-test"]');
+      await page.waitForFunction(() => document.querySelector('[data-testid="push-test"]')?.textContent.includes('Sending'), { timeout: 5000 });
+      await page.evaluate(() => sessionStorage.setItem('test.push.answer', '502|the push service did not accept the notification'));
+      await page.waitForFunction(() => document.querySelector('[data-testid="push-test"]')?.textContent === 'Couldn’t send: the push service refused it', {
+        timeout: 15000,
+      });
+      assert(/turn notifications off and on here/.test(await page.$eval('[data-testid="push-test-said"]', (p) => p.textContent)), await said());
+      // the server no longer has this device (its push service ended it): the card turns off and says why
+      await page.click('[data-testid="push-test"]');
+      await page.evaluate(() => sessionStorage.setItem('test.push.answer', '410|this device’s subscription has ended: turn notifications on again'));
+      await api('/api/push/unsubscribe', 'POST', { endpoint: EP });
+      await page.waitForSelector('[data-testid="push-settings"][data-state="off"]', { timeout: 15000 });
+      await page.waitForFunction(() => [...document.querySelectorAll('.toast')].some((t) => t.textContent.includes('had ended')), { timeout: 10000 });
+    } finally {
+      await page.removeScriptToEvaluateOnNewDocument(stub.identifier);
+      await api('/api/push/unsubscribe', 'POST', { endpoint: EP }).catch(() => {});
+    }
+  });
+
   await check('with the server out of reach, the app shows its offline screen', async () => {
     await srv.stop();
     await until(async () => {

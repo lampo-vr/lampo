@@ -89,8 +89,8 @@ test('3a: an upload on Free that needs room: Solo fits, priced as the picker say
   if (fit.kind !== 'plan') return;
   assert.equal(titleOf(reason, ask, 'Costa Cuts', fit), 'fjord-hotel-rooms-v3.mov needs more room');
   assert.match(ledeOf(reason, ask, free, 'Costa Cuts', fit), /^It’s 1\.8 GB, and Costa Cuts has 600 MB of Free’s 10 GB left\. The upload waits;/);
-  assert.deepEqual(priceOf(fit.offer, 'year', 1, 'eur'), { big: '€12', per: 'a month', sub: '€144 billed yearly' });
-  assert.equal(priceOf(fit.offer, 'month', 1, 'eur')?.sub, 'Billed monthly · €12 if yearly');
+  assert.deepEqual(priceOf(fit.offer, 'year', 1, 'eur'), { big: '€12', per: 'a month', sub: 'excl. VAT · €144 billed yearly' });
+  assert.equal(priceOf(fit.offer, 'month', 1, 'eur')?.sub, 'excl. VAT · billed monthly · €12 if yearly');
   assert.equal(saving(fit.offer, 'eur'), 'save 20%');
   const rows = changeRows(free, fit, reason, needOf(free, ask, reason));
   assert.deepEqual(
@@ -136,7 +136,7 @@ test('3c: a second person on Free: Team for two, the button invites them', () =>
   if (fit.kind !== 'plan') return;
   assert.equal(titleOf('members', ask, 'Costa Cuts', fit), 'Bring Ben into Costa Cuts');
   assert.equal(ledeOf('members', ask, free, 'Costa Cuts', fit), 'Free is for one person. Team has room for 2 to 50: Ben gets an account of their own.');
-  assert.deepEqual(priceOf(fit.offer, 'year', 2, 'eur'), { big: '€40', per: 'a month for 2', sub: '€480 billed yearly · €20 per member' });
+  assert.deepEqual(priceOf(fit.offer, 'year', 2, 'eur'), { big: '€40', per: 'a month for 2', sub: 'excl. VAT · €480 billed yearly · €20 per member' });
   assert.equal(saving(fit.offer, 'eur'), '2 months free');
   const rows = changeRows(free, fit, 'members', needOf(free, ask, 'members'));
   assert.deepEqual(rows[0], { k: 'Members', now: '1', next: '2 · up to 50' });
@@ -170,7 +170,7 @@ test('in German, du', () => {
     );
     assert.equal(payLabel('storage', fit, ask, '171,36 €', false), '171,36 € bezahlen und hochladen');
     // German puts a no-break space between the amount and the euro sign
-    if (fit.kind === 'plan') assert.match(priceOf(fit.offer, 'year', 1, 'eur')?.sub ?? '', /^144\s€ jährlich abgerechnet$/);
+    if (fit.kind === 'plan') assert.match(priceOf(fit.offer, 'year', 1, 'eur')?.sub ?? '', /^zzgl\. USt\. · 144\s€ jährlich abgerechnet$/);
   } finally {
     setDictionary('en', null);
   }

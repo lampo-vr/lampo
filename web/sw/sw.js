@@ -81,17 +81,33 @@ self.addEventListener('push', (e) => {
   } catch {}
   const badge =
     typeof d.count === 'number' && self.navigator.setAppBadge ? (d.count ? self.navigator.setAppBadge(d.count) : self.navigator.clearAppBadge()) : null;
+  const shown = self.registration.showNotification(d.title || 'Lampo', {
+    body: d.body || '',
+    tag: d.tag,
+    renotify: !!d.tag,
+    icon: '/icons/icon-192.png',
+    badge: '/icons/badge-96.png',
+    data: { url: d.url || '#/inbox' },
+  });
+  // A test from Settings → Notifications: the page that sent it hears whether this browser showed it (pwa/push.ts
+  // testPush). Whether the system then puts it on screen (macOS's own switch per browser, Focus) no page can know.
+  const tell = (ok) =>
+    self.clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((windows) => {
+        for (const w of windows) w.postMessage({ type: 'vr-push-test', shown: ok });
+      })
+      .catch(() => {});
   e.waitUntil(
     Promise.all([
-      self.registration.showNotification(d.title || 'Lampo', {
-        body: d.body || '',
-        tag: d.tag,
-        renotify: !!d.tag,
-        icon: '/icons/icon-192.png',
-        badge: '/icons/badge-96.png',
-        data: { url: d.url || '#/inbox' },
-      }),
-      badge,
+      d.tag === 'vr:test'
+        ? shown.then(
+            () => tell(true),
+            (err) => tell(false).then(() => Promise.reject(err)),
+          )
+        : shown,
+      // the icon's number is a nicety: a platform that refuses it doesn't fail the notification
+      badge?.catch(() => {}),
     ]),
   );
 });

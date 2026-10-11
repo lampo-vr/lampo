@@ -223,7 +223,11 @@ export default async function fakeBilling(host: Host, env: Record<string, string
    * says `paid`, as the real module does) — carries into Solo and Team only: a switch to Business ends it.
    */
   const endsTrial = (w: string, plan: string) => stateOf(w).trialing === true && plan !== 'solo' && plan !== 'team';
-  const units = async (w: string, offer: (typeof OFFERS)[number]) => (offer.perMember ? Math.max(offer.members.min, (await host.usage(w)).members) : 1);
+  // the members billed: what the suite says the workspace uses (as GET /api/billing answers), else the app's count
+  const units = async (w: string, offer: (typeof OFFERS)[number]) => {
+    const said = (stateOf(w).usage as { members?: number } | undefined)?.members;
+    return offer.perMember ? Math.max(offer.members.min, said ?? (await host.usage(w)).members) : 1;
+  };
   const accountOf = (d: Data, w: string): Account => {
     d.accounts[w] ??= { details: { name: null, email: null, address: null, taxIds: [] }, methods: [], invoices: [] };
     return d.accounts[w];
@@ -598,9 +602,15 @@ export default async function fakeBilling(host: Host, env: Record<string, string
         if (!offer) return json(400, { error: 'no such plan' });
         const n = await units(who.workspace, offer);
         const next = n * (req.body?.interval === 'year' ? offer.year : offer.month);
-        // a paid trial (`trialing`) switching to a plan the trial doesn't cover ends it: billed now, as the real module
+        // a paid trial (`trialing`) switching to a plan the trial doesn't cover ends it: billed now, as the real module —
+        // whose amount is the invoice now, with the VAT Stripe Tax adds for the billing address (19 % here)
         if (endsTrial(who.workspace, offer.plan))
-          return json(200, { amount: next, currency: String(stateOf(who.workspace).currency ?? 'usd'), date: new Date().toISOString(), endsTrial: true });
+          return json(200, {
+            amount: Math.round(next * 1.19),
+            currency: String(stateOf(who.workspace).currency ?? 'usd'),
+            date: new Date().toISOString(),
+            endsTrial: true,
+          });
         const cur = OFFERS.find((o) => o.plan === stateOf(who.workspace).plan);
         const now = cur ? (await units(who.workspace, cur)) * (stateOf(who.workspace).interval === 'year' ? cur.year : cur.month) : 0;
         return json(200, {

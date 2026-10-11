@@ -90,8 +90,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Your cancellation is received': 'Deine Kündigung ist eingegangen',
   'Your contract': 'Dein Vertrag',
   // consumers may buy (A13 CLOUD-2): gross prices, the express start, the terms line, the order button
-  '{month} a month · {year} billed yearly, incl. VAT': '{month} im Monat · {year} jährlich, inkl. USt.',
-  '{month} a month, billed monthly, incl. VAT': '{month} im Monat, monatlich, inkl. USt.',
   'Buy now': 'Zahlungspflichtig bestellen',
   'By ordering you accept the <0>Terms</0> and have read the <1>Privacy policy</1> and the <2>withdrawal information</2>.':
     'Mit deiner Bestellung akzeptierst du die <0>AGB</0> und hast die <1>Datenschutzerklärung</1> und die <2>Widerrufsbelehrung</2> gelesen.',
@@ -101,8 +99,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
     'Ich verlange ausdrücklich, dass {plan} jetzt beginnt, vor Ablauf der 14-tägigen Widerrufsfrist. Widerrufe ich, zahle ich für die Zeit bis dahin; ist die Leistung vollständig erbracht, erlischt mein Widerrufsrecht.',
   'Optional: its name and VAT ID on the invoice. A VAT ID is needed only for reverse charge.':
     'Optional: Name und USt-IdNr. auf der Rechnung. Die USt-IdNr. brauchst du nur fürs Reverse-Charge-Verfahren.',
-  'Prices include {rate} VAT. At the checkout it follows your billing address: a business with a VAT ID from another EU country pays none.':
-    'Preise inkl. {rate} USt. An der Kasse richtet sie sich nach deiner Rechnungsadresse: Ein Unternehmen mit USt-IdNr. aus einem anderen EU-Land zahlt keine.',
   'Tick the box to start {plan} now, or buy as a business.': 'Setz den Haken, damit {plan} jetzt beginnt, oder kauf als Unternehmen.',
   // reverse charge only where the provider offers it; a consumer's yearly plan after its first year: one month's notice
   '{amount} for {days} of {of} days': '{amount} für {days} von {of} Tagen',
@@ -114,8 +110,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
     'Gekündigt mit einer Frist von einem Monat: {plan} läuft bis zum {date}, dann wechselt {ws} zu Free, und die bezahlte Zeit danach, {amount}, geht auf deine Karte zurück. Nichts wird gelöscht, und bis dahin behältst du {plan} mit einem Klick.',
   'It goes on every invoice.': 'Sie steht auf jeder Rechnung.',
   'Optional: its name and VAT ID on the invoice.': 'Optional: Name und USt-IdNr. auf der Rechnung.',
-  'Prices include {rate} VAT. At the checkout it follows your billing address.':
-    'Preise inkl. {rate} USt. An der Kasse richtet sie sich nach deiner Rechnungsadresse.',
   Refund: 'Erstattung',
   'Then nothing is refunded: it simply renews again.': 'Dann wird nichts erstattet: Es verlängert sich einfach wieder.',
   'VAT ID (optional)': 'USt-IdNr. (optional)',
@@ -151,9 +145,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Choose {plan}': '{plan} wählen',
   'People on review links and agents never count as members.': 'Wer über Review-Links schaut, und Agents zählen nie als Mitglieder.',
   // conversion: the loop's price line
-  'After that, {plan} is {price} a month for the {n} of you, billed yearly.': 'Danach kostet {plan} {price} im Monat für euch {n}, jährlich abgerechnet.',
-  'After that, {plan} is {price} a month, billed yearly for {n}.': 'Danach kostet {plan} {price} im Monat, jährlich abgerechnet für {n}.',
-  'After that, {plan} is {price} a month, billed yearly.': 'Danach kostet {plan} {price} im Monat, jährlich abgerechnet.',
   // in-app conversion (web/src/conversion/): the trial's line and card, the banner at its end, read-only, the moments of value
   '{n} · no limit': '{n} · unbegrenzt',
   '{n} day left. No card until you choose a plan.|{n} days left. No card until you choose a plan.':
@@ -164,11 +155,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   '{n} more fix to check on this video.|{n} more fixes to check on this video.':
     'Noch {n} Korrektur an diesem Video zu prüfen.|Noch {n} Korrekturen an diesem Video zu prüfen.',
   '{n} of {of} videos to finish or archive': '{n} von {of} Videos abschließen oder archivieren',
-  '{plan} for {n}: {price} a month, billed yearly': '{plan} für {n}: {price} im Monat, jährlich abgerechnet',
-  '{plan} for {n}: {price} a month, billed yearly, or {monthly} monthly.':
-    '{plan} für {n}: {price} im Monat bei jährlicher Abrechnung, oder {monthly} monatlich.',
-  '{plan}: {price} a month, billed yearly': '{plan}: {price} im Monat, jährlich abgerechnet',
-  '{plan}: {price} a month, billed yearly, or {monthly} monthly.': '{plan}: {price} im Monat bei jährlicher Abrechnung, oder {monthly} monatlich.',
   '{size} to archive or download': '{size} archivieren oder herunterladen',
   '{workspace} holds more than {plan} allows, so nothing new is added until it fits its plan or has a bigger one. Reviewing and the links you sent keep working.':
     '{workspace} hat mehr, als {plan} erlaubt, deshalb kommt nichts Neues dazu, bis der Workspace in seinen Plan passt oder einen größeren hat. Reviews und deine verschickten Links funktionieren weiter.',
@@ -1271,7 +1257,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Temporary password': 'Vorläufiges Passwort',
   'Test delivered': 'Test zugestellt',
   'Test failed: {reason}': 'Test fehlgeschlagen: {reason}',
-  'Test sent — it should arrive in a moment': 'Test gesendet – er sollte gleich ankommen',
   'Text or a logo where a platform’s buttons and captions cover the picture':
     'Text oder ein Logo dort, wo Buttons und Captions einer Plattform das Bild verdecken',
   'text/typo': 'Text/Tippfehler',
@@ -3747,7 +3732,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
     'Das gilt sofort; die Differenz für den Rest dieses Zeitraums steht auf der nächsten Rechnung.',
   'It takes effect at once. Your trial ends today, and {plan} is billed now: {amount}.':
     'Das gilt sofort. Deine Testphase endet heute, und {plan} wird jetzt abgerechnet: {amount}.',
-  '{amount} incl. VAT': '{amount} inkl. USt.',
   'It takes effect at once. The next invoice, on {date}, will be {amount}: the difference for the rest of this period is on it.':
     'Das gilt sofort. Die nächste Rechnung am {date} beträgt {amount}: Die Differenz für den Rest dieses Zeitraums ist darin enthalten.',
   'Keep {plan}': '{plan} behalten',
@@ -4063,12 +4047,8 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   // in-app conversion: the limit sheets, paying in place, an invite beyond the plan, Insights explained (conversion/)
   ': {name} gets an account of their own.': ': {name} bekommt ein eigenes Konto.',
   '({amount} a month billed yearly.)': '({amount} im Monat bei jährlicher Abrechnung.)',
-  '{amount} a month for the {n} of you': '{amount} im Monat für euch {n}',
-  '{amount} a month for the {n} of you, billed yearly': '{amount} im Monat für euch {n}, jährlich abgerechnet',
   '{amount} a month, prorated to the renewal': '{amount} im Monat, anteilig bis zur Verlängerung',
   '{amount} a year, prorated to the renewal': '{amount} im Jahr, anteilig bis zur Verlängerung',
-  '{amount} billed yearly': '{amount} jährlich abgerechnet',
-  '{amount} billed yearly · {each} per member': '{amount} jährlich abgerechnet · {each} pro Mitglied',
   '{n} · up to {max}': '{n} · bis {max}',
   '{n} at a time': '{n} gleichzeitig',
   '{name} is uploading.': '{name} wird hochgeladen.',
@@ -4087,7 +4067,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   '{plan} is for {min} to {max} members, so it is billed for {min} while you work alone. Invite someone and the second seat is theirs; there is nothing extra to pay.':
     '{plan} ist für {min} bis {max} Mitglieder und wird deshalb für {min} abgerechnet, solange du allein arbeitest. Lädst du jemanden ein, ist der zweite Platz schon da; extra kostet das nichts.',
   '{plan} is for one person.': '{plan} ist für eine Person.',
-  '{plan}: {amount} a month for {n}, billed yearly': '{plan}: {amount} im Monat für {n}, jährlich abgerechnet',
   '{size} used': '{size} belegt',
   '{workspace} has {size} now': '{workspace} hat jetzt {size}',
   '{workspace} is on {plan}. {name}’s invite is on its way.': '{workspace} ist jetzt auf {plan}. Die Einladung an {name} ist unterwegs.',
@@ -4101,9 +4080,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Add 1 TB': '1 TB dazubuchen',
   'Add 1 TB and upload': '1 TB dazubuchen und hochladen',
   'An illustration, not your data': 'Eine Illustration, nicht deine Daten',
-  'Billed monthly · {each} per member · {yearly} if yearly': 'Monatlich abgerechnet · {each} pro Mitglied · {yearly} bei jährlich',
-  'Billed monthly · {yearly} if yearly': 'Monatlich abgerechnet · {yearly} bei jährlich',
-  'Billed with {plan}': 'Mit {plan} abgerechnet',
   'Bring {name} into {workspace}': '{name} zu {workspace} holen',
   'Expires {date} · pays for {plan}': 'Läuft {date} ab · bezahlt {plan}',
   'From {workspace}’ own work — {videos} videos, {notes} notes, {checked} checked fixes — Insights shows:':
@@ -4129,14 +4105,7 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'No limit': 'Unbegrenzt',
   'Not now · the upload waits': 'Nicht jetzt · der Upload wartet',
   'Nothing on offer holds that yet: a contract can.': 'Kein Plan im Angebot hält das: Ein Vertrag schon.',
-  'Nothing. The difference for the rest of this period is on the invoice of {date}, plus VAT, paid with {card}.':
-    'Nichts. Die Differenz für den Rest des Zeitraums steht zzgl. USt. auf der Rechnung vom {date} und wird mit {card} bezahlt.',
-  'Nothing. The difference for the rest of this period is on the next invoice, plus VAT, paid with {card}.':
-    'Nichts. Die Differenz für den Rest des Zeitraums steht zzgl. USt. auf der nächsten Rechnung und wird mit {card} bezahlt.',
-  'Nothing. The difference for the rest of this period, {amount} plus VAT, is on the invoice of {date}, paid with {card} like {plan}.':
-    'Nichts. Die Differenz für den Rest des Zeitraums, {amount} zzgl. USt., steht auf der Rechnung vom {date} und wird wie {plan} mit {card} bezahlt.',
   // a switch that ends a running trial: the new plan is billed now
-  '{amount} plus VAT': '{amount} zzgl. USt.',
   '{amount}: your trial ends today, and {plan} is billed now, paid with {card}.':
     '{amount}: Deine Testphase endet heute, und {plan} wird jetzt abgerechnet, bezahlt mit {card}.',
   'Your trial ends today, and {plan} is billed now: {amount}.': 'Deine Testphase endet heute, und {plan} wird jetzt abgerechnet: {amount}.',
@@ -4185,19 +4154,10 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Talk to us': 'Sprich mit uns',
   'the card on file': 'der hinterlegten Karte',
   'The card on file': 'Die hinterlegte Karte',
-  'The difference for the rest of this period goes on the invoice of {date}, plus VAT.':
-    'Die Differenz für den Rest des Zeitraums kommt zzgl. USt. auf die Rechnung vom {date}.',
-  'The difference for the rest of this period goes on the next invoice, plus VAT.':
-    'Die Differenz für den Rest des Zeitraums kommt zzgl. USt. auf die nächste Rechnung.',
-  'The difference for the rest of this period, {amount} plus VAT, is on the invoice of {date}.':
-    'Die Differenz für den Rest des Zeitraums, {amount} zzgl. USt., steht auf der Rechnung vom {date}.',
   'The difference is on the next invoice; every invoice is in Settings → Billing.':
     'Die Differenz steht auf der nächsten Rechnung; jede Rechnung liegt unter Einstellungen → Abrechnung.',
   'The receipt goes to your billing email; every invoice is in Settings → Billing.':
     'Der Beleg geht an deine Rechnungs-E-Mail; jede Rechnung liegt unter Einstellungen → Abrechnung.',
-  'The rest of this period goes on the next invoice, on {date}, prorated and plus VAT.':
-    'Der Rest des Zeitraums kommt anteilig und zzgl. USt. auf die nächste Rechnung am {date}.',
-  'The rest of this period goes on the next invoice, prorated and plus VAT.': 'Der Rest des Zeitraums kommt anteilig und zzgl. USt. auf die nächste Rechnung.',
   'The upload waits; reviewing and everything else go on.': 'Der Upload wartet; Reviews und alles andere laufen weiter.',
   them: 'die Person',
   'This needs more room': 'Das braucht mehr Platz',
@@ -4214,20 +4174,14 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Working with someone? {plan} brings them in, from {amount} a month for {n}.':
     'Arbeitest du mit jemandem? Mit {plan} kommt die Person dazu, ab {amount} im Monat für {n}.',
   'Your videos, notes and review links stay as they are.': 'Deine Videos, Notizen und Review-Links bleiben, wie sie sind.',
-  '{amount} billed yearly · {saving}': '{amount} jährlich · {saving}',
   '{amount} for {plan} is paid. Renewals use {method} from now on.': '{amount} für {plan} sind bezahlt. Verlängerungen laufen ab jetzt über {method}.',
   '{amount} for {plan} is paid. Renewals use the new card from now on.':
     '{amount} für {plan} sind bezahlt. Verlängerungen laufen ab jetzt über die neue Karte.',
-  '{amount} per member billed yearly · {saving}': '{amount} pro Mitglied jährlich · {saving}',
   '{base} plus {each} per member, pooled': '{base} plus {each} pro Mitglied, gemeinsam',
   '{method} didn’t go through': '{method} ist nicht durchgegangen',
   '{method} didn’t have enough funds': '{method} war nicht gedeckt',
   '{method} has expired': '{method} ist abgelaufen',
   '{method} removed.': '{method} entfernt.',
-  '{month} a month · {year} billed yearly': '{month} im Monat · {year} jährlich',
-  '{month} a month · {year} billed yearly, plus VAT': '{month} im Monat · {year} jährlich, zzgl. USt.',
-  '{month} a month, billed monthly': '{month} im Monat, monatlich',
-  '{month} a month, billed monthly, plus VAT': '{month} im Monat, monatlich, zzgl. USt.',
   '{n} video under review at a time|{n} videos under review at a time': '{n} Video gleichzeitig im Review|{n} Videos gleichzeitig im Review',
   '{plan} for {n} member|{plan} for {n} members': '{plan} für {n} Mitglied|{plan} für {n} Mitglieder',
   '{plan} for one person': '{plan} für eine Person',
@@ -4244,13 +4198,9 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'A new card settles it now.': 'Eine neue Karte erledigt es sofort.',
   'A week of grace after {date}, then read-only until it fits. Nothing is deleted.':
     'Nach dem {date} eine Woche Schonfrist, dann nur lesbar, bis er passt. Nichts wird gelöscht.',
-  'about {amount} a month · plus VAT': 'etwa {amount} im Monat · zzgl. USt.',
-  'about {amount} a month · VAT included': 'etwa {amount} im Monat · inkl. USt.',
   'Add a card': 'Karte hinzufügen',
   'After that, still: reviewing, notes, approvals, downloads and the review links you sent':
     'Danach weiterhin: Reviews, Notizen, Freigaben, Downloads und deine verschickten Review-Links',
-  'Agents and people on review links are free on every plan. More storage on any plan: 1 TB for {amount} a month. Business as a contract, on invoice:':
-    'Agents und Leute auf Review-Links sind in jedem Plan kostenlos. Mehr Speicher in jedem Plan: 1 TB für {amount} im Monat. Business als Vertrag, auf Rechnung:',
   'Also as a contract, on invoice.': 'Auch als Vertrag, auf Rechnung.',
   Amount: 'Betrag',
   'An EU VAT ID starts with its country’s letters ({prefix}), then 8 to 12 digits or letters.':
@@ -4258,9 +4208,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'being checked with VIES': 'wird über VIES geprüft',
   'Billed for at least {n} members.': 'Abgerechnet für mindestens {n} Mitglieder.',
   'Billed from today, once you confirm.': 'Abgerechnet ab heute, sobald du bestätigst.',
-  'Billed monthly · {amount} if yearly': 'Monatlich · {amount} bei jährlich',
-  'Billed monthly · plus VAT': 'Monatlich · zzgl. USt.',
-  'Billed monthly · VAT included': 'Monatlich · inkl. USt.',
   'Billed monthly for {n} member, renews on {date}. The bill follows the people: someone new adds {amount} a month, prorated.|Billed monthly for {n} members, renews on {date}. The bill follows the people: someone new adds {amount} a month, prorated.':
     'Monatlich abgerechnet für {n} Mitglied, verlängert sich am {date}. Die Rechnung folgt den Leuten: Jede neue Person kostet {amount} im Monat, anteilig.|Monatlich abgerechnet für {n} Mitglieder, verlängert sich am {date}. Die Rechnung folgt den Leuten: Jede neue Person kostet {amount} im Monat, anteilig.',
   'Billed yearly for {n} member, renews on {date}. The bill follows the people: someone new adds {amount} a month, prorated.|Billed yearly for {n} members, renews on {date}. The bill follows the people: someone new adds {amount} a month, prorated.':
@@ -4323,7 +4270,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Payment and invoices': 'Zahlung und Rechnungen',
   'Payment due': 'Zahlung offen',
   'Payment method': 'Zahlungsmethode',
-  'per member': 'pro Mitglied',
   'Rather pay by bank transfer?': 'Lieber per Überweisung?',
   'read-only, if unpaid': 'nur lesen, wenn offen',
   'renewal failed': 'Verlängerung fehlgeschlagen',
@@ -4921,6 +4867,80 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
     'Ein früheres Zahlungsformular ließ sich nicht schließen. Versuch es gleich noch einmal.',
   'This plan ends at the end of its period: one month’s notice is for a consumer’s yearly plan after its first year.':
     'Dieser Plan endet zum Ende seines Zeitraums: Die Kündigung mit einer Frist von einem Monat gilt für den Jahresplan von Verbrauchern nach dem ersten Jahr.',
+  // net prices like the website, the total with VAT where it is bought; Send a test says what happened
+  '{amount} a month for the {n} of you, billed yearly, excl. VAT': '{amount} im Monat für euch {n}, jährlich abgerechnet, zzgl. USt.',
+  '{amount} a month for the {n} of you, excl. VAT': '{amount} im Monat für euch {n}, zzgl. USt.',
+  '{amount} excl. VAT': '{amount} zzgl. USt.',
+  '{amount} excl. VAT ({total} incl. VAT)': '{amount} zzgl. USt. ({total} inkl. USt.)',
+  '{amount} incl. {rate} VAT': '{amount} inkl. {rate} USt.',
+  '{month} a month · {year} billed yearly, {tax}': '{month} im Monat · {year} jährlich, {tax}',
+  '{month} a month, billed monthly, {tax}': '{month} im Monat, monatlich, {tax}',
+  '{plan} for {n}: {price} a month, billed yearly, excl. VAT': '{plan} für {n}: {price} im Monat, jährlich abgerechnet, zzgl. USt.',
+  '{plan} for {n}: {price} a month, billed yearly, or {monthly} monthly, excl. VAT.':
+    '{plan} für {n}: {price} im Monat bei jährlicher Abrechnung, oder {monthly} monatlich, zzgl. USt.',
+  '{plan}: {amount} a month for {n}, billed yearly, excl. VAT': '{plan}: {amount} im Monat für {n}, jährlich abgerechnet, zzgl. USt.',
+  '{plan}: {price} a month, billed yearly, excl. VAT': '{plan}: {price} im Monat, jährlich abgerechnet, zzgl. USt.',
+  '{plan}: {price} a month, billed yearly, or {monthly} monthly, excl. VAT.':
+    '{plan}: {price} im Monat bei jährlicher Abrechnung, oder {monthly} monatlich, zzgl. USt.',
+  '{tax} · billed monthly': '{tax} · monatliche Abrechnung',
+  '{tax} · billed yearly, {saving}': '{tax} · jährliche Abrechnung, {saving}',
+  'about {amount} a month · {tax}': 'etwa {amount} im Monat · {tax}',
+  'After that, {plan} is {price} a month for the {n} of you, billed yearly, excl. VAT.':
+    'Danach kostet {plan} {price} im Monat für euch {n}, jährlich abgerechnet, zzgl. USt.',
+  'After that, {plan} is {price} a month, billed yearly for {n}, excl. VAT.': 'Danach kostet {plan} {price} im Monat, jährlich abgerechnet für {n}, zzgl. USt.',
+  'After that, {plan} is {price} a month, billed yearly, excl. VAT.': 'Danach kostet {plan} {price} im Monat, jährlich abgerechnet, zzgl. USt.',
+  'Agents and people on review links are free on every plan. More storage on any plan: 1 TB for {amount} a month, {tax}. Business as a contract, on invoice:':
+    'Agents und Leute auf Review-Links sind in jedem Plan kostenlos. Mehr Speicher in jedem Plan: 1 TB für {amount} im Monat, {tax}. Business als Vertrag, auf Rechnung:',
+  'Billed monthly · {tax}': 'Monatlich · {tax}',
+  'Check the connection, then try again.': 'Prüf die Verbindung und versuch es dann noch einmal.',
+  'Couldn’t send: {why}': 'Nicht gesendet: {why}',
+  'excl. VAT': 'zzgl. USt.',
+  'excl. VAT · {amount} billed yearly': 'zzgl. USt. · {amount} jährlich abgerechnet',
+  'excl. VAT · {amount} billed yearly · {each} per member': 'zzgl. USt. · {amount} jährlich abgerechnet · {each} pro Mitglied',
+  'excl. VAT · billed monthly · {each} per member · {yearly} if yearly': 'zzgl. USt. · monatlich abgerechnet · {each} pro Mitglied · {yearly} bei jährlich',
+  'excl. VAT · billed monthly · {yearly} if yearly': 'zzgl. USt. · monatlich abgerechnet · {yearly} bei jährlich',
+  'excl. VAT · billed with {plan}': 'zzgl. USt. · mit {plan} abgerechnet',
+  'incl. VAT': 'inkl. USt.',
+  'no connection': 'keine Verbindung',
+  'Nothing. The difference for the rest of this period is on the invoice of {date}, excl. VAT, paid with {card}.':
+    'Nichts. Die Differenz für den Rest des Zeitraums steht zzgl. USt. auf der Rechnung vom {date} und wird mit {card} bezahlt.',
+  'Nothing. The difference for the rest of this period is on the next invoice, excl. VAT, paid with {card}.':
+    'Nichts. Die Differenz für den Rest des Zeitraums steht zzgl. USt. auf der nächsten Rechnung und wird mit {card} bezahlt.',
+  'Nothing. The difference for the rest of this period, {amount} excl. VAT, is on the invoice of {date}, paid with {card} like {plan}.':
+    'Nichts. Die Differenz für den Rest des Zeitraums, {amount} zzgl. USt., steht auf der Rechnung vom {date} und wird wie {plan} mit {card} bezahlt.',
+  'per member a month': 'pro Mitglied im Monat',
+  'Prices excl. VAT; the total beside the button includes {rate}. At the checkout the VAT follows your billing address: a business with a VAT ID from another EU country pays none.':
+    'Preise zzgl. USt.; der Gesamtpreis neben dem Button enthält {rate}. An der Kasse richtet sich die USt. nach deiner Rechnungsadresse: Ein Unternehmen mit USt-IdNr. aus einem anderen EU-Land zahlt keine.',
+  'Prices excl. VAT; the total beside the button includes {rate}. At the checkout the VAT follows your billing address.':
+    'Preise zzgl. USt.; der Gesamtpreis neben dem Button enthält {rate}. An der Kasse richtet sich die USt. nach deiner Rechnungsadresse.',
+  'save up to {share}': 'bis zu {share} sparen',
+  'Sent, but not shown here': 'Gesendet, aber hier nicht angezeigt',
+  'Sent: check your notifications': 'Gesendet: Schau in deine Benachrichtigungen',
+  'The difference for the rest of this period goes on the invoice of {date}, excl. VAT.':
+    'Die Differenz für den Rest des Zeitraums kommt zzgl. USt. auf die Rechnung vom {date}.',
+  'The difference for the rest of this period goes on the next invoice, excl. VAT.':
+    'Die Differenz für den Rest des Zeitraums kommt zzgl. USt. auf die nächste Rechnung.',
+  'The difference for the rest of this period, {amount} excl. VAT, is on the invoice of {date}.':
+    'Die Differenz für den Rest des Zeitraums, {amount} zzgl. USt., steht auf der Rechnung vom {date}.',
+  'the push service refused it': 'der Push-Dienst hat abgelehnt',
+  'The push service took it, but this browser hasn’t shown it yet. If it never comes, turn notifications off and on here.':
+    'Der Push-Dienst hat sie angenommen, aber dieser Browser hat sie noch nicht angezeigt. Kommt sie nie an, schalte Benachrichtigungen hier aus und wieder an.',
+  'The rest of this period goes on the next invoice, on {date}, prorated, excl. VAT.':
+    'Der Rest des Zeitraums kommt anteilig, zzgl. USt., auf die nächste Rechnung am {date}.',
+  'The rest of this period goes on the next invoice, prorated, excl. VAT.': 'Der Rest des Zeitraums kommt anteilig, zzgl. USt., auf die nächste Rechnung.',
+  'the server refused it': 'der Server hat abgelehnt',
+  'This browser didn’t show it: allow notifications for this site in its settings.':
+    'Dieser Browser hat sie nicht angezeigt: Erlaube Benachrichtigungen für diese Seite in seinen Einstellungen.',
+  'This browser showed it. Nothing on screen? Allow your browser in the Mac’s System Settings → Notifications, and check that Focus is off.':
+    'Dieser Browser hat sie angezeigt. Nichts zu sehen? Erlaube deinen Browser in den Systemeinstellungen des Mac unter Mitteilungen, und prüf, dass kein Fokus an ist.',
+  'This browser showed it. Nothing on screen? Allow your browser in Windows Settings → System → Notifications, and check Do not disturb.':
+    'Dieser Browser hat sie angezeigt. Nichts zu sehen? Erlaube deinen Browser in den Windows-Einstellungen unter System → Benachrichtigungen, und prüf „Nicht stören“.',
+  'This device showed it. Nothing there? Allow notifications for this app in the device’s settings.':
+    'Dieses Gerät hat sie angezeigt. Nichts zu sehen? Erlaube Benachrichtigungen für diese App in den Einstellungen des Geräts.',
+  'This device’s notifications had ended. Turn them on again to get them here.':
+    'Die Benachrichtigungen auf diesem Gerät waren beendet. Schalte sie wieder an, um sie hier zu bekommen.',
+  'Try again in a moment. If it keeps failing, turn notifications off and on here.':
+    'Versuch es gleich noch einmal. Klappt es weiter nicht, schalte Benachrichtigungen hier aus und wieder an.',
 };
 
 export const de: Record<Key, string> = { ...owner, ...client };

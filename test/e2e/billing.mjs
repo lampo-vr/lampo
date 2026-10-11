@@ -26,7 +26,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { readOutbox } from '../../lib/mail/index.ts';
-import { makeVideo, ROOT, sleep, tmpdir } from '../lib/helpers.ts';
+import { makeVideo, ROOT, sleep, tmpdir, until } from '../lib/helpers.ts';
 import { client, tusUpload } from '../lib/http.ts';
 import { fitsAt, layoutMatrix, settle } from './layout.mjs';
 import { launch, requireChrome, shotsDir } from './lib/browser.mjs';
@@ -155,6 +155,8 @@ try {
     await page.setCookie(consentCookie(BASE));
   };
   const text = (sel) => page.$eval(sel, (el) => el.textContent.replace(/\s+/g, ' ').trim());
+  // what is on screen (a plan's price keeps its other interval's amount in the page, rolled away: innerText leaves it out)
+  const seen = (sel) => page.$eval(sel, (el) => el.innerText.replace(/\s+/g, ' ').trim());
   const waitText = (sel, re, timeout = 15000) =>
     page.waitForFunction(
       (s, src) => new RegExp(src).test((document.querySelector(s)?.textContent ?? '').replace(/\s+/g, ' ')),
@@ -249,21 +251,39 @@ try {
     // no limit is a dashed track, never a missing bar (audit m2)
     assert(await page.$('[data-testid=billing-videos] .bill-bar.none'), 'a dashed track for no limit');
     assert((await page.$$eval('.set-nav a', (as) => as.map((a) => a.textContent.trim()))).includes('Billing'), 'Billing in the nav');
-    // the plans: tiles selected like radio buttons, yearly first, per month — as consumers pay them, with 19 % VAT (PAngV,
-    // A13 CLOUD-2: the provider names the rate); the foot says the checkout works it out for the billing address
-    const solo = () => text('[data-testid=billing-offer-solo]');
-    assert(/€14\.28\s*a month/.test(await solo()) && /€171\.36 billed yearly · save 20%/.test(await solo()), await solo());
-    assert(/€23\.80\s*per member\s*a month/.test(await text('[data-testid=billing-offer-team]')), await text('[data-testid=billing-offer-team]'));
+    // the plans: tiles selected like radio buttons, yearly first, per month — net, "excl. VAT", as the website shows them;
+    // what a consumer pays in all (PAngV, A13 CLOUD-2: the provider names the rate) stands beside the one action
+    const solo = () => seen('[data-testid=billing-offer-solo]');
+    const team = () => seen('[data-testid=billing-offer-team]');
+    assert(/€12\s*a month/.test(await solo()) && /excl\. VAT · billed yearly, save 20%/.test(await solo()) && !/€15/.test(await solo()), await solo());
+    assert(/€20\s*per member a month/.test(await team()) && /excl\. VAT · billed yearly, 2 months free/.test(await team()), await team());
+    // both amounts stand in the price's one cell, the other rolled away: the switch rolls them, as the website's does
+    const roll = await page.$eval('[data-testid=billing-offer-solo] .bill-t-price .bill-roll', (r) =>
+      [...r.children].map((c) => ({ text: c.textContent, shown: getComputedStyle(c).visibility === 'visible' })),
+    );
     assert(
-      /€285\.60 per member billed yearly · 2 months free/.test(await text('[data-testid=billing-offer-team]')),
-      await text('[data-testid=billing-offer-team]'),
+      JSON.stringify(roll) ===
+        JSON.stringify([
+          { text: '€12', shown: true },
+          { text: '€15', shown: false },
+        ]),
+      JSON.stringify(roll),
+    );
+    // the switch's note says the most a yearly plan saves, as the website's
+    assert(
+      (await seen('[data-testid=billing-plans] .bill-seg button[aria-pressed=true]')) === 'Yearly save up to 20%',
+      await seen('[data-testid=billing-plans] .bill-seg'),
     );
     // no reverse charge here (the provider's seller has no VAT ID yet): a business abroad pays VAT like everyone
     assert(
-      (await text('[data-testid=billing-vat]')) === 'Prices include 19% VAT. At the checkout it follows your billing address.',
+      (await text('[data-testid=billing-vat]')) ===
+        'Prices excl. VAT; the total beside the button includes 19%. At the checkout the VAT follows your billing address.',
       await text('[data-testid=billing-vat]'),
     );
-    assert(/1 TB for €11\.90 a month/.test(await text('[data-testid=billing-plans] .bill-pk-foot')), await text('[data-testid=billing-plans] .bill-pk-foot'));
+    assert(
+      /1 TB for €10 a month, excl\. VAT\./.test(await text('[data-testid=billing-plans] .bill-pk-foot')),
+      await text('[data-testid=billing-plans] .bill-pk-foot'),
+    );
     assert((await text('[data-testid=billing-offer-team]')).includes('Your trial'), 'the trial’s plan is marked');
     assert(!(await page.$('[data-testid=billing-plans] .bill-tile button')), 'no button inside a tile');
     assert(await page.$eval('[data-testid=billing-offer-team] input', (i) => i.checked), 'the trial’s plan is selected');
@@ -272,17 +292,31 @@ try {
     assert(/Fits one member; .+ has 2\./.test(await solo()), await solo());
     // one bar: what the selection costs this workspace, and the one orange action
     const bar = () => text('[data-testid=billing-pick-bar]');
-    assert(/Team for 2 members/.test(await bar()) && /€47\.60 a month · €571\.20 billed yearly, incl\. VAT/.test(await bar()), await bar());
+    assert(/Team for 2 members/.test(await bar()) && /€40 a month · €480 billed yearly, excl\. VAT · €571\.20 incl\. 19% VAT/.test(await bar()), await bar());
     // two days left: paying ends the trial, and the bar says so before anyone clicks
     assert(/Team is billed from today: the trial ends when it starts\./.test(await bar()), await bar());
     assert(/Continue with Team/.test(await bar()), await bar());
     const orange = await page.$$eval('.bill-page .btn.primary', (bs) => bs.filter((b) => b.offsetParent).map((b) => b.textContent.trim()));
     assert(orange.length === 1, `one orange per view: ${orange.join(' | ')}`);
     await pick('Monthly');
-    await waitText('[data-testid=billing-offer-solo]', /€17\.85\s*a month/);
-    assert(/Billed monthly · €14\.28 if yearly/.test(await solo()), await solo());
+    await until(async () => /€15\s*a month/.test(await solo()), 'Solo rolls to its monthly price');
+    assert(/excl\. VAT · billed monthly/.test(await solo()) && !/€12/.test(await solo()), await solo());
+    assert(/€48 a month, billed monthly, excl\. VAT · €57\.12 incl\. 19% VAT/.test(await bar()), await bar());
+    // the picked side is one thumb that slid under Monthly (its place and width are the button's)
+    const thumb = await page.$eval('[data-testid=billing-plans] .bill-seg', (seg) => {
+      const on = seg.querySelector('button[aria-pressed=true]');
+      const th = seg.querySelector('.bill-thumb');
+      return {
+        on: on.textContent,
+        x: th.style.getPropertyValue('--x'),
+        w: th.style.getPropertyValue('--w'),
+        left: `${on.offsetLeft}px`,
+        width: `${on.offsetWidth}px`,
+      };
+    });
+    assert(thumb.on === 'Monthly' && thumb.x === thumb.left && thumb.w === thumb.width, JSON.stringify(thumb));
     await pick('USD');
-    await waitText('[data-testid=billing-offer-solo]', /\$17\.85/);
+    await until(async () => /\$15\s*a month/.test(await solo()), 'Solo in dollars');
     // the member stepper tries another team size: the bar follows, nothing is asked of the provider
     const calls = fake().calls.length;
     await page.click('[data-testid=billing-stepper] button[aria-label="One member more"]');
@@ -308,7 +342,7 @@ try {
       await openBilling();
       assert(
         (await text('[data-testid=billing-vat]')) ===
-          'Prices include 19% VAT. At the checkout it follows your billing address: a business with a VAT ID from another EU country pays none.',
+          'Prices excl. VAT; the total beside the button includes 19%. At the checkout the VAT follows your billing address: a business with a VAT ID from another EU country pays none.',
         await text('[data-testid=billing-vat]'),
       );
     } finally {
@@ -406,7 +440,7 @@ try {
     await waitText('[data-testid=billing-offer-business]', /Your pick/);
     assert(await page.$eval('[data-testid=billing-offer-business] input', (i) => i.checked), 'the pick is selected');
     assert(/You picked Business on lampo\.video, so it’s selected\. Nothing is charged until you confirm\./.test(await text('[data-testid=billing-picked]')));
-    assert(/\$49\.98\s*per member/.test(await text('[data-testid=billing-offer-business]')), 'monthly, in dollars, as the website showed');
+    assert(/\$42\s*per member a month/.test(await seen('[data-testid=billing-offer-business]')), 'monthly, in dollars, as the website showed');
     assert((await page.evaluate(() => location.hash)) === '#/settings/billing', 'the pick leaves nothing in the address');
     assert(!(await text('[data-testid=billing-offer-team]')).includes('Your pick'), 'only the one picked');
     // Business doesn't carry a trial's days: billed from today, said in the bar
@@ -443,7 +477,7 @@ try {
     await openBilling();
     await pick('Monthly');
     await pick('USD');
-    await waitText('[data-testid=billing-offer-team]', /\$28\.56/);
+    await until(async () => /\$24\s*per member a month/.test(await seen('[data-testid=billing-offer-team]')), 'Team monthly in dollars');
     await page.click('[data-testid=billing-go]');
     await page.waitForFunction(() => location.hash === '#/settings/billing/checkout?plan=team&interval=month&currency=usd', { polling: 100, timeout: 5000 });
     await page.waitForSelector('[data-testid=billing-checkout] [data-testid=billing-payment-element] iframe', { timeout: 15000 });
@@ -459,7 +493,7 @@ try {
     assert(await page.$eval('[data-testid=billing-offer-team] input', (i) => i.checked), 'Team still selected');
     assert(
       /Team for 2 members/.test(await text('[data-testid=billing-pick-bar]')) &&
-        /\$57\.12 a month, billed monthly, incl\. VAT/.test(await text('[data-testid=billing-pick-bar]')),
+        /\$48 a month, billed monthly, excl\. VAT · \$57\.12 incl\. 19% VAT/.test(await text('[data-testid=billing-pick-bar]')),
       await text('[data-testid=billing-pick-bar]'),
     );
     await page.click('[data-testid=billing-go]');
@@ -675,8 +709,8 @@ try {
       await page.waitForSelector('[data-testid=confirm-action]');
       const dialog = await text('[data-testid=confirm]');
       assert(/Switch to Business\?/.test(dialog), dialog);
-      // Business for the two of them, a month, billed now — said with VAT, as this page says its prices
-      assert(/It takes effect at once\. Your trial ends today, and Business is billed now: \$99\.96 incl\. VAT\./.test(dialog), dialog);
+      // Business for the two of them, a month, billed now — the net as the plans say it, and what is invoiced now with VAT
+      assert(/It takes effect at once\. Your trial ends today, and Business is billed now: \$84\.00 excl\. VAT \(\$99\.96 incl\. VAT\)\./.test(dialog), dialog);
       assert(!/next invoice/.test(dialog), `never “the next invoice”: ${dialog}`);
       await fitsOpen('trial-business');
       // confirmed, the payment fails: the module's sentence, and the plan and the trial stay as they were

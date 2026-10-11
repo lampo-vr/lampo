@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // covers: web/src/onboarding/Row.tsx web/src/onboarding/Panel.tsx web/src/onboarding/state.ts web/src/onboarding/data.ts web/src/onboarding/GetStarted.tsx web/src/styles/startpanel.css web/src/styles/onboarding.css web/src/library/Sidebar.tsx web/src/auth/UserMenu.tsx web/src/lib/chromeHint.ts server/routes/onboarding.ts lib/onboarding.ts
 // Get started at the sidebar's foot (onboarding/Row.tsx, Panel.tsx), for a hosted server's owner (five steps) and on
-// someone's own machine (four): the row says "2 of 5" with a 2 px line of the steps inside its own edge, on every
+// someone's own machine (four): the row says "2 of 5" beside a half keyframe, a row of the foot like Settings, on every
 // library page, never in the orange; a click opens the steps above it — one height from step to step, Esc and a click
 // outside close it, the focus back on the row; a review link made in the panel ticks the row at once; the card's × leaves
 // the row, "Hide for good" takes both (Undo brings them back and sends nothing, the account hears it once the toast is
@@ -107,13 +107,12 @@ try {
 
   // ---------------------------------------------------------------- the row
   const p = await fresh();
-  await check('the row at the sidebar’s foot: “Get started 2 of 5”, a 2 px line of five frames, two lit, inside its edge, no orange', async () => {
+  await check('the row at the sidebar’s foot: “Get started 2 of 5”, a row of the foot like Settings, its keyframe half, no orange', async () => {
     await open(p);
     assert((await countOf(p)) === '2 of 5', await countOf(p));
     const row = await p.$eval('[data-testid=ob-row]', (b) => {
       const r = b.getBoundingClientRect();
-      const line = b.querySelector('.ob-side-line').getBoundingClientRect();
-      const cells = [...b.querySelectorAll('.ob-side-line i')];
+      const settings = document.querySelector('.nav .nav-settings');
       const probe = document.createElement('span');
       probe.style.color = 'var(--brand)';
       document.body.append(probe);
@@ -125,19 +124,19 @@ try {
       });
       return {
         label: b.querySelector('.ob-side-label').textContent,
-        cells: cells.length,
-        lit: cells.filter((c) => c.classList.contains('ob-on')).length,
-        lineH: Math.round(line.height),
-        inside: line.left >= r.left && line.right <= r.right && line.top >= r.top && line.bottom <= r.bottom,
+        mark: b.querySelector('.nav-row-ic .kg')?.dataset.shape,
+        // one look with Settings: its height, the words starting where Settings' do
+        h: Math.round(r.height),
+        settingsH: Math.round(settings.getBoundingClientRect().height),
+        dx: Math.abs(b.querySelector('.grow').getBoundingClientRect().left - settings.querySelector('.grow').getBoundingClientRect().left),
         orange: colours.some((c) => c.includes(brand)),
-        aboveSettings: r.bottom <= document.querySelector('.nav .nav-settings').getBoundingClientRect().top,
+        aboveSettings: r.bottom <= settings.getBoundingClientRect().top,
         inFoot: !b.closest('.nav-sa'),
       };
     });
     assert(row.label === 'Get started', row.label);
-    assert(row.cells === 5 && row.lit === 2, `the line: ${row.lit} of ${row.cells} lit`);
-    assert(row.lineH === 2, `the line is ${row.lineH} px tall`);
-    assert(row.inside, 'the line sits inside the row’s own box');
+    assert(row.mark === 'half', `two of five done: a half keyframe (${row.mark})`);
+    assert(row.h === row.settingsH && row.dx < 0.5, `a row like Settings: ${JSON.stringify(row)}`);
     assert(!row.orange, 'the row never wears the orange');
     assert(row.aboveSettings && row.inFoot, 'at the foot, above Settings, out of the scrolling list');
   });
@@ -201,7 +200,7 @@ try {
     await p.click('.ob-sp-pane [data-slot=share] [data-testid=ob-make-link]');
     await p.waitForSelector('.ob-sp-pane [data-testid=ob-share-link]', { timeout: 10000 });
     await p.waitForFunction(() => document.querySelector('[data-testid=ob-row-count]')?.textContent.trim() === '3 of 5', { timeout: 5000 });
-    assert((await p.$$('.ob-side-line i.ob-on')).length === 3, 'three frames lit');
+    assert(await p.$('[data-testid=ob-row] .nav-row-ic .kg[data-shape=half]'), 'still half: three of five');
     assert((await p.$eval('[data-testid=ob-sp-count]', (e) => e.textContent)) === '3 of 5', 'the panel counts it too');
     // once its tick has popped, the step is still the one open: the link it made stays in view
     await p.waitForFunction(() => !document.querySelector('.ob-sp-row.ob-ticked'), { timeout: 5000 });

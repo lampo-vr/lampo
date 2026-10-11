@@ -59,58 +59,75 @@
   box-shadow: inset 0 0 0 1px var(--line-3);
 }
 
-/* the library sidebar's foot: Settings, a row like the ones above it (on a phone the drawer's way in) */
+/* the library sidebar's foot (on a phone the drawer's way in): Get started while its steps are open, the trial while one
+   runs, Settings. One look for the three, a row each like the ones above them: its mark, its words, what it says on the
+   right. The two rows whose code comes after the first paint (onboarding/Panel.tsx, conversion/Trial.tsx) are held
+   here at their size, one row each, so nothing moves when they arrive */
 .nav:has(> .nav-foot) {
   grid-template-rows: minmax(0, 1fr) auto;
 }
 .nav-foot {
+  display: grid;
+  gap: 1px;
   padding: var(--sp-2) var(--sp-2) calc(var(--sp-2) + env(safe-area-inset-bottom));
   border-top: 1px solid var(--line);
 }
-/* the trial's line above Settings (conversion/Trial.tsx, in a chunk after the first paint): its box is drawn here, so the
-   room it holds from the first paint (when the plan this browser kept says a trial runs) is exactly what it takes */
-.nav:has(> .nav-trial-wrap) {
-  grid-template-rows: minmax(0, 1fr) auto auto;
-}
-.nav-trial-wrap {
-  padding: var(--sp-2) var(--sp-2) 0;
-  border-top: 1px solid var(--line);
-}
-.nav-trial-wrap + .nav-foot {
-  border-top-color: transparent;
-}
-.nav-trial {
-  display: grid;
-  align-content: center;
-  gap: var(--sp-2);
-  width: 100%;
-  height: 54px;
-  padding: 0 var(--sp-2);
-}
-.nav-settings {
+.nav-row {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
+  width: 100%;
   height: var(--h);
   padding: 0 var(--sp-2);
+  border: 0;
   border-radius: var(--r);
+  background: transparent;
   color: var(--muted);
-  font: var(--fw-ui) var(--fs-sm) / var(--lh-ui) var(--ui);
+  /* the words at the size of the rows above (.nav-item), quieter */
+  font: var(--fw-ui) var(--fs-md) / var(--lh-ui) var(--ui);
+  text-align: left;
   text-decoration: none;
+  cursor: pointer;
   transition:
     background var(--dur-fast),
     color var(--dur-fast);
 }
-.nav-settings:hover,
-.nav-settings:focus-visible {
+.nav-row:hover,
+.nav-row:focus-visible,
+.nav-row[aria-expanded='true'] {
   background: var(--ink-3);
   color: var(--fg);
+}
+.nav-row > .grow {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* the mark's place, as wide as an icon: the words of every row start on one line */
+.nav-row-ic {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 15px;
+  color: var(--muted);
+}
+.nav-row-ic .kg {
+  --kg-size: 10px;
+}
+/* what a row says on the right: a count, the days left, a key */
+.nav-row-meta {
+  flex: none;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  white-space: nowrap;
 }
 .nav-settings .kbd {
   color: var(--muted);
 }
 @media (hover: none) {
-  .nav-settings {
+  .nav-row {
     height: var(--h-touch);
   }
   .nav-settings .kbd {

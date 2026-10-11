@@ -331,7 +331,7 @@ function FitBlock({
           <p>
             <b>{money(fit.year ?? fit.month ?? 0, fit.currency)}</b> <span>{fit.year !== null ? t('a year') : t('a month')}</span>
           </p>
-          <p className="lim-price-sub">{t('Billed with {plan}', { plan: b.planName })}</p>
+          <p className="lim-price-sub">{t('excl. VAT · billed with {plan}', { plan: b.planName })}</p>
         </div>
       )}
       <div className="lim-chg">
@@ -484,15 +484,15 @@ function PayColumn({
   const note =
     fit.kind === 'addon'
       ? renews
-        ? t('The rest of this period goes on the next invoice, on {date}, prorated and plus VAT.', { date: renews })
-        : t('The rest of this period goes on the next invoice, prorated and plus VAT.')
+        ? t('The rest of this period goes on the next invoice, on {date}, prorated, excl. VAT.', { date: renews })
+        : t('The rest of this period goes on the next invoice, prorated, excl. VAT.')
       : charge && fit.kind === 'plan'
         ? t('Your trial ends today, and {plan} is billed now: {amount}.', { plan: fit.offer.name, amount: charge })
         : prorated && when
-          ? t('The difference for the rest of this period, {amount} plus VAT, is on the invoice of {date}.', { amount: prorated, date: when })
+          ? t('The difference for the rest of this period, {amount} excl. VAT, is on the invoice of {date}.', { amount: prorated, date: when })
           : when
-            ? t('The difference for the rest of this period goes on the invoice of {date}, plus VAT.', { date: when })
-            : t('The difference for the rest of this period goes on the next invoice, plus VAT.');
+            ? t('The difference for the rest of this period goes on the invoice of {date}, excl. VAT.', { date: when })
+            : t('The difference for the rest of this period goes on the next invoice, excl. VAT.');
   return (
     <>
       {/* paid: the eyebrow says the plan is on its way, in the same line (nothing below moves) */}

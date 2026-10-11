@@ -1,7 +1,7 @@
 // What Settings → Billing and the workspace's banner say about a billing provider's answer (lib/types.ts BillingInfo):
 // one sentence per state, the numbers as people read them. The provider names its plans and prices; every other word is
 // ours, in English and German. Pure, so the page and the banner say the same and the unit test reads both languages.
-import type { BillingInfo, BillingOffer } from '../../../lib/types.ts';
+import type { BillingInfo, BillingOffer, BillingPreview } from '../../../lib/types.ts';
 import { currentLang, locale, t } from '../i18n/index.ts';
 import { bannerDue } from './due.ts';
 
@@ -151,10 +151,41 @@ export const unitsFor = (o: BillingOffer, n: number): number => (o.perMember ? M
 export function saving(o: BillingOffer, currency: string): string {
   const p = o.prices[currency];
   if (!p) return '';
-  if (p.year === p.month * 10) return t('2 months free');
-  const share = new Intl.NumberFormat(locale(), { style: 'percent', maximumFractionDigits: 0 }).format(1 - p.year / 12 / p.month);
-  return t('save {share}', { share });
+  if (twoMonths(p)) return t('2 months free');
+  return t('save {share}', { share: share(1 - p.year / 12 / p.month) });
 }
+const twoMonths = (p: { month: number; year: number }) => p.year === p.month * 10;
+const share = (x: number) => new Intl.NumberFormat(locale(), { style: 'percent', maximumFractionDigits: 0 }).format(x);
+
+/** The yearly switch's note, as the website says it: "2 months free" where every plan saves exactly that, else the most
+ * one saves ("save up to 20%"). */
+export function savingNote(offers: BillingOffer[], currency: string): string {
+  const prices = offers.flatMap((o) => (o.prices[currency] ? [o.prices[currency]] : []));
+  if (!prices.length) return '';
+  if (prices.every(twoMonths)) return t('2 months free');
+  return t('save up to {share}', { share: share(Math.max(...prices.map((p) => 1 - p.year / 12 / p.month))) });
+}
+
+/**
+ * How the plans' prices stand to tax, said beside every one as the website does: "excl. VAT" (the provider's prices are
+ * net and the checkout adds the VAT the billing address brings), or "incl. VAT" for a provider whose prices hold it.
+ */
+export const taxWord = (b: Pick<BillingInfo, 'tax'>): string => (b.tax === 'included' ? t('incl. VAT') : t('excl. VAT'));
+
+/**
+ * What a switch that ends the trial bills now, at the point of purchase: the net as the plans say it, and the total the
+ * provider invoices now for this billing address (its `amount`, taxes included where it adds them) — "€84.00 excl. VAT
+ * (€99.96 incl. VAT)" — or the provider's total alone where the net can't be said (conversion/facts.ts trialEndNet).
+ */
+export function billedNow(net: number | null, p: Pick<BillingPreview, 'amount' | 'currency'>): string {
+  const all = money(p.amount, p.currency, { cents: true });
+  if (net === null) return all;
+  const amount = money(net, p.currency, { cents: true });
+  return p.amount > net ? t('{amount} excl. VAT ({total} incl. VAT)', { amount, total: all }) : t('{amount} excl. VAT', { amount });
+}
+
+/** "19 % VAT" where the provider names the rate a consumer pays on the net prices (PAngV: shown before anyone pays). */
+export const vatOf = (b: Pick<BillingInfo, 'vat' | 'tax'>): number | null => (b.tax !== 'included' && b.vat?.rate ? b.vat.rate : null);
 
 /** A plan in a line, for the plans the provider sells today; another plan's tile goes without one. */
 export function planLine(plan: string): string {

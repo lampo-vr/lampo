@@ -29,7 +29,8 @@ export const keepPlan = (b: BillingInfo): string => (b.plan !== 'free' && offerO
 /** Its name as the provider calls it. */
 export const keepName = (b: BillingInfo): string => offerOf(b, keepPlan(b))?.name ?? b.planName;
 
-/** The trial's plan as the picker would bill it for this workspace: "Team for 4: €80 a month, billed yearly". */
+/** The trial's plan as the picker would bill it for this workspace, net like every price: "Team for 4: €80 a month,
+ * billed yearly, excl. VAT". */
 export function keepLine(b: BillingInfo, monthly = false, plan = keepPlan(b)): string | null {
   const o = offerOf(b, plan);
   if (!o) return null;
@@ -41,19 +42,20 @@ export function keepLine(b: BillingInfo, monthly = false, plan = keepPlan(b)): s
   const units = o.perMember ? Math.max(o.members.min, n) : null;
   if (monthly && month !== null)
     return units
-      ? t('{plan} for {n}: {price} a month, billed yearly, or {monthly} monthly.', {
+      ? t('{plan} for {n}: {price} a month, billed yearly, or {monthly} monthly, excl. VAT.', {
           plan: o.name,
           n: units,
           price: money(year, cur),
           monthly: money(month, cur),
         })
-      : t('{plan}: {price} a month, billed yearly, or {monthly} monthly.', { plan: o.name, price: money(year, cur), monthly: money(month, cur) });
+      : t('{plan}: {price} a month, billed yearly, or {monthly} monthly, excl. VAT.', { plan: o.name, price: money(year, cur), monthly: money(month, cur) });
   return units
-    ? t('{plan} for {n}: {price} a month, billed yearly', { plan: o.name, n: units, price: money(year, cur) })
-    : t('{plan}: {price} a month, billed yearly', { plan: o.name, price: money(year, cur) });
+    ? t('{plan} for {n}: {price} a month, billed yearly, excl. VAT', { plan: o.name, n: units, price: money(year, cur) })
+    : t('{plan}: {price} a month, billed yearly, excl. VAT', { plan: o.name, price: money(year, cur) });
 }
 
-/** "After that, Team is €80 a month for the 4 of you, billed yearly." (null when the plan's price isn't known here) */
+/** "After that, Team is €80 a month for the 4 of you, billed yearly, excl. VAT." (null when the plan's price isn't known
+ * here) */
 export function afterLine(b: BillingInfo): string | null {
   const o = offerOf(b, keepPlan(b));
   if (!o) return null;
@@ -63,10 +65,10 @@ export function afterLine(b: BillingInfo): string | null {
   if (price === null) return null;
   const units = o.perMember ? Math.max(o.members.min, n) : 1;
   return units > 1 && units === n
-    ? t('After that, {plan} is {price} a month for the {n} of you, billed yearly.', { plan: o.name, price: money(price, cur), n })
+    ? t('After that, {plan} is {price} a month for the {n} of you, billed yearly, excl. VAT.', { plan: o.name, price: money(price, cur), n })
     : units > 1
-      ? t('After that, {plan} is {price} a month, billed yearly for {n}.', { plan: o.name, price: money(price, cur), n: units })
-      : t('After that, {plan} is {price} a month, billed yearly.', { plan: o.name, price: money(price, cur) });
+      ? t('After that, {plan} is {price} a month, billed yearly for {n}, excl. VAT.', { plan: o.name, price: money(price, cur), n: units })
+      : t('After that, {plan} is {price} a month, billed yearly, excl. VAT.', { plan: o.name, price: money(price, cur) });
 }
 
 /** Settings → Billing. */

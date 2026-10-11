@@ -16,7 +16,7 @@ import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { SkLine } from '../ui/Skeleton.tsx';
 import { toastRefusal, useCancel } from './api.ts';
 import { FitGrid, Meter, Ruler, RulerTicks } from './parts.tsx';
-import { dayOf, daysUntil, money, ofLimit, size, stateLine, unitsFor, whyFailed } from './words.ts';
+import { dayOf, daysUntil, money, ofLimit, size, stateLine, taxWord, unitsFor, whyFailed } from './words.ts';
 
 const DAY = 86_400_000;
 /** A failed renewal's grace (the provider's): a week from the failure to read-only. */
@@ -141,8 +141,8 @@ function Loaded({ b, ws, picker, onPicker, onFix }: { b: BillingInfo; ws: string
       <span className="badge danger">{t('Read-only')}</span>
     ) : null;
 
-  // the price, right: what this workspace pays (owners and admins only)
-  const vat = b.tax === 'included' ? 'included' : 'plus';
+  // the price, right: what this workspace pays (owners and admins only), said like the plans: net, "excl. VAT"
+  const tax = taxWord(b);
   const priceBlock =
     kind === 'trial' && b.manage ? (
       <div className="bill-hero-price">
@@ -156,12 +156,8 @@ function Loaded({ b, ws, picker, onPicker, onFix }: { b: BillingInfo; ws: string
         </span>
         <span className="bill-hp-s">
           {price.interval === 'year'
-            ? vat === 'plus'
-              ? t('about {amount} a month · plus VAT', { amount: money(Math.round(price.period / 1200) * 100, price.currency) })
-              : t('about {amount} a month · VAT included', { amount: money(Math.round(price.period / 1200) * 100, price.currency) })
-            : vat === 'plus'
-              ? t('Billed monthly · plus VAT')
-              : t('Billed monthly · VAT included')}
+            ? t('about {amount} a month · {tax}', { amount: money(Math.round(price.period / 1200) * 100, price.currency), tax })
+            : t('Billed monthly · {tax}', { tax })}
         </span>
       </div>
     ) : null;

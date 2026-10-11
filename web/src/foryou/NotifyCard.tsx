@@ -4,11 +4,12 @@
 // quiet, dismissible invitation while this device hasn't decided, or a word when they are blocked or need a step
 // first — once they're on, the inbox says nothing about them.
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
 import { DEFAULT_PREFS } from '../../../lib/pushPrefs.ts';
 import type { PushPrefs, PushState } from '../../../lib/types.ts';
+import { ApiError } from '../api/client.ts';
 import { perLang, t } from '../i18n/index.ts';
-import { toast, toastError } from '../lib/toast.ts';
+import { errorMessage, toast, toastError } from '../lib/toast.ts';
 import { disablePush, enablePush, pushState, pushSupport, setPrefs, testPush } from '../pwa/push.ts';
 import { Spinner } from '../ui/feedback.tsx';
 import { I } from '../ui/icons.tsx';
@@ -65,7 +66,139 @@ function usePushDevice() {
     }
     setBusy(false);
   };
-  return { support, state: q.data ?? null, busy, run };
+  // A switch turns at once and goes back if the server refuses: the card never goes grey while a choice is saved
+  // (every switch and button used to be disabled for the request, a flash across the card on each change).
+  const pref = async (k: keyof PushPrefs, on: boolean) => {
+    const before = qc.getQueryData<PushState>(PUSH_KEY);
+    if (before?.subscription)
+      qc.setQueryData(PUSH_KEY, { ...before, subscription: { ...before.subscription, prefs: { ...before.subscription.prefs, [k]: on } } });
+    try {
+      qc.setQueryData(PUSH_KEY, await setPrefs({ [k]: on }));
+    } catch (e) {
+      if (before) qc.setQueryData(PUSH_KEY, before);
+      toastError(e);
+    }
+  };
+  return { support, state: q.data ?? null, busy, run, pref };
+}
+
+/** A computer's own settings for a browser's notifications, by platform: the step when a shown test isn't on screen. */
+const systemHint = perLang(() => {
+  const ua = navigator.userAgent;
+  if (/Mac/.test(ua) && navigator.maxTouchPoints === 0)
+    return t('This browser showed it. Nothing on screen? Allow your browser in the Mac’s System Settings → Notifications, and check that Focus is off.');
+  if (/Windows/.test(ua))
+    return t('This browser showed it. Nothing on screen? Allow your browser in Windows Settings → System → Notifications, and check Do not disturb.');
+  return t('This device showed it. Nothing there? Allow notifications for this app in the device’s settings.');
+});
+
+/** "Send a test", saying what happened on the button itself, with the next step beside it: sending, sent (the push
+ * service took it) and then what this browser made of it — shown, not shown, or no word yet — or why it couldn't go. */
+type Tested =
+  | { state: 'idle' }
+  | { state: 'sending' }
+  | { state: 'sent' | 'shown' | 'late' | 'blocked'; fresh: boolean }
+  | { state: 'failed'; why: string; next: string; fresh: boolean };
+
+function useTestPush() {
+  const qc = useQueryClient();
+  const [tested, setTested] = useState<Tested>({ state: 'idle' });
+  const said = useRef(0);
+  const settle = (next: Tested) => {
+    const n = ++said.current;
+    setTested(next);
+    // the button says it for a while, then offers the test again; the line beside it stays until the next test
+    setTimeout(() => n === said.current && setTested((s) => ('fresh' in s ? { ...s, fresh: false } : s)), 8000);
+    return n;
+  };
+  const send = async () => {
+    if (tested.state === 'sending') return;
+    said.current++;
+    setTested({ state: 'sending' });
+    try {
+      const { shown } = await testPush();
+      const n = settle({ state: 'sent', fresh: true });
+      const was = await shown;
+      // what this browser made of it, said beside the button (a newer test has its own say)
+      if (n === said.current) setTested((s) => ({ state: was ? 'shown' : was === false ? 'blocked' : 'late', fresh: 'fresh' in s && s.fresh }));
+    } catch (e) {
+      const status = e instanceof ApiError ? e.status : 0;
+      if (status === 404 || status === 410) {
+        // the server no longer has this device: the card turns to "Off on this device", and says why
+        await qc.invalidateQueries({ queryKey: PUSH_KEY });
+        setTested({ state: 'idle' });
+        toast(t('This device’s notifications had ended. Turn them on again to get them here.'), 'error');
+        return;
+      }
+      settle(
+        status === 502
+          ? {
+              state: 'failed',
+              why: t('the push service refused it'),
+              next: t('Try again in a moment. If it keeps failing, turn notifications off and on here.'),
+              fresh: true,
+            }
+          : status
+            ? { state: 'failed', why: t('the server refused it'), next: errorMessage(e), fresh: true }
+            : { state: 'failed', why: t('no connection'), next: t('Check the connection, then try again.'), fresh: true },
+      );
+    }
+  };
+  return { tested, send };
+}
+
+function TestFoot({ disabled, children }: { disabled: boolean; children: ReactNode }) {
+  const { tested, send } = useTestPush();
+  const s = tested.state;
+  const fresh = 'fresh' in tested && tested.fresh;
+  const label =
+    s === 'sending'
+      ? t('Sending…')
+      : fresh && (s === 'sent' || s === 'shown' || s === 'late')
+        ? t('Sent: check your notifications')
+        : fresh && s === 'blocked'
+          ? t('Sent, but not shown here')
+          : fresh && tested.state === 'failed'
+            ? t('Couldn’t send: {why}', { why: tested.why })
+            : t('Send a test');
+  const line =
+    s === 'shown'
+      ? systemHint()
+      : s === 'late'
+        ? t('The push service took it, but this browser hasn’t shown it yet. If it never comes, turn notifications off and on here.')
+        : s === 'blocked'
+          ? t('This browser didn’t show it: allow notifications for this site in its settings.')
+          : tested.state === 'failed'
+            ? tested.next
+            : '';
+  return (
+    <div className="fy-prefs-foot" data-tested={s}>
+      <button
+        // one node all along: what it says changes after the press, and the keyboard's focus stays on it
+        type="button"
+        className={`btn sm fy-test ${fresh ? s : ''}`}
+        disabled={disabled}
+        aria-busy={s === 'sending' || undefined}
+        onClick={send}
+        data-testid="push-test"
+      >
+        {s === 'sending' ? (
+          <Spinner />
+        ) : fresh && (s === 'failed' || s === 'blocked') ? (
+          <I name="x" size={13} />
+        ) : fresh ? (
+          <I name="check" size={13} />
+        ) : (
+          <I name="bell" size={13} />
+        )}
+        {label}
+      </button>
+      {children}
+      <p className="fy-test-said" role="status" data-testid="push-test-said">
+        {line}
+      </p>
+    </div>
+  );
 }
 
 /** The device's state in one row: a glyph, what it is, a line on it, and the action when there is one. */
@@ -90,7 +223,7 @@ function DeviceHead({ title, text, on, children }: { title: ReactNode; text: Rea
  * most likely have: on, with the usual choices, where the browser already allows notifications here.
  */
 export function PushSettings() {
-  const { support, state, busy, run } = usePushDevice();
+  const { support, state, busy, run, pref } = usePushDevice();
   if (!support.ok) {
     const why = WHY()[support.reason];
     return (
@@ -140,34 +273,21 @@ export function PushSettings() {
               id={`fy-pref-${k}`}
               checked={sub.prefs[k] ?? DEFAULT_PREFS[k] ?? false}
               disabled={busy || pending}
-              onCheckedChange={(on) => run(() => setPrefs({ [k]: on }))}
+              onCheckedChange={(on) => void pref(k, on)}
             />
           </div>
         ))}
       </div>
-      <div className="fy-prefs-foot">
+      <TestFoot disabled={busy || pending}>
         <button
           type="button"
-          className="btn sm"
-          disabled={busy || pending}
-          onClick={() =>
-            run(async () => {
-              await testPush();
-              return null;
-            }, t('Test sent — it should arrive in a moment'))
-          }
-        >
-          {t('Send a test')}
-        </button>
-        <button
-          type="button"
-          className="btn sm ghost"
+          className="btn sm ghost fy-off"
           disabled={busy || pending}
           onClick={() => run(() => disablePush(), t('Notifications are off on this device'))}
         >
           {t('Turn off here')}
         </button>
-      </div>
+      </TestFoot>
     </div>
   );
 }

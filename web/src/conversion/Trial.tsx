@@ -1,7 +1,8 @@
-// The trial, visible all along (conversion spec §1): a calm line at the sidebar's foot — "Team trial · 10 days left"
-// over a ruler of the trial's days, today the playhead, the end a keyframe (half and amber in the last three days, never
-// red, never a dot) — and, on a click only, its popover: what the trial includes with the workspace's own numbers, the
-// day it ends, and one way on (Choose a plan, for the people who choose it). A bottom sheet on a phone. The account
+// The trial, visible all along (conversion spec §1): a calm row of the sidebar's foot like Settings — an hourglass
+// keyframe, "Team trial", "10 days left" on the right (the keyframe half and amber in the last three days, never red,
+// never a dot) — and, on a click only, its popover: the trial's days as a ruler (today the playhead, the end a keyframe),
+// what the trial includes with the workspace's own numbers, the day it ends, and one way on (Choose a plan, for the
+// people who choose it). A bottom sheet on a phone. The account
 // menu carries the same line and opens the same card under the account chip. The grace week after a trial is the same
 // line on a 7-day ruler. Loaded after the first paint (billing/due.ts billingCode); the line's room is held before.
 
@@ -90,15 +91,17 @@ export function TrialLine({ billing }: { billing: BillingInfo }) {
   const ref = useRef<HTMLButtonElement>(null);
   const [inDrawer, setInDrawer] = useState(false);
   useLayoutEffect(() => setInDrawer(!!ref.current?.closest('.drawer')), []);
-  if (!line) return <div className="nav-trial" aria-hidden="true" />;
+  if (!line) return <span className="nav-row nav-trial" aria-hidden="true" />;
   const mine: Where = inDrawer ? 'drawer' : 'sidebar';
   const open = w === mine;
   const sheet = phone || inDrawer;
+  // a row of the foot like Settings: the hourglass (time passing; half and amber in the last days), the trial's name,
+  // the days left on the right. Its days as a ruler are the card's.
   const button = (
     <button
       ref={ref}
       type="button"
-      className={`nav-trial ${line.last ? 'last' : ''}`}
+      className={`nav-row nav-trial ${line.last ? 'last' : ''}`}
       aria-label={`${line.title}: ${line.words}`}
       aria-expanded={open}
       aria-haspopup="dialog"
@@ -106,11 +109,11 @@ export function TrialLine({ billing }: { billing: BillingInfo }) {
       // as a popover's trigger, Radix toggles it (onOpenChange)
       onClick={sheet ? () => setWhere(open ? null : mine) : undefined}
     >
-      <span className="nav-trial-top">
-        <b>{line.title}</b>
-        <span>{line.words}</span>
+      <span className="nav-row-ic">
+        <KeyGlyph shape={line.last ? 'half' : 'ease'} />
       </span>
-      <Ruler day={line.day} of={line.of} last={line.last} />
+      <span className="grow">{line.title}</span>
+      <span className="nav-row-meta">{line.words}</span>
     </button>
   );
   if (sheet)
@@ -153,7 +156,11 @@ export function menuEntries(b: BillingInfo | null | undefined): MenuEntry[] {
   const line = lineOf(b);
   if (!line) return [];
   return [
-    { label: `${line.title} · ${line.words}`, mark: <KeyGlyph shape="hold" size={9} />, onClick: () => setTimeout(() => setWhere('menu')) },
+    {
+      label: `${line.title} · ${line.words}`,
+      mark: <KeyGlyph shape={line.last ? 'half' : 'ease'} size={9} />,
+      onClick: () => setTimeout(() => setWhere('menu')),
+    },
     b.manage && {
       label: t('Billing'),
       icon: 'billing',
@@ -238,7 +245,7 @@ export function TrialCard({ billing: b, sheet }: { billing: BillingInfo; sheet?:
   const head = (eyebrow: string, aside: ReactNode) => (
     <header className="cv-pop-head">
       <span className="eyebrow">
-        <KeyGlyph shape="hold" size={8} /> {eyebrow}
+        <KeyGlyph shape="ease" size={8} /> {eyebrow}
       </span>
       <span className="cv-pop-day">{aside}</span>
       {sheet ? (

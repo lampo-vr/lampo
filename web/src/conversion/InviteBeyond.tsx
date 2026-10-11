@@ -90,8 +90,8 @@ export function BeyondLine({ x }: { x: Beyond }) {
     now === null
       ? ''
       : interval === 'month'
-        ? t('{amount} a month for the {n} of you', { amount: money(now, currency), n: members })
-        : t('{amount} a month for the {n} of you, billed yearly', { amount: money(now, currency), n: members });
+        ? t('{amount} a month for the {n} of you, excl. VAT', { amount: money(now, currency), n: members })
+        : t('{amount} a month for the {n} of you, billed yearly, excl. VAT', { amount: money(now, currency), n: members });
   const grows =
     b.limits.bytes !== null
       ? lacking
@@ -114,16 +114,16 @@ export function BeyondLine({ x }: { x: Beyond }) {
         card: paidWith,
       })
     ) : prorated && when ? (
-      t('Nothing. The difference for the rest of this period, {amount} plus VAT, is on the invoice of {date}, paid with {card} like {plan}.', {
+      t('Nothing. The difference for the rest of this period, {amount} excl. VAT, is on the invoice of {date}, paid with {card} like {plan}.', {
         amount: prorated,
         date: when,
         card: paidWith,
         plan: b.planName,
       })
     ) : when ? (
-      t('Nothing. The difference for the rest of this period is on the invoice of {date}, plus VAT, paid with {card}.', { date: when, card: paidWith })
+      t('Nothing. The difference for the rest of this period is on the invoice of {date}, excl. VAT, paid with {card}.', { date: when, card: paidWith })
     ) : (
-      t('Nothing. The difference for the rest of this period is on the next invoice, plus VAT, paid with {card}.', { card: paidWith })
+      t('Nothing. The difference for the rest of this period is on the next invoice, excl. VAT, paid with {card}.', { card: paidWith })
     );
   return (
     <div className="lim-beyond" data-testid="invite-beyond" role="status">

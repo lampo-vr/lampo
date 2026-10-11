@@ -85,7 +85,9 @@ export function InsightsExplained({ b }: { b: BillingInfo }) {
             {t('See {plan}', { plan: team?.name ?? 'Team' })}
           </button>
           {team && two !== null && (
-            <span className="lim-ins-fine">{t('{plan}: {amount} a month for {n}, billed yearly', { plan: team.name, amount: money(two, currency), n })}</span>
+            <span className="lim-ins-fine">
+              {t('{plan}: {amount} a month for {n}, billed yearly, excl. VAT', { plan: team.name, amount: money(two, currency), n })}
+            </span>
           )}
         </div>
       </div>

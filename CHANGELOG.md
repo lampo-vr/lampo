@@ -8,6 +8,14 @@ format stays backwards compatible throughout.
 ## [Unreleased]
 
 ### Changed
+- The sidebar's foot is one calm list: Get started, the trial and Settings are rows of the same shape — a mark, the
+  words, what they say on the right ("2 of 5", "10 days left", ⌘,) — in the phone's menu too. The trial's days as a
+  ruler are in its card, a click away; in its last three days the trial's mark turns amber.
+- Billing shows the plans the way the website does: prices without VAT, said "excl. VAT · billed yearly, save 20%",
+  and the switch between yearly and monthly slides, with each price rolling to the other. What you would pay with VAT
+  stands beside the button that goes on to pay (for example "€571.20 incl. 19% VAT"), and the checkout works out the
+  VAT for your billing address. Every price elsewhere in the app (the trial, a plan's limit, an invite beyond the plan)
+  says "excl. VAT" too; a switch that ends a trial says what is charged now with VAT.
 - The command for Claude Code adds Lampo for every folder you open (`claude mcp add --scope user …`), not only the
   one you were in when you added it.
 - Safe zones and the phone view are two separate choices. The safe-zones button (G) draws only the zones, the phone
@@ -66,6 +74,11 @@ format stays backwards compatible throughout.
   you list your server's MCP connector there.
 
 ### Fixed
+- Settings → Notifications, "Send a test": the card no longer flashes grey while a test or a choice is saved, and the
+  button itself says what happened — "Sent: check your notifications" once the push service has it, or "Couldn't send"
+  and why. Once this browser has shown it, the line beside it says where to look if it isn't on screen (on a Mac, the
+  browser's switch in System Settings → Notifications, and Focus). A device whose subscription its push service ended
+  is told so and shows notifications as off, instead of a refusal while they still looked on.
 - A position given to `lampo` (`--at`, `--t`, `--to`) or to an MCP tool's `timecode` reads a drop-frame timecode
   (`00:00:01;15`) the way a note's text does, and anything that isn't a position (`00:00:01.5`) is refused as a bad
   position instead of landing on frame 1. Malformed timecodes that used to be guessed at are refused the same way: a

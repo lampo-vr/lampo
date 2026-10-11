@@ -1,45 +1,13 @@
-/* The conversion moments (web/src/conversion/: the trial's line and card, the banner at the trial's end, the read-only
+/* The conversion moments (web/src/conversion/: the trial's row and card, the banner at the trial's end, the read-only
    Add video's popover, the moments of value), in the chunk that brings them (billing/Banner.tsx). Their rooms in the
-   first paint are in theme.css (.nav-trial) and library.css (.lib-banner-room): the boxes here keep those sizes. */
+   first paint are in theme.css (.nav-row) and library.css (.lib-banner-room): the boxes here keep those sizes. */
 
-/* ---------------------------------------------------------------- the trial's line: two words and a ruler */
-button.nav-trial {
-  border: 0;
-  border-radius: var(--r);
-  background: transparent;
-  color: var(--fg-2);
-  text-align: left;
-  font: var(--fw-ui) var(--fs-sm) / 1.2 var(--ui);
-  cursor: pointer;
-  transition: background var(--dur-fast);
+/* ---------------------------------------------------------------- the trial's row at the sidebar's foot (theme.css
+   .nav-row): its hourglass turns half and amber in the last three days, the days left come forward */
+.nav-trial.last .nav-row-ic {
+  color: var(--should);
 }
-button.nav-trial:hover,
-button.nav-trial[aria-expanded='true'] {
-  background: var(--sel);
-}
-button.nav-trial:focus-visible {
-  outline: 2px solid var(--focus, var(--fg-2));
-  outline-offset: -2px;
-}
-.nav-trial-top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--sp-2);
-  min-width: 0;
-}
-.nav-trial-top b {
-  font-weight: var(--fw-ui);
-  color: var(--fg-2);
-  white-space: nowrap;
-}
-.nav-trial-top span {
-  font-size: var(--fs-xs);
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-  white-space: nowrap;
-}
-.nav-trial.last .nav-trial-top span {
+.nav-trial.last .nav-row-meta {
   color: var(--fg-2);
 }
 

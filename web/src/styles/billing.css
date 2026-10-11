@@ -538,11 +538,73 @@
   margin: 0;
   min-inline-size: 0;
 }
+/* the picked side is one raised thumb that slides there, as on the website (Picker.tsx Slide places it): the buttons
+   stay put, the thumb moves under them with a little spring and takes the picked one's width */
+.bill-seg.slides {
+  position: relative;
+}
+.bill-seg.slides button {
+  position: relative;
+}
+.bill-seg.slides button.on {
+  background: none;
+  box-shadow: none;
+}
+.bill-thumb {
+  position: absolute;
+  top: var(--sp-0_5);
+  bottom: var(--sp-0_5);
+  left: 0;
+  width: var(--w, 0);
+  border-radius: var(--r);
+  background: var(--raise-sheen), var(--ink-3);
+  box-shadow: var(--raise);
+  transform: translateX(var(--x, 0));
+  transition:
+    transform 0.45s var(--ease-spring),
+    width 0.45s var(--ease-spring);
+}
+.bill-thumb.still {
+  transition: none;
+}
+/* what billing yearly saves: a small green pill beside Yearly, the website's */
 .bill-save {
-  margin-left: calc(var(--sp-1) + var(--sp-0_5));
-  font-style: normal;
-  font-size: var(--fs-xs);
+  display: inline-flex;
+  align-items: center;
+  height: calc(var(--h-xs) - var(--sp-0_5));
+  margin-left: var(--sp-0_5);
+  padding: 0 calc(var(--sp-1) + var(--sp-0_5));
+  border-radius: var(--r-full);
+  background: var(--ok-bg);
   color: var(--ok);
+  font: var(--fw-strong) var(--fs-xs) / 1 var(--ui);
+  font-style: normal;
+  white-space: nowrap;
+}
+/* a price rolls between its yearly and monthly amounts as the switch moves (the website's): both stand in one cell, as
+   wide as the wider, the one going out lifts away, the one coming in rises from under it; the cards follow one another */
+.bill-roll {
+  display: inline-grid;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+.bill-roll > * {
+  grid-area: 1 / 1;
+  transition:
+    transform 0.6s var(--ease-out),
+    opacity 0.35s,
+    visibility 0.6s;
+  transition-delay: calc(var(--i, 0) * 45ms);
+}
+.bill-picker[data-interval='year'] .bill-roll > .p-month {
+  transform: translateY(80%);
+  opacity: 0;
+  visibility: hidden;
+}
+.bill-picker[data-interval='month'] .bill-roll > .p-year {
+  transform: translateY(-80%);
+  opacity: 0;
+  visibility: hidden;
 }
 .bill-stepper {
   display: inline-flex;
@@ -657,7 +719,8 @@
   min-height: calc(var(--h-xs) + var(--sp-0_5));
 }
 .bill-t-h b {
-  font: var(--fw-strong) var(--fs-lg) / var(--lh-ui) var(--ui);
+  font: var(--fw-strong) var(--fs-xl) / var(--lh-ui) var(--display);
+  font-stretch: semi-condensed;
 }
 .bill-t-h .bill-tag:first-of-type {
   margin-left: auto;
@@ -684,25 +747,26 @@
   color: var(--muted);
   text-wrap: pretty;
 }
+/* the price as the website sets it: the amount big, its unit on the same baseline */
 .bill-t-price {
   display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  margin-top: var(--sp-1);
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-0_5) var(--sp-2);
+  margin-top: var(--sp-2);
 }
 .bill-t-price b {
   font: var(--fw-strong) var(--fs-3xl) / 1 var(--display);
   font-stretch: semi-condensed;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
-.bill-t-price span {
-  font-size: var(--fs-xs);
-  line-height: var(--lh-ui);
+.bill-t-unit {
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 .bill-t-billed {
-  font-size: var(--fs-xs);
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 .bill-t-facts {
@@ -746,8 +810,8 @@
     grid-row: auto;
     grid-template-rows: none;
   }
-  /* a phone shows the selection's facts; the others say their price and why */
-  .bill-tile:not(.on) :is(.bill-t-facts, .bill-t-billed) {
+  /* a phone shows the selection's facts; the others say their price (with how it stands to tax) and why */
+  .bill-tile:not(.on) .bill-t-facts {
     display: none;
   }
   .bill-t-price b {
@@ -780,6 +844,12 @@
 .bill-pk-sum span {
   color: var(--fg-2);
   font-variant-numeric: tabular-nums;
+}
+/* what a consumer pays in all, beside the one action (PAngV): as plain as the rest of the line, one step brighter */
+.bill-pk-gross {
+  font-style: normal;
+  color: var(--fg);
+  white-space: nowrap;
 }
 .bill-pk-sum small {
   font-size: var(--fs-xs);

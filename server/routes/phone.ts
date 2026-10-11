@@ -3,7 +3,7 @@
 import express, { type Request, type Router } from 'express';
 import { z } from 'zod';
 import { dismiss, type ForYouViewer, forYou, SNOOZE_MAX, snooze, unsnooze, viewerFor } from '../../lib/foryou.ts';
-import { countSubs, findSub, subscribe, unsubscribe, updatePrefs, vapidKeys } from '../../lib/push/index.ts';
+import { countSubs, type Delivery, findSub, subscribe, unsubscribe, updatePrefs, vapidKeys } from '../../lib/push/index.ts';
 import { assignedState } from '../../lib/sessions.ts';
 import { stageForReview } from '../../lib/stageContext.ts';
 import type { PushState, Review } from '../../lib/types.ts';
@@ -125,13 +125,16 @@ export function phoneRoutes(ctx: ServerContext): Router {
 
   r.post('/api/push/test', express.json(), async (req, res) => {
     const b = body(ForEndpoint, req);
-    let sent: boolean;
+    let said: Delivery;
     try {
-      sent = await ctx.push.test(b.endpoint, userOf(req));
+      said = await ctx.push.test(b.endpoint, userOf(req));
     } catch (e) {
       throw failFrom(404, e);
     }
-    if (!sent) throw fail(502, 'the push service did not accept the notification');
+    // a subscription its push service ended is forgotten here too: the device turns notifications on again (it used to
+    // read as a refusal while the page still showed them on)
+    if (said === 'gone') throw fail(410, 'this device’s subscription has ended: turn notifications on again');
+    if (said !== 'sent') throw fail(502, 'the push service did not accept the notification');
     res.json({ ok: true });
   });
 

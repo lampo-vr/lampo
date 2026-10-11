@@ -53,20 +53,17 @@ export function fromMenu(qc: QueryClient): void {
   if (o?.dismissed || (!here && o?.hidden)) comeBack(qc, !here).catch(toastError);
 }
 
-/** The row's face — the keyframe, the words, the steps as frames on a line — in the room Row.tsx held for it. */
+/** The row's face — a row of the foot like Settings: the keyframe of where it stands, the words, the count — in the room
+ * Row.tsx held for it. */
 function RowFace({ count, all, pop, ...button }: { count: { done: number; of: number }; all?: boolean; pop?: boolean } & ComponentProps<'button'>) {
   return (
-    <button type="button" className={`ob-side-row ${all ? 'ob-all' : ''}`} aria-haspopup="dialog" data-testid="ob-row" {...button}>
-      <KeyGlyph key={count.done} shape={all ? 'diamond' : count.done ? 'half' : 'outline'} pop={pop} className="ob-side-kg" />
-      <span className="ob-side-label">{all ? t('You’re set') : t('Get started')}</span>
-      <span className="ob-side-count" data-testid="ob-row-count">
-        {t('{done} of {n}', { done: count.done, n: count.of })}
+    <button type="button" className={`nav-row ob-side-row ${all ? 'ob-all' : ''}`} aria-haspopup="dialog" data-testid="ob-row" {...button}>
+      <span className="nav-row-ic">
+        <KeyGlyph key={count.done} shape={all ? 'diamond' : count.done ? 'half' : 'outline'} pop={pop} />
       </span>
-      <span className="ob-side-line" aria-hidden="true">
-        {Array.from({ length: count.of }, (_, i) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: a step's place on the line
-          <i key={i} className={i < count.done ? 'ob-on' : undefined} />
-        ))}
+      <span className="grow ob-side-label">{all ? t('You’re set') : t('Get started')}</span>
+      <span className="nav-row-meta" data-testid="ob-row-count">
+        {t('{done} of {n}', { done: count.done, n: count.of })}
       </span>
     </button>
   );

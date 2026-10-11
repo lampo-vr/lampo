@@ -83,8 +83,36 @@ export async function setPrefs(prefs: Partial<PushPrefs>): Promise<PushState> {
   return api<PushState>('/api/push/prefs', { method: 'PATCH', body: { endpoint, prefs } });
 }
 
-export async function testPush(): Promise<void> {
+/**
+ * A test notification, as far as a page can know what happened: it resolves once its push service took it (a refusal
+ * throws: the server's 404, 410, 502, or no connection), and `shown` then says whether this browser showed it (true,
+ * said by the service worker: web/sw/sw.js), didn't (false), or said nothing within `wait` ms (null: it may still come).
+ * Whether the system puts it on screen (on a Mac its own switch per browser, Focus) is the system's: no page hears of it.
+ */
+export async function testPush(wait = 8000): Promise<{ shown: Promise<boolean | null> }> {
   const endpoint = await currentEndpoint();
   if (!endpoint) throw new Error(t('Notifications are off on this device.'));
-  await api('/api/push/test', { method: 'POST', body: { endpoint } });
+  // listening before it is sent: the worker may show it before the server has answered
+  let stop = () => {};
+  const shown = new Promise<boolean | null>((done) => {
+    const sw = navigator.serviceWorker;
+    const on = (e: MessageEvent<{ type?: string; shown?: boolean }>) => {
+      if (e.data?.type === 'vr-push-test') done(e.data.shown === true);
+    };
+    const timer = setTimeout(() => done(null), wait);
+    sw?.addEventListener('message', on);
+    stop = () => {
+      clearTimeout(timer);
+      sw?.removeEventListener('message', on);
+    };
+  });
+  void shown.then(() => stop());
+  try {
+    await api('/api/push/test', { method: 'POST', body: { endpoint } });
+  } catch (e) {
+    stop();
+    throw e;
+  }
+  // sent: what this browser made of it comes after (the push service's way to it takes a moment)
+  return { shown };
 }

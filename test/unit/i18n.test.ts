@@ -115,8 +115,8 @@ test('t(): placeholders, plurals, contexts, and the German words', () => {
 
 test('a sentence never ends in two full stops when what fills its end has one ("zzgl. USt.", a name)', () => {
   setDictionary('de', de);
-  for (const vat of ['{amount} plus VAT', '{amount} incl. VAT'] as const) {
-    const amount = t(vat, { amount: '24,00 €' });
+  for (const vat of ['{amount} excl. VAT', '{amount} incl. {rate} VAT'] as const) {
+    const amount = t(vat, { amount: '24,00 €', rate: '19 %' });
     assert.match(amount, /USt\.$/);
     for (const said of [
       t('Your trial ends today, and {plan} is billed now: {amount}.', { plan: 'Business', amount }),
@@ -126,6 +126,12 @@ test('a sentence never ends in two full stops when what fills its end has one ("
       assert.match(said, /USt\.$/);
     }
   }
+  // the net with what is invoiced now in brackets ends on the bracket: the sentence keeps its own full stop
+  const both = t('Your trial ends today, and {plan} is billed now: {amount}.', {
+    plan: 'Business',
+    amount: t('{amount} excl. VAT ({total} incl. VAT)', { amount: '84,00 €', total: '99,96 €' }),
+  });
+  assert.equal(both, 'Deine Testphase endet heute, und Business wird jetzt abgerechnet: 84,00 € zzgl. USt. (99,96 € inkl. USt.).');
   assert.equal(t('On {name}.', { name: 'Acme Inc.' }), 'Auf Acme Inc.');
   assert.equal(t('On {name}.', { name: 'Acme' }), 'Auf Acme.', 'a value without one keeps the sentence’s');
   const html = renderToStaticMarkup(createElement('p', null, rich(message('On {name}.'), { name: 'Acme Inc.' }, [])));

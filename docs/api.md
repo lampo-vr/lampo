@@ -129,8 +129,9 @@ failed: it tells the workspace's owners and admins, once per failed payment. The
 declares the lowest role that may call it and whether only a person may, and the server's guard holds it to that, a
 `HEAD` as its `GET` (`403`, with `{person: true}` for an API token); a module's paths are literal, never patterns. An API token never changes what a workspace pays.
 
-Consumers may buy. `vat: {rate}` is the VAT a consumer pays on the offers' prices: Settings → Billing shows them with
-it. `reverseCharge: true` says the checkout offers reverse charge (the provider's seller has a VAT ID of its own): the
+Consumers may buy. The offers' prices are net (`tax: 'excluded'`), and Settings → Billing shows them so, "excl. VAT",
+as the website does; `vat: {rate}` is the VAT a consumer pays on them, and the page shows the selected plan's total with
+it beside the one action, before anyone pays. `reverseCharge: true` says the checkout offers reverse charge (the provider's seller has a VAT ID of its own): the
 business's name and VAT ID are then the provider's tax ID field, and a business from another EU country pays no VAT.
 Without it every buyer pays VAT, the page asks a business's name and VAT ID in fields of its own, and nothing on it says
 reverse charge. Right before the checkout confirms an order, the page sends `POST /api/billing/checkout/consent {buyer:
@@ -1373,7 +1374,7 @@ What they are for: [mobile.md](mobile.md).
 | `GET /api/push?endpoint=` | `PushState`: the server's VAPID public key, your `subscription` on that endpoint (`id`, `name`, `prefs`, `created`, `last_ok`) and how many devices you have |
 | `POST /api/push/subscribe` | `{subscription: {endpoint, keys: {p256dh, auth}}, name?, prefs?}` → `PushState`; a person's, in the app (`403` with an API token). Any new password (Profile, an admin, a reset) ends the account's subscriptions |
 | `PATCH /api/push/prefs` | `{endpoint, prefs: {questions?, fixes?, versions?, clients?, answers?, posts?, agents?, quiet?}}` → `PushState`; `404` for an unknown device |
-| `POST /api/push/unsubscribe` · `POST /api/push/test` | `{endpoint}`; the test answers `404` when the device isn't subscribed, `502` when its push service refuses |
+| `POST /api/push/unsubscribe` · `POST /api/push/test` | `{endpoint}`; the test answers `404` when the device isn't subscribed, `410` when its push service ended the subscription (the device is forgotten: turn notifications on again), `502` when its push service refuses |
 
 Details:
 

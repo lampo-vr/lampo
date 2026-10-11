@@ -570,17 +570,17 @@ export function Sidebar({ videos: loaded, folders: all = NONE, archived = NO_ARC
         </div>
       </ScrollArea>
 
-      {/* Get started while the first run has steps open, above the trial (onboarding/Row.tsx) */}
-      <StartRow {...start} />
-      {/* Settings and the theme — in the phone drawer too, where the account chip isn't. The language lives in Settings. */}
-      {/* Settings: the one way in on a phone (the account chip isn't there) and a visible one at a desk (the account menu
-          and ⌘, are the others). The theme is a setting (Appearance), with a quick row in the account menu. */}
-      {trialLineDue(billing) && (
-        <div className="nav-trial-wrap">{Trial && billing ? <Trial billing={billing} /> : <span className="nav-trial" aria-hidden="true" />}</div>
-      )}
+      {/* The foot, one row each (theme.css .nav-row): Get started while the first run has steps open
+          (onboarding/Row.tsx), the trial while one runs, and Settings — the one way in on a phone (the account chip isn't
+          there) and a visible one at a desk (the account menu and ⌘, are the others). The theme is a setting
+          (Appearance), with a quick row in the account menu; the language lives in Settings. */}
       <div className="nav-foot">
-        <a className="nav-settings" href="#/settings" data-testid="settings-link">
-          <I name="settings" size={15} />
+        <StartRow {...start} />
+        {trialLineDue(billing) && (Trial && billing ? <Trial billing={billing} /> : <span className="nav-row nav-trial" aria-hidden="true" />)}
+        <a className="nav-row nav-settings" href="#/settings" data-testid="settings-link">
+          <span className="nav-row-ic">
+            <I name="settings" size={15} />
+          </span>
           <span className="grow">{t('Settings')}</span>
           <kbd className="kbd">⌘,</kbd>
         </a>

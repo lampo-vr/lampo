@@ -263,11 +263,11 @@ try {
     await page.waitForSelector('[data-testid=invite-beyond]', { timeout: 10000 });
     // the card and the prorated amount are two answers (the account, the provider's preview), in either order: wait for
     // the sentence that has both, not for the card alone
-    await waitText('[data-testid=invite-beyond]', /€[\d.,]+ plus VAT, is on the invoice of .+, paid with Visa •••• 4242/);
+    await waitText('[data-testid=invite-beyond]', /€[\d.,]+ excl\. VAT, is on the invoice of .+, paid with Visa •••• 4242/);
     const line = await text('[data-testid=invite-beyond]');
     assert(/^Solo is for one person\./.test(line), line);
-    assert(/Team brings Ben in: €48 a month for the 2 of you\./.test(line), line);
-    assert(/Today\s*Nothing\. The difference for the rest of this period, €[\d.,]+ plus VAT, is on the invoice of/.test(line), line);
+    assert(/Team brings Ben in: €48 a month for the 2 of you, excl\. VAT\./.test(line), line);
+    assert(/Today\s*Nothing\. The difference for the rest of this period, €[\d.,]+ excl\. VAT, is on the invoice of/.test(line), line);
     assert((await text('[data-testid=invite-submit]')) === 'Switch to Team and invite Ben', await text('[data-testid=invite-submit]'));
     assert(await page.$eval('[data-testid=invite-submit]', (b) => b.classList.contains('primary')), 'the form’s purpose: the orange one');
     await shots('2c', null, { sel: '[data-testid=invite-beyond]' });
@@ -404,8 +404,8 @@ try {
     await waitText('[data-testid=invite-beyond]', /your trial ends today/);
     const line = await text('[data-testid=invite-beyond]');
     assert(/^Team holds 2 members\./.test(line), line);
-    assert(/Business brings Tom in: €126 a month for the 3 of you\./.test(line), line);
-    assert(/Today\s*€84\.00 plus VAT: your trial ends today, and Business is billed now, paid with Visa •••• 4242\./.test(line), line);
+    assert(/Business brings Tom in: €126 a month for the 3 of you, excl\. VAT\./.test(line), line);
+    assert(/Today\s*€84\.00 excl\. VAT \(€99\.96 incl\. VAT\): your trial ends today, and Business is billed now, paid with Visa •••• 4242\./.test(line), line);
     const said = await page.evaluate(() => window.__todaySaid);
     assert(said.length === 1, `the Today line said one thing: ${JSON.stringify(said)}`);
     await shots('2c-trial', null, { sel: '[data-testid=invite-beyond]' });
@@ -462,8 +462,8 @@ try {
     for (const go of sheetAnswers) await go();
     await waitText('[data-testid=limit-sheet] [data-testid=pay-order]', /Your trial ends today/);
     const order = await text('[data-testid=limit-sheet] [data-testid=pay-order]');
-    assert(/Today\s*€84\.00 plus VAT/.test(order), order);
-    assert(/Your trial ends today, and Business is billed now: €84\.00 plus VAT\./.test(order), order);
+    assert(/Today\s*€84\.00 excl\. VAT \(€99\.96 incl\. VAT\)/.test(order), order);
+    assert(/Your trial ends today, and Business is billed now: €84\.00 excl\. VAT \(€99\.96 incl\. VAT\)\./.test(order), order);
     assert(!/€0\.00|next invoice/.test(order), order);
     await shots('3f-trial', null);
     await page.click('[data-testid=pay-go]');
@@ -483,7 +483,10 @@ try {
     await sheet('storage');
     assert((await page.$eval('[data-testid=limit-sheet]', (e) => e.dataset.fit)) === 'business', 'Business, not a terabyte');
     assert(!/\+1 TB/.test(await text('[data-testid=limit-sheet]')), await text('[data-testid=limit-sheet]'));
-    await waitText('[data-testid=limit-sheet] [data-testid=pay-order]', /Your trial ends today, and Business is billed now: €84\.00 plus VAT\./);
+    await waitText(
+      '[data-testid=limit-sheet] [data-testid=pay-order]',
+      /Your trial ends today, and Business is billed now: €84\.00 excl\. VAT \(€99\.96 incl\. VAT\)\./,
+    );
     await page.waitForSelector('[data-testid=pay-go]:enabled');
     await page.click('[data-testid=pay-go]');
     await waitText(
@@ -560,7 +563,7 @@ try {
     assert(/Insights come with Team/.test(page3d) && /See where review time goes/.test(page3d), page3d);
     assert(/From Costa Cuts’ own work — 2 videos, 0 notes, 0 checked fixes — Insights shows:/.test(page3d), page3d);
     assert(/Illustration · not your data/.test(page3d), page3d);
-    assert(/Team: €40 a month for 2, billed yearly/.test(page3d), page3d);
+    assert(/Team: €40 a month for 2, billed yearly, excl\. VAT/.test(page3d), page3d);
     // the sidebar's row says which plan brings them, while the page explains
     const tag = await page.evaluate(() => {
       const row = [...document.querySelectorAll('.nav-item')].find((r) => r.querySelector('.i-chart'));
