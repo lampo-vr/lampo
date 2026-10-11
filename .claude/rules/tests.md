@@ -47,3 +47,7 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
   (`inbox.mjs` "Still wrong").
 - A price that keeps both intervals in the page (the plans' roll) is read with `innerText`: the one rolled away is `visibility: hidden`, still in `textContent` (billing.mjs `seen`).
 - A click on something near the window's foot can land on the toasts stacked there (puppeteer clicks the point, not the element): bring it to the middle and wait until `elementFromPoint` is inside it (`playbook.mjs`, the skill's row after three saves).
+- What a stand-in proxy holds is one test's: a request held paused never reads its sender's close (`gone` stays false),
+  so once its sender has exited it is dropped, never let go to the server; and a wait for "an answer came" counts only
+  requests that came in while this test listens. Let go late, a stopped upload's 404 was taken for the next render's
+  answer, whose SIGINT then hit `lampo` while Node was still starting (`render-stop.test.ts`, half the runs under load).

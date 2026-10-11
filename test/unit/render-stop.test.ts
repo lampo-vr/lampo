@@ -28,15 +28,18 @@ const v1 = makeVideo(path.join(dir, 'renders/spot.mp4'), { w: 320, h: 180, fps: 
 const rendered = makeVideo(path.join(dir, 'renders/next.mp4'), { w: 320, h: 180, fps: 25, dur: 1, pattern: 'smptebars' });
 
 // The proxy `lampo` talks to: everything goes through, except an upload's bytes (PATCH) while `holding` — those are not
-// read until released (a slow link: the sender can't get them all out) and go nowhere once their sender has gone — and,
-// while `holdingAnswers`, the server's answer to an upload's bytes (they went in; the answer waits here). `pendingSeen`:
-// the server answered an upload "pending" (it registers in the background).
+// read until released (a slow link: the sender can't get them all out) and go nowhere once their sender has gone
+// (`drop`: a paused request never reads its sender's close, so `gone` can't tell) — and the server's answer to the bytes
+// of an upload sent while `holdingAnswers` (they went in; the answer waits here). Only bytes that came in while answers
+// are held count: an earlier render's, let go late, would be answered while the next test listens, as if it were its
+// own render's. `pendingSeen`: the server answered an upload "pending" (it registers in the background).
 let holding = false;
 let holdingAnswers = false;
 let pendingSeen = false;
-const held: { go: () => void; gone: boolean }[] = [];
+const held: { go: () => void; drop: () => void; gone: boolean }[] = [];
 const answers: { go: () => void }[] = [];
 const proxy = http.createServer((req, res) => {
+  const holdAnswer = holdingAnswers && req.method === 'PATCH';
   const forward = () => {
     const up = http.request({ host: '127.0.0.1', port: app.port, method: req.method, path: req.url, headers: req.headers }, (r) => {
       const pass = () => {
@@ -44,7 +47,7 @@ const proxy = http.createServer((req, res) => {
         r.pipe(res);
       };
       if (req.method === 'PATCH' && r.statusCode === 202) pendingSeen = true;
-      if (holdingAnswers && req.method === 'PATCH') answers.push({ go: pass });
+      if (holdAnswer) answers.push({ go: pass });
       else pass();
     });
     up.on('error', () => res.destroy());
@@ -52,7 +55,7 @@ const proxy = http.createServer((req, res) => {
   };
   if (!(holding && req.method === 'PATCH' && req.url?.startsWith('/api/uploads/'))) return forward();
   req.pause();
-  const h = { gone: false, go: () => (h.gone ? undefined : forward()) };
+  const h = { gone: false, go: () => (h.gone ? undefined : forward()), drop: () => req.destroy() };
   res.on('close', () => {
     h.gone = true;
   });
@@ -177,12 +180,12 @@ test('a stop while the render goes up ends the upload: nothing is registered, an
   holding = true;
   let code: number | null;
   let out: string;
+  let exited = false;
   try {
     const r = render(tool, big);
     // the tool has ended and the bytes are on their way
     await until(() => held.length > 0, 'the upload under way');
     r.p.kill('SIGINT');
-    let exited = false;
     void r.done.then(() => {
       exited = true;
     });
@@ -190,7 +193,12 @@ test('a stop while the render goes up ends the upload: nothing is registered, an
     ({ code, out } = await r.done);
   } finally {
     holding = false;
-    for (const h of held.splice(0)) h.go();
+    // lampo has ended: its upload goes nowhere (let go, the server's late answer to it lands in the next test); a render
+    // still running gets its bytes through
+    for (const h of held.splice(0)) {
+      if (exited) h.drop();
+      else h.go();
+    }
   }
   assert.equal(code, 130, out);
   assert.match(out, /^Render failed \(exit 130\): stopped\. The person sees it in Lampo\./m);
