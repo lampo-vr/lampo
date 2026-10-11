@@ -588,7 +588,7 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Carry the approval over to V{v}': 'Freigabe auf V{v} übernehmen',
   Change: 'Ändern',
   'Change “{label}”': '„{label}“ ändern',
-  'Change link': 'Link ändern',
+  'Edit link': 'Link bearbeiten',
   'Change password': 'Passwort ändern',
   'Change webhook': 'Webhook ändern',
   'CHANGED SINCE V{v}': 'GEÄNDERT SEIT V{v}',

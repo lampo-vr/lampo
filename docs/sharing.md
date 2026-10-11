@@ -56,7 +56,7 @@ and offers the one action that changes it:
 
 ## What a link allows
 
-The share dialog shows every setting under the kinds, one row each; *Change link* in a link's ⋯ menu opens the link
+The share dialog shows every setting under the kinds, one row each; *Edit link* in a link's ⋯ menu opens the link
 as its own page with the same rows (an *Embed* link keeps its kind: [below](#embedding-a-video)):
 
 | Setting | Choices |
@@ -246,7 +246,7 @@ sits at the bar's end; where a workspace hides the badge ([For the visitor](#for
   video's file name, as a *Watch only* visitor reads it.
 - **A link is an embed from the start, or never.** Its address sits in the pages it is on, for anyone to read, so
   *Embed* is offered only when a link is made: an existing link doesn't become one, and an embed doesn't become
-  another kind of link (*Change link* changes its name and expiry). For another kind, make a new link.
+  another kind of link (*Edit link* changes its name and expiry). For another kind, make a new link.
 - **Revoking** the link stops every page it is on at once (the frame then says "This video isn't available"), and so
   does its expiry. An embed has no password: it plays for anyone who sees the page it is on.
 - **What it records** is what a *Watch only* link records ([What a link records](#what-a-link-records)), counted when

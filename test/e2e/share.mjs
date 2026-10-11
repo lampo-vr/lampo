@@ -1085,7 +1085,7 @@ try {
     await page.keyboard.press('Escape');
   });
 
-  await check('Change link opens the link as its own page in the dialog: the same rows, Save, and back to the list', async () => {
+  await check('Edit link opens the link as its own page in the dialog: the same rows, Save, and back to the list', async () => {
     const folderShares = async () => (await api(`/api/folder-shares?folder=${encodeURIComponent('Acme/Reels')}`)).shares;
     await page.goto(`${BASE}/#/folder/${encodeURIComponent('Acme/Reels')}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.hero-share');
@@ -1099,7 +1099,7 @@ try {
     );
     await more.click();
     await page.waitForSelector('.menu[data-state=open] [role=menuitem]');
-    await clickText('.menu[data-state=open] [role=menuitem]', 'Change link');
+    await clickText('.menu[data-state=open] [role=menuitem]', 'Edit link');
     await page.waitForSelector('[data-testid=link-change]');
     // the list is still there under it, hidden: the dialog didn't change its height
     await settle(page);

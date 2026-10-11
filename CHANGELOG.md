@@ -92,6 +92,7 @@ format stays backwards compatible throughout.
   checkout (where the trial's end leads) and in a plan's limit. The button that goes on to pay waits for it, and once
   given it is remembered for the workspace. The checkout asks for the business's name; the VAT ID stays optional.
   In German: "für Unternehmen".
+- A review link's ⋯ menu says *Edit link* (German *Link bearbeiten*) for its settings, instead of *Change link*.
 
 ### Added
 - When an agent stops listening while something waits on it — your answer to its question, notes you sent — the

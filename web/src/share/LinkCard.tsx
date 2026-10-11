@@ -153,7 +153,7 @@ export function LinkCard({ s, opened = false, url, reach, here, canShare, editin
               <IconButton className={`btn sm ghost icon-only ${editing ? 'on' : ''}`} label={t('More for {label}', { label: s.label })} icon="more" size={15} />
             }
             items={[
-              !s.gone && { label: t('Change link'), icon: 'edit', onClick: onEdit },
+              !s.gone && { label: t('Edit link'), icon: 'edit', onClick: onEdit },
               // a site that embeds from an address (oEmbed: WordPress, Notion, …) takes the player's
               !!code && !s.expired && !s.gone && { label: t('Copy the player’s address'), icon: 'link', onClick: copyPlayer },
               any && { label: open ? t('Hide activity') : t('Activity'), icon: 'users', onClick: () => setOpen((x) => !x) },

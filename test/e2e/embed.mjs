@@ -3,7 +3,7 @@
 // Browser end-to-end test of an Embed link: a real server (local mode, temp store, free port), headless Chrome, and a
 // page on another origin (another host and port) that pastes the code the share dialog copies. Share → Embed on a
 // video: the settings an embed doesn't take are off and fixed, Create copies the code, and the link's line opens with
-// it; Change link keeps a link on its side (an embed is offered no kinds, a review link no Embed). In the other site's
+// it; Edit link keeps a link on its side (an embed is offered no kinds, a review link no Embed). In the other site's
 // page the frame keeps the video's shape, plays, and steps frame by frame — each picture ffmpeg's decode of that
 // frame, the timecode the app's —; J K L, Space, M and F (full screen) work; chapters stand on
 // the timeline as keyframe glyphs (a press on one goes to its first frame, pointing names it); captions show what is
@@ -302,7 +302,7 @@ try {
     await p.close();
   });
 
-  await check('Change link keeps a link’s side: an embed is offered no other kind, and another link not Embed', async () => {
+  await check('Edit link keeps a link’s side: an embed is offered no other kind, and another link not Embed', async () => {
     const enc = encodeURIComponent(stepsVideo.slug);
     const kept = await api(`/api/review/${enc}/shares`, 'POST', { label: 'Kept embed', embed: true });
     await api(`/api/review/${enc}/shares`, 'POST', { label: 'Mia, review' });
@@ -315,7 +315,7 @@ try {
       await p.click(`.link-row [aria-label="More for ${label}"]`);
       await p.waitForSelector('.menu[data-state=open] [role=menuitem]');
       await p.evaluate(() =>
-        [...document.querySelectorAll('.menu[data-state=open] [role=menuitem]')].find((m) => m.textContent.trim() === 'Change link').click(),
+        [...document.querySelectorAll('.menu[data-state=open] [role=menuitem]')].find((m) => m.textContent.trim() === 'Edit link').click(),
       );
       await p.waitForSelector('[data-testid=link-change]');
     };

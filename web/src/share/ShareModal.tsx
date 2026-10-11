@@ -1,7 +1,7 @@
 // Owner side of review links: make one for a video or a whole folder, decide what visitors may do, see who opened
 // it, change or revoke it later, and (locally) make links reachable from anywhere through a Cloudflare tunnel.
 // Who it's for, one of three kinds of link, and every setting in view as a row with its name and its switch
-// (LinkSettings.tsx); the links already made are one line each, and Change link opens one as its own page in the
+// (LinkSettings.tsx); the links already made are one line each, and Edit link opens one as its own page in the
 // dialog, with the same rows.
 import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { useShareActions } from '../api/mutations.ts';
