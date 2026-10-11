@@ -132,7 +132,9 @@ try {
 server when the suite exits; `await srv.setupToken()` is a hosted server's one-time setup token. Its fresh store stands
 for one in use: new accounts there get no first run unless the suite asks (`onboarding: true`, see
 `test/e2e/onboarding.mjs`). Screenshots go to `LAMPO_SHOTS` when it is set (`shotsDir()`; `screenshotFailures(() => page)`
-adds one per failed check). `LAMPO_CHECK=<part of a name>` runs only the checks whose name contains it
+adds one per failed check). With `LAMPO_FAIL_SHOTS=<folder>` every failed check saves what each open page of the
+suite's browsers shows at that moment, in any suite (`<suite>-<n>-<check>.png`); CI sets it and keeps the folder as
+the run's `failure-screenshots-<part>` artifact. `LAMPO_CHECK=<part of a name>` runs only the checks whose name contains it
 (`LAMPO_CHECK=skeleton node test/e2e/quality-load.mjs`).
 
 Wait for a state, never for a time: `until(fn, what)` (test/lib/helpers.ts) polls until `fn` gives something,

@@ -97,6 +97,45 @@ function openSource() {
     });
 }
 
+// The stream is the tab's that holds the 'vr-sse' lock, for as long as it lives: the next tab in line takes over when
+// it closes. A tab Chrome freezes (one in the background, to save energy) runs nothing, and what its stream brought
+// waited in it while every other tab heard nothing (an open note showed an agent's reply only after a reload). So a tab
+// about to freeze hands the lock on, a frozen one never waits in line for it, and one that wakes asks again.
+let waiting: AbortController | null = null;
+let handBack: (() => void) | null = null;
+
+function holdTheStream(takeover: boolean) {
+  return new Promise<void>((done) => {
+    waiting = null;
+    handBack = () => {
+      handBack = null;
+      leader = false;
+      if (again) clearTimeout(again);
+      again = null;
+      es?.close();
+      es = null;
+      done();
+    };
+    // taken over from another tab: whatever was said since that tab stopped is asked again, here and in every tab
+    if (takeover) gap = true;
+    leader = true;
+    openSource();
+  });
+}
+
+function askForTheStream() {
+  if (handBack || waiting) return;
+  const asking = new AbortController();
+  waiting = asking;
+  navigator.locks
+    .request('vr-sse', { ifAvailable: true }, (lock) => (lock ? holdTheStream(false) : null))
+    .then((held) => {
+      if (held !== null || waiting !== asking) return;
+      return navigator.locks.request('vr-sse', { signal: asking.signal }, () => holdTheStream(true));
+    })
+    .catch(() => {}); // it froze while waiting (the request was taken back)
+}
+
 /**
  * Opens the stream (or joins the tab that holds it). Called by the auth gate once the app may talk to the server:
  * at once in local mode, after sign-in in server mode.
@@ -104,13 +143,22 @@ function openSource() {
 export function startEvents() {
   if (started) return;
   started = true;
-  const lead = () => {
+  if (navigator.locks && channel) {
+    askForTheStream();
+    document.addEventListener('freeze', () => {
+      if (handBack) handBack();
+      waiting?.abort();
+      waiting = null;
+    });
+    // awake again: nothing that was said while it slept reached it
+    document.addEventListener('resume', () => {
+      resync();
+      askForTheStream();
+    });
+  } else {
     leader = true;
     openSource();
-  };
-  // The lock is held forever (the promise never settles): the next tab takes over when this one closes.
-  if (navigator.locks && channel) navigator.locks.request('vr-sse', () => new Promise<void>(lead));
-  else lead();
+  }
   window.addEventListener('pagehide', () => {
     es?.close();
     es = null;

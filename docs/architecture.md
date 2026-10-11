@@ -240,7 +240,9 @@ Frame accuracy is the product, and it is kept at every step:
 
 React 19, with TanStack Query for everything that comes from the server. Query keys follow the API's resources, and
 live updates refresh exactly what changed. Across browser tabs only one holds the event stream (a Web Lock) and
-passes events to the others over a BroadcastChannel, so tabs don't use up the browser's six connections per host.
+passes events to the others over a BroadcastChannel, so tabs don't use up the browser's six connections per host. A
+tab the browser is about to freeze (one in the background, to save energy) hands the lock on, and asks everything
+again when it wakes: a frozen tab runs nothing, and kept for itself what its stream brought.
 Radix provides menus, dialogs, popovers and tooltips, unstyled and dressed in the project's own CSS; it loads after
 the first paint ([Speed](#speed)). The timeline draws a still canvas and moves the playhead as a separate layer, so
 playback doesn't redraw the strip.
@@ -256,7 +258,9 @@ playback doesn't redraw the strip.
   `status/api.ts`, which works out the new stage with `lib/stage.ts`).
 - **Precise live updates.** Events name the video they are about. `api/live.ts` fetches after the first announcement
   at once, merges the repeats of the same write (the route, the data folder's watcher, the event feed), and updates
-  single library entries (`GET /api/library?slug=…`) instead of fetching the whole list again.
+  single library entries (`GET /api/library?slug=…`) instead of fetching the whole list again. The event feed's line
+  is the one announcement every write has, in every workspace: an agent's write through the server's own `/mcp`
+  passes no route, and the watcher reads workspace #1's folder only.
 - **A light start.** The first paint loads no Radix: buttons that open things are plain elements with their roles,
   names and states, and tooltips are notes on their element (`web/src/ui/primitives.tsx`, `ui/tip.tsx`,
   `ui/toggle.tsx`). The Radix half (`ui/layers.tsx`: dialogs, menus, popovers, hover cards, one tooltip layer, the

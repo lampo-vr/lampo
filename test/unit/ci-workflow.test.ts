@@ -73,6 +73,16 @@ test('the Chrome job installs the suites’ own browser, cached by its version, 
   assert.ok(e2e.indexOf('npm run chrome:install') < e2e.indexOf('test:e2e'), 'before the suites run');
 });
 
+test('a failed browser check can be looked at: the Chrome job saves its pages (LAMPO_FAIL_SHOTS) and keeps them when it fails', () => {
+  const e2e = jobsOf(ci).e2e;
+  const dir = /\n\s+LAMPO_FAIL_SHOTS: (\S+)\n/.exec(e2e)?.[1];
+  assert.ok(dir, 'the job sets LAMPO_FAIL_SHOTS');
+  const upload = /if: \$\{\{ failure\(\) \}\}\n\s+uses: actions\/upload-artifact@v\d+\n\s+with:\n((?:\s{10}.+\n)+)/.exec(e2e)?.[1] || '';
+  assert.match(upload, /name: failure-screenshots-\$\{\{ matrix\.part \}\}\n/, 'one artifact per part');
+  assert.ok(upload.includes(`path: ${dir.replace(/\/?$/, '/')}\n`), `uploads ${dir}: ${upload}`);
+  assert.ok(e2e.indexOf('test:e2e') < e2e.indexOf('name: failure-screenshots'), 'after the suites ran');
+});
+
 test('macOS runs only when asked: by hand, or on a pull request labelled macos', () => {
   const mac = workflows['macos.yml'];
   assert.doesNotMatch(mac, /\n {2}push:|\n {2}schedule:/, 'not on pushes or a schedule');

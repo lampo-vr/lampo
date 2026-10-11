@@ -2,7 +2,7 @@
 // starts there with a stand-in for the `claude` CLI. Nothing else in test/e2e does either — a suite that started its
 // own server or asked the real `claude agents` could put the maintainer's Claude Code sessions into screenshots.
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
+import { execFile, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -66,6 +66,40 @@ test('the server helper stands in for `claude` and ignores the shell’s instanc
   } finally {
     await srv.stop();
     fs.rmSync(srv.dir, { recursive: true, force: true });
+  }
+});
+
+test('with LAMPO_FAIL_SHOTS a failed check saves every open page of the suite’s browsers; a passed one, or none set, saves nothing', () => {
+  const dir = tmpdir('vr-harness-failshots-');
+  try {
+    // a suite of two checks, its browser a stand-in with three pages (one blank): no Chrome needed here
+    const suite = path.join(dir, 'demo.mjs');
+    fs.writeFileSync(
+      suite,
+      `import fs from 'node:fs';
+import { check, watchBrowser } from ${JSON.stringify(pathToFileURL(path.join(E2E, 'lib/checks.mjs')).href)};
+const page = (url) => ({ isClosed: () => false, url: () => url, screenshot: async ({ path }) => fs.writeFileSync(path, url) });
+watchBrowser({ once: () => {}, pages: async () => [page('http://127.0.0.1/#/v/a'), page('about:blank'), page('http://127.0.0.1/#/')] });
+await check('it passes', async () => {});
+await check('Send all makes ordinary notes', async () => {
+  throw new Error('no');
+});
+`,
+    );
+    const shots = path.join(dir, 'shots');
+    const run = (extra: Record<string, string>) => {
+      const env = { ...process.env, ...extra };
+      if (!extra.LAMPO_FAIL_SHOTS) delete env.LAMPO_FAIL_SHOTS;
+      const r = spawnSync(process.execPath, [suite], { env, encoding: 'utf8', timeout: 30_000 });
+      assert.match(r.stdout, /✗ Send all makes ordinary notes/, r.stdout + r.stderr);
+    };
+    run({});
+    assert.ok(!fs.existsSync(shots), 'nothing without the setting');
+    run({ LAMPO_FAIL_SHOTS: shots });
+    assert.deepEqual(fs.readdirSync(shots).sort(), ['demo-2-send-all-makes-ordinary-notes-page2.png', 'demo-2-send-all-makes-ordinary-notes.png']);
+    assert.equal(fs.readFileSync(path.join(shots, 'demo-2-send-all-makes-ordinary-notes.png'), 'utf8'), 'http://127.0.0.1/#/v/a');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 

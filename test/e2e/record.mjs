@@ -230,7 +230,10 @@ try {
         }, spacing);
         for (const b of bad) out.push(`@${width}${spacing === '0' ? '' : ' wider letters'}: ${b}`);
       }
+    // Touch off again reloads the page (puppeteer does, for isMobile/hasTouch): the drafts are back some 70 ms after its
+    // load on a Mac, later on a slower machine, and the next check clicks into the first one (CI's Linux runner).
     if (own) await page.setViewport(own);
+    await page.waitForSelector('[data-testid=drafts][data-state=ready] [data-testid=draft]:first-of-type textarea', { timeout: 20000 });
     assert(!out.length, out.join('\n'));
   });
 

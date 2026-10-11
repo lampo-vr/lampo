@@ -122,6 +122,9 @@ jobs:
       # test/e2e/baseline/ (styleguide-{dark,light}-linux.png) once they look right, then delete this line: from then on
       # a missing Linux baseline fails the run (test/e2e/lib/baseline.mjs).
       LAMPO_BASELINE_MISSING: skip
+      # A failed check saves what each open page shows then (test/e2e/lib/checks.mjs), uploaded below as
+      # failure-screenshots: a failure only this runner shows can be looked at.
+      LAMPO_FAIL_SHOTS: test-output/failures
     steps:
       - uses: actions/checkout@v5
         with:
@@ -169,6 +172,14 @@ jobs:
           name: new-screenshot-baselines-${{ matrix.part }}
           path: test-output/baseline/
           if-no-files-found: ignore
+      - name: Keep the failed checks' screenshots
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-screenshots-${{ matrix.part }}
+          path: test-output/failures/
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Leave nothing running
         if: always() && runner.environment == 'self-hosted'
         run: scripts/ci-runner.sh cleanup

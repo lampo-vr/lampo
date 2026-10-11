@@ -107,6 +107,12 @@ format stays backwards compatible throughout.
   you list your server's MCP connector there.
 
 ### Fixed
+- On a hosted server, an agent's reply, new note or fix made through the MCP connection now shows in the open player
+  right away, in every workspace. Outside a server's first workspace it showed only after a reload: an open note
+  didn't show the reply, and a closed note's reply count stayed as it was.
+- With Lampo open in several tabs, live updates no longer stop when the browser puts a background tab to sleep: one
+  tab receives them for all, and while that tab slept the others showed nothing new until a reload (an agent's reply
+  in the open note, for one). The sleeping tab now hands the job to another and catches up when it wakes.
 - Checkboxes and switches show the keyboard's focus ring again, like every other control, and a disabled checkbox no
   longer lights up under the pointer.
 - Auto-check no longer calls a dark shot a black gap. A frame counts as black only when it is black, not when it is

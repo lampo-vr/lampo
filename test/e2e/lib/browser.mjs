@@ -7,6 +7,7 @@ import path from 'node:path';
 import { settings } from '../../../lib/env.ts';
 import { ROOT } from '../../lib/helpers.ts';
 import { unavailable } from '../prereq.mjs';
+import { watchBrowser } from './checks.mjs';
 
 const CHROMES = [
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -175,6 +176,8 @@ export async function launch({ locale = 'en-US', reducedMotion = true, args = []
     const createContext = browser.createBrowserContext.bind(browser);
     browser.createBrowserContext = async (...a) => inWindows(await createContext(...a));
   }
+  // a failed check photographs its pages (LAMPO_FAIL_SHOTS, ./checks.mjs)
+  watchBrowser(browser);
   // every page's session is of the class the browser's own is
   const session = await browser.target().createCDPSession();
   keepTheMouse(session);

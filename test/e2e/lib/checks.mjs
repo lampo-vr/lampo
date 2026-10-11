@@ -8,6 +8,38 @@ import { settings } from '../../../lib/env.ts';
 const results = [];
 let failureShot = null;
 
+// LAMPO_FAIL_SHOTS=<dir> (CI sets it and keeps the folder as an artifact): a failed check saves what every open page of
+// every browser the suite launched (./browser.mjs launch) shows at that moment, whatever the suite set up itself.
+const FAIL_SHOTS = settings.LAMPO_FAIL_SHOTS ? path.resolve(import.meta.dirname, '../../..', settings.LAMPO_FAIL_SHOTS) : null;
+const browsers = new Set();
+/** Called by launch(): the browser's pages are photographed when a check fails (with LAMPO_FAIL_SHOTS). */
+export function watchBrowser(browser) {
+  browsers.add(browser);
+  browser.once('disconnected', () => browsers.delete(browser));
+}
+// A page that hangs (a crashed renderer, a dialog) must not hang the suite: each step gives up after a while.
+const within = (p, ms) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error('timed out')), ms).unref())]);
+async function shootOpenPages(n, name) {
+  if (!FAIL_SHOTS || !browsers.size) return;
+  fs.mkdirSync(FAIL_SHOTS, { recursive: true });
+  const suite = path.basename(process.argv[1] || 'suite', '.mjs');
+  const what = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 48);
+  let i = 0;
+  for (const browser of browsers) {
+    const pages = await within(browser.pages(), 3000).catch(() => []);
+    for (const page of pages) {
+      // Chrome's first tab (and a page left on about:blank) has nothing to show
+      if (page.isClosed() || !/^https?:/.test(page.url())) continue;
+      i++;
+      await within(page.screenshot({ path: path.join(FAIL_SHOTS, `${suite}-${n}-${what}${i > 1 ? `-page${i}` : ''}.png`) }), 5000).catch(() => {});
+    }
+  }
+}
+
 class Skipped extends Error {}
 /** Ends the running check as skipped, never as passed: it couldn't decide here (say why). Shown in the summary, and
  * as a warning on a GitHub Actions run. */
@@ -36,6 +68,7 @@ export async function check(name, fn) {
     }
     results.push({ name, ok: false });
     await failureShot?.(results.length).catch(() => {});
+    await shootOpenPages(results.length, name);
     // The whole message (a rule may list every offender), then the first frames of where it was thrown.
     const at = String(e?.stack || '')
       .split('\n')

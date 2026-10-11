@@ -5,6 +5,7 @@
 // insights and For you only where a screen shows them. Every read revalidates with its ETag, so a repeat is a 304.
 // Server events (events.ts) and this tab's own writes (mutations.ts) both come through here.
 import type { QueryClient } from '@tanstack/react-query';
+import type { EventType as LogLine } from '../../../lib/types.ts';
 import { api } from './client.ts';
 import { type EventData, on, onResync } from './events.ts';
 import { keys } from './queries.ts';
@@ -14,6 +15,8 @@ import type { LibraryResponse } from './types.ts';
 const WINDOW = 250;
 // For you follows every line of the event log, which arrives up to half a second after the change itself.
 const FOR_YOU_WINDOW = 700;
+// Event lines (lib/types.ts EventType) that change nothing a review shows: a download, an agent's run, a post.
+const NOT_A_REVIEW_CHANGE: ReadonlySet<string> = new Set<LogLine>(['download', 'agent_run', 'run', 'post']);
 
 interface Batch {
   reviews: Set<string>;
@@ -174,9 +177,15 @@ export function bindQueryClient(qc: QueryClient) {
     inv(['agents']);
   });
   // "For you" follows everything that can add or settle an item: every line of events.jsonl, whoever wrote it.
+  // A line about a video's notes, versions or verdicts is that video's change too, said in the workspace it happened
+  // in: an agent's write through the server's own MCP endpoint is told by nothing else outside workspace #1 (the data
+  // folder's watcher is #1's alone), and an open note showed the agent's reply only after a reload. Where a route or
+  // the watcher said it already, this is one more ask, answered 304 (the line comes up to half a second later).
   // a question asked on a folder (no video): the folder's line of questions too (options/api.ts)
   on('event', (d) => {
-    live.forYou();
+    const slug = slugOf(d);
+    if (slug && typeof d.type === 'string' && !NOT_A_REVIEW_CHANGE.has(d.type)) live.review(slug);
+    else live.forYou();
     if (!d.slug && d.folder) inv(['asks']);
   });
   on('asks', () => inv(['asks']));
