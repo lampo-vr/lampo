@@ -1,20 +1,25 @@
 #!/usr/bin/env node
 // covers: web/src/files/ web/src/settings/Files.tsx web/src/ui/kindIcons.tsx web/src/styles/files.css web/src/uploads/UploadTray.tsx
 // covers: web/src/billing/Plan.tsx web/src/conversion/limits/LimitSheet.tsx server/routes/files.ts lib/files.ts
+// covers: lib/fileMedia.ts lib/mcpConfig.ts
 // Browser end-to-end test of a project's files (the Files tab) on a real server with a real-shaped project in it
 // (test/e2e/lib/filesStore.mjs: footage by day, music, an After Effects and a Cinema 4D project, Photoshop files, fonts,
 // LUTs, a brief; an agent's files and versions; the project's and the House's files above it; a file in the trash).
 // The sizes the page shows are a real project's (the answers are scaled, nothing else changes). Checks: the tab beside
-// Videos and Playbook for the team and never for reviewers; a folder added through the picker and loose files dropped
+// Videos and Playbook for the team and never for reviewers; the table (Name · Size · Changed close together, a folder
+// filled like a file, the column names ordering the list, a row's actions under the pointer and from the keys);
+// footage's and pictures' posters in boxes that were there before them, footage's and sound's lengths; an empty
+// project's prompt for an agent; a folder added through the picker and loose files dropped
 // on the tab are checked before a byte moves (what is new, what replaces what, junk left out), then upload into the
 // tray and land as rows; a replace whose file changed meanwhile says who changed it, and Keep both / Replace; a file
 // opened beside the list with its versions, one restored; trash with Undo, then for real, then back from the trash; a
 // new folder; inherited files folded and open; the plan's line, its sheet on a refusal and Settings → Billing; the
 // phone's bottom sheet; the keys; no layout shift and the loading state in the real layout; every state at 390–1920 in
 // both themes and German. Screenshots land in VR_SHOTS.
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { until } from '../lib/helpers.ts';
+import { FFMPEG, until } from '../lib/helpers.ts';
 import { dataTheme, layoutMatrix, settle } from './layout.mjs';
 import { launch, requireChrome, requireDist, shotsDir, signedIn } from './lib/browser.mjs';
 import { assert, check, crashed, finish, screenshotFailures } from './lib/checks.mjs';
@@ -116,6 +121,9 @@ const NO_SUCH_FILE = 'fl_000000000000';
 let dayFull = false;
 /** The `conflict` of every POST /api/files/uploads, in order. */
 const asked = [];
+/** Every poster asked for (its path), and whether they wait until let go. */
+const posters = [];
+let holdPosters = false;
 
 async function intercept(p) {
   await p.setRequestInterception(true);
@@ -125,6 +133,11 @@ async function intercept(p) {
     // Linux-like metrics on any machine: the brand fonts never arrive
     if (blockFonts && /\.woff2?$/.test(at)) return req.abort().catch(() => {});
     try {
+      if (/^\/api\/files\/fl_[0-9a-f]{12}\/poster$/.test(at)) {
+        posters.push(at);
+        await until(() => !holdPosters, 'posters let go', 30_000).catch(() => {});
+        return req.continue().catch(() => {});
+      }
       if (!at.startsWith('/api/') || req.method() !== 'GET') {
         if (at === '/api/files/uploads' && req.method() === 'POST') asked.push(JSON.parse(req.postData() || '{}').conflict ?? 'refuse');
         // the account's day of versions full: the server's own 429 (a copy is never refused for it)
@@ -217,6 +230,9 @@ try {
 
   await check('the Files tab stands beside Videos and Playbook on a project and a folder, and opens the folder’s files', async () => {
     await open(`#/folder/${e(PROJECT)}`, { wait: '[data-testid=folder-tab-files]' });
+    // Day 1 (all footage) opens as a grid: the checks written for the list's rows see it as a list (the browser keeps the
+    // view per folder; the grid has checks of its own)
+    await page.evaluate((k) => localStorage.setItem(k, 'list'), `vr.files.view:${CAMPAIGN}/Footage/Day 1`);
     const tabs = await page.$$eval('.hero-tabs [role=tab]', (els) => els.map((x) => x.textContent?.trim()));
     assert(tabs.join(' · ') === 'Videos · Files · Playbook', `tabs: ${tabs.join(' · ')}`);
     await page.click('[data-testid=folder-tab-files]');
@@ -228,11 +244,45 @@ try {
     for (const n of ['Brief', 'Footage', 'Graphics', 'Music', 'Project', 'Renders for review', 'subtitles_de.srt'])
       assert(names.includes(n), `a row for ${n}: ${names.join(', ')}`);
     assert(names.indexOf('Footage') < names.indexOf('subtitles_de.srt'), 'folders first');
-    // the list's heading: where it is and what it holds (what it inherits is folded under the rows, each a section)
-    const count = await page.$eval('[data-testid=files-count]', (x) => x.textContent);
-    assert(/^18 files · [\d.]+ GB$/.test(count ?? ''), `the heading's numbers: ${count}`);
+    // no heading repeats the page's title: what the list holds stands quietly beside the columns' names (what it
+    // inherits is folded under the rows, each a section)
+    assert(!(await page.$('[data-testid=files-place]')), 'no crumbs at the area’s top: the page’s title says where');
+    const count = await page.$eval('.pf-cols [data-testid=files-count]', (x) => x.textContent);
+    assert(/^18 files · [\d.]+ GB$/.test(count ?? ''), `what the list holds: ${count}`);
+    const heads = await page.$$eval('.pf-cols .pf-sort-head', (els) => els.map((x) => x.textContent));
+    assert(heads.join() === 'Name,Size,Changed', `the columns: ${heads}`);
+    assert(!/Kind/.test(await page.$eval('.pf-cols', (x) => x.textContent ?? '')), 'no Kind column: the glyph says it');
+    // every row filled the same way: a folder says what it holds beside its name, its size, and who changed it last and
+    // when (its newest file's), as a file does; only an empty folder has nothing to say
+    const dirs = Object.fromEntries((await listing(CAMPAIGN, '', false)).dirs.map((d) => [d.path, d.files]));
+    const rows = await page.$$eval('[data-testid=files-list] :is([data-testid=file-row], [data-testid=dir-row])', (els) =>
+      els.map((r) => ({
+        dir: r.dataset.testid === 'dir-row',
+        name: r.querySelector('.pf-name')?.textContent,
+        facts: r.querySelector('[data-testid=dir-facts]')?.textContent ?? null,
+        size: r.querySelector('.pf-c-size')?.textContent ?? '',
+        who: r.querySelector('.pf-c-changed .pf-who-name')?.textContent ?? '',
+        when: r.querySelector('.pf-c-changed .pf-when')?.textContent ?? '',
+        lead: !!r.querySelector('.pf-c-lead .pf-thumb svg'),
+      })),
+    );
+    for (const r of rows) {
+      assert(r.lead, `${r.name}: its kind's glyph in the name cell`);
+      if (r.dir && !dirs[r.name]) {
+        assert(r.facts === 'Empty folder' && !r.size && !r.who, `an empty folder: ${JSON.stringify(r)}`);
+        continue;
+      }
+      if (r.dir) assert(r.facts === `${dirs[r.name]} file${dirs[r.name] === 1 ? '' : 's'}`, `${r.name} says what it holds: ${r.facts}`);
+      assert(r.size && r.who && /^ · \S/.test(r.when), `${r.name}: filled like every row: ${JSON.stringify(r)}`);
+    }
     const from = await page.$$eval('[data-testid=files-inherited]', (els) => els.map((x) => x.textContent));
-    assert(/From Acme4 files/.test(from[0] ?? '') && /From House3 files/.test(from[1] ?? ''), `inherited: ${from.join(' | ')}`);
+    assert(
+      /^Also here, from the Acme project4 files/.test(from[0] ?? '') && /^Also here, from the House3 files/.test(from[1] ?? ''),
+      `inherited: ${from.join(' | ')}`,
+    );
+    // the trash at the list's foot, in plain words
+    const trash = await page.$eval('.pf-foot [data-testid=files-trash-link]', (x) => x.textContent);
+    assert(trash === 'Trash: 1 file, 3.1 GB, doesn’t count toward your storage', `the trash: ${trash}`);
     await shot('files-campaign-1440');
   });
 
@@ -273,7 +323,9 @@ try {
       async () => (await rowNames()).join() === 'endcard.c4d,spot.aep,Spring sale key visual.psd',
       async () => (await rowNames()).join(),
     );
-    assert(await page.$eval('[data-testid=file-row] .pf-dir', (x) => x.textContent === 'Project'), 'a match says where it is');
+    // (after its length or version, which stay whole: where it is gives way first on a narrow row)
+    const where = await page.$eval('[data-testid=file-row]', (r) => [...r.querySelectorAll('.pf-meta')].map((x) => x.textContent).join(' · '));
+    assert(/(^| · )Project$/.test(where ?? ''), `a match says where it is: ${where}`);
     await page.$$eval('.pf-kind-chips button', (bs) => bs.find((b) => b.textContent === 'All')?.click());
     await page.type('[data-testid=files-search]', 'A001');
     // every folder inside is searched: Day 1's three takes (the old one is in the trash)
@@ -283,6 +335,257 @@ try {
     );
     await page.click('[data-testid=files-search]', { count: 3 });
     await page.keyboard.press('Escape');
+  });
+
+  await check('the column names order the list, each way, an arrow saying which; kept; the keys reach them', async () => {
+    await open(campaign(`?path=${e('Footage/Day 1')}`));
+    const head = (by) =>
+      page.$eval(`[data-testid=files-order-${by}]`, (b) => ({
+        pressed: b.getAttribute('aria-pressed'),
+        label: b.getAttribute('aria-label'),
+        arrow: b.querySelector('.i-sortAsc') ? 'asc' : b.querySelector('.i-sortDesc') ? 'desc' : null,
+      }));
+    const names = async () => (await rowNames()).join();
+    const byName = 'A001C003.mov,A001C004.mov,A001C005.mov,A002C001.mov';
+    assert((await names()) === byName, `by name first: ${await names()}`);
+    assert((await head('name')).label === 'Name, ordered A to Z' && (await head('size')).pressed === 'false', JSON.stringify(await head('size')));
+    // Size: the largest first, then (again) the smallest
+    await page.click('[data-testid=files-order-size]');
+    await until(async () => (await names()) === 'A002C001.mov,A001C003.mov,A001C005.mov,A001C004.mov', names);
+    const size = await head('size');
+    assert(size.pressed === 'true' && size.arrow === 'desc' && size.label === 'Size, ordered largest first', JSON.stringify(size));
+    assert((await head('name')).pressed === 'false', 'one column orders the list');
+    // from the keys: Tab reaches the names, Enter presses one
+    await page.focus('[data-testid=files-order-size]');
+    await page.keyboard.press('Enter');
+    await until(async () => (await names()) === 'A001C004.mov,A001C005.mov,A001C003.mov,A002C001.mov', names);
+    assert((await head('size')).label === 'Size, ordered smallest first' && (await head('size')).arrow === 'asc', JSON.stringify(await head('size')));
+    // kept for the next visit
+    await open(campaign(`?path=${e('Footage/Day 1')}`));
+    assert((await names()) === 'A001C004.mov,A001C005.mov,A001C003.mov,A002C001.mov', `kept: ${await names()}`);
+    await page.click('[data-testid=files-order-changed]');
+    await until(async () => (await head('changed')).pressed === 'true', 'by when it changed');
+    assert((await head('changed')).label === 'Changed, ordered newest first', JSON.stringify(await head('changed')));
+    // and back to names, A to Z (the checks after this one read the list in that order)
+    await page.click('[data-testid=files-order-name]');
+    await until(async () => (await names()) === byName, names);
+    assert((await head('name')).pressed === 'true', 'by name again');
+  });
+
+  await check('the columns stand together at 1440 and 1920: Name takes the room, Size right-aligned in even figures', async () => {
+    try {
+      for (const width of [1440, 1920]) {
+        await page.setViewport({ width, height: 900 });
+        await open(campaign());
+        const m = await page.evaluate(() => {
+          const box = (el) => el.getBoundingClientRect();
+          const head = document.querySelector('.pf-cols');
+          const cell = (c) => box(head.querySelector(`.pf-c-${c}`));
+          const [name, size, changed, acts, row] = [cell('name'), cell('size'), cell('changed'), cell('acts'), box(head)];
+          // Size's words end at its column's right edge, in every row; its figures are tabular
+          const ragged = [...document.querySelectorAll('[data-testid=files-list] .pf-row .pf-c-size')]
+            .filter((c) => c.textContent)
+            .map((c) => {
+              const r = document.createRange();
+              r.selectNodeContents(c);
+              return Math.round(box(c).right - r.getBoundingClientRect().right);
+            })
+            .filter((d) => Math.abs(d) > 1);
+          const figures = getComputedStyle(document.querySelector('[data-testid=files-list] .pf-c-size')).fontVariantNumeric;
+          return {
+            gaps: [size.left - name.right, changed.left - size.right, acts.left - changed.right].map(Math.round),
+            end: Math.round(row.right - acts.right),
+            nameShare: name.width / row.width,
+            ragged,
+            figures,
+          };
+        });
+        assert(
+          m.gaps.every((g) => g >= 0 && g <= 16),
+          `@${width}: the columns' gaps ${m.gaps.join(', ')} px`,
+        );
+        assert(m.end <= 12, `@${width}: the actions end at the row's end (${m.end} px before it)`);
+        assert(m.nameShare >= 0.5, `@${width}: Name takes the room (${Math.round(m.nameShare * 100)}%)`);
+        assert(!m.ragged.length && /tabular-nums/.test(m.figures), `@${width}: Size right-aligned (${m.ragged}), figures ${m.figures}`);
+        await shot(`files-columns-${width}`);
+      }
+    } finally {
+      await page.setViewport({ width: 1440, height: 900 });
+    }
+  });
+
+  await check('the rows start at the content’s left edge, where the search field does, and every name at one x', async () => {
+    const out = [];
+    try {
+      for (const vp of [
+        { width: 390, height: 844, isMobile: true, hasTouch: true },
+        { width: 768, height: 1024, isMobile: true, hasTouch: true },
+        { width: 1024, height: 900 },
+        { width: 1440, height: 900 },
+        { width: 1920, height: 900 },
+      ]) {
+        await page.setViewport(vp);
+        // folders and a subtitle file (no posters), footage only, and pictures among other files
+        for (const [what, p] of [
+          ['folders', ''],
+          ['footage', 'Footage/Day 1'],
+          ['mixed', 'Graphics'],
+        ]) {
+          await open(campaign(p ? `?path=${e(p)}` : ''));
+          if (what !== 'folders') await page.waitForFunction(() => document.querySelector('[data-testid=file-row] .pf-thumb.has-pic'), { timeout: 20_000 });
+          const m = await page.evaluate(() => {
+            const left = (el) => (el ? Math.round(el.getBoundingClientRect().left) : null);
+            const shown = (el) => el && el.getBoundingClientRect().width > 0;
+            const rows = [...document.querySelectorAll('[data-testid=files-list] .pf-row')];
+            const set = (xs) => [...new Set(xs)];
+            return {
+              field: left(document.querySelector('[data-testid=files-search]')),
+              leads: set(rows.map((r) => left(r.querySelector('.pf-c-lead')))),
+              glyphs: set(rows.map((r) => left(r.querySelector('.pf-thumb-glyph')))),
+              pics: set([...document.querySelectorAll('[data-testid=files-list] .pf-thumb.has-pic img')].map(left)),
+              names: set(rows.map((r) => left(r.querySelector('.pf-name')))),
+              head: left([...document.querySelectorAll('.pf-cols .pf-sort-head, .pf-cols [data-testid=files-count]')].find(shown)),
+              sections: [...document.querySelectorAll('[data-testid=files-inherited-head], .pf-foot')].map(left),
+            };
+          });
+          const at = `${what} @${vp.width}`;
+          const edge = (x) => x !== null && Math.abs(x - m.field) <= 1;
+          if (!m.leads.every(edge)) out.push(`${at}: rows' first column at ${m.leads}, the search field at ${m.field}`);
+          if (!m.glyphs.every(edge)) out.push(`${at}: glyphs at ${m.glyphs}, not the left edge ${m.field}`);
+          if (!m.pics.every(edge)) out.push(`${at}: posters at ${m.pics}, not the left edge ${m.field}`);
+          if (m.names.length !== 1) out.push(`${at}: names at ${m.names.length} x's: ${m.names}`);
+          if (m.head === null || Math.abs(m.head - m.names[0]) > 1) out.push(`${at}: the columns' row starts at ${m.head}, the names at ${m.names[0]}`);
+          if (!m.sections.every(edge)) out.push(`${at}: the sections and the foot at ${m.sections}, the search field at ${m.field}`);
+          // what the folder inherits, open: its rows on the same edge, its names where the folder's are
+          if (what === 'folders') {
+            await page.click(`[data-testid=files-inherited][data-area="${PROJECT}"] [data-testid=files-inherited-head]`);
+            await page.waitForSelector(`[data-testid=files-inherited][data-area="${PROJECT}"] .pf-inh-list .pf-row:not(.pending)`);
+            const inh = await page.$$eval('[data-testid=files-inherited] .pf-inh-list .pf-row', (rows) =>
+              rows.map((r) => [r.querySelector('.pf-c-lead'), r.querySelector('.pf-name')].map((x) => Math.round(x.getBoundingClientRect().left))),
+            );
+            if (!inh.every(([l, n]) => Math.abs(l - m.field) <= 1 && n === m.names[0])) out.push(`${at}: the inherited rows at ${JSON.stringify(inh)}`);
+            // (its words: the link's box takes the slot before them too)
+            const all = await page.$eval('[data-testid=files-inherited] .pf-inh-all', (x) => {
+              const r = document.createRange();
+              r.selectNodeContents(x);
+              return Math.round(r.getBoundingClientRect().left);
+            });
+            if (all !== m.names[0]) out.push(`${at}: "All files of Acme" at ${all}, the names at ${m.names[0]}`);
+          }
+          if (vp.width === 1440) await shot(`files-edge-${what}-1440`);
+        }
+      }
+    } finally {
+      await page.setViewport({ width: 1440, height: 900 });
+    }
+    assert(!out.length, out.join('\n'));
+  });
+
+  await check('a row’s actions: under the pointer (Download, Copy for an agent, ⋯), and from the keys on the row they are on', async () => {
+    await open(campaign());
+    const shown = () =>
+      page.$$eval('[data-testid=files-list] .pf-row:not(.pf-cols)', (rows) =>
+        rows.map((r) => [...r.querySelectorAll('.pf-c-acts .btn')].filter((b) => getComputedStyle(b).visibility === 'visible').length),
+      );
+    await page.mouse.move(0, 0);
+    assert(
+      (await shown()).every((n) => n === 0),
+      `before the pointer: ${await shown()}`,
+    );
+    const file = await page.$('[data-testid=file-row]');
+    const name = await file.$eval('.pf-name', (x) => x.textContent);
+    await file.hover();
+    const labels = await file.$$eval('.pf-c-acts .btn', (bs) =>
+      bs.filter((b) => getComputedStyle(b).visibility === 'visible').map((b) => b.getAttribute('aria-label')),
+    );
+    assert(labels.join() === `Download ${name},Copy ${name} for an agent,More for ${name}`, `under the pointer: ${labels}`);
+    assert((await shown()).filter((n) => n > 0).length === 1, `only that row's: ${await shown()}`);
+    // the keys: the list's row, then Tab into its actions (one stop for the list, the row's actions after it)
+    await page.mouse.move(0, 0);
+    await page.focus('[data-testid=files-list]');
+    await page.keyboard.press('End');
+    const last = await page.$eval('[data-testid=files-list] .pf-row.active .pf-name', (x) => x.textContent);
+    const tabbed = [];
+    for (let i = 0; i < 3; i++) {
+      await page.keyboard.press('Tab');
+      tabbed.push(
+        await page.evaluate(() => {
+          const a = document.activeElement;
+          return a?.closest('.pf-row.active') && getComputedStyle(a).visibility === 'visible'
+            ? a.getAttribute('aria-label')
+            : `(${a?.tagName} ${a?.className})`;
+        }),
+      );
+    }
+    assert(tabbed.join() === `Download ${last},Copy ${last} for an agent,More for ${last}`, `Tab: ${tabbed.join(' → ')}`);
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('[role=menu]');
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.querySelector('[role=menu]'));
+  });
+
+  await check('footage and pictures: a poster in a box that was there before it; footage and sound say their length', async () => {
+    const boxes = () =>
+      page.$$eval('[data-testid=file-row]', (rows) =>
+        rows.map((r) => {
+          const t = r.querySelector('.pf-thumb').getBoundingClientRect();
+          const n = r.querySelector('.pf-name').getBoundingClientRect();
+          return `${Math.round(t.left)},${Math.round(t.top)},${Math.round(t.width)}x${Math.round(t.height)} name@${Math.round(n.left)},${Math.round(n.top)}`;
+        }),
+      );
+    const metas = () => page.$$eval('[data-testid=file-row] .pf-meta', (els) => els.map((x) => x.textContent).join());
+    holdPosters = true;
+    posters.length = 0;
+    try {
+      await open(campaign(`?path=${e('Footage/Day 1')}`));
+      // the lengths come first (one request for the rows), the posters after them
+      await until(
+        async () => (await metas()) === '0:02,0:02,0:02,0:02',
+        async () => `lengths: ${await metas()}`,
+      );
+      await until(
+        () => posters.length === 4,
+        () => `posters asked for: ${posters.length}`,
+      );
+      const before = await boxes();
+      assert(!(await page.$('.pf-thumb.has-pic')), 'no picture before its bytes');
+      holdPosters = false;
+      await page.waitForFunction(() => document.querySelectorAll('[data-testid=file-row] .pf-thumb.has-pic').length === 4, { timeout: 20_000 });
+      await settle(page, { quiet: 300 });
+      const after = await boxes();
+      assert(before.join() === after.join(), `nothing moved when the pictures came:\n${before.join('\n')}\n→\n${after.join('\n')}`);
+      // within the server's box, in their own shape (16:9 here)
+      const pics = await page.$$eval('[data-testid=file-row] .pf-thumb img', (els) => els.map((x) => `${x.naturalWidth}x${x.naturalHeight}`));
+      assert(
+        pics.every((p) => p === '128x72'),
+        `posters: ${pics}`,
+      );
+      await shot('files-posters-1440');
+    } finally {
+      holdPosters = false;
+    }
+    // a picture gets one; a file ffprobe can't read (made-up bytes named .svg) is never asked for one
+    posters.length = 0;
+    await open(campaign(`?path=${e('Graphics')}`));
+    const still = (await listing(CAMPAIGN, 'Graphics')).files.find((f) => f.path === 'Graphics/still_hero.png');
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid=file-row] .pf-thumb.has-pic').length === 1, { timeout: 20_000 });
+    await settle(page, { quiet: 300 });
+    assert(posters.join() === `/api/files/${still.id}/poster`, `posters asked for in Graphics: ${posters.join(', ')}`);
+    // sound: its length beside its name, no picture
+    const tone = path.join(dir, 'room-tone.wav');
+    execFileSync(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=330:duration=3', '-ac', '2', '-ar', '22050', tone]);
+    await push(BASE, CAMPAIGN, { 'Music/room tone.wav': fs.readFileSync(tone) });
+    await open(campaign(`?path=${e('Music')}`));
+    const length = () =>
+      page.$$eval(
+        '[data-testid=file-row]',
+        (rows) => rows.find((r) => r.querySelector('.pf-name')?.textContent === 'room tone.wav')?.querySelector('.pf-meta')?.textContent ?? null,
+      );
+    await until(
+      async () => (await length()) === '0:03',
+      async () => `the sound's length: ${await length()}`,
+    );
+    assert(!(await page.$('.pf-thumb.has-pic')), 'sound has no picture');
   });
 
   await check('a folder through the picker: the check says what comes before any byte moves, then the tray and the rows', async () => {
@@ -511,7 +814,7 @@ try {
     },
   );
 
-  await check('the keys: ↓ moves, ↵ opens a folder, ⌘↑ goes back up, Space looks, ⌫ trashes with Undo', async () => {
+  await check('the keys: ↓ moves, ↵ opens a folder, ⌘↑ goes back up, Space is Quick Look, ⌫ trashes with Undo', async () => {
     await open(campaign());
     await page.focus('[data-testid=files-list]');
     const active = () => page.$eval('[data-testid=files-list] .pf-row.active .pf-name', (x) => x.textContent).catch(() => null);
@@ -530,10 +833,11 @@ try {
     await page.focus('[data-testid=files-list]');
     await page.keyboard.press('End');
     assert((await active()) === 'subtitles_de.srt', `End: ${await active()}`);
+    // Space: Quick Look, and again to close it (the details beside the list are Details' or ↵'s)
     await page.keyboard.press('Space');
-    await page.waitForSelector('[data-testid=file-sheet]');
+    await page.waitForSelector('[data-testid=quick-look]');
     await page.keyboard.press('Space');
-    await page.waitForFunction(() => !document.querySelector('[data-testid=file-sheet]'));
+    await page.waitForFunction(() => !document.querySelector('[data-testid=quick-look]'));
     // ⌫, then Undo: back, and nothing reached the server
     await page.keyboard.press('Backspace');
     await until(async () => !(await rowNames()).includes('subtitles_de.srt'), 'gone from the list');
@@ -641,24 +945,51 @@ try {
   await check('what a folder inherits: folded under its own, open to the files above', async () => {
     await open(campaign());
     const from = await page.$$eval('[data-testid=files-inherited] .pf-inh-from', (els) => els.map((x) => x.textContent));
-    assert(from.join() === 'From Acme,From House', from.join());
+    assert(from.join(' | ') === 'Also here, from the Acme project | Also here, from the House', from.join(' | '));
+    // which file is used where both have one, said once, plainly (this list is a folder's)
+    const note = await page.$$eval('[data-testid=files-inherited] .pf-inh-note', (els) => els.map((x) => x.textContent));
+    assert(note.join(' | ') === 'Same name in the same folder: this folder’s own file is used.', `the note: ${note.join(' | ')}`);
     await page.click(`[data-testid=files-inherited][data-area="${PROJECT}"] .pf-inh-head`);
     await page.waitForSelector(`[data-testid=files-inherited][data-area="${PROJECT}"] [data-testid=inherited-dir-row]`);
     await shot('files-inherited-1440');
   });
 
-  await check('the plan: a quiet line of what files use, the head’s pill near the end, the sheet on a refusal, Settings → Billing', async () => {
-    plan = billingOf(2.18 * TB, 2.5 * TB, { bytes: 1.31 * TB, kept: 18e9 });
+  await check('the plan: a bar you can read at the list’s foot, amber near the end, the sheet on a refusal, Settings → Billing', async () => {
+    // what the bar draws: how full (its fill's share of its width) and in which colour, beside the amber of the tokens
+    const store = () =>
+      page.$eval('.pf-foot [data-testid=files-usage]', (a) => {
+        const bar = a.querySelector('.pf-store-bar');
+        const probe = document.createElement('i');
+        probe.style.color = 'var(--should)';
+        document.body.append(probe);
+        const amber = getComputedStyle(probe).color;
+        probe.remove();
+        const fill = getComputedStyle(bar, '::before');
+        return {
+          words: a.querySelector('.pf-store-words')?.textContent,
+          near: a.classList.contains('near'),
+          share: Number.parseFloat(fill.width) / bar.getBoundingClientRect().width,
+          amber: fill.backgroundColor === amber,
+          href: a.getAttribute('href'),
+        };
+      });
+    plan = billingOf(0.31 * TB, 2.5 * TB, { bytes: 0.12 * TB, kept: 0 });
     try {
       await open(campaign());
-      // the storage at the end of the list's heading: near the end in words, split into files and videos in its name
-      // (and its tooltip)
+      const quiet = await store();
+      assert(quiet.words === '310 GB of 2.5 TB' && !quiet.near && !quiet.amber, `a plan with room: ${JSON.stringify(quiet)}`);
+      assert(Math.abs(quiet.share - 0.124) < 0.02 && quiet.href === '#/settings/billing', JSON.stringify(quiet));
+      assert(!(await page.$('[data-testid=files-quota-near]')), 'nothing said with room left');
+      plan = billingOf(2.18 * TB, 2.5 * TB, { bytes: 1.31 * TB, kept: 18e9 });
+      await open(campaign());
+      // near the end: amber, and in words; its name (and its tooltip) splits it into files and videos
+      const near = await store();
+      assert(near.words === '2.18 TB of 2.5 TB' && near.near && near.amber && Math.abs(near.share - 0.872) < 0.02, `near the end: ${JSON.stringify(near)}`);
       const usage = await page.$eval('[data-testid=files-usage]', (x) => x.getAttribute('aria-label'));
       assert(/Files 1\.31 TB · videos 870 GB · 2\.18 TB of 2\.5 TB in use/.test(usage ?? ''), `usage: ${usage}`);
       assert(/trash and older versions 18 GB, not counted/.test(usage ?? ''), usage ?? '');
       const pill = await page.$eval('[data-testid=files-quota-near]', (x) => x.textContent);
       assert(pill === '87% of storage used', `near the end: ${pill}`);
-      assert(await page.$('.pf-shead [data-testid=files-usage]'), 'the storage is in the list’s heading');
       await shot('files-quota-1440');
       // a refusal for room: the plan's own sheet, with what fills it
       refuseNext = true;
@@ -691,8 +1022,20 @@ try {
     await open(campaign(`?path=${e('Footage/Day 1')}`));
     const h = await page.$eval('[data-testid=file-row]', (x) => Math.round(x.getBoundingClientRect().height));
     assert(h === 56, `a phone row: ${h}`);
+    // no columns: what the list holds and the order, one compact control over the rows' ⋯
+    const head = await page.evaluate(() => {
+      const right = (s) => Math.round(document.querySelector(s)?.getBoundingClientRect().right ?? -1);
+      return {
+        count: document.querySelector('.pf-cols [data-testid=files-count]')?.textContent,
+        order: right('.pf-cols .pf-order-menu'),
+        more: right('[data-testid=file-row] .pf-more'),
+        names: [...document.querySelectorAll('.pf-cols .pf-sort-head')].filter((x) => x.getBoundingClientRect().width).length,
+      };
+    });
+    assert(/^4 files · [\d.]+ GB$/.test(head.count ?? '') && head.order === head.more && !head.names, `a phone's columns row: ${JSON.stringify(head)}`);
     await shot('files-phone-390');
     await page.tap('[data-testid=file-row] .pf-name');
+    assert(!(await page.$('[data-testid=files-peek]')), 'no card on touch');
     await page.waitForSelector('.modal [data-testid=file-sheet] [data-testid=file-version]');
     // measured where it rests: the versions can come before its slide-up has begun (still pending at its first frame,
     // translateY(100%): a bottom a sheet's height below the screen)
@@ -841,6 +1184,163 @@ try {
     assert(!out.length, out.join('\n'));
   });
 
+  await check('an empty project: Add files (the prompt for an agent waits for its command)', async () => {
+    await api('/api/folders', 'POST', { path: 'Launch' });
+    await open('#/files/Launch', { wait: '[data-testid=files-empty]' });
+    const acts = await page.$$eval('[data-testid=files-empty] .pf-empty-acts .btn', (bs) => bs.map((b) => b.textContent));
+    assert(acts.join() === 'Add files', `the empty state's buttons: ${acts}`);
+    assert(!(await page.$('[data-testid=files-prompt]')), 'no prompt until `lampo files push` exists');
+    await shot('files-empty-project-1440');
+  });
+
+  await check('the view: a grid where pictures dominate, a list elsewhere; the switch and ⌘1 / ⌘2, kept per folder', async () => {
+    const view = () =>
+      page.evaluate(() => ({
+        grid: !!document.querySelector('[data-testid=files] .pf-grid'),
+        list: !!document.querySelector('[data-testid=files] .pf-list'),
+        on: [...document.querySelectorAll('.pf-view button')].filter((b) => b.classList.contains('on')).map((b) => b.getAttribute('aria-label')),
+      }));
+    // the top: one subtitle file among folders → a list; Day 2: all footage → a grid; Footage: folders of footage → a grid
+    await open(campaign());
+    assert((await view()).list && (await view()).on.join() === 'List', `the top: ${JSON.stringify(await view())}`);
+    await open(campaign(`?path=${e('Footage/Day 2')}`));
+    assert((await view()).grid && (await view()).on.join() === 'Grid', `Day 2: ${JSON.stringify(await view())}`);
+    // ⌘2 a list, kept for this folder only
+    await page.keyboard.down('Meta');
+    await page.keyboard.press('2');
+    await page.keyboard.up('Meta');
+    await until(async () => (await view()).list, 'a list after ⌘2');
+    await open(campaign(`?path=${e('Footage/Day 2')}`));
+    assert((await view()).list, `Day 2 kept as a list: ${JSON.stringify(await view())}`);
+    await open(campaign(`?path=${e('Footage')}`));
+    assert((await view()).grid, `Footage keeps its own (a grid): ${JSON.stringify(await view())}`);
+    // ⌘1 a grid again; the buttons do the same, and say their keys
+    await open(campaign(`?path=${e('Footage/Day 2')}`));
+    await page.keyboard.down('Meta');
+    await page.keyboard.press('1');
+    await page.keyboard.up('Meta');
+    await until(async () => (await view()).grid, 'a grid after ⌘1');
+    await page.click('.pf-view button[aria-label=List]');
+    await until(async () => (await view()).list, 'a list from the button');
+    await page.click('.pf-view button[aria-label=Grid]');
+    await until(async () => (await view()).grid, 'a grid from the button');
+    await shot('files-grid-1440');
+  });
+
+  await check('Quick Look: Space or a picture opens it, ← → go through the folder, Esc closes, Details opens the file beside the list', async () => {
+    await open(campaign(`?path=${e('Footage/Day 2')}`));
+    const count = () => page.$eval('[data-testid=quick-look-count]', (x) => x.textContent).catch(() => null);
+    const title = () => page.$eval('.modal-head h3', (x) => x.textContent).catch(() => null);
+    await page.focus('[data-testid=files-list]');
+    await page.keyboard.press('Space');
+    await page.waitForSelector('[data-testid=quick-look][data-look=video] video');
+    assert((await count()) === '1 of 3' && (await title()) === 'B001C001.mov', `${await count()} ${await title()}`);
+    await page.keyboard.press('ArrowRight');
+    await until(
+      async () => (await count()) === '2 of 3' && (await title()) === 'B001C002.mov',
+      async () => `→: ${await count()} ${await title()}`,
+    );
+    await page.keyboard.press('ArrowLeft');
+    await until(
+      async () => (await count()) === '1 of 3',
+      async () => `←: ${await count()}`,
+    );
+    await shot('files-quicklook-1440');
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.querySelector('[data-testid=quick-look]'));
+    // a click on a tile's picture, then Details: the file beside the list, with its versions
+    await page.$$eval('[data-testid=file-row] .pf-tile-pic', (els) => els[2]?.click());
+    await until(
+      async () => (await title()) === 'B001C007_drone.mp4',
+      async () => `the picture's click: ${await title()}`,
+    );
+    await page.$$eval('.pf-ql-foot button', (bs) => bs.find((b) => b.textContent?.includes('Details'))?.click());
+    await page.waitForSelector('[data-testid=file-sheet] [data-testid=file-version]');
+    assert(!(await page.$('[data-testid=quick-look]')), 'Quick Look made way for the details');
+    await page.keyboard.press('Escape');
+  });
+
+  await check('picking in the grid: the box under the pointer, ⌘- and ⇧-clicks, and the bar', async () => {
+    await open(campaign(`?path=${e('Footage/Day 2')}`));
+    const tiles = await page.$$('[data-testid=file-row]');
+    await tiles[0].hover();
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid=file-row] .pf-tick')).opacity === '1');
+    await (await tiles[0].$('.pf-tick')).click();
+    await page.keyboard.down('Meta');
+    await (await tiles[2].$('.pf-tile-text')).click();
+    await page.keyboard.up('Meta');
+    await page.keyboard.down('Shift');
+    await (await tiles[0].$('.pf-tile-text')).click();
+    await page.keyboard.up('Shift');
+    await page.waitForSelector('[data-testid=files-selbar]');
+    const bar = await page.$eval('[data-testid=files-selbar] .pf-selbar-n', (x) => x.textContent);
+    assert(/^3 selected/.test(bar ?? ''), `the bar: ${bar}`);
+    assert(!(await page.$('[data-testid=quick-look]')), 'picking opens nothing');
+    await shot('files-grid-picked-1440');
+    await page.click('.pf-selbar-x');
+    await page.waitForFunction(() => !document.querySelector('[data-testid=files-selbar]'));
+  });
+
+  await check('a clip scrubs under a mouse: the frame and the time follow the pointer across its picture', async () => {
+    await open(campaign(`?path=${e('Footage/Day 2')}`));
+    let strips = 0;
+    const count = (r) => r.url().includes('/scrub') && strips++;
+    page.on('request', count);
+    try {
+      const box = await page.$eval('[data-testid=file-row] .pf-tile-pic', (x) => {
+        const r = x.getBoundingClientRect();
+        return { x: r.left, y: r.top + r.height / 2, w: r.width };
+      });
+      const at = async (f) => {
+        await page.mouse.move(box.x + box.w * f, box.y, { steps: 3 });
+        await page.waitForSelector('[data-testid=file-row] .pf-scrub.ready .pf-scrub-frame');
+        return page.$eval('[data-testid=file-row] .pf-scrub', (x) => ({
+          frame: x.querySelector('.pf-scrub-frame')?.style.backgroundPosition,
+          line: Math.round(Number.parseFloat(x.querySelector('.pf-scrub-line')?.style.width ?? '0')),
+        }));
+      };
+      const left = await at(0.1);
+      const right = await at(0.9);
+      assert(left.frame !== right.frame && left.line < 20 && right.line > 80, `the frames: ${JSON.stringify({ left, right })}`);
+      assert(strips === 1, `one strip asked for: ${strips}`);
+      await shot('files-scrub-1440');
+    } finally {
+      page.off('request', count);
+      await page.mouse.move(0, 0);
+    }
+  });
+
+  await check('the list’s card: above the row after a rest, gone when the pointer moves on, none while picking', async () => {
+    await open(campaign(`?path=${e('Footage/Day 1')}`));
+    const rows = await page.$$('[data-testid=files-list] [data-testid=file-row]');
+    const peek = () => page.$('[data-testid=files-peek]');
+    const rect = (el) => el.evaluate((x) => x.getBoundingClientRect().toJSON());
+    await (await rows[2].$('.pf-name')).hover();
+    await page.waitForSelector('[data-testid=files-peek].ready');
+    const card = await (await peek()).evaluate((x) => x.getBoundingClientRect().toJSON());
+    const row = await rect(rows[2]);
+    const below = await rect(rows[3]);
+    assert(card.bottom <= row.top, `above the row: ${Math.round(card.bottom)} ≤ ${Math.round(row.top)}`);
+    assert(card.bottom <= below.top || card.top >= below.bottom, 'never over the row below');
+    await shot('files-peek-1440');
+    // on to the next row: the card goes at once (the next one only after its own rest)
+    await (await rows[3].$('.pf-name')).hover();
+    await page.waitForFunction(() => !document.querySelector('[data-testid=files-peek]'), { polling: 'raf', timeout: 2000 });
+    await page.mouse.move(0, 0);
+    await page.waitForFunction(() => !document.querySelector('[data-testid=files-peek]'));
+    // while files are picked: none (a fixed while is the only way to see "never")
+    await rows[0].hover();
+    await (await rows[0].$('.pf-tick')).click();
+    await (await rows[2].$('.pf-name')).hover();
+    const shown = await page.waitForSelector('[data-testid=files-peek]', { timeout: 1200 }).then(
+      () => true,
+      () => false,
+    );
+    assert(!shown, 'no card while files are picked');
+    await page.click('.pf-selbar-x');
+    await page.mouse.move(0, 0);
+  });
+
   await check('the House’s files in Settings → Files, the same page', async () => {
     await open('#/settings/files');
     const names = await rowNames();
@@ -874,7 +1374,7 @@ try {
     const where = () =>
       p.evaluate(() =>
         Object.fromEntries(
-          ['.pf-toolbar', '.pf-shead', '.pf-cols', '[data-testid=files-search]', '[data-testid=files-add]'].map((s) => [
+          ['.pf-toolbar', '.pf-cols', '[data-testid=files-search]', '[data-testid=files-add]'].map((s) => [
             s,
             Math.round(document.querySelector(s)?.getBoundingClientRect().top ?? -1),
           ]),
@@ -896,6 +1396,13 @@ try {
     const states = {
       'campaign files': () => open(campaign()),
       'a folder of footage': () => open(campaign(`?path=${e('Footage/Day 1')}`)),
+      'footage as a grid': () => open(campaign(`?path=${e('Footage/Day 2')}`)),
+      'quick look': async () => {
+        await open(campaign(`?path=${e('Footage/Day 2')}`));
+        await page.focus('[data-testid=files-list]');
+        await page.keyboard.press('Space');
+        await page.waitForSelector('[data-testid=quick-look] video');
+      },
       'a file opened': async () => {
         await open(campaign(`?path=${e('Project')}`));
         await page.$$eval('[data-testid=file-row]', (rows) => rows.find((r) => r.querySelector('.pf-name')?.textContent === 'spot.aep')?.click());
@@ -903,6 +1410,7 @@ try {
       },
       trash: () => open(campaign('?trash=1'), { wait: '[data-testid=files-trash]' }),
       'an empty folder': () => open(campaign(`?path=${e('Renders for review')}`)),
+      'an empty project': () => open('#/files/Launch', { wait: '[data-testid=files-empty]' }),
     };
     const run = async (lang) => {
       out.push(

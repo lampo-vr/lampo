@@ -39,6 +39,7 @@ import { isoLocal } from './paths.ts';
 import { chainOf } from './playbookFiles.ts';
 import { currentWorkspace } from './scope.ts';
 import { filesStorage } from './storage/index.ts';
+import { compareTime } from './time.ts';
 import type {
   FileArea,
   FileAreaInfo,
@@ -1386,7 +1387,17 @@ export function listFiles(folder: string, o: ListOptions = {}): FilesListing {
     const x = dirs.get(d) ?? { area: scope, path: d, files: 0, bytes: 0 };
     x.files++;
     x.bytes += e.size;
+    // the folder's row says who changed it last, as a file's does: its newest file's change
+    if (!x.changed || compareTime(e.at, x.changed.at) > 0)
+      x.changed = { at: e.at, by: e.by, via: e.via, ...(e.agent ? { agent: e.agent } : {}), ...(e.agent_kind ? { agent_kind: e.agent_kind } : {}) };
     dirs.set(d, x);
+  }
+  // a grid's folder shows a mosaic of the first footage and pictures inside it, by path
+  for (const { e } of [...all].sort((a, b) => byPath(a.e.path, b.e.path))) {
+    const d = childOf(e.path);
+    const x = d ? dirs.get(d) : undefined;
+    if (!x || (e.kind !== 'footage' && e.kind !== 'image') || (x.pics?.length ?? 0) >= 4) continue;
+    x.pics = [...(x.pics ?? []), { id: e.id, v: e.v }];
   }
   const deep = !!(o.deep || o.q || o.kind);
   const q = o.q?.toLowerCase();

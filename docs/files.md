@@ -156,10 +156,38 @@ are in Settings → Files. Reviewers have neither.
 
 ![A project's Files tab: its folders (Footage, Grade, Music) and files with their kind, version, size and when they changed; the House’s typeface folded below; and the end card opened beside them with its preview and its two versions, the newer one by the film’s agent](assets/files.webp)
 
-- **The list**: the area's folders, then its files — what each is, its version, its size, who changed it last (an
-  agent with its mark), when. What it inherits from its project and the House is folded under it. Search looks in
-  every folder inside; the kinds and the order narrow the list in place. Keys: ↑↓ (⇧ to pick), ↵ opens, Space looks,
-  F2 renames a file or a folder, ⌫ trashes (with Undo), ⌘A picks all, ⌘↑ goes up a folder, `/` searches.
+- **The list**: the area's folders, then its files, in three columns: *Name* (with the kind's glyph, or a small poster
+  of footage and pictures, and beside the name a folder's number of files, a clip's or a sound's length, a version past
+  V1), *Size*, and *Changed* (who changed it last, an agent with its mark, and when; for a folder its newest file's).
+  A column's name orders the list by it, again the other way (on a phone: the order control beside the count); the
+  order is kept in the browser. Under the pointer, and on the row the keys are on, a file shows *Download*, *Copy for an
+  agent* and ⋯. What it inherits from its project and the House is folded under it ("Also here, from the Acme
+  project"): where both have a file of the same name in the same folder, the area's own is used. Search looks in every
+  folder inside; the kinds narrow the list in place. Keys: ↑↓ (⇧ to pick), ↵ opens, Space is Quick Look, F2 renames a
+  file or a folder, ⌫ trashes (with Undo), ⌘A picks all, ⌘↑ goes up a folder, `/` searches, ⌘1 / ⌘2 a grid or a list,
+  Tab reaches the keys' row's actions.
+- **Posters and lengths**: the server reads a version's length and size in pixels with ffprobe and makes a poster of
+  footage (its frame at one second) and pictures within 128×72 with ffmpeg, the first time a row is seen, from the bytes
+  on its own disk (a file kept only in a bucket gets none); both are kept in the workspace's cache by content
+  (`cache/file-media/`), and a file ffmpeg can't read is remembered as such. A poster counts as one of the account's
+  new frames.
+- **A grid or a list**, as in Finder: the toolbar's switch (⌘1 grid, ⌘2 list), kept per folder in the browser. A
+  folder opens as a grid where more than half of its files are footage or pictures (a folder of folders: where more
+  than half of them hold some), else as a list. The grid shows each file large (its poster on a dark frame, its length
+  and size on it, the name under it; a long name is cut in its middle, its end kept), a folder as a mosaic of the first
+  four pictures inside it (`dirs[].pics` in the listing) or its glyph, and a file on its way with how far it got; two
+  columns on a phone. The arrows move by tiles and by rows of them.
+- **Scrubbing**: under a mouse (never a finger) a clip's tile shows the frame for where the pointer is across it, from
+  a strip of 8 frames the server makes on the first hover (`GET /api/files/:id/scrub`: one ffmpeg seeking once per
+  frame, never decoding the clip, counted as one of the account's new frames, kept like the poster). In the list, a
+  clip's or a picture's row shows a card with it larger after a short rest, above the row (under it near the window's
+  top), a clip flipping through its strip; it goes when the pointer moves on, and never shows while files are picked or
+  in Quick Look.
+- **Quick Look**: Space, or a click on a picture, shows the file large: a clip plays, a picture fills the room, a sound
+  shows its waveform (read in the browser, files up to 40 MB) over its player, anything else its kind and name. ← → go
+  through the folder's files, Space or Esc closes; *Details* opens the file beside the list, with its versions.
+- **An empty project**: *Add files*. *Copy prompt for your agent* (its prompt hands the agent `lampo files push`)
+  comes back with that command ([ROADMAP.md](../ROADMAP.md)).
 - **Adding**: drop files and folders anywhere on the tab, or *Add files* (a folder, or a new empty folder, from its
   menu). Before a byte moves, one sheet says what will happen: what is already in Lampo (the browser hashes files up
   to 256 MB and asks), which files become a new version, what is left out (junk), and whether it fits the plan. The
@@ -175,10 +203,11 @@ are in Settings → Files. Reviewers have neither.
   downloads. Every version kept, who made it and whether an agent did, *Restore* and *Download* per version; rename,
   move (also into another project's files), trash, and *Copy for an agent*: the `lampo files pull` line that fetches
   exactly the files picked. An address naming a file that isn't there any more says so, with the way back.
-- **The trash**: at the foot of the area's top, *Restore*. Each file says when it goes (`purge_at`: up to 30 days), an
+- **The trash**: at the foot of the area's top ("Trash: 1 file, 3.1 GB, doesn't count toward your storage"), *Restore*. Each file says when it goes (`purge_at`: up to 30 days), an
   older version until when it is kept (`kept_until`). A member trashes what they added; owners and admins anyone's.
-- **The plan**: where a billing provider runs, the foot says what files and videos take of the plan's storage, the head
-  says when it is nearly full, and Settings → Billing and the plan's sheet split the storage into videos and files.
+- **The plan**: where a billing provider runs, the list's foot has a bar of the plan's storage ("310 GB of 2.5 TB",
+  amber and in words from 80 %, a way to Settings → Billing; its tooltip splits it into files and videos), and Settings
+  → Billing and the plan's sheet split the storage into videos and files.
 
 ## API
 

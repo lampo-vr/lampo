@@ -99,7 +99,10 @@ encode of it); agents only draft (`draft_post`, `lampo post draft`, never "publi
 - **The agents' file tools.** MCP `list_files`, `get_file` and `add_file`, and `lampo files push` / `lampo files pull`
   (with `ls` and `status`), so an agent works from the same footage, fonts and project files as the team on any machine
   and saves its project back as a version of its own. The app's *Copy for an agent* already hands out the
-  `lampo files pull` line for the files picked; the instructions agents read gain one line on where the files are.
+  `lampo files pull` line for the files picked. An empty project's Files get *Copy prompt for your agent* back with
+  `lampo files push`: the prompt is built (lib/mcpConfig.ts `filesPrompt`, its tests pass) and hands the agent
+  `lampo files push '<the folder>' --to <project>`; the button is hidden until the command exists. The instructions
+  agents read gain one line on where the files are.
 
 - **Project files, phase 2**: the **Handover link**, a fourth kind of link (a project's videos and files with a
   generated `HANDOVER.md`, for whoever takes the project over), and **editing leases** (who has a project file open,

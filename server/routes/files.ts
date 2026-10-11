@@ -13,6 +13,7 @@ import express, { type Request, type Response, type Router } from 'express';
 import { z } from 'zod';
 import { AGENT_KINDS } from '../../lib/agentKind.ts';
 import { scopeOf } from '../../lib/fileAreas.ts';
+import { MEDIA_KINDS, mediaOf, posterable, posterOf, scrubOf } from '../../lib/fileMedia.ts';
 import {
   type AreaRef,
   areaRefOf,
@@ -62,16 +63,18 @@ import { cleanAgentName } from '../../lib/names.ts';
 import { CACHE } from '../../lib/paths.ts';
 import { can } from '../../lib/permissions.ts';
 import { currentWorkspace, DEFAULT_WORKSPACE, inWorkspace, WORKSPACE_ID } from '../../lib/scope.ts';
+import { countedGrab } from '../../lib/shots.ts';
 import { filesStorage, SIGNED_URL_SECONDS } from '../../lib/storage/index.ts';
 import { openMedia, sealMedia } from '../../lib/storage/mediaHost.ts';
-import type { AgentKind, FileEntry, FileUploadAnswer, FileUploadSlot, FileUrl, FileUrls, FileVersion, TrashedFile } from '../../lib/types.ts';
+import type { AgentKind, FileEntry, FilesMedia, FileUploadAnswer, FileUploadSlot, FileUrl, FileUrls, FileVersion, TrashedFile } from '../../lib/types.ts';
 import * as workspaces from '../../lib/workspaces.ts';
 import type { ServerContext } from '../context.ts';
 import { mediaHostOf, requestHost } from '../guard.ts';
-import { body, fail, query, router } from '../http.ts';
+import { body, fail, query, router, sendInternal } from '../http.ts';
 import { streamFile } from '../playback.ts';
 import { freeBytes } from '../ready.ts';
 import { issuerOf, issuerStill, type TicketGuard, teamGuard } from '../uploadTickets.ts';
+import { grabsOf } from './media.ts';
 
 const Sha = z.string().regex(/^[0-9a-f]{64}$/, 'a sha256: 64 lowercase hex');
 const PathIn = z.string().min(1).max(4096);
@@ -133,6 +136,20 @@ const DownloadQuery = z.strictObject({
 });
 /** A file's or a folder's id as a route takes it: anything else is nobody's (404). */
 const ANY_ID = /^f[ld]_[0-9a-f]{12}$/;
+/** The files a row of the Files tab shows a length or a picture for: ids, comma-separated, a page's worth at most. */
+const MediaQuery = z.strictObject({
+  ids: z
+    .string()
+    .max(FILE_LIMITS.page * 16)
+    .transform((s) => [...new Set(s.split(','))])
+    .pipe(
+      z
+        .array(z.string().regex(/^fl_[0-9a-f]{12}$/, 'file ids (fl_…), comma-separated'))
+        .min(1)
+        .max(FILE_LIMITS.page),
+    ),
+});
+const PosterQuery = z.strictObject({ v: z.coerce.number().int().positive().optional() });
 
 /** What a project file's URL on the media host carries (sealed): the workspace, the blob, who asked, how to serve it. */
 const FileClaims = z.object({
@@ -314,6 +331,29 @@ export function fileRoutes(ctx: ServerContext): Router {
     }),
   );
 
+  // What the Files tab's rows show of footage, pictures and sound (lib/fileMedia.ts): each file's current version's
+  // length and size in pixels, read once from the bytes on this disk (ffprobe), then kept. Files of other kinds, gone,
+  // trashed or another workspace's are left out like ones nobody has.
+  r.get('/api/files/media', (req, res) =>
+    run(async () => {
+      const { ids } = query(MediaQuery, req);
+      const files: FilesMedia['files'] = {};
+      // four at a time: a first look at a page of footage reads its files' headers, not one after another
+      for (let i = 0; i < ids.length; i += 4)
+        await Promise.all(
+          ids.slice(i, i + 4).map(async (id) => {
+            const found = findFile(id);
+            if (!found || found.trashed || !MEDIA_KINDS.has(found.entry.kind) || !heldBlob(found.entry.hash)) return;
+            const { hash, kind } = found.entry;
+            const m = await mediaOf(hash, kind);
+            if (m && Object.keys(m).length) files[id] = posterable(hash, kind, m) ? { ...m, poster: true } : m;
+          }),
+        );
+      res.setHeader('Cache-Control', 'no-store');
+      res.json({ files } satisfies FilesMedia);
+    }),
+  );
+
   r.get('/api/files/:id', (req, res) =>
     run(() => {
       const id = idOf(req);
@@ -332,6 +372,42 @@ export function fileRoutes(ctx: ServerContext): Router {
       if (!FILE_ID.test(id)) throw fail(404, 'no such file');
       res.setHeader('Cache-Control', 'no-store');
       res.json(historyOf(id));
+    }),
+  );
+
+  // A version's poster for its row (footage and pictures, lib/fileMedia.ts): a small JPEG made on first sight from the
+  // bytes on this disk, one of the account's new pictures (counted like a frame, 429 past the limit), then kept. Its URL
+  // names the version, whose bytes never change. Nothing to show (another kind, bytes only in a bucket, unreadable): 404.
+  r.get('/api/files/:id/poster', (req, res) =>
+    run(async () => {
+      const id = idOf(req);
+      const q = query(PosterQuery, req);
+      const found = FILE_ID.test(id) ? findFile(id) : null;
+      if (!found) throw fail(404, 'no such file');
+      const version = versionOf(found.entry, q.v);
+      if (!version || !heldBlob(version.hash)) throw fail(404, 'no picture for this file');
+      const count = grabsOf(ctx, req);
+      const out = await posterOf(version.hash, found.entry.kind, (work) => countedGrab(count, work));
+      if (!out) throw fail(404, 'no picture for this file');
+      res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+      sendInternal(res, out);
+    }),
+  );
+
+  // A clip's scrub strip (frames along it, side by side) for a grid's poster under the pointer: made like the poster.
+  r.get('/api/files/:id/scrub', (req, res) =>
+    run(async () => {
+      const id = idOf(req);
+      const q = query(PosterQuery, req);
+      const found = FILE_ID.test(id) ? findFile(id) : null;
+      if (!found) throw fail(404, 'no such file');
+      const version = versionOf(found.entry, q.v);
+      if (!version || !heldBlob(version.hash)) throw fail(404, 'no strip for this file');
+      const count = grabsOf(ctx, req);
+      const out = await scrubOf(version.hash, found.entry.kind, (work) => countedGrab(count, work));
+      if (!out) throw fail(404, 'no strip for this file');
+      res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+      sendInternal(res, out);
     }),
   );
 

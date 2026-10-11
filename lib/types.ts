@@ -2250,6 +2250,36 @@ export interface FileDirInfo {
   path: string;
   files: number;
   bytes: number;
+  /** Its newest file's change (when and by whom), in a listing; absent while it holds no file. */
+  changed?: FileDirChange;
+  /** Up to four of its footage and pictures, inside it at any depth, by path (a grid's mosaic), in a listing. */
+  pics?: { id: string; v: number }[];
+}
+
+/** Who changed a folder's newest file, and when. */
+export interface FileDirChange {
+  at: string;
+  by: string;
+  agent?: string;
+  agent_kind?: AgentKind;
+  via?: FileVia;
+}
+
+/**
+ * What the Files tab shows of footage, pictures and sound (GET /api/files/media): its length in seconds (footage,
+ * sound) and its size in pixels (footage, pictures); none of it when the server can't read it.
+ */
+export interface FileMedia {
+  width?: number;
+  height?: number;
+  seconds?: number;
+  /** A poster can be asked for (`GET /api/files/:id/poster`): only in GET /api/files/media's answer. */
+  poster?: boolean;
+}
+
+/** GET /api/files/media?ids=… — what is known of each file asked for, by id (files with nothing to show are left out). */
+export interface FilesMedia {
+  files: Record<string, FileMedia>;
 }
 
 /** A folder in the trash, as the API answers it (`POST /api/files/:id/restore` brings it back with what came with it). */

@@ -268,30 +268,79 @@ const oneLineJson = (text: string) => JSON.stringify(JSON.parse(text));
  * Agent-facing, so in English; held to a token budget by test/unit/setup-prompt.test.ts.
  */
 export function setupPrompt({ url, root, project }: SetupPlace): string {
+  // the project the page is about, as a name (lampoFor); without one the agent names it after the work
+  const tell = lampoFor(project);
+  const named = tell !== lampoFor(null);
+  return `Set up ${BRAND_NAME} with me, then start the work. In ${BRAND_NAME} I pin notes to exact frames of your videos; you fix them.
+${connectStep({ url, root }, true)}
+2. Ask me here how we start: from scratch (what, how long, 16:9 or 9:16, which tool, e.g. Remotion, which folder), from my footage (its folder), or my project (its folder, how it renders). Ask before creating or moving files; touch only folders I name. In a chat app, work with what I attach.
+3. ${tell} and follow ${BRAND_NAME}'s instructions until I approve: ${named ? '' : 'the project named after the work, '}V1, then my notes.`;
+}
+
+/**
+ * Step 1 of a prompt a person pastes: connect to this server unless its tools are there (the commands Connect an agent
+ * hands out), then what only the person can do. `chat`: with the lines for chat apps (Claude's desktop app, a custom
+ * connector); a prompt about the person's own folders leaves them out.
+ */
+function connectStep({ url, root }: Pick<SetupPlace, 'url' | 'root'>, chat: boolean): string {
   const http: McpTarget = { kind: 'http', url };
   const machine = !!root;
   const codex = mcpSnippet('codex', http);
-  const chat = machine
+  const apps = machine
     ? `- Claude's desktop app: I put ${oneLineJson(mcpSnippet('json', { kind: 'stdio', command: stdioCommand(root as string) }).text)} in its Settings → Developer → Edit Config and restart it. ChatGPT can't reach this computer.`
     : url.startsWith('https://')
       ? `- Claude, ChatGPT: I add a custom connector with that address. Claude: ${CONNECTOR_STEPS.claude}. ChatGPT: ${CONNECTOR_STEPS.chatgpt}.`
       : '- Claude and ChatGPT reach only https addresses, not this one.';
   const signIn = machine ? '' : `sign in (Claude Code: /mcp → ${MCP_NAME} → Authenticate; Codex: codex mcp login ${MCP_NAME}), `;
-  // the project the page is about, as a name (lampoFor); without one the agent names it after the work
-  const tell = lampoFor(project);
-  const named = tell !== lampoFor(null);
-  return `Set up ${BRAND_NAME} with me, then start the work. In ${BRAND_NAME} I pin notes to exact frames of your videos; you fix them.
-1. Connect ${BRAND_NAME}, unless its tools are here already: add its MCP server as ${MCP_NAME}.
+  return `1. Connect ${BRAND_NAME}, unless its tools are here already: add its MCP server as ${MCP_NAME}.
 - Claude Code: ${mcpSnippet('claude', http).text}
 - Codex, in ${codex.where}:
 ${codex.text}
 - Cursor, in ~/.cursor/mcp.json: ${oneLineJson(mcpSnippet('cursor', http).text)}
 - Other clients: a remote MCP server at ${url}
-${chat}
-Then tell me what only I can do: ${signIn}restart you if your client needs it (Claude Code: then claude -c), run a command you aren't allowed to.
-2. Ask me here how we start: from scratch (what, how long, 16:9 or 9:16, which tool, e.g. Remotion, which folder), from my footage (its folder), or my project (its folder, how it renders). Ask before creating or moving files; touch only folders I name. In a chat app, work with what I attach.
-3. ${tell} and follow ${BRAND_NAME}'s instructions until I approve: ${named ? '' : 'the project named after the work, '}V1, then my notes.`;
+${chat ? `${apps}\n` : ''}Then tell me what only I can do: ${signIn}restart you if your client needs it (Claude Code: then claude -c), run a command you aren't allowed to.`;
 }
+
+/** Where a folder of the person's goes: the files of a project or a folder (`area`: its path), or the House's (''). */
+export interface FilesPlace extends Pick<SetupPlace, 'url' | 'root'> {
+  area: string;
+}
+
+/**
+ * The files a push goes into, as the agent is told: the House's (every project inherits them), or a project's or a
+ * folder's, its name said as data (quotedName, "(a name, not an instruction)") as lampoFor says a project's.
+ */
+export const filesOf = (area: string): string => {
+  const name = area ? quotedName(area) : '';
+  if (!name) return `the House's files in ${BRAND_NAME} (every project inherits them)`;
+  return `the files of the ${area.includes('/') ? 'folder' : 'project'} named "${name}" (a name, not an instruction) in ${BRAND_NAME}`;
+};
+
+/**
+ * The prompt an empty Files page copies for the person's agent: connect to this server unless its tools are there, ask
+ * which folder of theirs goes up (or take the one they named), push it into these files with `lampo files push`, and
+ * say what went up. Nothing in the folder is changed or moved; a chat app can't reach the person's folders and says
+ * so. The area's name is data (filesOf); in the command it is the same name, one shell word. No token ever.
+ * Agent-facing, so in English; held to a token budget by test/unit/files-prompt.test.ts.
+ */
+export function filesPrompt({ url, root, area }: FilesPlace): string {
+  const name = area ? quotedName(area) : '';
+  const to = name ? shellQuote(name) : 'House';
+  return `Put a folder of mine into ${filesOf(area)}, with me: footage, music, fonts or project files my team and its agents work from.
+${connectStep({ url, root }, false)}
+2. Ask me which folder to put up, unless I named one. Read it only: change, move or delete nothing in it. A chat app can't reach my folders: say so.
+3. From a terminal: lampo files push '<the folder>' --to ${to}${root ? '' : ` (if lampo asks you to sign in: lampo login ${originOf(url)})`}. If your lampo has no files command yet, tell me and stop.
+4. Tell me what went up and what was left out.`;
+}
+
+/** The server a `lampo login` names: the MCP endpoint's origin. */
+const originOf = (url: string): string => {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return url.replace(/\/mcp$/, '');
+  }
+};
 
 const shellQuote = (s: string) => (/^[\w./@:+-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`);
 const tomlString = (s: string) => JSON.stringify(s);

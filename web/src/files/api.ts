@@ -2,9 +2,9 @@
 // what it inherits), a page of its files at a path, its trash, a file's history; the writes, each answered with the
 // file as it now stands. The event stream says `files {area, rev}`: only the queries of that area and the folders
 // inside it (which inherit it) ask again, and none whose answer is that revision already (this tab's own write).
-import { type InfiniteData, type QueryClient, useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { type InfiniteData, keepPreviousData, type QueryClient, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { FILE_LIMITS } from '../../../lib/fileText.ts';
-import type { FileDirInfo, FileHistory, FileKind, FilesListing, FilesSummary, FilesTrash, TrashedFileInfo } from '../../../lib/types.ts';
+import type { FileDirInfo, FileHistory, FileKind, FilesListing, FilesMedia, FilesSummary, FilesTrash, TrashedFileInfo } from '../../../lib/types.ts';
 import { ApiError, api, enc } from '../api/client.ts';
 import type { FileRow, TrashRow } from './model.ts';
 
@@ -73,6 +73,25 @@ export async function filesUnder(area: string, path: string, cap = 20_000): Prom
   } while (cursor && out.length < cap);
   return out;
 }
+
+/**
+ * What the rows show of footage, pictures and sound (`files`: each one's id and version): lengths and sizes in pixels,
+ * read once by the server and never changing for a version, so asked for once per set of rows.
+ */
+export const useFilesMedia = (area: string, files: { id: string; v: number }[], enabled = true) =>
+  useQuery({
+    queryKey: [...fileKeys.area(area), 'media', files.map((f) => `${f.id}.${f.v}`).join(',')],
+    queryFn: () => api<FilesMedia>(`/api/files/media?ids=${files.map((f) => f.id).join(',')}`),
+    enabled: enabled && files.length > 0,
+    staleTime: Number.POSITIVE_INFINITY,
+    // a row more (the next page, a file added): the rows already shown keep their pictures meanwhile
+    placeholderData: keepPreviousData,
+  });
+
+/** A version's poster for its row (footage, pictures): immutable, the browser keeps it. */
+export const posterUrl = (id: string, v: number) => `/api/files/${enc(id)}/poster?v=${v}`;
+/** A clip's scrub strip (frames along it, side by side): made on the first hover, then kept. */
+export const scrubUrl = (id: string, v: number) => `/api/files/${enc(id)}/scrub?v=${v}`;
 
 export const useFilesTrash = (area: string, enabled = true) =>
   useQuery({

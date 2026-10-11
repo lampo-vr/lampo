@@ -4569,7 +4569,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   '“{name}” is here already': '„{name}“ gibt es hier schon',
   '“{name}” is in the trash': '„{name}“ liegt im Papierkorb',
   '{agent}, the agent {name} works with': '{agent}, der Agent, mit dem {name} arbeitet',
-  '{area} wins where a path is the same': '{area} gewinnt, wo ein Pfad gleich ist',
   '{h} h {m} min': '{h} Std. {m} Min.',
   '{n} already in Lampo: nothing sent|{n} already in Lampo: nothing sent': '{n} schon in Lampo: nichts gesendet|{n} schon in Lampo: nichts gesendet',
   '{n} becomes a new version: {names}|{n} become new versions: {names}': '{n} wird eine neue Version: {names}|{n} werden neue Versionen: {names}',
@@ -4577,8 +4576,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   '{n} can’t go beside a file whose name differs only in case: {names}':
     '{n} können nicht neben eine Datei, deren Name sich nur in Groß- und Kleinschreibung unterscheidet: {names}',
   '{n} didn’t arrive': '{n} sind nicht angekommen',
-  '{n} file · {size} · kept up to 30 days, not counted|{n} files · {size} · kept up to 30 days, not counted':
-    '{n} Datei · {size} · bis zu 30 Tage aufbewahrt, nicht mitgezählt|{n} Dateien · {size} · bis zu 30 Tage aufbewahrt, nicht mitgezählt',
   '{n} file changed since you added it|{n} files changed since you added them':
     '{n} Datei hat sich geändert, seit du sie hinzugefügt hast|{n} Dateien haben sich geändert, seit du sie hinzugefügt hast',
   '{n} file on its way|{n} files on their way': '{n} Datei unterwegs|{n} Dateien unterwegs',
@@ -4633,7 +4630,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Back to the files': 'Zurück zu den Dateien',
   'Blackmagic RAW': 'Blackmagic RAW',
   'Blender scene': 'Blender-Szene',
-  'Changed by': 'Geändert von',
   'Changed since you added them': 'Geändert, seit du sie hinzugefügt hast',
   'changed since: V{v} by {name}': 'inzwischen geändert: V{v} von {name}',
   'Checking what’s already in Lampo · {pct}%': 'Prüfe, was schon in Lampo ist · {pct} %',
@@ -4668,8 +4664,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   Footage: 'Footage',
   'Footage, music, fonts and project files: your team and its agents work from the same material.':
     'Footage, Musik, Schriften und Projektdateien: Dein Team und seine Agenten arbeiten mit demselben Material.',
-  'From {area}': 'Aus {area}',
-  'From a terminal, or an agent:': 'Aus einem Terminal oder von einem Agenten:',
   'goes {when}': 'geht {when}',
   Graphics: 'Grafiken',
   'here now': 'jetzt hier',
@@ -4745,10 +4739,7 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'This is {size}; the workspace has {left} left. Remove files you no longer need, add fewer, or add storage.':
     'Das sind {size}; der Workspace hat noch {left} frei. Entferne Dateien, die du nicht mehr brauchst, füge weniger hinzu oder buche Speicher dazu.',
   Trash: 'Papierkorb',
-  'Trash · {n} file · {size}, not counted|Trash · {n} files · {size}, not counted':
-    'Papierkorb · {n} Datei · {size}, nicht mitgezählt|Papierkorb · {n} Dateien · {size}, nicht mitgezählt',
   Trashed: 'Entfernt',
-  'Trashed by': 'Entfernt von',
   'TrueType font': 'TrueType-Schrift',
   'Try another word, or every kind.': 'Versuch ein anderes Wort oder alle Arten.',
   'Uploaded {n} file|Uploaded {n} files': '{n} Datei hochgeladen|{n} Dateien hochgeladen',
@@ -4765,7 +4756,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Web font': 'Webschrift',
   Where: 'Wo',
   'Where in the files': 'Wo in den Dateien',
-  'Where it was': 'Wo sie lag',
   'ZIP archive': 'ZIP-Archiv',
   // one prompt for any agent (sessions/agentStart.tsx): copied, the line under it follows the agent; by hand second
   '{agent} connected': '{agent} verbunden',
@@ -4941,6 +4931,28 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
     'Die Benachrichtigungen auf diesem Gerät waren beendet. Schalte sie wieder an, um sie hier zu bekommen.',
   'Try again in a moment. If it keeps failing, turn notifications off and on here.':
     'Versuch es gleich noch einmal. Klappt es weiter nicht, schalte Benachrichtigungen hier aus und wieder an.',
+  '{column}, ordered {way}': '{column}, sortiert {way}',
+  '{n} file, {size} · each kept up to 30 days, doesn’t count toward your storage|{n} files, {size} · each kept up to 30 days, doesn’t count toward your storage':
+    '{n} Datei, {size} · jede bleibt bis zu 30 Tage, zählt nicht zu deinem Speicher|{n} Dateien, {size} · jede bleibt bis zu 30 Tage, zählt nicht zu deinem Speicher',
+  'A to Z': 'A bis Z',
+  'Also here, from the {name} folder': 'Auch hier, aus dem Ordner {name}',
+  'Also here, from the {name} project': 'Auch hier, aus dem Projekt {name}',
+  'Also here, from the House': 'Auch hier, aus dem Studio',
+  'Copy {name} for an agent': '{name} für einen Agenten kopieren',
+  'from {where}': 'aus {where}',
+  'from the top': 'aus der obersten Ebene',
+  'largest first': 'größte zuerst',
+  'newest first': 'neueste zuerst',
+  'oldest first': 'älteste zuerst',
+  'Order by {column}': 'Nach {column} sortieren',
+  'Same name in the same folder: this folder’s own file is used.': 'Gleicher Name im gleichen Ordner: Die eigene Datei dieses Ordners wird verwendet.',
+  'Same name in the same folder: this project’s own file is used.': 'Gleicher Name im gleichen Ordner: Die eigene Datei dieses Projekts wird verwendet.',
+  'smallest first': 'kleinste zuerst',
+  'Trash: {n} file, {size}, doesn’t count toward your storage|Trash: {n} files, {size}, doesn’t count toward your storage':
+    'Papierkorb: {n} Datei, {size}, zählt nicht zu deinem Speicher|Papierkorb: {n} Dateien, {size}, zählt nicht zu deinem Speicher',
+  'Z to A': 'Z bis A',
+  'Opens in a tab of its own': 'Öffnet sich in einem eigenen Tab',
+  View: 'Ansicht',
 };
 
 export const de: Record<Key, string> = { ...owner, ...client };

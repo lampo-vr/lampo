@@ -7,9 +7,9 @@
 // (FileSheet.tsx). Reviewers never see this (the tab isn't there, the API answers 404). Loaded on demand with its styles.
 import { useQueryClient } from '@tanstack/react-query';
 import { type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { dirOf, nameOf } from '../../../lib/fileText.ts';
+import { dirOf, FILE_LIMITS, nameOf } from '../../../lib/fileText.ts';
 import { can as roleCan } from '../../../lib/permissions.ts';
-import type { BillingInfo, FileAreaInfo, FileDirInfo, FileKind, FilesTrash, TrashedDirInfo } from '../../../lib/types.ts';
+import type { BillingInfo, FileAreaInfo, FileDirInfo, FileKind, FilesTrash } from '../../../lib/types.ts';
 import { useAuthStatus, useCan, useLikelyRole } from '../api/auth.ts';
 import { useSSE } from '../api/events.ts';
 import { useBilling, useInfo } from '../api/queries.ts';
@@ -36,6 +36,7 @@ import {
   restoreFile,
   trashFile,
   useFilesList,
+  useFilesMedia,
   useFilesSummary,
   useFilesTrash,
 } from './api.ts';
@@ -43,6 +44,7 @@ import { CheckSheet } from './Check.tsx';
 import { MoveDialog, NameDialog, takenIn } from './Dialogs.tsx';
 import { draggingFiles, fromDrop, fromInput, type Gathered } from './drop.ts';
 import { type FileActs, FileSheet } from './FileSheet.tsx';
+import { columnsOf, DirTileView, FileTileView, GoingTile, GridHead, TilePending } from './Grid.tsx';
 import {
   between,
   crumbsOf,
@@ -50,16 +52,23 @@ import {
   KINDS,
   kindWords,
   mcpCall,
+  nextOrder,
+  type Order,
+  orderOf,
+  orderWord,
+  pictured,
   pullCommand,
-  pushCommand,
   type SortBy,
   size,
   sortDirs,
   sortFiles,
   spaced,
   type TrashRow,
+  type Who,
   whoOf,
 } from './model.ts';
+import { Peek, peekAt } from './Peek.tsx';
+import { QuickLook } from './QuickLook.tsx';
 import { Columns, DirRowView, FileRowView, GoingRowView, RowPending, WhoTag } from './Rows.tsx';
 import { filesHref, noteOpen, useFilesAt } from './route.ts';
 import { bindFileUploads, type FileUpload, useFileUploads } from './uploadStore.ts';
@@ -71,23 +80,25 @@ export { prefetchArea } from './api.ts';
 // ---------------------------------------------------------------- small pieces
 
 const SORT_KEY = 'vr.files.sort';
-function useSort(): [SortBy, (s: SortBy) => void] {
-  const [sort, setSort] = useState<SortBy>(() => {
+/** The list's order, kept per browser: a column and which way ("size:asc"; a column alone is its first way). */
+function useOrder(): [Order, (by: SortBy) => void] {
+  const [order, setOrder] = useState<Order>(() => {
     try {
-      const v = localStorage.getItem(SORT_KEY);
-      return v === 'size' || v === 'changed' ? v : 'name';
+      return orderOf(localStorage.getItem(SORT_KEY));
     } catch {
-      return 'name';
+      return orderOf(null);
     }
   });
   return [
-    sort,
-    (s) => {
-      setSort(s);
-      try {
-        localStorage.setItem(SORT_KEY, s);
-      } catch {}
-    },
+    order,
+    (by) =>
+      setOrder((o) => {
+        const next = nextOrder(o, by);
+        try {
+          localStorage.setItem(SORT_KEY, orderWord(next));
+        } catch {}
+        return next;
+      }),
   ];
 }
 
@@ -106,62 +117,45 @@ type Row =
 type Dialog = { kind: 'rename'; row: Row } | { kind: 'move'; keys: string[] } | { kind: 'new' } | null;
 
 /**
- * The list's heading, as a section of the Videos tab has one: where it is in the area (its name, then the folders down
- * to here, each a way back up), what it holds, and — on the right — what the plan's storage holds. One line whatever
- * it says, so the rows under it never move when its numbers arrive.
+ * Where the list is, inside a folder of the area or in its trash: the area's name, then the folders down to here, each
+ * a way back up. At the area's top there is none: the page's title says where.
  */
-function PlaceHead({ area, path, trash, facts, store }: { area: string; path: string; trash: boolean; facts: ReactNode; store?: ReactNode }) {
+function Place({ area, path, trash }: { area: string; path: string; trash: boolean }) {
   const parts = crumbsOf(path);
-  const top = !parts.length && !trash;
   return (
-    <div className="pf-shead">
-      <span className="pf-shead-lead" aria-hidden="true">
-        <I name={trash ? 'trash' : 'files'} size={14} />
-      </span>
-      <nav className="pf-crumbs" aria-label={t('Where in the files')}>
-        {top ? (
-          <span className="pf-crumb here" aria-current="page">
-            {areaName(area)}
-          </span>
-        ) : (
-          <a className="pf-crumb" href={filesHref(area)}>
-            {areaName(area)}
-          </a>
-        )}
-        {parts.map(([name, to], i) => (
-          <span key={to} className="pf-crumb-step">
-            <I name="right" size={12} className="pf-crumb-sep" />
-            {i === parts.length - 1 && !trash ? (
-              <span className="pf-crumb here" aria-current="page">
-                {name}
-              </span>
-            ) : (
-              <a className="pf-crumb" href={filesHref(area, { path: to })}>
-                {name}
-              </a>
-            )}
-          </span>
-        ))}
-        {trash && (
-          <span className="pf-crumb-step">
-            <I name="right" size={12} className="pf-crumb-sep" />
+    <nav className="pf-place" aria-label={t('Where in the files')} data-testid="files-place">
+      <a className="pf-crumb" href={filesHref(area)}>
+        {areaName(area)}
+      </a>
+      {parts.map(([name, to], i) => (
+        <span key={to} className="pf-crumb-step">
+          <I name="right" size={12} className="pf-crumb-sep" />
+          {i === parts.length - 1 && !trash ? (
             <span className="pf-crumb here" aria-current="page">
-              {t('Trash')}
+              {name}
             </span>
+          ) : (
+            <a className="pf-crumb" href={filesHref(area, { path: to })}>
+              {name}
+            </a>
+          )}
+        </span>
+      ))}
+      {trash && (
+        <span className="pf-crumb-step">
+          <I name="right" size={12} className="pf-crumb-sep" />
+          <span className="pf-crumb here" aria-current="page">
+            {t('Trash')}
           </span>
-        )}
-      </nav>
-      <span className="pf-facts" data-testid="files-count">
-        {facts}
-      </span>
-      {store}
-    </div>
+        </span>
+      )}
+    </nav>
   );
 }
 
 /**
- * What the plan's storage holds (where a billing provider runs): one quiet line at the end of the list's heading, a
- * way to Settings → Billing. Near the end it says so; its tooltip (and its name) splits it into files and videos.
+ * What the plan's storage holds (where a billing provider runs), at the list's foot: a bar and "310 GB of 2.5 TB", in
+ * amber near the end, a way to Settings → Billing. Its tooltip (and its name) splits it into files and videos.
  */
 function Storage({ billing }: { billing: BillingInfo | undefined }) {
   const usage = billing?.usage;
@@ -169,7 +163,6 @@ function Storage({ billing }: { billing: BillingInfo | undefined }) {
   if (!usage || limit === null) return null;
   const share = usage.bytes / limit;
   const near = share >= 0.8;
-  const used = t('{used} of {limit} in use', { used: size(usage.bytes), limit: size(limit) });
   const split = usage.files
     ? `${t('Files {files} · videos {videos} · {used} of {limit} in use', {
         files: size(usage.files.bytes),
@@ -177,7 +170,7 @@ function Storage({ billing }: { billing: BillingInfo | undefined }) {
         used: size(usage.bytes),
         limit: size(limit),
       })}${usage.files.kept > 0 ? t(' · trash and older versions {size}, not counted', { size: size(usage.files.kept) }) : ''}`
-    : used;
+    : t('{used} of {limit} in use', { used: size(usage.bytes), limit: size(limit) });
   return (
     <Tip content={split}>
       <a
@@ -187,7 +180,12 @@ function Storage({ billing }: { billing: BillingInfo | undefined }) {
         data-testid="files-usage"
       >
         <span className="pf-store-bar" style={{ '--v': Math.min(1, share) } as CSSProperties} aria-hidden="true" />
-        {near ? <span data-testid="files-quota-near">{share >= 1 ? t('Storage full') : t('{pct} of storage used', { pct: pct(share) })}</span> : used}
+        <span className="pf-store-words">{t('{used} of {limit}', { used: size(usage.bytes), limit: size(limit) })}</span>
+        {near && (
+          <span className="pf-store-near" data-testid="files-quota-near">
+            {share >= 1 ? t('Storage full') : t('{pct} of storage used', { pct: pct(share) })}
+          </span>
+        )}
       </a>
     </Tip>
   );
@@ -213,7 +211,8 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
   const likely = useLikelyRole();
   const mayAdd = !!likely && roleCan(likely, 'files-write') && !readOnly;
   // a member trashes what they added; owners and admins anyone's (the server holds the same rule)
-  const me = useAuthStatus().data?.user?.name ?? null;
+  const status = useAuthStatus().data;
+  const me = status?.user?.name ?? null;
   const mayTrash = (f: FileRow) => write && (can('remove') || f.added_by === me);
   const phone = usePhone();
   const touch = useTouch();
@@ -234,7 +233,40 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
     setQ('');
     setKind('');
   }, [area, path, at.trash]);
-  const [sort, setSort] = useSort();
+  const [listOrder, setListOrder] = useOrder();
+  // a grid or a list, per folder (kept in this browser); a folder that holds footage or pictures opens as a grid
+  const viewKey = `vr.files.view:${area}/${path}`;
+  const readView = (k: string): 'grid' | 'list' | null => {
+    try {
+      const v = localStorage.getItem(k);
+      return v === 'grid' || v === 'list' ? v : null;
+    } catch {
+      return null;
+    }
+  };
+  const [viewPick, setViewPick] = useState<'grid' | 'list' | null>(() => readView(viewKey));
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on a new place only
+  useEffect(() => setViewPick(readView(viewKey)), [viewKey]);
+  const pickView = (v: 'grid' | 'list') => {
+    setViewPick(v);
+    try {
+      localStorage.setItem(viewKey, v);
+    } catch {}
+  };
+  // ⌘1 a grid, ⌘2 a list (Finder's keys for its views), and 1 / 2 as the Videos tab's layout keys
+  const pickViewRef = useRef(pickView);
+  pickViewRef.current = pickView;
+  useEffect(() => {
+    if (at.trash) return;
+    const f = (e: globalThis.KeyboardEvent) => {
+      if ((e.key !== '1' && e.key !== '2') || e.altKey || e.shiftKey) return;
+      if ((e.target as Element | null)?.closest?.('input, textarea, select, [role=dialog], [role=menu]')) return;
+      e.preventDefault();
+      pickViewRef.current(e.key === '1' ? 'grid' : 'list');
+    };
+    window.addEventListener('keydown', f);
+    return () => window.removeEventListener('keydown', f);
+  }, [at.trash]);
   const searching = !!(q || kind);
   const list = useFilesList(area, { path, q, kind }, !pending && !at.trash);
   const trash = useFilesTrash(area, !pending && at.trash);
@@ -283,7 +315,8 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
     }
     const dirRows: Row[] = sortDirs(
       [...dirs, ...[...deeper.keys()].filter((p) => !dirs.some((d) => d.path === p)).map((p) => ({ path: p, files: 0, bytes: 0 }))],
-      sort,
+      listOrder.by,
+      listOrder.dir,
     )
       .filter((d) => !hidden.has(dirKey(d.path)))
       .map((d) => {
@@ -306,10 +339,11 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
           .map((f) => ({ path: f.path, size: f.size, at: f.at, row: { key: fileKey(f.id), kind: 'file', f, upload: onRow.get(f.path) } as Row })),
         ...going.map((u) => ({ path: u.path, size: u.size, at: now, row: { key: `u:${u.key}`, kind: 'going', u } as Row })),
       ],
-      sort,
+      listOrder.by,
+      listOrder.dir,
     ).map((x) => x.row);
     return [...dirRows, ...mixed];
-  }, [pages, searching, uploads, batches, area, path, sort, hidden, listedAt]);
+  }, [pages, searching, uploads, batches, area, path, listOrder, hidden, listedAt]);
 
   const order = useMemo(() => rows.filter((r) => r.kind !== 'going').map((r) => r.key), [rows]);
   const byKey = useMemo(() => new Map(rows.map((r) => [r.key, r])), [rows]);
@@ -319,6 +353,13 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
   const [active, setActive] = useState<string | null>(null);
   const [checked, setChecked] = useState<ReadonlySet<string>>(new Set());
   const [opened, setOpened] = useState<{ id: string; area: string; focus: boolean } | null>(at.open ? { id: at.open, area, focus: false } : null);
+  // Quick Look: the file large, ← → through the folder's files
+  const [look, setLook] = useState<string | null>(null);
+  // a pictured row's larger picture beside its name, a moment after the pointer stops on it
+  const [peek, setPeek] = useState<{ id: string; at: { x: number; y: number; below: boolean } } | null>(null);
+  const peekRow = useRef<string | null>(null);
+  const peekTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(peekTimer.current), []);
   // a new folder: nothing picked, nothing open
   // biome-ignore lint/correctness/useExhaustiveDependencies: when the place changes
   useEffect(() => {
@@ -379,6 +420,22 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
   const reveal = (key: string) => requestAnimationFrame(() => document.getElementById(rowId(key))?.scrollIntoView({ block: 'nearest' }));
   const rowIds = useMemo(() => new Map(order.map((k, i) => [k, `pf-r${i}`])), [order]);
   const rowId = (key: string) => rowIds.get(key) ?? '';
+
+  // Quick Look closed: the keys go back to the list, on the row they were on (a task after the dialog is gone: its own
+  // focus return comes then, and left the focus on the page's body)
+  const hadLook = useRef(false);
+  useEffect(() => {
+    if (look) {
+      hadLook.current = true;
+      return;
+    }
+    if (!hadLook.current) return;
+    hadLook.current = false;
+    const back = setTimeout(() => {
+      if (!document.activeElement || document.activeElement === document.body) grid.current?.focus({ preventScroll: true });
+    }, 0);
+    return () => clearTimeout(back);
+  }, [look]);
 
   const [dialog, setDialog] = useState<Dialog>(null);
   // A dialog that closes and leaves the focus on nothing (it gives it back to its own field, gone with it: F2's rename)
@@ -574,6 +631,8 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
   // ---- the keys (on the list)
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if ((e.target as Element).closest('input, textarea, [role=menu]')) return;
+    // the keys take over from the pointer: its card goes
+    setPeek(null);
     const i = active ? order.indexOf(active) : -1;
     const go = (j: number, extend: boolean) => {
       const k = order[Math.max(0, Math.min(order.length - 1, j))];
@@ -587,11 +646,14 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
       if (opened && r?.kind === 'file') open(r.f.id);
     };
     const r = active ? byKey.get(active) : undefined;
-    if (e.key === 'ArrowDown') go(i + 1, e.shiftKey);
+    const step = view === 'grid' ? columnsOf(grid.current) : 1;
+    if (e.key === 'ArrowDown') go(i + step, e.shiftKey);
     else if (e.key === 'ArrowUp' && e.metaKey && path) {
       e.preventDefault();
       enter(dirOf(path));
-    } else if (e.key === 'ArrowUp') go(i < 0 ? 0 : i - 1, e.shiftKey);
+    } else if (e.key === 'ArrowUp') go(i < 0 ? 0 : i - step, e.shiftKey);
+    else if (e.key === 'ArrowRight' && view === 'grid') go(i + 1, e.shiftKey);
+    else if (e.key === 'ArrowLeft' && view === 'grid') go(Math.max(0, i - 1), e.shiftKey);
     else if (e.key === 'Home') go(0, false);
     else if (e.key === 'End') go(order.length - 1, false);
     else if (e.key === 'Enter' && r) {
@@ -600,7 +662,7 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
       else if (r.kind === 'file') open(r.f.id, { focus: true });
     } else if (e.key === ' ' && r?.kind === 'file') {
       e.preventDefault();
-      open(opened?.id === r.f.id ? null : r.f.id);
+      setLook(r.f.id);
     } else if (e.key === 'F2' && write && r && (r.kind === 'file' || (r.kind === 'dir' && r.d.id))) {
       // Rename from the keys, as in a file manager: a folder's Rename otherwise sits only in its row's ⋯ (pointer)
       e.preventDefault();
@@ -683,17 +745,43 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
   // ---- the numbers: the area's (at its top), a folder's (from its listing), what a search found
   const own = summary.data?.areas.find((a) => a.area === area);
   const loading = !pending && !at.trash && !pages && !list.error;
-  const showCols = !phone;
   const empty = !!pages && !rows.length && !searching;
   // what the area inherits, folded under its own rows — once the rows are here, so they never push it down
   const inherited = !path && !searching && !at.trash && pages ? (summary.data?.areas.filter((a) => a.area !== area && a.files > 0) ?? []) : [];
+  // what the rows show of footage, pictures and sound (lengths, sizes): asked for once the rows are here
+  const mediaRows = useMemo(() => files.filter((f) => f.kind === 'footage' || f.kind === 'audio' || f.kind === 'image').slice(0, FILE_LIMITS.page), [files]);
+  const mosaics = useMemo(() => (searching ? [] : (pages?.[0]?.dirs ?? []).flatMap((d) => d.pics ?? [])), [pages, searching]);
+  const media = useFilesMedia(area, [...mediaRows, ...mosaics].slice(0, FILE_LIMITS.page), !pending && !at.trash).data?.files;
+  // a grid where pictures dominate: more than half the files here are footage or pictures (a folder of folders: more
+  // than half of them hold some); a list elsewhere
+  const dirsHere = searching ? [] : (pages?.[0]?.dirs ?? []);
+  const gridFits = files.length
+    ? files.filter((f) => pictured(f.kind)).length * 2 > files.length
+    : dirsHere.length > 0 && dirsHere.filter((d) => d.pics?.length).length * 2 > dirsHere.length;
+  const view: 'grid' | 'list' = at.trash ? 'list' : (viewPick ?? (gridFits ? 'grid' : 'list'));
+  // a poster's slot where the list has footage or pictures (from the listing: it is set before any picture comes)
+  const pics = !at.trash && !pending && files.some((f) => pictured(f.kind));
+  const hoverRow = (row: Element | null) => {
+    const id = row?.getAttribute('data-id') ?? null;
+    if (id === peekRow.current) return;
+    peekRow.current = id;
+    clearTimeout(peekTimer.current);
+    setPeek(null);
+    const f = id ? files.find((x) => x.id === id) : undefined;
+    if (!row || !id || !f || !pictured(f.kind) || !media?.[id]?.poster || checked.size > 0 || look) return;
+    peekTimer.current = setTimeout(() => setPeek({ id, at: peekAt(row) }), 350);
+  };
+  // how much the list holds, beside the columns' names
   const facts = ((): ReactNode => {
     if (at.trash)
       return trash.data ? (
-        t('{n} file · {size} · kept up to 30 days, not counted|{n} files · {size} · kept up to 30 days, not counted', {
-          n: trash.data.files.length,
-          size: size(trash.data.bytes),
-        })
+        t(
+          '{n} file, {size} · each kept up to 30 days, doesn’t count toward your storage|{n} files, {size} · each kept up to 30 days, doesn’t count toward your storage',
+          {
+            n: trash.data.files.length,
+            size: size(trash.data.bytes),
+          },
+        )
       ) : (
         <SkLine w="14em" />
       );
@@ -798,19 +886,15 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
           )}
           <span className="grow" />
           {!at.trash && (
-            <Menu
-              trigger={
-                <Tip content={t('Order')}>
-                  <button type="button" className="btn lib-display pf-sort" aria-label={t('Order')} data-testid="files-sort">
-                    <I name="sortable" size={14} />
-                    <span className="lib-display-label">{sort === 'size' ? t('Size') : sort === 'changed' ? t('Last changed') : t('Name')}</span>
-                  </button>
-                </Tip>
-              }
-              items={[
-                { label: t('Name'), checked: sort === 'name', onClick: () => setSort('name') },
-                { label: t('Size'), checked: sort === 'size', onClick: () => setSort('size') },
-                { label: t('Last changed'), checked: sort === 'changed', onClick: () => setSort('changed') },
+            <Segmented
+              iconOnly
+              className="pf-view"
+              label={t('View')}
+              value={view}
+              onChange={(v) => pickView(v === 'grid' ? 'grid' : 'list')}
+              options={[
+                { value: 'grid', label: t('Grid'), icon: 'grid', shortcut: '⌘1' },
+                { value: 'list', label: t('List'), icon: 'list', shortcut: '⌘2' },
               ]}
             />
           )}
@@ -830,14 +914,13 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
           )}
         </div>
 
-        {/* the content, from where the Videos tab's first section starts: the list's heading, then its rows — or, for an
-            empty area, the empty state in their place */}
-        <div className="pf-body" data-tab-body>
-          {!(empty && !path && !at.trash) && (
-            <PlaceHead area={area} path={path} trash={at.trash} facts={facts} store={at.trash ? null : <Storage billing={billing} />} />
-          )}
+        {/* the content, from where the Videos tab's first section starts: inside a folder where it is, the columns (each
+            one orders the list, what it holds beside Name), then its rows — or, for an empty area, the empty state in
+            their place — and at the foot its trash and what the plan's storage holds */}
+        <div className={`pf-body ${pics ? 'pics' : ''}`} data-tab-body>
+          {(path || at.trash) && <Place area={area} path={path} trash={at.trash} />}
           {at.trash ? (
-            <TrashList area={area} write={write} data={trash.data} error={trash.error} onOpen={(id) => open(id)} />
+            <TrashList area={area} write={write} data={trash.data} error={trash.error} count={facts} onOpen={(id) => open(id)} />
           ) : list.error && !pages ? (
             <EmptyState
               art="error"
@@ -852,109 +935,201 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
               {list.error.message}
             </EmptyState>
           ) : empty ? (
-            <Empty area={area} path={path} write={write} touch={touch} onAdd={() => pickFiles.current?.click()} small={inherited.length > 0} />
+            <Empty area={area} path={path} write={write} onAdd={() => pickFiles.current?.click()} small={inherited.length > 0} />
+          ) : view === 'grid' ? (
+            <>
+              <GridHead order={listOrder} onOrder={setListOrder} count={facts} />
+              <div
+                ref={grid}
+                className={`pf-grid ${checked.size ? 'picking' : ''}`}
+                role="listbox"
+                aria-label={t('Files')}
+                aria-multiselectable="true"
+                aria-activedescendant={active && rowIds.has(active) ? rowId(active) : undefined}
+                tabIndex={0}
+                onKeyDown={onKey}
+                onFocus={() => !active && order[0] && setActive(order[0])}
+                data-testid="files-list"
+              >
+                {loading || pending
+                  ? [1, 2, 3, 4, 5, 6].map((n) => <TilePending key={n} />)
+                  : rows.map((r) => {
+                      const rowLook = { active: active === r.key, picked: r.kind === 'file' && opened?.id === r.f.id, checked: checked.has(r.key) };
+                      if (r.kind === 'going') return <GoingTile key={r.key} u={r.u} id={`pf-${r.key}`} />;
+                      if (r.kind === 'dir')
+                        return (
+                          <DirTileView
+                            key={r.key}
+                            id={rowId(r.key)}
+                            d={r.d}
+                            media={media}
+                            {...rowLook}
+                            onPress={(e) => press(r, e)}
+                            onCheck={write || !phone ? () => toggle(r.key) : undefined}
+                            menu={dirMenu(r)}
+                          />
+                        );
+                      return (
+                        <FileTileView
+                          key={r.key}
+                          id={rowId(r.key)}
+                          f={r.f}
+                          media={media?.[r.f.id]}
+                          onLook={() => {
+                            setActive(r.key);
+                            setLook(r.f.id);
+                          }}
+                          {...rowLook}
+                          onPress={(e) => press(r, e)}
+                          onCheck={() => toggle(r.key)}
+                          menu={fileMenu(r.f)}
+                        />
+                      );
+                    })}
+              </div>
+            </>
           ) : (
-            <div
-              ref={grid}
-              className={`pf-list ${checked.size ? 'picking' : ''}`}
-              role="listbox"
-              aria-label={t('Files')}
-              aria-multiselectable="true"
-              aria-activedescendant={active && rowIds.has(active) ? rowId(active) : undefined}
-              tabIndex={0}
-              onKeyDown={onKey}
-              onFocus={() => !active && order[0] && setActive(order[0])}
-              data-testid="files-list"
-            >
-              {showCols && <Columns />}
-              {loading || pending ? (
-                <SkeletonRegion label={t('Loading the files')} className="pf-wait">
-                  {['9em', '12em', '7em', '10em', '8em', '11em'].map((w) => (
-                    <RowPending key={w} w={w} />
-                  ))}
-                </SkeletonRegion>
-              ) : !rows.length ? (
-                <EmptyState
-                  art="filter"
-                  size="sm"
-                  titleAs="h2"
-                  title={t('Nothing matches')}
-                  action={
-                    <Button
-                      icon="x"
-                      onClick={() => {
-                        setTyped('');
-                        setKind('');
-                      }}
-                    >
-                      {t('Clear the search')}
-                    </Button>
-                  }
-                >
-                  {t('Try another word, or every kind.')}
-                </EmptyState>
-              ) : (
-                rows.map((r) => {
-                  const look = { active: active === r.key, picked: r.kind === 'file' && opened?.id === r.f.id, checked: checked.has(r.key) };
-                  if (r.kind === 'going') return <GoingRowView key={r.key} u={r.u} id={`pf-${r.key}`} />;
-                  if (r.kind === 'dir')
+            <>
+              <Columns order={listOrder} onOrder={setListOrder} count={facts} />
+              <div
+                ref={grid}
+                className={`pf-list ${checked.size ? 'picking' : ''}`}
+                role="listbox"
+                aria-label={t('Files')}
+                aria-multiselectable="true"
+                aria-activedescendant={active && rowIds.has(active) ? rowId(active) : undefined}
+                tabIndex={0}
+                onKeyDown={onKey}
+                onFocus={() => !active && order[0] && setActive(order[0])}
+                onPointerOver={(e) => e.pointerType === 'mouse' && hoverRow((e.target as Element).closest('[data-testid=file-row]'))}
+                onPointerLeave={() => hoverRow(null)}
+                onScroll={() => hoverRow(null)}
+                data-testid="files-list"
+              >
+                {loading || pending ? (
+                  <SkeletonRegion label={t('Loading the files')} className="pf-wait">
+                    {['9em', '12em', '7em', '10em', '8em', '11em'].map((w) => (
+                      <RowPending key={w} w={w} />
+                    ))}
+                  </SkeletonRegion>
+                ) : !rows.length ? (
+                  <EmptyState
+                    art="filter"
+                    size="sm"
+                    titleAs="h2"
+                    title={t('Nothing matches')}
+                    action={
+                      <Button
+                        icon="x"
+                        onClick={() => {
+                          setTyped('');
+                          setKind('');
+                        }}
+                      >
+                        {t('Clear the search')}
+                      </Button>
+                    }
+                  >
+                    {t('Try another word, or every kind.')}
+                  </EmptyState>
+                ) : (
+                  rows.map((r) => {
+                    const rowLook = { active: active === r.key, picked: r.kind === 'file' && opened?.id === r.f.id, checked: checked.has(r.key) };
+                    // the row the keys are on takes Tab into its actions; the others' wait for the pointer
+                    const tab = rowLook.active ? 0 : -1;
+                    if (r.kind === 'going') return <GoingRowView key={r.key} u={r.u} id={`pf-${r.key}`} />;
+                    if (r.kind === 'dir')
+                      return (
+                        <DirRowView
+                          key={r.key}
+                          id={rowId(r.key)}
+                          d={r.d}
+                          going={r.going}
+                          {...rowLook}
+                          onPress={(e) => press(r, e)}
+                          onCheck={write || !phone ? () => toggle(r.key) : undefined}
+                          menu={dirMenu(r)}
+                          quick={
+                            <IconButton
+                              className="btn ghost sm icon-only pf-quick"
+                              label={t('Copy {name} for an agent', { name: nameOf(r.d.path) })}
+                              icon="copy"
+                              size={14}
+                              tabIndex={tab}
+                              onClick={() => void copyFor([r.key])}
+                            />
+                          }
+                        />
+                      );
                     return (
-                      <DirRowView
+                      <FileRowView
                         key={r.key}
                         id={rowId(r.key)}
-                        d={r.d}
-                        going={r.going}
-                        {...look}
+                        f={r.f}
+                        upload={r.upload}
+                        showDir={searching}
+                        media={media?.[r.f.id]}
+                        onLook={() => {
+                          setActive(r.key);
+                          setLook(r.f.id);
+                        }}
+                        {...rowLook}
                         onPress={(e) => press(r, e)}
-                        onCheck={write || !phone ? () => toggle(r.key) : undefined}
-                        menu={dirMenu(r)}
+                        onCheck={() => toggle(r.key)}
+                        menu={fileMenu(r.f)}
+                        quick={
+                          <>
+                            <IconButton
+                              className="btn ghost sm icon-only pf-quick pf-dl"
+                              label={t('Download {name}', { name: nameOf(r.f.path) })}
+                              icon="download"
+                              size={14}
+                              tabIndex={tab}
+                              onClick={() => download(r.f.id)}
+                            />
+                            <IconButton
+                              className="btn ghost sm icon-only pf-quick"
+                              label={t('Copy {name} for an agent', { name: nameOf(r.f.path) })}
+                              icon="copy"
+                              size={14}
+                              tabIndex={tab}
+                              onClick={() => void copyFor([r.key])}
+                            />
+                          </>
+                        }
                       />
                     );
-                  return (
-                    <FileRowView
-                      key={r.key}
-                      id={rowId(r.key)}
-                      f={r.f}
-                      upload={r.upload}
-                      showDir={searching}
-                      {...look}
-                      onPress={(e) => press(r, e)}
-                      onCheck={() => toggle(r.key)}
-                      menu={fileMenu(r.f)}
-                      quick={
-                        <IconButton
-                          className="btn ghost sm icon-only pf-dl"
-                          label={t('Download {name}', { name: nameOf(r.f.path) })}
-                          icon="download"
-                          size={14}
-                          tabIndex={-1}
-                          onClick={() => download(r.f.id)}
-                        />
-                      }
-                    />
-                  );
-                })
-              )}
-              {list.hasNextPage && (
-                <button type="button" className="pf-more-rows" onClick={() => void list.fetchNextPage()} disabled={list.isFetchingNextPage}>
-                  {t('Show more · {n} in all', { n: pages?.[0]?.total ?? 0 })}
-                </button>
-              )}
-            </div>
+                  })
+                )}
+                {list.hasNextPage && (
+                  <button type="button" className="pf-more-rows" onClick={() => void list.fetchNextPage()} disabled={list.isFetchingNextPage}>
+                    {t('Show more · {n} in all', { n: pages?.[0]?.total ?? 0 })}
+                  </button>
+                )}
+              </div>
+            </>
           )}
 
           {!at.trash && inherited.map((a, i) => <Inherited key={a.area} info={a} here={i === 0 ? area : null} onOpen={(id) => open(id, { area: a.area })} />)}
 
-          {/* the area's trash, at its top, under everything (once the rows are here: nothing under them moves) */}
-          {!at.trash && !path && pages && own && own.trash > 0 && (
+          {/* the area's trash at its top, and what the plan's storage holds: once the rows are here (nothing under them
+              moves), never under an empty area's empty state */}
+          {!at.trash && pages && !(empty && !path) && (
             <div className="pf-foot">
-              <a className="pf-foot-link" href={filesHref(area, { trash: true })} data-testid="files-trash-link">
-                <I name="trash" size={14} />
-                {t('Trash · {n} file · {size}, not counted|Trash · {n} files · {size}, not counted', { n: own.trash, size: size(own.trash_bytes) })}
-              </a>
+              {!path && own && own.trash > 0 && (
+                <a className="pf-foot-link" href={filesHref(area, { trash: true })} data-testid="files-trash-link">
+                  <I name="trash" size={14} />
+                  {t('Trash: {n} file, {size}, doesn’t count toward your storage|Trash: {n} files, {size}, doesn’t count toward your storage', {
+                    n: own.trash,
+                    size: size(own.trash_bytes),
+                  })}
+                </a>
+              )}
+              <Storage billing={billing} />
             </div>
           )}
         </div>
+
         {selected.length > 0 && (
           <div className="pf-selbar" role="toolbar" aria-label={t('{n} selected', { n: selected.length })} data-testid="files-selbar">
             <span className="pf-selbar-n">
@@ -1018,6 +1193,32 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
           }}
         />
       )}
+      {peek &&
+        !look &&
+        !checked.size &&
+        (() => {
+          const f = files.find((x) => x.id === peek.id);
+          return f ? <Peek f={f} media={media?.[f.id]} at={peek.at} /> : null;
+        })()}
+      {look && files.some((f) => f.id === look) && (
+        <QuickLook
+          files={files}
+          at={files.findIndex((f) => f.id === look)}
+          media={media}
+          onMove={(i) => {
+            const f = files[i];
+            if (!f) return;
+            setLook(f.id);
+            setActive(fileKey(f.id));
+          }}
+          onClose={() => setLook(null)}
+          onCopy={(f) => void copyFor([fileKey(f.id)])}
+          onDetails={(f) => {
+            setLook(null);
+            open(f.id);
+          }}
+        />
+      )}
       {check && <CheckSheet area={area} dir={check.dir} gathered={check.gathered} billing={billing} onClose={() => setCheck(null)} />}
       {dialog?.kind === 'new' && (
         <NameDialog
@@ -1055,7 +1256,7 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
 
 // ---------------------------------------------------------------- empty, inherited, trash
 
-function Empty({ area, path, write, touch, onAdd, small }: { area: string; path: string; write: boolean; touch: boolean; onAdd: () => void; small: boolean }) {
+function Empty({ path, write, onAdd, small }: { area: string; path: string; write: boolean; onAdd: () => void; small: boolean }) {
   if (path)
     return (
       <EmptyState
@@ -1065,7 +1266,7 @@ function Empty({ area, path, write, touch, onAdd, small }: { area: string; path:
         title={t('This folder is empty')}
         action={
           write && (
-            // the head's Add files is the page's one primary
+            // the toolbar's Add files is the page's one primary
             <Button icon="upload" onClick={onAdd}>
               {t('Add files')}
             </Button>
@@ -1077,9 +1278,7 @@ function Empty({ area, path, write, touch, onAdd, small }: { area: string; path:
         {t('Files you add here keep this folder in their path.')}
       </EmptyState>
     );
-  // (where the Videos tab's empty project stands, as big; the way from a terminal is its quiet last line — not on a
-  // touch screen, where no terminal is)
-  const push = pushCommand(area, '', './<folder>');
+  // where the Videos tab's empty project stands, as big: Add files
   return (
     <EmptyState
       art="folder"
@@ -1090,38 +1289,27 @@ function Empty({ area, path, write, touch, onAdd, small }: { area: string; path:
       title={t('No files yet')}
       action={
         write && (
-          // the toolbar's Add files is the page's one primary
-          <Button icon="upload" onClick={onAdd}>
-            {t('Add files')}
-          </Button>
-        )
-      }
-      tips={write ? [t('Drop files and folders anywhere on this page')] : undefined}
-      foot={
-        write &&
-        !touch && (
-          <span className="pf-push" data-testid="files-push">
-            {t('From a terminal, or an agent:')} <code>{push}</code>
-            <IconButton
-              className="btn ghost icon-only pf-push-copy"
-              label={t('Copy')}
-              icon="copy"
-              size={13}
-              onClick={async () => {
-                if (await copyText(push)) toast(t('Copied'), 'ok');
-              }}
-            />
+          <span className="pf-empty-acts">
+            {/* the toolbar's Add files is the page's one primary */}
+            <Button icon="upload" onClick={onAdd}>
+              {t('Add files')}
+            </Button>
+            {/* "Copy prompt for your agent" comes back here with `lampo files push`, the command its prompt
+                (lib/mcpConfig.ts filesPrompt) hands the agent: ROADMAP, the agents' file tools */}
           </span>
         )
       }
+      tips={write ? [t('Drop files and folders anywhere on this page')] : undefined}
     >
       {t('Footage, music, fonts and project files: your team and its agents work from the same material.')}
     </EmptyState>
   );
 }
 
-/** What this area inherits from one above (the playbook's way): folded to a line, open to its top-level files. */
-/** `here`: the area it is inherited into, said on the first of them (who wins where a path is the same). */
+/**
+ * What this area inherits from one above (the playbook's way): folded to a line, open to its top-level files. `here`:
+ * the area it is inherited into, said on the first of them: which file is used where both have one at the same place.
+ */
 function Inherited({ info, here, onOpen }: { info: FileAreaInfo; here: string | null; onOpen: (id: string) => void }) {
   const [open, setOpen] = useState(false);
   // the keys' row: none until the list has the keys
@@ -1158,18 +1346,31 @@ function Inherited({ info, here, onOpen }: { info: FileAreaInfo; here: string | 
       onClick: async () => (await copyText(`${pullCommand(info.area, [f.path])}\n${mcpCall(info.area, '')}`)) && toast(t('Copied'), 'ok'),
     },
   ];
+  // "Also here, from the Acme project": the House's, a project's or a folder's, in plain words
+  const from = !info.area
+    ? t('Also here, from the House')
+    : info.area.includes('/')
+      ? t('Also here, from the {name} folder', { name })
+      : t('Also here, from the {name} project', { name });
+  // which one is used where both have a file of the same name in the same folder: this page's own
+  const wins =
+    here === null
+      ? ''
+      : here.includes('/')
+        ? t('Same name in the same folder: this folder’s own file is used.')
+        : t('Same name in the same folder: this project’s own file is used.');
   return (
-    <section className={`pf-inh ${open ? 'open' : ''}`} aria-label={t('From {area}', { area: name })} data-testid="files-inherited" data-area={info.area}>
-      {/* a section's heading, as the Videos tab's: the fold, whose it is, what it holds, and who wins */}
+    <section className={`pf-inh ${open ? 'open' : ''}`} aria-label={from} data-testid="files-inherited" data-area={info.area}>
+      {/* a section's heading, as the Videos tab's: the fold, whose it is, what it holds, and which file is used */}
       <button type="button" className="pf-inh-head" aria-expanded={open} onClick={() => setOpen((o) => !o)} data-testid="files-inherited-head">
         <span className="pf-shead-lead" aria-hidden="true">
           <I name="right" size={13} className="pf-inh-chev" />
         </span>
-        <span className="pf-inh-from">{t('From {area}', { area: name })}</span>
+        <span className="pf-inh-from">{from}</span>
         <span className="pf-inh-facts">
           {t('{n} file|{n} files', { n: info.files })} · {size(info.bytes)}
         </span>
-        <span className="pf-inh-note">{here !== null ? t('{area} wins where a path is the same', { area: areaName(here) }) : ''}</span>
+        {wins && <span className="pf-inh-note">{wins}</span>}
       </button>
       {open && (
         <div
@@ -1227,12 +1428,14 @@ function TrashList({
   write,
   data,
   error,
+  count,
   onOpen,
 }: {
   area: string;
   write: boolean;
   data: (Omit<FilesTrash, 'files'> & { files: TrashRow[] }) | undefined;
   error: Error | null;
+  count: ReactNode;
   onOpen: (id: string) => void;
 }) {
   const qc = useQueryClient();
@@ -1285,75 +1488,102 @@ function TrashList({
       </button>
     );
   return (
-    // (what it holds is said in the heading above it)
-    <div className="pf-list trash" data-testid="files-trash">
-      <Columns trash />
-      {!files ? (
-        ['9em', '7em', '11em'].map((w) => <RowPending key={w} w={w} />)
-      ) : (
-        <>
-          {dirs.map((d) => (
-            <TrashDirRow key={d.id} d={d} action={restoreButton(d, true)} />
-          ))}
-          {files.map((f) => (
-            <div key={f.id} className="pf-row" data-testid="trash-row" data-id={f.id}>
-              <span className="pf-c pf-c-lead">
-                <span className="pf-glyph">
-                  <KindIcon kind={f.kind} />
-                </span>
-              </span>
-              <span className="pf-c pf-c-name">
-                <button type="button" className="pf-name pf-name-btn" title={f.path} onClick={() => onOpen(f.id)}>
-                  {nameOf(f.path)}
-                </button>
-              </span>
-              <span className="pf-c pf-c-kind">
-                <span className="pf-kind">{dirOf(f.path) ? spaced(dirOf(f.path)) : t('At the top')}</span>
-                <span className="pf-v" title={new Date(f.purge_at).toLocaleString()}>
-                  {t('goes {when}', { when: until(f.purge_at) })}
-                </span>
-              </span>
-              <span className="pf-c pf-c-size">{size(f.size)}</span>
-              <span className="pf-c pf-c-who">
-                <WhoTag who={whoOf({ by: f.trashed_by, agent: f.trashed_agent })} />
-              </span>
-              <span className="pf-c pf-c-when">{ago(f.trashed_at)}</span>
-              <span className="pf-c pf-c-sub">{`${size(f.size)} · ${t('goes {when}', { when: until(f.purge_at) })}`}</span>
-              <span className="pf-c pf-c-acts trash">{restoreButton(f, false)}</span>
-            </div>
-          ))}
-        </>
-      )}
-    </div>
+    <>
+      <Columns trash count={count} />
+      <div className="pf-list trash" data-testid="files-trash">
+        {!files ? (
+          ['9em', '7em', '11em'].map((w) => <RowPending key={w} w={w} />)
+        ) : (
+          <>
+            {dirs.map((d) => (
+              <TrashRowView
+                key={d.id}
+                id={d.id}
+                dir
+                name={nameOf(d.path)}
+                path={d.path}
+                where={d.files ? t('{n} file|{n} files', { n: d.files }) : t('Empty folder')}
+                purge={d.purge_at}
+                bytes={d.files ? d.bytes : null}
+                who={whoOf({ by: d.trashed_by, agent: d.trashed_agent })}
+                at={d.trashed_at}
+                action={restoreButton(d, true)}
+              />
+            ))}
+            {files.map((f) => (
+              <TrashRowView
+                key={f.id}
+                id={f.id}
+                glyph={<KindIcon kind={f.kind} />}
+                name={nameOf(f.path)}
+                path={f.path}
+                where={dirOf(f.path) ? t('from {where}', { where: spaced(dirOf(f.path)) }) : t('from the top')}
+                purge={f.purge_at}
+                bytes={f.size}
+                who={whoOf({ by: f.trashed_by, agent: f.trashed_agent })}
+                at={f.trashed_at}
+                action={restoreButton(f, false)}
+                onOpen={() => onOpen(f.id)}
+              />
+            ))}
+          </>
+        )}
+      </div>
+    </>
   );
 }
 
-function TrashDirRow({ d, action }: { d: TrashedDirInfo; action: ReactNode }) {
+/**
+ * A trashed file or folder, in the list's anatomy: what it is, its name with where it was and when it goes, its size,
+ * who trashed it and when, Restore.
+ */
+function TrashRowView(p: {
+  id: string;
+  dir?: boolean;
+  glyph?: ReactNode;
+  name: string;
+  path: string;
+  where: string;
+  purge: string;
+  bytes: number | null;
+  who: Who;
+  at: string;
+  action: ReactNode;
+  onOpen?: () => void;
+}) {
+  const goes = t('goes {when}', { when: until(p.purge) });
   return (
-    <div className="pf-row dir" data-testid="trash-dir-row" data-id={d.id}>
+    <div className={`pf-row ${p.dir ? 'dir' : ''}`} data-testid={p.dir ? 'trash-dir-row' : 'trash-row'} data-id={p.id}>
+      <span className="pf-c pf-c-tick" />
       <span className="pf-c pf-c-lead">
-        <span className="pf-glyph">
-          <I name="folder" size={16} />
+        <span className="pf-thumb">
+          <span className="pf-thumb-glyph">{p.dir ? <I name="folder" size={16} /> : p.glyph}</span>
         </span>
       </span>
       <span className="pf-c pf-c-name">
-        <span className="pf-name" title={d.path}>
-          {nameOf(d.path)}
+        {p.onOpen ? (
+          <button type="button" className="pf-name pf-name-btn" title={p.path} onClick={p.onOpen}>
+            {p.name}
+          </button>
+        ) : (
+          <span className="pf-name" title={p.path}>
+            {p.name}
+          </span>
+        )}
+        <span className="pf-meta">
+          {p.where} ·{' '}
+          <span className="pf-v" title={new Date(p.purge).toLocaleString()}>
+            {goes}
+          </span>
         </span>
       </span>
-      <span className="pf-c pf-c-kind">
-        <span className="pf-kind">{d.files ? t('{n} file|{n} files', { n: d.files }) : t('Empty folder')}</span>
-        <span className="pf-v" title={new Date(d.purge_at).toLocaleString()}>
-          {t('goes {when}', { when: until(d.purge_at) })}
-        </span>
+      <span className="pf-c pf-c-size">{p.bytes !== null ? size(p.bytes) : ''}</span>
+      <span className="pf-c pf-c-changed" title={new Date(p.at).toLocaleString()}>
+        <WhoTag who={p.who} />
+        <span className="pf-when"> · {ago(p.at)}</span>
       </span>
-      <span className="pf-c pf-c-size">{d.files ? size(d.bytes) : ''}</span>
-      <span className="pf-c pf-c-who">
-        <WhoTag who={whoOf({ by: d.trashed_by, agent: d.trashed_agent })} />
-      </span>
-      <span className="pf-c pf-c-when">{ago(d.trashed_at)}</span>
-      <span className="pf-c pf-c-sub">{`${d.files ? `${t('{n} file|{n} files', { n: d.files })} · ` : ''}${t('goes {when}', { when: until(d.purge_at) })}`}</span>
-      <span className="pf-c pf-c-acts trash">{action}</span>
+      <span className="pf-c pf-c-sub">{[...(p.bytes !== null ? [size(p.bytes)] : []), goes].join(' · ')}</span>
+      <span className="pf-c pf-c-acts trash">{p.action}</span>
     </div>
   );
 }

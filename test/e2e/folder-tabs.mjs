@@ -6,11 +6,14 @@
 // them moves nothing. In a browser that kept nothing, with the Files and Playbook answers held back until each tab's
 // loading state has been drawn, every frame of a round trip is measured: the tabs stay put, every tab's first row (the
 // Videos toolbar, the Files toolbar, the playbook's line) stands at the same place and is as tall, every tab's content
-// starts at the same edge (the first section of videos, the list's heading or the empty state, the document), no frame
-// lacks the first row or draws it faded, and no layout shift is recorded. A project with videos, files and a playbook,
-// and one with videos only (empty Files and Playbook), at 1440, 1024, a tablet (768, touch) and a phone (390).
+// starts at the same edge (the first section of videos, the list's columns or the empty state, the document), no frame
+// lacks the first row or draws it faded, and no layout shift is recorded (the files' pictures arriving too). A project
+// with videos, files (a clip and a picture among them) and a playbook, and one with videos only (empty Files and
+// Playbook), at 1440, 1024, a tablet (768, touch) and a phone (390).
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
-import { age, makeVideo } from '../lib/helpers.ts';
+import { age, FFMPEG, makeVideo } from '../lib/helpers.ts';
 import { settle } from './layout.mjs';
 import { jsonApi } from './lib/api.mjs';
 import { launch, requireChrome, requireDist, shotsDir } from './lib/browser.mjs';
@@ -65,9 +68,10 @@ function sampler() {
   };
   // A tab marks its first row and its content (data-tab-row, data-tab-body); a page without the marks is measured by
   // its own parts: the Videos toolbar and content, the playbook's line and document, the Files page's first row and its
-  // list or empty state (the first of them on screen, in the page's order, is the top one)
+  // columns, list or empty state (the first of them on screen, in the page's order, is the top one)
   const ROW = 'main [data-tab-row], main .lib-toolbar, main .pb-meta, main [data-testid=files] .pf-main > :first-child';
-  const BODY = 'main [data-tab-body], main .lib-content, main .pb-layout, main [data-testid=files] :is(.pf-shead, .pf-list, [data-testid=files-empty])';
+  const BODY =
+    'main [data-tab-body], main .lib-content, main .pb-layout, main [data-testid=files] :is(.pf-place, .pf-cols, .pf-grid-head, .pf-list, .pf-grid, [data-testid=files-empty])';
   const tick = () => {
     if (T.on) {
       const tabs = document.querySelector('.hero .hero-tabs');
@@ -142,6 +146,9 @@ async function roundTrip(browser, folder, vp) {
     await shot('files-loading');
     release('files');
     await page.waitForSelector('[data-testid=files][aria-busy=false]', { timeout: 20_000 });
+    // the clip's and the picture's posters, in boxes that were there before them (two pictures of three files: a grid)
+    if (folder === 'Acme')
+      await page.waitForFunction(() => document.querySelectorAll('[data-testid=files] :is(.pf-thumb, .pf-scrub).has-pic').length === 2, { timeout: 20_000 });
     await settle(page, { quiet: 400 });
     await shot('files');
     // Playbook: the same
@@ -201,7 +208,8 @@ async function roundTrip(browser, folder, vp) {
 
 let browser;
 try {
-  // Acme: videos, files (a folder of brand files, a brief) and a playbook with a brief and rules; Launch: videos only
+  // Acme: videos, files (a folder of brand files, a brief, a clip and a picture whose posters come after the list) and a
+  // playbook with a brief and rules; Launch: videos only
   let i = 0;
   for (const [folder, name] of [
     ['Acme', 'spot'],
@@ -213,10 +221,14 @@ try {
     age(file);
     await api('/api/library', 'POST', { path: file, folder });
   }
+  const still = path.join(dir, 'key-visual.png');
+  execFileSync(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=480x270', '-frames:v', '1', still]);
   await push(BASE, 'Acme', {
     'Brand/Logo primary.svg': Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'),
     'Brand/Acme Sans.otf': Buffer.alloc(4096, 7),
     'Brief v3.txt': Buffer.from('Spring sale, 30 s and 15 s cuts.\n'),
+    'Teaser A001.mp4': fs.readFileSync(makeVideo(path.join(dir, 'teaser.mp4'), { dur: 2, w: 320, h: 180 })),
+    'Key visual.png': fs.readFileSync(still),
   });
   await api('/api/playbook/text', 'PUT', { folder: 'Acme', section: 'brief', content: 'Calm, warm product films. No whooshes.' });
   await api('/api/playbook/text', 'PUT', { folder: 'Acme', section: 'rules', content: '- Logo at most 12 % of the frame width\n- End card holds 2 s' });

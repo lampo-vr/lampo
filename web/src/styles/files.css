@@ -21,10 +21,13 @@
   grid-template-columns: minmax(0, 1fr);
   align-content: start;
   min-width: 0;
-  /* the list's columns: what it is · name · kind · size · who · when · actions. The name takes what is left; what
-     is said about a file stays together at the row's end, however wide the page */
-  --pf-cols: var(--sp-6) minmax(200px, 1fr) minmax(0, 200px) 80px minmax(0, 160px) 96px 64px;
+  /* the list's columns after what a row is (--pf-lead): name · size · changed (who, when) · actions. The name takes what
+     is left; what is said about a file stays together at the row's end, however wide the page */
+  --pf-cols: minmax(0, 1fr) 88px minmax(0, 180px) 100px;
   --pf-row: var(--h-lg);
+  /* a poster's slot: 16:9, a little shorter than the row */
+  --pf-thumb-w: 42px;
+  --pf-thumb-h: 24px;
 }
 
 /* ---------------------------------------------------------------- the toolbar: the Videos tab's, its parts its own */
@@ -56,41 +59,30 @@
   border-left: 1px solid color-mix(in srgb, var(--on-brand) 24%, transparent);
 }
 
-/* ---------------------------------------------------------------- the content: the list's heading, then the rows */
+/* ---------------------------------------------------------------- the content: where it is, the columns, the rows */
 
-/* where the Videos tab's first section starts (library.css .lib-section) */
+/* where the Videos tab's first section starts (library.css .lib-section). What a row is takes a glyph's width at the
+   content's left edge, or a poster's where the list has footage or pictures (`pics`, known from the listing, before any
+   picture: nothing moves when they come); every name starts one gap after it */
 .pf-body {
+  --pf-lead: var(--ic);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-content: start;
   min-width: 0;
   margin-top: var(--sp-6);
 }
-/* the list's heading, a section's (library.css .shead): where it is, what it holds, and the storage at its end */
-.pf-shead {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  min-width: 0;
-  height: var(--h-sm);
-  margin-bottom: var(--sp-2);
+.pf-body.pics {
+  --pf-lead: var(--pf-thumb-w);
 }
-/* the heading's glyph slot, as wide as a section's fold in the Videos tab: the files' glyph, an inherited section's fold */
-.pf-shead-lead {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: var(--h-xs);
-  height: var(--h-xs);
-  border-radius: var(--r-sm);
-  color: var(--faint);
-}
-.pf-crumbs {
-  flex: 0 1 auto;
+/* inside a folder or the trash: where it is, the area's name first, each name a way back up */
+.pf-place {
   display: flex;
   align-items: center;
   gap: var(--sp-1);
   min-width: 0;
+  height: var(--h-sm);
+  margin-bottom: var(--sp-2);
   overflow: hidden;
 }
 .pf-crumb-step {
@@ -124,77 +116,6 @@ a.pf-crumb:focus-visible {
   flex: none;
   color: var(--faint);
 }
-.pf-facts {
-  flex: none;
-  margin-left: var(--sp-1);
-  white-space: nowrap;
-  font-size: var(--fs-sm);
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-}
-/* what the plan's storage holds: a short meter and its words, a way to Settings → Billing */
-.pf-store {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  height: var(--h-sm);
-  margin: 0 calc(-1 * var(--sp-2)) 0 auto;
-  padding: 0 var(--sp-2);
-  border-radius: var(--r);
-  white-space: nowrap;
-  font-size: var(--fs-sm);
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-  text-decoration: none;
-}
-.pf-store:hover,
-.pf-store:focus-visible {
-  background: var(--sel);
-  color: var(--fg);
-}
-.pf-store-bar {
-  position: relative;
-  flex: none;
-  width: var(--sp-8);
-  height: var(--sp-1);
-  border-radius: var(--r-full);
-  background: var(--line-2);
-  overflow: hidden;
-}
-.pf-store-bar::before {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: calc(var(--v, 0) * 100%);
-  min-width: var(--sp-0_5);
-  border-radius: inherit;
-  background: var(--fg-2);
-}
-/* near the plan's end: said in words, the meter in the colour of a should-fix */
-.pf-store.near {
-  color: var(--fg-2);
-}
-.pf-store.near .pf-store-bar::before {
-  background: var(--should);
-}
-/* the way from a terminal: the empty state's quiet last line (system.css .empty-foot) with a copy of its own */
-.pf-push code {
-  user-select: all;
-}
-.pf-push-copy.btn,
-.pf-push-copy {
-  width: var(--h-xs);
-  min-width: 0;
-  height: var(--h-xs);
-  margin-left: var(--sp-1);
-  padding: 0;
-  vertical-align: middle;
-  color: var(--muted);
-}
-.pf-push-copy:hover {
-  color: var(--fg);
-}
 
 /* ---------------------------------------------------------------- the list */
 
@@ -207,19 +128,46 @@ a.pf-crumb:focus-visible {
 .pf-list:focus {
   outline: none;
 }
+/* a row: what it is (the box to tick over it), its name with what it holds, its size, who changed it and when, its
+   actions. The name takes what is left; the rest stays together at the row's end, however wide the page. Its words
+   start at the content's left edge, as the toolbar's and the sections' do; its fill reaches a little past it on both
+   sides (the foot's links do the same) */
 .pf-row {
   position: relative;
   display: grid;
-  grid-template-columns: var(--pf-cols);
+  grid-template-columns: var(--pf-lead) var(--pf-cols);
+  grid-template-areas: 'lead name size changed acts';
   align-items: center;
-  gap: 0 var(--sp-3);
+  column-gap: var(--sp-3);
   height: var(--pf-row);
+  margin: 0 calc(-1 * var(--sp-2));
   padding: 0 var(--sp-2);
   border-radius: var(--r);
   color: var(--fg);
   text-decoration: none;
   cursor: pointer;
   user-select: none;
+}
+.pf-c-tick {
+  grid-area: lead;
+}
+.pf-c-lead {
+  grid-area: lead;
+}
+.pf-c-name {
+  grid-area: name;
+}
+.pf-c-size {
+  grid-area: size;
+}
+.pf-c-changed {
+  grid-area: changed;
+}
+.pf-c-sub {
+  grid-area: sub;
+}
+.pf-c-acts {
+  grid-area: acts;
 }
 /* one quiet system: under the pointer or the keys a faint fill; opened beside the list and picked for the bar a step
    deeper; the keys' row a hairline ring while the list has the keys */
@@ -251,27 +199,21 @@ a.pf-crumb:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.pf-c-lead {
+/* the box to tick: over what the row is, at its left edge (it takes the glyph's place); there under the pointer, on the
+   keys' row, once ticked, and on every row while some are picked */
+.pf-c-tick {
   position: relative;
-  display: grid;
-  place-items: center;
-  width: var(--sp-6);
-  height: var(--sp-6);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-self: start;
+  width: var(--ic);
+  height: 100%;
   overflow: visible;
+  pointer-events: none;
 }
-.pf-glyph {
-  display: grid;
-  place-items: center;
-  color: var(--muted);
-}
-.pf-row.dir .pf-glyph {
-  color: var(--fg-2);
-}
-/* ticking: a box in the glyph's place under the pointer, on a picked row, and on every row while some are picked */
 .pf-tick {
-  position: absolute;
-  inset: 0;
-  margin: auto;
+  position: relative;
   display: grid;
   place-items: center;
   width: var(--ic);
@@ -283,44 +225,95 @@ a.pf-crumb:focus-visible {
   color: transparent;
   cursor: pointer;
   opacity: 0;
+  pointer-events: auto;
 }
 .pf-row:hover .pf-tick,
+.pf-row.active .pf-tick,
 .pf-list.picking .pf-tick,
 .pf-tick.on {
   opacity: 1;
-}
-.pf-row:hover .pf-c-lead:has(.pf-tick) .pf-glyph,
-.pf-list.picking .pf-c-lead:has(.pf-tick) .pf-glyph,
-.pf-row.checked .pf-glyph {
-  visibility: hidden;
-}
-/* touch: no pointer to hover with; a row is picked from its ⋯ or the bar */
-@media (hover: none) and (pointer: coarse) {
-  /* (the last row tapped keeps :hover: a ticked one keeps its box, and while picking every row shows one) */
-  .pf-list:not(.picking) .pf-row:hover:not(.checked) .pf-tick:not(.on) {
-    opacity: 0;
-  }
-  .pf-list:not(.picking) .pf-row:hover:not(.checked) .pf-c-lead:has(.pf-tick) .pf-glyph {
-    visibility: visible;
-  }
-  /* a finger-sized place to tap, centred on the box (the box stays the glyph's size) */
-  .pf-tick::after {
-    content: '';
-    position: absolute;
-    inset: calc((var(--ic) - var(--h-touch)) / 2);
-  }
 }
 .pf-tick.on {
   border-color: var(--fg);
   background: var(--fg);
   color: var(--on-fg);
 }
+/* the glyph gives the box its place while the box shows (a poster keeps showing under it) */
+@media (hover: hover) {
+  .pf-row:is(:hover, .active) .pf-c-tick:not(:empty) + .pf-c-lead .pf-thumb-glyph {
+    visibility: hidden;
+  }
+}
+.pf-list.picking .pf-c-tick:not(:empty) + .pf-c-lead .pf-thumb-glyph,
+.pf-row.checked .pf-thumb-glyph {
+  visibility: hidden;
+}
+/* touch: no pointer to hover with; a row is picked from its ⋯ or the bar */
+@media (hover: none) and (pointer: coarse) {
+  /* (the last row tapped keeps :hover: a ticked one keeps its box, and while picking every row shows one) */
+  .pf-list:not(.picking) .pf-row:not(.checked) .pf-tick:not(.on) {
+    opacity: 0;
+  }
+  /* a finger-sized place to tap, centred on the box (the box stays its size) */
+  .pf-tick::after {
+    content: '';
+    position: absolute;
+    inset: calc((var(--ic) - var(--h-touch)) / 2);
+  }
+}
+/* what it is: the lead column's whole width at a fixed height, whatever is in it, so nothing moves when a picture
+   arrives; a poster in its own shape at the left edge (16:9 fills the slot), the kind's glyph there until it has loaded
+   and where there is none */
+.pf-c-lead {
+  display: flex;
+  align-items: center;
+  overflow: visible;
+}
+.pf-thumb {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: var(--pf-thumb-h);
+  color: var(--muted);
+}
+.pf-thumb > img {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: var(--r-sm);
+  outline: 1px solid var(--line);
+  outline-offset: -1px;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity var(--dur) var(--ease-out);
+}
+.pf-thumb.has-pic > img {
+  opacity: 1;
+}
+.pf-thumb.has-pic .pf-thumb-glyph {
+  visibility: hidden;
+}
+.pf-thumb-glyph {
+  display: grid;
+  place-items: center;
+  width: var(--ic);
+}
+.pf-row.dir .pf-thumb {
+  color: var(--fg-2);
+}
+/* the name, and beside it what it holds: a folder's files, a clip's or a sound's length, its version, where a match is */
 .pf-c-name {
   display: flex;
   align-items: baseline;
   gap: var(--sp-2);
 }
 .pf-name {
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -343,49 +336,33 @@ a.pf-crumb:focus-visible {
   text-decoration-color: var(--line-4);
   text-underline-offset: 2px;
 }
-/* in a search: where in the area it sits */
-.pf-dir {
-  flex: 0 1 auto;
+.pf-meta {
+  flex: 0 10000 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--fs-sm);
-  color: var(--muted);
-}
-.pf-c-kind {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  font-size: var(--fs-sm);
-  color: var(--muted);
-}
-.pf-kind {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-/* which version: a quiet tag, figures that don't dance */
-.pf-v {
-  flex: none;
-  padding: 0 var(--sp-1);
-  border-radius: var(--r-sm);
-  box-shadow: 0 0 0 1px var(--line-2);
-  font: var(--fw-ui) var(--fs-xs) / var(--lh-ui) var(--ui);
   font-variant-numeric: tabular-nums;
-  color: var(--fg-2);
+  color: var(--muted);
 }
-.pf-c-size,
-.pf-c-when {
+/* a length and a version stay whole beside a long name (the name gives way); where a match was found gives way first */
+.pf-meta-facts {
+  flex: none;
+}
+.pf-c-size {
   text-align: right;
   font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums;
-  color: var(--muted);
-}
-.pf-c-size {
   color: var(--fg-2);
+}
+/* who changed it last and when, one cell: a picture (an agent's mark) and a name, then the time */
+.pf-c-changed {
+  display: flex;
+  align-items: center;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
 }
 .pf-who {
   display: inline-flex;
@@ -397,10 +374,17 @@ a.pf-crumb:focus-visible {
   color: var(--fg-2);
   vertical-align: middle;
 }
+.pf-c-changed .pf-who {
+  flex: 0 1 auto;
+}
 .pf-who-name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.pf-when {
+  flex: none;
+  white-space: pre;
 }
 /* an agent: its mark in a small rounded tile, the size of a picture */
 .pf-who-mark {
@@ -419,7 +403,8 @@ a.pf-crumb:focus-visible {
   font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
-/* the row's actions at its end: their room is always there; shown under the pointer, the keys, an open menu, on touch */
+/* the row's actions at its end: their room is always there; shown under the pointer, on the keys' row, an open menu,
+   a focused action, and on touch screens (there only ⋯: its menu has them all) */
 .pf-c-acts {
   display: flex;
   align-items: center;
@@ -431,7 +416,7 @@ a.pf-crumb:focus-visible {
   visibility: hidden;
   color: var(--muted);
 }
-.pf-c-acts .btn:hover {
+.pf-c-acts .btn:hover:where(:not(:disabled)) {
   color: var(--fg);
 }
 .pf-row:hover .pf-c-acts .btn,
@@ -445,26 +430,27 @@ a.pf-crumb:focus-visible {
   .pf-c-acts .btn {
     visibility: visible;
   }
-  .pf-c-acts .pf-dl {
+  .pf-c-acts .pf-quick {
     display: none;
   }
 }
 .pf-c-acts.trash .btn {
   color: var(--fg);
 }
-.pf-row.dir .pf-c-acts > .icon {
-  color: var(--faint);
-}
-/* a file on its way: how far it got where its kind says what it is, a 3 px line under it; the row keeps its height */
+/* a file on its way: how far it got beside its name, a 3 px line under the words; the row keeps its height */
 .pf-going {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-content: center;
+  display: inline-flex;
+  align-items: center;
   gap: var(--sp-1);
-  overflow: hidden;
 }
 .pf-going .kg {
+  flex: none;
   color: var(--muted);
+}
+.pf-going-words {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .pf-going.conflict .kg,
 .pf-going.room .kg {
@@ -474,17 +460,21 @@ a.pf-crumb:focus-visible {
   color: var(--must-2);
 }
 .pf-up-bar.progress {
+  flex: none;
+  width: var(--sp-16);
   height: 3px;
 }
 .pf-row.going .pf-name {
   color: var(--fg-2);
 }
-/* the columns' names over the list (wide screens) */
+/* the columns' names over the list, each one ordering it; what the list holds beside Name. No fill: it stands inside
+   the content's edges, its hairline as wide as the foot's */
 .pf-row.pf-cols {
   height: var(--h);
+  margin: 0 0 var(--sp-1);
+  padding: 0;
   border-bottom: 1px solid var(--line);
   border-radius: 0;
-  margin-bottom: var(--sp-1);
   font-size: var(--fs-xs);
   font-weight: var(--fw-ui);
   color: var(--muted);
@@ -492,6 +482,53 @@ a.pf-crumb:focus-visible {
 }
 .pf-row.pf-cols:hover {
   background: transparent;
+}
+.pf-cols .pf-c-size {
+  display: flex;
+  justify-content: flex-end;
+  color: var(--muted);
+}
+.pf-cols .pf-c-name,
+.pf-cols .pf-c-changed {
+  align-items: center;
+  font-size: var(--fs-xs);
+}
+.pf-sort-head {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: var(--h-sm);
+  padding: 0;
+  border: 0;
+  background: none;
+  font: var(--fw-ui) var(--fs-xs) / var(--lh-ui) var(--ui);
+  color: var(--muted);
+  cursor: pointer;
+}
+.pf-sort-head:hover:where(:not(:disabled)),
+.pf-sort-head.on {
+  color: var(--fg);
+}
+/* the arrow says which way: always on the column the list goes by, under the pointer on the others (its room kept) */
+.pf-sort-arrow {
+  visibility: hidden;
+}
+.pf-sort-head.on .pf-sort-arrow,
+.pf-sort-head:hover .pf-sort-arrow,
+.pf-sort-head:focus-visible .pf-sort-arrow {
+  visibility: visible;
+}
+.pf-count {
+  min-width: 0;
+  margin-left: var(--sp-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: var(--fw-text);
+  font-variant-numeric: tabular-nums;
+}
+/* the order on a phone, where there are no columns: one compact control at the header's end */
+.pf-order-menu {
+  display: none;
 }
 .pf-wait {
   display: grid;
@@ -514,12 +551,32 @@ a.pf-crumb:focus-visible {
 .pf-list > .empty-state {
   margin-top: var(--sp-2);
 }
+/* an empty area: Add files, the prompt for the person's agent under it */
+.pf-empty-acts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+}
 
 /* ---------------------------------------------------------------- what it inherits, folded */
 
 /* each a section under the area's own, its heading the list's (.pf-shead): the fold where the files glyph stands, whose
    it is, what it holds; then, open, its top-level rows */
+/* the fold's slot, a glyph's width at the content's edge: the heading's words start where the names of a list without
+   pictures do */
+.pf-shead-lead {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--ic);
+  height: var(--h-xs);
+  border-radius: var(--r-sm);
+  color: var(--faint);
+}
 .pf-inh {
+  /* (glyphs only: no posters for what is read here) */
+  --pf-lead: var(--ic);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   margin-top: var(--sp-6);
@@ -533,7 +590,7 @@ a.pf-crumb:focus-visible {
 .pf-inh-head {
   display: flex;
   align-items: center;
-  gap: var(--sp-2);
+  gap: var(--sp-3);
   min-width: 0;
   height: var(--h-sm);
   margin: 0;
@@ -602,22 +659,33 @@ a.pf-crumb:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
-  margin: 0 0 var(--sp-2) var(--sp-2);
+  margin: 0 0 var(--sp-2);
   font-size: var(--fs-sm);
   color: var(--muted);
   text-decoration: none;
+}
+/* its words where its rows' names start (the slot and its gap, less the link's own gap) */
+.pf-inh-all::before {
+  content: '';
+  flex: none;
+  width: calc(var(--pf-lead) + var(--sp-3) - var(--sp-1));
 }
 .pf-inh-all:hover {
   color: var(--fg);
 }
 
-/* ---------------------------------------------------------------- the foot: the area's trash */
+/* ---------------------------------------------------------------- the foot: the area's trash, the plan's storage */
 
+/* a quiet line under everything, the list's own status: its trash on the left, what the plan's storage holds on the
+   right; a hairline over it */
 .pf-foot {
   display: flex;
   align-items: center;
+  gap: var(--sp-2) var(--sp-6);
   min-height: var(--h);
   margin-top: var(--sp-6);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--line);
   font-size: var(--fs-sm);
   color: var(--muted);
 }
@@ -625,6 +693,7 @@ a.pf-crumb:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
+  min-width: 0;
   height: var(--h-sm);
   margin-left: calc(-1 * var(--sp-2));
   padding: 0 var(--sp-2);
@@ -636,6 +705,52 @@ a.pf-crumb:focus-visible {
 .pf-foot-link:hover,
 .pf-foot-link:focus-visible {
   background: var(--sel);
+  color: var(--fg);
+}
+/* what the plan's storage holds: a bar you can read and its words ("310 GB of 2.5 TB"), amber near the end; a way to
+   Settings → Billing */
+.pf-store {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: var(--h-sm);
+  margin: 0 calc(-1 * var(--sp-2)) 0 auto;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r);
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-2);
+  text-decoration: none;
+}
+.pf-store:hover,
+.pf-store:focus-visible {
+  background: var(--sel);
+  color: var(--fg);
+}
+.pf-store-bar {
+  position: relative;
+  flex: none;
+  width: var(--sp-20);
+  height: calc(var(--sp-1) + var(--sp-0_5));
+  border-radius: var(--r-full);
+  background: var(--line-2);
+  overflow: hidden;
+}
+.pf-store-bar::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--v, 0) * 100%);
+  min-width: var(--sp-1);
+  border-radius: inherit;
+  background: var(--fg-2);
+}
+.pf-store.near .pf-store-bar::before {
+  background: var(--should);
+}
+.pf-store-near {
   color: var(--fg);
 }
 
@@ -1143,14 +1258,18 @@ a.pf-crumb:focus-visible {
 
 /* ---------------------------------------------------------------- narrower rooms */
 
-/* a tablet's room: who changed it goes (the sheet says it) */
+/* a tablet's room: who changed it shows as its picture only, the time beside it (the name is in its tooltip) */
 /* (a query styles what is inside its container, never the container: the columns are set on its children) */
 @container pf (max-width: 900px) {
   .pf-main > * {
-    --pf-cols: var(--sp-6) minmax(160px, 1fr) minmax(0, 180px) 72px 80px 64px;
+    --pf-cols: minmax(0, 1fr) 80px minmax(0, 120px) 100px;
   }
-  .pf-c-who {
+  .pf-c-changed .pf-who-name,
+  .pf-c-changed .pf-when-sep {
     display: none;
+  }
+  .pf-c-changed .pf-who + .pf-when {
+    margin-left: var(--sp-2);
   }
 }
 /* the picked rows' bar: where its words would run into each other (German's are longer), the glyphs stay; on a phone
@@ -1177,59 +1296,67 @@ a.pf-crumb:focus-visible {
     display: none;
   }
 }
-/* a phone's room: two lines — the name, then what it is, its size and when; the actions behind ⋯ */
+/* a phone's room: two lines — the name, then its length or version, size and when; the actions behind ⋯; the box to
+   tick over the picture while picking. The columns' row is what the list holds and the order, one compact control */
 @container pf (max-width: 600px) {
   .pf-main > * {
     --pf-row: 56px;
+    --pf-thumb-w: 64px;
+    --pf-thumb-h: 36px;
   }
   .pf-row {
-    grid-template-columns: var(--sp-6) minmax(0, 1fr) auto;
+    grid-template-columns: var(--pf-lead) minmax(0, 1fr) auto;
     grid-template-rows: auto auto;
+    grid-template-areas:
+      'lead name acts'
+      'lead sub acts';
     align-content: center;
     gap: var(--sp-0_5) var(--sp-3);
   }
-  .pf-c-lead {
-    grid-row: 1 / span 2;
-  }
-  .pf-c-name {
-    grid-column: 2;
-    grid-row: 1;
-  }
   .pf-c-sub {
     display: block;
-    grid-column: 2;
-    grid-row: 2;
   }
-  .pf-c-kind,
   .pf-c-size,
-  .pf-c-who,
-  .pf-c-when {
+  .pf-c-changed {
     display: none;
   }
-  .pf-c-acts {
-    grid-column: 3;
-    grid-row: 1 / span 2;
-  }
-  .pf-row.going .pf-c-kind {
-    display: grid;
-    grid-column: 2;
-    grid-row: 2;
-  }
+  .pf-c-name .pf-meta,
   .pf-row.going .pf-c-sub {
     display: none;
   }
+  .pf-row.going .pf-c-name .pf-going {
+    display: inline-flex;
+  }
+  /* (what the list holds where the names start, as on wider rooms) */
   .pf-row.pf-cols {
+    grid-template-rows: auto;
+    grid-template-areas: 'lead name acts';
+    height: var(--h-touch);
+  }
+  /* (Size's name is a flex cell on wider rooms: it is hidden here too, or it takes a column of its own) */
+  .pf-cols .pf-c-tick,
+  .pf-cols .pf-c-size,
+  .pf-cols .pf-c-changed {
     display: none;
   }
-  .pf-dl {
+  .pf-cols .pf-sort-head {
     display: none;
+  }
+  .pf-cols .pf-count {
+    margin-left: 0;
+    font-size: var(--fs-sm);
+  }
+  .pf-order-menu {
+    display: grid;
   }
   .pf-inh-note {
     display: none;
   }
+  .pf-foot {
+    flex-wrap: wrap;
+  }
 }
-/* a phone's toolbar: Add files beside the field, its glyph says it (its name stays its accessible name); the storage
-   gives the heading's room to the place (Settings → Billing has it) unless the plan is near its end */
+/* a phone's toolbar: Add files beside the field, its glyph says it (its name stays its accessible name) */
 @container pf (max-width: 520px) {
   .pf-add-label {
     position: absolute;
@@ -1239,12 +1366,8 @@ a.pf-crumb:focus-visible {
     clip-path: inset(50%);
     white-space: nowrap;
   }
-  .pf-store:not(.near),
-  .pf-store-bar {
-    display: none;
-  }
 }
-/* touch: a finger's height for the toolbar's buttons, the crumbs (the heading is that tall), the folds and the links */
+/* touch: a finger's height for the toolbar's buttons, the crumbs (their line is that tall), the folds and the links */
 @media (hover: none) and (pointer: coarse) {
   .pf-add .btn,
   .pf-back {
@@ -1253,7 +1376,7 @@ a.pf-crumb:focus-visible {
   .pf-add-more.btn {
     width: var(--h-touch);
   }
-  .pf-shead {
+  .pf-place {
     height: var(--h-touch);
     margin-bottom: 0;
   }
@@ -1266,13 +1389,529 @@ a.pf-crumb:focus-visible {
   }
   .pf-store,
   .pf-foot-link,
-  .pf-push-copy {
+  .pf-order-menu {
     position: relative;
   }
   .pf-store::after,
-  .pf-foot-link::after {
+  .pf-foot-link::after,
+  .pf-order-menu::after {
     content: '';
     position: absolute;
     inset: min(0px, calc(50% - 22px));
   }
+}
+
+/* ---------------------------------------------------------------- Quick Look: a file large, ← → through the folder */
+
+/* a row's picture opens it */
+.pf-c-lead.looks {
+  cursor: zoom-in;
+}
+.pf-ql {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-2);
+  height: 100%;
+  min-height: 0;
+  padding: 0 var(--sp-2) var(--sp-4);
+}
+.pf-ql-stage {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  border-radius: var(--r-lg);
+  background: var(--ink-2);
+  overflow: hidden;
+}
+.pf-ql-stage > img,
+.pf-ql-stage > video {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.pf-ql-stage > video {
+  width: 100%;
+  height: 100%;
+  background: var(--cast);
+}
+.pf-ql-nav.btn {
+  width: var(--h);
+  height: var(--h);
+  border-radius: var(--r-full);
+}
+.pf-ql-count {
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.pf-ql-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  min-width: 0;
+}
+.pf-ql-facts {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.pf-ql-audio {
+  display: grid;
+  gap: var(--sp-6);
+  width: min(100%, 760px);
+  padding: var(--sp-6);
+}
+.pf-ql-wave {
+  width: 100%;
+  height: 140px;
+  color: var(--fg-2);
+}
+.pf-ql-wave.wait {
+  color: var(--line-3);
+}
+.pf-ql-audio audio {
+  width: 100%;
+}
+.pf-ql-none {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-6);
+  text-align: center;
+  color: var(--muted);
+}
+.pf-ql-none-name {
+  font: var(--fw-strong) var(--fs-lg) / var(--lh-ui) var(--ui);
+  color: var(--fg);
+}
+/* a phone: the picture takes the width, the arrows over its edges; the facts on a line of their own over the actions
+   (the dialog is a layer of the page's own, so the window's width, not the list's) */
+@media (max-width: 600px) {
+  .pf-ql {
+    position: relative;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 0 var(--sp-3) var(--sp-3);
+  }
+  .pf-ql-stage {
+    grid-row: 1;
+    grid-column: 1;
+  }
+  .pf-ql-nav.btn {
+    position: absolute;
+    top: 50%;
+    z-index: 1;
+    background: color-mix(in srgb, var(--cast) 45%, transparent);
+    color: var(--hi);
+    transform: translateY(-50%);
+  }
+  .pf-ql-nav.prev {
+    left: var(--sp-4);
+  }
+  .pf-ql-nav.next {
+    right: var(--sp-4);
+  }
+  .pf-ql-foot {
+    flex-wrap: wrap;
+  }
+  .pf-ql-facts {
+    flex-basis: 100%;
+  }
+  .pf-ql-who {
+    display: none;
+  }
+  .pf-ql-foot .btn.primary {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .pf-ql-foot .btn.icon-only {
+    width: var(--h-touch);
+    height: var(--h-touch);
+  }
+  .pf-ql-foot .btn.primary {
+    height: var(--h-touch);
+  }
+}
+
+/* ---------------------------------------------------------------- a clip that scrubs under the pointer */
+
+.pf-scrub {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.pf-scrub > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease-out);
+}
+.pf-scrub.has-pic > img {
+  opacity: 1;
+}
+.pf-scrub-frame {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  background-size: 800% 100%;
+}
+.pf-scrub-line {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: var(--brand);
+}
+.pf-scrub-time {
+  position: absolute;
+  top: var(--sp-1);
+  left: 50%;
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--cast) 64%, transparent);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--hi);
+  transform: translateX(-50%);
+}
+
+/* ---------------------------------------------------------------- the grid: big pictures, the name under each */
+
+.pf-view {
+  flex: none;
+}
+.pf-grid-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  height: var(--h);
+  margin-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.pf-grid-head .pf-count {
+  margin-left: 0;
+}
+.pf-grid-order.btn {
+  margin-right: calc(-1 * var(--sp-2));
+  color: var(--muted);
+}
+.pf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(208px, 1fr));
+  gap: var(--sp-6) var(--sp-4);
+  min-width: 0;
+  border-radius: var(--r);
+}
+.pf-grid:focus {
+  outline: none;
+}
+.pf-tile {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: var(--sp-2);
+  min-width: 0;
+  margin: calc(-1 * var(--sp-1));
+  padding: var(--sp-1);
+  border-radius: var(--r-lg);
+  cursor: pointer;
+  user-select: none;
+}
+.pf-tile:hover,
+.pf-tile.menu-open,
+.pf-tile.active {
+  background: var(--sel);
+}
+.pf-tile.picked,
+.pf-tile.checked {
+  background: var(--sel-on);
+}
+.pf-grid:focus-visible .pf-tile.active {
+  box-shadow: inset 0 0 0 1.5px var(--line-3);
+}
+.pf-tile-pic {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  border-radius: calc(var(--r-lg) - var(--sp-1));
+  background: var(--ink-3);
+  color: var(--muted);
+  overflow: hidden;
+  cursor: zoom-in;
+}
+.pf-tile-pic.dir {
+  cursor: pointer;
+}
+/* pictures on a dark frame, as a player shows them */
+.pf-tile-pic.pic {
+  background: color-mix(in srgb, var(--cast) 92%, var(--hi));
+}
+.pf-tile-pic > .pf-scrub {
+  position: absolute;
+  inset: 0;
+}
+.pf-tile-glyph {
+  display: grid;
+  place-items: center;
+}
+.pf-tile.dir .pf-tile-glyph {
+  color: var(--fg-2);
+}
+.pf-mosaic {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: var(--sp-0_5);
+}
+.pf-mosaic.n1 {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
+.pf-mosaic.n2 {
+  grid-template-rows: 1fr;
+}
+.pf-mosaic.n3 > img:first-child {
+  grid-row: span 2;
+}
+.pf-mosaic > img {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  object-fit: cover;
+}
+.pf-tile-badges {
+  position: absolute;
+  right: var(--sp-2);
+  bottom: var(--sp-2);
+  left: var(--sp-2);
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  pointer-events: none;
+}
+.pf-tile-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: 18px;
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--cast) 62%, transparent);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--hi);
+}
+.pf-tile-pic:not(.pic) .pf-tile-badge {
+  background: var(--ink-1);
+  color: var(--fg-2);
+}
+.pf-tile .pf-c-tick {
+  position: absolute;
+  top: var(--sp-2);
+  left: var(--sp-2);
+  width: var(--ic);
+  height: var(--ic);
+}
+.pf-tile:hover .pf-tick,
+.pf-tile.active .pf-tick,
+.pf-grid.picking .pf-tick {
+  opacity: 1;
+}
+.pf-tile-acts {
+  position: absolute;
+  top: var(--sp-1);
+  right: var(--sp-1);
+  visibility: hidden;
+}
+.pf-tile:hover .pf-tile-acts,
+.pf-tile.active .pf-tile-acts,
+.pf-tile.menu-open .pf-tile-acts {
+  visibility: visible;
+}
+.pf-tile-more.btn {
+  border: 0;
+  background: color-mix(in srgb, var(--cast) 55%, transparent);
+  color: var(--hi);
+}
+@media (hover: none) and (pointer: coarse) {
+  .pf-tile-acts {
+    visibility: visible;
+  }
+  /* a small mark on the picture, a finger's place to tap around it */
+  .pf-tile .pf-tile-more.btn {
+    position: relative;
+    width: var(--h-sm);
+    min-width: 0;
+    height: var(--h-sm);
+    min-height: 0;
+  }
+  .pf-tile .pf-tile-more.btn::after {
+    content: '';
+    position: absolute;
+    inset: calc((var(--h-sm) - var(--h-touch)) / 2);
+  }
+  .pf-grid:not(.picking) .pf-tile:not(.checked) .pf-tick:not(.on) {
+    opacity: 0;
+  }
+}
+.pf-tile-text {
+  display: grid;
+  gap: var(--sp-0_5);
+  min-width: 0;
+  padding: 0 var(--sp-1) var(--sp-1);
+}
+.pf-tile-name {
+  display: flex;
+  min-width: 0;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-ui);
+  color: var(--fg);
+}
+.pf-cut-a {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+.pf-cut-b {
+  flex: none;
+  white-space: pre;
+}
+.pf-tile-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.pf-tile.pending,
+.pf-tile.going {
+  cursor: default;
+}
+.pf-tile.going:hover {
+  background: transparent;
+}
+.pf-tile.going .pf-tile-pic {
+  cursor: default;
+}
+.pf-tile-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: var(--fg-2);
+}
+.pf-tile.pending .pf-tile-pic {
+  background: var(--ink-2);
+}
+.pf-tile .sk {
+  display: block;
+  width: 60%;
+  height: 10px;
+  border-radius: var(--r-sm);
+  background: var(--ink-3);
+}
+@container pf (max-width: 600px) {
+  .pf-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-4) var(--sp-3);
+  }
+  .pf-tile-name {
+    font-size: var(--fs-sm);
+  }
+  .pf-tile-meta {
+    font-size: var(--fs-xs);
+  }
+}
+
+/* ---------------------------------------------------------------- a row's larger picture, beside its name */
+
+.pf-peek {
+  position: fixed;
+  z-index: var(--z-menu);
+  display: grid;
+  gap: var(--sp-0_5);
+  width: 320px;
+  padding: var(--sp-2);
+  border: 1px solid var(--float-line);
+  border-radius: var(--r-lg);
+  background: var(--float-bg);
+  box-shadow: var(--shadow-float);
+  pointer-events: none;
+  animation: pf-peek-in var(--dur) var(--ease-out);
+}
+@keyframes pf-peek-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.pf-peek-pic {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  margin-bottom: var(--sp-1);
+  border-radius: calc(var(--r-lg) - var(--sp-2));
+  background: color-mix(in srgb, var(--cast) 92%, var(--hi));
+  overflow: hidden;
+}
+.pf-peek-pic > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+/* a clip's frames, flipped through as a short silent preview */
+.pf-peek-flip {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  background-size: 800% 100%;
+  animation: pf-flip 1.6s steps(8, jump-none) infinite;
+}
+@keyframes pf-flip {
+  from {
+    background-position: 0% 0;
+  }
+  to {
+    background-position: 100% 0;
+  }
+}
+.pf-peek-name {
+  padding: 0 var(--sp-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-ui);
+  color: var(--fg);
+}
+.pf-peek-facts {
+  padding: 0 var(--sp-1) var(--sp-1);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
 }

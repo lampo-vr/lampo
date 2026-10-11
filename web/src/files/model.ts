@@ -231,19 +231,58 @@ export function againAt(at: number, now = Date.now()): string {
 // ---------------------------------------------------------------- the list
 
 export type SortBy = 'name' | 'size' | 'changed';
+export type SortDir = 'asc' | 'desc';
+/** How the list is ordered: by a column, one way or the other. */
+export interface Order {
+  by: SortBy;
+  dir: SortDir;
+}
+/** Each column's first way: names A to Z, the largest first, the newest first. */
+export const firstDir = (by: SortBy): SortDir => (by === 'name' ? 'asc' : 'desc');
+/** A column's header pressed: that column its first way, or the other way when it is the order already. */
+export const nextOrder = (o: Order, by: SortBy): Order => (o.by === by ? { by, dir: o.dir === 'asc' ? 'desc' : 'asc' } : { by, dir: firstDir(by) });
+/** An order as kept ("size:asc"), and read back ("size" alone: its first way; anything else: by name). */
+export const orderWord = (o: Order): string => (o.dir === firstDir(o.by) ? o.by : `${o.by}:${o.dir}`);
+export function orderOf(word: string | null): Order {
+  const [by, dir] = (word ?? '').split(':');
+  const b: SortBy = by === 'size' || by === 'changed' ? by : 'name';
+  return { by: b, dir: dir === 'asc' || dir === 'desc' ? dir : firstDir(b) };
+}
 
 const collator = () => new Intl.Collator(locale(), { numeric: true, sensitivity: 'base' });
 
-/** Files in the list's order: by name (numbers as numbers: A001C2 before A001C10), size (largest first) or the newest. */
-export function sortFiles<T extends { path: string; size: number; at: string }>(files: T[], by: SortBy): T[] {
+/**
+ * Files in the list's order: by name (numbers as numbers: A001C2 before A001C10), size or when they changed, each way
+ * (`dir`; by default its first: A to Z, the largest, the newest). Ties go by name, A to Z.
+ */
+export function sortFiles<T extends { path: string; size: number; at: string }>(files: T[], by: SortBy, dir: SortDir = firstDir(by)): T[] {
   const c = collator();
   const byName = (a: T, b: T) => c.compare(nameOf(a.path), nameOf(b.path));
-  return [...files].sort((a, b) => (by === 'size' ? b.size - a.size : by === 'changed' ? Date.parse(b.at) - Date.parse(a.at) : 0) || byName(a, b));
+  const sign = dir === firstDir(by) ? 1 : -1;
+  const key = (a: T, b: T) => (by === 'size' ? b.size - a.size : by === 'changed' ? Date.parse(b.at) - Date.parse(a.at) : byName(a, b));
+  return [...files].sort((a, b) => sign * key(a, b) || byName(a, b));
 }
 
-export function sortDirs<T extends { path: string; bytes: number }>(dirs: T[], by: SortBy): T[] {
+/** Folders the same way: by everything in them (their size, their newest file), or by name. */
+export function sortDirs<T extends { path: string; bytes: number; changed?: { at: string } }>(dirs: T[], by: SortBy, dir: SortDir = firstDir(by)): T[] {
   const c = collator();
-  return [...dirs].sort((a, b) => (by === 'size' ? b.bytes - a.bytes : 0) || c.compare(nameOf(a.path), nameOf(b.path)));
+  const byName = (a: T, b: T) => c.compare(nameOf(a.path), nameOf(b.path));
+  const sign = dir === firstDir(by) ? 1 : -1;
+  const when = (x: T) => (x.changed ? Date.parse(x.changed.at) : 0);
+  const key = (a: T, b: T) => (by === 'size' ? b.bytes - a.bytes : by === 'changed' ? when(b) - when(a) : byName(a, b));
+  return [...dirs].sort((a, b) => sign * key(a, b) || byName(a, b));
+}
+
+/** The kinds a row shows a poster of (where the server has one): footage and pictures. */
+export const pictured = (kind: FileKind): boolean => kind === 'footage' || kind === 'image';
+
+/** A clip's or a sound's length as a player says it: "0:32", "12:04", "1:02:03". */
+export function lengthOf(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
 }
 
 /** The names of a path as a breadcrumb: [["Footage", "Footage"], ["Day 1", "Footage/Day 1"]]. */

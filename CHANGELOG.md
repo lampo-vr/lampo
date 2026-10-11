@@ -25,9 +25,21 @@ format stays backwards compatible throughout.
   says "excl. VAT" too; a switch that ends a trial says what is charged now with VAT.
 - A project's Videos, Files and Playbook tabs are one page: each starts with a toolbar in the same place and of the
   same height, and its content starts at the same edge, so switching tabs moves nothing — not while a tab loads either.
-- The Files page looks like the Videos tab: search, the kinds as quick views, the order and Add files in one toolbar;
-  the list under a heading that says where you are, what it holds and how much of the plan's storage is in use; an
-  empty project gets the Videos tab's empty state, with the terminal command as its quiet last line.
+- The Files page looks like the Videos tab: search, the kinds as quick views and Add files in one toolbar, and an
+  empty project gets the Videos tab's empty state.
+- The Files list reads at a glance: Name, Size and Changed side by side, and clicking a column's name orders the list
+  by it (again for the other way, an arrow says which). A folder says how many files it holds and who changed it last
+  and when, as a file does. A row's Download, Copy for an agent and ⋯ show under the pointer and from the keyboard.
+  Footage and pictures show a small picture of themselves, footage and sound their length. What the plan's storage
+  holds is a bar at the list's foot ("310 GB of 2.5 TB", amber near the limit, a way to Billing), and the trash beside
+  it says that it doesn't count toward it. Files from the project or the House above read "Also here, from the Acme
+  project", with one plain line on which file is used when both have one of the same name.
+- Files can be a grid or a list, as in Finder: the switch in the toolbar (⌘1 grid, ⌘2 list), kept per folder. A
+  folder where footage and pictures are most of what it holds opens as a grid: big pictures with their length and
+  size, the name under each, a folder as a mosaic of the first pictures inside it, and a clip shows its frames as the
+  pointer moves across it. In the list, a clip's or a picture's row shows it larger beside its name after a moment's
+  rest (a clip flips through its frames). Space opens Quick Look on any file: a clip plays, a picture fills the room, a
+  sound shows its waveform; ← → go through the folder, Esc closes, and Details opens the file beside the list.
 - A project's Files and Playbook tabs open drawn: the page asks for them once it is idle.
 - The command for Claude Code adds Lampo for every folder you open (`claude mcp add --scope user …`), not only the
   one you were in when you added it.

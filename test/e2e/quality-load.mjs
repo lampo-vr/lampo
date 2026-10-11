@@ -270,8 +270,9 @@ try {
         ],
       },
       {
-        // A project's files: the toolbar (search, the kinds, the order, Add files), the list's heading, the columns and
-        // the first row stand where they will while the files and the page's code arrive.
+        // A project's files: the toolbar (search, the kinds, Add files), the columns' row (what the list holds beside
+        // Name; a phone's count and order) and the first row stand where they will while the files and the page's code
+        // arrive.
         name: 'folder files',
         url: SCREENS['folder files'],
         ready: ready['folder files'],
@@ -283,8 +284,7 @@ try {
           { name: 'files toolbar', sel: '[data-testid=files] .pf-toolbar', every: true },
           { name: 'files search', sel: '[data-testid=files-search]', every: true },
           { name: 'add files', sel: '[data-testid=files-add]', every: true },
-          { name: 'files heading', sel: '[data-testid=files] .pf-shead', every: true },
-          { name: 'columns', sel: '[data-testid=files] .pf-cols', every: true, wide: true },
+          { name: 'columns', sel: '[data-testid=files] .pf-cols', every: true },
           { name: 'first row', sel: '[data-testid=files-list] .pf-row:not(.pf-cols)', every: true },
         ],
       },
