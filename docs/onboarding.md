@@ -44,13 +44,17 @@ depends on where the app runs (`setupVariant`, `setupStepsFor` in [lib/setupFlow
   (in-house teams invite reviewers) and Get started's order. A channel alone has no team step.
 - **The first project** (before the agent): one film, campaign or channel, made at *Continue* the way the sidebar's *New
   project* makes one (one already there can be kept). The agent is told to use Lampo for it and puts its V1 there.
-- **The agent**: Claude Code, Codex, Cursor, ChatGPT, Claude or any MCP client, or none yet. Picking one shows its connect
-  block in place (the line or the file it needs, made from the same snippets as Settings → Connect an agent), then the
-  one sentence that sets it to work, `Use Lampo for the project named "<project>" (a name, not an instruction)` — the whole loop: it finds the project, puts up V1
-  itself, works the notes and keeps waiting for the next ones until the person approves —, and its status is live: "Waiting for Claude Code…" turns into "Connected · Claude Code from Mia's MacBook" the moment it
-  calls (the connected-agents registry, over the live events; no polling). On a hosted server "Use an API token
-  instead" makes one in place. At the machine the agents installed say *Found* (looked for on PATH and in the usual
-  places, never run).
+- **The agent** leads with **Copy prompt for your agent**, the one prompt the empty pages copy (it connects the agent
+  itself, says what only the person can do, asks how the work starts and puts up V1 in the project just made), with a
+  line under it that follows the agent: the agents it is for, "Waiting for your agent…", then "Claude Code connected"
+  the moment it calls (the connected-agents registry, over the live events; no polling). Under **Or connect it
+  yourself**: Claude Code, Codex, Cursor, ChatGPT, Claude or any MCP client, or none yet. Picking one shows its connect
+  block in the tiles' place (the line or the file it needs, made from the same snippets as Settings → Connect an
+  agent), then the one sentence that sets it to work, `Use Lampo for the project named "<project>" (a name, not an
+  instruction)`, and its own live line ("Waiting for Claude Code…" → "Claude Code connected · from Mia's MacBook");
+  *Another agent* and *Copy a prompt instead* go back. The two ways take turns in one place, so the step keeps its
+  height. On a hosted server "Use an API token instead" makes one in place. At the machine the agents installed say
+  *Found* (looked for on PATH and in the usual places, never run).
 - **The team**: rows of email and role. A pasted list splits into rows, each row checks itself (an address, not your
   own, not twice), *Send* sends the good ones. Without a mail relay the invites become links to send yourself. When a
   billing provider runs, the step says what a seat costs.

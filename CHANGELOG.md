@@ -36,6 +36,19 @@ format stays backwards compatible throughout.
   frame-exact. The rest of the page follows when you scroll. The timeline's zoom is one button in the row of In, Out,
   loop, speed and sound — zoom in, and zoomed, back to the whole video — so its row above the timeline is gone and the
   picture has that much more room (a tall or square video shows that much bigger).
+- The first run's agent step leads with Copy prompt for your agent, as an empty page does, and the line under it follows
+  the agent until it connects. The agents to connect yourself sit under "Or connect it yourself"; picking one opens its
+  setup in their place, and the step keeps its height either way.
+- A connected agent shows the app's quiet way in the first run and Get started: one line with its status keyframe
+  ("Claude Code connected · just now"), no green box. On the agent step that line and the picture say it once: the
+  agent's tile shows only its status keyframe, and no toast repeats it.
+- The first run's Welcome shows the loop as Lampo draws it: the frame, and under it V1 and V2 as lanes with one
+  playhead through the note's frame. Beside it only the headline, its sentence and the way on; the list of the steps
+  ahead is gone (the line under the button still counts them).
+- "Who are the videos for?" draws a frame for each choice, Something else too (it turns into a title card of what you
+  type), and names all four on one line. With Something else picked too it reads "Review links lead.", not "leads".
+- The team step's picture shows the people it asks for (your editor, your producer, whoever approves), each place taken
+  by an invite as you type it, beside a frame with everyone's pins.
 
 ### Added
 - **Start with your agent in one paste.** An empty library, project or folder leads with **Copy prompt for your

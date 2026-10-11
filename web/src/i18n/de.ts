@@ -3372,6 +3372,12 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   '{n} to fix, whenever you like': '{n} zu beheben, wann immer du willst',
   '{n} video linked from {folder}|{n} videos linked from {folder}': '{n} Video aus {folder} verknüpft|{n} Videos aus {folder} verknüpft',
   '{name} connected': '{name} verbunden',
+  'A note on a frame': 'Eine Notiz auf einem Frame',
+  'Your agent’s fix, your check': 'Die Korrektur deines Agents, deine Prüfung',
+  'Your editor': 'Wer schneidet',
+  'Your producer': 'Wer produziert',
+  'Whoever approves': 'Wer freigibt',
+  'Hold the logo a beat longer': 'Logo einen Moment länger halten',
   '{name} is connected': '{name} ist verbunden',
   '{name} is in the library. Pin a note on a frame: press C where something should change.':
     '{name} ist in der Bibliothek. Heft eine Notiz an einen Frame: Drück C, wo sich etwas ändern soll.',
@@ -3385,31 +3391,14 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   '{plan} trial · {n} day left|{plan} trial · {n} days left': '{plan}-Testphase · noch {n} Tag|{plan}-Testphase · noch {n} Tage',
   '{role} · 7 days': '{role} · 7 Tage',
   '{what} lead.': '{what} stehen vorn.',
-  '{what} leads.': '{what} steht vorn.',
   '{word} — connect later': '{word} – später verbinden',
   '<0>{url}</0> · review links and emails point here.': '<0>{url}</0> · Review-Links und E-Mails zeigen hierher.',
   '<0>{url}</0> isn’t https: review links work, chat apps can’t connect.':
     '<0>{url}</0> ist kein https: Review-Links funktionieren, Chat-Apps können sich nicht verbinden.',
-  '<0>Check</0> the server': 'Den Server <0>prüfen</0>',
-  '<0>Connect</0> agents': 'Agents <0>verbinden</0>',
-  '<0>Invite</0> the team': 'Das Team <0>einladen</0>',
-  '<0>Name</0> the workspace': 'Den Workspace <0>benennen</0>',
-  '<0>Name</0> your workspace': 'Deinen Workspace <0>benennen</0>',
-  '<0>The library</0>: {name}’s videos and a sample': '<0>Die Bibliothek</0>: die Videos von {name} und ein Beispiel',
-  '<0>The library</0>: the team’s videos and a sample': '<0>Die Bibliothek</0>: die Videos des Teams und ein Beispiel',
-  '<0>The sample</0>: the whole loop': '<0>Das Beispiel</0>: der ganze Ablauf',
   '<0>lampo mcp config vscode</0> prints a ready setup; also antigravity, windsurf, gemini, zed.':
     '<0>lampo mcp config vscode</0> gibt eine fertige Einrichtung aus; ebenso antigravity, windsurf, gemini, zed.',
-  '<0>Where</0> your exports land': '<0>Wo</0> deine Exporte landen',
-  '<0>Which agent</0> you use': '<0>Welchen Agent</0> du nutzt',
-  '<0>Who</0> the videos are for': '<0>Für wen</0> die Videos sind',
-  '<0>Who</0> works with you': '<0>Wer</0> mit dir arbeitet',
-  '<0>Your agent</0>, connected in a line': '<0>Dein Agent</0>, mit einer Zeile verbunden',
-  '<0>Your agent</0>, found on this computer': '<0>Dein Agent</0>, auf diesem Computer gefunden',
-  '<0>Your agent</0>, found on this Mac': '<0>Dein Agent</0>, auf diesem Mac gefunden',
   '9:16 versions': '9:16-Versionen',
   'A creator. Mostly you, sometimes an editor.': 'Creator. Meist du, manchmal mit Cutter.',
-  'A note on a frame, your agent’s fix, your check': 'Eine Notiz auf einem Frame, die Korrektur deines Agents, deine Prüfung',
   'A note on a frame, your agent’s fix, your check.': 'Eine Notiz auf einem Frame, die Korrektur deines Agents, deine Prüfung.',
   'A note on an exact frame. {agent}’s fix in V2. Your check, before and after. Your own videos work the same way.':
     'Eine Notiz auf einem exakten Frame. Die Korrektur von {agent} in V2. Deine Prüfung, vorher und nachher. Mit deinen eigenen Videos geht es genauso.',
@@ -3439,7 +3428,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'An agency or studio. The brands you make videos for review through a link.':
     'Agentur oder Studio. Die Marken, für die du Videos machst, prüfen über einen Link.',
   'An in-house team. Marketing, product and legal sign off.': 'Inhouse-Team. Marketing, Produkt und Legal geben frei.',
-  And: 'Und',
   'Another agent': 'Anderer Agent',
   'Another folder…': 'Anderer Ordner …',
   'Any agent, when you’re ready': 'Jeder Agent, wenn du so weit bist',
@@ -3466,7 +3454,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Connect your team’s agents': 'Verbinde die Agents deines Teams',
   Connected: 'Verbunden',
   connected: 'verbunden',
-  'Connected · {name}': 'Verbunden · {name}',
   Continue: 'Weiter',
   'Create {n} invite|Create {n} invites': '{n} Einladung erstellen|{n} Einladungen erstellen',
   'Create a review link for {name}': 'Review-Link für {name} erstellen',
@@ -3523,8 +3510,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'It opens on your network, or anywhere once the tunnel is on.': 'Er öffnet in deinem Netzwerk, oder überall, sobald der Tunnel an ist.',
   'It reads a note the moment it’s sent, fixes the video and puts up V2. You check.':
     'Er liest eine Notiz, sobald sie gesendet ist, korrigiert das Video und stellt V2 hoch. Du prüfst.',
-  'It reads your notes, fixes the video and renders the next version. Pick it, and connect it right here.':
-    'Er liest deine Notizen, korrigiert das Video und rendert die nächste Version. Wähl ihn und verbinde ihn gleich hier.',
   'It runs on this machine, and you’re signed in already. <0>No account; your videos stay where they are.</0>':
     'Es läuft auf diesem Rechner, und du bist schon angemeldet. <0>Kein Konto; deine Videos bleiben, wo sie sind.</0>',
   'It signs in the first time, or takes an API token.': 'Er meldet sich beim ersten Mal an oder nimmt einen API-Token.',
@@ -3533,10 +3518,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Lampo fits its words and first steps to what you pick.': 'Lampo passt Wörter und erste Schritte an deine Auswahl an.',
   'Lampo links files where they are. Nothing is copied. Export to the same path again and it arrives as V2.':
     'Lampo verknüpft Dateien dort, wo sie liegen. Nichts wird kopiert. Exportier wieder auf denselben Pfad, und es kommt als V2 an.',
-  'Lampo looked on this computer. Pick one: it gets one line, and nothing to sign in.':
-    'Lampo hat auf diesem Computer nachgesehen. Wähl einen: Er bekommt eine Zeile, anmelden musst du nichts.',
-  'Lampo looked on this Mac. Pick one: it gets one line, and nothing to sign in.':
-    'Lampo hat auf diesem Mac nachgesehen. Wähl einen: Er bekommt eine Zeile, anmelden musst du nichts.',
   'Later: take it to a server or Lampo Cloud.': 'Später: auf einen Server oder in die Lampo Cloud umziehen.',
   'Link {n} video|Link {n} videos': '{n} Video verknüpfen|{n} Videos verknüpfen',
   'Link made. When they open it, you’ll see it here.': 'Link erstellt. Sobald er geöffnet wird, siehst du es hier.',
@@ -3631,7 +3612,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Skip this question': 'Frage überspringen',
   'Skip to the library': 'Direkt zur Bibliothek',
   'Some addresses need a look.': 'Einige Adressen brauchen einen Blick.',
-  'something else': 'etwas anderes',
   'Something else': 'Etwas anderes',
   'Speech engine': 'Spracherkennung',
   'Speech is off: voice notes keep their sound, without words.': 'Spracherkennung ist aus: Sprachnotizen behalten ihren Ton, ohne Text.',
@@ -3678,7 +3658,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Welcome · {name}': 'Willkommen · {name}',
   'Welcome to {name}': 'Willkommen bei {name}',
   'Welcome to {workspace}, {name}': 'Willkommen in {workspace}, {name}',
-  'What comes next': 'Was als Nächstes kommt',
   'What the videos are for': 'Wofür die Videos sind',
   'What your team will need, checked.': 'Was dein Team braucht, geprüft.',
   'What your team will need. Fix anything now or later: Settings → About shows this server’s state.':
@@ -4877,7 +4856,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   '{name} is ready: your agent puts its V1 there.': '{name} ist bereit: Dein Agent stellt seine V1 dort ein.',
   '{name} puts it here': '{name} stellt sie hier ein',
   '{name} puts up V1': '{name} stellt V1 ein',
-  '<0>Your first project</0>, for your agent’s V1': '<0>Dein erstes Projekt</0>, für die V1 deines Agenten',
   'Add a video yourself': 'Selbst ein Video hinzufügen',
   'Add it, then tell {name} the sentence above: it shows up here.': 'Füg es hinzu und sag {name} den Satz oben: Dann erscheint er hier.',
   'Add it, then tell it the sentence above: it shows up here.': 'Füg es hinzu und sag ihm den Satz oben: Dann erscheint er hier.',

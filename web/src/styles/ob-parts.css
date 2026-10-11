@@ -270,63 +270,34 @@
 .ob-copy.ob-done {
   color: var(--ok);
 }
+/* an agent's live status (parts.tsx Live): a line, never a box — the keyframe glyph says the state and carries the
+   colour, the words stay quiet */
 .ob-live {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  display: flex;
   align-items: center;
-  gap: var(--sp-0_5) var(--sp-3);
-  padding: var(--sp-3);
-  border-radius: var(--r);
-  background: var(--ink-2);
-  box-shadow: inset 0 0 0 1px var(--line);
+  gap: var(--sp-2);
+  min-width: 0;
+  min-height: var(--h-sm);
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-ui);
+  color: var(--muted);
+  text-wrap: pretty;
 }
 .ob-live .kg {
-  --kg-size: 14px;
-  grid-row: span 2;
+  --kg-size: 10px;
+  flex: none;
   color: var(--muted);
 }
 .ob-live b {
   font-weight: var(--fw-ui);
-  color: var(--fg);
-}
-.ob-live-sub {
-  font-size: var(--fs-sm);
-  color: var(--muted);
-}
-.ob-live-lane {
-  grid-column: 1 / -1;
-  position: relative;
-  height: 2px;
-  margin-top: var(--sp-2);
-  border-radius: 2px;
-  background: var(--line);
-  overflow: hidden;
-}
-.ob-live-lane::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 30%;
-  border-radius: 2px;
-  background: linear-gradient(90deg, transparent, var(--fg-2), transparent);
-  animation: ob-listen 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  color: var(--fg-2);
 }
 .ob-live[data-state='waiting'] .kg {
   animation: ob-breathe 1.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
 }
-.ob-live[data-state='connected'] {
-  background: var(--ok-bg);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 32%, transparent);
-}
 .ob-live[data-state='connected'] .kg {
   color: var(--ok);
-}
-.ob-live[data-state='connected'] .ob-live-lane {
-  background: color-mix(in srgb, var(--ok) 40%, transparent);
-}
-.ob-live[data-state='connected'] .ob-live-lane::after {
-  display: none;
 }
 .ob-track {
   position: relative;
@@ -445,9 +416,6 @@
   color: var(--fg);
   text-decoration-color: currentColor;
 }
-.ob-reveal {
-  min-width: 0;
-}
 .ob-connect {
   display: grid;
   gap: var(--sp-3);
@@ -491,12 +459,6 @@
 .ob-connect > .ob-btn.ob-raised {
   justify-self: start;
 }
-.ob-connect .ob-live {
-  background: var(--ink-1);
-}
-.ob-connect .ob-live[data-state='connected'] {
-  background: var(--ok-bg);
-}
 .ob-connect .ob-fine {
   margin: 0;
 }
@@ -527,70 +489,6 @@
   background: var(--ink-4);
   color: var(--fg-2);
   font: var(--fw-strong) var(--fs-xs) / 1 var(--ui);
-}
-.ob-live.ob-compact {
-  grid-template-columns: auto auto minmax(0, 1fr);
-  gap: var(--sp-0_5) var(--sp-2);
-  padding: var(--sp-2) var(--sp-3);
-}
-.ob-live.ob-compact .kg {
-  grid-row: auto;
-  --kg-size: 12px;
-}
-.ob-live.ob-compact .ob-live-sub {
-  min-width: 0;
-}
-.ob-live.ob-compact .ob-live-lane {
-  margin-top: calc(var(--sp-1) + var(--sp-0_5));
-}
-@container (max-width: 480px) {
-  .ob-live.ob-compact {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-  .ob-live.ob-compact .ob-live-sub {
-    grid-column: 2;
-  }
-}
-.ob-live,
-.ob-live.ob-compact {
-  grid-template-columns: auto minmax(0, max-content) minmax(0, 1fr);
-  align-items: center;
-  gap: var(--sp-0_5) var(--sp-2);
-  padding: var(--sp-2) var(--sp-3);
-}
-.ob-live .kg,
-.ob-live.ob-compact .kg {
-  grid-row: auto;
-  --kg-size: 12px;
-}
-.ob-live b {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.ob-live .ob-live-sub {
-  justify-self: end;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: right;
-}
-.ob-live-lane {
-  display: none;
-}
-@container (max-width: 560px) {
-  .ob-live,
-  .ob-live.ob-compact {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-  .ob-live .ob-live-sub,
-  .ob-live.ob-compact .ob-live-sub {
-    grid-column: 2;
-    justify-self: start;
-    text-align: left;
-    white-space: normal;
-  }
 }
 .ob-cmd,
 .ob-cmd.ob-multi {
@@ -651,14 +549,6 @@
   from {
     opacity: 0;
     transform: translateX(16px);
-  }
-}
-@keyframes ob-listen {
-  from {
-    left: -30%;
-  }
-  to {
-    left: 100%;
   }
 }
 @keyframes ob-spin {

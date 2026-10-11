@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// covers: web/src/sessions/agentStart.tsx web/src/library/Library.tsx web/src/settings/Mcp.tsx web/src/onboarding/GetStarted.tsx web/src/styles/agentstart.css lib/mcpConfig.ts
+// covers: web/src/sessions/agentStart.tsx web/src/library/Library.tsx web/src/settings/Mcp.tsx web/src/onboarding/GetStarted.tsx web/src/onboarding/steps.tsx web/src/styles/agentstart.css lib/mcpConfig.ts
 // One prompt starts the agent's work wherever it is offered. An empty library leads with it: the one raised button
 // copies it, the line right under it follows the agent (the agents it is for → waiting for one → the agent connected,
 // what it does), then Connect your agent (the setup by hand), then adding a video yourself, quieter. On the machine the
 // prompt points at this app with nothing to sign in; on a hosted server at its /mcp, signing in being the person's, and
 // never a token. A heartbeat or a real MCP client moves the line from waiting to connected; the agent's V1 ends the
-// empty page. The layout at 390/768/1024/1440/1920 in both themes, German too; Connect an agent and Get started's
-// agent step lead with the same copy. Screenshots land in VR_SHOTS.
+// empty page. The layout at 390/768/1024/1440/1920 in both themes, German too; Connect an agent, Get started's agent
+// step and the setup's agent step lead with the same copy. Screenshots land in VR_SHOTS.
 import path from 'node:path';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { makeVideo } from '../lib/helpers.ts';
@@ -311,6 +311,40 @@ try {
     });
     assert(order.copy > 0 && order.line > order.copy && order.picks > order.line, JSON.stringify(order));
     await shot(p, 'getstarted-agent-1440-light');
+    await p.browserContext().close();
+  });
+
+  await check('the setup’s agent step leads with the same copy: the prompt, its line, then “Or connect it yourself” and the tiles', async () => {
+    const p = await fresh(gs);
+    await p.goto(`${gs.base}/#/welcome/agents`, { waitUntil: 'domcontentloaded' });
+    await p.waitForSelector('[data-testid=ob-setup][data-step=agents] [data-testid=ob-copy-prompt]', { timeout: 15000 });
+    await settle(p, { quiet: 300 });
+    const at = () =>
+      p.evaluate(() => {
+        const box = (s) => document.querySelector(s)?.getBoundingClientRect();
+        const copy = box('[data-testid=ob-copy-prompt]');
+        return {
+          copy: { top: copy.top, width: copy.width },
+          line: box('[data-testid=ob-agent-line]').top,
+          or: box('.ob-or').top,
+          tiles: box('[data-testid=ob-agent-tiles]').top,
+          text: document.querySelector('[data-testid=ob-agent-line]').textContent.trim(),
+        };
+      });
+    const before = await at();
+    assert(before.line > before.copy.top && before.or > before.line && before.tiles > before.or, JSON.stringify(before));
+    await p.click('[data-testid=ob-copy-prompt]');
+    await p.waitForSelector('[data-testid=ob-agent-line][data-state=waiting]', { timeout: 5000 });
+    const prompt = await clip(p);
+    assert(prompt.startsWith('Set up Lampo with me') && prompt.includes(`${gs.base}/mcp`), prompt);
+    const after = await at();
+    assert(after.text.startsWith('Waiting for your agent…'), after.text);
+    assert(
+      after.copy.top === before.copy.top && after.copy.width === before.copy.width && after.tiles === before.tiles,
+      `nothing moves when the line changes: ${JSON.stringify({ before, after })}`,
+    );
+    assert((await p.$eval('[data-testid=ob-next]', (e) => e.textContent)).includes('connect later'), 'on, and connect later');
+    await shot(p, 'setup-agent-1440-light');
     await p.browserContext().close();
   });
 

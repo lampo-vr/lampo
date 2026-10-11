@@ -49,10 +49,13 @@ function fit(pnl: HTMLElement) {
   }
   if (R <= L) return;
   const band = r.height < 360;
-  const availW = band ? r.width - 24 : r.width * 0.84;
+  // Welcome's picture is the first thing anyone sees: it takes a little more of the panel's width
+  const availW = band ? r.width - 24 : r.width * (pic.querySelector('.ob-hl') ? 0.9 : 0.84);
   const availH = band ? r.height - 20 : r.height * 0.7;
   // the caps keep a picture from looming on a laptop; a wide panel (1920 and up) lets it grow with the room
-  const cap = (pic.querySelector('.ob-wscard') ? 1.2 : 1.5) * Math.max(1, r.width / 1000);
+  // Welcome's picture stands beside the headline as one composition: on a wide screen it grows less, so the words keep
+  // their weight beside it
+  const cap = pic.querySelector('.ob-hl') ? 1.15 * Math.max(1, r.width / 1200) : (pic.querySelector('.ob-wscard') ? 1.2 : 1.5) * Math.max(1, r.width / 1000);
   const s = Math.max(0.3, Math.min(cap, availW / (R - L), availH / (B - T)));
   pnl.style.setProperty('--s', s.toFixed(3));
   pnl.style.setProperty('--dx', `${((320 - (L + R) / 2) * s).toFixed(1)}px`);
@@ -101,7 +104,6 @@ function Frame({
   fx,
   style,
   children,
-  tag,
 }: {
   x: number;
   y: number;
@@ -113,7 +115,6 @@ function Frame({
   fx?: number;
   style?: CSSProperties;
   children?: ReactNode;
-  tag?: string;
 }) {
   return (
     <div className={`ob-fr ${className}`} style={{ left: x, top: y, width: w + 20, height: h + 33, ...style }}>
@@ -126,7 +127,6 @@ function Frame({
       <span className="ob-fr-img" style={{ ...bg(f), ...(fx != null ? ({ '--fx': `${fx}%` } as CSSProperties) : {}) }}>
         {children}
       </span>
-      {tag && <span className="ob-pf-tag">{tag}</span>}
     </div>
   );
 }
@@ -404,6 +404,42 @@ export const SceneLoop = ({ cap }: { cap: string }) => (
   </>
 );
 
+/**
+ * Welcome: the loop as Lampo shows it — the frame, and under it the two versions as lanes of a graph editor, one
+ * playhead through both at the note's frame: on V1 the note's keyframe, on V2 the fix's, lit while the frame shows V2
+ * (the same slow crossfade). The lanes start and end with the picture, so the pin and its keyframes share one line.
+ */
+export function SceneHello() {
+  const x = 20;
+  const w = 600;
+  const h = Math.round(((w - 24) * 308) / 720) + 38;
+  const y = 16;
+  return (
+    <>
+      <Glow />
+      <Loop x={x} y={y} w={w} mode="cycle" />
+      <div className="ob-hl" style={{ left: x + 12, top: y + h + 20, width: w - 24 }} data-testid="ob-hello-lanes">
+        <span className="ob-hl-ruler" />
+        <span className="ob-hl-ph" />
+        <span className="ob-hl-lane ob-hl-v1">
+          <span className="ob-hl-name">V1</span>
+          <span className="ob-hl-key">
+            <KeyGlyph shape="diamond" className="ob-t-must" />
+            {t('A note on a frame')}
+          </span>
+        </span>
+        <span className="ob-hl-lane ob-hl-v2">
+          <span className="ob-hl-name">V2</span>
+          <span className="ob-hl-key">
+            <KeyGlyph shape="half" className="ob-t-ok" />
+            {t('Your agent’s fix, your check')}
+          </span>
+        </span>
+      </div>
+    </>
+  );
+}
+
 /** The agent step: the loop held at V1, "Waiting for X"; once X connects it plays over to V2 once. */
 export function SceneAgent({
   label,
@@ -412,28 +448,32 @@ export function SceneAgent({
 }: {
   label: string | null;
   mark: ReactNode;
-  /** none: nothing picked; none-yet: "None yet"; offline/blocked: it can't show up here; waiting; connected. */
-  state: 'none' | 'none-yet' | 'offline' | 'blocked' | 'waiting' | 'connected' | 'just';
+  /** none: nothing picked; none-yet: "None yet"; copied: the prompt is out, no agent here yet; offline/blocked: it
+   * can't show up here; waiting; connected (just: this moment). */
+  state: 'none' | 'none-yet' | 'copied' | 'offline' | 'blocked' | 'waiting' | 'connected' | 'just';
 }) {
   const mode = state === 'just' ? 'once' : state === 'connected' ? 'v2' : 'v1';
+  const on = state === 'connected' || state === 'just';
   const cap =
-    state === 'none' ? (
-      t('Your agent turns the note into V2')
-    ) : state === 'none-yet' ? (
-      t('Any agent, when you’re ready')
-    ) : state === 'blocked' ? (
-      t('{name} needs an https address', { name: label ?? '' })
-    ) : state === 'offline' ? (
-      t('{name} starts its own server here', { name: label ?? '' })
-    ) : state === 'waiting' ? (
-      t('Waiting for {name}', { name: label ?? '' })
-    ) : (
-      <span className="ob-ok">{t('{name} connected', { name: label ?? '' })}</span>
-    );
+    state === 'none'
+      ? t('Your agent turns the note into V2')
+      : state === 'none-yet'
+        ? t('Any agent, when you’re ready')
+        : state === 'copied'
+          ? t('Waiting for your agent…')
+          : state === 'blocked'
+            ? t('{name} needs an https address', { name: label ?? '' })
+            : state === 'offline'
+              ? t('{name} starts its own server here', { name: label ?? '' })
+              : state === 'waiting'
+                ? t('Waiting for {name}', { name: label ?? '' })
+                : t('{name} connected', { name: label ?? '' });
+  // connected, the quiet way: the status keyframe in its colour beside the words, as in every status line
+  const lead = on ? <KeyGlyph shape="diamond" className="ob-t-ok" /> : state === 'none' || state === 'none-yet' || state === 'copied' ? undefined : mark;
   return (
     <>
       <Glow />
-      <Loop mode={mode} cap={cap} mark={state === 'none' || state === 'none-yet' ? undefined : mark} />
+      <Loop mode={mode} cap={cap} mark={lead} />
     </>
   );
 }
@@ -507,60 +547,72 @@ export function Switcher({ name, sub }: { name: string; sub: string }) {
   );
 }
 
-/** Who the videos are for: three frames, the picked ones forward. */
+/**
+ * Who the videos are for: a frame for each of the four choices on one shelf — a review link's, a team's approval, a
+ * short in 9:16, and a slot for something else that, once picked, becomes a title card of the words typed — their
+ * names on one line under them. The picked ones come forward and their names light; the frames move, the names stay.
+ */
 export function ScenePersona({ picked, other }: { picked: string[]; other: string | null }) {
+  const on = (k: string) => (k === 'other' ? other !== null : picked.includes(k));
   const any = picked.length > 0 || other !== null;
-  const cls = (k: string) => `ob-pf ${any ? (picked.includes(k) ? 'ob-on' : 'ob-dim') : ''}`;
-  const lift = (k: string): CSSProperties | undefined => (picked.includes(k) ? { transform: 'translateY(-12px) scale(1.04)' } : undefined);
+  const cls = (k: string) => `ob-pf ${any ? (on(k) ? 'ob-on' : 'ob-dim') : ''}`;
+  const lift = (k: string): CSSProperties | undefined => (on(k) ? { transform: 'translateY(-12px) scale(1.04)' } : undefined);
+  // the shelf: frames standing on one line (y 330), their names on one line under it
+  const shelf = 330;
+  const tag = (k: string, x: number, w: number, words: string) => (
+    <span className={`ob-pf-name ${on(k) ? 'ob-on' : ''}`} style={{ left: x, width: w, top: shelf + 18 }}>
+      {words}
+    </span>
+  );
+  const words = other?.trim() ?? '';
   return (
     <>
       <Glow />
-      <Frame x={20} y={196} w={200} h={112} f={295} className={cls('agency')} style={lift('agency')} lit={picked.includes('agency')} tag={t('Link review')}>
-        <span className="ob-ov-chip" style={{ left: 8, bottom: 8 }}>
+      <Frame x={0} y={shelf - 123} w={160} h={90} f={295} className={cls('agency')} style={lift('agency')} lit={on('agency')}>
+        <span className="ob-ov-chip" style={{ left: 6, bottom: 6 }}>
           <span className="ob-av" aria-hidden="true">
             <I name="link" size={10} />
           </span>
           {t('Review link · 2 notes')}
         </span>
       </Frame>
-      <Frame
-        x={256}
-        y={196}
-        w={200}
-        h={112}
-        f={311}
-        className={cls('inhouse')}
-        style={lift('inhouse')}
-        lit={picked.includes('inhouse')}
-        tag={t('Team approval')}
-      >
-        <span className="ob-ov-chip" style={{ left: 8, bottom: 8 }}>
+      <Frame x={194} y={shelf - 123} w={160} h={90} f={311} className={cls('inhouse')} style={lift('inhouse')} lit={on('inhouse')}>
+        <span className="ob-ov-chip" style={{ left: 6, bottom: 6 }}>
           <KeyGlyph shape="diamond" className="ob-t-ok" />
           {t('Approved · Legal')}
         </span>
       </Frame>
-      <Frame
-        x={492}
-        y={116}
-        w={108}
-        h={192}
-        f={281}
-        fx={47}
-        className={cls('creator')}
-        style={lift('creator')}
-        lit={picked.includes('creator')}
-        tag={t('Shorts · 9:16')}
-      >
+      <Frame x={388} y={shelf - 168} w={76} h={135} f={281} fx={47} className={cls('creator')} style={lift('creator')} lit={on('creator')}>
         <span className="ob-safe" />
-        <span className="ob-ov-chip" style={{ left: 6, top: 6 }}>
+        <span className="ob-ov-chip" style={{ left: 5, top: 5 }}>
           9:16
         </span>
       </Frame>
-      {other !== null && (
-        <span className="ob-loop-cap" style={{ left: 20, width: 580, top: 400 }}>
-          {t('And')} <b>{other.trim() || t('something else')}</b>
-        </span>
-      )}
+      <div
+        className={`ob-fr ob-pf ob-pf-else ${other !== null ? '' : 'ob-dashed'} ${any ? (on('other') ? 'ob-on' : 'ob-dim') : ''}`}
+        style={{ left: 498, top: shelf - 123, width: 140, height: 123, ...lift('other') }}
+        data-testid="ob-persona-else"
+      >
+        {other === null ? (
+          <I name="plus" size={18} />
+        ) : (
+          <>
+            <span className="ob-fr-top">
+              <span>
+                F <b>0001</b>
+              </span>
+              <span>00:00:00</span>
+            </span>
+            <span className="ob-fr-img ob-pf-card">
+              <span className={`ob-ttl ob-pf-words ${words ? '' : 'ob-ph'}`}>{words || t('Tell us in a few words')}</span>
+            </span>
+          </>
+        )}
+      </div>
+      {tag('agency', 0, 180, t('Link review'))}
+      {tag('inhouse', 194, 180, t('Team approval'))}
+      {tag('creator', 388, 96, t('Shorts · 9:16'))}
+      {tag('other', 498, 140, t('Something else'))}
     </>
   );
 }
@@ -570,8 +622,11 @@ export interface TeamRow {
   role: string;
 }
 
-/** The team step: the workspace as a card of a stable height — you, three invitee slots (empty ones are ghosts) and a
- * footer that counts the rest as a stack of faces. Each invite carries a paper plane; on Send the planes fly. */
+/** The team step: what the team does together — one frame of the film with everyone's pins on it (yours, and a place
+ * for the next one's until an invite is ready) — and, in front of it, the workspace as a card of a stable height: you,
+ * three places for the people the lede names (your editor, your producer, whoever approves), each taken by an invite as
+ * it is typed, and a footer that counts the rest as a stack of faces. Each invite carries a paper plane; on Send the
+ * planes fly. */
 export function SceneTeam({
   name,
   sub,
@@ -588,10 +643,40 @@ export function SceneTeam({
   const n = invitees.length;
   const shown = invitees.slice(0, 3);
   const rest = invitees.slice(3);
+  // who the empty places are for, as the step's lede says it
+  const places = [
+    { who: t('Your editor'), role: t('Member') },
+    { who: t('Your producer'), role: t('Member') },
+    { who: t('Whoever approves'), role: t('Reviewer') },
+  ];
+  // where each one's pin sits on the frame: yours, then the next ones'
+  const at = [
+    { left: '66%', top: '70%' },
+    { left: '84%', top: '30%' },
+    { left: '44%', top: '18%' },
+  ];
   return (
     <>
       <Glow />
-      <div className="ob-sheet ob-wscard ob-team" style={{ left: 140, top: 70, width: 360 }} data-testid="ob-team-card">
+      <Frame x={204} y={30} w={364} h={205} f={281} className="ob-tm-frame">
+        <span className="ob-tm-pin ob-me" style={{ left: '24%', top: '46%' }}>
+          {initialsOf(me.name)}
+        </span>
+        <span className="ob-tm-note" style={{ left: '24%', top: '46%' }}>
+          {t('Hold the logo a beat longer')}
+        </span>
+        {shown.length
+          ? shown.map((r, i) => (
+              <span key={r.email} className="ob-tm-pin ob-arrive" style={{ ...at[i], animationDelay: `${60 + i * 60}ms` }}>
+                {initialsOf(r.email)}
+              </span>
+            ))
+          : null}
+        <span className={`ob-tm-pin ob-next ${shown.length < 3 ? '' : 'ob-gone'}`} style={at[Math.min(shown.length, 2)]}>
+          <I name="plus" size={12} />
+        </span>
+      </Frame>
+      <div className="ob-sheet ob-wscard ob-team" style={{ left: 24, top: 176, width: 352 }} data-testid="ob-team-card">
         <div className="ob-wsc-h">
           <span className="ob-ws-mark">{initialsOf(name)}</span>
           <b>{name}</b>
@@ -626,15 +711,15 @@ export function SceneTeam({
               </span>
             </li>
           ))}
-          {Array.from({ length: 3 - shown.length }, (_, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: the empty slots hold their places
-            <li key={`g${i}`} className="ob-wsc-row ob-ghost">
-              <span className="ob-av ob-ghost" />
-              <span className="ob-wsc-n">
-                <b className="ob-gbar" />
-                <small className="ob-gbar" />
+          {places.slice(shown.length).map((p) => (
+            <li key={p.who} className="ob-wsc-row ob-place">
+              <span className="ob-av ob-place-av">
+                <I name="plus" size={12} />
               </span>
-              <span className="ob-wsc-role" />
+              <span className="ob-wsc-n">
+                <b>{p.who}</b>
+              </span>
+              <span className="ob-wsc-role">{p.role}</span>
             </li>
           ))}
         </ul>

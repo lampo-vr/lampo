@@ -789,7 +789,6 @@ function AgentVideoPane({ ctx }: { ctx: PaneCtx }) {
       <Cmd text={lampoFor(project)} testid="ob-v1-tell" />
       {pick && where && (
         <Live
-          compact
           on={!!connected}
           label={agentLabel(pick) ?? t('your MCP client')}
           sub={

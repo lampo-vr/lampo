@@ -369,7 +369,7 @@ Findings of audit A13 (2026-10-05, `AUDITS.md`) and its verification rounds that
   folder before any video (`asks.json`), and notes made on a video after it moved, which a later export can't merge.)
 - The setup prompt (Copy prompt for your agent): whether the server's instructions also learn "no version yet: ask how
   the work starts" (an agent connected by hand skips that question today; it costs the instructions about 15 tokens over
-  their 480 budget), and whether the first run's own agent step (Welcome) leads with the same copy as Get started does.
+  their 480 budget). (The first run's own agent step now leads with the same copy as Get started does.)
 - What recovering an account does with what someone else made in it. A password reset (or Sign out everywhere) ends
   the account's sessions, API tokens, app connections, sign-in codes and push devices, but not the review links and
   webhooks made meanwhile: they belong to the workspace, not to a session, so a webhook keeps sending the workspace's

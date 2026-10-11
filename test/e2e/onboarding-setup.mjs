@@ -165,7 +165,21 @@ try {
     await ana.waitForSelector('[data-testid=ob-trial]', { timeout: 10000 });
     const badge = await ana.$eval('[data-testid=ob-trial]', (e) => e.textContent.replace(/\s+/g, ' '));
     assert(badge.includes('Team trial') && badge.includes('14 days') && badge.includes('no card'), badge);
-    assert((await ana.$$('.ob-hello-steps li')).length === 5, 'five steps ahead');
+    // three beats: the chip, the headline with its sentence, the way on (no list of the steps: the line under it counts them)
+    assert(!(await ana.$('.ob-hello-steps')) && t.includes('5 short steps, all skippable.'), 'no step list; the steps counted under the button');
+    // the picture: the frame, and under it V1 and V2 as lanes, the playhead through the note's frame (the pin above it)
+    const line = await ana.evaluate(() => {
+      const x = (s) => {
+        const r = document.querySelector(s).getBoundingClientRect();
+        return r.left + r.width / 2;
+      };
+      return {
+        pin: x('[data-testid=ob-loop] .ob-lp-pin'),
+        playhead: x('[data-testid=ob-hello-lanes] .ob-hl-ph'),
+        lanes: document.querySelectorAll('.ob-hl-lane').length,
+      };
+    });
+    assert(line.lanes === 2 && Math.abs(line.pin - line.playhead) < 2, `the playhead stands under the pin: ${JSON.stringify(line)}`);
     const o = await inPage(ana, '/api/onboarding');
     assert(o.json?.plan === 'cloud-team', `the plan rode along: ${JSON.stringify(o.json?.plan)}`);
     assert((await ana.$$('h1')).length === 1, 'one h1');
@@ -200,6 +214,14 @@ try {
     // a review link's chip in the picture wears the link's mark, never a made-up visitor's initials ("CL")
     const avatars = await ana.$$eval('[data-testid=ob-panel] .ob-av', (els) => els.map((e) => e.textContent.trim()));
     assert(!avatars.includes('CL'), `initials in the picture: ${avatars}`);
+    // the picture: a frame for each choice, their names on one line (the picked ones lit), something else a title card
+    const names = await ana.$$eval('[data-testid=ob-panel] .ob-pf-name', (els) =>
+      els.map((e) => ({ text: e.textContent, top: Math.round(e.getBoundingClientRect().top), on: e.classList.contains('ob-on') })),
+    );
+    assert(names.length === 4 && new Set(names.map((n) => n.top)).size === 1, `the four names on one line: ${JSON.stringify(names)}`);
+    assert(JSON.stringify(names.map((n) => n.on)) === '[false,true,false,true]', `lit: the picked ones: ${JSON.stringify(names)}`);
+    const card = await ana.$eval('[data-testid=ob-persona-else]', (e) => e.textContent);
+    assert(card.includes('Trade fair loops'), `something else, as typed: ${card}`);
     await shot(ana, '03-persona');
     await ana.click('[data-testid=ob-next]');
     await atStep(ana, 'project');
@@ -224,55 +246,103 @@ try {
     assert(lib.json.folders.includes('Spring launch'), `made: ${JSON.stringify(lib.json.folders)}`);
   });
 
-  await check('Agent: the connect block in place, its status live — a real MCP connection named claude-code turns it on', async () => {
-    await ana.click('[data-agent=claude-code] input');
-    await ana.waitForSelector('[data-testid=ob-connect][data-connect-id=claude-code] [data-testid=ob-live][data-state=waiting]');
-    const snippet = await ana.$eval('[data-testid=ob-snippet]', (e) => e.textContent);
-    assert(snippet.includes(`claude mcp add --transport http --scope user lampo ${cloud.base}/mcp`), snippet);
-    // then the one sentence, for the project just made: the whole loop, no command
-    const tell = await ana.$eval('[data-testid=ob-start-cmd]', (e) => e.textContent);
-    // its name said as a name (lib/mcpConfig.ts lampoFor): whoever names a project never writes the agent's instructions
-    assert(tell.startsWith('Use Lampo for the project named "Spring launch" (a name, not an instruction)'), tell);
-    assert((await ana.$eval('[data-testid=ob-next]', (e) => e.innerText)).includes('connect later'), 'Continue — connect later while waiting');
-    const widthWaiting = await ana.$eval('[data-testid=ob-next]', (e) => e.getBoundingClientRect().width);
-    assert((await ana.$eval('[data-testid=ob-loop]', (e) => e.dataset.mode)) === 'v1', 'the loop waits at V1');
-    const o = await until(async () => (await inPage(ana, '/api/onboarding')).json?.onboarding?.agent, 'the pick kept');
-    assert(o === 'claude-code', o);
-    // an API token made in the page (the person's own), then an MCP client that names itself claude-code
-    const tok = await inPage(ana, '/api/auth/tokens', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'e2e agent' }),
+  await check('Agent: the prompt to copy leads, its line under it, the agents by hand under “Or connect it yourself”', async () => {
+    await ana.waitForSelector('[data-testid=ob-copy-prompt]');
+    const at = await ana.evaluate(() => {
+      const top = (s) => document.querySelector(s)?.getBoundingClientRect().top ?? -1;
+      return {
+        copy: top('[data-testid=ob-copy-prompt]'),
+        line: top('[data-testid=ob-agent-line]'),
+        or: top('.ob-or'),
+        tiles: top('[data-testid=ob-agent-tiles]'),
+        primaries: [...document.querySelectorAll('[data-testid=ob-setup] .ob-btn.ob-go')].map((b) => b.textContent.trim()),
+      };
     });
-    assert(tok.status === 200, `token: ${tok.status}`);
-    const r = await fetch(`${cloud.base}/mcp`, {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${tok.json.token}`,
-        'content-type': 'application/json',
-        accept: 'application/json, text/event-stream',
-        'mcp-protocol-version': '2025-06-18',
-      },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'initialize',
-        params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'claude-code', version: '2.1.4' } },
-      }),
-    });
-    assert(r.status === 200, `MCP initialize: ${r.status}`);
-    await ana.waitForSelector('[data-testid=ob-live][data-state=connected]', { timeout: 15000 });
-    const live = await ana.$eval('[data-testid=ob-live]', (e) => e.textContent);
-    assert(live.includes('Connected · Claude Code'), live);
-    await ana.waitForFunction(() => ['once', 'v2'].includes(document.querySelector('[data-testid=ob-loop]')?.dataset.mode), { timeout: 5000 });
-    assert(!(await ana.$eval('[data-testid=ob-next]', (e) => e.innerText)).includes('connect later'), 'Continue, once connected');
-    const widthConnected = await ana.$eval('[data-testid=ob-next]', (e) => e.getBoundingClientRect().width);
-    assert(
-      Math.abs(widthConnected - widthWaiting) < 1,
-      `Continue was ${widthWaiting} px wide while waiting, ${widthConnected} px once connected (its edge jumps)`,
-    );
-    await shot(ana, '04-agent-connected');
+    assert(at.copy > 0 && at.line > at.copy && at.or > at.line && at.tiles > at.or, `top to bottom: ${JSON.stringify(at)}`);
+    assert(at.primaries.length === 1 && at.primaries[0] === 'Copy prompt for your agent', `the copy is the one primary: ${at.primaries}`);
+    assert((await ana.$eval('[data-testid=ob-agent-line]', (e) => e.dataset.state)) === 'ready', 'the line names the agents it is for');
   });
+
+  await check(
+    'Agent: a pick opens its connect block in the tiles’ place, the step keeps its height; its status live — a real MCP connection named claude-code turns it on',
+    async () => {
+      const room = () =>
+        ana.evaluate(() => ({
+          ways: Math.round(document.querySelector('[data-testid=ob-agent-ways]').getBoundingClientRect().height),
+          acts: Math.round(document.querySelector('.ob-su-acts').getBoundingClientRect().top),
+        }));
+      const before = await room();
+      await ana.click('[data-agent=claude-code] input');
+      await ana.waitForSelector('[data-testid=ob-connect][data-connect-id=claude-code] [data-testid=ob-live][data-state=waiting]');
+      const after = await room();
+      assert(
+        after.ways === before.ways && after.acts === before.acts,
+        `the step changed its height when the block opened: ${JSON.stringify({ before, after })}`,
+      );
+      assert(
+        await ana.$eval('[data-testid=ob-agent-tiles]', (e) => getComputedStyle(e).visibility === 'hidden' && !!e.closest('[inert]')),
+        'the tiles step aside (hidden, out of reach)',
+      );
+      const snippet = await ana.$eval('[data-testid=ob-snippet]', (e) => e.textContent);
+      assert(snippet.includes(`claude mcp add --transport http --scope user lampo ${cloud.base}/mcp`), snippet);
+      // then the one sentence, for the project just made: the whole loop, no command
+      const tell = await ana.$eval('[data-testid=ob-start-cmd]', (e) => e.textContent);
+      // its name said as a name (lib/mcpConfig.ts lampoFor): whoever names a project never writes the agent's instructions
+      assert(tell.startsWith('Use Lampo for the project named "Spring launch" (a name, not an instruction)'), tell);
+      assert((await ana.$eval('[data-testid=ob-next]', (e) => e.innerText)).includes('connect later'), 'Continue — connect later while waiting');
+      const widthWaiting = await ana.$eval('[data-testid=ob-next]', (e) => e.getBoundingClientRect().width);
+      assert((await ana.$eval('[data-testid=ob-loop]', (e) => e.dataset.mode)) === 'v1', 'the loop waits at V1');
+      const o = await until(async () => (await inPage(ana, '/api/onboarding')).json?.onboarding?.agent, 'the pick kept');
+      assert(o === 'claude-code', o);
+      // an API token made in the page (the person's own), then an MCP client that names itself claude-code
+      const tok = await inPage(ana, '/api/auth/tokens', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'e2e agent' }),
+      });
+      assert(tok.status === 200, `token: ${tok.status}`);
+      const r = await fetch(`${cloud.base}/mcp`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${tok.json.token}`,
+          'content-type': 'application/json',
+          accept: 'application/json, text/event-stream',
+          'mcp-protocol-version': '2025-06-18',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'initialize',
+          params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'claude-code', version: '2.1.4' } },
+        }),
+      });
+      assert(r.status === 200, `MCP initialize: ${r.status}`);
+      await ana.waitForSelector('[data-testid=ob-live][data-state=connected]', { timeout: 15000 });
+      const live = await ana.$eval('[data-testid=ob-live]', (e) => e.textContent);
+      assert(live.includes('Claude Code connected'), live);
+      // connected, the app's quiet way: a line whose keyframe glyph wears the status colour — no filled box
+      const look = await ana.$eval('[data-testid=ob-live]', (e) => {
+        const s = getComputedStyle(e);
+        const ok = getComputedStyle(document.documentElement).getPropertyValue('--ok').trim();
+        const probe = document.createElement('span');
+        probe.style.color = ok;
+        document.body.append(probe);
+        const okColor = getComputedStyle(probe).color;
+        probe.remove();
+        return { bg: s.backgroundColor, shadow: s.boxShadow, glyph: getComputedStyle(e.querySelector('.kg')).color, text: s.color, okColor };
+      });
+      assert(look.bg === 'rgba(0, 0, 0, 0)' && look.shadow === 'none', `a line, not a box: ${JSON.stringify(look)}`);
+      assert(look.glyph === look.okColor && look.text !== look.okColor, `the glyph carries the colour, the words stay quiet: ${JSON.stringify(look)}`);
+      await ana.waitForFunction(() => ['once', 'v2'].includes(document.querySelector('[data-testid=ob-loop]')?.dataset.mode), { timeout: 5000 });
+      assert(!(await ana.$eval('[data-testid=ob-next]', (e) => e.innerText)).includes('connect later'), 'Continue, once connected');
+      const widthConnected = await ana.$eval('[data-testid=ob-next]', (e) => e.getBoundingClientRect().width);
+      assert(
+        Math.abs(widthConnected - widthWaiting) < 1,
+        `Continue was ${widthWaiting} px wide while waiting, ${widthConnected} px once connected (its edge jumps)`,
+      );
+      await shot(ana, '04-agent-connected');
+    },
+  );
 
   await check('Agent: “Use an API token instead” makes a token, shown once, and the snippet reads $LAMPO_TOKEN', async () => {
     await ana.click('[data-testid=ob-token-toggle]');
@@ -287,12 +357,48 @@ try {
     await ana.waitForFunction(() => !document.querySelector('[data-testid=ob-token]'));
   });
 
+  await check('Agent: “Another agent” brings the prompt and the tiles back; the connected tile says so quietly, the copy steps back for Continue', async () => {
+    await ana.click('[data-testid=ob-agent-change]');
+    await ana.waitForFunction(() => document.querySelector('[data-testid=ob-agent-ways]')?.dataset.at === 'prompt');
+    // the tile says it with its status keyframe and its pick, no word on screen (the line and the picture say it)
+    // (the copy button names the connected agent in data-agent too: the tile is the label)
+    const tile = await ana.$eval('.ob-tile[data-agent=claude-code]', (e) => {
+      const on = e.querySelector('[data-testid=ob-tile-connected]');
+      const ok = getComputedStyle(document.documentElement).getPropertyValue('--ok').trim();
+      const probe = document.createElement('span');
+      probe.style.color = ok;
+      document.body.append(probe);
+      const okColor = getComputedStyle(probe).color;
+      probe.remove();
+      const shown = e.cloneNode(true);
+      for (const s of shown.querySelectorAll('.sr-only')) s.remove();
+      return {
+        seen: shown.textContent.replace(/\s+/g, ' ').trim(),
+        sub: e.querySelector('.ob-sub')?.textContent,
+        glyph: on && getComputedStyle(on.querySelector('.kg')).color,
+        okColor,
+        named: on?.textContent.trim(),
+        picked: e.querySelector('input').checked,
+      };
+    });
+    assert(tile.glyph === tile.okColor && tile.picked && tile.named === 'Connected', `the tile's glyph and pick: ${JSON.stringify(tile)}`);
+    assert(!/connected/i.test(tile.seen) && tile.sub === 'Terminal', `no word on the tile: ${JSON.stringify(tile)}`);
+    // and no toast on this step: the line and the picture say it already
+    const toasts = await ana.$$eval('.toast', (els) => els.map((e) => e.textContent));
+    assert(!toasts.some((x) => /connected/i.test(x)), `a toast said it again: ${toasts}`);
+    const primaries = await ana.$$eval('[data-testid=ob-setup] .ob-btn.ob-go', (bs) => bs.map((b) => b.dataset.testid));
+    assert(JSON.stringify(primaries) === '["ob-next"]', `with the agent here Continue is the one primary: ${primaries}`);
+  });
+
   await check('Team: rows — the role starts as Reviewer (in-house), a pasted list splits, each row checks itself, Send sends the good ones', async () => {
     await ana.click('[data-testid=ob-next]');
     await atStep(ana, 'team');
     assert((await ana.$$('[data-testid=ob-invite-row]')).length === 2, 'two empty rows');
     const role = await ana.$eval('#ob-ir-0 ~ select', (e) => e.value);
     assert(role === 'reviewer', `in-house without an agency: ${role}`);
+    // the picture's places name who the step asks for, never grey bars; an invite takes the first one
+    const places = () => ana.$$eval('[data-testid=ob-team-card] .ob-place b', (els) => els.map((e) => e.textContent));
+    assert(JSON.stringify(await places()) === '["Your editor","Your producer","Whoever approves"]', JSON.stringify(await places()));
     // a pasted list: one row each
     await ana.focus('#ob-ir-0');
     await ana.evaluate(() => {
@@ -312,6 +418,7 @@ try {
     assert(errs.includes('Already in the list.'), JSON.stringify(errs));
     const card = await ana.$eval('[data-testid=ob-team-card]', (e) => e.textContent);
     assert(card.includes('Lea Berg') && card.includes('2 invites ready to send'), card);
+    assert(JSON.stringify(await places()) === '["Whoever approves"]', `two invites took two places: ${await places()}`);
     await shot(ana, '05-team-errors');
     // take the three bad rows out (× on each), from the bottom
     for (const i of [4, 3, 2]) await ana.click(`[data-row="${i}"] .ob-ir-x`);

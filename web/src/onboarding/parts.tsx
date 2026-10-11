@@ -211,14 +211,18 @@ export function Cmd({ text, onCopied, testid }: { text: string; onCopied?: () =>
   );
 }
 
-/** An agent's live status, one line: its glyph, "Waiting for X…" or "Connected · X", and the meta muted beside it. */
-export function Live({ on, label, sub, compact, testid = 'ob-live' }: { on: boolean; label: string; sub: ReactNode; compact?: boolean; testid?: string }) {
+/** An agent's live status, the app's quiet way: one line, its keyframe glyph saying the state (hollow and breathing
+ * while it waits, filled in the status colour once it is there), "Waiting for X…" or "X connected", the meta muted
+ * after it. Never a box: the glyph carries the colour. */
+export function Live({ on, label, sub, testid = 'ob-live' }: { on: boolean; label: string; sub: ReactNode; testid?: string }) {
   return (
-    <div className={`ob-live ${compact ? 'ob-compact' : ''}`} data-state={on ? 'connected' : 'waiting'} role="status" aria-live="polite" data-testid={testid}>
+    <p className="ob-live" data-state={on ? 'connected' : 'waiting'} role="status" aria-live="polite" data-testid={testid}>
       <KeyGlyph shape={on ? 'diamond' : 'outline'} />
-      <b>{on ? t('Connected · {name}', { name: label }) : t('Waiting for {name}…', { name: label })}</b>
-      <span className="ob-live-sub">{sub}</span>
-    </div>
+      <span>
+        <b>{on ? t('{name} connected', { name: label }) : t('Waiting for {name}…', { name: label })}</b>
+        {sub && <span className="ob-live-sub"> · {sub}</span>}
+      </span>
+    </p>
   );
 }
 

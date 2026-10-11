@@ -250,17 +250,7 @@
     height: var(--h-touch);
   }
 }
-/* the agent's live status under the headline: a line of its own, not a box */
-.ob-gs-text .ob-live,
-.ob-gs-text .ob-live.ob-compact,
-.ob-gs-text .ob-live[data-state='connected'] {
-  grid-template-columns: auto auto minmax(0, 1fr);
+/* the agent's live status under the headline keeps the pane's tighter line */
+.ob-gs-text .ob-live {
   min-height: var(--h-xs);
-  padding: 0;
-  background: none;
-  box-shadow: none;
-}
-.ob-gs-text .ob-live .ob-live-sub {
-  justify-self: start;
-  text-align: left;
 }

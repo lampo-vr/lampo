@@ -353,19 +353,6 @@
 .ob-tiles.ob-agents .ob-tile b {
   font-size: var(--fs-md);
 }
-.ob-tiles.ob-agents .ob-tile .ob-found {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  font: var(--fw-ui) var(--fs-xs) / 1 var(--ui);
-  color: var(--ok);
-}
-.ob-tiles.ob-agents .ob-tile .ob-found .kg {
-  --kg-size: 8px;
-}
 .ob-tiles.ob-agents .ob-tile.ob-absent {
   color: var(--muted);
 }
@@ -374,6 +361,59 @@
 }
 .ob-tiles.ob-agents .ob-tile.ob-none-yet {
   grid-column: 1 / -1;
+}
+/* The agent step's two ways (steps.tsx AgentStep) take turns in one cell, the taller holding the room: the prompt with
+   the tiles under it, or the connect block of the one picked. The step keeps its height whichever shows. */
+.ob-swap {
+  display: grid;
+  min-width: 0;
+}
+.ob-swap > * {
+  grid-area: 1 / 1;
+  display: grid;
+  align-content: start;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.ob-swap > [inert] {
+  visibility: hidden;
+}
+.ob-agent-start {
+  display: grid;
+  justify-items: start;
+  gap: var(--sp-2);
+}
+/* "Or connect it yourself": a quiet label on a hairline, the way by hand under it */
+.ob-or {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-top: var(--sp-3);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-ui);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ob-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+/* the connect block in the tiles' place: no box of its own (the column is its box), its head a row with the way back */
+.ob-swap-h .ob-connect {
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+.ob-hand-h > .ob-lk {
+  margin-left: auto;
+}
+/* a phone's column: the copy as wide as it, like every big action there */
+@container ob (max-width: 560px) {
+  .ob-agent-start {
+    justify-items: stretch;
+  }
 }
 .ob-tile-ico .ob-none-ring {
   width: 18px;
@@ -407,27 +447,11 @@
 .ob-hello .ob-su-head {
   gap: var(--sp-4);
 }
-.ob-hello-steps {
-  display: grid;
-  gap: var(--sp-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  color: var(--muted);
-}
-.ob-hello-steps li {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  font-size: var(--fs-md);
-}
-.ob-hello-steps .kg {
-  --kg-size: 10px;
-  color: var(--line-4);
-}
-.ob-hello-steps b {
-  font-weight: var(--fw-ui);
-  color: var(--fg-2);
+/* Welcome is three beats: the chip, the headline with its sentence, the way on. The sentence and the button keep more
+   air between them than the rest, so the headline stands as the block beside the picture and the action reads as
+   what follows it, not as a list's last row. */
+.ob-hello .ob-su-acts {
+  margin-top: var(--sp-4);
 }
 .ob-hello .ob-su-col > * {
   animation: ob-rise 640ms var(--ease-out) backwards;
@@ -684,11 +708,38 @@
   align-items: center;
   gap: calc(var(--sp-1) + 1px);
 }
-.ob-tiles.ob-agents .ob-tile .ob-sub.ob-state.ob-ok {
+/* connected: the status keyframe alone, at the tile's end (its words are for screen readers) */
+.ob-tiles.ob-agents .ob-tile:has(.ob-tile-on) {
+  padding-right: calc(var(--sp-3) + var(--sp-6));
+}
+.ob-tiles.ob-agents .ob-tile .ob-tile-on {
+  position: absolute;
+  top: 50%;
+  right: var(--sp-4);
+  display: grid;
+  transform: translateY(-50%);
+}
+.ob-tiles.ob-agents .ob-tile .ob-tile-on .kg {
+  --kg-size: 10px;
   color: var(--ok);
 }
+/* a narrow tile keeps its name on one line: the keyframe sits in its corner instead of taking room at its end */
+@container ob (max-width: 820px) {
+  .ob-tiles.ob-agents .ob-tile:has(.ob-tile-on) {
+    padding-right: var(--sp-3);
+  }
+  .ob-tiles.ob-agents .ob-tile .ob-tile-on {
+    top: var(--sp-2);
+    right: var(--sp-2);
+    transform: none;
+  }
+}
+/* "◆ Found · 2.1": the glyph carries the status colour, the words stay the tile's quiet second line */
 .ob-tiles.ob-agents .ob-tile .ob-sub.ob-state .kg {
   --kg-size: 8px;
+}
+.ob-tiles.ob-agents .ob-tile .ob-sub.ob-state.ob-ok .kg {
+  color: var(--ok);
 }
 @container ob (max-width: 820px) {
   .ob-tiles.ob-agents .ob-tile .ob-sub.ob-state {

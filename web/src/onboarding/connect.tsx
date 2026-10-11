@@ -4,7 +4,7 @@
 // that sets it to work ("Use Lampo for <project>": the whole loop), and its live status from the connected-agents
 // registry (GET /api/agents, refetched when the `sessions` event says one arrived: every client over /mcp and every
 // `lampo watch` announces itself). Copy-only: nothing here writes an agent's configuration.
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { BRAND_NAME } from '../../../lib/brand.ts';
 import { lampoFor, MCP_NAME, type McpTarget, mcpSnippet, stdioCommand } from '../../../lib/mcpConfig.ts';
 import { compareTime } from '../../../lib/time.ts';
@@ -14,7 +14,7 @@ import { useInfo } from '../api/queries.ts';
 import { perLang, t } from '../i18n/index.ts';
 import { T } from '../i18n/T.tsx';
 import { ago } from '../lib/format.ts';
-import { toast, toastError } from '../lib/toast.ts';
+import { toastError } from '../lib/toast.ts';
 import { AgentMark } from '../ui/icons.tsx';
 import { Cmd, KG, Live, OIcon, Said } from './parts.tsx';
 
@@ -200,16 +200,6 @@ export function seenLine(a: ConnectedAgent, atMachine: boolean): string {
   return [where, ago(a.last_seen)].filter(Boolean).join(' · ');
 }
 
-/** Says so once when the picked agent connects (it can happen while the person looks elsewhere on the page). */
-export function useConnectToast(pick: SetupAgent | null, connected: ConnectedAgent | null) {
-  const was = useRef<string | null>(connected ? `${pick}` : null);
-  useEffect(() => {
-    if (!pick || pick === 'none') return;
-    if (connected && was.current !== pick) toast(t('{name} connected', { name: agentLabel(pick) ?? '' }), 'ok');
-    was.current = connected ? pick : null;
-  }, [pick, connected]);
-}
-
 /** Cursor's own link that offers to add a server (its MCP install deeplink: the config as base64 JSON). */
 const cursorLink = (url: string) => {
   const config = btoa(JSON.stringify({ url }));
@@ -291,7 +281,7 @@ export function ConnectBlock({
     <section className="ob-connect" data-testid={testid} data-connect-id={pick} aria-label={t('Connect {name}', { name: label })}>
       {head}
       {s.live ? (
-        <Live compact on={!!connected} label={statusName} sub={connected ? seenLine(connected, where.atMachine) : t('changes by itself once it calls')} />
+        <Live on={!!connected} label={statusName} sub={connected ? seenLine(connected, where.atMachine) : t('changes by itself once it calls')} />
       ) : (
         <Said shape="outline" first={s.offline ?? ''} />
       )}
@@ -371,16 +361,25 @@ export function AgentTiles({
   found,
   connectedKinds,
   atMachine,
+  labelledBy,
 }: {
   value: SetupAgent | null;
+  /** Also called for the tile already picked (clicked again: its connect block opens again). */
   onPick: (id: SetupAgent) => void;
   /** The machine: the agents found installed, with their versions. */
   found?: Partial<Record<SetupAgent, string | null>>;
   connectedKinds: Set<SetupAgent>;
   atMachine: boolean;
+  /** The id of the words that name the tiles (else "Your agent"). */
+  labelledBy?: string;
 }) {
   return (
-    <fieldset className="ob-tiles ob-agents ob-two" aria-label={t('Your agent')} data-testid="ob-agent-tiles">
+    <fieldset
+      className="ob-tiles ob-agents ob-two"
+      aria-label={labelledBy ? undefined : t('Your agent')}
+      aria-labelledby={labelledBy}
+      data-testid="ob-agent-tiles"
+    >
       {AGENTS().map((a) => {
         const hasFound = !!found && a.id in found;
         const absent = atMachine && !!found && !hasFound && !['other', 'none', 'claude', 'chatgpt'].includes(a.id);
@@ -388,16 +387,28 @@ export function AgentTiles({
         const version = found?.[a.id];
         return (
           <label key={a.id} className={`ob-tile ${a.id === 'none' ? 'ob-none-yet' : ''} ${absent ? 'ob-absent' : ''}`} data-agent={a.id}>
-            <input type="radio" name="ob-agent" value={a.id} checked={value === a.id} onChange={() => onPick(a.id)} />
+            <input
+              type="radio"
+              name="ob-agent"
+              value={a.id}
+              checked={value === a.id}
+              onChange={() => onPick(a.id)}
+              onClick={() => value === a.id && onPick(a.id)}
+            />
             <span className="ob-tile-ico">
               <Mark id={a.id} size={18} />
             </span>
             <b>{a.label}</b>
+            {/* connected: the tile says it with its status keyframe alone (the line under the copy and the picture say
+                it in words); its own line stays what it was */}
             {on ? (
-              <span className="ob-sub ob-state ob-ok">
-                <KG />
-                {t('Connected')}
-              </span>
+              <>
+                <span className="ob-sub">{a.sub}</span>
+                <span className="ob-tile-on" data-testid="ob-tile-connected">
+                  <KG />
+                  <span className="sr-only">{t('Connected')}</span>
+                </span>
+              </>
             ) : hasFound ? (
               <span className="ob-sub ob-state ob-ok">
                 <KG />

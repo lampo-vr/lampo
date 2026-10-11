@@ -149,8 +149,7 @@ try {
     assert(a.url().endsWith('#/welcome'), `the library sent the new machine to its setup: ${a.url()}`);
     const t = await textOf(a);
     assert(t.includes('Welcome to Lampo') && t.includes('On this machine') && t.includes('Signed in as you'), t.slice(0, 400));
-    assert((await a.$$('.ob-hello-steps li')).length === 3, 'three steps ahead');
-    assert(t.includes('3 short steps, all skippable.'), 'all skippable');
+    assert(!(await a.$('.ob-hello-steps')) && t.includes('3 short steps, all skippable.'), 'no step list; three counted, all skippable');
     assert((await a.$$('h1')).length === 1, 'one h1');
     assert(!(await a.$('[data-testid=ob-gs]')), 'no Get started on the way');
     await shot(a, '01-welcome');
@@ -192,7 +191,7 @@ try {
     await api('/api/agents/heartbeat', 'POST', { session_id: 'e2e-agent', name: 'spot-edit', kind: 'claude-code' });
     await a.waitForSelector('[data-testid=ob-live][data-state=connected]', { timeout: 15000 });
     const live = await a.$eval('[data-testid=ob-live]', (e) => e.textContent);
-    assert(live.includes('Connected · Claude Code'), live);
+    assert(live.includes('Claude Code connected'), live);
     assert((await api('/api/onboarding')).onboarding.agent === 'claude-code', 'the pick kept on the account');
     // then the one sentence that sets it to work: "use Lampo" (no /lampo:watch, no vr command)
     const tell = await a.$eval('[data-testid=ob-start-cmd]', (e) => e.textContent);

@@ -2,7 +2,7 @@
 // renders land (the machine), the sample (the machine). The team's invites and a server's health check have files of
 // their own (Team.tsx, Health.tsx). Each step stores what it changes as it goes; none blocks the way on.
 import { type QueryClient, useQuery, useQueryClient } from '@tanstack/react-query';
-import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { personaKinds, type SetupVariant } from '../../../lib/onboarding.ts';
 import { PERSONAS, type SetupStep, setupStepsFor } from '../../../lib/setupFlow.ts';
 import type { AuthStatus, MyWorkspace, Persona as PersonaKind, SetupAgent } from '../../../lib/types.ts';
@@ -14,11 +14,12 @@ import { perLang, t } from '../i18n/index.ts';
 import { T } from '../i18n/T.tsx';
 import { projectsOf } from '../lib/projects.ts';
 import { toast, toastError } from '../lib/toast.ts';
-import { I, type IconName } from '../ui/icons.tsx';
-import { AgentTiles, agentLabel, ConnectBlock, isPick, Mark, setupOf, useConnected, useConnectToast, useWhere } from './connect.tsx';
+import { AgentLine, agentWord, StartButton, useAgentStart } from '../sessions/agentStart.tsx';
+import { AgentMark, I, type IconName } from '../ui/icons.tsx';
+import { AgentTiles, agentLabel, ConnectBlock, isPick, Mark, setupOf, useConnected, useWhere } from './connect.tsx';
 import { finishSetup, linkVideos, makeProject, useFolders, useOnboarding } from './data.ts';
 import { KG, Said, SampleKeys } from './parts.tsx';
-import { SceneAgent, SceneJoin, SceneLoop, ScenePersona, SceneProject, SceneRenders, SceneWorkspace, Switcher } from './pictures.tsx';
+import { SceneAgent, SceneHello, SceneJoin, SceneLoop, ScenePersona, SceneProject, SceneRenders, SceneWorkspace, Switcher } from './pictures.tsx';
 import type { StepProps } from './Setup.tsx';
 import { useFirstRun } from './state.ts';
 
@@ -30,9 +31,6 @@ export function finish(qc: QueryClient, to = '#/') {
 
 /** The first name, for a greeting. */
 const firstName = (name: string | undefined) => (name || '').trim().split(/\s+/)[0] || '';
-
-/** "Mac" where the browser says it runs on one, else "computer" (the app runs on Linux and Windows too). */
-const onMac = () => /Mac/i.test(navigator.platform || navigator.userAgent);
 
 /** The host people see this app at (the public address's, or the page's). */
 export function useHost(): string {
@@ -89,42 +87,6 @@ export function Welcome({ frame, next, variant, steps, onSkip }: StepProps & { v
     window.addEventListener('keydown', f);
     return () => window.removeEventListener('keydown', f);
   }, [next]);
-
-  const lines: ReactNode[] = {
-    cloud: [
-      <T k="<0>Name</0> your workspace" key="1" tags={[(c) => <b>{c}</b>]} />,
-      <T k="<0>Who</0> the videos are for" key="2" tags={[(c) => <b>{c}</b>]} />,
-      <T k="<0>Your first project</0>, for your agent’s V1" key="3" tags={[(c) => <b>{c}</b>]} />,
-      <T k="<0>Which agent</0> you use" key="4" tags={[(c) => <b>{c}</b>]} />,
-      <T k="<0>Who</0> works with you" key="5" tags={[(c) => <b>{c}</b>]} />,
-    ],
-    local: [
-      <T k="<0>Where</0> your exports land" key="1" tags={[(c) => <b>{c}</b>]} />,
-      onMac() ? (
-        <T k="<0>Your agent</0>, found on this Mac" key="2" tags={[(c) => <b>{c}</b>]} />
-      ) : (
-        <T k="<0>Your agent</0>, found on this computer" key="2" tags={[(c) => <b>{c}</b>]} />
-      ),
-      <T k="<0>The sample</0>: the whole loop" key="3" tags={[(c) => <b>{c}</b>]} />,
-    ],
-    server: [
-      <T k="<0>Name</0> the workspace" key="1" tags={[(c) => <b>{c}</b>]} />,
-      <T k="<0>Check</0> the server" key="2" tags={[(c) => <b>{c}</b>]} />,
-      <T k="<0>Invite</0> the team" key="3" tags={[(c) => <b>{c}</b>]} />,
-      <T k="<0>Your first project</0>, for your agent’s V1" key="4" tags={[(c) => <b>{c}</b>]} />,
-      <T k="<0>Connect</0> agents" key="5" tags={[(c) => <b>{c}</b>]} />,
-    ],
-    invited: [
-      <T k="<0>Your agent</0>, connected in a line" key="1" tags={[(c) => <b>{c}</b>]} />,
-      invitedBy ? (
-        <T k="<0>The library</0>: {name}’s videos and a sample" key="2" values={{ name: firstName(invitedBy.name) }} tags={[(c) => <b>{c}</b>]} />
-      ) : (
-        <T k="<0>The library</0>: the team’s videos and a sample" key="2" tags={[(c) => <b>{c}</b>]} />
-      ),
-    ],
-  }[variant];
-  // cloud with one of the cloud's steps dropped (a channel alone has no team): the list says what is ahead
-  const shown = variant === 'cloud' ? lines.slice(0, steps.length) : lines;
 
   const badges =
     variant === 'cloud' ? (
@@ -219,7 +181,7 @@ export function Welcome({ frame, next, variant, steps, onSkip }: StepProps & { v
       me={{ name: user?.name ?? '', email: user?.email ?? '', role: roleWord(user?.role ?? 'member') }}
     />
   ) : (
-    <SceneLoop cap={t('A note on a frame, your agent’s fix, your check')} />
+    <SceneHello />
   );
   return frame({
     pictureId: inv ? 'join' : 'loop',
@@ -233,15 +195,6 @@ export function Welcome({ frame, next, variant, steps, onSkip }: StepProps & { v
           <h1>{title}</h1>
           <p className="ob-lede">{lede}</p>
         </div>
-        <ol className="ob-hello-steps" aria-label={t('What comes next')}>
-          {shown.map((l, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: the steps ahead, in order
-            <li key={i}>
-              <KG shape="outline" />
-              <span>{l}</span>
-            </li>
-          ))}
-        </ol>
         <div className="ob-su-acts">
           <button type="button" className="ob-btn ob-go ob-lg ob-block" onClick={next} data-testid="ob-start">
             {goWord}
@@ -521,14 +474,8 @@ function PersonaNote({ picks }: { picks: PersonaKind[] }) {
   if (!leads.length)
     return <Said first={<b>{t('Thanks, that helps.')}</b>} second={t('Your first steps stay general; change them any time.')} on key="other" />;
   const list = leads.length === 1 ? leads[0] : t('{list} and {last}', { list: leads.slice(0, -1).join(', '), last: leads[leads.length - 1] });
-  return (
-    <Said
-      first={<b>{leads.length === 1 ? t('{what} leads.', { what: cap(list) }) : t('{what} lead.', { what: cap(list) })}</b>}
-      second={t('Your first steps cover all of it; change them any time.')}
-      on
-      key={list}
-    />
-  );
+  // every lead is a plural ("review links", "approvals", "9:16 versions"): one or several, they lead
+  return <Said first={<b>{t('{what} lead.', { what: cap(list) })}</b>} second={t('Your first steps cover all of it; change them any time.')} on key={list} />;
 }
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -613,47 +560,12 @@ export function Persona({ frame, next, s, set }: StepProps) {
 
 // ---------------------------------------------------------------- the agent
 
-/** Grows (or shrinks) the revealed block from its old height instead of jumping, then brings it into view. */
-function useGrow(key: string) {
-  const ref = useRef<HTMLDivElement>(null);
-  const h = useRef<number | null>(null);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: measured again whenever what it holds changes
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const to = el.getBoundingClientRect().height;
-    const from = h.current;
-    h.current = to;
-    if (from == null || Math.abs(to - from) < 2) return;
-    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const bring = () => {
-      el.style.overflow = '';
-      if (to <= from || !el.isConnected) return;
-      const box = el.closest('.ob-su-form, .ob-su') as HTMLElement | null;
-      if (!box) return;
-      const r = el.getBoundingClientRect();
-      const b = box.getBoundingClientRect();
-      const sticky = box.querySelector<HTMLElement>('.ob-su-acts.ob-sticky');
-      const room = b.bottom - (sticky && getComputedStyle(sticky).position === 'sticky' ? sticky.offsetHeight : 0);
-      if (r.bottom > room) box.scrollBy({ top: Math.min(r.bottom - room + 16, r.top - b.top - 16), behavior: still ? 'auto' : 'smooth' });
-    };
-    if (still) return bring();
-    el.style.overflow = 'hidden';
-    const an = el.animate(
-      [
-        { height: `${from}px`, opacity: from ? 1 : 0.4 },
-        { height: `${to}px`, opacity: 1 },
-      ],
-      {
-        duration: 320,
-        easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
-      },
-    );
-    an.onfinish = an.oncancel = bring;
-  }, [key]);
-  return ref;
-}
-
+/**
+ * The agent: the prompt every empty page copies leads (sessions/agentStart.tsx) — one copy, and the line under it
+ * follows the agent until it connects. By hand comes second, under "Or connect it yourself": the agents as tiles, and
+ * a pick opens its connect block in their place. The two take turns in one grid cell (the taller holds the room), so
+ * the step keeps its height, and the actions under it their place, whichever shows.
+ */
 export function AgentStep({
   frame,
   next,
@@ -665,8 +577,8 @@ export function AgentStep({
 }: StepProps & { variant: SetupVariant; id: 'agent' | 'agents'; onPick: (a: SetupAgent) => void }) {
   const where = useWhere();
   const pick = s.agent;
+  const hand = pick && pick !== 'none' ? pick : null;
   const connected = useConnected(pick);
-  useConnectToast(pick, connected);
   const agents = useAgents(120_000).data?.agents ?? [];
   const connectedKinds = new Set<SetupAgent>(
     (['claude-code', 'codex', 'cursor', 'chatgpt', 'claude', 'other'] as SetupAgent[]).filter((k) => agents.some((a) => isPick(k, a.kind))),
@@ -674,51 +586,69 @@ export function AgentStep({
   const found = useFound(variant === 'local');
   // the project it is told to use Lampo for: the one just made, else the newest there is
   const projects = projectsOf(useLibrary().data);
-  const setup = pick && pick !== 'none' && where ? setupOf(pick, where, null) : null;
+  const project = s.project ?? projects[0] ?? null;
+  const start = useAgentStart(project);
+  // a pick opens its connect block in the tiles' place; Another agent / Copy a prompt instead go back
+  const [byHand, setByHand] = useState(false);
+  const setup = hand && where ? setupOf(hand, where, null) : null;
   const live = !!setup?.live;
+  // what the picture follows: the agent picked by hand, else the one the prompt set going
+  const shown = hand ? connected : start.agent;
   // the moment it connects the loop plays over to V2 once; afterwards it rests there
   const [just, setJust] = useState<string | null>(null);
-  const was = useRef(!!connected);
+  const shownKey = hand ?? shown?.kind ?? null;
+  const was = useRef(!!shown);
   useEffect(() => {
-    if (connected && !was.current) setJust(pick);
-    was.current = !!connected;
-  }, [connected, pick]);
-  const state = !pick
-    ? 'none'
-    : pick === 'none'
+    if (shown && !was.current) setJust(shownKey);
+    was.current = !!shown;
+  }, [shown, shownKey]);
+  const state =
+    pick === 'none'
       ? 'none-yet'
-      : setup?.blocked
-        ? 'blocked'
-        : !live
-          ? 'offline'
-          : connected
-            ? just === pick
-              ? 'just'
-              : 'connected'
-            : 'waiting';
+      : hand
+        ? setup?.blocked
+          ? 'blocked'
+          : !live
+            ? 'offline'
+            : connected
+              ? just === hand
+                ? 'just'
+                : 'connected'
+              : 'waiting'
+        : start.agent
+          ? just === shownKey
+            ? 'just'
+            : 'connected'
+          : start.copied
+            ? 'copied'
+            : 'none';
+  const lede = t('Paste one prompt into it: it connects itself to Lampo, asks how you want to start and puts up V1.');
   const words = {
-    cloud: [t('Which agent do you use?'), t('It reads your notes, fixes the video and renders the next version. Pick it, and connect it right here.')],
-    invited: [t('Which agent do you use?'), t('It reads your notes, fixes the video and renders the next version. Pick it, and connect it right here.')],
-    local: [
-      t('Connect the agent you have'),
-      onMac()
-        ? t('Lampo looked on this Mac. Pick one: it gets one line, and nothing to sign in.')
-        : t('Lampo looked on this computer. Pick one: it gets one line, and nothing to sign in.'),
-    ],
+    cloud: [t('Which agent do you use?'), lede],
+    invited: [t('Which agent do you use?'), lede],
+    local: [t('Connect the agent you have'), lede],
     server: [
       t('Connect your team’s agents'),
       t('Each agent reaches {host} and signs in as a person. Start with yours; your team does the same from Settings.', { host: where?.host ?? '' }),
     ],
   }[variant];
   const word = last ? t('Go to the library') : t('Continue');
-  const grow = useGrow(`${pick}:${!!connected}`);
-  const label = pick === 'other' ? t('Your MCP client') : agentLabel(pick);
+  // nothing done yet: the question can be skipped; set going and not here yet: on, and connect later; else on
+  const engaged = !!pick || start.copied || !!start.agent;
+  const waiting = hand ? live && !connected : pick !== 'none' && !start.agent;
+  const handLabel = hand === 'other' ? t('Your MCP client') : agentLabel(hand);
+  const label = hand ? handLabel : start.agent ? agentWord(start.agent) : null;
+  const mark = hand ? <Mark id={hand} size={13} /> : start.agent ? <AgentMark kind={start.agent.kind ?? 'mcp'} size={13} /> : null;
+  const choose = (a: SetupAgent) => {
+    onPick(a);
+    if (a !== 'none') setByHand(true);
+  };
+  const showHand = byHand && !!hand && !!where;
   return frame({
     pictureId: 'agent',
-    picture: <SceneAgent label={label} mark={pick ? <Mark id={pick} size={13} /> : null} state={state} />,
+    picture: <SceneAgent label={label} mark={mark} state={state} />,
     caption: t('A note on a frame, your agent’s fix, your check.'),
     wide: true,
-    cls: 'ob-grows',
     body: (
       <>
         <div className="ob-su-head">
@@ -726,28 +656,72 @@ export function AgentStep({
           <h1>{words[0]}</h1>
           <p className="ob-lede">{words[1]}</p>
         </div>
-        <AgentTiles value={pick} onPick={onPick} found={found} connectedKinds={connectedKinds} atMachine={variant === 'local'} />
-        <div className="ob-reveal" ref={grow}>
-          {pick && where && <ConnectBlock pick={pick} where={where} connected={connected} project={s.project ?? projects[0] ?? null} />}
+        <div className="ob-swap" data-at={showHand ? 'hand' : 'prompt'} data-testid="ob-agent-ways">
+          <div className="ob-swap-p" inert={showHand || undefined}>
+            <div className="ob-agent-start">
+              {/* the step's primary until an agent is here; then Continue is, and the copy steps back */}
+              <StartButton
+                start={start}
+                className={`ob-btn ob-lg ${shown ? 'ob-raised' : 'ob-go'}`}
+                label={t('Copy prompt for your agent')}
+                testid="ob-copy-prompt"
+              />
+              <AgentLine start={start} testid="ob-agent-line" />
+            </div>
+            <p className="ob-or" id={`ob-or-${id}`}>
+              {t('Or connect it yourself')}
+            </p>
+            <AgentTiles value={pick} onPick={choose} found={found} connectedKinds={connectedKinds} atMachine={variant === 'local'} labelledBy={`ob-or-${id}`} />
+          </div>
+          <div className="ob-swap-h" inert={!showHand || undefined}>
+            {hand && where && (
+              <>
+                <header className="ob-connect-h ob-hand-h">
+                  <span className="ob-mk">
+                    <Mark id={hand} size={16} />
+                  </span>
+                  <span>
+                    <b>{t('Connect {name}', { name: hand === 'other' ? t('any MCP client') : (agentLabel(hand) ?? '') })}</b>
+                    <small>{t('to {host}', { host: where.host })}</small>
+                  </span>
+                  <button type="button" className="ob-lk" onClick={() => setByHand(false)} data-testid="ob-agent-change">
+                    {t('Another agent')}
+                  </button>
+                </header>
+                <ConnectBlock
+                  pick={hand}
+                  where={where}
+                  connected={connected}
+                  project={project}
+                  headless
+                  more={
+                    <button type="button" className="ob-lk" onClick={() => setByHand(false)} data-testid="ob-agent-prompt">
+                      {t('Copy a prompt instead')}
+                    </button>
+                  }
+                />
+              </>
+            )}
+          </div>
         </div>
         <div className="ob-su-acts ob-sticky">
           <div className="ob-row2">
-            <button type="button" className="ob-lk" onClick={next} hidden={!!pick}>
+            <button type="button" className="ob-lk" onClick={next} hidden={engaged}>
               {variant === 'local' ? t('Later') : t('Skip this question')}
             </button>
-            {!pick ? (
+            {!engaged ? (
               <button type="button" className="ob-btn ob-lg ob-raised" disabled>
                 {word}
                 <I name="right" size={15} />
               </button>
             ) : (
               // both labels in one cell: the button keeps its width when the agent connects (its edge doesn't jump)
-              <button type="button" className={`ob-btn ob-lg ${live && !connected ? 'ob-raised' : 'ob-go'}`} onClick={next} data-testid="ob-next">
+              <button type="button" className={`ob-btn ob-lg ${waiting ? 'ob-raised' : 'ob-go'}`} onClick={next} data-testid="ob-next">
                 <span className="ob-sizer">
-                  <span className={live && !connected ? '' : 'ob-held'} aria-hidden={live && !connected ? undefined : true}>
+                  <span className={waiting ? '' : 'ob-held'} aria-hidden={waiting ? undefined : true}>
                     {t('{word} — connect later', { word })}
                   </span>
-                  <span className={live && !connected ? 'ob-held' : ''} aria-hidden={live && !connected ? true : undefined}>
+                  <span className={waiting ? 'ob-held' : ''} aria-hidden={waiting ? true : undefined}>
                     {word}
                   </span>
                   {/* the long label in the primary's weight: the widest it gets, in either state */}
