@@ -44,7 +44,7 @@ jobs:
         id: webkit
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: echo "playwright=$(node -p "require('playwright-core/package.json').version")" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: webkit-cache
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         with:
