@@ -8,6 +8,13 @@ format stays backwards compatible throughout.
 ## [Unreleased]
 
 ### Changed
+- The Versions menu reads at a glance: one short line a version — "V4 · 8 min ago · 3 fixed", "V3 · 3 h ago · by
+  Mia", a part's stretch — with a quiet "current", "newest" or "approved" after it. Who made it and from which notes,
+  how long it runs (beside the version before, when it changed) and the playbook it was made under are the row's
+  tooltip, or a tap on its ⌄ on a phone; how an agent made a version lives in the Agent tab, so "Steps" is gone. What a
+  part's seams or the next full render found wrong still stands in the row. The player's top bar is calmer too: the
+  agent button is as wide as what it says ("fixing 3 of 5") and eases to a new width, while an agent is on the video
+  it alone says so, and where the video stands is a quiet pill whose explanation is its tooltip.
 - Checking fixes reads calmly. The card over the picture says first what you asked for, in your words, then how it
   was answered — the agent by its name ("Claude Code"), "fixed in V2" and its words, folded to three lines with More —
   and Looks right is its one raised button. It no longer wears a green box or edge, and it sits under the before and

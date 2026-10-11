@@ -37,16 +37,20 @@
   gap: var(--sp-2);
   min-width: 0;
 }
+/* Where the video stands: a quiet pill with its name; what it waits for, the steps and who watched are its tooltip's */
 .signoff .so-status {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
   min-width: 0;
   max-width: min(34vw, 320px);
+  height: var(--h-sm);
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-full);
   font-size: var(--fs-sm);
   color: var(--fg-2);
   white-space: nowrap;
-  border-radius: var(--r);
   cursor: default;
 }
 .signoff .so-status:focus-visible {
@@ -85,11 +89,10 @@
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
-/* Narrower desktops: the status keeps its name and what it waits for moves to its tooltip, so the bar's other
-   controls keep their words on one line. */
+/* Narrower desktops: the status keeps its name, its note moves to its tooltip, so the bar's other controls keep their
+   words on one line. */
 @media (max-width: 1279px) {
-  .signoff .so-note,
-  .signoff .so-wait {
+  .signoff .so-note {
     display: none;
   }
 }

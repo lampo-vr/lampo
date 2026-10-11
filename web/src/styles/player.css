@@ -55,7 +55,7 @@
   flex: none;
 }
 @media (max-width: 1180px) {
-  .p-top .agent-btn {
+  .p-top .agent-hug-in {
     max-width: 150px;
   }
   .p-top .p-tool-word {
@@ -108,9 +108,10 @@
   color: var(--faint);
 }
 .vpick-pop {
-  width: 320px;
+  width: min(360px, calc(100vw - 2 * var(--sp-2)));
   padding: var(--sp-2);
 }
+/* one short line a version — "V4 · 8 min ago · 3 fixed" — its marks after it, its actions in one column */
 .vpick-list {
   list-style: none;
   margin: var(--sp-1) 0 0;
@@ -120,82 +121,121 @@
 }
 .vpick-list li {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--sp-1);
-  border-radius: var(--radius-sm);
+  min-width: 0;
+  border-radius: var(--r);
 }
-.vpick-list li:hover,
+.vpick-list li:hover {
+  background: var(--ink-3);
+}
 .vpick-list li.on {
-  background: var(--raise-sheen), var(--ink-3);
-  box-shadow: var(--raise);
+  background: var(--sel);
 }
 .vpick-row {
   flex: 1;
   min-width: 0;
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-2);
+  padding: var(--sp-2);
   border: 0;
+  border-radius: var(--r);
   background: transparent;
   color: var(--fg);
+  font: inherit;
   text-align: left;
   cursor: pointer;
 }
 .vpick-num {
   flex: none;
-  width: 30px;
-  font: var(--fw-strong) var(--fs-sm) var(--mono);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-strong);
+  font-variant-numeric: tabular-nums;
 }
-.vpick-meta {
+.vpick-text {
   flex: 1;
   min-width: 0;
   display: grid;
   gap: var(--sp-0_5);
-  font-size: var(--fs-sm);
-  color: var(--muted);
 }
-.vpick-tags {
+.vpick-short {
   display: flex;
-  gap: var(--sp-1);
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-width: 0;
+  font-size: var(--fs-md);
+  color: var(--fg-2);
 }
-.vpick-tags:empty {
-  display: none;
+.vpick-line {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .vpick-tag {
+  flex: none;
+  margin-left: auto;
   font: var(--fw-ui) var(--fs-xs) var(--ui);
+  color: var(--muted);
+}
+.vpick-tag + .vpick-tag {
+  margin-left: 0;
+}
+.vpick-tag.on {
   color: var(--fg-2);
 }
 .vpick-tag.ok {
   color: var(--ok);
+}
+/* compare (and on a touch screen, the row's details) in one column on every row, there on hover or focus */
+.vpick-acts {
+  display: flex;
+  flex: none;
+  justify-content: flex-end;
+  gap: var(--sp-0_5);
+  padding-right: var(--sp-1);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.vpick-list li:is(:hover, :focus-within, .on) .vpick-acts {
+  opacity: 1;
+}
+/* a desk has the row's tooltip; a touch screen opens the row under it */
+.vpick-more {
+  display: none;
+}
+.vpick-more[aria-expanded='true'] .icon {
+  transform: rotate(180deg);
+}
+@media (hover: none) {
+  .vpick-acts {
+    opacity: 1;
+  }
+  .vpick-more {
+    display: inline-flex;
+  }
+}
+.vpick-open {
+  flex: 1 0 100%;
+  padding: 0 var(--sp-2) var(--sp-2);
+}
+/* the row's details: who made it and from which notes, how long it runs, the playbook */
+.vpick-details {
+  display: grid;
+  gap: var(--sp-0_5);
+  min-width: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-ui);
+}
+.vpick-open .vpick-details {
+  color: var(--muted);
 }
 .vpick-pb {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-0_5);
   min-width: 0;
-  color: var(--muted);
-}
-.vpick-check {
-  flex: none;
-  color: var(--fg);
-}
-/* Who made a version (an agent's work: in how long, what it fixed; else who uploaded it), and the one on its way. */
-.vpick-by {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0 var(--sp-1);
-  min-width: 0;
-  font-size: var(--fs-xs);
-  line-height: var(--lh-ui);
-  color: var(--fg-2);
-}
-.vpick-from {
-  color: var(--muted);
-}
-.vpick-steps {
-  flex: none;
 }
 .vpick-list li.vpick-ghost,
 .vpick-list li.vpick-ghost:hover {
@@ -211,9 +251,9 @@
   align-items: center;
   gap: var(--sp-1);
   min-width: 0;
-  font-size: var(--fs-xs);
+  font-size: var(--fs-sm);
 }
-/* What is said about a version: a part's seams, what the next full render found. */
+/* what a part's seams or the next full render found wrong: in the row itself */
 .vpick-said {
   font-size: var(--fs-xs);
   line-height: var(--lh-ui);

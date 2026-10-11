@@ -1,7 +1,7 @@
 // The player's one agent control: the assigned agent (its mark, name and whether it runs), or "Agent" when there is
 // none. Its popover says where the agent stands, sends it a request, copies the notes for any agent, and assigns
 // another one — the picker opens in the same popover. Never a dead end: without an agent it offers exactly that.
-import { useState } from 'react';
+import { type ReactNode, useCallback, useState } from 'react';
 import { agentKindOfRef, agentShown } from '../../../lib/agentKind.ts';
 import { partWhere } from '../../../lib/part.ts';
 import { timecode } from '../../../lib/time.ts';
@@ -33,6 +33,27 @@ const QUICK = (v: number): [string, string][] => [
   ['Work through all open notes, put up the next version, then mark each one fixed.', t('Fix all open notes')],
   [`Tell me in one reply what you changed in v${v} and why.`, t('Summarise what changed in V{v}', { v })],
 ];
+
+/**
+ * The agent button's words at their own width: no room kept for the longest state ("fixing 12 of 12"), and a change of
+ * words eases the button from one width to the next instead of jumping (only while it isn't moving: reduced motion).
+ */
+function Hug({ children }: { children: ReactNode }) {
+  const [w, setW] = useState<number | null>(null);
+  const measure = useCallback((el: HTMLSpanElement | null) => {
+    if (!el) return;
+    const ro = new ResizeObserver(() => setW(el.offsetWidth));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <span className="agent-hug" style={w === null ? undefined : { width: w }}>
+      <span className="agent-hug-in" ref={measure}>
+        {children}
+      </span>
+    </span>
+  );
+}
 
 /** Whether the agent runs, as the sidebar says it: a turning keyframe while it does, an outline while it doesn't. */
 export const AgentState = ({ active }: { active: boolean | null }) => (
@@ -189,32 +210,36 @@ export function AgentMenu({
   const trigger = (
     <button
       type="button"
-      className={`btn sm ghost agent-btn${session ? '' : ' none'}${tight && !compact ? ' now' : ''}`}
+      className={`btn sm ghost agent-btn${session ? '' : ' none'}`}
       aria-label={label}
       title={session && full ? label : undefined}
       data-testid="agent-button"
     >
-      {session ? (
+      {session && compact ? (
         <>
           {look ? <KeyGlyph shape={look.shape} className={`nav-kg run-kg ${look.tone}`} /> : <AgentState active={working} />}
           <AgentMark kind={agentKindOfRef(session)} size={14} />
-          {/* While it works, where it stands takes the name's place (the name is in the popover and the label). */}
-          {!compact &&
-            (tight ? (
-              <>
-                <span className="agent-name agent-step ellipsis" data-testid="agent-step">
-                  {tight.words}
-                </span>
-                {tight.figure && (
-                  <span className="agent-fig" data-testid="agent-fig">
-                    {tight.figure}
-                  </span>
-                )}
-              </>
-            ) : (
-              <span className="agent-name ellipsis">{shown}</span>
-            ))}
         </>
+      ) : session ? (
+        <Hug>
+          {look ? <KeyGlyph shape={look.shape} className={`nav-kg run-kg ${look.tone}`} /> : <AgentState active={working} />}
+          <AgentMark kind={agentKindOfRef(session)} size={14} />
+          {/* While it works, where it stands takes the name's place (the name is in the popover and the label). */}
+          {tight ? (
+            <>
+              <span className="agent-name agent-step ellipsis" data-testid="agent-step">
+                {tight.words}
+              </span>
+              {tight.figure && (
+                <span className="agent-fig" data-testid="agent-fig">
+                  {tight.figure}
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="agent-name ellipsis">{shown}</span>
+          )}
+        </Hug>
       ) : (
         <>
           <I name="spark" size={14} className="spark" />

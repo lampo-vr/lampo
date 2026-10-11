@@ -167,6 +167,7 @@ try {
     assert(tl.part === '40-79' && tl.seam === 'jump:40', `timeline ${JSON.stringify(tl)}`);
     await page.click('[data-testid=version-picker]');
     await page.waitForSelector('.vpick-list');
+    // what went wrong stands in the row itself, without opening its details
     const said = await page.$$eval('[data-testid=version-said]', (els) => els.map((e) => e.textContent));
     assert(said.includes('The motion doesn’t match at 00:01:15 — render the next shot too, or the whole video'), `said: ${said.join(' | ')}`);
     await shot('partial-03-seam-jumps');
@@ -266,6 +267,10 @@ try {
     assert((await text('[data-testid=version-picker]')) === 'V4', 'V4 is a full render');
     await page.click('[data-testid=version-picker]');
     await page.waitForSelector('.vpick-list');
+    // what matched is the rows' details
+    await page.$$eval('.vpick-more', (bs) => {
+      for (const b of bs) b.click();
+    });
     const said = await page.$$eval('[data-testid=version-said]', (els) => els.map((e) => e.textContent));
     assert(said.includes('The full version matches what you approved in V3'), `said: ${said.join(' | ')}`);
     assert(said.includes('V4 matches what you approved here'), 'and on the part');
@@ -285,6 +290,9 @@ try {
     await de.waitForSelector('[data-testid=version-picker]');
     await de.click('[data-testid=version-picker]');
     await de.waitForSelector('.vpick-list');
+    await de.$$eval('.vpick-more', (bs) => {
+      for (const b of bs) b.click();
+    });
     const said = await de.$$eval('[data-testid=version-said], [data-testid=version-part-tag]', (els) => els.map((e) => e.textContent));
     for (const want of [
       'Die komplette Version stimmt mit dem überein, was du in V3 freigegeben hast',

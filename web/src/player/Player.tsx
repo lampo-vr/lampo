@@ -1274,11 +1274,6 @@ function PlayerView({
     const c = placed.find((x) => x.id === id);
     if (c) selectComment(c);
   });
-  const showSteps = useStableCallback((id: string) => {
-    setPickRun(id);
-    setView('agent');
-    if (phone) setSheet((x) => (x === 'peek' ? 'half' : x));
-  });
   const warmAgent = useCallback(() => setWarm(true), []);
   // the Agent view's writes, here so its own chunk carries none of their code
   const runActs = useRunActions(slug);
@@ -1419,7 +1414,6 @@ function PlayerView({
           frameNow={pb.live.get}
           runs={runs}
           run={stripRun}
-          onSteps={showSteps}
           archived={
             frozen
               ? {

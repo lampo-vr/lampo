@@ -479,6 +479,11 @@ try {
     await page.goto(`${BASE}/#/v/${e(slug)}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('[data-testid=version-picker]');
     await page.click('[data-testid=version-picker]');
+    await page.waitForSelector('.vpick-list');
+    // the playbook a version was made under is in its details
+    await page.$$eval('.vpick-more', (bs) => {
+      for (const b of bs) b.click();
+    });
     await page.waitForSelector('[data-testid=version-playbook]');
     assert((await text('[data-testid=version-playbook]')) === `Reels r${rev}`, 'the folder’s own revision');
     await page.keyboard.press('Escape');

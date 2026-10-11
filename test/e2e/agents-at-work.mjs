@@ -393,16 +393,21 @@ try {
     stopAnswer = 'ok';
   });
 
-  await check('the version picker: a ghost of the version on its way, and who made each one', async () => {
+  await check('the version picker: a ghost of the version on its way, and who made each one in its details', async () => {
     await go(page, 'rendering');
     await page.click('[data-testid=version-picker]');
     await page.waitForSelector('[data-testid=version-ghost]');
     assert(/V3.*rendering 42%.*Claude Code/.test(await text(page, '[data-testid=version-ghost]')), await text(page, '[data-testid=version-ghost]'));
-    assert(/Claude Code · 12 min · 5 fixed · 1 asked/.test(await text(page, '[data-testid=version-by]')), await text(page, '[data-testid=version-by]'));
     await shot(page, '03-version-picker');
-    await page.click('[data-testid=version-steps]');
-    await page.waitForSelector('[data-testid=agent-view]');
-    await page.click('[data-testid=panel-notes]');
+    // who made it is the row's details (its tooltip; the ⌄ opens them where there is no hover)
+    await page.$$eval('.vpick-more', (bs) => {
+      for (const b of bs) b.click();
+    });
+    await page.waitForSelector('[data-testid=version-by]');
+    assert(/Claude Code · 12 min · 5 fixed · 1 asked/.test(await text(page, '[data-testid=version-by]')), await text(page, '[data-testid=version-by]'));
+    // how it was made is the Agent tab's (its runs), never a button in the menu
+    assert(!(await page.$('[data-testid=version-steps]')), 'no Steps in the version picker');
+    await page.keyboard.press('Escape');
   });
 
   await check('a reviewer sees the work, never Stop, Try again or Tell it…', async () => {

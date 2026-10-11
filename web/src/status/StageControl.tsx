@@ -44,6 +44,8 @@ interface StageControlProps {
   onPublish?: () => void;
   /** Phones: only the button, with a short word (the status is the line under the video's name: StageLine). */
   compact?: boolean;
+  /** The agent button beside it says what the agent is doing (the stage is in progress): no status of its own then. */
+  agentSays?: boolean;
 }
 
 /** Phones: where the video stands, as the line under its name — the bar has no room for the words beside the button,
@@ -84,7 +86,7 @@ interface Primary {
   onClick: () => void;
 }
 
-export function StageControl({ data, latestV, onShare, onVerify, onPublish, compact = false }: StageControlProps) {
+export function StageControl({ data, latestV, onShare, onVerify, onPublish, compact = false, agentSays = false }: StageControlProps) {
   const info: StageInfo = data.summary.stage;
   const allowed = useCan();
   const act = useStageActions(data.slug);
@@ -203,7 +205,7 @@ export function StageControl({ data, latestV, onShare, onVerify, onPublish, comp
 
   return (
     <div className={compact ? 'signoff compact' : 'signoff'} data-stage={info.stage}>
-      {!compact && (
+      {!compact && !agentSays && (
         <Tip
           side="bottom"
           content={
@@ -211,6 +213,7 @@ export function StageControl({ data, latestV, onShare, onVerify, onPublish, comp
               <StageStepper info={info} />
               <span>{stageDetail(info)}</span>
               {watchedLine && <span>{watchedLine}</span>}
+              {waiting && waiting !== status && <span className="so-next">{waiting}</span>}
               {nextLine(info) && <span className="so-next">{nextLine(info)}</span>}
             </div>
           }
@@ -227,7 +230,8 @@ export function StageControl({ data, latestV, onShare, onVerify, onPublish, comp
             )}
             {stageNote(info) && <span className="so-note">{stageNote(info)}</span>}
             {/* never the same words twice (check mode leaves the stage saying "Check 2 fixes" and nothing to press) */}
-            {waiting && waiting !== status && <span className="so-wait">· {waiting}</span>}
+            {/* what it waits for: in its tooltip for the eye (its steps say it), here for screen readers */}
+            {waiting && waiting !== status && <span className="so-wait sr-only">· {waiting}</span>}
           </span>
         </Tip>
       )}

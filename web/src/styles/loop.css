@@ -103,7 +103,6 @@
 /* The player's one agent control (player/ClaudeMenu.tsx): the agent's state, mark and name, or "Agent". */
 .agent-btn {
   gap: var(--sp-1);
-  max-width: 200px;
 }
 .agent-btn .agent-name {
   min-width: 0;
@@ -111,14 +110,25 @@
 .agent-btn.none .spark {
   color: var(--agent-2);
 }
-/* While the agent works the button says where it stands in a word or two, in the name's place, never the agent's own
- * sentence: one width for any state, so the bar doesn't shift with each (the bar's 150/200 px cap still holds). The
- * words give way with an ellipsis, a percentage beside them never does. */
-.agent-btn.now {
-  width: 200px;
+/* What it says — its name, or while it works where it stands in a word or two ("fixing 3 of 5") — at its own width,
+ * never a width kept for the longest state: the button eases to the new width as the words change. The words give way
+ * with an ellipsis past 220 px (150 px below 1180: player.css), a percentage beside them never does. */
+.agent-hug {
+  display: inline-flex;
+  min-width: 0;
+  overflow: hidden;
+  transition: width var(--dur) var(--ease-out);
+}
+.agent-hug-in {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sp-1);
+  width: max-content;
+  max-width: 220px;
 }
 .agent-btn .agent-step {
-  flex: 1;
+  flex: 0 1 auto;
   text-align: left;
   font-weight: var(--fw-text);
   color: var(--fg-2);

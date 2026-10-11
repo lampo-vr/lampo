@@ -53,8 +53,6 @@ interface PlayerTopbarProps {
    * agent button's words follow it). */
   runs?: Run[];
   run?: RunLike | null;
-  /** The version picker's "Steps": the Agent view on that work. */
-  onSteps?: (id: string) => void;
 }
 
 export const PlayerTopbar = memo(function PlayerTopbar({
@@ -76,7 +74,6 @@ export const PlayerTopbar = memo(function PlayerTopbar({
   archived = null,
   runs,
   run = null,
-  onSteps,
 }: PlayerTopbarProps) {
   useLang(); // memo'd: renders again on a language switch by itself
   const { review, summary, slug } = data;
@@ -104,7 +101,6 @@ export const PlayerTopbar = memo(function PlayerTopbar({
       onCompare={onCompareWith}
       runs={runs}
       coming={run}
-      onSteps={onSteps}
     />
   );
   const compare = (
@@ -150,7 +146,16 @@ export const PlayerTopbar = memo(function PlayerTopbar({
   const approval = archived ? (
     <ArchivedBanner onRestore={archived.onRestore} />
   ) : (
-    <StageControl data={data} latestV={latestV} onShare={onShare} onVerify={onVerify} onPublish={onPublish} compact={phone} />
+    <StageControl
+      data={data}
+      latestV={latestV}
+      onShare={onShare}
+      onVerify={onVerify}
+      onPublish={onPublish}
+      compact={phone}
+      // while an agent is on it the agent button says so ("fixing 3 of 5"): the stage steps back, Decide stays
+      agentSays={!phone && !final && (canAsk || canAssign) && !!review.session && summary.stage.stage === 'in_progress'}
+    />
   );
   // The version on screen as its own file (as rendered, whatever the browser plays), the others a step further in.
   const canDownload = allowed('download') && !review.archived;
