@@ -27,6 +27,8 @@
   grid-column: 2;
   grid-row: 1;
   margin: var(--sp-1) var(--sp-1) 0 0;
+  /* in the box's corner: concentric with it (its radius less the --sp-1 around the button) */
+  border-radius: calc(var(--r) - var(--sp-1));
 }
 .set-code pre {
   grid-column: 1 / -1;

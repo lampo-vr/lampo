@@ -33,7 +33,8 @@
     .aud-thumb,
     .cv-loop,
     .cv-rl
-  ) {
+  ),
+.theme-dark {
   color-scheme: dark;
   /* color is inherited as a resolved value: an island sets it again, or text without a colour of its own keeps the
      page's ink (dark on dark in the light theme). */
@@ -177,7 +178,12 @@
   --gs-b: #131314;
 }
 
-:root {
+/* A theme island (.theme-dark / .theme-light: the styleguide shows both themes side by side) takes a theme's colours
+   and works out everything made from them (the shadows, the float's lines, the raised material) for itself; the dark
+   islands above keep the page's. */
+:root,
+.theme-dark,
+.theme-light {
   /* Shadows cast onto the page: dark islands don't redeclare these, so a film strip on paper casts a paper shadow. */
   --cast: #000;
   --cast-k: 1;
@@ -236,10 +242,26 @@
   --r-full: 999px;
   --radius: var(--r-lg);
   --radius-sm: var(--r);
-  /* Icons: in chips and menus · in buttons, nav and toolbars · in empty states and large buttons. */
+  /* Nested corners are concentric: a surface inset p inside a rounded one of radius R gets R − p, so the gap around it
+     stays even along the curve (further in than R a corner is free; test/e2e/lib/designInventory.mjs concentric()).
+     A sunken track (segmented controls, tabs) is --r with a 1 px edge and --track-pad inside it, so the raised item in
+     it gets --r-track-in (5); a row in a menu sits inside its 1 px edge and --sp-1 (3). */
+  --track-pad: var(--sp-0_5);
+  --r-track-in: calc(var(--r) - 1px - var(--track-pad));
+  --r-menu-in: calc(var(--r) - 1px - var(--sp-1));
+  /* Icons follow the type beside them: 14 beside 12 px (small buttons, segments, tabs, toasts) · 16 beside 13 px
+     (buttons, menus, nav) and alone in a 26–30 px button · 20 alone in a 40 px button and in empty states. */
   --ic-sm: 14px;
   --ic: 16px;
   --ic-lg: 20px;
+  /* in a 20 px chip or label beside 11 px type, and a menu's or a choice's chevron at the end of a button */
+  --ic-xs: 12px;
+  /* Their stroke on the 24-unit grid (ui/icons.tsx strokeFor): a little heavier the smaller, one weight on screen. The
+     control families set size and stroke by their own size step, whatever size a screen asked for (ui.css). */
+  --ic-stroke-xs: 2.25;
+  --ic-stroke-sm: 2;
+  --ic-stroke: 1.9;
+  --ic-stroke-lg: 1.75;
   /* The play triangle's optical nudge: its weight sits left of its box, so it stands this much right of the middle of a
      round play button (dock.css .playbtn); pause bars stand exactly in the middle. */
   --ic-play-nudge: 1px;
@@ -260,6 +282,15 @@
     0 8px 24px color-mix(in srgb, var(--cast) calc(30% * var(--cast-k)), transparent),
     0 1px 3px color-mix(in srgb, var(--cast) calc(30% * var(--cast-k)), transparent);
   --focus-ring: 0 0 0 3px color-mix(in srgb, var(--fg) 14%, transparent);
+  /* The keyboard's focus, one ring for everything pressed: a line of --focus-width in the text colour (the brand's on
+     the orange way in), --focus-offset off the edge — 0 for an item in a track (the ring fills the gap around it),
+     --focus-inset inside the edge where the box clips (a row in a list). Fields show where typing goes instead: their
+     edge in --fg-2 and the soft --focus-ring. design-scale.test.ts holds every focus rule to these. */
+  --focus-width: 2px;
+  --focus-offset: 2px;
+  --focus-inset: calc(-1 * var(--focus-width));
+  /* what can't be used now: faded, the same amount everywhere (a primary lies flat instead: system.css) */
+  --disabled-o: 0.4;
   /* A sunken track (segmented controls, tabs, the timecode, the timeline): the opposite of the raised material. */
   --sunk: inset 0 1px 2px color-mix(in srgb, var(--cast) calc(18% * var(--cast-k)), transparent);
   /* The raised material: the one 3D look for primary actions and for everything selected or active (a segment, a
@@ -339,6 +370,7 @@
 /* Light: warm paper, ink-black type, the film details kept; status colours deepened to pass WCAG AA as text.
    The print sheet is paper in both themes, so it always takes these. */
 :root[data-theme='light'],
+.theme-light,
 body.printing {
   color-scheme: light;
   --cast: #3a2e1c;
@@ -461,6 +493,11 @@ body.printing {
   --gs-b: #f8f6f0;
 }
 
+/* an island's own text colour (the dark block sets the dark ones') */
+.theme-light {
+  color: var(--fg);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -562,8 +599,8 @@ strong {
   background: transparent;
 }
 :focus-visible {
-  outline: 1.5px solid var(--fg);
-  outline-offset: 2px;
+  outline: var(--focus-width) solid var(--fg);
+  outline-offset: var(--focus-offset);
 }
 /* the ring is the keyboard's: a native select clicked with the mouse matches :focus-visible in Chrome too
    (lib/themeBoot.ts says which input came last) */

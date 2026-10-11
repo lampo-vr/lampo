@@ -638,8 +638,8 @@
   color: var(--fg);
 }
 .set-tiles .set-tile:has(input:focus-visible) {
-  outline: 2px solid var(--fg);
-  outline-offset: 2px;
+  outline: var(--focus-width) solid var(--fg);
+  outline-offset: var(--focus-offset);
 }
 /* three across while a name and its line fit whole (a tablet's panel cut "Claude Co…"), else two */
 @container agent-tiles (max-width: 480px) {
@@ -700,8 +700,8 @@
   color: var(--fg);
 }
 .set-chip:has(input:focus-visible) {
-  outline: 2px solid var(--fg);
-  outline-offset: 2px;
+  outline: var(--focus-width) solid var(--fg);
+  outline-offset: var(--focus-offset);
 }
 @media (pointer: coarse) {
   .set-chip {

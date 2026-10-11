@@ -951,6 +951,10 @@ button.c-tc:hover {
   flex: none;
   color: var(--ok);
 }
+/* its button sits --sp-2 inside the banner's corner: concentric with it */
+.verify-cta > .btn {
+  border-radius: calc(var(--radius) - var(--sp-2));
+}
 .verify-cta .grow {
   display: grid;
   gap: 1px;

@@ -68,7 +68,7 @@
   gap: var(--sp-2);
   min-height: var(--h);
   padding: 0 var(--sp-2);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-menu-in);
   cursor: pointer;
   color: var(--fg-2);
   font-size: var(--fs-sm);

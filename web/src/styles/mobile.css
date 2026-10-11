@@ -798,6 +798,12 @@
     min-height: var(--h-touch);
     font: var(--fw-strong) var(--fs-md) var(--mono);
   }
+  /* a frame step under the thumb: the large icon (ui.css) */
+  .pstep > .icon {
+    width: var(--ic-lg);
+    height: var(--ic-lg);
+    stroke-width: var(--ic-stroke-lg);
+  }
   .pbtns .playbtn {
     width: 58px;
     height: 58px;

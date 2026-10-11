@@ -510,8 +510,8 @@ a.op-link-row.set-row:hover {
 }
 .op-rows > a.op-row:focus-visible,
 a.op-link-row.set-row:focus-visible {
-  outline: 2px solid var(--fg-2);
-  outline-offset: -2px;
+  outline: var(--focus-width) solid var(--fg);
+  outline-offset: var(--focus-inset);
   background: var(--sel);
 }
 .op-rows > a.op-row:active,

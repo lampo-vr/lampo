@@ -5,10 +5,6 @@
   padding: 0;
   justify-content: center;
 }
-.seg.theme-switch button:focus-visible {
-  outline: 2px solid var(--fg);
-  outline-offset: 1px;
-}
 
 /* the language switch (web/src/ui/LangSwitch.tsx): EN · DE beside the theme, the full words in Settings */
 .seg.lang-switch.short button {
@@ -16,10 +12,6 @@
   padding: 0 var(--sp-2);
   justify-content: center;
   font: var(--fw-strong) var(--fs-xs) var(--mono);
-}
-.seg.lang-switch button:focus-visible {
-  outline: 2px solid var(--fg);
-  outline-offset: 1px;
 }
 
 /* inside a menu: a label and three choices side by side */
@@ -92,7 +84,7 @@
     background var(--dur-fast),
     color var(--dur-fast);
 }
-.nav-row:hover,
+.nav-row:hover:where(:not(:disabled)),
 .nav-row:focus-visible,
 .nav-row[aria-expanded='true'] {
   background: var(--ink-3);

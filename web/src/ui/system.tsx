@@ -17,14 +17,20 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   pressed?: boolean;
   /** The width of its container: the one action of a small card (a gate, a sheet's foot). */
   wide?: boolean;
+  /** Working on it: a spinner in the icon's place (and at its size), the words kept, the look kept, not pressable until
+   * done (aria-busy). */
+  busy?: boolean;
   ref?: Ref<HTMLButtonElement>;
 }
 
-const ICON: Record<Size, number> = { sm: 14, md: 16, lg: 20 };
+/** An icon follows the type beside it (14 beside a small button's 12 px, 16 beside 13 px); alone it fills its button
+ * (16 in 26–30 px, 20 in 40 px). styles/ui.css holds every .btn to this, whatever size is asked for. */
+const ICON: Record<Size, number> = { sm: 14, md: 16, lg: 16 };
+const ALONE: Record<Size, number> = { sm: 16, md: 16, lg: 20 };
 
 /** Primary (the raised ink, one per view), secondary (the default), ghost (toolbars, rows), danger (filled, for what
  * can't be undone), link (a text action: no box). Sizes follow the control heights: 26 · 30 · 40. A disabled primary
- * lies flat: the raised look means "you can press this". */
+ * lies flat: the raised look means "you can press this"; a busy one keeps its look. */
 export function Button({
   variant = 'secondary',
   size = 'md',
@@ -32,9 +38,11 @@ export function Button({
   iconOnly,
   pressed,
   wide,
+  busy,
   className = '',
   children,
   type = 'button',
+  disabled,
   ref,
   ...rest
 }: ButtonProps) {
@@ -52,8 +60,17 @@ export function Button({
     .filter(Boolean)
     .join(' ');
   return (
-    <button ref={ref} type={type} className={cls} aria-pressed={pressed === undefined ? undefined : pressed} {...rest}>
-      {icon && <I name={icon} size={ICON[size]} />}
+    <button
+      ref={ref}
+      type={type}
+      className={cls}
+      aria-pressed={pressed === undefined ? undefined : pressed}
+      aria-busy={busy || undefined}
+      disabled={disabled || busy}
+      {...rest}
+    >
+      {/* feedback.tsx's Spinner, drawn here: this module is in the first paint and that one isn't */}
+      {busy ? <span className="spinner" aria-hidden="true" /> : icon && <I name={icon} size={(iconOnly ? ALONE : ICON)[size]} />}
       {iconOnly ? null : children}
     </button>
   );

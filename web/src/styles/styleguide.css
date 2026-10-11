@@ -3,16 +3,59 @@
 .sg {
   height: 100%;
   overflow-y: auto;
+  scroll-padding-top: var(--sp-6);
 }
 .sg .sg-page {
-  max-width: 1120px;
+  max-width: 1320px;
   margin: 0 auto;
   padding: var(--sp-12) var(--sp-6) var(--sp-20);
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-6);
+}
+.sg .sg-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--sp-12);
+  min-width: 0;
+}
+/* the sections: a column beside the page on a wide screen, a few lines above it otherwise */
+.sg .sg-toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  align-content: start;
+}
+.sg .sg-toc button {
+  height: var(--h-sm);
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--r);
+  background: none;
+  color: var(--muted);
+  font: var(--fw-ui) var(--fs-sm) / var(--lh-ui) var(--ui);
+  text-align: left;
+  cursor: pointer;
+}
+.sg .sg-toc button:hover {
+  background: var(--sel);
+  color: var(--fg);
+}
+@media (min-width: 1200px) {
+  .sg .sg-page {
+    grid-template-columns: 184px minmax(0, 1fr);
+    gap: var(--sp-8);
+  }
+  .sg .sg-toc {
+    position: sticky;
+    top: var(--sp-6);
+    flex-direction: column;
+    flex-wrap: nowrap;
+  }
 }
 .sg .sg-block {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--sp-4);
 }
 .sg .sg-note {
@@ -22,15 +65,24 @@
   font-size: var(--fs-md);
   line-height: var(--lh-body);
 }
+.sg .sg-sub {
+  margin: 0;
+  font: var(--fw-strong) var(--fs-md) / var(--lh-ui) var(--ui);
+}
 .sg .sg-row {
   display: grid;
-  grid-template-columns: 128px minmax(0, 1fr);
+  grid-template-columns: 136px minmax(0, 1fr);
   align-items: center;
   gap: var(--sp-4);
 }
 .sg .sg-label {
   color: var(--muted);
   font-size: var(--fs-sm);
+}
+.sg .sg-label code,
+.sg code.sg-token {
+  font: var(--fw-ui) var(--fs-xs) / var(--lh-ui) var(--mono);
+  color: var(--fg-2);
 }
 .sg .sg-items {
   display: flex;
@@ -39,16 +91,39 @@
   gap: var(--sp-2) var(--sp-3);
   min-width: 0;
 }
-.sg .sg-raised {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--sp-4);
-  padding: var(--sp-6);
-  border-radius: var(--r-lg);
-  background: var(--ink-2);
-  border: 1px solid var(--line);
+.sg .sg-row-note {
+  flex: 1 1 100%;
+  max-width: 72ch;
+  color: var(--muted);
+  font-size: var(--fs-sm);
 }
+.sg .sg-items > :is(.sg-lines, .sg-codes) {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+/* a grid of samples: one column of labels, one per state or size */
+.sg .sg-matrix {
+  display: grid;
+  grid-template-columns: 136px repeat(var(--cols), minmax(0, 1fr));
+  align-items: center;
+  gap: var(--sp-3) var(--sp-4);
+}
+.sg .sg-matrix-row {
+  display: contents;
+}
+.sg .sg-col {
+  font-size: var(--fs-xs);
+}
+.sg .sg-cell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.sg .sg-cell > .input {
+  width: 100%;
+}
+
 .sg .sg-brand {
   display: flex;
   flex-wrap: wrap;
@@ -78,54 +153,104 @@
   gap: var(--sp-2);
   color: var(--fg-2);
 }
-.sg .sg-gate {
+
+/* ---------------------------------------------------------------- colour: each token in both themes */
+.sg .sg-colours {
   display: grid;
+  gap: var(--sp-6);
+}
+.sg .sg-colours-head,
+.sg .sg-colour-row {
+  display: grid;
+  grid-template-columns: 136px minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--sp-2);
-  width: 280px;
-  padding: var(--sp-6);
-  border-radius: var(--r-lg);
-  border: 1px solid var(--line);
-  background: var(--ink-2);
+  align-items: stretch;
 }
-.sg .sg-w {
-  width: 160px;
-}
-.sg .sg-p {
-  margin: var(--sp-2) 0 var(--sp-3);
+.sg .sg-colours-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--sp-2) 0;
+  background: var(--ink-1);
   color: var(--muted);
-  font-size: var(--fs-md);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-ui);
 }
-.sg .sg-panels {
+.sg .sg-colour-group {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: var(--sp-4);
-  align-items: start;
+  gap: var(--sp-1);
 }
-.sg .sg-list {
-  padding: var(--sp-1);
+.sg .sg-colour-group > .sg-note {
+  margin-bottom: var(--sp-2);
+  font-size: var(--fs-sm);
 }
-.sg .sg-empties {
+.sg .sg-colour-row > .sg-token {
+  align-self: center;
+}
+.sg .sg-colour {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-1);
+  border-radius: var(--r);
+  background: var(--ink-1);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.sg .sg-chip {
+  flex: none;
+  width: var(--sp-8);
+  height: var(--h-xs);
+  /* concentric with its cell (--r less the --sp-1 around it) */
+  border-radius: calc(var(--r) - var(--sp-1));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 12%, transparent);
+}
+.sg .sg-aa {
+  flex: none;
+  font: var(--fw-strong) var(--fs-md) / 1 var(--ui);
+}
+/* type on the fill it is made for */
+.sg .sg-chip:has(> .sg-on) {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: var(--sp-3);
+  place-items: center;
 }
+.sg .sg-on {
+  font: var(--fw-strong) var(--fs-sm) / 1 var(--ui);
+}
+.sg .sg-token-on {
+  color: var(--muted);
+}
+.sg .sg-val {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font: var(--fw-ui) var(--fs-xs) / var(--lh-ui) var(--mono);
+  font-stretch: 87.5%;
+}
+
+/* ---------------------------------------------------------------- type */
 .sg .sg-type {
   display: grid;
   gap: var(--sp-3);
 }
 .sg .sg-type-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   align-items: baseline;
   gap: var(--sp-6);
-  min-width: 0;
 }
 .sg .sg-fs {
-  flex: none;
-  width: 60%;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: var(--lh-tight);
+}
+.sg .sg-fs-4xl {
+  font: var(--fw-strong) semi-condensed var(--fs-4xl) / var(--lh-tight) var(--display);
+  letter-spacing: var(--track-title);
 }
 .sg .sg-fs-3xl {
   font: var(--fw-strong) semi-condensed var(--fs-3xl) / var(--lh-tight) var(--display);
@@ -152,6 +277,13 @@
 .sg .sg-fs-xs {
   font-size: var(--fs-xs);
 }
+.sg .sg-fs-2xs {
+  font: var(--fw-ui) var(--fs-2xs) / var(--lh-tight) var(--mono);
+  letter-spacing: var(--track-eyebrow);
+}
+.sg .sg-fs-touch {
+  font-size: var(--fs-touch);
+}
 .sg .sg-fw-400 {
   font-weight: var(--fw-text);
 }
@@ -161,12 +293,48 @@
 .sg .sg-fw-650 {
   font-weight: var(--fw-strong);
 }
-.sg .sg-space {
+.sg .sg-face-display {
+  font: var(--fw-strong) semi-condensed var(--fs-lg) / var(--lh-ui) var(--display);
+  letter-spacing: var(--track-title);
+}
+.sg .sg-face-wide {
+  font: var(--fw-strong) var(--fs-lg) / var(--lh-ui) var(--ui);
+  letter-spacing: var(--track-title);
+}
+.sg .sg-face-keys {
+  font: var(--fw-ui) var(--fs-md) / var(--lh-ui) var(--keys);
+}
+.sg .sg-lh {
+  max-width: 14em;
+  padding: 0 var(--sp-2);
+  background: var(--sel);
+  font-size: var(--fs-md);
+}
+.sg .sg-lh-tight {
+  line-height: var(--lh-tight);
+}
+.sg .sg-lh-ui {
+  line-height: var(--lh-ui);
+}
+.sg .sg-lh-body {
+  line-height: var(--lh-body);
+}
+
+/* ---------------------------------------------------------------- the scales */
+.sg .sg-scales {
+  display: grid;
+  gap: var(--sp-4);
+}
+.sg .sg-space,
+.sg .sg-icon {
   display: inline-grid;
   justify-items: center;
   gap: var(--sp-1);
   font-size: var(--fs-xs);
   color: var(--muted);
+}
+.sg .sg-icon > .icon {
+  color: var(--fg);
 }
 .sg .sg-space i {
   display: block;
@@ -198,6 +366,12 @@
 .sg .sg-sp-12 {
   width: var(--sp-12);
 }
+.sg .sg-sp-16 {
+  width: var(--sp-16);
+}
+.sg .sg-sp-20 {
+  width: var(--sp-20);
+}
 .sg .sg-radius,
 .sg .sg-height,
 .sg .sg-shadow {
@@ -224,6 +398,47 @@
 .sg .sg-r-full {
   border-radius: var(--r-full);
 }
+/* nested corners drawn: the outer box, the inner one inset in it with the concentric radius */
+.sg .sg-nest {
+  display: inline-grid;
+  width: var(--sp-20);
+  height: var(--sp-12);
+  border: 1px solid var(--line-2);
+  background: var(--ink-0);
+}
+.sg .sg-nest > span {
+  display: grid;
+  place-items: center;
+  background: var(--raise-sheen), var(--ink-3);
+  box-shadow: var(--raise);
+  color: var(--fg-2);
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+}
+.sg .sg-nest-track {
+  padding: var(--track-pad);
+  border-radius: var(--r);
+  box-shadow: var(--sunk);
+}
+.sg .sg-nest-track > span {
+  border-radius: var(--r-track-in);
+}
+.sg .sg-nest-menu {
+  padding: var(--sp-1);
+  border-radius: var(--r);
+  background: var(--float-bg);
+}
+.sg .sg-nest-menu > span {
+  border-radius: var(--r-menu-in);
+}
+.sg .sg-nest-card {
+  padding: var(--sp-2);
+  border-width: 0;
+  border-radius: var(--r-lg);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.sg .sg-nest-card > span {
+  border-radius: calc(var(--r-lg) - var(--sp-2));
+}
 .sg .sg-height {
   width: var(--sp-16);
   border-radius: var(--r);
@@ -234,75 +449,253 @@
 .sg .sg-h-sm {
   height: var(--h-sm);
 }
-.sg .sg-h-md {
+.sg .sg-h {
   height: var(--h);
 }
 .sg .sg-h-lg {
   height: var(--h-lg);
 }
+.sg .sg-h-touch {
+  height: var(--h-touch);
+}
+.sg .sg-h-xl {
+  height: var(--h-xl);
+}
 .sg .sg-shadow {
-  width: var(--sp-20);
+  min-width: var(--sp-20);
+  padding: 0 var(--sp-2);
   height: var(--sp-12);
   border-radius: var(--r);
+  border-color: transparent;
 }
-.sg .sg-shadow-raise {
+.sg .sg-sh-raise {
   background: var(--raise-sheen), var(--ink-3);
   box-shadow: var(--raise);
 }
-.sg .sg-shadow-press {
+.sg .sg-sh-press {
   box-shadow: var(--press);
 }
-.sg .sg-shadow-float {
-  background: var(--ink-1);
+.sg .sg-sh-sunk {
+  background: var(--ink-0);
+  box-shadow: var(--sunk);
+}
+.sg .sg-sh-shadow-float {
+  background: var(--float-bg);
   box-shadow: var(--shadow-float);
 }
-.sg .sg-shadow-focus {
+.sg .sg-sh-shadow-raise {
+  box-shadow: var(--shadow-raise);
+}
+.sg .sg-sh-shadow-small {
+  box-shadow: var(--shadow-small);
+}
+.sg .sg-sh-shadow-hair {
+  box-shadow: var(--shadow-hair);
+}
+.sg .sg-sh-shadow-brand {
+  background: var(--brand-deep);
+  color: var(--on-brand);
+  box-shadow: var(--shadow-brand);
+}
+.sg .sg-sh-shadow-danger {
+  background: var(--danger);
+  color: var(--on-must);
+  box-shadow: var(--shadow-danger);
+}
+.sg .sg-sh-focus-ring {
+  border-color: var(--fg-2);
   box-shadow: var(--focus-ring);
 }
+.sg .sg-layers {
+  display: grid;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
 
-@media (max-width: 640px) {
-  .sg .sg-page {
-    padding: var(--sp-8) var(--sp-4) var(--sp-16);
-    gap: var(--sp-8);
-  }
-  .sg .sg-row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--sp-2);
-  }
-  .sg .sg-type-row {
-    display: grid;
-    gap: var(--sp-1);
-  }
-  .sg .sg-fs {
-    width: auto;
-  }
-  .sg .sg-gate {
-    width: 100%;
-  }
+/* ---------------------------------------------------------------- both themes side by side */
+.sg .sg-themes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: var(--sp-4);
+}
+.sg .sg-raised {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-6);
+  border-radius: var(--r-lg);
+  background: var(--ink-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.sg .sg-gate {
+  display: grid;
+  gap: var(--sp-2);
+  width: 280px;
+  max-width: 100%;
+  padding: var(--sp-6);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+}
+.sg .sg-w {
+  width: 160px;
+}
+.sg .sg-w-lg {
+  width: 280px;
+  max-width: 100%;
+}
+.sg .sg-w-xl {
+  width: 392px;
+  max-width: 100%;
+}
+.sg .sg-search {
+  width: 280px;
+  max-width: 100%;
+}
+.sg .sg-p {
+  margin: var(--sp-2) 0 var(--sp-3);
+  color: var(--muted);
+  font-size: var(--fs-md);
+}
+/* the keyboard's ring on a control that takes no class of ours (a switch, a checkbox): the same tokens */
+.sg .sg-focus-wrap > * {
+  outline: var(--focus-width) solid var(--fg);
+  outline-offset: var(--focus-offset);
+}
+.sg .sg-codes {
+  display: grid;
+  gap: var(--sp-2);
+  max-width: 640px;
+}
+.sg .sg-menu-kbd {
+  display: inline-flex;
+  align-items: baseline;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.sg .sg-menu-kbd .menu-kbd {
+  margin-left: var(--sp-2);
+}
+
+/* keyframe glyphs: shapes by tones */
+.sg .sg-glyphs {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) repeat(7, minmax(0, 1fr));
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  max-width: 760px;
+}
+.sg .sg-glyph-row {
+  display: contents;
+}
+.sg .sg-kg {
+  display: inline-flex;
+  color: var(--fg-2);
+}
+.sg .sg-kg.must {
+  color: var(--must);
+}
+.sg .sg-kg.should {
+  color: var(--should);
+}
+.sg .sg-kg.nice {
+  color: var(--nice);
+}
+.sg .sg-kg.idea {
+  color: var(--idea);
+}
+.sg .sg-kg.ok {
+  color: var(--ok);
+}
+.sg .sg-kg.claude {
+  color: var(--claude);
+}
+
+.sg .sg-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: var(--sp-4);
+  align-items: start;
+}
+.sg .sg-cta {
+  flex: 1 1 360px;
+  max-width: 480px;
+}
+.sg .sg-list {
+  padding: var(--sp-1);
+}
+/* a list's selection, flat (the screens' own rows use the same tokens) */
+.sg .list-row.sg-sel {
+  background: var(--sel);
+}
+.sg .list-row.sg-sel-on {
+  background: var(--sel-on);
+}
+.sg .sg-heads {
+  display: grid;
+  gap: var(--sp-6);
+  padding: var(--sp-6);
+  border-radius: var(--r-lg);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.sg .sg-loading {
+  display: grid;
+  gap: var(--sp-4);
+  animation: none;
+}
+.sg .sg-empties {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--sp-3);
 }
 
 /* the floating family, laid out flat on the page (the real ones are portalled and positioned) */
 .sg .sg-floats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
   gap: var(--sp-6);
   align-items: start;
 }
 .sg .sg-float {
   position: static;
   width: auto;
+  min-width: 0;
+  max-width: none;
   max-height: none;
   animation: none;
+}
+/* on a phone the app's menus are sheets (mobile.css); the sample keeps the menu as it floats at a desk */
+.sg .sg-float.menu {
+  border-radius: var(--r);
+  border-bottom: 1px solid var(--float-line);
+  padding: var(--sp-1);
+  box-shadow: var(--shadow-float);
+}
+.sg .sg-float.modal {
+  border-radius: var(--r-lg);
+  border-bottom: 1px solid var(--float-line);
 }
 .sg .sg-float-col {
   display: grid;
   gap: var(--sp-4);
   justify-items: start;
 }
+.sg-drawer-body {
+  display: grid;
+  gap: var(--sp-0_5);
+  padding: var(--sp-2);
+}
+
 /* Agent at work: each state's strip at the side panel's width, labelled */
 .sg-strips {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(392px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 392px), 1fr));
   gap: var(--sp-3) var(--sp-6);
 }
 .sg-strip {
@@ -328,7 +721,77 @@
 .sg-poster {
   position: relative;
   width: 320px;
+  max-width: 100%;
   aspect-ratio: 16 / 10;
   overflow: hidden;
   background: var(--ink-0);
+}
+.sg-poster.sg-poster-sm {
+  width: 240px;
+  border-radius: var(--radius);
+}
+
+@media (max-width: 640px) {
+  .sg .sg-page {
+    padding: var(--sp-8) var(--sp-4) var(--sp-16);
+  }
+  .sg .sg-main {
+    gap: var(--sp-8);
+  }
+  .sg .sg-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-2);
+  }
+  /* the samples' grid as rows of captioned cells: the label, then each sample over its column's name */
+  .sg .sg-matrix {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-4);
+  }
+  .sg .sg-matrix > :is(span, .sg-col) {
+    display: none;
+  }
+  .sg .sg-matrix-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    gap: var(--sp-3);
+  }
+  .sg .sg-matrix-row > .sg-label {
+    grid-column: 1 / -1;
+  }
+  .sg .sg-cell {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-1);
+  }
+  .sg .sg-cell::after {
+    content: attr(data-col);
+    color: var(--muted);
+    font-size: var(--fs-xs);
+  }
+  .sg .sg-colours-head,
+  .sg .sg-colour-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .sg .sg-colours-head > :first-child {
+    display: none;
+  }
+  .sg .sg-colour-row > .sg-token {
+    grid-column: 1 / -1;
+  }
+  /* a value with its contrast takes two lines in a phone's half */
+  .sg .sg-val {
+    white-space: normal;
+  }
+  /* the tones' names don't fit over 20 px columns: the glyphs' colours say them */
+  .sg .sg-glyphs > .sg-label {
+    visibility: hidden;
+  }
+  .sg .sg-type-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-1);
+  }
+  .sg .sg-glyphs {
+    grid-template-columns: minmax(0, 1fr) repeat(7, minmax(0, 20px));
+  }
 }

@@ -22,7 +22,7 @@
     color 0.15s,
     transform 0.1s;
 }
-.btn:hover {
+.btn:hover:where(:not(:disabled)) {
   background: var(--ink-4);
   border-color: var(--line-3);
 }
@@ -30,9 +30,15 @@
   transform: translateY(1px);
 }
 .btn:disabled {
-  opacity: 0.4;
   cursor: default;
   transform: none;
+}
+/* busy (Button busy, aria-busy) is working, not unavailable: it keeps its look */
+.btn:disabled:where(:not([aria-busy='true'])) {
+  opacity: var(--disabled-o);
+}
+.btn[aria-busy='true'] {
+  cursor: progress;
 }
 /* The raised material (base.css --raise*) in the brand's colour: the one action a view is for, in both themes the
    same orange button the client's invitation opens with. Selected and active states keep the neutral material.
@@ -44,7 +50,7 @@
   font-weight: var(--fw-strong);
   box-shadow: var(--raise);
 }
-.btn.primary:hover {
+.btn.primary:hover:where(:not(:disabled)) {
   background: var(--raise-sheen), var(--brand-deep);
   border-color: var(--brand-deep);
   box-shadow: var(--raise-edge), var(--shadow-brand);
@@ -60,7 +66,7 @@
   border-color: transparent;
   color: var(--fg-2);
 }
-.btn.ghost:hover {
+.btn.ghost:hover:where(:not(:disabled)) {
   background: var(--ink-3);
   color: var(--fg);
 }
@@ -69,10 +75,10 @@
   border-color: color-mix(in srgb, var(--ok) 35%, transparent);
   color: var(--ok);
 }
-.btn.ok:hover {
+.btn.ok:hover:where(:not(:disabled)) {
   background: color-mix(in srgb, var(--ok) 18%, transparent);
 }
-.btn.danger:hover {
+.btn.danger:hover:where(:not(:disabled)) {
   color: var(--must);
   border-color: color-mix(in srgb, var(--must) 45%, transparent);
 }
@@ -140,7 +146,7 @@ kbd {
     border-color 0.15s,
     box-shadow 0.15s;
 }
-.input:hover {
+.input:hover:where(:not(:disabled)) {
   border-color: var(--line-3);
 }
 .input:focus,
@@ -169,6 +175,11 @@ textarea {
 .input::placeholder {
   color: var(--faint);
 }
+/* what can't be used now fades by one amount, whatever it is (a filled button lies flat instead: system.css) */
+:is(.input, .textarea, .seg button, .tabs button, button.chip):disabled {
+  opacity: var(--disabled-o);
+  cursor: default;
+}
 .select.sm {
   height: var(--h-sm);
   font-size: var(--fs-sm);
@@ -181,22 +192,23 @@ select.input {
   background-position: right 8px center;
   cursor: pointer;
 }
-/* A sunken track; the chosen item is lifted out of it (the raised material, surface tone). */
+/* A sunken track; the chosen item is lifted out of it (the raised material, surface tone), its corners concentric with
+   the track's (--r-track-in: the track's radius less its edge and padding). */
 .seg {
   display: inline-flex;
-  padding: var(--sp-0_5);
-  gap: var(--sp-0_5);
+  padding: var(--track-pad);
+  gap: var(--track-pad);
   border-radius: var(--r);
   background: var(--ink-0);
   border: 1px solid var(--line);
   box-shadow: var(--sunk);
 }
 .seg button {
-  /* the group is one control: its outer height is --h (2 px padding and a 1 px border each side) */
-  height: calc(var(--h) - 6px);
+  /* the group is one control: its outer height is --h (the track's padding and 1 px edge each side) */
+  height: calc(var(--h) - 2 * (1px + var(--track-pad)));
   padding: 0 var(--sp-2);
   border: 0;
-  border-radius: var(--r);
+  border-radius: var(--r-track-in);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
@@ -209,7 +221,7 @@ select.input {
     color 0.15s,
     background 0.15s;
 }
-.seg button:hover {
+.seg button:hover:where(:not(:disabled)) {
   color: var(--fg);
 }
 .seg button.on {
@@ -220,8 +232,8 @@ select.input {
 /* Tabs are a segmented track too: one look for every "choose one of these". */
 .tabs {
   display: inline-flex;
-  padding: var(--sp-0_5);
-  gap: var(--sp-0_5);
+  padding: var(--track-pad);
+  gap: var(--track-pad);
   border-radius: var(--r);
   background: var(--ink-0);
   border: 1px solid var(--line);
@@ -229,10 +241,10 @@ select.input {
 }
 .tabs button {
   position: relative;
-  height: calc(var(--h) - 6px);
+  height: calc(var(--h) - 2 * (1px + var(--track-pad)));
   padding: 0 var(--sp-2);
   border: 0;
-  border-radius: var(--r-sm);
+  border-radius: var(--r-track-in);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
@@ -260,7 +272,7 @@ select.input {
 .tabs button .n.q {
   color: var(--claude-2);
 }
-.tabs button:hover {
+.tabs button:hover:where(:not(:disabled)) {
   color: var(--fg);
 }
 .tabs button.on {
@@ -288,7 +300,7 @@ select.input {
 button.chip {
   cursor: pointer;
 }
-button.chip:hover {
+button.chip:hover:where(:not(:disabled)) {
   border-color: var(--line-3);
   color: var(--fg);
 }
@@ -450,7 +462,7 @@ button.badge {
   border-top-color: var(--fg);
   animation: spin 0.75s linear infinite;
 }
-.btn.primary .spinner {
+.btn:is(.primary, .danger-fill) .spinner {
   border-color: color-mix(in srgb, var(--on-brand) 30%, transparent);
   border-top-color: var(--on-brand);
 }
@@ -465,9 +477,9 @@ button.badge {
   padding: 0;
   justify-content: center;
 }
-.seg.icons button:focus-visible {
-  outline: 2px solid var(--fg);
-  outline-offset: 1px;
+/* an item in a track: the ring fills the gap around it, concentric with the track */
+:is(.seg, .tabs) button:focus-visible {
+  outline-offset: 0;
 }
 
 /* A text field that grows with its text (ui/controls.tsx AutoTextarea sets its height): no inner scrollbar, no cap. */
@@ -513,10 +525,6 @@ button.badge {
 }
 .slider-thumb:hover {
   transform: scale(1.12);
-}
-.slider-thumb:focus-visible {
-  outline: 2px solid var(--fg);
-  outline-offset: 2px;
 }
 
 /* A sideways strip with more to one side (lib/hooks.ts useScrollEdges): a soft edge there, none at its ends, so an

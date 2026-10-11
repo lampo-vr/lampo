@@ -16,7 +16,7 @@ import { cutLabels, fitsAt } from './layout.mjs';
 import { BASELINE_DIR, baselineFiles, baselinePlan } from './lib/baseline.mjs';
 import { launch, requireChrome, shotsDir } from './lib/browser.mjs';
 import { assert, check, crashed, finish, skip } from './lib/checks.mjs';
-import { inventory, SCALE } from './lib/designInventory.mjs';
+import { concentric, inventory, SCALE } from './lib/designInventory.mjs';
 import { diffPng } from './lib/png.mjs';
 import { startServer } from './lib/server.mjs';
 
@@ -53,7 +53,7 @@ try {
   };
 
   await check(
-    'the styleguide shows every family: buttons, chips, badges, choosing, surfaces, floating, agents at work, rows, empty states, scales',
+    'the styleguide shows every family: colour, type, scales, buttons in every state, fields, choosing, chips, glyphs, keys, progress, surfaces, floating, rows, loading, agents, empty states',
     async () => {
       const page = await open('dark', { width: 1440, height: 900 });
       const blocks = await page.$$eval('.sg-block', (els) => els.map((e) => e.getAttribute('aria-label')));
@@ -61,37 +61,110 @@ try {
         JSON.stringify(blocks) ===
           JSON.stringify([
             'Brand',
-            'Agent marks',
+            'Colour',
+            'Type',
+            'Scales',
             'The raised material',
             'Buttons',
-            'Chips and badges',
+            'Fields',
             'Choosing',
+            'Chips, badges and labels',
+            'Keyframe glyphs',
+            'Keys, avatars and code',
+            'Progress and steps',
             'Surfaces',
             'Floating',
+            'Rows and headers',
+            'Loading',
+            'Agent marks',
             'Agent at work',
-            'Rows',
             'Empty states',
-            'Scales',
           ]),
         `blocks: ${blocks}`,
       );
       const counts = await page.evaluate(() => ({
         buttons: document.querySelectorAll('.sg-block .btn').length,
+        // every kind × every state (default, hover, pressed, focus, disabled, busy)
+        states: document.querySelectorAll('[data-testid=sg-button-states] .sg-cell').length,
+        tokens: document.querySelectorAll('[data-testid=sg-colours] .sg-colour').length,
+        glyphs: document.querySelectorAll('[data-testid=sg-glyphs] .kg').length,
         empties: document.querySelectorAll('.sg-empties .empty-state').length,
         stages: document.querySelectorAll('.sbadge[data-stage]').length,
         logo: document.querySelectorAll('[data-testid=sg-brand] svg.brand-logo[aria-label=Lampo]').length,
         marks: document.querySelectorAll('[data-testid=sg-marks] .agent-mark').length,
         // an agent's work in every state of the design's table (ready and isn't running included)
         strips: document.querySelectorAll('[data-testid=sg-strips] [data-testid=run-strip]').length,
+        sections: document.querySelectorAll('.sg-toc button').length,
       }));
       // every scene in ui/emptyArt.tsx
       assert(
-        counts.buttons >= 30 && counts.empties === 17 && counts.stages >= 8 && counts.logo === 1 && counts.marks >= 12 && counts.strips === 15,
+        counts.buttons >= 80 &&
+          counts.states === 7 * 6 &&
+          counts.tokens >= 120 &&
+          counts.glyphs === 6 * 7 &&
+          counts.empties === 17 &&
+          counts.stages >= 8 &&
+          counts.logo === 1 &&
+          counts.marks >= 12 &&
+          counts.strips === 15 &&
+          counts.sections === blocks.length,
         JSON.stringify(counts),
       );
       await page.close();
     },
   );
+
+  await check('each colour token shows in both themes side by side (theme islands), whatever theme the page is in', async () => {
+    for (const theme of ['dark', 'light']) {
+      const page = await open(theme, { width: 1440, height: 900 });
+      const cells = await page.$$eval('[data-testid=sg-colours] .sg-colour-row', (rows) =>
+        rows.map((r) => {
+          const lum = (el) => {
+            const [rr, g, b] = getComputedStyle(el)
+              .backgroundColor.match(/[\d.]+/g)
+              .map(Number);
+            return (0.2126 * rr + 0.7152 * g + 0.0722 * b) / 255;
+          };
+          const [dark, light] = r.querySelectorAll('.sg-colour');
+          return { token: r.querySelector('.sg-token').textContent, dark: lum(dark), light: lum(light), value: dark.querySelector('.sg-val').textContent };
+        }),
+      );
+      await page.close();
+      // the page each cell sits on is its theme's (--ink-1: near black, warm paper), and every value is read
+      const wrong = cells.filter((c) => !(c.dark < 0.1 && c.light > 0.85) || !/^#[0-9a-f]{6}/.test(c.value));
+      assert(cells.length >= 60 && !wrong.length, `${theme}: ${JSON.stringify(wrong.slice(0, 3))}`);
+    }
+  });
+
+  await check('the segmented control’s raised item is concentric with its track: 8 − 1 − 2 = 5 (“Last active · Newest”)', async () => {
+    const page = await open('dark', { width: 1440, height: 900 });
+    const m = await page.$eval('.sg-sort', (track) => {
+      const item = track.querySelector('button.on');
+      const t = track.getBoundingClientRect();
+      const i = item.getBoundingClientRect();
+      return { R: parseFloat(getComputedStyle(track).borderTopLeftRadius), r: parseFloat(getComputedStyle(item).borderTopLeftRadius), inset: i.top - t.top };
+    });
+    await page.close();
+    assert(m.inset === 3 && m.r === m.R - m.inset, JSON.stringify(m));
+  });
+
+  await check('hover, pressed and focus samples show the app’s own rules (pseudo-classes copied onto the samples)', async () => {
+    const page = await open('dark', { width: 1440, height: 900 });
+    const looks = await page.$$eval('[data-testid=sg-button-states] .sg-matrix-row', (rows) =>
+      rows.slice(0, 4).map((r) => {
+        const [base, hover, pressed, focus] = [...r.querySelectorAll('.sg-cell > *')].map((el) => getComputedStyle(el));
+        return {
+          row: r.querySelector('.sg-label').textContent,
+          hover: hover.backgroundColor !== base.backgroundColor || hover.boxShadow !== base.boxShadow,
+          pressed: pressed.transform !== base.transform,
+          focus: focus.outlineStyle === 'solid' && focus.outlineWidth === '2px',
+        };
+      }),
+    );
+    await page.close();
+    const off = looks.filter((l) => !(l.hover && l.pressed && l.focus));
+    assert(looks.length === 4 && !off.length, JSON.stringify(off));
+  });
 
   await check('empty-state scenes: one lit element at most; every one moves, rests under reduced motion and pauses in a hidden tab', async () => {
     const page = await browser.newPage();
@@ -228,6 +301,8 @@ try {
     const labels = await cutLabels(page);
     const scale = await page.evaluate(inventory, { scale: SCALE, allow: ['.avatar', '.sg-type'] });
     const off = Object.entries(scale).flatMap(([k, list]) => list.map((x) => `${k} ${x.value} (${x.who.join(', ')})`));
+    // nested corners follow the corner around them, in every block (the segmented control's raised item in its track)
+    for (const n of await page.evaluate(concentric, { allow: ['.sg-scales'] })) off.push(`corner of ${n.who} in ${n.in}: ${n.corners}`);
     await page.close();
     const all = [...fit, ...labels, ...off];
     assert(!all.length, all.join('\n        '));

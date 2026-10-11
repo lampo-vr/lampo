@@ -50,8 +50,8 @@
   cursor: default;
 }
 .signoff .so-status:focus-visible {
-  outline: 2px solid var(--fg);
-  outline-offset: 3px;
+  outline: var(--focus-width) solid var(--fg);
+  outline-offset: var(--focus-offset);
 }
 .signoff .so-label {
   color: var(--st);

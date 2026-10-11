@@ -42,8 +42,8 @@
   box-shadow: 0 0 0 1px var(--line-3);
 }
 .ref-box:focus-visible {
-  outline: 2px solid var(--fg);
-  outline-offset: 2px;
+  outline: var(--focus-width) solid var(--fg);
+  outline-offset: var(--focus-offset);
 }
 .ref-box img {
   width: 100%;

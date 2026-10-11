@@ -68,9 +68,16 @@
 .ob-btn:active:not(:disabled) {
   transform: translateY(1px);
 }
+/* icons on the design system's steps (base.css --ic-*: 16 beside 13 px type, 14 beside 12 px) */
 .ob-btn .icon {
-  width: 15px;
-  height: 15px;
+  width: var(--ic);
+  height: var(--ic);
+  stroke-width: var(--ic-stroke);
+}
+.ob-btn.ob-sm .icon {
+  width: var(--ic-sm);
+  height: var(--ic-sm);
+  stroke-width: var(--ic-stroke-sm);
 }
 .ob-btn.ob-sm {
   height: var(--h-sm);
@@ -110,8 +117,8 @@
   box-shadow: var(--raise-edge), var(--shadow-brand);
 }
 .ob-btn.ob-go:focus-visible {
-  outline: 2px solid var(--brand);
-  outline-offset: 2px;
+  outline: var(--focus-width) solid var(--brand);
+  outline-offset: var(--focus-offset);
 }
 .ob-btn.ob-go .ob-chev {
   width: 15px;

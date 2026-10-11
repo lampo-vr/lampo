@@ -5,8 +5,9 @@
   align-items: center;
   gap: var(--sp-1);
   height: var(--h);
-  padding: 0 var(--sp-1);
-  border-radius: var(--radius-sm);
+  padding: 0 var(--sp-2) 0 var(--sp-1);
+  /* a pill: the round avatar inside it sits concentric with its end (the chip's half-height less the inset) */
+  border-radius: var(--r-full);
   border: 1px solid var(--line-2);
   background: var(--ink-2);
   color: var(--fg-2);

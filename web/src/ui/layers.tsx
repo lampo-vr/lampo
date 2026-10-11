@@ -117,7 +117,7 @@ export function ModalLayer({ title, onClose, children, foot, width, head, fill, 
               </Dialog.Title>
               {head}
               <Dialog.Close asChild>
-                <IconButton label={t('Close')} icon="x" size={18} shortcut="Esc" />
+                <IconButton label={t('Close')} icon="x" shortcut="Esc" />
               </Dialog.Close>
             </div>
             <div className="modal-body">{children}</div>
@@ -218,7 +218,7 @@ export function DrawerLayer({ open, onOpenChange, title, children }: DrawerProps
               <h3 className="grow">{title}</h3>
             </Dialog.Title>
             <Dialog.Close asChild>
-              <IconButton label={t('Close')} icon="x" size={18} />
+              <IconButton label={t('Close')} icon="x" />
             </Dialog.Close>
           </div>
           {children}
@@ -240,7 +240,7 @@ function Choice({ P, choice }: { P: Parts; choice: MenuChoice['choice'] }) {
         {choice.options.map((o) => (
           <P.RadioItem key={o.value} value={o.value} asChild onSelect={(e: Event) => e.preventDefault()}>
             <button type="button" className={choice.value === o.value ? 'on' : ''}>
-              {o.icon && <I name={o.icon} size={14} />}
+              {o.icon && <I name={o.icon} size={16} />}
               {o.label}
             </button>
           </P.RadioItem>
@@ -299,7 +299,7 @@ function Sub({ P, sub }: { P: Parts; sub: MenuSub['sub'] }) {
     <P.Sub>
       <P.SubTrigger asChild>
         <button type="button" className="menu-sub">
-          {sub.icon ? <I name={sub.icon} size={15} /> : <span className="menu-icon-gap" />}
+          {sub.icon ? <I name={sub.icon} size={16} /> : <span className="menu-icon-gap" />}
           <span className="grow">{sub.label}</span>
           <I name="right" size={14} className="menu-sub-arrow" />
         </button>
@@ -349,7 +349,7 @@ function Item({ P, it, opens = false }: { P: Parts; it: MenuItem; opens?: boolea
   };
   const face = (
     <button type="button" className={it.danger ? 'danger' : opens ? 'menu-sub' : ''} onClickCapture={click}>
-      {it.mark ?? (it.icon ? <I name={it.icon} size={15} /> : <span className="menu-icon-gap" />)}
+      {it.mark ?? (it.icon ? <I name={it.icon} size={16} /> : <span className="menu-icon-gap" />)}
       <span className="grow">{it.label}</span>
       {it.shortcut && <kbd className="menu-kbd">{it.shortcut}</kbd>}
       {it.checked !== undefined && <I name="check" size={14} className="menu-tick" />}
@@ -815,8 +815,8 @@ export function Toaster() {
           onOpenChange={(open) => !open && closeToast(item)}
           data-testid="toast"
         >
-          {item.kind === 'ok' && <I name="check" size={15} />}
-          {item.kind === 'error' && <I name="x" size={15} />}
+          {item.kind === 'ok' && <I name="check" size={14} />}
+          {item.kind === 'error' && <I name="x" size={14} />}
           <Toast.Title className="toast-title">{item.message}</Toast.Title>
           {item.action && (
             <Toast.Action
@@ -828,7 +828,7 @@ export function Toaster() {
               }}
             >
               <button type="button" className="toast-act">
-                {item.action.undo && <I name="undo" size={13} />}
+                {item.action.undo && <I name="undo" size={14} />}
                 {item.action.label}
               </button>
             </Toast.Action>

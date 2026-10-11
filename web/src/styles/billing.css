@@ -552,11 +552,12 @@
 }
 .bill-thumb {
   position: absolute;
-  top: var(--sp-0_5);
-  bottom: var(--sp-0_5);
+  top: var(--track-pad);
+  bottom: var(--track-pad);
   left: 0;
   width: var(--w, 0);
-  border-radius: var(--r);
+  /* the raised item of a track: concentric with it, like every segmented control's (base.css --r-track-in) */
+  border-radius: var(--r-track-in);
   background: var(--raise-sheen), var(--ink-3);
   box-shadow: var(--raise);
   transform: translateX(var(--x, 0));
@@ -694,8 +695,8 @@
   box-shadow: inset 0 0 0 1px var(--line-3);
 }
 .bill-tile:has(input:focus-visible) {
-  outline: 2px solid var(--fg);
-  outline-offset: 2px;
+  outline: var(--focus-width) solid var(--fg);
+  outline-offset: var(--focus-offset);
 }
 /* selected: the raised material and a filled radio, never the orange */
 .bill-tile.on,

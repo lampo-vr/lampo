@@ -63,6 +63,22 @@ format stays backwards compatible throughout.
   type), and names all four on one line. With Something else picked too it reads "Review links lead.", not "leads".
 - The team step's picture shows the people it asks for (your editor, your producer, whoever approves), each place taken
   by an invite as you type it, beside a frame with everyone's pins.
+- The chosen item of a segmented control and of tabs sits concentric in its track: its corners follow the track's
+  curve with an even gap (“Last active · Newest”, the library's layouts, the theme and language switches). Rows in
+  menus, the drawing tools, the Copy button of a command, chips on a video's poster and the account chip follow the
+  corner around them the same way.
+- One keyboard focus ring everywhere: 2 px in the text colour, the same distance off every control (it was 1 px on
+  some and 2 px on others), filling the gap around an item in a segmented control.
+- Icons in buttons, segmented controls, tabs, menus, toasts and chips come in four sizes that follow the text beside
+  them, with one stroke weight, instead of sizes from 12 to 18 px.
+- Everything that can't be used fades by the same amount; a disabled danger button lies flat and grey like a
+  disabled primary, and nothing disabled changes when the pointer is over it. A busy button keeps its look with a
+  spinner where its icon was.
+- Key caps in chips and the shortcuts in menus use the key caps' typeface.
+- The design system page (`#/styleguide`, in development builds) shows every building block: each colour in both
+  themes side by side with its contrast, the whole type scale, spacing, corners, heights, icons, shadows, layers and
+  motion, every button kind in every state (hover, pressed, focus, disabled, busy), fields, choices, chips, glyphs,
+  key caps, code, progress, floating layers you can open, rows, headers and loading states.
 
 ### Added
 - **Start with your agent in one paste.** An empty library, project or folder leads with **Copy prompt for your

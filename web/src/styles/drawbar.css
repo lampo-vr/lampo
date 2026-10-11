@@ -36,8 +36,15 @@
   width: var(--h-lg);
   min-width: var(--h-lg);
   height: var(--h-lg);
-  border-radius: var(--r);
+  /* concentric with the bar: its corner less its edge and padding */
+  border-radius: calc(var(--r-lg) - 1px - var(--sp-1) * 1.5);
   color: var(--fg-2);
+}
+/* 40 px tools: the icon alone in a large button (ui.css) */
+.draw-bar .btn > .icon {
+  width: var(--ic-lg);
+  height: var(--ic-lg);
+  stroke-width: var(--ic-stroke-lg);
 }
 .draw-bar .btn:hover {
   color: var(--fg);

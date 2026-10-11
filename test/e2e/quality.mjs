@@ -11,7 +11,7 @@ import { sleep } from '../lib/helpers.ts';
 import { bentEdges, faintText, settle } from './layout.mjs';
 import { requireChrome } from './lib/browser.mjs';
 import { assert, check, crashed, finish } from './lib/checks.mjs';
-import { inventory, SCALE } from './lib/designInventory.mjs';
+import { concentric, inventory, SCALE } from './lib/designInventory.mjs';
 import { qualityScreens, qualityServers } from './lib/qualityScreens.mjs';
 
 const LABEL = 'quality e2e';
@@ -372,42 +372,49 @@ try {
   // control's height, on each screen and layout at desktop and phone size. Sizes drawn rather than set (an avatar's
   // initials, the phone mock, the first run's pictures, which scale with their room, the styleguide's type ramp) are
   // left out.
-  await check('every screen renders on the design system’s scales: type sizes, weights, corners, control heights', async () => {
-    const pages = {
-      ...SCREENS,
-      board: '/#/',
-      list: '/#/',
-      settings: '/#/settings/appearance',
-      styleguide: '/#/styleguide',
-    };
-    const layouts = { library: 'grid', board: 'board', list: 'list' };
-    // (the entrance's brand film and the first run's pictures are drawings at their own scale: their labels and corners
-    // scale with the picture)
-    const ALLOW = ['.avatar', '.phone', '.rdp-root', '.sg-type', '.ent-film', '.ob-pic', '.ob-smp-thumb'];
-    const out = [];
-    for (const vp of [DESKTOP, PHONE])
-      for (const [screen, url] of Object.entries(pages)) {
-        const found = await again(async () => {
-          const page = await q.browser.newPage();
-          if (vp.isMobile) await page.emulate({ viewport: vp, userAgent: IPHONE });
-          else await page.setViewport(vp);
-          await page.evaluateOnNewDocument((layout) => {
-            try {
-              if (layout) localStorage.setItem('vr.library', JSON.stringify({ layout }));
-            } catch {}
-          }, layouts[screen] ?? null);
-          await page.goto(url.startsWith('http') ? url : BASE + url, { waitUntil: 'domcontentloaded' });
-          await page.waitForSelector(ready[screen] ?? 'main, [data-testid=styleguide], .set-main', { timeout: 15000 });
-          await sleep(900);
-          const r = await page.evaluate(inventory, { scale: SCALE, allow: ALLOW });
-          await page.close();
-          return r;
-        });
-        for (const [kind, list] of Object.entries(found))
-          for (const { value, who } of list) out.push(`${screen} @${vp.width}: ${kind} ${value} (${who.join(', ')})`);
-      }
-    assert(!out.length, `off the scales in base.css:\n        ${out.join('\n        ')}`);
-  });
+  await check(
+    'every screen renders on the design system’s scales: type sizes, weights, corners (concentric where nested), control heights, icons',
+    async () => {
+      const pages = {
+        ...SCREENS,
+        board: '/#/',
+        list: '/#/',
+        settings: '/#/settings/appearance',
+        styleguide: '/#/styleguide',
+      };
+      const layouts = { library: 'grid', board: 'board', list: 'list' };
+      // (the entrance's brand film and the first run's pictures are drawings at their own scale: their labels and corners
+      // scale with the picture)
+      const ALLOW = ['.avatar', '.phone', '.rdp-root', '.sg-type', '.ent-film', '.ob-pic', '.ob-smp-thumb'];
+      const out = [];
+      for (const vp of [DESKTOP, PHONE])
+        for (const [screen, url] of Object.entries(pages)) {
+          const found = await again(async () => {
+            const page = await q.browser.newPage();
+            if (vp.isMobile) await page.emulate({ viewport: vp, userAgent: IPHONE });
+            else await page.setViewport(vp);
+            await page.evaluateOnNewDocument((layout) => {
+              try {
+                if (layout) localStorage.setItem('vr.library', JSON.stringify({ layout }));
+              } catch {}
+            }, layouts[screen] ?? null);
+            await page.goto(url.startsWith('http') ? url : BASE + url, { waitUntil: 'domcontentloaded' });
+            await page.waitForSelector(ready[screen] ?? 'main, [data-testid=styleguide], .set-main', { timeout: 15000 });
+            await sleep(900);
+            const r = await page.evaluate(inventory, { scale: SCALE, allow: ALLOW });
+            // (a count on its button's corner sits on it, not in it)
+            r.nested = await page.evaluate(concentric, { allow: [...ALLOW, '.inbox-count'] });
+            await page.close();
+            return r;
+          });
+          for (const n of found.nested ?? []) out.push(`${screen} @${vp.width}: corner of ${n.who} in ${n.in}: ${n.corners}`);
+          delete found.nested;
+          for (const [kind, list] of Object.entries(found))
+            for (const { value, who } of list) out.push(`${screen} @${vp.width}: ${kind} ${value} (${who.join(', ')})`);
+        }
+      assert(!out.length, `off the scales in base.css:\n        ${out.join('\n        ')}`);
+    },
+  );
 } catch (e) {
   crashed(e, ...q.servers);
 } finally {

@@ -390,7 +390,8 @@
   background: transparent;
   text-align: left;
   padding: 0 var(--sp-2);
-  border-radius: var(--r-sm);
+  /* concentric with the menu's corner (its 1 px edge and --sp-1 inside it) */
+  border-radius: var(--r-menu-in);
   cursor: pointer;
   color: var(--fg-2);
   font: var(--fw-ui) var(--fs-md) / var(--lh-ui) var(--ui);

@@ -247,8 +247,8 @@ button.link-title[aria-expanded='true'] .link-sub {
   color: var(--fg-2);
 }
 button.link-title:focus-visible {
-  outline: 2px solid var(--fg);
-  outline-offset: 2px;
+  outline: var(--focus-width) solid var(--fg);
+  outline-offset: var(--focus-offset);
 }
 .link-name {
   display: flex;

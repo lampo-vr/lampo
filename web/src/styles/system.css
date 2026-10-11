@@ -14,16 +14,14 @@
 .btn.wide {
   width: 100%;
 }
-/* The raised look says "press me": a primary that can't be pressed yet lies flat, and a primary loses its colour
-   too (a faded orange reads as a muddy brown on the dark surfaces). */
-.btn.primary:disabled,
-.btn.danger-fill:disabled {
-  box-shadow: none;
-}
-.btn.primary:disabled {
+/* The raised look says "press me": a filled button that can't be pressed yet lies flat and loses its colour (a faded
+   orange reads as a muddy brown on the dark surfaces, a faded crimson as dried blood), the primary and the danger
+   alike. */
+.btn:is(.primary, .danger-fill):disabled:where(:not([aria-busy='true'])) {
   background: var(--ink-4);
   border-color: var(--line-2);
   color: var(--muted);
+  box-shadow: none;
   opacity: 1;
 }
 /* Danger, for what can't be undone: a crimson fill (--danger), unmistakably not the orange primary, with the raised
@@ -35,7 +33,7 @@
   font-weight: var(--fw-strong);
   box-shadow: var(--raise);
 }
-.btn.danger-fill:hover {
+.btn.danger-fill:hover:where(:not(:disabled)) {
   background: var(--raise-sheen), var(--danger);
   border-color: var(--danger);
   box-shadow: var(--raise-edge), var(--shadow-danger);
@@ -58,9 +56,12 @@
   text-decoration: underline;
 }
 .btn-link:focus-visible {
-  outline: 2px solid var(--fg);
-  outline-offset: 2px;
   border-radius: var(--r-sm);
+}
+.btn-link:disabled {
+  opacity: var(--disabled-o);
+  cursor: default;
+  text-decoration: none;
 }
 
 /* Chips: one height (20) and one shape (the status badge's pill) for every small label; only key caps keep a key's
@@ -83,9 +84,10 @@
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
 }
+/* a key cap in the key caps' face (base.css --keys), as kbd */
 .ch-key {
   border-radius: var(--r-sm);
-  font-family: var(--mono);
+  font-family: var(--keys);
   color: var(--muted);
   background: var(--ink-2);
   box-shadow:
@@ -234,7 +236,8 @@ button.list-row:hover {
 }
 .empty-state.sm {
   padding: var(--sp-8) var(--sp-4);
-  border-radius: var(--r);
+  /* flush in what holds it: its corners are that box's */
+  border-radius: inherit;
   /* no edge of its own: the light fades out before the sides and the top */
   background: radial-gradient(ellipse 46% 40% at 50% 40%, var(--ink-3), transparent);
   box-shadow: none;

@@ -105,8 +105,8 @@
 /* Chips on the poster: glass on the picture, colour only where it means something (a must, a fix, a question). */
 .film-over {
   position: absolute;
-  left: 8px;
-  right: 8px;
+  left: var(--sp-2);
+  right: var(--sp-2);
   display: flex;
   align-items: center;
   gap: var(--sp-1);
@@ -114,19 +114,20 @@
   min-width: 0;
 }
 .film-over.top {
-  top: 8px;
+  top: var(--sp-2);
 }
 .film-over.bottom {
-  bottom: 8px;
+  bottom: var(--sp-2);
 }
 .vchip {
   flex: none;
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
-  height: 20px;
+  height: var(--h-xs);
   padding: 0 var(--sp-2);
-  border-radius: var(--r);
+  /* concentric with the poster's corner it sits --sp-2 inside of */
+  border-radius: calc(var(--radius) - var(--sp-2));
   font: var(--fw-strong) var(--fs-xs) / var(--lh-tight) var(--mono);
   font-variant-numeric: tabular-nums;
   color: #f4f1ea;

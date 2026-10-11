@@ -59,7 +59,8 @@ export function RowsSkeleton({ n = 4, thumb = 44, action = true }: { n?: number;
             <Skeleton h={11} w={`${70 - ((i * 13) % 30)}%`} />
             <Skeleton h={8} w={`${45 - ((i * 7) % 20)}%`} />
           </span>
-          {action && <Skeleton w={54} h={24} r={7} />}
+          {/* a small button's box: its height and corners (--h-sm, --r) */}
+          {action && <Skeleton w={54} h={26} r={8} />}
         </div>
       ))}
     </div>

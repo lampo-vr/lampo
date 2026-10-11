@@ -11,6 +11,7 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - Never import `radix-ui` in a module the first paint needs; budget 183 KB (`BUNDLE_BUDGET_KB`).
 - On-demand code goes through `lib/lazy.ts` (`loader`, `useLoaded`, `screen`), not `lazy()` + Suspense.
 - A new dynamic import in the first paint costs its preload entry: ride an existing chunk, measure a build.
+- A lazy chunk (the styleguide) that imports a library module (`library/Film.tsx`) makes the build split the library's first chunk into shared pieces: +2 KB in the first paint. Show such parts some other way, and measure.
 - Measure the budget with a Node that bundles its own zlib, as CI's does: Homebrew's links macOS zlib and reads ~0.2 KB low.
 - Loading states use the real layout (`pending` props, `SkLine`, `…Pending` rows); never a separate skeleton tree.
 - What follows playback subscribes to `player/frameStore.ts` (`pb.live`, `useFrame`), never `pb.frame`.

@@ -441,7 +441,7 @@ export function Segmented({ value, onChange, options, className = '', label, ico
           <ToggleItem key={o.value} value={o.value} className={value === o.value ? 'on' : ''} aria-label={o.label} asChild>
             <Tip content={o.label} shortcut={o.shortcut}>
               <button type="button" className={value === o.value ? 'on' : ''} aria-label={o.label} data-tip="">
-                <I name={o.icon} size={15} />
+                <I name={o.icon} size={16} />
               </button>
             </Tip>
           </ToggleItem>

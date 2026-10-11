@@ -108,24 +108,24 @@
 /* ---------------------------------------------------------------- menus */
 
 .menu-icon-gap {
-  width: 15px;
+  width: var(--ic);
   flex: none;
 }
-/* a shortcut in a menu is quiet type, not a key cap: the row is the thing to press */
+/* a shortcut in a menu is quiet type, not a key cap: the row is the thing to press (in the key caps' face) */
 .menu-kbd {
   margin-left: var(--sp-6);
   padding: 0;
   border: 0;
   background: transparent;
   color: var(--muted);
-  font: var(--fw-ui) var(--fs-xs) / var(--lh-ui) var(--mono);
+  font: var(--fw-ui) var(--fs-xs) / var(--lh-ui) var(--keys);
 }
 /* a choice that is on or off: the tick keeps its place when it's off, so the rows don't change width */
 .menu [role='menuitemcheckbox'][data-state='unchecked'] > .menu-tick {
   visibility: hidden;
 }
 .menu :is([role='menuitem'], [role='menuitemcheckbox'])[data-disabled] {
-  opacity: 0.4;
+  opacity: var(--disabled-o);
   cursor: default;
 }
 .menu :is([role='menuitem'], [role='menuitemcheckbox']) > .icon {
@@ -264,12 +264,8 @@
   background: var(--raise-sheen), var(--fg);
   box-shadow: inset 0 0 0 1px var(--fg);
 }
-.switch:focus-visible {
-  outline: 1.5px solid var(--fg);
-  outline-offset: 2px;
-}
 .switch[data-disabled] {
-  opacity: 0.45;
+  opacity: var(--disabled-o);
   cursor: default;
 }
 .switch-thumb {
@@ -309,9 +305,9 @@
   background: var(--fg);
   box-shadow: inset 0 0 0 1.5px var(--fg);
 }
-.checkbox:focus-visible {
-  outline: 1.5px solid var(--fg);
-  outline-offset: 2px;
+.checkbox[data-disabled] {
+  opacity: var(--disabled-o);
+  cursor: default;
 }
 .checkbox-mark {
   display: grid;
@@ -794,6 +790,43 @@
 .toast-x:focus-visible {
   background: color-mix(in srgb, currentColor 26%, transparent);
   color: inherit;
+}
+
+/* ---------------------------------------------------------------- icons in the control families
+
+   An icon follows the type beside it (base.css --ic-*): 14 beside 12 px (small buttons, segments, tabs, toasts), 16
+   beside 13 px (buttons, menus); alone it fills its button: 16 in a 26–30 px one, 20 in a 40 px one; a chevron at the
+   end of a button (a menu or a choice opens) is the 12 px indicator, as in chips and labels. The family sets the box
+   and the stroke, whatever size a screen asked for; everything here is :where(), so a component that means another
+   size (the drawing tools, the phone's frame steps) says so with any selector of its own. */
+:where(:is(.btn, .menu :is(button, [role='menuitem'], [role='menuitemcheckbox']), .seg.icons button) > .icon:first-child) {
+  width: var(--ic);
+  height: var(--ic);
+  stroke-width: var(--ic-stroke);
+}
+:where(:is(.btn.sm:not(.icon-only), .seg:not(.icons) button, .tabs button, .toast, .toast-act) > .icon:first-child) {
+  width: var(--ic-sm);
+  height: var(--ic-sm);
+  stroke-width: var(--ic-stroke-sm);
+}
+:where(.btn.lg.icon-only > .icon:first-child) {
+  width: var(--ic-lg);
+  height: var(--ic-lg);
+  stroke-width: var(--ic-stroke-lg);
+}
+:where(.btn > .icon:last-child:not(:first-child), :is(.ch, .badge) > .icon) {
+  width: var(--ic-xs);
+  height: var(--ic-xs);
+  stroke-width: var(--ic-stroke-xs);
+}
+/* a busy button's spinner takes the icon's place at the icon's size: nothing beside it moves */
+:where(.btn) > .spinner {
+  width: var(--ic);
+  height: var(--ic);
+}
+:where(.btn.sm:not(.icon-only)) > .spinner {
+  width: var(--ic-sm);
+  height: var(--ic-sm);
 }
 
 /* ---------------------------------------------------------------- micro-interactions */
