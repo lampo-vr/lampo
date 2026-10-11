@@ -4,9 +4,10 @@
 // browser suite show (web/src/styleguide/runStates.ts).
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { RunPlanItem } from '../../lib/types.ts';
-import { cardRun, edgeOf, fullWords, isOpen, mostUrgent, ownWords, phaseOf, shortLine, stateWords, tightOf } from '../../web/src/sessions/runState.ts';
-import { clock, idleSaid, madeBy, planSaid, runSaid, workedNow } from '../../web/src/sessions/runWords.ts';
+import { runBrief, runToShow } from '../../lib/runCard.ts';
+import type { Run, RunPlanItem } from '../../lib/types.ts';
+import { cardRun, edgeOf, fullWords, isOpen, mostUrgent, ownWords, phaseOf, planAt, shortLine, stateWords, tightOf } from '../../web/src/sessions/runState.ts';
+import { clock, idleSaid, madeBy, planSaid, runSaid, runShown, workedNow } from '../../web/src/sessions/runWords.ts';
 import { RUN_STATES, runFixtures } from '../../web/src/styleguide/runStates.ts';
 
 const NOW = Date.parse('2026-10-07T12:00:00Z');
@@ -74,6 +75,51 @@ test('the cards: a word or two, the work that matters most for an agent, and whi
   assert.equal(cardRun(summary(f.failed.run))?.state, 'failed');
   assert.equal(cardRun(summary(f.done.run, 'check_fixes'))?.state, 'done', 'done while its fixes wait');
   assert.equal(cardRun(summary(f.done.run, 'team_approved')), null, 'done and checked: the card says the stage again');
+});
+
+test('how far it is reads the same on the card (the brief) as in the player (the whole run), whatever it holds in hand', () => {
+  // An agent reads every note before it fixes one (Claude does), and each stays in hand ("doing") until answered: the
+  // player counted one more per note in hand ("fixing 5 of 5" with nothing done) while the card said "fixing 1 of 5".
+  const steps: [RunPlanItem['state'][], string, string][] = [
+    [['doing', 'doing', 'doing', 'doing', 'doing'], 'fixing 1 of 5', '1 of 5'],
+    [['fixed', 'doing', 'doing', 'doing', 'doing'], 'fixing 2 of 5', '2 of 5'],
+    [['fixed', 'fixed', 'asked', 'doing', 'todo'], 'fixing 4 of 5', '4 of 5'],
+    [['fixed', 'wontfix', 'replied', 'fixed', 'doing'], 'fixing 5 of 5', '5 of 5'],
+    [['fixed', 'fixed', 'fixed', 'fixed', 'fixed'], 'wrapping up · 5 of 5 done', '5 of 5'],
+  ];
+  for (const [states, words, count] of steps) {
+    const whole: Run = { ...f.working.run, plan: states.map((state, i) => ({ id: `c_${i}`, state })) };
+    const brief = runBrief(whole);
+    assert.equal(stateWords(whole), words, `the player: ${states}`);
+    assert.equal(stateWords(brief), words, `the card: ${states}`);
+    const at = planAt(whole);
+    assert.deepEqual(planAt(brief), at);
+    assert.equal(`${at.n} of ${at.total}`, count, `the Agent view: ${states}`);
+  }
+  // once it ended, the count is what it answered
+  assert.deepEqual(
+    planAt({
+      ...f.stopped.run,
+      plan: [
+        { id: 'a', state: 'fixed' },
+        { id: 'b', state: 'doing' },
+      ],
+    }),
+    { n: 1, total: 2 },
+  );
+});
+
+test('the player speaks of the run the card does: the open one before a newer one that ended', () => {
+  const at = (s: number) => new Date(NOW - s * 1000).toISOString();
+  const open = { ...f.working.run, id: 'run_open', started: at(600), ended: null };
+  const stopped = { ...f.stopped.run, id: 'run_stopped', started: at(300), ended: at(60) };
+  const old = { ...f.done.run, id: 'run_old', started: at(3 * 86400), ended: at(2 * 86400) };
+  const kept = [old, open, stopped];
+  // the server reads them as kept (oldest first, lib/runs.ts cardRun), the player as the API lists them (newest first)
+  assert.equal(runToShow(kept, NOW, 86400_000)?.id, 'run_open');
+  assert.equal(runShown([stopped, open, old], NOW)?.id, 'run_open', 'not the newest one, which ended');
+  assert.equal(runToShow([old, stopped], NOW, 86400_000)?.id, 'run_stopped', 'none open: the last that ended in the past day');
+  assert.equal(runToShow([old], NOW, 86400_000), null, 'ended more than a day ago: none');
 });
 
 test('the agent with no work going on: ready, or not running with a way to start it', () => {

@@ -10,7 +10,7 @@ import { locale, t } from '../i18n/index.ts';
 import { pct, secsWords } from '../lib/format.ts';
 import { toastError } from '../lib/toast.ts';
 import { PermissionNeeds, PrintedLines } from '../sessions/RunNeeds.tsx';
-import { clock, isOpen, madeBy, phaseOf, planCounts, type RunLike, type Say, workedNow } from '../sessions/runWords.ts';
+import { clock, isOpen, madeBy, phaseOf, planAt, type RunLike, type Say, workedNow } from '../sessions/runWords.ts';
 import { I } from '../ui/icons.tsx';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { SkLine } from '../ui/Skeleton.tsx';
@@ -202,7 +202,8 @@ function Shown({
   const open = isOpen(run);
   const phase = phaseOf(run);
   const plan = whole?.plan ?? [];
-  const counts = planCounts(whole ?? run);
+  // the count every place says (the strip, the button, the cards): the note it is on, the ones answered once it ended
+  const at = planAt(whole ?? run);
   const byId = new Map(p.notes.map((c) => [c.id, c]));
   // what it is doing now: its newest action, and what it said after it (a thought folds once the next step comes)
   const action = steps?.find((s) => s.type === 'action' || s.type === 'elicitation') ?? (run.now && run.now.type !== 'thought' ? run.now : null);
@@ -228,10 +229,7 @@ function Shown({
         <section className="av-sec" aria-label={t('Your notes')}>
           <div className="av-label">
             <span>{t('Your {n} note|Your {n} notes', { n: plan.length })}</span>
-            {/* the strip's count: the note it is on while it works, the ones answered once it ended */}
-            <span className="av-count">
-              {t('{n} of {total}', { n: open ? Math.min(counts.total, counts.answered + Math.max(1, counts.doing)) : counts.answered, total: counts.total })}
-            </span>
+            <span className="av-count">{t('{n} of {total}', at)}</span>
           </div>
           <ul className="av-plan" data-testid="agent-plan">
             {plan.map((item) => {

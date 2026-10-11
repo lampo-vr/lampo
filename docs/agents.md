@@ -842,7 +842,7 @@ joins it. Its plan is the notes they sent; its result is the version you put up.
   with `lampo watch`, your next command).
 - **The plan moves** with what you do anyway: reading a note or looking at its frame puts it "in hand"; `mark_fixed`
   / `lampo fix`, `wont_fix`, `reply` and a question (`add_note` kind question, `ask_options`) answer it. Nothing is
-  guessed from time.
+  guessed from time. "fixing 3 of 6" is the note after those you answered: reading ahead doesn't move it.
 - **A question** (yours) makes it wait for the person; their answer sends it on. Time waiting for them isn't counted
   as your work.
 - **It ends** when you hand back: you wait again after putting up the version or answering every note, or the version

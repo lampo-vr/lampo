@@ -29,7 +29,8 @@ import { dataDir, isoLocal, slugify } from './paths.ts';
 import { can } from './permissions.ts';
 import { pendingProposals, scopeLabel } from './playbooks.ts';
 import { failedPosts } from './publish/posts.ts';
-import { due, isAnswered, readRuns, type StoredRun, settle } from './runs.ts';
+import { planTally } from './runPlan.ts';
+import { due, readRuns, type StoredRun, settle } from './runs.ts';
 import { stageOf } from './stage.ts';
 import { listReviews, readHistory, withLock, writeAtomic } from './store.ts';
 import { compareTime, isAgent, isQuestion, isRequired } from './time.ts';
@@ -404,8 +405,7 @@ function runOf(r: StoredRun): ForYouRun {
         }
       : {}),
     ...(r.log ? { log: true } : {}),
-    planned: r.plan.length,
-    answered: r.plan.filter(isAnswered).length,
+    ...planTally(r.plan),
   };
 }
 

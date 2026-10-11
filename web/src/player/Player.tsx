@@ -36,7 +36,7 @@ import { GOTO_FRAME, type GotoFrame } from '../refs/model.ts';
 import { say } from '../sessions/activityWords.ts';
 import { useListening, useListenNudge, waitingOnAgent, waitsForStart } from '../sessions/listening.tsx';
 import { progressOf } from '../sessions/runState.ts';
-import { isOpen, type RunLike } from '../sessions/runWords.ts';
+import { isOpen, type RunLike, runShown } from '../sessions/runWords.ts';
 import { useWakeChoice } from '../sessions/Wake.tsx';
 import { ShareModal } from '../share/ShareModal.tsx';
 import { I } from '../ui/icons.tsx';
@@ -993,11 +993,14 @@ function PlayerView({
   const painted = usePainted();
   const runsQ = useRuns(slug, brief !== undefined && (painted || (!!brief && isOpen(brief))));
   const runs = runsQ.runs;
-  const newest: RunLike | null = runs?.[0] ?? brief ?? null;
+  // the run the card speaks of, picked the same way (lib/runCard.ts runToShow): the open one, else the last that ended
+  // in the past day — so the strip and the agent button never speak of another run than the library's card
+  const shownRun = useMemo(() => (runs ? runShown(runs) : null), [runs]);
+  const newest: RunLike | null = runs ? shownRun : (brief ?? null);
   const asOf = runs ? runsQ.at : briefAt;
   // what the strip speaks of: work going on, or work that ended in the past day — badly (failed, stopped), waiting for
   // the person (a permission it lacks, a question: its process ended asking), or done while its fixes wait to be
-  // checked (as the card does, lib/runs.ts cardRun)
+  // checked (as the card does, sessions/runState.ts cardRun)
   const recent = !!newest && Date.now() - Date.parse(newest.ended ?? newest.started) < DAY_MS;
   const stripRun =
     newest &&
@@ -1013,7 +1016,7 @@ function PlayerView({
   const sayRun = useCallback((w: ActivityWords) => say(w, noteAtId), [noteAtId]);
   // the plan's lines on the note rows while the strip speaks of the work (going on, or done with fixes to check: the
   // lines stay, so no row moves when it ends); before the runs arrive, the notes it likely holds keep their room
-  const planRun = runs?.[0] && stripRun?.id === runs[0].id ? runs[0] : null;
+  const planRun = shownRun && stripRun === shownRun ? shownRun : null;
   const plans = useMemo(() => new Map((planRun?.plan ?? []).map((x) => [x.id, x])), [planRun]);
   const planPending = !runs && !!stripRun;
   const inHand = planRun && isOpen(planRun) ? (planRun.plan.find((x) => x.state === 'doing')?.id ?? null) : null;

@@ -3,6 +3,7 @@
 // Stop (at once, put back if the server says no), Try again and Nudge. SSE `run` refetches only that video's runs and
 // that run's steps where they are shown (api/live.ts); the library's cards read the brief on their entry.
 import { type QueryClient, useMutation, useQueryClient } from '@tanstack/react-query';
+import { runBrief } from '../../../lib/runCard.ts';
 import { api, enc } from './client.ts';
 import { guess, withEntry } from './mutations.ts';
 import { keys } from './queries.ts';
@@ -10,27 +11,6 @@ import { runKeys } from './runQueries.ts';
 import type { LibraryResponse, ReviewResponse, Run, RunBrief, RunDetail, RunsResponse, RunWriteResponse } from './types.ts';
 
 export { runKeys, useRunDetail, useRuns } from './runQueries.ts';
-
-/** What the cards need of a run (lib/types.ts RunBrief), from the whole run. */
-export function briefOf(r: Run): RunBrief {
-  const answered = r.plan.filter((p) => p.state !== 'todo' && p.state !== 'doing').length;
-  return {
-    id: r.id,
-    agent: r.agent,
-    state: r.state,
-    started: r.started,
-    ended: r.ended,
-    worked_s: r.worked_s,
-    now: r.now,
-    progress: r.progress,
-    result: r.result,
-    error: r.error,
-    needs: r.needs,
-    ...(r.stop_pending ? { stop_pending: true } : {}),
-    planned: r.plan.length,
-    answered,
-  };
-}
 
 /** Every cached copy of one run changed the same way: the video's list, its steps, its card and the review's summary. */
 function guessRun(qc: QueryClient, slug: string, id: string, patch: Partial<Pick<Run, 'state' | 'ended' | 'progress'>>): Promise<(() => void)[]> {
@@ -53,7 +33,8 @@ function settleRun(qc: QueryClient, slug: string, run: Run) {
     old ? { ...old, runs: old.runs.some((r) => r.id === run.id) ? old.runs.map((r) => (r.id === run.id ? run : r)) : [run, ...old.runs] } : old,
   );
   qc.setQueryData<RunDetail>(runKeys.one(run.id), (old) => (old ? { ...old, run } : old));
-  const b = briefOf(run);
+  // the card's brief as the server makes it from the same run (lib/runCard.ts)
+  const b = runBrief(run);
   qc.setQueryData<LibraryResponse>(keys.library, (old) => (old ? withEntry(slug, (v) => ({ ...v, run: b }))(old) : old));
   qc.setQueryData<ReviewResponse>(keys.review(slug), (old) => (old ? { ...old, summary: { ...old.summary, run: b } } : old));
 }

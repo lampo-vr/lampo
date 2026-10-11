@@ -1,7 +1,9 @@
 // Where an agent's work on a video stands, in the fewest words: the state (design §5.2) with its keyframe glyph, a word
 // or two ("rendering · 42 %", "needs you"), and how far a render is. Light, for the library's first paint (the cards'
 // line, the sidebar's Agents rows); the player's strip says it in full (runWords.ts). One value from the server
-// (lib/types.ts Run, or the cards' RunBrief) — never an id, and no noun for the work itself.
+// (lib/types.ts Run, or the cards' RunBrief), counted one way for both (lib/runPlan.ts) — never an id, and no noun for
+// the work itself.
+import { noteOn, type PlanTally, planTally } from '../../../lib/runPlan.ts';
 import type { ActivityWords, Run, RunBrief, RunProgress, VideoSummary } from '../api/types.ts';
 import { t } from '../i18n/index.ts';
 import { pct } from '../lib/format.ts';
@@ -83,21 +85,23 @@ export function phaseOf(r: RunLike): Phase {
   return r.state;
 }
 
-/** The plan in counts: sent, answered (fixed, asked, left, replied) and in hand. */
-export function planCounts(r: RunLike): { total: number; answered: number; doing: number } {
-  if ('plan' in r) {
-    const answered = r.plan.filter((p) => p.state !== 'todo' && p.state !== 'doing').length;
-    return { total: r.plan.length, answered, doing: r.plan.filter((p) => p.state === 'doing').length };
-  }
-  return { total: r.planned, answered: r.answered, doing: 0 };
+/** The plan in counts — notes sent and answered (fixed, asked, left, replied) — the same from the card's brief as from
+ * the whole run (lib/runPlan.ts). */
+export const planCounts = (r: RunLike): PlanTally => ('plan' in r ? planTally(r.plan) : { planned: r.planned, answered: r.answered });
+
+/** How far it is, as a count: the note it is on while it works ("3" of 6, lib/runPlan.ts noteOn), the ones answered once
+ * it ended. Every place that counts says this number (the cards, the strip, the agent button, the Agent view). */
+export function planAt(r: RunLike): { n: number; total: number } {
+  const c = planCounts(r);
+  return { n: isOpen(r) ? noteOn(c) : c.answered, total: c.planned };
 }
 
-/** "fixing 3 of 6": the note it is on, counted from the ones done (one in hand when nothing says which). */
+/** "fixing 3 of 6": the note it is on, counted from the ones answered — never one more per note it holds. */
 export function fixing(r: RunLike): string {
-  const { total, answered, doing } = planCounts(r);
+  const { planned: total, answered } = planCounts(r);
   if (!total) return t('working');
   if (answered >= total) return t('wrapping up · {n} of {n} done', { n: total });
-  return t('fixing {n} of {total}', { n: Math.min(total, answered + Math.max(1, doing)), total });
+  return t('fixing {n} of {total}', { n: planAt(r).n, total });
 }
 
 /** A word or two for where it stands ("rendering", "needs you", "V4 is ready"); `stateWords` adds the version a render

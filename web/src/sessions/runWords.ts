@@ -4,13 +4,21 @@
 // noun for the work itself: the words say what is happening ("fixing 3 of 6", "rendering V4 · 42 %"), history is named
 // by its version ("V4 · Claude Code · 12 min · 5 fixed"). What an agent did in its own terms (a step, an error, a
 // permission) is said by the caller's `say` (sessions/activityWords.ts), else left out.
-import type { ActivityWords, RunPlanItem, RunProgress } from '../api/types.ts';
+import { runToShow } from '../../../lib/runCard.ts';
+import type { ActivityWords, Run, RunPlanItem, RunProgress } from '../api/types.ts';
 import { t } from '../i18n/index.ts';
 import { ago, pct, secsWords } from '../lib/format.ts';
 import type { Shape } from '../ui/glyphs.ts';
 import { edgeOf, fixing, LOOK, type Phase, phaseOf, progressOf, type RunLike, type Tone } from './runState.ts';
 
-export { isOpen, phaseOf, planCounts, type RunLike, runShort } from './runState.ts';
+export { isOpen, phaseOf, planAt, planCounts, type RunLike, runShort } from './runState.ts';
+
+/** How long a card and the strip speak of work that ended (lib/runs.ts RUN_TIMES.brief). */
+const SHOWN_MS = 24 * 3600_000;
+
+/** Of a video's whole runs (newest first, as the API lists them), the one the player's strip and agent button speak
+ * of: the one the server puts on the card (lib/runCard.ts runToShow), so the player never speaks of another. */
+export const runShown = (runs: readonly Run[], now = Date.now()): Run | null => runToShow([...runs].reverse(), now, SHOWN_MS);
 
 /** What the person can do from the line (gated by the caller: Stop, Try again and Nudge need the agents right). */
 export type RunAction = 'answer' | 'check' | 'log' | 'retry' | 'nudge' | 'stop' | 'cancel' | 'again' | 'copy' | 'go_on' | 'allow';

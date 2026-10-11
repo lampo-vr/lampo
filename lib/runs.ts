@@ -17,6 +17,8 @@ import { agentKindOf } from './agentKind.ts';
 import { cleanAgentName, cutChars } from './names.ts';
 import { cacheDir, dataDir, isoLocal, reviewDir, reviewFile } from './paths.ts';
 import { RENDER_STAGES, RENDER_TOOLS } from './render/tools.ts';
+import { runBrief, runToShow } from './runCard.ts';
+import { isAnswered } from './runPlan.ts';
 import { currentWorkspace, wsKey } from './scope.ts';
 import { findComment, listSlugs, loadReview, resolveVideo, setVersionRunProvider, withLock, writeAtomic } from './store.ts';
 import { compareTime, oneLine } from './time.ts';
@@ -176,9 +178,7 @@ export function cleanProgress(p: unknown): RunProgress | undefined {
   return out;
 }
 
-/** A plan item the agent answered: fixed, asked the person about, left as it is, or replied to. */
-const ANSWERED = new Set<RunPlanItem['state']>(['fixed', 'asked', 'wontfix', 'replied']);
-export const isAnswered = (p: RunPlanItem): boolean => ANSWERED.has(p.state);
+// every plan note answered (fixed, asked, left, replied), counted as the browser counts it (lib/runPlan.ts)
 const allAnswered = (r: Run): boolean => r.plan.every(isAnswered);
 
 /** An agent's name without whose it is (`claude-code · Sam` → `claude-code`): how its writes name it (`agent:claude-code`). */
@@ -981,25 +981,8 @@ export function shownRun(r: StoredRun, now = Date.now()): Run {
   return { ...head, worked_s: workedAt(r, now) };
 }
 
-export function briefOf(r: StoredRun, now = Date.now()): RunBrief {
-  const s = shownRun(r, now);
-  return {
-    id: s.id,
-    agent: s.agent,
-    state: s.state,
-    started: s.started,
-    ended: s.ended,
-    worked_s: s.worked_s,
-    now: s.now,
-    ...(s.progress !== undefined ? { progress: s.progress } : {}),
-    ...(s.result ? { result: s.result } : {}),
-    ...(s.error ? { error: s.error } : {}),
-    ...(s.needs ? { needs: s.needs } : {}),
-    ...(s.stop_pending ? { stop_pending: true } : {}),
-    planned: s.plan.length,
-    answered: s.plan.filter(isAnswered).length,
-  };
-}
+/** The card's brief, as the browser makes it from a whole run too (lib/runCard.ts runBrief). */
+export const briefOf = (r: StoredRun, now = Date.now()): RunBrief => runBrief(shownRun(r, now));
 
 // ---------------------------------------------------------------- what a role without the agents right reads
 
@@ -1047,16 +1030,9 @@ export function plainHead<T extends Pick<Run, 'now' | 'error' | 'needs' | 'resul
   };
 }
 
-/** The run a video's card shows: the open one (the newest), else the last that ended in the past day. */
-export function cardRun(runs: readonly StoredRun[], now = Date.now()): StoredRun | null {
-  let best: StoredRun | null = null;
-  for (const r of runs) {
-    if (r.ended === null) {
-      if (!best || best.ended !== null || compareTime(r.started, best.started) >= 0) best = r;
-    } else if (now - ms(r.ended) <= RUN_TIMES.brief && (!best || (best.ended !== null && compareTime(r.ended, best.ended) >= 0))) best = r;
-  }
-  return best;
-}
+/** The run a video's card shows: the open one (the newest), else the last that ended in the past day — the one the
+ * player's strip speaks of too (lib/runCard.ts). */
+export const cardRun = (runs: readonly StoredRun[], now = Date.now()): StoredRun | null => runToShow(runs, now, RUN_TIMES.brief);
 
 /** A video's card line (summary): its run as of now — time's moves seen, not written (the server's clock writes them). */
 export function briefFor(slug: string, now = Date.now()): RunBrief | null {

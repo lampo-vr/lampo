@@ -86,6 +86,9 @@ const SECONDS = {
   // (measured in a run of ten, 2026-10-11)
   'agent-reply': 28,
   'agent-listening': 70,
+  // how far an agent is, the same on the library's card and in the player at every step: two tabs, one going back
+  // and forth, a hosted server's second workspace
+  'run-progress': 18,
   // frame-exact in WebKit on an iPhone, the review link at 390 and 430, a big version's phone copy (made, then played)
   webkit: 45,
   playbook: 15,

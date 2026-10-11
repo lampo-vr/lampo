@@ -133,6 +133,10 @@ format stays backwards compatible throughout.
   you list your server's MCP connector there.
 
 ### Fixed
+- How far an agent is reads the same everywhere. An agent that read all of a video's notes before fixing any made the
+  player say "fixing 5 of 5" while the library's card said "fixing 1 of 5": the player counted every note the agent
+  had read as one it was working on. Now the card, the run strip, the agent button, the Agent view and the sidebar
+  count the same way — the note after those it has answered — and all of them speak of the same piece of work.
 - Back from Settings goes back to where you opened it from. From a video, Settings' back button returned to the
   library; now it and the browser's back both land on the video, with the dialog you came from open again and scrolled
   as it was: the Share dialog's "All links" and "Add your name", the agent picker's "How agents get notes", a limit
