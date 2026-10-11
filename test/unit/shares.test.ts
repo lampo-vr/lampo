@@ -180,15 +180,39 @@ test("'own' links keep their clients' verdicts apart too: another link's verdict
   const idOf = async (token: string) => (await guest('GET', `/api/g/${token}`)).json().videos[0].slug;
   const [ida, idb] = [await idOf(a.token), await idOf(b.token)];
   const secret = 'legal says the claim at 0:12 is a problem';
-  const given = await guest('POST', `/api/g/${a.token}/approval`, { name: 'Mia', slug: ida, v: 1, status: 'changes', note: secret });
+  // The probe name has a space and a letter outside ASCII: neither occurs in a link's token, a video's id or a hash
+  // (base64url, hex), so finding it in B's answers means A's verdict got there. "Mia" alone turned up by chance inside
+  // B's random token or video id (about one run in 7,000).
+  const who = 'Mia Kovač';
+  const given = await guest('POST', `/api/g/${a.token}/approval`, { name: who, slug: ida, v: 1, status: 'changes', note: secret });
   assert.equal(given.status, 200, given.text);
+  const own = (await guest('GET', `/api/g/${a.token}/review/${ida}`)).json().approval;
+  assert.deepEqual(
+    [own.by, own.note, own.status],
+    [`guest:${who}`, secret, 'changes'],
+    'A sees its own, the name kept whole (a probe that lost its space would prove nothing)',
+  );
 
   const page = await guest('GET', `/api/g/${b.token}/review/${idb}`);
   const room = await guest('GET', `/api/g/${b.token}`);
   assert.equal(page.json().approval, null, "B's page: no verdict of B's");
   assert.equal(room.json().videos[0].approval, null, "B's room counts nothing as reviewed by B");
-  for (const r of [page, room]) assert.ok(!r.text.includes(secret) && !r.text.includes('Mia'), 'nothing of A’s verdict reaches B');
-  assert.equal((await guest('GET', `/api/g/${a.token}/review/${ida}`)).json().approval.note, secret, 'A sees its own');
+  for (const [what, r] of [
+    ['page', page],
+    ['room', room],
+  ] as const) {
+    // Every key and string B is sent (a verdict's by and note, a note's author, a reply's by, who shared the link)…
+    const strings: string[] = [];
+    JSON.parse(r.text, (k, v) => {
+      strings.push(k, ...(typeof v === 'string' ? [v] : []));
+      return v;
+    });
+    const leaked = strings.filter((s) => s.includes(who) || s.includes('Kovač') || s.includes(secret));
+    assert.deepEqual(leaked, [], `nothing of A’s verdict reaches B’s ${what}`);
+    // …and the raw answer, in case A's name or words travel inside a URL.
+    for (const probe of [who, encodeURIComponent(who), secret, encodeURIComponent(secret)])
+      assert.ok(!r.text.includes(probe), `B’s ${what} never carries ${JSON.stringify(probe)}`);
+  }
 
   const decided = await guest('POST', `/api/g/${b.token}/approval`, { name: 'Bo', slug: idb, v: 1, status: 'approved' });
   assert.equal(decided.status, 200, decided.text);

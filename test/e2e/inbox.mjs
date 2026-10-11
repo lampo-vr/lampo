@@ -299,6 +299,10 @@ try {
   });
 
   await check('"Still wrong" keeps a fix open with what is wrong', async () => {
+    // "Looks right" hands the preview to the row after the one checked. Fixes are listed newest first by a time to the
+    // second: marked fixed within one second the list reads [first fix, other fix], across two [other fix, first fix],
+    // and the row after the first fix is then the render to review (CI). Open the fix that is left, whichever it is.
+    await page.click(row('verify'));
     await page.waitForSelector(`${row('verify')}.picked`);
     await page.$$eval('.inbox-act-row button', (bs) => bs.find((b) => b.textContent.includes('Still wrong'))?.click());
     await page.type('.inbox-act textarea', 'Still too loud at the end');
@@ -1293,6 +1297,10 @@ try {
     await clearToasts();
     const extra = [];
     for (const text of ['Swap the music?', 'Keep the outro?', 'Faster cut?']) extra.push(await note(promo, { frame: 12, text, by: 'agent:promo-cut' }));
+    // Open it once the page has heard of all three: the group folds from its third item, and each question heard later
+    // takes the head row's place (newest first), so a row picked meanwhile is gone from the page (CDP: detached).
+    const n = (await api('/api/for-you')).counts.total;
+    await page.waitForSelector(`[data-testid="inbox-bell"][aria-label="Inbox, ${n} waiting"]`, { timeout: 20000 });
     await page.click('[data-testid="inbox-bell"]');
     const grp = '[data-testid="inbox"] [data-testid="inbox-vgroup"][aria-label="promo.mp4"]';
     await page.waitForSelector(`${grp} [data-testid="inbox-vmore"]`, { timeout: 15000 });

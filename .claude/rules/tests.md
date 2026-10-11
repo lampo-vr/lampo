@@ -34,3 +34,10 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - A key gone from a mock bucket is not its removal ended: the remover drops the working copy once the bucket has
   answered. Read working copies after `store.removalsSettled()`, never right after the bucket looks empty
   (`playback-copies-deleted.test.ts`; mockBunny's `deleteAnswerDelayMs` widens that gap).
+- A negative substring check ("B's answer never says X") uses a probe that can't occur in a token: a space or a letter
+  outside ASCII (`'Mia Kovač'`), never a short ASCII name. Links, ids and hashes are base64url or hex, and "Mia" turned
+  up inside a random video id about once in 7,000 runs (`shares.test.ts`). Check the parsed fields too, and that the
+  probe arrived whole where it belongs.
+- Times in the store are to the second (`isoLocal`): two writes in a row land in one second or two, and a list sorted
+  newest first swaps them. Never assume which of two such items comes next; open the one the check is about
+  (`inbox.mjs` "Still wrong").
