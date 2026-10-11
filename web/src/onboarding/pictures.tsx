@@ -49,9 +49,11 @@ function fit(pnl: HTMLElement) {
   }
   if (R <= L) return;
   const band = r.height < 360;
-  // Welcome's picture is the first thing anyone sees: it takes a little more of the panel's width
-  const availW = band ? r.width - 24 : r.width * (pic.querySelector('.ob-hl') ? 0.9 : 0.84);
-  const availH = band ? r.height - 20 : r.height * 0.7;
+  // Welcome's picture is the first thing anyone sees, and the persona shelf is one long row: they take a little more of
+  // the panel's width
+  const availW = band ? r.width - 24 : r.width * (pic.querySelector('.ob-hl, .ob-pf-name') ? 0.9 : 0.84);
+  // (the shelf of names keeps air above and below in the band too: on a tablet it fills it by height)
+  const availH = band ? r.height - (pic.querySelector('.ob-pf-name') ? 48 : 20) : r.height * 0.7;
   // the caps keep a picture from looming on a laptop; a wide panel (1920 and up) lets it grow with the room
   // Welcome's picture stands beside the headline as one composition: on a wide screen it grows less, so the words keep
   // their weight beside it
@@ -104,6 +106,7 @@ function Frame({
   fx,
   style,
   children,
+  short,
 }: {
   x: number;
   y: number;
@@ -115,6 +118,8 @@ function Frame({
   fx?: number;
   style?: CSSProperties;
   children?: ReactNode;
+  /** A narrow frame (a 9:16 one): its number only, no timecode beside it. */
+  short?: boolean;
 }) {
   return (
     <div className={`ob-fr ${className}`} style={{ left: x, top: y, width: w + 20, height: h + 33, ...style }}>
@@ -122,7 +127,7 @@ function Frame({
         <span>
           F <b style={lit ? undefined : { color: 'inherit' }}>{pad4(f)}</b>
         </span>
-        <span>{tc24(f)}</span>
+        {!short && <span>{tc24(f)}</span>}
       </span>
       <span className="ob-fr-img" style={{ ...bg(f), ...(fx != null ? ({ '--fx': `${fx}%` } as CSSProperties) : {}) }}>
         {children}
@@ -550,17 +555,29 @@ export function Switcher({ name, sub }: { name: string; sub: string }) {
 /**
  * Who the videos are for: a frame for each of the four choices on one shelf — a review link's, a team's approval, a
  * short in 9:16, and a slot for something else that, once picked, becomes a title card of the words typed — their
- * names on one line under them. The picked ones come forward and their names light; the frames move, the names stay.
+ * names on one line under them. One set: every picture the same height, each as wide as its format (16:9, 16:9, 9:16,
+ * a square for "any other"), the same gap between all of them, standing on one line. A pick lights its frame and its
+ * name and the others step back; nothing moves or grows into its neighbour.
  */
 export function ScenePersona({ picked, other }: { picked: string[]; other: string | null }) {
   const on = (k: string) => (k === 'other' ? other !== null : picked.includes(k));
   const any = picked.length > 0 || other !== null;
   const cls = (k: string) => `ob-pf ${any ? (on(k) ? 'ob-on' : 'ob-dim') : ''}`;
-  const lift = (k: string): CSSProperties | undefined => (on(k) ? { transform: 'translateY(-12px) scale(1.04)' } : undefined);
-  // the shelf: frames standing on one line (y 330), their names on one line under it
+  // the set: one picture height, widths by format, one gap; the mat adds 20 across and 33 down (Frame)
+  const H = 96;
+  const GAP = 24;
+  const widths = { agency: Math.round((H * 16) / 9), inhouse: Math.round((H * 16) / 9), creator: Math.round((H * 9) / 16), other: H };
+  const keys = ['agency', 'inhouse', 'creator', 'other'] as const;
+  const x: Record<(typeof keys)[number], number> = { agency: 0, inhouse: 0, creator: 0, other: 0 };
+  keys.reduce((at, k) => {
+    x[k] = at;
+    return at + widths[k] + 20 + GAP;
+  }, 0);
+  // the shelf: frames standing on one line, their names on one line under it
   const shelf = 330;
-  const tag = (k: string, x: number, w: number, words: string) => (
-    <span className={`ob-pf-name ${on(k) ? 'ob-on' : ''}`} style={{ left: x, width: w, top: shelf + 18 }}>
+  const top = shelf - (H + 33);
+  const tag = (k: (typeof keys)[number], words: string) => (
+    <span className={`ob-pf-name ${on(k) ? 'ob-on' : ''}`} style={{ left: x[k] - GAP / 2, width: widths[k] + 20 + GAP, top: shelf + 18 }}>
       {words}
     </span>
   );
@@ -568,7 +585,7 @@ export function ScenePersona({ picked, other }: { picked: string[]; other: strin
   return (
     <>
       <Glow />
-      <Frame x={0} y={shelf - 123} w={160} h={90} f={295} className={cls('agency')} style={lift('agency')} lit={on('agency')}>
+      <Frame x={x.agency} y={top} w={widths.agency} h={H} f={295} className={cls('agency')} lit={on('agency')}>
         <span className="ob-ov-chip" style={{ left: 6, bottom: 6 }}>
           <span className="ob-av" aria-hidden="true">
             <I name="link" size={10} />
@@ -576,21 +593,18 @@ export function ScenePersona({ picked, other }: { picked: string[]; other: strin
           {t('Review link · 2 notes')}
         </span>
       </Frame>
-      <Frame x={194} y={shelf - 123} w={160} h={90} f={311} className={cls('inhouse')} style={lift('inhouse')} lit={on('inhouse')}>
+      <Frame x={x.inhouse} y={top} w={widths.inhouse} h={H} f={311} className={cls('inhouse')} lit={on('inhouse')}>
         <span className="ob-ov-chip" style={{ left: 6, bottom: 6 }}>
           <KeyGlyph shape="diamond" className="ob-t-ok" />
           {t('Approved · Legal')}
         </span>
       </Frame>
-      <Frame x={388} y={shelf - 168} w={76} h={135} f={281} fx={47} className={cls('creator')} style={lift('creator')} lit={on('creator')}>
+      <Frame x={x.creator} y={top} w={widths.creator} h={H} f={281} fx={47} short className={cls('creator')} lit={on('creator')}>
         <span className="ob-safe" />
-        <span className="ob-ov-chip" style={{ left: 5, top: 5 }}>
-          9:16
-        </span>
       </Frame>
       <div
         className={`ob-fr ob-pf ob-pf-else ${other !== null ? '' : 'ob-dashed'} ${any ? (on('other') ? 'ob-on' : 'ob-dim') : ''}`}
-        style={{ left: 498, top: shelf - 123, width: 140, height: 123, ...lift('other') }}
+        style={{ left: x.other, top, width: widths.other + 20, height: H + 33 }}
         data-testid="ob-persona-else"
       >
         {other === null ? (
@@ -601,7 +615,6 @@ export function ScenePersona({ picked, other }: { picked: string[]; other: strin
               <span>
                 F <b>0001</b>
               </span>
-              <span>00:00:00</span>
             </span>
             <span className="ob-fr-img ob-pf-card">
               <span className={`ob-ttl ob-pf-words ${words ? '' : 'ob-ph'}`}>{words || t('Tell us in a few words')}</span>
@@ -609,10 +622,10 @@ export function ScenePersona({ picked, other }: { picked: string[]; other: strin
           </>
         )}
       </div>
-      {tag('agency', 0, 180, t('Link review'))}
-      {tag('inhouse', 194, 180, t('Team approval'))}
-      {tag('creator', 388, 96, t('Shorts · 9:16'))}
-      {tag('other', 498, 140, t('Something else'))}
+      {tag('agency', t('Link review'))}
+      {tag('inhouse', t('Team approval'))}
+      {tag('creator', t('Shorts · 9:16'))}
+      {tag('other', t('Something else'))}
     </>
   );
 }

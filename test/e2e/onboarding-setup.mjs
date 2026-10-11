@@ -220,6 +220,17 @@ try {
     );
     assert(names.length === 4 && new Set(names.map((n) => n.top)).size === 1, `the four names on one line: ${JSON.stringify(names)}`);
     assert(JSON.stringify(names.map((n) => n.on)) === '[false,true,false,true]', `lit: the picked ones: ${JSON.stringify(names)}`);
+    // one set on one shelf: the same height, standing on one line, the same clear gap between each two (none touching)
+    const set = await ana.$$eval('[data-testid=ob-panel] .ob-pf', (els) =>
+      els.map((e) => {
+        const r = e.getBoundingClientRect();
+        return { left: r.left, right: r.right, top: r.top, height: r.height };
+      }),
+    );
+    const gaps = set.slice(1).map((f, i) => Math.round(f.left - set[i].right));
+    const spread = (k) => Math.max(...set.map((f) => f[k])) - Math.min(...set.map((f) => f[k]));
+    assert(set.length === 4 && spread('top') <= 1 && spread('height') <= 1, `one height, one line: ${JSON.stringify(set)}`);
+    assert(Math.min(...gaps) >= 12 && Math.max(...gaps) - Math.min(...gaps) <= 1, `even, clear gaps: ${gaps}`);
     const card = await ana.$eval('[data-testid=ob-persona-else]', (e) => e.textContent);
     assert(card.includes('Trade fair loops'), `something else, as typed: ${card}`);
     await shot(ana, '03-persona');
