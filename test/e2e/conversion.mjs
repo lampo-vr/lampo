@@ -2,12 +2,15 @@
 // covers: web/src/conversion/ web/src/billing/Banner.tsx web/src/billing/due.ts web/src/billing/code.ts web/src/styles/conversion.css
 // covers: web/src/library/Sidebar.tsx web/src/library/LibraryTopbar.tsx web/src/library/Library.tsx web/src/auth/UserMenu.tsx
 // covers: web/src/ui/layers.tsx web/src/styles/theme.css web/src/styles/library.css test/e2e/lib/billingModule.ts
+// covers: web/src/billing/Business.tsx
 // The in-app conversion moments of the app's shell, against the stand-in billing provider (test/e2e/lib/billingModule.ts):
 // a workspace in its Team trial (four people, videos in four projects) shows the trial all along — a line at the
 // sidebar's foot over a ruler of its days, its card with the workspace's own numbers and one way on (Choose a plan,
 // for owners and admins only), the same line in the account menu — and nothing of it once paid; in its last three days
 // and after it the library's banner says the date, the hour, the week of grace and the three ways on (opened only on a
 // click), read-only locks Add video (a neutral button that explains, never the orange that fails later: audit B-M8).
+// Keeping the plan at the trial's end goes straight to the checkout, whose first thing is the business box (paid plans
+// are for businesses): unticked, nothing starts and Buy now waits; ticked, the checkout starts for a business.
 // The line and the banner hold their room from the first paint (no layout shift), and every state fits 390–2560 in both
 // themes and German. With CONVERSION_SHOTS=<dir> it also writes the QA sheet: every state at six widths × two themes.
 import fs from 'node:fs';
@@ -409,6 +412,38 @@ try {
     await library('today');
     await waitText('[data-testid=billing-banner]', /The trial ends today, at \d{1,2}:\d{2}( [AP]M)?\./);
     assert(/Ends today/.test(await text('[data-testid=trial-line]')), await text('[data-testid=trial-line]'));
+  });
+
+  await check('the trial’s end goes straight to the checkout: the business box first, unticked; nothing starts and “Buy now” waits for it', async () => {
+    await library('today');
+    await page.waitForSelector('[data-testid=billing-banner]');
+    await page.click('[data-testid=banner-more]');
+    await page.waitForSelector('[data-testid=banner-keep]');
+    const started = () => fake().calls.filter((c) => c.kind === 'checkout' && c.workspace === ws);
+    const before = started().length;
+    await page.click('[data-testid=banner-keep]');
+    await page.waitForFunction(() => location.hash.startsWith('#/settings/billing/checkout?plan=team&interval=year'), { polling: 100, timeout: 5000 });
+    // paid plans are for businesses: the step's first thing is the box, unticked (nothing confirmed before), and nothing
+    // starts at the provider until it is ticked; the one action waits, without a spinner
+    await page.waitForSelector('[data-testid=billing-checkout] [data-testid=billing-business]', { timeout: 15000 });
+    await settle(page);
+    const look = await page.evaluate(() => ({
+      on: document.querySelector('[data-testid=billing-business] [role=checkbox]').getAttribute('aria-checked'),
+      pay: [document.querySelector('[data-testid=billing-pay]').textContent.trim(), document.querySelector('[data-testid=billing-pay]').disabled],
+    }));
+    assert(JSON.stringify(look) === JSON.stringify({ on: 'false', pay: ['Buy now', true] }), JSON.stringify(look));
+    assert(started().length === before, `nothing started: ${JSON.stringify(started())}`);
+    const fit = await fitsAt(page, 'the trial’s end at the checkout');
+    assert(!fit.length, fit.join('\n'));
+    // ticked: the checkout starts, for a business, and the provider keeps who and when
+    await page.click('[data-testid=billing-business] [role=checkbox]');
+    await until(async () => started().length === before + 1, 'the checkout starts once ticked');
+    assert(started().at(-1).business === true && started().at(-1).plan === 'team', JSON.stringify(started().at(-1)));
+    assert(fake().workspaces[ws].business?.at, JSON.stringify(fake().workspaces[ws]));
+    // the trial as it was for the checks after: no confirmation, no customer the checkout's start made
+    const d = fake();
+    d.workspaces[ws] = STATES.today();
+    fs.writeFileSync(FAKE, JSON.stringify(d, null, 2));
   });
 
   await check('the week of grace: three honest ways on, with exactly what fitting into Free takes', async () => {

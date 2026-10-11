@@ -36,17 +36,20 @@ function useRefresh() {
   return () => qc.invalidateQueries({ queryKey: keys.billing });
 }
 
-/** A checkout for a plan: its client secret, for the payment form on this page. */
-export const useCheckout = () => useMutation({ mutationFn: (c: PlanChoice) => api<BillingSecret>('/api/billing/checkout', { method: 'POST', body: c }) });
+/**
+ * A checkout for a plan: its client secret, for the payment form on this page. Paid plans are for businesses: it carries
+ * the person's "I'm buying for my business" (billing/Business.tsx), and the provider starts none without it.
+ */
+export const useCheckout = () =>
+  useMutation({ mutationFn: (c: PlanChoice & { business: true }) => api<BillingSecret>('/api/billing/checkout', { method: 'POST', body: c }) });
 
 /**
- * What the buyer agreed to, recorded right before the order goes to the provider (A13 CLOUD-2): as a consumer (with the
- * express request to start at once, § 356(4) / § 357a BGB) or as a business — with its VAT ID for the invoice where the
- * checkout offers no reverse charge (the provider puts it on the invoices).
+ * What the buyer agreed to, recorded right before the order goes to the provider (A13 CLOUD-2): a business's order, with
+ * its VAT ID for the invoice where the checkout offers no reverse charge (the provider puts it on the invoices).
  */
 export const useOrderConsent = () =>
   useMutation({
-    mutationFn: (c: { buyer: 'consumer' | 'business'; start: boolean; vatId?: string }) => api('/api/billing/checkout/consent', { method: 'POST', body: c }),
+    mutationFn: (c: { buyer: 'business'; start: false; vatId?: string }) => api('/api/billing/checkout/consent', { method: 'POST', body: c }),
   });
 
 /** What a plan change will put on the next invoice (nothing changes yet). */

@@ -4,9 +4,10 @@
 // only inform (Your trial, Current, Your pick). One bar under the tiles, sticky while the plans are in view, says what
 // the selection costs this workspace and holds the one orange action: on to the checkout step for a new plan, or a
 // switch (with what the next invoice will be, or that it ends the trial and bills the plan now) for a running one. The member stepper tries other team sizes and never
-// changes the bill. Free and the rest in one row and one line below. Consumers may buy: where the provider
-// names the VAT a consumer pays (BillingInfo.vat), every price here is shown with it (PAngV), and the foot says that the
-// checkout works the tax out for the billing address.
+// changes the bill. Free and the rest in one row and one line below. Paid plans are for businesses: a new plan's action
+// waits for "I'm buying for my business, not as a private person" (billing/Business.tsx), ticked right above it, and the
+// foot says it plainly with the prices net and the VAT the checkout adds; where the provider names the VAT
+// (BillingInfo.vat), the bar says what the period comes to with it.
 import { type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { BillingInfo, BillingOffer, BillingPreview } from '../../../lib/types.ts';
 import { trialEndNet } from '../conversion/facts.ts';
@@ -19,8 +20,25 @@ import { I } from '../ui/icons.tsx';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { useConfirm } from '../ui/primitives.tsx';
 import { type PlanChoice, toastRefusal, useChangePlan, usePlanPreview, useSwitchEndsTrial } from './api.ts';
+import { BusinessTick, useBusiness } from './Business.tsx';
 import { checkoutHash } from './Checkout.tsx';
-import { billedNow, dayOf, daysUntil, gross, money, monthly, planLine, saving, savingNote, size, taxWord, unitsFor, vatOf, vatRate } from './words.ts';
+import {
+  billedNow,
+  businessLine,
+  dayOf,
+  daysUntil,
+  gross,
+  money,
+  monthly,
+  planLine,
+  saving,
+  savingNote,
+  size,
+  taxWord,
+  unitsFor,
+  vatOf,
+  vatRate,
+} from './words.ts';
 
 /** What the address brought: a plan picked on the website, with its interval and currency when it said them. */
 export interface Picked {
@@ -64,6 +82,10 @@ export function Picker({
   const [ask, confirmation] = useConfirm();
   const subscribed = !!b.subscribed;
   const canPay = b.available !== false && !!b.payments;
+  // a new plan is bought by a business: the box right above the action, which waits for it (a running plan's switch
+  // asks nothing new)
+  const [business, setBusiness] = useBusiness(b);
+  const asks = !subscribed && canPay;
   const offers = b.offers;
   const fitting = offers.filter((o) => fitsNow(o, n));
   // the selection: what was clicked, else the website's pick, the plan in force, Team, the first that fits
@@ -78,6 +100,7 @@ export function Picker({
     if (!sel) return;
     const c: PlanChoice = { plan: sel.plan, interval, currency };
     if (!subscribed) {
+      if (!business) return;
       chosenLast = { plan: sel.plan, interval, currency };
       location.hash = checkoutHash({ plan: sel.plan, interval, currency });
       return;
@@ -111,8 +134,8 @@ export function Picker({
   const left = b.trialEndsAt ? daysUntil(b.trialEndsAt) : 0;
   const units = sel ? unitsFor(sel, n) : 1;
   const unit = sel ? (monthly(sel, interval, currency) ?? 0) : 0;
-  // the prices as the provider sells them, net, said "excl. VAT" like the website's (taxWord); what a consumer pays in
-  // all comes beside the one action, before anyone commits (PAngV): the period's total with the VAT the provider names
+  // the prices as the provider sells them, net, said "excl. VAT" like the website's (taxWord); what the period comes to
+  // in all stands beside the one action, before anyone commits: its total with the VAT the provider names
   const year = sel ? (sel.prices[currency]?.year ?? 0) * units : 0;
   const month = Math.round(unit * units);
   const rate = vatOf(b);
@@ -237,22 +260,36 @@ export function Picker({
             {t('Close')}
           </button>
         ) : (
-          <button type="button" className="btn primary lg" onClick={go} disabled={!sel || busy || (!subscribed && !canPay)} data-testid="billing-go">
-            {busy && <Spinner />}
-            {!sel
-              ? t('Choose a plan')
-              : !subscribed
-                ? t('Continue with {plan}', { plan: sel.name })
-                : sel.plan === b.plan
-                  ? interval === 'year'
-                    ? t('Switch to yearly')
-                    : t('Switch to monthly')
-                  : t('Switch to {plan}', { plan: sel.name })}
-            <I name="right" size={15} />
-          </button>
+          <div className={`bill-pk-go ${asks ? 'asks' : ''}`}>
+            {asks && <BusinessTick on={business} onChange={setBusiness} disabled={busy} />}
+            <button
+              type="button"
+              className="btn primary lg"
+              onClick={go}
+              disabled={!sel || busy || (!subscribed && (!canPay || !business))}
+              data-testid="billing-go"
+            >
+              {busy && <Spinner />}
+              {!sel
+                ? t('Choose a plan')
+                : !subscribed
+                  ? t('Continue with {plan}', { plan: sel.name })
+                  : sel.plan === b.plan
+                    ? interval === 'year'
+                      ? t('Switch to yearly')
+                      : t('Switch to monthly')
+                    : t('Switch to {plan}', { plan: sel.name })}
+              <I name="right" size={15} />
+            </button>
+          </div>
         )}
       </div>
       <div className="bill-pk-foot">
+        {/* said plainly where a plan is chosen: who may buy, the prices net, the VAT the checkout adds (a business abroad
+            pays none only where the provider offers reverse charge: its seller has a VAT ID) */}
+        <p className="bill-fine bill-b2b" data-testid="billing-vat">
+          {businessLine(b)}
+        </p>
         <div className="bill-free-row">
           <b>Free</b>
           <span>{t('1 member · 10 GB of storage · 3 videos under review at a time · A small Lampo badge on review links')}</span>
@@ -267,19 +304,6 @@ export function Picker({
           </a>
           .
         </p>
-        {rate !== null && (
-          <p className="bill-fine" data-testid="billing-vat">
-            {/* a business abroad pays no VAT only where the provider offers reverse charge (its seller has a VAT ID) */}
-            {b.reverseCharge
-              ? t(
-                  'Prices excl. VAT; the total beside the button includes {rate}. At the checkout the VAT follows your billing address: a business with a VAT ID from another EU country pays none.',
-                  { rate: vatRate(rate) },
-                )
-              : t('Prices excl. VAT; the total beside the button includes {rate}. At the checkout the VAT follows your billing address.', {
-                  rate: vatRate(rate),
-                })}
-          </p>
-        )}
       </div>
       {confirmation}
     </section>

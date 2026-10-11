@@ -7,6 +7,8 @@
 // `window.__fakeStripe.calls` records what the page asked; `window.__fakeStripe.decline = true` declines the next card;
 // `__fakeStripe.address('DE' | 'AT' | 'US')` stands in for an address typed into the address element (the tax follows:
 // 19 % in Germany, nothing elsewhere), `__fakeStripe.taxId('ATU12345678')` for a VAT ID typed into the tax ID element.
+// The session requires the business's name, as the real module's does: a confirm without one (no updateBusinessName, no
+// tax ID element whose own row asks it) is refused.
 // Each frame is as tall as Stripe's own with our appearance, in the step's grid (measured on real Stripe.js: Slots.tsx).
 (() => {
   const fake = { calls: [], decline: false, email: 'pia@e2e.test' };
@@ -81,6 +83,10 @@
         let discount = 0;
         let country = null;
         let taxId = null;
+        // the business's name the session requires (paid plans are for businesses): the page's own field sends it with
+        // updateBusinessName; the tax ID element asks it in its own row (taken as given here)
+        let businessName = null;
+        let taxIdElement = false;
         const listeners = [];
         const rate = () => (country === 'DE' ? 0.19 : 0);
         const off = (x) => (x ? Math.round(x * (1 - discount)) : 0);
@@ -135,6 +141,7 @@
           createTaxIdElement: (o) => {
             fake.options = { ...fake.options, taxId: o };
             fake.calls.push(['createTaxIdElement']);
+            taxIdElement = true;
             return element('taxid');
           },
           on(event, cb) {
@@ -165,10 +172,13 @@
                 },
                 async updateBusinessName(v) {
                   fake.calls.push(['updateBusinessName', v]);
+                  businessName = v || null;
                   return { type: 'success', session: changed() };
                 },
                 async confirm(o) {
                   fake.calls.push(['confirm', o?.redirect ?? null]);
+                  // like the real session with the business's name required: no order without it
+                  if (!businessName && !taxIdElement) return { type: 'error', error: { type: 'validation_error', message: 'Enter a business name.' } };
                   const r = await confirm(clientSecret, discount ? 'WELCOME' : null);
                   return r.error ? { type: 'error', error: r.error } : { type: 'success', session: session() };
                 },

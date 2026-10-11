@@ -298,7 +298,7 @@
     background var(--dur-fast),
     box-shadow var(--dur-fast);
 }
-.checkbox:hover {
+.checkbox:hover:where(:not(:disabled)) {
   box-shadow: inset 0 0 0 1.5px var(--line-4);
 }
 .checkbox[data-state='checked'] {
@@ -308,6 +308,12 @@
 .checkbox[data-disabled] {
   opacity: var(--disabled-o);
   cursor: default;
+}
+/* `all: unset` above takes base.css's focus ring away too (it comes later, at the same specificity): the one ring back */
+.switch:focus-visible,
+.checkbox:focus-visible {
+  outline: var(--focus-width) solid var(--fg);
+  outline-offset: var(--focus-offset);
 }
 .checkbox-mark {
   display: grid;

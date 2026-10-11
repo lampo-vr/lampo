@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 // covers: web/src/conversion/ web/src/lib/toast.ts web/src/ui/layers.tsx web/src/uploads/ web/src/settings/Users.tsx
 // covers: web/src/library/Insights.tsx web/src/styles/limits.css web/src/styles/pay.css server/extension.ts server/routes/uploads.ts
-// covers: test/e2e/lib/billingModule.ts
+// covers: test/e2e/lib/billingModule.ts web/src/billing/Business.tsx web/src/billing/Checkout.tsx
 // A limit reached is a sheet, not a toast (the build spec's moments 2c and 3), against the stand-in billing provider
 // (test/e2e/lib/billingModule.ts) and the stand-in Stripe.js: an upload a Free plan has no room for opens the sheet with
-// what fits (Solo) and waits in the tray; paying on the sheet lets it go on by itself. A second person on Free: the
+// what fits (Solo) and waits in the tray; its pay column starts with "I'm buying for my business, not as a private
+// person" (paid plans are for businesses): nothing starts and Buy now waits until it is ticked, then the business's name
+// and the card; paying on the sheet lets the upload go on by itself. A second person on Free: the
 // invite's refusal opens Team's sheet, and the invite goes out once it's paid. On Solo with a card on file the invite
 // form itself says what brings them in, and its button switches the plan, then invites. On a paid Team, one more
 // terabyte is the answer, paid with the card on file. A paid trial on a full Team: the invite and the sheet say the trial
@@ -74,6 +76,8 @@ const patchFake = (workspace, patch) => {
   fs.writeFileSync(FAKE, JSON.stringify(d, null, 2));
 };
 const FREE = { plan: 'free', planName: 'Free', state: 'free' };
+/** An owner who confirmed before that the workspace buys for its business: the provider remembers it, the box is ticked. */
+const CONFIRMED = { business: { at: new Date().toISOString() } };
 async function signUp(name, email) {
   const made = await request('POST', '/api/auth/signup', { body: { name, email, password: PASSWORD, lang: 'en' }, headers: origin });
   assert(made.status === 200, made.text);
@@ -162,8 +166,17 @@ try {
   };
   const sheet = (reason) => page.waitForSelector(`[data-testid=limit-sheet][data-reason=${reason}]`, { timeout: 15000 });
   const sheetGone = () => page.waitForFunction(() => !document.querySelector('[data-testid=limit-sheet]'), { polling: 100, timeout: 10000 });
-  /** Pays on the sheet's checkout (the stand-in Stripe's fields, the express start a consumer asks for, then Buy now). */
+  const TICK = '[data-testid=limit-sheet] [data-testid=billing-business] [role=checkbox]';
+  /**
+   * Pays on the sheet's checkout: the business box first (paid plans are for businesses; "Buy now" waits for it), the
+   * business's name, the stand-in Stripe's fields, then Buy now.
+   */
   const payCheckout = async () => {
+    await page.waitForSelector(TICK, { timeout: 15000 });
+    if ((await page.$eval(TICK, (c) => c.getAttribute('aria-checked'))) !== 'true') {
+      assert(await page.$eval('[data-testid=limit-sheet] [data-testid=billing-pay]', (b) => b.disabled), 'Buy now waits for the box');
+      await page.click(TICK);
+    }
     await page.waitForSelector('[data-testid=limit-sheet] [data-testid=billing-pay]:enabled', { timeout: 15000 });
     // the checkout's own button and terms line in a sheet too (A13 CLOUD-2): never the moment's "Pay … and upload"
     assert(
@@ -171,7 +184,7 @@ try {
       await text('[data-testid=limit-sheet] [data-testid=billing-pay]'),
     );
     assert(/^By ordering you accept the Terms/.test(await text('[data-testid=limit-sheet] [data-testid=billing-terms]')), 'the terms line above it');
-    await page.click('[data-testid=limit-sheet] [data-testid=billing-start] input');
+    await page.type('[data-testid=limit-sheet] [data-testid=billing-business-name]', 'Costa Cuts Lda.');
     await page.click('[data-testid=limit-sheet] [data-testid=billing-pay]');
   };
   /** Opens a sheet as a refusal would (the toaster's event), with real-shaped numbers for the pictures. */
@@ -234,6 +247,40 @@ try {
     await waitText('[data-testid=upload-room]', /Waiting for room/);
     await page.click('[data-testid=upload-room-plans]');
     await sheet('storage');
+  });
+
+  await check('paid plans are for businesses: the sheet’s pay column starts with the box; nothing starts and “Buy now” waits until it is ticked', async () => {
+    await page.waitForSelector(TICK, { timeout: 15000 });
+    const look = await page.evaluate(() => {
+      const pay = document.querySelector('[data-testid=limit-sheet] .lim-pay');
+      const b = pay.querySelector('[data-testid=billing-business]');
+      return {
+        on: b.querySelector('[role=checkbox]').getAttribute('aria-checked'),
+        words: [...b.querySelector('label').children].map((c) => c.textContent.trim()).join(' '),
+        first: b.getBoundingClientRect().top < pay.querySelector('[data-testid=billing-business-name]').getBoundingClientRect().top,
+        cardResting:
+          !!pay.querySelector('[data-testid=billing-checkout] .co-slots .rest') && !pay.querySelector('[data-testid=billing-checkout] .co-slots .sk'),
+        pay: [pay.querySelector('[data-testid=billing-pay]').textContent.trim(), pay.querySelector('[data-testid=billing-pay]').disabled],
+      };
+    });
+    assert(
+      JSON.stringify(look) ===
+        JSON.stringify({
+          on: 'false',
+          words: 'I’m buying for my business, not as a private person',
+          first: true,
+          cardResting: true,
+          pay: ['Buy now', true],
+        }),
+      JSON.stringify(look),
+    );
+    assert(!fake().calls.some((c) => c.kind === 'checkout'), `nothing started: ${JSON.stringify(fake().calls)}`);
+    await shots('3a-unticked', null);
+    // ticked: the checkout starts for a business, and the card arrives
+    await page.click(TICK);
+    await page.waitForSelector('[data-testid=limit-sheet] [data-testid=billing-pay]:enabled', { timeout: 15000 });
+    const started = fake().calls.filter((c) => c.kind === 'checkout');
+    assert(started.length === 1 && started[0].business === true && started[0].form === 'card', JSON.stringify(started));
   });
 
   await check('paying on the sheet: Solo, and the upload goes on by itself', async () => {
@@ -599,7 +646,7 @@ try {
 
   await check('nothing moves while Stripe’s fields load: the sheet keeps their room', async () => {
     await signIn(ana.cookie);
-    setFake(ana.ws, { ...FREE, usage: { members: 1, bytes: 9.4e9, activeVideos: 2 }, limits: { members: 1, bytes: 10e9, activeVideos: 3 } });
+    setFake(ana.ws, { ...FREE, ...CONFIRMED, usage: { members: 1, bytes: 9.4e9, activeVideos: 2 }, limits: { members: 1, bytes: 10e9, activeVideos: 3 } });
     await fresh('#/');
     await page.waitForSelector('.lib-scroll');
     held = [];
@@ -635,7 +682,7 @@ try {
   await check('every sheet fits a phone to 2560 px, light and dark, with 44 px targets on a phone', async () => {
     const posed = {
       '3a': {
-        state: { ...FREE, usage: { members: 1, bytes: 9.4e9, activeVideos: 2 }, limits: { members: 1, bytes: 10e9, activeVideos: 3 } },
+        state: { ...FREE, ...CONFIRMED, usage: { members: 1, bytes: 9.4e9, activeVideos: 2 }, limits: { members: 1, bytes: 10e9, activeVideos: 3 } },
         ask: { reason: 'storage', needed: 1.8e9, name: 'fjord-hotel-rooms-v3.mov', upload: 'posed', room: { videos: 3, bytes: 4.2e9 } },
       },
       '3b': {
@@ -653,8 +700,8 @@ try {
         },
         ask: { reason: 'storage', needed: 64e9, name: 'pinewood-brand-film-90s_V7.mov', upload: 'posed', room: { videos: 6, bytes: 412e9 } },
       },
-      '3c': { state: { ...FREE }, ask: { reason: 'members', needed: 'ben.kruse@example.com', name: 'Ben' } },
-      '3e': { state: { ...FREE }, ask: { feature: 'insights', fits: 'team' } },
+      '3c': { state: { ...FREE, ...CONFIRMED }, ask: { reason: 'members', needed: 'ben.kruse@example.com', name: 'Ben' } },
+      '3e': { state: { ...FREE, ...CONFIRMED }, ask: { feature: 'insights', fits: 'team' } },
     };
     for (const [name, { state, ask: limit }] of Object.entries(posed)) {
       setFake(ana.ws, state);
@@ -680,6 +727,13 @@ try {
     assert(/fjord-hotel-rooms-v3\.mov braucht mehr Platz/.test(head), head);
     assert(/Die Datei hat 1,8 GB, und Costa Cuts hat von den 10 GB auf Free noch 600 MB frei\. Der Upload wartet;/.test(head), head);
     assert((await text('[data-testid=limit-later]')) === 'Nicht jetzt · der Upload wartet', await text('[data-testid=limit-later]'));
+    // paid plans are for businesses: the box in German (du), "für Unternehmen"
+    await page.waitForSelector('[data-testid=limit-sheet] [data-testid=billing-business]', { timeout: 15000 });
+    const words = await page.$eval('[data-testid=limit-sheet] [data-testid=billing-business] label', (l) =>
+      [...l.children].map((c) => c.textContent.trim()).join(' '),
+    );
+    assert(words === 'Ich kaufe für mein Unternehmen, nicht als Privatperson', words);
+    assert(/Name des Unternehmens/.test(await text('[data-testid=limit-sheet] [data-testid=billing-business-fields]')), 'the name’s label');
     assert(/Oder schaff Platz: 3 finale Videos belegen 4,2 GB\./.test(await text('[data-testid=limit-room]')), await text('[data-testid=limit-room]'));
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, '3a-de-1440.png') });
     await page.click('[data-testid=limit-later]');

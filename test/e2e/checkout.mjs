@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // covers: web/src/billing/Checkout.tsx web/src/billing/stripe.ts web/src/styles/checkout.css web/src/settings/Billing.tsx
+// covers: web/src/billing/Business.tsx web/src/billing/Slots.tsx
 // covers: test/e2e/lib/billingModule.ts test/e2e/lib/fakeStripe.js server/respond.ts web/src/consent/ web/src/vendor/
 // covers: web/src/styles/consent.css test/e2e/lib/consent.mjs
 // The checkout step (conversion SPEC §5) against the stand-in billing provider and Stripe.js (test/e2e/billing.mjs has
@@ -8,11 +9,14 @@
 // they arrive, desktop and phone), and sets Stripe up as the SPEC says (card only, no wallets or Link, the address
 // searched with Stripe's autocomplete, the tax ID element behind its beta, our appearance and our Instrument Sans, served to Stripe's frames
 // across origins). The order is the session's: the lines, VAT once the address is known, a promotion code above the
-// total, what is due today while the trial carries over (Team) or that paying ends it (Business). Consumers may buy (A13
-// CLOUD-2): "business" is off at first and, ticked, brings the business's name and VAT ID — Stripe's tax ID element only
-// where the provider offers reverse charge (its seller has a VAT ID), else two fields of the page's own whose VAT ID goes
-// with the consent, and nothing says reverse charge (unticked again, it is cleared); a consumer's
-// express start and the terms line with the operator's pages sit above the button, which says "Buy now" ("Zahlungspflichtig
+// total, what is due today while the trial carries over (Team) or that paying ends it (Business). Paid plans are for
+// businesses: "I'm buying for my business, not as a private person" comes first, unticked until the provider has it;
+// nothing starts (no session, Stripe's fields' room held still) and "Buy now" waits until it is ticked; ticked, the
+// session starts with it (never a second one when it is unticked and ticked again), and from then on it is remembered.
+// The business's name is required (said at its field), its VAT ID optional — Stripe's tax ID element only where the
+// provider offers reverse charge (its seller has a VAT ID), else two fields of the page's own whose VAT ID goes with the
+// consent, and nothing says reverse charge; the terms line with the operator's pages (no withdrawal information) sits
+// above the button, which says "Buy now" ("Zahlungspflichtig
 // bestellen"), and the consent is recorded before the order; a new receipts address is saved once paid; a declined card is said under the card; paid, a calm
 // done panel with four facts, and See Billing goes back. Two checkouts that raced (this one replaced, an earlier form
 // that couldn't be closed) say so, with Try again. The cookie settings ask first (A13 CLOUD-1): nothing from
@@ -149,11 +153,20 @@ try {
   };
   const elementsReady = (n) =>
     page.waitForFunction((k) => document.querySelectorAll('[data-testid=billing-checkout] .co-el.settled').length === k, { polling: 100, timeout: 15000 }, n);
-  /** The step with its fields loaded and its pay button live. */
+  const TICK = '[data-testid=billing-business] [role=checkbox]';
+  /** The business box: its words, and whether it is ticked. */
+  const box = () =>
+    page.$eval('[data-testid=billing-business]', (b) => ({
+      on: b.querySelector('[role=checkbox]').getAttribute('aria-checked') === 'true',
+      words: [...b.querySelector('label').children].map((c) => c.textContent.trim()).join(' '),
+    }));
+  /** The step with its fields loaded and its pay button live (the business box ticked, as the provider remembers it). */
   const open = async (hash = TEAM, vp = { width: 1440, height: 900 }) => {
     // each check starts at its own size (a failed one may have left a phone behind)
     await page.setViewport(vp);
     await fresh(hash);
+    await page.waitForSelector('[data-testid=billing-business]', { timeout: 15000 });
+    if (!(await box()).on) await page.click(TICK);
     await elementsReady(2);
     await page.waitForFunction(() => !document.querySelector('[data-testid=billing-pay]')?.disabled, { polling: 100, timeout: 15000 });
     await settle(page);
@@ -162,7 +175,7 @@ try {
   const marks = () =>
     page.evaluate(() =>
       Object.fromEntries(
-        ['.co-chk', '#co-card-h', '[data-testid=billing-total]', '[data-testid=billing-due]', '.co-safe', '.co-bar'].map((s) => {
+        ['[data-testid=billing-business-fields]', '#co-card-h', '[data-testid=billing-total]', '[data-testid=billing-due]', '.co-safe', '.co-bar'].map((s) => {
           const r = document.querySelector(s)?.getBoundingClientRect();
           return [s, r?.height ? Math.round(r.top * 10) / 10 : null];
         }),
@@ -170,6 +183,90 @@ try {
     );
 
   console.log(`checkout e2e against ${BASE} (store ${srv.dir})`);
+
+  await check('paid plans are for businesses: the box comes first; nothing starts and “Buy now” waits until it is ticked; then remembered', async () => {
+    await page.setCookie(consentCookie(BASE));
+    await page.setViewport({ width: 1440, height: 900 });
+    thirdParty.length = 0;
+    // the way the trial's end comes here: straight to the step, nothing confirmed before
+    assert(!fake().workspaces[ws.id].business, JSON.stringify(fake().workspaces[ws.id]));
+    await fresh(TEAM);
+    await page.waitForSelector('[data-testid=billing-business]', { timeout: 15000 });
+    await settle(page);
+    assert(
+      JSON.stringify(await box()) ===
+        JSON.stringify({
+          on: false,
+          words: 'I’m buying for my business, not as a private person Paid plans are for businesses; the trial and Free are open to everyone.',
+        }),
+      JSON.stringify(await box()),
+    );
+    // it comes first in the form, above the receipts line and the address
+    const order = await page.evaluate(() =>
+      ['[data-testid=billing-business]', '[data-testid=billing-receipts]', '#co-addr-h'].map((s) => document.querySelector(s).getBoundingClientRect().top),
+    );
+    assert(order[0] < order[1] && order[1] < order[2], `the box first: ${order}`);
+    // nothing started: no checkout at the provider, nothing of Stripe, the fields' room held still (no loading line)
+    assert(!fake().calls.some((c) => c.kind === 'checkout'), JSON.stringify(fake().calls));
+    assert(!thirdParty.length, `nothing from Stripe before the box: ${thirdParty.join(', ')}`);
+    const waiting = await page.evaluate(() => ({
+      slots: document.querySelectorAll('[data-testid=billing-checkout] .co-slots').length,
+      loadingLine: document.querySelectorAll('[data-testid=billing-checkout] .co-slots .sk').length,
+      resting: document.querySelectorAll('[data-testid=billing-checkout] .co-slots .rest').length,
+      pay: [...document.querySelectorAll('[data-testid=billing-pay], [data-testid=billing-pay-bar]')].map((b) => [b.textContent.trim(), b.disabled]),
+      spinner: !!document.querySelector('[data-testid=billing-pay] .spinner, [data-testid=billing-pay] svg.spin'),
+    }));
+    assert(waiting.slots === 2 && waiting.loadingLine === 0 && waiting.resting > 0, JSON.stringify(waiting));
+    assert(
+      JSON.stringify(waiting.pay) ===
+        JSON.stringify([
+          ['Buy now', true],
+          ['Buy now', true],
+        ]) && !waiting.spinner,
+      `waits, not loading: ${JSON.stringify(waiting)}`,
+    );
+    // the design system's box: a keyboard's focus ring of --focus-width, the words a label for it (a click on them ticks)
+    await page.focus(TICK);
+    await page.keyboard.press('Shift');
+    const ring = await page.$eval(TICK, (c) => ({ style: getComputedStyle(c).outlineStyle, width: getComputedStyle(c).outlineWidth }));
+    assert(ring.style === 'solid' && ring.width === '2px', JSON.stringify(ring));
+    await shot('business-box');
+    const problems = await layoutMatrix(
+      page,
+      { 'the business box, unticked': null },
+      { widths: [390, 1440], each: (w, theme) => shot(`business-box-${w}-${theme}`) },
+    );
+    assert(!problems.length, problems.join('\n'));
+    // ticked (on its words): the session starts with it, and the form loads
+    await page.click('[data-testid=billing-business] label');
+    await page.waitForFunction(() => document.querySelector('[data-testid=billing-business] [role=checkbox]').getAttribute('aria-checked') === 'true');
+    await elementsReady(2);
+    await page.waitForFunction(() => !document.querySelector('[data-testid=billing-pay]')?.disabled, { polling: 100, timeout: 15000 });
+    const started = fake().calls.filter((c) => c.kind === 'checkout');
+    assert(started.length === 1 && started[0].business === true && started[0].plan === 'team', JSON.stringify(started));
+    assert(fake().workspaces[ws.id].business?.at, `the provider keeps who and when: ${JSON.stringify(fake().workspaces[ws.id])}`);
+    // unticked again: "Buy now" waits once more, and nothing new is asked of the provider; ticked, it is live again
+    await page.click(TICK);
+    await page.waitForFunction(() => document.querySelector('[data-testid=billing-pay]').disabled, { polling: 100, timeout: 5000 });
+    await page.click(TICK);
+    await page.waitForFunction(() => !document.querySelector('[data-testid=billing-pay]').disabled, { polling: 100, timeout: 5000 });
+    assert(fake().calls.filter((c) => c.kind === 'checkout').length === 1, 'one session, whatever the box did after');
+    // remembered: the next visit finds it ticked, and the form loads at once
+    await fresh(TEAM);
+    await page.waitForSelector('[data-testid=billing-business]', { timeout: 15000 });
+    assert((await box()).on, 'ticked, as the provider remembers it');
+    await elementsReady(2);
+    // the provider starts no checkout without it, whatever a page sends
+    const refused = await page.evaluate(async () => {
+      const r = await fetch('/api/billing/checkout', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ plan: 'team', interval: 'year', currency: 'eur' }),
+      });
+      return { status: r.status, body: await r.json() };
+    });
+    assert(refused.status === 400 && refused.body.code === 'business-only', JSON.stringify(refused));
+  });
 
   await check('the cookie settings ask first: nothing from Stripe or Google before a choice; refused, said and allowed in place; kept', async () => {
     await page.deleteCookie({ name: 'cc_cookie', domain: host });
@@ -303,7 +400,9 @@ try {
       JSON.stringify(p),
     );
     assert(p.terms?.card === 'auto', 'Stripe’s terms line stays');
-    assert(!opts.taxId, 'no tax ID element until “business” is ticked');
+    assert(!opts.taxId, 'no tax ID element without reverse charge');
+    // the session was started for a business
+    assert(call.business === true, JSON.stringify(call));
     // the appearance: one control scale, ink focus, the theme's own colours
     const a = opts.checkout.appearance;
     assert(
@@ -364,65 +463,51 @@ try {
     assert(!(await page.$('[data-testid=billing-promo-applied]')), 'the code is off');
   });
 
-  await check('consumers may buy: the business box is off; the express start and the terms line sit right above “Buy now”', async () => {
-    await open();
-    const look = await page.evaluate(() => {
-      const y = (s) => document.querySelector(s)?.getBoundingClientRect().top ?? null;
-      return {
-        business: document.querySelector('.co-biz input')?.checked,
-        businessNote: document.querySelector('.co-biz small')?.textContent,
-        taxId: !!document.querySelector('[data-testid=billing-taxid-element]'),
-        start: document.querySelector('[data-testid=billing-start]')?.textContent.trim(),
-        terms: [...document.querySelectorAll('[data-testid=billing-terms] a')].map((a) => [a.textContent, a.getAttribute('href'), a.rel, a.target]),
-        line: document.querySelector('[data-testid=billing-terms]')?.textContent,
-        order: [y('[data-testid=billing-start]'), y('[data-testid=billing-terms]'), y('[data-testid=billing-pay]')],
-        button: document.querySelector('[data-testid=billing-pay]')?.textContent,
-      };
-    });
-    assert(look.business === false && !look.taxId, `a person by default: ${JSON.stringify(look)}`);
-    // no reverse charge here (the provider's seller has no VAT ID): the box says what a VAT ID is for, and nothing more
-    assert(look.businessNote === 'Optional: its name and VAT ID on the invoice.', look.businessNote);
-    assert(
-      /^I expressly ask for Team to start now, before the 14-day withdrawal period ends\. If I withdraw, I pay for the time until then/.test(look.start ?? ''),
-      look.start,
-    );
-    assert(
-      JSON.stringify(look.terms) ===
-        JSON.stringify([
-          ['Terms', LEGAL.VR_TERMS_URL, 'noreferrer', '_blank'],
-          ['Privacy policy', LEGAL.VR_PRIVACY_URL, 'noreferrer', '_blank'],
-          ['withdrawal information', LEGAL.VR_WITHDRAWAL_URL, 'noreferrer', '_blank'],
-        ]),
-      JSON.stringify(look.terms),
-    );
-    assert(look.line === 'By ordering you accept the Terms and have read the Privacy policy and the withdrawal information.', look.line);
-    assert(look.order[0] < look.order[1] && look.order[1] < look.order[2], `the box, the terms line, the button: ${look.order}`);
-    assert(look.button === 'Buy now', look.button);
-    // pressed without the box: said at the box (the focus there), nothing recorded, nothing ordered
-    await page.click('[data-testid=billing-pay]');
-    await waitText('[data-testid=billing-start-miss]', /^Tick the box to start Team now, or buy as a business\.$/);
-    assert(await page.$eval('[data-testid=billing-start] input', (i) => document.activeElement === i), 'the focus is on the box');
-    assert(!fake().calls.some((c) => c.kind === 'consent' || c.kind === 'confirm-checkout'), JSON.stringify(fake().calls));
-    assert(!(await page.evaluate(() => window.__fakeStripe.calls)).some((c) => c[0] === 'confirm'), 'Stripe was not asked');
-    await shot('consumer');
-    // a business: no right of withdrawal, so no box, and the terms line without the withdrawal information
-    await page.click('.co-biz input');
-    await page.waitForSelector('[data-testid=billing-business-fields]');
-    assert(!(await page.$('[data-testid=billing-start]')), 'no express start for a business');
-    assert(
-      (await text('[data-testid=billing-terms]')) === 'By ordering you accept the Terms and have read the Privacy policy.',
-      await text('[data-testid=billing-terms]'),
-    );
-    await page.click('.co-biz input');
-    await page.waitForSelector('[data-testid=billing-start]');
-  });
+  await check(
+    'a business buys: its name required, said at its field; no express start, no withdrawal information; the terms right above “Buy now”',
+    async () => {
+      await open();
+      const look = await page.evaluate(() => {
+        const y = (s) => document.querySelector(s)?.getBoundingClientRect().top ?? null;
+        return {
+          fields: !!document.querySelector('[data-testid=billing-business-fields]'),
+          taxId: !!document.querySelector('[data-testid=billing-taxid-element]'),
+          start: !!document.querySelector('[data-testid=billing-start]'),
+          terms: [...document.querySelectorAll('[data-testid=billing-terms] a')].map((a) => [a.textContent, a.getAttribute('href'), a.rel, a.target]),
+          line: document.querySelector('[data-testid=billing-terms]')?.textContent,
+          order: [y('[data-testid=billing-terms]'), y('[data-testid=billing-pay]')],
+          button: document.querySelector('[data-testid=billing-pay]')?.textContent,
+          required: document.querySelector('[data-testid=billing-business-name]')?.required,
+        };
+      });
+      assert(look.fields && !look.taxId && !look.start && look.required, `the business's own fields, from the start: ${JSON.stringify(look)}`);
+      assert(
+        JSON.stringify(look.terms) ===
+          JSON.stringify([
+            ['Terms', LEGAL.VR_TERMS_URL, 'noreferrer', '_blank'],
+            ['Privacy policy', LEGAL.VR_PRIVACY_URL, 'noreferrer', '_blank'],
+          ]),
+        JSON.stringify(look.terms),
+      );
+      assert(look.line === 'By ordering you accept the Terms and have read the Privacy policy.', look.line);
+      assert(look.order[0] < look.order[1], `the terms line, then the button: ${look.order}`);
+      assert(look.button === 'Buy now', look.button);
+      // pressed without the business's name: said at its field (the focus there), nothing recorded, nothing ordered
+      await page.click('[data-testid=billing-pay]');
+      await waitText('[data-testid=billing-business-name-miss]', /^Enter the business’s name: it goes on the invoice\.$/);
+      assert(await page.$eval('[data-testid=billing-business-name]', (i) => document.activeElement === i), 'the focus is on the name');
+      assert(await page.$eval('[data-testid=billing-business-name]', (i) => i.getAttribute('aria-invalid') === 'true'), 'marked invalid');
+      assert(!fake().calls.some((c) => c.kind === 'consent' || c.kind === 'confirm-checkout'), JSON.stringify(fake().calls));
+      assert(!(await page.evaluate(() => window.__fakeStripe.calls)).some((c) => c[0] === 'confirm'), 'Stripe was not asked');
+      await shot('business-name-missing');
+      // typed, the line goes
+      await page.type('[data-testid=billing-business-name]', 'Studio Nord GmbH');
+      await page.waitForFunction(() => !document.querySelector('[data-testid=billing-business-name-miss]'), { polling: 100, timeout: 5000 });
+    },
+  );
 
   await check('without the seller’s VAT ID: the business’s name and VAT ID in our own fields, the VAT ID with the order, never “reverse charge”', async () => {
     await open();
-    await page.evaluate(() => {
-      window.__fakeStripe.calls.length = 0;
-    });
-    await page.click('.co-biz input');
     await page.waitForSelector('[data-testid=billing-business-fields]');
     const calls = await page.evaluate(() => window.__fakeStripe.calls);
     assert(!calls.some((c) => c[0] === 'createTaxIdElement'), `no Stripe tax ID element: ${JSON.stringify(calls)}`);
@@ -469,45 +554,37 @@ try {
       { widths: [390, 1440], each: (w, theme) => shot(`business-fields-${w}-${theme}`) },
     );
     assert(!problems.length, problems.join('\n'));
-    // unticked: the fields go, and what they held with them
-    await page.click('.co-biz input');
-    await page.waitForFunction(() => !document.querySelector('[data-testid=billing-business-fields]'), { polling: 100, timeout: 5000 });
-    await page.click('.co-biz input');
-    await page.waitForSelector('[data-testid=billing-business-fields]');
-    assert((await page.$eval('[data-testid=billing-business-vat]', (i) => i.value)) === '', 'the VAT ID is gone');
   });
 
   await check(
-    'with the seller’s VAT ID: the tax ID element while ticked; unticked, what it held is cleared; a VAT ID abroad reads reverse charge',
+    'with the seller’s VAT ID: the business’s name and VAT ID are Stripe’s tax ID element from the start; a VAT ID abroad reads reverse charge',
     async () => {
       setFake(ws.id, { reverseCharge: true });
       try {
-        await open();
-        assert(
-          (await text('.co-biz small')) === 'Optional: its name and VAT ID on the invoice. A VAT ID is needed only for reverse charge.',
-          await text('.co-biz small'),
-        );
-        assert(!(await page.$('[data-testid=billing-taxid-element]')), 'off from the start: no tax ID element');
-        await page.click('.co-biz input');
-        await page.waitForSelector('[data-testid=billing-taxid-element][data-mounted=taxid]');
+        await page.setViewport({ width: 1440, height: 900 });
+        await fresh(TEAM);
+        await page.waitForSelector('[data-testid=billing-taxid-element][data-mounted=taxid]', { timeout: 15000 });
         await elementsReady(3);
-        await page.click('.co-biz input');
-        await page.waitForFunction(() => !document.querySelector('[data-testid=billing-taxid-element]'), { polling: 100, timeout: 5000 });
-        await page.waitForFunction(() => window.__fakeStripe.calls.some((c) => c[0] === 'updateBusinessName'), { polling: 100, timeout: 5000 });
-        const calls = await page.evaluate(() => window.__fakeStripe.calls);
-        assert(
-          calls.some((c) => c[0] === 'updateTaxIdInfo' && c[1] === null),
-          JSON.stringify(calls),
-        );
-        await page.click('.co-biz input');
-        await page.waitForSelector('[data-testid=billing-taxid-element][data-mounted=taxid]');
-        await elementsReady(3);
+        assert(!(await page.$('[data-testid=billing-business-fields]')), 'Stripe’s element, not our fields');
+        assert((await page.evaluate(() => window.__fakeStripe.options.taxId?.visibility)) === 'always', 'always shown: every buyer is a business');
         await page.evaluate(() => {
           window.__fakeStripe.address('AT');
           window.__fakeStripe.taxId('ATU12345678');
         });
         await waitText('[data-testid=billing-tax]', /Reverse charge/);
-        assert(!(await page.$('[data-testid=billing-business-fields]')), 'Stripe’s element, not our fields');
+        // the name is Stripe's to ask (its element's row, required by the session): the page asks nothing of its own, and
+        // the order is recorded as a business's (declined here, so the trial stays for the checks after)
+        await page.evaluate(() => {
+          window.__fakeStripe.decline = true;
+        });
+        const consents = fake().calls.filter((c) => c.kind === 'consent').length;
+        await page.click('[data-testid=billing-pay]');
+        await page.waitForSelector('[data-testid=billing-pay-error]', { timeout: 15000 });
+        assert(!(await page.evaluate(() => window.__fakeStripe.calls)).some((c) => c[0] === 'updateBusinessName'), 'the element took the name');
+        const recorded = fake()
+          .calls.filter((c) => c.kind === 'consent')
+          .slice(consents);
+        assert(recorded.length === 1 && recorded[0].buyer === 'business' && recorded[0].start === false && !recorded[0].vatId, JSON.stringify(recorded));
       } finally {
         setFake(ws.id, { reverseCharge: undefined });
       }
@@ -578,16 +655,20 @@ try {
     assert(/Due today €0\.00/.test(bar.text) && /then €480\.00 on/.test(bar.text) && /Buy now/.test(bar.text), bar.text);
     const h = await page.$eval('[data-testid=billing-pay-bar]', (b) => b.getBoundingClientRect().height);
     assert(h >= 44, `the bar's button is touch height: ${h}`);
-    // the bar's button is far from the box: pressed without it, the box comes into view, said
+    // the bar's button is far from the business's name: pressed without it, the field comes into view, said
     await page.click('[data-testid=billing-pay-bar]');
-    await waitText('[data-testid=billing-start-miss]', /Tick the box/);
+    await waitText('[data-testid=billing-business-name-miss]', /Enter the business’s name/);
     await page.waitForFunction(
       () => {
-        const r = document.querySelector('[data-testid=billing-start]').getBoundingClientRect();
+        const r = document.querySelector('[data-testid=billing-business-name]').getBoundingClientRect();
         return r.top >= 0 && r.bottom <= innerHeight - document.querySelector('.co-bar').offsetHeight;
       },
       { polling: 100, timeout: 5000 },
     );
+    // and the business box unticked: the bar's button waits too
+    await page.click('[data-testid=billing-business] [role=checkbox]');
+    await page.waitForFunction(() => document.querySelector('[data-testid=billing-pay-bar]').disabled, { polling: 100, timeout: 5000 });
+    await page.click('[data-testid=billing-business] [role=checkbox]');
     await shot('phone');
     await page.setViewport({ width: 1440, height: 900 });
   });
@@ -625,13 +706,15 @@ try {
     assert(/Heute fällig/.test(await text('[data-testid=billing-due]')), await text('[data-testid=billing-due]'));
     assert(/Kündigst du vorher/.test(await text('[data-testid=billing-due]')), 'du, not Sie');
     assert((await text('[data-testid=billing-pay]')) === 'Zahlungspflichtig bestellen', await text('[data-testid=billing-pay]'));
+    // paid plans are for businesses: "für Unternehmen", the box in du
     assert(
-      /^Ich verlange ausdrücklich, dass Team jetzt beginnt, vor Ablauf der 14-tägigen Widerrufsfrist\./.test(await text('[data-testid=billing-start]')),
-      await text('[data-testid=billing-start]'),
+      (await box()).words ===
+        'Ich kaufe für mein Unternehmen, nicht als Privatperson Bezahlte Pläne sind für Unternehmen; die Testphase und Free sind für alle offen.',
+      (await box()).words,
     );
+    assert(/Name des Unternehmens/.test(await text('[data-testid=billing-business-fields]')), await text('[data-testid=billing-business-fields]'));
     assert(
-      (await text('[data-testid=billing-terms]')) ===
-        'Mit deiner Bestellung akzeptierst du die AGB und hast die Datenschutzerklärung und die Widerrufsbelehrung gelesen.',
+      (await text('[data-testid=billing-terms]')) === 'Mit deiner Bestellung akzeptierst du die AGB und hast die Datenschutzerklärung gelesen.',
       await text('[data-testid=billing-terms]'),
     );
     const calls = await page.evaluate(() => window.__fakeStripe.calls);
@@ -656,8 +739,8 @@ try {
     await page.type('.co-mail-f input', 'invoices@e2e.test');
     await page.$eval('.co-mail-f', (f) => f.requestSubmit());
     await waitText('[data-testid=billing-receipts]', /invoices@e2e\.test.*saved when you pay/);
-    // a consumer asks for the start (the box above the button)
-    await page.click('[data-testid=billing-start] input');
+    // the business's name, for the invoice
+    await page.type('[data-testid=billing-business-name]', 'Studio Nord GmbH');
     // declined: Stripe's sentence in the error colour right under the card, and nothing paid
     await page.evaluate(() => {
       window.__fakeStripe.decline = true;
@@ -681,15 +764,19 @@ try {
       (await page.evaluate(() => window.__fakeStripe.calls)).some((c) => c[0] === 'confirm' && c[1] === 'if_required'),
       'cards confirm in place',
     );
-    // what was agreed went to the provider right before the order: a consumer, the express start (an earlier check's
-    // declined business order recorded its own)
+    // what was agreed went to the provider right before the order: a business's (no VAT ID given here); its name went to
+    // Stripe for the invoice
     const kinds = fake().calls.map((c) => c.kind);
     const paidAt = kinds.indexOf('confirm-checkout');
     const consent = fake()
       .calls.slice(0, paidAt)
       .findLast((c) => c.kind === 'consent');
-    assert(consent?.buyer === 'consumer' && consent.start === true && !consent.vatId, JSON.stringify(consent));
+    assert(consent?.buyer === 'business' && consent.start === false && !consent.vatId, JSON.stringify(consent));
     assert(paidAt > 0 && kinds.lastIndexOf('consent', paidAt) === paidAt - 1, kinds.join(' '));
+    assert(
+      (await page.evaluate(() => window.__fakeStripe.calls)).some((c) => c[0] === 'updateBusinessName' && c[1] === 'Studio Nord GmbH'),
+      'the business’s name on the invoice',
+    );
     assert((await text('#co-paid-h')) === `${ws.name} is on Team`, await text('#co-paid-h'));
     // the trial's ruler, swept full: every day after today fills, the end is the solid keyframe
     const ruler = await page.$eval('.co-paid-ruler .bill-ruler.sweep', (r) => ({

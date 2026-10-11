@@ -239,6 +239,23 @@ test('every focus ring is the one ring: --focus-width in the text colour (the br
   assert.deepEqual(off, []);
 });
 
+test('a control that starts from `all: unset` names its own focus ring (base.css’s comes earlier and loses to it)', () => {
+  const unset: string[] = [];
+  const ringed = new Set<string>();
+  for (const f of stylesheets())
+    for (const r of parseCss(f)) {
+      if (r.decls.some((d) => d.prop === 'all' && d.value === 'unset')) unset.push(...r.selectors);
+      if (r.decls.some((d) => d.prop === 'outline' && d.value !== 'none'))
+        for (const s of r.selectors) if (s.endsWith(':focus-visible')) ringed.add(s.slice(0, -':focus-visible'.length));
+    }
+  assert.ok(unset.length >= 2, `the checkbox and the switch start from all: unset: ${unset.join(', ')}`);
+  assert.deepEqual(
+    unset.filter((s) => !ringed.has(s)),
+    [],
+    'every one of them has a :focus-visible outline of its own',
+  );
+});
+
 test('a theme island (.theme-dark, .theme-light) takes its theme’s colours and works out what is made from them', () => {
   const base = fs.readFileSync(path.join(STYLES_DIR, 'base.css'), 'utf8');
   const selectorsOf = (needle: string) => {

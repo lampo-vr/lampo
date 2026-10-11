@@ -189,7 +189,7 @@ only where a billing provider sells plans ([server-mode.md](server-mode.md#a-bil
 |---|---|---|---|
 | `LAMPO_IMPRINT_URL` | `imprint_url` | none | Who runs this server (an imprint, § 5 DDG in Germany): at the foot of the sign-in screens and of every review link's page, and in *Settings → About*. |
 | `LAMPO_TERMS_URL`, `LAMPO_PRIVACY_URL` | `terms_url`, `privacy_url` | none | As above; open sign-up needs both. |
-| `LAMPO_WITHDRAWAL_URL` | `withdrawal_url` | none | The withdrawal information for consumers, linked above the checkout's order button and in *Settings → About*. |
+| `LAMPO_WITHDRAWAL_URL` | `withdrawal_url` | none | The withdrawal information for consumers, linked in *Settings → About* (the checkout no longer links it: paid plans are for businesses). |
 | `LAMPO_CANCEL_URL` | `cancel_url` | none | A page where anyone cancels a contract without signing in (*Cancel contracts here*, § 312k BGB), linked at the foot of the sign-in screens and in *Settings → About*. Without it, where a billing provider runs, the same link opens *Settings → Billing*'s own cancellation, after signing in. |
 
 ### Email

@@ -84,6 +84,12 @@ format stays backwards compatible throughout.
   themes side by side with its contrast, the whole type scale, spacing, corners, heights, icons, shadows, layers and
   motion, every button kind in every state (hover, pressed, focus, disabled, busy), fields, choices, chips, glyphs,
   key caps, code, progress, floating layers you can open, rows, headers and loading states.
+- Paid plans on a hosted Lampo are for businesses; the trial and Free stay open to everyone. Billing says so under the
+  plans ("Paid plans are for businesses. Prices are excl. VAT; the checkout adds the VAT for your billing address."),
+  and before a checkout starts you tick "I'm buying for my business, not as a private person": on the plans, at the
+  checkout (where the trial's end leads) and in a plan's limit. The button that goes on to pay waits for it, and once
+  given it is remembered for the workspace. The checkout asks for the business's name; the VAT ID stays optional.
+  In German: "für Unternehmen", "zzgl. USt.".
 
 ### Added
 - **Start with your agent in one paste.** An empty library, project or folder leads with **Copy prompt for your
@@ -101,6 +107,8 @@ format stays backwards compatible throughout.
   you list your server's MCP connector there.
 
 ### Fixed
+- Checkboxes and switches show the keyboard's focus ring again, like every other control, and a disabled checkbox no
+  longer lights up under the pointer.
 - Auto-check no longer calls a dark shot a black gap. A frame counts as black only when it is black, not when it is
   dark (a night sky, a dark grade, low light), and a few black frames are a "black gap between shots" only where the
   picture changes across them like a cut; black frames the shot goes on through aren't listed. A gap between two dark

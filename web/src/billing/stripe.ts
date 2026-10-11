@@ -30,7 +30,7 @@ export function declined(e: StripeError | undefined): string {
   if (/insufficient_funds|card_velocity_exceeded|withdrawal_count_limit_exceeded/.test(code))
     return t('The card can’t cover this payment right now. Nothing was charged. Try another card.');
   if (/authentication/.test(code)) return t('Your bank’s confirmation didn’t go through. Nothing was charged. Try again, or use another card.');
-  if (/tax_id/.test(code)) return t('That VAT ID doesn’t fit the address’s country. Check it, or untick “I’m purchasing as a business”.');
+  if (/tax_id/.test(code)) return t('That VAT ID doesn’t fit the address’s country. Check it, or leave it out.');
   if (e?.type === 'card_error' || /declin|fraud/.test(code))
     return t('Your bank declined this card. Nothing was charged. Try another card, or ask the bank to allow the payment.');
   if (e?.type === 'validation_error') return t('Some details are missing or not right: check the fields above.');
@@ -83,8 +83,6 @@ export interface CheckoutActions {
   confirm(o: { redirect: 'if_required' }): Promise<Result>;
   applyPromotionCode(code: string): Promise<Result>;
   removePromotionCode(): Promise<Result>;
-  /** Clears what the Tax ID Element collected (the business box unticked). */
-  updateTaxIdInfo?(info: null): Promise<Result>;
   /** The business's name on the invoice (the page's own field where there is no Tax ID Element), or none. */
   updateBusinessName?(name: string | null): Promise<Result>;
 }

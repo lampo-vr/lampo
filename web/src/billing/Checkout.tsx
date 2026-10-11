@@ -5,17 +5,18 @@
 // (billing/stripe.ts). The order beside them is the session's own numbers: the lines, the tax from the address, a
 // promotion code, the total, and what is due today. Until Stripe's fields arrive their room is held, field by field, so
 // nothing moves when they do. Card details go to Stripe and never reach this app.
-// Consumers may buy (A13 CLOUD-2): "I'm purchasing as a business" is optional and off (the business's name and VAT ID
-// only when ticked); a consumer asks for the plan to start at once (§ 356(4) / § 357a BGB) in a box
-// above the order button, the terms line with the operator's pages sits right above it, and the button says the order
-// costs money: "Buy now" / "Zahlungspflichtig bestellen" (§ 312j(3) BGB). What was agreed is recorded with the provider
-// right before the order goes to Stripe.
+// Paid plans are for businesses: the session starts only once "I'm buying for my business, not as a private person" is
+// ticked (billing/Business.tsx; ticked already where it was confirmed before, and on the way here from the plans), and
+// "Buy now" waits for it. The business's name is required (on the invoice; Stripe confirms no order without it). The
+// terms line with the operator's pages sits right above the button, which says the order costs money: "Buy now" /
+// "Zahlungspflichtig bestellen" (§ 312j(3) BGB). What was agreed is recorded with the provider right before the order
+// goes to Stripe.
 // Reverse charge only where the provider offers it (BillingInfo.reverseCharge: its seller has a VAT ID of its own): then
 // the business's name and VAT ID are Stripe's Tax ID Element, and a VAT ID abroad makes the tax "Reverse charge".
 // Without it the page asks them in two fields of its own, the VAT ID goes to the provider for the invoice only (with the
 // consent), and every buyer pays the VAT the address brings: nothing on the page says reverse charge.
 import { useQueryClient } from '@tanstack/react-query';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import type { BillingInfo, BillingOffer } from '../../../lib/types.ts';
 import { keys, useBilling, useInfo } from '../api/queries.ts';
 import { locale, t } from '../i18n/index.ts';
@@ -28,6 +29,7 @@ import { IconButton } from '../ui/primitives.tsx';
 import { SkLine } from '../ui/Skeleton.tsx';
 import { Panel } from '../ui/system.tsx';
 import { useBillingAccount, useCheckout, useOrderConsent, useSaveDetails } from './api.ts';
+import { BusinessTick, useBusiness } from './Business.tsx';
 import { PaymentsConsent, usePaymentsChoice } from './PaymentsConsent.tsx';
 import { Ruler } from './parts.tsx';
 import { payingHere } from './returning.ts';
@@ -189,19 +191,23 @@ function Step({ b, choice, workspace, layout = 'page', onBack, onPaid, onRetry }
   const allowed = usePaymentsChoice(!!key);
   const refused = !!allowed && !allowed.stripe;
   const { sdk, els, actions, session, ready, error: loadError } = useStripeCheckout(key, secret, form, allowed);
-  // a person by default; a business ticks the box (its name and VAT ID for the invoice; abroad, reverse charge where the
-  // provider offers it)
-  const [business, setBusiness] = useState(false);
+  // paid plans are for businesses: the person says so before the session starts (and "Buy now" waits for it); once it
+  // has started, unticking holds the order, never a second session
+  const [business, setBusiness] = useBusiness(b);
+  const [go, setGo] = useState(business);
+  useEffect(() => {
+    if (business) setGo(true);
+  }, [business]);
   const reverse = !!b.reverseCharge;
-  // without reverse charge: the business's name and VAT ID in fields of the page's own (Stripe's Tax ID Element would
-  // put the VAT ID where Stripe Tax reads it)
+  // with reverse charge on the page's full form, the business's name and VAT ID are Stripe's Tax ID Element (held while
+  // Stripe.js loads); otherwise the name, required, is a field of the page's own (and without reverse charge, the VAT ID
+  // too: Stripe's element would put it where Stripe Tax reads it)
+  const taxIdEl = reverse && form === 'full' && (!sdk || !!sdk.createTaxIdElement);
   const [bizName, setBizName] = useState('');
+  const [nameMiss, setNameMiss] = useState(false);
+  const nameId = useId();
   const [vat, setVat] = useState('');
   const [vatTouched, setVatTouched] = useState(false);
-  // a consumer's express request to start at once, and whether the order button was pressed without it
-  const [asked, setAsked] = useState(false);
-  const [startMiss, setStartMiss] = useState(false);
-  const startBox = useRef<HTMLInputElement>(null);
   const [taxEl, setTaxEl] = useState<StripeElement | null>(null);
   const [taxReady, setTaxReady] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -216,26 +222,27 @@ function Step({ b, choice, workspace, layout = 'page', onBack, onPaid, onRetry }
   // one session per visit (a second one for the same choice within the minute is the same session: the module's key)
   // keyed by what the session is for, not by the billing answer's objects: paying refreshes that answer, and must not
   // start a second session
+  // and only once the business box is ticked: the provider starts no checkout without it
   useEffect(() => {
-    if (!offered || !key) return;
+    if (!offered || !key || !go) return;
     let live = true;
     setStartError('');
-    mutateAsync({ plan: choice.plan, interval: choice.interval, currency: choice.currency, form })
+    mutateAsync({ plan: choice.plan, interval: choice.interval, currency: choice.currency, form, business: true })
       .then((r) => live && setSecret(r.clientSecret))
       .catch((e: Error) => live && setStartError(billingSaid(e)));
     return () => {
       live = false;
     };
-  }, [offered, key, choice.plan, choice.interval, choice.currency, form, mutateAsync]);
+  }, [offered, key, go, choice.plan, choice.interval, choice.currency, form, mutateAsync]);
 
   // the title is what's bought: focus lands there on arrival, so a screen reader starts at the step
   useEffect(() => {
     if (layout === 'page') title.current?.focus({ preventScroll: true });
   }, [layout]);
 
-  // the business's name and VAT ID: Stripe's Tax ID Element, while "purchasing as a business" is ticked (reverse charge)
+  // the business's name and VAT ID: Stripe's Tax ID Element where the provider offers reverse charge
   useEffect(() => {
-    if (!reverse || !sdk?.createTaxIdElement || !business || form !== 'full') return;
+    if (!reverse || !sdk?.createTaxIdElement || form !== 'full') return;
     const el = sdk.createTaxIdElement({ visibility: 'always' });
     el.on('ready', () => setTaxReady(true));
     setTaxEl(el);
@@ -244,20 +251,7 @@ function Step({ b, choice, workspace, layout = 'page', onBack, onPaid, onRetry }
       setTaxEl(null);
       setTaxReady(false);
     };
-  }, [sdk, business, form, reverse]);
-  const untick = async () => {
-    setBusiness(false);
-    setBizName('');
-    setVat('');
-    setVatTouched(false);
-    // what the element held goes too: no business name or VAT ID on an invoice for a person
-    await Promise.resolve()
-      .then(() => actions?.updateTaxIdInfo?.(null))
-      .catch(() => {});
-    await Promise.resolve()
-      .then(() => actions?.updateBusinessName?.(null))
-      .catch(() => {});
-  };
+  }, [sdk, form, reverse]);
 
   if (!offer || !b.payments)
     return (
@@ -283,8 +277,9 @@ function Step({ b, choice, workspace, layout = 'page', onBack, onPaid, onRetry }
   const trialEnd = b.trialEndsAt ? day(b.trialEndsAt) : '';
   const total = trial ? session?.recurring?.dueNext?.total?.amount : session?.total?.total?.amount;
   const totalNow = total ?? (session ? undefined : cents(unit * units, choice.currency));
-  const canPay = !!actions && ready.payment && (form === 'card' || ready.address) && !busy && session?.canConfirm !== false;
-  const loading = !actions || !ready.payment || (form === 'full' && !ready.address);
+  const canPay = business && !!actions && ready.payment && (form === 'card' || ready.address) && !busy && session?.canConfirm !== false;
+  // nothing loads before the business box is ticked: the button waits without a spinner then
+  const loading = go && (!actions || !ready.payment || (form === 'full' && !ready.address));
   const applied = session?.discountAmounts?.find((d) => d.promotionCode);
   // in a trial nothing is charged today: the code, the tax and the total are those of the first payment
   const basis = trial ? session?.recurring?.dueNext : session?.total;
@@ -306,28 +301,29 @@ function Step({ b, choice, workspace, layout = 'page', onBack, onPaid, onRetry }
   // the VAT ID as typed, said wrong at its field before anything is sent (the provider checks it again)
   const vatId = vat.replace(/\s+/g, '').toUpperCase();
   const vatCountry = session?.billingAddress?.address?.country ?? '';
-  const vatWrong = !reverse && business && vatId ? vatProblem(vatId, vatCountry) : null;
+  const vatWrong = !reverse && form === 'full' && vatId ? vatProblem(vatId, vatCountry) : null;
+  // a field said wrong is shown where it is (a phone's bar is far from it)
+  const show = (id: string) => {
+    const field = document.getElementById(id);
+    field?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    field?.focus({ preventScroll: true });
+  };
 
   const pay = async () => {
-    if (!actions) return;
-    // a consumer's order waits for the express start: the box is shown where it is (a phone's bar is far from it)
-    if (!business && !asked) {
-      setStartMiss(true);
-      startBox.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      startBox.current?.focus({ preventScroll: true });
-      return;
+    if (!actions || !business) return;
+    // the business's name goes on the invoice: required (Stripe's Tax ID Element asks it itself)
+    if (!taxIdEl && !bizName.trim()) {
+      setNameMiss(true);
+      return show(nameId);
     }
     if (vatWrong) {
       setVatTouched(true);
-      const field = document.getElementById('co-vat');
-      field?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      field?.focus({ preventScroll: true });
-      return;
+      return show('co-vat');
     }
     setBusy(true);
     setError('');
     // the business's name on the invoice, through Stripe (its Tax ID Element takes it where there is reverse charge)
-    if (business && !reverse && bizName.trim()) {
+    if (!taxIdEl) {
       const named = await Promise.resolve()
         .then(() => actions.updateBusinessName?.(bizName.trim()))
         .catch(() => undefined);
@@ -338,11 +334,7 @@ function Step({ b, choice, workspace, layout = 'page', onBack, onPaid, onRetry }
     }
     // what was agreed, kept with the provider before the order goes to Stripe (a business's VAT ID for the invoice too)
     try {
-      await consent.mutateAsync({
-        buyer: business ? 'business' : 'consumer',
-        start: !business && asked,
-        ...(business && !reverse && vatId ? { vatId } : {}),
-      });
+      await consent.mutateAsync({ buyer: 'business', start: false, ...(!reverse && form === 'full' && vatId ? { vatId } : {}) });
     } catch (e) {
       setBusy(false);
       return setError(billingSaid(e));
@@ -484,11 +476,7 @@ function Step({ b, choice, workspace, layout = 'page', onBack, onPaid, onRetry }
                 {x.label}
                 {/* always a second line, so the row keeps its height when the tax arrives */}
                 <small>
-                  {x.minorUnitsAmount
-                    ? t('From the billing address')
-                    : reverse && business && session?.taxIdInfo
-                      ? t('Reverse charge')
-                      : t('None for this address')}
+                  {x.minorUnitsAmount ? t('From the billing address') : reverse && session?.taxIdInfo ? t('Reverse charge') : t('None for this address')}
                 </small>
               </dt>
               <dd>{x.amount}</dd>
@@ -570,41 +558,8 @@ function Step({ b, choice, workspace, layout = 'page', onBack, onPaid, onRetry }
         </p>
       ) : null}
       <div className="co-go">
-        {!business && (
-          <label className={`co-chk co-start ${startMiss && !asked ? 'miss' : ''}`} data-testid="billing-start">
-            <input
-              ref={startBox}
-              type="checkbox"
-              checked={asked}
-              onChange={(e) => {
-                setAsked(e.target.checked);
-                setStartMiss(false);
-              }}
-              disabled={busy}
-              aria-describedby={startMiss && !asked ? 'co-start-miss' : undefined}
-            />
-            <span>
-              {t(
-                'I expressly ask for {plan} to start now, before the 14-day withdrawal period ends. If I withdraw, I pay for the time until then; once the service is fully provided, the right of withdrawal ends.',
-                { plan: offer.name },
-              )}
-            </span>
-          </label>
-        )}
-        {startMiss && !asked && !business && (
-          <p className="bill-error" id="co-start-miss" role="alert" data-testid="billing-start-miss">
-            {t('Tick the box to start {plan} now, or buy as a business.', { plan: offer.name })}
-          </p>
-        )}
         <p className="co-terms" data-testid="billing-terms">
-          {business ? (
-            <T k="By ordering you accept the <0>Terms</0> and have read the <1>Privacy policy</1>." tags={[page(info?.terms_url), page(info?.privacy_url)]} />
-          ) : (
-            <T
-              k="By ordering you accept the <0>Terms</0> and have read the <1>Privacy policy</1> and the <2>withdrawal information</2>."
-              tags={[page(info?.terms_url), page(info?.privacy_url), page(info?.withdrawal_url)]}
-            />
-          )}
+          <T k="By ordering you accept the <0>Terms</0> and have read the <1>Privacy policy</1>." tags={[page(info?.terms_url), page(info?.privacy_url)]} />
         </p>
         {payButton('order')}
         <p className="co-safe">
@@ -622,7 +577,7 @@ function Step({ b, choice, workspace, layout = 'page', onBack, onPaid, onRetry }
           {t('Card')}
         </h3>
       )}
-      <Element el={els?.payment ?? null} ready={ready.payment} slots={CARD} terms="checkout" testid="billing-payment-element" />
+      <Element el={els?.payment ?? null} ready={ready.payment} slots={CARD} terms="checkout" rest={!go} testid="billing-payment-element" />
       {/* what the card's bank or Stripe said, right under the card */}
       {error && (
         <p className="bill-error" role="alert" data-testid="billing-pay-error">
@@ -643,10 +598,51 @@ function Step({ b, choice, workspace, layout = 'page', onBack, onPaid, onRetry }
     </div>
   ) : null;
 
+  // paid plans are for businesses: the box comes first, and nothing of the form loads before it is ticked
+  // (a sheet's column is short: there the box goes without its second line, so "Buy now" stays in view at 900 px)
+  const tick = (
+    <BusinessTick
+      on={business}
+      onChange={setBusiness}
+      disabled={busy}
+      boxed
+      note={layout === 'page' ? t('Paid plans are for businesses; the trial and Free are open to everyone.') : undefined}
+    />
+  );
+  // the business's name, required: it goes on the invoice (Stripe confirms no order without it)
+  const nameMissing = nameMiss && !bizName.trim();
+  const nameField = (
+    <label className="co-f">
+      <span className="co-l">{t('Business name')}</span>
+      <input
+        id={nameId}
+        className={`input co-in ${nameMissing ? 'invalid' : ''}`}
+        value={bizName}
+        onChange={(e) => setBizName(e.target.value)}
+        maxLength={200}
+        autoComplete="organization"
+        required
+        disabled={busy}
+        aria-invalid={nameMissing}
+        aria-describedby={nameMissing ? `${nameId}-miss` : undefined}
+        data-testid="billing-business-name"
+      />
+      {nameMissing && (
+        <span className="bill-error" id={`${nameId}-miss`} role="alert" data-testid="billing-business-name-miss">
+          {t('Enter the business’s name: it goes on the invoice.')}
+        </span>
+      )}
+    </label>
+  );
+
   if (layout === 'sheet')
     return (
       <div className="co sheet" data-testid="billing-checkout">
+        {tick}
         {failed}
+        <div className="co-biz-f one" data-testid="billing-business-fields">
+          {nameField}
+        </div>
         {card}
         {order}
       </div>
@@ -679,6 +675,7 @@ function Step({ b, choice, workspace, layout = 'page', onBack, onPaid, onRetry }
       </header>
       <div className="co-grid">
         <div className="co-form">
+          {tick}
           {failed}
           <Receipts email={email ?? session?.email ?? null} known={!!session} edited={email} onEdit={setEmail} busy={busy} />
           <section className="co-sec" aria-labelledby="co-addr-h">
@@ -686,62 +683,41 @@ function Step({ b, choice, workspace, layout = 'page', onBack, onPaid, onRetry }
               <span className="co-n">1</span>
               {t('Billing address')}
             </h3>
-            <Element el={els?.address ?? null} ready={ready.address} slots={ADDRESS} testid="billing-address-element" />
-            {(!reverse || !sdk || sdk.createTaxIdElement) && (
-              <label className="co-chk co-biz">
-                <input type="checkbox" checked={business} onChange={(e) => (e.target.checked ? setBusiness(true) : untick())} disabled={busy} />
-                <span className="co-chk-t">
-                  {t('I’m purchasing as a business')}
-                  <small>
-                    {reverse
-                      ? t('Optional: its name and VAT ID on the invoice. A VAT ID is needed only for reverse charge.')
-                      : t('Optional: its name and VAT ID on the invoice.')}
-                  </small>
-                </span>
-              </label>
-            )}
-            {business && reverse && (!sdk || sdk.createTaxIdElement) && <Element el={taxEl} ready={taxReady} slots={TAX_ID} testid="billing-taxid-element" />}
-            {business && !reverse && (
-              <div className="co-biz-f" data-testid="billing-business-fields">
-                <label className="co-f">
-                  <span className="co-l">{t('Business name')}</span>
-                  <input
-                    className="input co-in"
-                    value={bizName}
-                    onChange={(e) => setBizName(e.target.value)}
-                    maxLength={200}
-                    autoComplete="organization"
-                    disabled={busy}
-                    data-testid="billing-business-name"
-                  />
-                </label>
-                <label className="co-f">
-                  <span className="co-l">{t('VAT ID (optional)')}</span>
-                  <input
-                    id="co-vat"
-                    className={`input co-in ${vatTouched && vatWrong ? 'invalid' : ''}`}
-                    value={vat}
-                    onChange={(e) => setVat(e.target.value)}
-                    onBlur={() => {
-                      // shown as it goes on the invoice
-                      setVat((v) => v.replace(/\s+/g, '').toUpperCase());
-                      setVatTouched(true);
-                    }}
-                    placeholder={`${vatCountry === 'GR' ? 'EL' : vatCountry || 'DE'}123456789`}
-                    maxLength={30}
-                    autoComplete="off"
-                    spellCheck={false}
-                    disabled={busy}
-                    aria-invalid={vatTouched && !!vatWrong}
-                    aria-describedby={vatTouched && vatWrong ? 'co-vat-error' : undefined}
-                    data-testid="billing-business-vat"
-                  />
-                  {vatTouched && vatWrong && (
-                    <span className="bill-error" id="co-vat-error" role="alert" data-testid="billing-business-vat-error">
-                      {vatWrong}
-                    </span>
-                  )}
-                </label>
+            <Element el={els?.address ?? null} ready={ready.address} slots={ADDRESS} rest={!go} testid="billing-address-element" />
+            {taxIdEl ? (
+              <Element el={taxEl} ready={taxReady} slots={TAX_ID} rest={!go} testid="billing-taxid-element" />
+            ) : (
+              <div className={`co-biz-f ${reverse ? 'one' : ''}`} data-testid="billing-business-fields">
+                {nameField}
+                {!reverse && (
+                  <label className="co-f">
+                    <span className="co-l">{t('VAT ID (optional)')}</span>
+                    <input
+                      id="co-vat"
+                      className={`input co-in ${vatTouched && vatWrong ? 'invalid' : ''}`}
+                      value={vat}
+                      onChange={(e) => setVat(e.target.value)}
+                      onBlur={() => {
+                        // shown as it goes on the invoice
+                        setVat((v) => v.replace(/\s+/g, '').toUpperCase());
+                        setVatTouched(true);
+                      }}
+                      placeholder={`${vatCountry === 'GR' ? 'EL' : vatCountry || 'DE'}123456789`}
+                      maxLength={30}
+                      autoComplete="off"
+                      spellCheck={false}
+                      disabled={busy}
+                      aria-invalid={vatTouched && !!vatWrong}
+                      aria-describedby={vatTouched && vatWrong ? 'co-vat-error' : undefined}
+                      data-testid="billing-business-vat"
+                    />
+                    {vatTouched && vatWrong && (
+                      <span className="bill-error" id="co-vat-error" role="alert" data-testid="billing-business-vat-error">
+                        {vatWrong}
+                      </span>
+                    )}
+                  </label>
+                )}
               </div>
             )}
           </section>

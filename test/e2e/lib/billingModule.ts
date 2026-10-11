@@ -14,13 +14,15 @@
 // trial doesn't cover ends it, and the preview says so (`endsTrial`, billed now), as the real module's does; with
 // `trialDeclines` that switch's payment fails (409 payment-incomplete); no extra storage is sold meanwhile (no
 // `addons`, a plan `fits`, 409 trial-storage). `checkoutRace` answers a checkout as when two raced: `replaced` (409
-// checkout-replaced) or `still-open` (502 form-still-open).
+// checkout-replaced) or `still-open` (502 form-still-open). Paid plans are for businesses, as with the real module: a
+// checkout without `business: true` is refused (400 business-only), one with it keeps who and when (`business`, said back
+// as `{at}` to owners and admins), and an order recorded as a consumer's is refused.
 import fs from 'node:fs';
 
 type Json = Record<string, unknown>;
 interface Host {
   publicUrl: string;
-  who(req: unknown): { workspace: string; role: string; via: string } | null;
+  who(req: unknown): { workspace: string; role: string; via: string; account?: string } | null;
   sameOrigin(req: unknown): boolean;
   usage(w: string): Promise<{ members: number; bytes: number; activeVideos: number; room?: { videos: number; bytes: number } }>;
   placeSignup(account: string, o?: { reset?: boolean }): Promise<{ workspace: string | null; own: boolean }>;
@@ -63,6 +65,8 @@ interface Data {
   oplog?: Record<string, Json[]>;
 }
 const PLAN_NAMES: Record<string, string> = { free: 'Free', solo: 'Solo', team: 'Team', business: 'Business' };
+/** The real module's refusal of a checkout or an order without the business confirmation (paid plans are for businesses). */
+const BUSINESS_ONLY = 'Paid plans are for businesses: confirm that you’re buying for your business, not as a private person.';
 
 const DAY = 86_400_000;
 const OFFERS = [
@@ -372,11 +376,14 @@ export default async function fakeBilling(host: Host, env: Record<string, string
           // the cancel step's other ways are their own answer (GET /api/billing/cancel), never the plan's
           delete info.cancelWays;
           delete info.keptRenewsAt;
-          // what only owners and admins read: the provider's next invoice and the failed renewal's details
+          // the business confirmation as the real module says it: when, never who
+          if (info.business) info.business = { at: (info.business as Json).at };
+          // what only owners and admins read: the provider's next invoice, the failed renewal's details, the confirmation
           if (!manage) {
             delete info.next;
             delete info.failure;
             delete info.refund;
+            delete info.business;
           }
           if (manage)
             Object.assign(info, {
@@ -388,7 +395,7 @@ export default async function fakeBilling(host: Host, env: Record<string, string
               currency: String(s.currency ?? 'eur'),
               currencies: s.customer && s.currency ? [s.currency] : ['eur', 'usd'],
               tax: 'excluded',
-              // what a consumer pays on top, as Lampo Cloud says it: the page shows consumers gross prices (A13 CLOUD-2)
+              // the seller's VAT on the net prices, as Lampo Cloud says it: the plans' bar shows the period's total with it
               vat: { rate: 19 },
               offers: OFFERS.map(({ month, year, ...o }) => ({
                 ...o,
@@ -400,12 +407,13 @@ export default async function fakeBilling(host: Host, env: Record<string, string
           return json(200, info);
         },
       },
-      // what the buyer agreed to, right before the order (A13 CLOUD-2): a consumer's express start, or a business — with
-      // its VAT ID for the invoice where there is no reverse charge (the real module prints it on the invoices)
+      // what the buyer agreed to, right before the order (A13 CLOUD-2): a business — with its VAT ID for the invoice where
+      // there is no reverse charge (the real module prints it on the invoices); a consumer's order is refused, as paid
+      // plans are for businesses
       route('POST', '/api/billing/checkout/consent', async (who, req) => {
         const b = req.body ?? {};
         if ((b.buyer !== 'consumer' && b.buyer !== 'business') || typeof b.start !== 'boolean') return json(400, { error: 'buyer and start' });
-        if (b.buyer === 'consumer' && !b.start) return json(400, { error: 'a consumer asks for the plan to start at once' });
+        if (b.buyer === 'consumer') return json(400, { error: BUSINESS_ONLY, code: 'business-only' });
         if (b.vatId !== undefined && (b.buyer !== 'business' || typeof b.vatId !== 'string' || !/^[A-Z0-9][A-Z0-9.\-/+*]{3,29}$/.test(b.vatId)))
           return json(400, { error: 'That VAT ID doesn’t look right. Check it, or leave it out.', code: 'tax-id-invalid' });
         update((d) => {
@@ -418,8 +426,21 @@ export default async function fakeBilling(host: Host, env: Record<string, string
       route('GET', '/api/billing/cancel', async (who) => json(200, (stateOf(who.workspace).cancelWays as Json | undefined) ?? {})),
       route('POST', '/api/billing/checkout', async (who, req) => {
         const b = req.body ?? {};
+        // paid plans are for businesses, as with the real module: no checkout without the buyer's confirmation; who gave
+        // it and when is kept (the newest), and the plan's answer says when
+        if (b.business !== true) {
+          update((d) => {
+            d.calls.push({ kind: 'checkout-refused', workspace: who.workspace, code: 'business-only' });
+          });
+          return json(400, { error: BUSINESS_ONLY, code: 'business-only' });
+        }
         const offer = OFFERS.find((o) => o.plan === b.plan);
         if (!offer) return json(400, { error: 'no such plan' });
+        change(
+          who.workspace,
+          { business: { at: new Date().toISOString(), account: (who as { account?: string }).account ?? null } },
+          { kind: 'business', workspace: who.workspace },
+        );
         // the real module's answers when checkouts race (the suite's `checkoutRace`): another one replaced this one, or
         // an earlier form couldn't be closed (a 502 whose sentence is for people)
         const race = stateOf(who.workspace).checkoutRace;

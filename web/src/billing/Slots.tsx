@@ -34,11 +34,11 @@ const slotWord = (w: string): string =>
     'Security code': t('Security code'),
   })[w] ?? w;
 
-function SlotField({ label }: { label: string }) {
+function SlotField({ label, rest }: { label: string; rest?: boolean }) {
   return (
     <span className="co-slot-f">
       <span className="co-slot-l">{slotWord(label)}</span>
-      <span className="sk co-slot-box" />
+      <span className={`co-slot-box ${rest ? 'rest' : 'sk'}`} />
     </span>
   );
 }
@@ -54,6 +54,7 @@ export function Element({
   slots,
   testid,
   terms,
+  rest,
 }: {
   el: StripeElement | null;
   ready: boolean;
@@ -61,6 +62,8 @@ export function Element({
   testid: string;
   /** Stripe's terms line under the card: two lines on a checkout (three below 450 px), three on a setup or payment. */
   terms?: 'checkout' | 'intent';
+  /** Nothing is on its way yet (the checkout waits for the business box): the room is held without the loading line. */
+  rest?: boolean;
 }) {
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -93,14 +96,14 @@ export function Element({
           {slots.map((s) =>
             s.pair ? (
               <span className={`co-slot-2 ${s.stack ? 'stack' : ''}`} key={s.label}>
-                <SlotField label={s.label} />
-                <SlotField label={s.pair} />
+                <SlotField label={s.label} rest={rest} />
+                <SlotField label={s.pair} rest={rest} />
               </span>
             ) : (
-              <SlotField key={s.label} label={s.label} />
+              <SlotField key={s.label} label={s.label} rest={rest} />
             ),
           )}
-          {terms && <span className={`sk co-slot-terms ${terms}`} />}
+          {terms && <span className={`co-slot-terms ${terms} ${rest ? 'rest' : 'sk'}`} />}
         </div>
       )}
       <div ref={box} className="co-el-frame" data-testid={testid} />

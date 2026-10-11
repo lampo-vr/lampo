@@ -4,7 +4,21 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { BillingInfo, BillingOffer } from '../../lib/types.ts';
-import { bannerOf, billingSaid, day, daysUntil, gross, money, monthly, ofLimit, size, stateLabel, stateLine, vatRate } from '../../web/src/billing/words.ts';
+import {
+  bannerOf,
+  billingSaid,
+  businessLine,
+  day,
+  daysUntil,
+  gross,
+  money,
+  monthly,
+  ofLimit,
+  size,
+  stateLabel,
+  stateLine,
+  vatRate,
+} from '../../web/src/billing/words.ts';
 import { de } from '../../web/src/i18n/de.ts';
 import { setDictionary } from '../../web/src/i18n/index.ts';
 import { refusalText } from '../../web/src/lib/refusal.ts';
@@ -103,7 +117,7 @@ test('prices and sizes as people read them: yearly shown per month, minor units,
   assert.equal(ofLimit('3', '50'), '3 of 50');
 });
 
-test('consumers see prices with the VAT the provider names, to the cent (PAngV, A13 CLOUD-2); none named: as they are', () => {
+test('the bar’s total with the VAT the provider names, to the cent; none named: as it is', () => {
   setDictionary('en', null);
   const vat = { vat: { rate: 19 } };
   // Solo €12 a month billed yearly, €144 a year; Team €20 per member, €240 a year; one more terabyte €10; Business €42
@@ -117,6 +131,37 @@ test('consumers see prices with the VAT the provider names, to the cent (PAngV, 
   setDictionary('de', de);
   assert.match(vatRate(19), /^19\s%$/, 'German keeps its no-break space');
   setDictionary('en', null);
+});
+
+test('paid plans are for businesses: said plainly under the plans, net prices and the VAT the checkout adds, in English and German', () => {
+  setDictionary('en', null);
+  assert.equal(businessLine({}), 'Paid plans are for businesses. Prices are excl. VAT; the checkout adds the VAT for your billing address.');
+  // a business abroad pays none only where the provider offers reverse charge (its seller has a VAT ID)
+  assert.equal(
+    businessLine({ reverseCharge: true }),
+    'Paid plans are for businesses. Prices are excl. VAT; the checkout adds the VAT for your billing address, and a business with a VAT ID from another EU country pays none.',
+  );
+  // a checkout the provider refused without the box: its sentence in English, ours in German
+  const refused = Object.assign(new Error('Paid plans are for businesses: confirm that you’re buying for your business, not as a private person.'), {
+    status: 400,
+    details: { code: 'business-only' },
+  });
+  assert.equal(billingSaid(refused), refused.message);
+  setDictionary('de', de);
+  try {
+    // "für Unternehmen", "zzgl. USt." (the app's one word for VAT), du
+    assert.equal(
+      businessLine({}),
+      'Bezahlte Pläne sind für Unternehmen. Die Preise verstehen sich zzgl. USt.; an der Kasse kommt die USt. für deine Rechnungsadresse dazu.',
+    );
+    assert.match(
+      businessLine({ reverseCharge: true }),
+      /^Bezahlte Pläne sind für Unternehmen\. .+ ein Unternehmen mit USt-IdNr\. aus einem anderen EU-Land zahlt keine\.$/,
+    );
+    assert.equal(billingSaid(refused), 'Bezahlte Pläne sind für Unternehmen: Bestätige, dass du für dein Unternehmen kaufst, nicht als Privatperson.');
+  } finally {
+    setDictionary('en', null);
+  }
 });
 
 test('a plan’s refusal: the provider’s sentence in the page’s language, else ours for its reason', () => {

@@ -859,7 +859,54 @@
 .bill-pick-bar .btn {
   flex: none;
 }
+/* the one action and, for a new plan, the business box right above it (billing/Business.tsx): a column as wide as the
+   box's words want, the button as wide as the column */
+.bill-pk-go {
+  flex: none;
+  display: grid;
+  gap: var(--sp-2);
+}
+.bill-pk-go.asks {
+  width: 36ch;
+}
+/* "I'm buying for my business, not as a private person": the design system's checkbox, its words beside it */
+.bill-biz {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-ui);
+  color: var(--fg);
+}
+.bill-biz label {
+  display: grid;
+  gap: var(--sp-0_5);
+  min-width: 0;
+  cursor: pointer;
+  text-wrap: pretty;
+}
+.bill-biz small {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.bill-biz:has(.checkbox[data-disabled]) label {
+  cursor: default;
+}
+/* standing on its own (the checkout step, a limit sheet): in a hairline box like the receipts line beside it */
+.bill-biz.boxed {
+  padding: var(--sp-3);
+  border-radius: var(--r);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: var(--fs-md);
+}
+/* the plans' plain line under the bar: who may buy, net prices, the VAT the checkout adds */
+.bill-b2b {
+  color: var(--fg-2);
+}
 @container bill-picker (max-width: 560px) {
+  .bill-pk-go.asks {
+    width: auto;
+  }
   .bill-pk-head {
     flex-direction: column;
     align-items: stretch;

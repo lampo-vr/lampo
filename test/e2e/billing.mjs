@@ -9,7 +9,10 @@
 // what the workspace uses, dashed where there is no limit), the plans as tiles selected like radio buttons whose rows
 // line up in German, one bar with the one orange action, monthly or yearly in EUR or USD, a plan picked on the website
 // selected; one 1040 px column in the middle of its room like every section; nothing in --faint, nothing moving as it
-// loads; nothing from Stripe until a payment form opens. Choosing a plan opens the checkout step at its own address and
+// loads; nothing from Stripe until a payment form opens. Paid plans are for businesses: the line under the bar says so
+// (net prices, the VAT the checkout adds), and a new plan's action waits for "I'm buying for my business, not as a private
+// person" right above it (carried into the checkout, then remembered; a running plan's switch asks nothing new).
+// Choosing a plan opens the checkout step at its own address and
 // pays there (the step itself: test/e2e/checkout.mjs); the account panel shows the card and the invoice, takes a new
 // card for renewals and a removal with Undo, the billing details edited in place with the VAT ID said wrong at its field
 // and then checked; on a phone its badges never wrap; a switch shows what the next invoice will be (a paid trial's switch
@@ -274,12 +277,32 @@ try {
       (await seen('[data-testid=billing-plans] .bill-seg button[aria-pressed=true]')) === 'Yearly save up to 20%',
       await seen('[data-testid=billing-plans] .bill-seg'),
     );
-    // no reverse charge here (the provider's seller has no VAT ID yet): a business abroad pays VAT like everyone
+    // said plainly where a plan is chosen: paid plans are for businesses, net prices, the VAT the checkout adds (no
+    // reverse charge here: the provider's seller has no VAT ID yet, so a business abroad pays VAT like everyone)
     assert(
-      (await text('[data-testid=billing-vat]')) ===
-        'Prices excl. VAT; the total beside the button includes 19%. At the checkout the VAT follows your billing address.',
+      (await text('[data-testid=billing-vat]')) === 'Paid plans are for businesses. Prices are excl. VAT; the checkout adds the VAT for your billing address.',
       await text('[data-testid=billing-vat]'),
     );
+    // right under the bar, where someone commits
+    assert(
+      await page.evaluate(
+        () =>
+          document.querySelector('[data-testid=billing-vat]').getBoundingClientRect().top >=
+          document.querySelector('[data-testid=billing-pick-bar]').getBoundingClientRect().bottom,
+      ),
+      'the line under the bar',
+    );
+    // a new plan is bought by a business: the box right above the one action, unticked, and the action waits for it
+    const tick = await page.$eval('[data-testid=billing-pick-bar] [data-testid=billing-business]', (b) => ({
+      on: b.querySelector('[role=checkbox]').getAttribute('aria-checked'),
+      words: b.textContent.trim(),
+      above: b.getBoundingClientRect().bottom <= document.querySelector('[data-testid=billing-go]').getBoundingClientRect().top,
+    }));
+    assert(
+      JSON.stringify(tick) === JSON.stringify({ on: 'false', words: 'I’m buying for my business, not as a private person', above: true }),
+      JSON.stringify(tick),
+    );
+    assert(await page.$eval('[data-testid=billing-go]', (b) => b.disabled), 'Continue waits for the box');
     assert(
       /1 TB for €10 a month, excl\. VAT\./.test(await text('[data-testid=billing-plans] .bill-pk-foot')),
       await text('[data-testid=billing-plans] .bill-pk-foot'),
@@ -342,7 +365,7 @@ try {
       await openBilling();
       assert(
         (await text('[data-testid=billing-vat]')) ===
-          'Prices excl. VAT; the total beside the button includes 19%. At the checkout the VAT follows your billing address: a business with a VAT ID from another EU country pays none.',
+          'Paid plans are for businesses. Prices are excl. VAT; the checkout adds the VAT for your billing address, and a business with a VAT ID from another EU country pays none.',
         await text('[data-testid=billing-vat]'),
       );
     } finally {
@@ -390,6 +413,18 @@ try {
     assert(new Set(rows.map((r) => Math.round(r.line))).size > 1 || rows.some((r) => r.line > 20), `a line wraps in German: ${JSON.stringify(rows)}`);
     for (const k of ['price', 'billed', 'facts', 'note'])
       assert(new Set(rows.map((r) => r[k])).size === 1, `the tiles' ${k} rows line up: ${rows.map((r) => r[k]).join(', ')}`);
+    // "für Unternehmen", "zzgl. USt.": the box and the plain line in German (du)
+    assert(
+      (await text('[data-testid=billing-pick-bar] [data-testid=billing-business]')) === 'Ich kaufe für mein Unternehmen, nicht als Privatperson',
+      await text('[data-testid=billing-pick-bar] [data-testid=billing-business]'),
+    );
+    assert(
+      (await text('[data-testid=billing-vat]')) ===
+        'Bezahlte Pläne sind für Unternehmen. Die Preise verstehen sich zzgl. USt.; an der Kasse kommt die USt. für deine Rechnungsadresse dazu.',
+      await text('[data-testid=billing-vat]'),
+    );
+    const de = await layoutMatrix(page, { 'billing (German)': null }, { widths: [390, 1440], themes: ['light'] });
+    assert(!de.length, de.join('\n'));
     await shot('trial-de');
     await page.evaluate(() => localStorage.removeItem('vr.lang'));
   });
@@ -478,19 +513,38 @@ try {
     await pick('Monthly');
     await pick('USD');
     await until(async () => /\$24\s*per member a month/.test(await seen('[data-testid=billing-offer-team]')), 'Team monthly in dollars');
+    // Continue waits for the business box; pressed anyway, nothing happens
+    assert(await page.$eval('[data-testid=billing-go]', (b) => b.disabled), 'waits for the box');
+    await page.click('[data-testid=billing-go]');
+    assert((await page.evaluate(() => location.hash)) === '#/settings/billing', 'nowhere without the box');
+    assert(!fake().calls.some((c) => c.kind === 'checkout'), 'nothing started');
+    await page.click('[data-testid=billing-pick-bar] [data-testid=billing-business] [role=checkbox]');
+    await page.waitForFunction(() => !document.querySelector('[data-testid=billing-go]').disabled, { polling: 100, timeout: 5000 });
+    await shot('plans-ticked');
     await page.click('[data-testid=billing-go]');
     await page.waitForFunction(() => location.hash === '#/settings/billing/checkout?plan=team&interval=month&currency=usd', { polling: 100, timeout: 5000 });
+    // ticked on the plans, ticked here: the checkout starts at once, for a business
+    await page.waitForSelector('[data-testid=billing-checkout] [data-testid=billing-business] [role=checkbox][aria-checked=true]', { timeout: 15000 });
     await page.waitForSelector('[data-testid=billing-checkout] [data-testid=billing-payment-element] iframe', { timeout: 15000 });
     await page.waitForFunction(() => !document.querySelector('[data-testid=billing-pay]')?.disabled, { polling: 100, timeout: 15000 });
     assert(stripeRequests.includes(STRIPE_JS), `Stripe.js from js.stripe.com: ${stripeRequests.join(', ')}`);
     const call = fake().calls.find((c) => c.kind === 'checkout');
-    assert(call && call.plan === 'team' && call.interval === 'month' && call.currency === 'usd' && call.form === 'full', JSON.stringify(call));
+    assert(
+      call && call.plan === 'team' && call.interval === 'month' && call.currency === 'usd' && call.form === 'full' && call.business === true,
+      JSON.stringify(call),
+    );
     // back to the plans: the choice is still selected there
     await page.evaluate(() => {
       location.hash = '#/settings/billing';
     });
     await page.waitForSelector('[data-testid=billing-plans]');
     assert(await page.$eval('[data-testid=billing-offer-team] input', (i) => i.checked), 'Team still selected');
+    // remembered: the provider has it now, and the box stays ticked
+    assert(
+      await page.$eval('[data-testid=billing-pick-bar] [data-testid=billing-business] [role=checkbox]', (c) => c.getAttribute('aria-checked') === 'true'),
+      'the box is ticked',
+    );
+    assert(fake().workspaces[piaWs].business?.at, JSON.stringify(fake().workspaces[piaWs]));
     assert(
       /Team for 2 members/.test(await text('[data-testid=billing-pick-bar]')) &&
         /\$48 a month, billed monthly, excl\. VAT · \$57\.12 incl\. 19% VAT/.test(await text('[data-testid=billing-pick-bar]')),
@@ -504,9 +558,9 @@ try {
       (await text('[data-testid=billing-trial-ends]')) === 'The trial ends when you pay: Team is billed from today.',
       await text('[data-testid=billing-checkout]'),
     );
-    // the order button says it costs money (§ 312j(3) BGB); a consumer asks for the start first (A13 CLOUD-2)
+    // the order button says it costs money (§ 312j(3) BGB); the business's name goes on the invoice
     await waitText('[data-testid=billing-pay]', /^Buy now$/);
-    await page.click('[data-testid=billing-start] input');
+    await page.type('[data-testid=billing-business-name]', 'Studio Nord GmbH');
     await page.click('[data-testid=billing-pay]');
     await page.waitForSelector('[data-testid=billing-checkout-done]', { timeout: 15000 });
     assert(
@@ -530,6 +584,9 @@ try {
     assert(/This is your plan\./.test(await text('[data-testid=billing-pick-bar]')) && !(await page.$('[data-testid=billing-go]')), 'the current plan closes');
     await page.click('[data-testid=billing-offer-business]');
     await waitText('[data-testid=billing-pick-bar]', /Switch to Business/);
+    // a running plan's switch asks nothing new: no box, the action live
+    assert(!(await page.$('[data-testid=billing-pick-bar] [data-testid=billing-business]')), 'no box for a switch');
+    assert(!(await page.$eval('[data-testid=billing-go]', (b) => b.disabled)), 'the switch is live');
     await shot('paid');
   });
 

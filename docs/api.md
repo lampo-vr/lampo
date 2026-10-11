@@ -117,7 +117,7 @@ Settings → Billing (`BillingInfo` in [`lib/types.ts`](../lib/types.ts)): its n
 `grace`, `read-only`, with the dates that go with it), what the workspace uses of what the plan holds, and — for owners
 and admins signed in in the browser (`manage`) — the plans to choose from with their prices in minor units, and
 `payments` (the provider's publishable key for its payment form) while paying works. Nothing sends anyone to the
-provider's own pages: `POST /api/billing/checkout {plan, interval, currency?}`, `/payment-method` and `/invoice/pay`
+provider's own pages: `POST /api/billing/checkout {plan, interval, currency?, business: true}`, `/payment-method` and `/invoice/pay`
 answer `{clientSecret}`, which the page's payment form (the provider's elements, mounted on Settings → Billing) confirms
 in place. `GET /api/billing/account` (`BillingAccount`) has the payment methods (a card's brand and last four), the
 name, address and tax IDs on the invoices, and the invoices with their PDFs; `/details`, `/tax-id`, `/tax-id/remove`,
@@ -129,15 +129,18 @@ failed: it tells the workspace's owners and admins, once per failed payment. The
 declares the lowest role that may call it and whether only a person may, and the server's guard holds it to that, a
 `HEAD` as its `GET` (`403`, with `{person: true}` for an API token); a module's paths are literal, never patterns. An API token never changes what a workspace pays.
 
-Consumers may buy. The offers' prices are net (`tax: 'excluded'`), and Settings → Billing shows them so, "excl. VAT",
-as the website does; `vat: {rate}` is the VAT a consumer pays on them, and the page shows the selected plan's total with
-it beside the one action, before anyone pays. `reverseCharge: true` says the checkout offers reverse charge (the provider's seller has a VAT ID of its own): the
+Paid plans are for businesses; the trial and Free are open to everyone. The offers' prices are net (`tax: 'excluded'`),
+and Settings → Billing shows them so, "excl. VAT", as the website does; `vat: {rate}` is the seller's VAT on them, and
+the page shows the selected plan's total with it beside the one action, before anyone pays. Before a checkout starts the
+person ticks "I'm buying for my business, not as a private person": the page sends `business: true` with the checkout,
+the provider starts none without it (`400`, code `business-only`) and keeps who confirmed it and when; its answer says
+so (`business: {at}`, owners and admins) and the box shows ticked from then on. The checkout asks for the business's
+name, required. `reverseCharge: true` says the checkout offers reverse charge (the provider's seller has a VAT ID of its own): the
 business's name and VAT ID are then the provider's tax ID field, and a business from another EU country pays no VAT.
 Without it every buyer pays VAT, the page asks a business's name and VAT ID in fields of its own, and nothing on it says
 reverse charge. Right before the checkout confirms an order, the page sends `POST /api/billing/checkout/consent {buyer:
-consumer | business, start, vatId?}`: a consumer's express request to start at once (`start: true`, § 356(4) / § 357a
-BGB), kept by the provider with the session and the terms and withdrawal pages the server links, and a business's VAT ID
-for its invoices (without reverse charge). *Cancel contracts here* (§ 312k BGB) asks `GET /api/billing/cancel` as it
+business, start: false, vatId?}`: kept by the provider with the session and the terms page the server links, with the
+business's VAT ID for its invoices (without reverse charge); a consumer's order is refused (`business-only`). *Cancel contracts here* (§ 312k BGB) asks `GET /api/billing/cancel` as it
 opens (`BillingCancelOptions`: `notice` with `endsAt` and `refund` when a consumer's yearly plan after its first year may
 end with one month's notice, § 309 Nr. 9 BGB), sends `POST /api/billing/cancel {kind: ordinary | extraordinary | notice,
 reason?}` (a reason for the second) and answers `{kind, receivedAt, endsAt, refund?}`; the provider confirms it by email

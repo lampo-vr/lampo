@@ -89,17 +89,21 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
     'Wir prüfen deinen Grund und antworten per E-Mail. Bis dahin läuft {plan} längstens bis zum {date}.',
   'Your cancellation is received': 'Deine Kündigung ist eingegangen',
   'Your contract': 'Dein Vertrag',
-  // consumers may buy (A13 CLOUD-2): gross prices, the express start, the terms line, the order button
+  // the terms line and the order button (§ 312j(3) BGB)
   'Buy now': 'Zahlungspflichtig bestellen',
-  'By ordering you accept the <0>Terms</0> and have read the <1>Privacy policy</1> and the <2>withdrawal information</2>.':
-    'Mit deiner Bestellung akzeptierst du die <0>AGB</0> und hast die <1>Datenschutzerklärung</1> und die <2>Widerrufsbelehrung</2> gelesen.',
   'By ordering you accept the <0>Terms</0> and have read the <1>Privacy policy</1>.':
     'Mit deiner Bestellung akzeptierst du die <0>AGB</0> und hast die <1>Datenschutzerklärung</1> gelesen.',
-  'I expressly ask for {plan} to start now, before the 14-day withdrawal period ends. If I withdraw, I pay for the time until then; once the service is fully provided, the right of withdrawal ends.':
-    'Ich verlange ausdrücklich, dass {plan} jetzt beginnt, vor Ablauf der 14-tägigen Widerrufsfrist. Widerrufe ich, zahle ich für die Zeit bis dahin; ist die Leistung vollständig erbracht, erlischt mein Widerrufsrecht.',
-  'Optional: its name and VAT ID on the invoice. A VAT ID is needed only for reverse charge.':
-    'Optional: Name und USt-IdNr. auf der Rechnung. Die USt-IdNr. brauchst du nur fürs Reverse-Charge-Verfahren.',
-  'Tick the box to start {plan} now, or buy as a business.': 'Setz den Haken, damit {plan} jetzt beginnt, oder kauf als Unternehmen.',
+  // paid plans are for businesses (prices stay net): the box before every checkout, the plans' plain line
+  'Enter the business’s name: it goes on the invoice.': 'Gib den Namen des Unternehmens ein: Er steht auf der Rechnung.',
+  'I’m buying for my business, not as a private person': 'Ich kaufe für mein Unternehmen, nicht als Privatperson',
+  'Paid plans are for businesses; the trial and Free are open to everyone.': 'Bezahlte Pläne sind für Unternehmen; die Testphase und Free sind für alle offen.',
+  'Paid plans are for businesses: confirm that you’re buying for your business, not as a private person.':
+    'Bezahlte Pläne sind für Unternehmen: Bestätige, dass du für dein Unternehmen kaufst, nicht als Privatperson.',
+  'Paid plans are for businesses. Prices are excl. VAT; the checkout adds the VAT for your billing address, and a business with a VAT ID from another EU country pays none.':
+    'Bezahlte Pläne sind für Unternehmen. Die Preise verstehen sich zzgl. USt.; an der Kasse kommt die USt. für deine Rechnungsadresse dazu, und ein Unternehmen mit USt-IdNr. aus einem anderen EU-Land zahlt keine.',
+  'Paid plans are for businesses. Prices are excl. VAT; the checkout adds the VAT for your billing address.':
+    'Bezahlte Pläne sind für Unternehmen. Die Preise verstehen sich zzgl. USt.; an der Kasse kommt die USt. für deine Rechnungsadresse dazu.',
+  'That VAT ID doesn’t fit the address’s country. Check it, or leave it out.': 'Diese USt-IdNr. passt nicht zum Land der Adresse. Prüf sie, oder lass sie weg.',
   // reverse charge only where the provider offers it; a consumer's yearly plan after its first year: one month's notice
   '{amount} for {days} of {of} days': '{amount} für {days} von {of} Tagen',
   '{amount} for {days} of the {of} days paid for goes back to the card the plan was paid with once it has ended, with a credit note.':
@@ -109,7 +113,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Cancelled with one month’s notice: {plan} runs until {date}, then {ws} moves to Free, and the time paid for after that, {amount}, goes back to your card. Nothing is deleted, and you can keep {plan} until then with one click.':
     'Gekündigt mit einer Frist von einem Monat: {plan} läuft bis zum {date}, dann wechselt {ws} zu Free, und die bezahlte Zeit danach, {amount}, geht auf deine Karte zurück. Nichts wird gelöscht, und bis dahin behältst du {plan} mit einem Klick.',
   'It goes on every invoice.': 'Sie steht auf jeder Rechnung.',
-  'Optional: its name and VAT ID on the invoice.': 'Optional: Name und USt-IdNr. auf der Rechnung.',
   Refund: 'Erstattung',
   'Then nothing is refunded: it simply renews again.': 'Dann wird nichts erstattet: Es verlängert sich einfach wieder.',
   'VAT ID (optional)': 'USt-IdNr. (optional)',
@@ -3793,7 +3796,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'First payment': 'Erste Zahlung',
   'From the billing address': 'Aus der Rechnungsadresse',
   'Full name': 'Vollständiger Name',
-  'I’m purchasing as a business': 'Ich kaufe als Unternehmen',
   'Invoices to': 'Rechnungen an',
   monthly: 'monatlich',
   'None for this address': 'Für diese Adresse keine',
@@ -4325,8 +4327,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'You picked <0>{plan}</0> on lampo.video, so it’s selected. Nothing is charged until you confirm.':
     'Du hast auf lampo.video <0>{plan}</0> gewählt, deshalb ist es ausgewählt. Berechnet wird erst, wenn du bestätigst.',
   'Some details are missing or not right: check the fields above.': 'Es fehlen Angaben oder sie stimmen nicht: Prüf die Felder oben.',
-  'That VAT ID doesn’t fit the address’s country. Check it, or untick “I’m purchasing as a business”.':
-    'Diese USt-IdNr. passt nicht zum Land der Adresse. Prüf sie, oder nimm den Haken bei „Ich kaufe als Unternehmen“ raus.',
   'The card can’t cover this payment right now. Nothing was charged. Try another card.':
     'Die Karte kann diese Zahlung gerade nicht decken. Es wurde nichts abgebucht. Versuch es mit einer anderen Karte.',
   'The card number or expiry isn’t right. Nothing was charged.': 'Kartennummer oder Ablaufdatum stimmen nicht. Es wurde nichts abgebucht.',
@@ -4909,10 +4909,6 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Nothing. The difference for the rest of this period, {amount} excl. VAT, is on the invoice of {date}, paid with {card} like {plan}.':
     'Nichts. Die Differenz für den Rest des Zeitraums, {amount} zzgl. USt., steht auf der Rechnung vom {date} und wird wie {plan} mit {card} bezahlt.',
   'per member a month': 'pro Mitglied im Monat',
-  'Prices excl. VAT; the total beside the button includes {rate}. At the checkout the VAT follows your billing address: a business with a VAT ID from another EU country pays none.':
-    'Preise zzgl. USt.; der Gesamtpreis neben dem Button enthält {rate}. An der Kasse richtet sich die USt. nach deiner Rechnungsadresse: Ein Unternehmen mit USt-IdNr. aus einem anderen EU-Land zahlt keine.',
-  'Prices excl. VAT; the total beside the button includes {rate}. At the checkout the VAT follows your billing address.':
-    'Preise zzgl. USt.; der Gesamtpreis neben dem Button enthält {rate}. An der Kasse richtet sich die USt. nach deiner Rechnungsadresse.',
   'save up to {share}': 'bis zu {share} sparen',
   'Sent, but not shown here': 'Gesendet, aber hier nicht angezeigt',
   'Sent: check your notifications': 'Gesendet: Schau in deine Benachrichtigungen',

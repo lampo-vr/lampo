@@ -371,8 +371,9 @@ outside this repository. What such a module may do:
   would mean for the workspace, a grace period and its three ways on, or that the workspace is read-only (then Add
   video is a locked button that explains why instead of an upload that fails). The first fix checked on a video of the
   workspace's own and its first review link opened each show a short, dismissible note about the plan, once per
-  workspace. Nothing of it counts down in hours or blocks the work. The checkout tells a consumer from a business (a
-  consumer reads the withdrawal information, a business gives its name and VAT ID) and links your
+  workspace. Nothing of it counts down in hours or blocks the work. Paid plans are for businesses: before a checkout
+  starts the person ticks "I'm buying for my business, not as a private person" (the module keeps who and when), and
+  the checkout asks for the business's name and VAT ID and links your
   [legal pages](configuration.md#legal-pages); it speaks of reverse charge only where the module says the seller offers
   it (`reverseCharge`, [api.md](api.md#workspaces-and-plan-limits)).
 - **Name the origins its payment form loads from** (`contentSecurity`: https origins only, or the server doesn't

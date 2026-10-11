@@ -3723,10 +3723,15 @@ export interface BillingInfo {
   /** Whether the prices shown include tax or have it added (from the billing address) when paying. */
   tax?: 'excluded' | 'included';
   /**
-   * The VAT a consumer pays on the offers' prices before an address is known (percent; the seller's own country's): the
-   * plans show consumers gross prices (PAngV). The checkout's order says the tax for the billing address itself.
+   * The VAT on the offers' prices before an address is known (percent; the seller's own country's): the plans' bar says
+   * what the period comes to with it. The checkout's order says the tax for the billing address itself.
    */
   vat?: { rate: number };
+  /**
+   * Paid plans are for businesses: an owner or admin confirmed that the workspace buys for its business, last then (owners
+   * and admins). The page shows its "I'm buying for my business" box ticked; every checkout still sends `business: true`.
+   */
+  business?: { at: string };
   /**
    * The checkout offers reverse charge: a business with a VAT ID from another EU country pays no VAT (the provider's
    * seller has a VAT ID of its own to put on that invoice). Absent: everyone pays VAT, a business's VAT ID goes on the

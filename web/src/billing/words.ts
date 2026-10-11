@@ -34,8 +34,8 @@ export function money(minor: number, currency: string, o: { cents?: boolean } = 
 }
 
 /**
- * A price as a consumer pays it (PAngV, A13 CLOUD-2): with the VAT the provider names (`BillingInfo.vat`), to the cent;
- * as it is where it names none.
+ * A price with the VAT the provider names (`BillingInfo.vat`), to the cent, as the plans' bar says what a period comes
+ * to; as it is where it names none.
  */
 export const gross = (minor: number, b: Pick<BillingInfo, 'vat'>): number => (b.vat?.rate ? Math.round((minor * (100 + b.vat.rate)) / 100) : minor);
 
@@ -184,7 +184,18 @@ export function billedNow(net: number | null, p: Pick<BillingPreview, 'amount' |
   return p.amount > net ? t('{amount} excl. VAT ({total} incl. VAT)', { amount, total: all }) : t('{amount} excl. VAT', { amount });
 }
 
-/** "19 % VAT" where the provider names the rate a consumer pays on the net prices (PAngV: shown before anyone pays). */
+/**
+ * Paid plans are for businesses, said plainly where a plan is chosen (under the plans' bar): the prices net, the VAT the
+ * checkout adds — and that a business abroad pays none only where the provider offers reverse charge.
+ */
+export const businessLine = (b: Pick<BillingInfo, 'reverseCharge'>): string =>
+  b.reverseCharge
+    ? t(
+        'Paid plans are for businesses. Prices are excl. VAT; the checkout adds the VAT for your billing address, and a business with a VAT ID from another EU country pays none.',
+      )
+    : t('Paid plans are for businesses. Prices are excl. VAT; the checkout adds the VAT for your billing address.');
+
+/** "19 % VAT" where the provider names the rate on its net prices: the plans' bar says the total with it before anyone pays. */
 export const vatOf = (b: Pick<BillingInfo, 'vat' | 'tax'>): number | null => (b.tax !== 'included' && b.vat?.rate ? b.vat.rate : null);
 
 /** A plan in a line, for the plans the provider sells today; another plan's tile goes without one. */
@@ -268,6 +279,9 @@ export function billingSaid(e: unknown): string {
       return t('Someone started another checkout for this workspace a moment ago. Open Billing again to see it.');
     case 'form-still-open':
       return t('An earlier payment form couldn’t be closed. Try again in a moment.');
+    // paid plans are for businesses: no checkout without the box ticked (billing/Business.tsx)
+    case 'business-only':
+      return t('Paid plans are for businesses: confirm that you’re buying for your business, not as a private person.');
     default:
       return said;
   }
