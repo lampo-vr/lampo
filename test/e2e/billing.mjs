@@ -36,6 +36,7 @@ import { launch, requireChrome, shotsDir } from './lib/browser.mjs';
 import { assert, check, crashed, finish, screenshotFailures } from './lib/checks.mjs';
 import { consentCookie } from './lib/consent.mjs';
 import { LEGAL, startServer } from './lib/server.mjs';
+import { writeJsonAtomic } from './lib/sharedJson.ts';
 
 const LABEL = 'billing e2e';
 requireChrome(LABEL);
@@ -74,12 +75,12 @@ const fake = () => JSON.parse(fs.readFileSync(FAKE, 'utf8'));
 const setFake = (workspace, patch) => {
   const d = fake();
   d.workspaces[workspace] = { ...d.workspaces[workspace], ...patch };
-  fs.writeFileSync(FAKE, JSON.stringify(d, null, 2));
+  writeJsonAtomic(FAKE, d);
 };
 const addInvoice = (workspace, invoice) => {
   const d = fake();
   d.accounts[workspace].invoices.unshift(invoice);
-  fs.writeFileSync(FAKE, JSON.stringify(d, null, 2));
+  writeJsonAtomic(FAKE, d);
 };
 
 let browser;
@@ -711,7 +712,7 @@ try {
         pdf: `${BASE}/old-${i}.pdf`,
         description: 'Team · monthly · 2 members',
       });
-    fs.writeFileSync(FAKE, JSON.stringify(d, null, 2));
+    writeJsonAtomic(FAKE, d);
     await page.setViewport({ width: 390, height: 844 });
     await openBilling();
     await page.waitForSelector('[data-testid=billing-invoice]');
@@ -979,7 +980,7 @@ try {
         // the workspace as the checks before left it (Business, monthly, in dollars)
         const d = fake();
         d.workspaces[piaWs] = before;
-        fs.writeFileSync(FAKE, JSON.stringify(d, null, 2));
+        writeJsonAtomic(FAKE, d);
       }
     },
   );
@@ -1013,7 +1014,7 @@ try {
     assert(/Hide the Lampo badge/.test(off.text) && !/no badge/i.test(off.text), off.text);
     const d = fake();
     d.workspaces[piaWs] = paidState;
-    fs.writeFileSync(FAKE, JSON.stringify(d, null, 2));
+    writeJsonAtomic(FAKE, d);
     // paid: the admin hides it; the link's answer and its page say so, the source offer stays
     await fresh('#/settings/links');
     await page.waitForFunction(() => document.querySelector('[data-testid=set-badge] [role=switch]')?.disabled === false, { polling: 100, timeout: 10000 });
@@ -1065,7 +1066,7 @@ try {
     });
     const d = fake();
     d.accounts[piaWs].methods = d.accounts[piaWs].methods.map((m) => (m.default ? { ...m, expMonth: 1, expYear: 2025, expired: true } : m));
-    fs.writeFileSync(FAKE, JSON.stringify(d, null, 2));
+    writeJsonAtomic(FAKE, d);
     setFake(piaWs, {
       state: 'grace',
       reason: 'payment',

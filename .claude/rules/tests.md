@@ -54,3 +54,7 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
   so once its sender has exited it is dropped, never let go to the server; and a wait for "an answer came" counts only
   requests that came in while this test listens. Let go late, a stopped upload's 404 was taken for the next render's
   answer, whose SIGINT then hit `lampo` while Node was still starting (`render-stop.test.ts`, half the runs under load).
+- A file two processes share (the stand-in billing module's state, a store file a suite edits under its running server)
+  is written with a rename (`writeJsonAtomic`, `test/e2e/lib/sharedJson.ts`), and its reader never turns a parse error
+  into a default (`readJson`: only a missing file is). A plain write empties the file first: CI's conversion suite read
+  half of it, a tight loop tore 1 read in 6, and the module had read a torn file as "Free for everyone".

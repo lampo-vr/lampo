@@ -17,7 +17,7 @@
 // checkout-replaced) or `still-open` (502 form-still-open). Paid plans are for businesses, as with the real module: a
 // checkout without `business: true` is refused (400 business-only), one with it keeps who and when (`business`, said back
 // as `{at}` to owners and admins), and an order recorded as a consumer's is refused.
-import fs from 'node:fs';
+import { readJson, writeJsonAtomic } from './sharedJson.ts';
 
 type Json = Record<string, unknown>;
 interface Host {
@@ -110,14 +110,10 @@ const LIMITS: Record<string, { members: number | null; bytes: number | null; act
 
 export default async function fakeBilling(host: Host, env: Record<string, string | undefined>) {
   const file = env.FAKE_BILLING_FILE as string;
-  const read = (): Data => {
-    try {
-      return { workspaces: {}, accounts: {}, sessions: {}, calls: [], seq: 0, ...JSON.parse(fs.readFileSync(file, 'utf8')) };
-    } catch {
-      return { workspaces: {}, accounts: {}, sessions: {}, calls: [], seq: 0 };
-    }
-  };
-  const write = (d: Data) => fs.writeFileSync(file, JSON.stringify(d, null, 2));
+  // Shared with the suite, which reads and sets it meanwhile: written in one step (./sharedJson.ts), and a file that
+  // doesn't parse throws (an empty state would answer "free" for every workspace); only a missing one is empty.
+  const read = (): Data => ({ workspaces: {}, accounts: {}, sessions: {}, calls: [], seq: 0, ...readJson<Partial<Data>>(file, () => ({})) });
+  const write = (d: Data) => writeJsonAtomic(file, d);
   const stateOf = (w: string): Json => read().workspaces[w] ?? { plan: 'free', planName: 'Free', state: 'free' };
   const update = <T>(fn: (d: Data) => T): T => {
     const d = read();

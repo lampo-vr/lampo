@@ -2,7 +2,7 @@
 // starts there with a stand-in for the `claude` CLI. Nothing else in test/e2e does either — a suite that started its
 // own server or asked the real `claude agents` could put the maintainer's Claude Code sessions into screenshots.
 import assert from 'node:assert/strict';
-import { execFile, spawnSync } from 'node:child_process';
+import { execFile, spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -98,6 +98,63 @@ await check('Send all makes ordinary notes', async () => {
     run({ LAMPO_FAIL_SHOTS: shots });
     assert.deepEqual(fs.readdirSync(shots).sort(), ['demo-2-send-all-makes-ordinary-notes-page2.png', 'demo-2-send-all-makes-ordinary-notes.png']);
     assert.equal(fs.readFileSync(path.join(shots, 'demo-2-send-all-makes-ordinary-notes.png'), 'utf8'), 'http://127.0.0.1/#/v/a');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// The stand-in billing module's state is a file the suite and the server's module both read and write. Written plainly
+// (empty, then filled), a suite read half of it on CI ("Unexpected end of JSON input"), and the module turned a file
+// it couldn't parse into an empty state, which answers "free" for every workspace and lets a check pass or fail for
+// the wrong reason.
+test('the stand-in billing file: never read half-written while another process writes it; a broken one throws, a missing one is empty', async () => {
+  const dir = tmpdir('vr-harness-sharedjson-');
+  try {
+    const file = path.join(dir, 'billing.json');
+    const { default: fakeBilling } = await import(pathToFileURL(path.join(E2E, 'lib/billingModule.ts')).href);
+    const { writeJsonAtomic } = await import(pathToFileURL(path.join(E2E, 'lib/sharedJson.ts')).href);
+    const billing = await fakeBilling({}, { FAKE_BILLING_FILE: file });
+    const plan = async (w: string) => (await billing.entitlements.get(w)).plan;
+
+    assert.equal(await plan('w_acme'), 'free', 'no file yet: every workspace is on Free');
+    writeJsonAtomic(file, { workspaces: { w_acme: { plan: 'team', planName: 'Team', state: 'paid' } } });
+    assert.equal(await plan('w_acme'), 'team');
+    fs.writeFileSync(file, '{"workspaces": {"w_acme": {"plan": "te');
+    await assert.rejects(plan('w_acme'), /billing\.json doesn't parse/, 'a broken file is said, never read as Free');
+
+    // another process writes it again and again while this one reads it through the module
+    const big = { workspaces: Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`w_${i}`, { plan: 'team', state: 'paid', note: 'x'.repeat(200) }])) };
+    writeJsonAtomic(file, big);
+    const writer = spawn(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `import { writeJsonAtomic } from ${JSON.stringify(pathToFileURL(path.join(E2E, 'lib/sharedJson.ts')).href)};
+const data = ${JSON.stringify(big)};
+for (const end = Date.now() + 1500; Date.now() < end; ) writeJsonAtomic(${JSON.stringify(file)}, { ...data, seq: Date.now() });`,
+      ],
+      { stdio: 'inherit' },
+    );
+    const ended = new Promise((resolve) => writer.on('exit', resolve));
+    let reads = 0;
+    let running = true;
+    void ended.then(() => {
+      running = false;
+    });
+    while (running) {
+      assert.equal(await plan('w_7'), 'team');
+      reads++;
+      // the module answers in microtasks: let the writer's exit be heard
+      await new Promise(setImmediate);
+    }
+    assert.equal(await ended, 0, 'the writer ran to its end');
+    assert.ok(reads > 100, `read while it wrote: ${reads}`);
+    assert.deepEqual(
+      fs.readdirSync(dir).filter((f) => f.endsWith('.tmp')),
+      [],
+      'no temp file left beside it',
+    );
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

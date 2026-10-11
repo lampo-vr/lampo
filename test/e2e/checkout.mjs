@@ -33,6 +33,7 @@ import { launch, requireChrome, shotsDir } from './lib/browser.mjs';
 import { assert, check, crashed, finish, screenshotFailures } from './lib/checks.mjs';
 import { consentCookie } from './lib/consent.mjs';
 import { LEGAL, startServer } from './lib/server.mjs';
+import { writeJsonAtomic } from './lib/sharedJson.ts';
 
 const LABEL = 'checkout e2e';
 requireChrome(LABEL);
@@ -74,7 +75,7 @@ const fake = () => JSON.parse(fs.readFileSync(FAKE, 'utf8'));
 const setFake = (workspace, patch) => {
   const d = fake();
   d.workspaces[workspace] = { ...d.workspaces[workspace], ...patch };
-  fs.writeFileSync(FAKE, JSON.stringify(d, null, 2));
+  writeJsonAtomic(FAKE, d);
 };
 
 let browser;

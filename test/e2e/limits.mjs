@@ -26,6 +26,7 @@ import { launch, requireChrome } from './lib/browser.mjs';
 import { assert, check, crashed, finish, screenshotFailures } from './lib/checks.mjs';
 import { consentCookie } from './lib/consent.mjs';
 import { LEGAL, startServer } from './lib/server.mjs';
+import { writeJsonAtomic } from './lib/sharedJson.ts';
 
 const LABEL = 'limits e2e';
 requireChrome(LABEL);
@@ -68,12 +69,12 @@ const fake = () => JSON.parse(fs.readFileSync(FAKE, 'utf8'));
 const setFake = (workspace, state) => {
   const d = fake();
   d.workspaces[workspace] = state;
-  fs.writeFileSync(FAKE, JSON.stringify(d, null, 2));
+  writeJsonAtomic(FAKE, d);
 };
 const patchFake = (workspace, patch) => {
   const d = fake();
   d.workspaces[workspace] = { ...d.workspaces[workspace], ...patch };
-  fs.writeFileSync(FAKE, JSON.stringify(d, null, 2));
+  writeJsonAtomic(FAKE, d);
 };
 const FREE = { plan: 'free', planName: 'Free', state: 'free' };
 /** An owner who confirmed before that the workspace buys for its business: the provider remembers it, the box is ticked. */

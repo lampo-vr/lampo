@@ -12,6 +12,7 @@
 // Never on a real store: it refuses a VR_DATA that has anything in it.
 import fs from 'node:fs';
 import path from 'node:path';
+import { writeJsonAtomic } from './sharedJson.ts';
 
 const DATA = process.env.VR_DATA;
 const FAKE = process.env.FAKE_BILLING_FILE;
@@ -334,6 +335,6 @@ stamped('orla@formerly.test', { created: iso(NOW - 10 * D) });
 fs.writeFileSync(usersFile, `${JSON.stringify(users, null, 2)}\n`);
 fs.chmodSync(usersFile, 0o600);
 
-fs.writeFileSync(FAKE, JSON.stringify(billing, null, 2));
+writeJsonAtomic(FAKE, billing);
 if (process.argv.includes('--print'))
   console.log(JSON.stringify({ workspaces: reg.workspaces.map((w: { id: string; name: string }) => [w.id, w.name]) }, null, 2));

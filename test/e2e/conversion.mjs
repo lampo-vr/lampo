@@ -22,6 +22,7 @@ import { fitsAt, layoutMatrix, settle } from './layout.mjs';
 import { launch, requireChrome } from './lib/browser.mjs';
 import { assert, check, crashed, finish, screenshotFailures } from './lib/checks.mjs';
 import { LEGAL, startServer } from './lib/server.mjs';
+import { writeJsonAtomic } from './lib/sharedJson.ts';
 
 const LABEL = 'conversion e2e';
 requireChrome(LABEL);
@@ -62,7 +63,7 @@ const setState = (workspace, state) => {
   const d = fake();
   const { customer } = d.workspaces[workspace] ?? {};
   d.workspaces[workspace] = { ...(customer ? { customer } : {}), ...state };
-  fs.writeFileSync(FAKE, JSON.stringify(d, null, 2));
+  writeJsonAtomic(FAKE, d);
 };
 const at = (ms) => new Date(ms).toISOString();
 /** Today at hh:mm, or later today when that has passed (the trial's last day must still be today). */
@@ -443,7 +444,7 @@ try {
     // the trial as it was for the checks after: no confirmation, no customer the checkout's start made
     const d = fake();
     d.workspaces[ws] = STATES.today();
-    fs.writeFileSync(FAKE, JSON.stringify(d, null, 2));
+    writeJsonAtomic(FAKE, d);
   });
 
   await check('the week of grace: three honest ways on, with exactly what fitting into Free takes', async () => {

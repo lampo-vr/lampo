@@ -18,6 +18,7 @@ import { faintText, fitsAt, settle } from './layout.mjs';
 import { launch, requireChrome, shotsDir } from './lib/browser.mjs';
 import { assert, check, crashed, finish, screenshotFailures } from './lib/checks.mjs';
 import { LEGAL, startServer } from './lib/server.mjs';
+import { writeJsonAtomic } from './lib/sharedJson.ts';
 
 const LABEL = 'account e2e';
 requireChrome(LABEL);
@@ -723,7 +724,7 @@ try {
     const links = JSON.parse(fs.readFileSync(file, 'utf8'));
     const last = links.links.filter((l) => l.kind === 'reset' && !l.used && !l.void).at(-1);
     last.expires = Date.now() - 1000;
-    fs.writeFileSync(file, JSON.stringify(links));
+    writeJsonAtomic(file, links);
     await page.goto(linkIn(m), { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('[data-testid=link-expired]', { timeout: 15000 });
     assert((await page.$eval('.ent-col h1', (e) => e.textContent)).includes('expired'), 'the link says it expired');

@@ -18,6 +18,7 @@ import { jsonApi } from './lib/api.mjs';
 import { launch, requireChrome, shotsDir } from './lib/browser.mjs';
 import { assert, check, crashed, finish, screenshotFailures } from './lib/checks.mjs';
 import { startServer } from './lib/server.mjs';
+import { writeJsonAtomic } from './lib/sharedJson.ts';
 
 const LABEL = 'notes e2e';
 requireChrome(LABEL);
@@ -68,7 +69,7 @@ try {
       delete c.author_id;
     }
   });
-  fs.writeFileSync(reviewFile, JSON.stringify(stored, null, 2));
+  writeJsonAtomic(reviewFile, stored);
   const review = async () => (await api(`/api/review/${enc(slug)}`)).review;
   await until(async () => (await review()).comments.some((c) => c.author === 'Mia Lang'), 'the store is read again');
 
