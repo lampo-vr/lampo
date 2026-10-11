@@ -24,6 +24,7 @@ import { Avatar } from '../ui/plain.tsx';
 import { IconButton, Kbd, Segmented } from '../ui/primitives.tsx';
 import { CheckDecision } from './CheckDecision.tsx';
 import { clientOf, displayName, WordsChange } from './CommentCard.tsx';
+import { lastStillWrong } from './fixCheck.ts';
 import { previewSource } from './previews.ts';
 import '../styles/check.css';
 
@@ -51,6 +52,11 @@ interface VerifyPanelProps {
   onPlayRange?: () => void;
   /** The card's height as it rests (its long words folded): the stage keeps that much free under the pictures. */
   onRoom?: (px: number) => void;
+  /** Still wrong's reason is being given: the version being checked takes a drawing meanwhile (Player.tsx). */
+  onReopening?: (on: boolean) => void;
+  /** The version Still wrong can be drawn on (the one being checked), and how many marks are on it so far. */
+  drawOn?: number | null;
+  drawn?: number;
 }
 
 /** Up to this many fixes are dots in the head; more are only counted. */
@@ -76,8 +82,18 @@ export function VerifyPanel({
   fps,
   onPlayRange,
   onRoom,
+  onReopening,
+  drawOn = null,
+  drawn = 0,
 }: VerifyPanelProps) {
   const [reopening, setReopening] = useState(false);
+  // the stage hears when the reason is being given (the picture takes a drawing then), and that it ended with the card
+  const told = useRef(onReopening);
+  told.current = onReopening;
+  useEffect(() => {
+    told.current?.(reopening);
+  }, [reopening]);
+  useEffect(() => () => told.current?.(false), []);
   // a long text unfolded ("More"): the card grows upwards from its foot, so the decision stays where it was
   const [open, setOpen] = useState(false);
   const yes = preview && onVerifyPreview ? onVerifyPreview : onVerify;
@@ -121,6 +137,9 @@ export function VerifyPanel({
     return () => ro.disconnect();
   }, [open]);
   const fix = [...(item.replies || [])].reverse().find((r) => r.status === 'fixed');
+  // the last time it was found still wrong (on V2, say): read before the new answer, so the history reads in order
+  const wrong = preview ? null : lastStillWrong(item);
+  const wrongWords = wrong && wrong.reply.text !== t('Still wrong in V{latestV}.', { latestV: wrong.v }) ? wrong.reply.text : '';
   const source = preview && previewSource(preview.p);
   const avatarOf = usePeople();
   // which words are cut where they rest, and the one "More" that unfolds them all
@@ -195,6 +214,17 @@ export function VerifyPanel({
         )}
         {noteCut && !moreInFix && more}
       </div>
+      {/* what was said last time, quietly: "Still wrong in V2 · drawn on it · “touches the logo”" (what it is compared with) */}
+      {wrong && (
+        <p className="verify-was" data-testid="verify-was">
+          <I name="x" size={12} />
+          <span className="ellipsis">
+            <b>{t('Still wrong in V{v}', { v: wrong.v })}</b>
+            {wrong.reply.drawing?.length ? ` · ${t('drawn on it')}` : ''}
+            {wrongWords ? ` · “${wrongWords}”` : ''}
+          </span>
+        </p>
+      )}
       {preview ? (
         <div className="verify-preview" data-testid="verify-preview">
           <I name="eye" size={14} />
@@ -289,6 +319,8 @@ export function VerifyPanel({
         onReopening={setReopening}
         client={clientOf(item.author)}
         rightLabel={preview ? t('Looks right (preview)') : undefined}
+        drawOn={preview ? null : drawOn}
+        drawn={drawn}
       >
         <span className="grow" />
         <button type="button" className="btn ghost sm" onClick={onSkip} data-testid="verify-skip">

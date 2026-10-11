@@ -249,6 +249,16 @@ export interface Reply {
   /** A reply written through a review link: that link's id (Share.id), so a link showing only its own visitors' notes
    * shows only its own visitors' replies too. Absent: the team's, an agent's, or from before. */
   share?: string;
+  /**
+   * Still wrong: the version it was said on (check mode's, the one being checked). The next check compares this
+   * version with the newer one, and the agent reads "still wrong in v2". Absent on older verdicts and other replies.
+   */
+  on_v?: number;
+  /** With `drawing`: the frame of `on_v` it was drawn on (absent: the note's moment on that version). */
+  on_frame?: number;
+  /** Still wrong with a drawing: what the person marked on `on_v`, in that version's video px. The reply's picture is
+   * made from it when read (the version's frame with it laid over), never stored. */
+  drawing?: Shape[];
 }
 
 /** What a person picked from a question's options: item ids per group id (none = left open), and their own words. */

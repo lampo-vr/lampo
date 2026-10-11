@@ -37,3 +37,8 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
   next `registerVersion` for a `fix_pending` note (a part: notes `inPart`), sets `fixed_in_v`; never a new version
   for open notes (`check_again` is read for old stores, never set), never the run's newest for a plan line. One rule
   says what is to check (`waitsForCheck`, `fixWaits`): the stage, the player's queue and agents count with it.
+- A Still wrong names the version it was said on (`Reply.on_v`; a drawing made there in `drawing` at `on_frame`,
+  checked in the route against that version: `sanitizeDrawing`, the frame inside it), a person's only: an agent's
+  reopen gets none. Check mode compares a fix with the version it was last turned down on (`comparedWith`,
+  fixCheck.ts), the note's own only before that; a fix after it must be newer than that version (`fixBase` reads
+  `on_v`, a time only for a reopen from before).

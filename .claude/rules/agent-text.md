@@ -59,3 +59,14 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
   (`unmarkedAfter`, `markWhatItFixedLine`), never "wait now" before the marks (a hasty agent waited and marked nothing);
   a hand-back with only early fixes left says to put the version up (`putUpNextLine`). A version an agent names that
   doesn't exist is "bad version", never taken as given.
+- A wait never skips what an agent wasn't told: it hands over everything after the video's told place (`Told`,
+  lib/told.ts), whatever cursor it brings; the cursor is a floor, never a reason to skip. A hand-out marks only what it
+  handed out; a read of the notes marks only past the notes it told of (`readPlace`, up to `placeNow` taken before the
+  review is read): never past an approval, a request or a verdict on a note it left out, which the next wait brings.
+  Counting within a second goes by the second, never by a run of lines (a log may hold one second's events apart).
+- A picture made for an agent of another version (`spotPicture`: same spot, still wrong here) goes through the
+  caller's frame budget (`count`) and is cached, never written to versions/; it is cropped like the marked frame and
+  labelled `<id> f<frame> v<v> <what>`; a picture that can't be made, or a screenshot that is missing, is said in a
+  line, never left out. Lists show it on request (`images: "compare"`); only get_note pairs it by default. A fix riding
+  with the next version (`fix_pending`) is the agent's own hand-over: named, never pictured on a version without it,
+  never counted as work waiting for it or as a person's input.

@@ -571,6 +571,22 @@ try {
   );
   log('ask_options → a question on a folder before any render (sounds measured), picked → wait_for_feedback: ANSWERED … PICKED voice=v2 look=l1');
 
+  // The inbox never skips (mcp/feedback.ts inbox): the agent reads clip.mp4's notes and goes off to work; a person writes
+  // a note meanwhile; the cursor the agent comes back with is from later (another video's wait), yet its wait on
+  // clip.mp4 hands the note over — once: an older cursor doesn't bring it again.
+  const people = await import('../lib/store.ts');
+  const oldCursor = must(/cursor: (\S+)/.exec(textOf(await call('wait_for_feedback', { video: 'clip.mp4', timeout_s: 0 })))?.[1], 'a cursor');
+  await call('get_open_notes', { video: 'clip.mp4', images: 'none' });
+  const meanwhile = people.addComment(VIDEO.split('/').join('__'), { frame: 30, text: 'inboxmark said while it rendered', severity: 'must', author: 'Sam' });
+  await new Promise((r) => setTimeout(r, 1100));
+  const later = must(/cursor: (\S+)/.exec(textOf(await call('wait_for_feedback', { video: 'stretch.mp4', timeout_s: 0 })))?.[1], 'a later cursor');
+  const caught = textOf(await call('wait_for_feedback', { video: 'clip.mp4', since: later, timeout_s: 5 }));
+  assert.match(caught, new RegExp(`^1 new:\\n.*NEW MUST \\[-\\] ${meanwhile.id} .*"inboxmark said while it rendered"`), caught);
+  const again = textOf(await call('wait_for_feedback', { video: 'clip.mp4', since: oldCursor, timeout_s: 0 }));
+  assert.match(again, /^No new feedback in 0 s\./, again);
+  people.updateComment(meanwhile.id, { status: 'wontfix', note: 'asked in the e2e only', by: 'agent:mcp-e2e' });
+  log('inbox → a note written while the agent worked comes with its next wait, though its cursor is from later; once');
+
   // Publishing: an agent drafts the post of a final video; a person publishes it (no tool does: drafts only).
   const slug = VIDEO.split('/').join('__');
   const early = (await client.callTool({ name: 'draft_post', arguments: { video: 'clip.mp4', platform: 'youtube' } })) as CallToolResult;

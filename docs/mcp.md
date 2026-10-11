@@ -427,8 +427,17 @@ assignment, a decision, a request, or a reference on a note) or the time is up: 
 
 - the events as one line each, the way `lampo watch --brief` prints them, and each video's path once (`video: …`);
 - the marked frames of new notes **with a drawing**, cropped to it (`images: "all"`: every new note's whole frame;
-  `"none"`: no pictures), four at most;
+  `"none"`: no pictures), four at most; a Still wrong the person drew on the version being checked comes with that
+  picture (`c_… f20 v2 still wrong here, cropped: …`), and its line names the version (`· still wrong in v2, drawn on
+  it`);
 - a `cursor`: pass it back as `since`, and nothing is missed or repeated.
+
+The inbox never skips. A wait hands over everything a person did on a video since this agent last heard of it (an
+earlier wait's answer) or read its notes (`get_open_notes`), whatever cursor it brings: a note written while the agent
+rendered is never behind the cursor its upload or its last fix gave. A read counts for the notes it showed: an
+approval, a request or a verdict on a note it left out still comes with the next wait. The cursor is the floor for a
+video the agent was never told of, and keeps anything from being heard twice. The server remembers per agent (an
+account and the client's name over HTTP; the Claude Code session on stdio) and per workspace, up to a week back.
 
 Without a cursor (`since`), the agent has just started to listen, so the first call answers at once when something
 waits for it already: the videos assigned to it with open notes or a request it hasn't been told of (by an earlier
@@ -603,14 +612,21 @@ anything elsewhere.
   read-only until a person restores it` ([agents.md](agents.md#where-a-video-stands)).
 - **`get_open_notes({video, images?, max_images?, since?, all?})`.** `images`: `drawn` (the default) shows the marked
   frame of each note with a drawing, cropped to it (512 px at most; the label names the crop in video pixels; a
-  drawing over most of the frame shows the whole frame). `all` shows every note's marked frame, range strip and
-  references; `none` no pictures. `max_images` defaults to 6. The answer ends with `as of <time>`: pass that as
-  `since` next time and you get only the notes that changed since (new, edited, answered, given a reference), the
-  others by id, and the notes no longer open. `all: true` lists every status. After the work, by id: `Fixed, riding
-  with your next version` (marked before their version) and `Fixed, waiting for the person's check`; neither is work.
-  Older clients' `include_images` still works (`true` = `all`, `false` = `none`).
-- **`get_note({id, clean?})`.** `clean: true` adds the untouched frame. On the machine itself it names the screenshots'
-  files; for anyone else it doesn't, and a clip reference plays from its URL.
+  drawing over most of the frame shows the whole frame). `compare` adds, for a note made on an older version, its
+  same spot in the newest one with the note's drawing laid over, at the same crop (`c_… f20 v1 marked, cropped: …`
+  beside `c_… f20 v3 same spot, cropped: …`). `all` shows every note's marked frame, range strip and references;
+  `none` no pictures. `max_images` defaults to 6. The answer ends with `as of <time>`: pass that as `since` next time
+  and you get only the notes that changed since (new, edited, answered, given a reference), the others by id, and the
+  notes no longer open. `all: true` lists every status. After the work, by id: `Fixed, riding with your next version`
+  (marked before their version) and `Fixed, waiting for the person's check`; neither is work. The fixes waiting for the
+  check keep their pictures (and, with `compare`, their spot in the newest version); a fix riding with your next
+  version has none yet. Older clients' `include_images` still works (`true` = `all`, `false` = `none`). A screenshot
+  that is missing is said in a line, never left out.
+- **`get_note({id, clean?})`.** `clean: true` adds the untouched frame. Once a newer version exists, the marked frame
+  comes cropped beside the note's same spot in the newest version (not for a fix riding with your next version: no
+  version has it yet), and a Still wrong the person drew on a version comes as that version's picture (`still wrong
+  here`, the latest two). The spots are made when asked for and count as frames, like `get_frame`'s. On the machine
+  itself it names the screenshots' files; for anyone else it doesn't, and a clip reference plays from its URL.
 - **`get_frame({video, frame | timecode | seconds, v?})`.** The frame comes straight from the file (ffmpeg,
   frame-exact).
 - **`get_transcript({video, v?, format?})`.** `format`: `lines` (the default), `words`, `srt` or `vtt`. A version is

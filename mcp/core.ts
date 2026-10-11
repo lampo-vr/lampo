@@ -20,7 +20,7 @@ import { keepLines } from '../lib/time.ts';
 import { allowed, audienceOf, backendFor } from './access.ts';
 import { registerReviewApp } from './app.ts';
 import { registerFeedback } from './feedback.ts';
-import { INBOX_URI, markedPicture, OLD_INBOX_URI, preview, reviewUri } from './format.ts';
+import { INBOX_URI, markedPicture, OLD_INBOX_URI, preview, reviewUri, spotPicture } from './format.ts';
 import { instructionsFor, WATCH_PROMPT, watchPromptText, wayOf } from './loop.ts';
 import { createToolKit, type ReviewServerOptions } from './toolkit.ts';
 import { registerAskTools } from './tools/asks.ts';
@@ -80,6 +80,13 @@ export function createReviewServer(options: ReviewServerOptions): McpServer {
         if (!hit?.comment.drawing?.length) return [];
         await b.fetchShots(hit.review, [hit.comment]);
         return markedPicture(b, hit.review, hit.comment);
+      },
+      stillWrong: async (e) => {
+        const hit = e.id ? await b.findComment(e.id) : null;
+        const ver = hit?.review.versions.find((x) => x.v === e.reply?.on_v);
+        if (!hit || !ver || !e.reply?.drawing?.length) return [];
+        const { drawing, on_frame: frame } = e.reply;
+        return spotPicture(b, hit.review, hit.comment, ver, { what: 'still wrong here', drawing, frame, count: o.frameGrabs });
       },
       allowed: allowed(o.principal, 'view'),
       audience: audienceOf(o.principal),

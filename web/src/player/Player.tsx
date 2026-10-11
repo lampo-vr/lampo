@@ -51,6 +51,7 @@ import { DrawBar } from './DrawBar.tsx';
 import type { DraftFocus } from './drafts/Unsent.tsx';
 import { useUnsent } from './drafts/useUnsent.ts';
 import { findingWords } from './findingWords.ts';
+import { lastStillWrong } from './fixCheck.ts';
 import { HelpModal } from './HelpModal.tsx';
 import { MicButton } from './MicButton.tsx';
 import { frameMarks } from './marks.ts';
@@ -317,6 +318,9 @@ function PlayerView({
   const band = prefs.views === true && !!audience && audience.v === ver.v && audience.retention.length > 0;
 
   const [composer, setComposer] = useState<ComposerState | null>(null);
+  // Check mode's Still wrong, its reason being given: what is drawn on the version being checked, on the frame of its
+  // first mark (it goes with the reason: the agent gets that picture), and the tool in hand. Null: not giving one.
+  const [wrongDraw, setWrongDraw] = useState<{ tool: Tool; shapes: Shape[]; frame: number | null } | null>(null);
   const [selected, setSelected] = useState<string | null>(focus || null);
   const [filter, setFilter] = useState<Filter>('active');
   // a tag picked in the filter row narrows the list, with the filter beside it; it belongs to its video
@@ -1150,6 +1154,12 @@ function PlayerView({
         : m?.error || t('This version cannot be played.')
     : null;
   const verifying = verify.active && !!verify.item;
+  // Still wrong drawn on the version being checked: its marks show on the frame they were made on (or, none yet, wherever
+  // the playhead is: the first mark pins the frame)
+  const wrongHere = verifying && wrongDraw && !fixPreview && (wrongDraw.frame === null || wrongDraw.frame === frame) ? wrongDraw : null;
+  // what was found still wrong last time, drawn on the version now shown before: on its frame, as it was drawn
+  const lastWrong = verifying && verify.item && verify.before ? lastStillWrong(verify.item) : null;
+  const wrongBefore = lastWrong?.v === verify.before && lastWrong.reply.drawing?.length && lastWrong.reply.on_frame === frame ? lastWrong.reply.drawing : null;
   const paneA: Pane = {
     key: `a-${ver.v}`,
     src: pb.src,
@@ -1160,19 +1170,30 @@ function PlayerView({
     marks,
     // The compare bar names both sides (A left, B right); verify mode and the phone's stacked panes label their own.
     label: ab && b ? (verifying ? t('After · V{v}', { v: ver.v }) : phone ? `V${ver.v}` : null) : null,
-    draw: composer
-      ? {
-          tool: composer.tool,
-          shapes: composer.shapes,
-          onAdd: (s) => setComposer((c) => (c ? { ...c, shapes: [...c.shapes, s] } : c)),
-        }
-      : recorder.active
-        ? // Recording: draw with its tools; what was drawn shows on its frame while paused there.
-          { tool: recorder.tool, shapes: pb.playing ? [] : recorder.strokes.filter((x) => x.f === frame).map((x) => x.shape), onAdd: recorder.addStroke }
-        : draftFocus && !pb.playing && frame === draftFocus.frame && draftFocus.drawing.length
-          ? // A draft looked at: its drawing (or the ring of its spot) on its frame.
-            { tool: 'none', shapes: draftFocus.drawing, onAdd: () => {} }
-          : null,
+    draw:
+      wrongDraw && verifying && !fixPreview
+        ? // Still wrong, its reason being given: drawn on the version being checked, on one frame.
+          {
+            tool: wrongHere ? wrongDraw.tool : 'none',
+            shapes: wrongHere ? wrongDraw.shapes : [],
+            onAdd: (s) => {
+              if (pb.playing) pb.pause();
+              setWrongDraw((w) => (w ? { ...w, shapes: [...w.shapes, s], frame: w.frame ?? frameRef.current } : w));
+            },
+          }
+        : composer
+          ? {
+              tool: composer.tool,
+              shapes: composer.shapes,
+              onAdd: (s) => setComposer((c) => (c ? { ...c, shapes: [...c.shapes, s] } : c)),
+            }
+          : recorder.active
+            ? // Recording: draw with its tools; what was drawn shows on its frame while paused there.
+              { tool: recorder.tool, shapes: pb.playing ? [] : recorder.strokes.filter((x) => x.f === frame).map((x) => x.shape), onAdd: recorder.addStroke }
+            : draftFocus && !pb.playing && frame === draftFocus.frame && draftFocus.drawing.length
+              ? // A draft looked at: its drawing (or the ring of its spot) on its frame.
+                { tool: 'none', shapes: draftFocus.drawing, onAdd: () => {} }
+              : null,
   };
   if (ab && b && ab.mode !== 'side')
     paneA.wipe = {
@@ -1198,6 +1219,8 @@ function PlayerView({
     };
     if (verifying) {
       paneB.marks = marks;
+      // compared with the version it was found still wrong on: what was drawn on it then, on its frame
+      if (wrongBefore) paneB.draw = { tool: 'none', shapes: wrongBefore, onAdd: () => {} };
       panes.unshift(paneB); // before on the left, after on the right
     } else panes.push(paneB);
   }
@@ -1395,7 +1418,18 @@ function PlayerView({
       after={latestV}
       busy={verify.busy}
       onVerify={() => verify.decide(true)}
-      onReopen={(note) => verify.decide(false, note)}
+      onReopen={(note) =>
+        verify.decide(false, note, wrongDraw?.shapes.length && wrongDraw.frame !== null ? { frame: wrongDraw.frame, drawing: wrongDraw.shapes } : null)
+      }
+      onReopening={(on) => {
+        // the reason is being given: the version being checked takes a drawing (a box to start with), paused
+        if (on && !phone && !fixPreview) {
+          if (pb.playing) pb.pause();
+          setWrongDraw((w) => w ?? { tool: 'box', shapes: [], frame: null });
+        } else setWrongDraw(null);
+      }}
+      drawOn={phone || fixPreview ? null : latestV}
+      drawn={wrongDraw?.shapes.length ?? 0}
       onSkip={verify.advance}
       onExit={verify.exit}
       preview={fixPreview ? { p: fixPreview, url: previewUrl(slug, fixPreview) } : null}
@@ -1496,6 +1530,22 @@ function PlayerView({
               undoLabel={t('Undo last shape')}
               under={!!ab && !verifying && !phone}
               flat={phone}
+            />
+          )}
+          {/* Still wrong in check mode: the same tools, for the version being checked (its marks go with the reason) */}
+          {wrongDraw && verifying && !fixPreview && !phone && (
+            <DrawBar
+              tools={COMPOSER_TOOLS().filter((x) => x.id !== 'none')}
+              tool={wrongDraw.tool}
+              onTool={(tool) => {
+                if (pb.playing) pb.pause();
+                setWrongDraw((w) => (w ? { ...w, tool } : w));
+              }}
+              onUndo={() => setWrongDraw((w) => (w ? { ...w, shapes: w.shapes.slice(0, -1), frame: w.shapes.length > 1 ? w.frame : null } : w))}
+              canUndo={wrongDraw.shapes.length > 0}
+              label={t('Drawing tool')}
+              undoLabel={t('Undo last shape')}
+              after={panes.length === 2}
             />
           )}
           {(recorder.active || recorder.phase === 'saving') && RecordUI && <RecordUI.RecordBar rec={recorder} />}

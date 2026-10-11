@@ -3,19 +3,24 @@
 // tools — so the tool long-polls until new human feedback arrives or the timeout passes, and hands back a cursor.
 // An agent hears notes only while it waits (an MCP client acts when prompted): the app shows whether it does
 // (`onWait`, server/agents.ts), and the first wait of an agent that starts listening hands over what came in for it
-// meanwhile.
+// meanwhile. Its inbox never skips: a wait hands over everything that came since the agent last read a video or heard of
+// it (`Told`, kept by the server per agent and workspace: lib/told.ts), whatever cursor it brings — what the person said
+// while the agent rendered is never behind the cursor its upload gave. The cursor only keeps a video nothing was told
+// of from being heard from the start.
 import fs from 'node:fs';
 import type { CallToolResult, McpServer, ServerContext } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import type { Backend } from '../lib/backend/types.ts';
 import { isFeedback, shortEventLine } from '../lib/eventLine.ts';
 import { CHAT_STOP_LINE, PENDING_LINE, QUIET_STOP_MIN, STOP_LINE } from '../lib/handoff.ts';
+import { fixWaits } from '../lib/handover.ts';
 import { forAgents } from '../lib/onboarding.ts';
 import { slugify } from '../lib/paths.ts';
 import { type Audience, publicMessage } from '../lib/publicError.ts';
 import { Recent } from '../lib/rateLimit.ts';
 import { matchesSession } from '../lib/sessions.ts';
 import { instant, isAgent, isIdea, isRequired, keepLines, oneLine } from '../lib/time.ts';
+import { markTold, toldPlace, toldPlaces } from '../lib/told.ts';
 import type { Comment, ReviewEvent } from '../lib/types.ts';
 import { hintsFor } from './access.ts';
 import { trimmed } from './lean.ts';
@@ -115,6 +120,8 @@ export interface FeedbackOptions {
   preview: (file: string, width: number) => Promise<CallToolResult['content'][number]>;
   /** A note's marked frame cropped to its drawing, with its label; nothing for a note without a drawing. */
   drawn?: (id: string) => Promise<CallToolResult['content']>;
+  /** Still wrong drawn on a version (a reopen's or a reply's picture): that version's frame with the drawing, cropped. */
+  stillWrong?: (e: ReviewEvent) => Promise<CallToolResult['content']>;
   allowed: boolean;
   /** How events leave the server (hosted: screenshot paths become URLs); images are read from the real paths first. */
   publicEvent?: (e: ReviewEvent) => ReviewEvent;
@@ -151,27 +158,136 @@ const GONE = 'your access ended (the token was revoked, or the account left this
 export type Hold = () => (() => void) | string;
 
 /**
- * What an agent was told of already, per video: until when (ms) — by a wait that handed out the video's events or
- * what waited for it, or by reading its open notes. A first wait hands over only what came after.
+ * What an agent was told of already, per video: the place in the video's feedback right after the last event a wait
+ * handed it, or after what a read of the video's notes showed it (lib/told.ts ToldPlace: a second, and how many of that
+ * video's events of that second came before). Every wait hands over what came after that place, whatever cursor it
+ * brings (the cursor decides only for a video nothing was told of); a first wait's "waiting for you" goes by it too.
  */
 export interface Told {
-  at(slug: string): number;
-  mark(slug: string, at: number): void;
+  at(slug: string): Cursor | null;
+  /** Every video it was told of, with its place: where a wait on all videos must start looking. */
+  all(): Record<string, Cursor>;
+  /** Told up to these places (never moving back): one call per answer. */
+  mark(places: Record<string, Cursor>): void;
 }
 
-/** One agent's Told in a map shared by many (bounded: forgetting means telling once more). */
-export function toldIn(map: Recent<number>, agent: string): Told {
+/** How far back a wait looks for what a video's place says it wasn't told yet: older than this isn't news any more. */
+export const INBOX_LOOKBACK_MS = 7 * 24 * 3600_000;
+
+const later = (a: Cursor, b: Cursor) => a.at > b.at || (a.at === b.at && a.seen > b.seen);
+
+/** One agent's Told in a map shared by many, in memory (bounded: forgetting means the cursor decides again). */
+export function toldIn(map: Recent<Cursor>, agent: string): Told {
   const key = (slug: string) => `${agent}\u0000${slug}`;
   return {
-    at: (slug) => map.get(key(slug)) ?? 0,
-    mark: (slug, at) => {
-      if (Number.isFinite(at) && at > (map.get(key(slug)) ?? 0)) map.set(key(slug), at);
+    at: (slug) => map.get(key(slug)) ?? null,
+    all: () => {
+      const out: Record<string, Cursor> = {};
+      for (const [k, v] of map.entries()) if (k.startsWith(`${agent}\u0000`)) out[k.slice(agent.length + 1)] = v;
+      return out;
+    },
+    mark: (places) => {
+      for (const [slug, place] of Object.entries(places)) {
+        const had = map.get(key(slug));
+        if (Number.isFinite(place.at) && (!had || later(place, had))) map.set(key(slug), place);
+      }
     },
   };
 }
 
-/** A Told for one agent alone (stdio: the process is the agent). */
-export const ownTold = (): Told => toldIn(new Recent<number>(5000), '');
+/** A Told for one agent alone, in memory (stdio against a hosted server: the process is the agent). */
+export const ownTold = (): Told => toldIn(new Recent<Cursor>(5000), '');
+
+/** One agent's Told kept in a workspace's folder (lib/told.ts): a restart of the server forgets nothing. */
+export function toldOnDisk(dataDir: () => string, agent: string): Told {
+  return {
+    at: (slug) => toldPlace(dataDir(), agent, slug),
+    all: () => toldPlaces(dataDir(), agent),
+    mark: (places) => markTold(dataDir(), agent, places),
+  };
+}
+
+/**
+ * Where a read of `slug`'s notes leaves its reader: right after the video's feedback the log holds now (the log is
+ * read before anything else of the video, so what lands while the read goes on is after it, never passed over).
+ */
+export async function placeNow(b: Backend, slug: string, now = Date.now()): Promise<Cursor> {
+  const at = Math.floor(now / 1000) * 1000;
+  const events = await b.events(200, { since: new Date(at - 1000).toISOString() });
+  return { at, seen: events.filter((e) => isFeedback(e) && e.slug === slug && Date.parse(e.at) === at).length };
+}
+
+/**
+ * Where a read of `slug`'s notes leaves its reader (`shown`: the notes it told of; `to`: placeNow, taken before the read).
+ * From the place it was told up to (`from`), past every person's event on a note the read told of, up to `to` — never
+ * past one it didn't (an approval, a request, a verdict on a note it left out): the next wait hands that over, and what
+ * came after it. Told nothing of the video yet: up to `to` (the read is where it starts).
+ */
+export async function readPlace(b: Backend, slug: string, from: Cursor | null, shown: ReadonlySet<string>, to: Cursor): Promise<Cursor> {
+  if (!from) return to;
+  if (!later(to, from)) return from;
+  const events = (await b.events(5000, { since: new Date(from.at - 1000).toISOString() })).filter((e) => isFeedback(e) && e.slug === slug);
+  // the video's events counted per second, as placeNow and the inbox count them; the first it didn't tell of stops it
+  const counted = new Map<number, number>();
+  const passed: Cursor[] = [];
+  let stop: Cursor | null = null;
+  for (const e of events) {
+    const at = Date.parse(e.at);
+    const mine = { at, seen: (counted.get(at) ?? 0) + 1 };
+    counted.set(at, mine.seen);
+    if (!later(mine, from) || later(mine, to)) continue;
+    if (e.id && shown.has(e.id)) passed.push(mine);
+    else if (!stop || later(stop, mine)) stop = mine;
+  }
+  if (!stop) return to;
+  let place = from;
+  for (const p of passed) if (later(stop, p) && later(p, place)) place = p;
+  return place;
+}
+
+/**
+ * The inbox of a wait (oldest first, at most `limit`): every event `keep` takes that wasn't told to this agent yet. A
+ * video it was told of (`toldAt`) hands over everything after that place, however old or new the cursor is — what a
+ * person said while the agent rendered is never behind it; a video nothing was told of goes by the cursor, which keeps
+ * old things from being heard twice. `events` must hold every event of each second they reach (the counts within a
+ * second are made from them). The next cursor stands after the last event handed out, never before the one given.
+ */
+export function inbox(
+  events: ReviewEvent[],
+  c: Cursor,
+  toldAt: (slug: string) => Cursor | null,
+  limit = Number.POSITIVE_INFINITY,
+  keep: (e: ReviewEvent) => boolean = () => true,
+): { fresh: ReviewEvent[]; places: Record<string, Cursor>; next: string; more: boolean } {
+  const fresh: ReviewEvent[] = [];
+  const places: Record<string, Cursor> = {};
+  // each event's place: the how-manyth of its second (every video's), and of its video's in that second — counted per
+  // second, not per run: a log may hold a second's events apart (an import, a clock's step back), as after() counts them
+  const inSecond = new Map<number, number>();
+  const inVideo = new Map<string, number>();
+  let more = false;
+  let next = { at: c.at, seen: c.seen };
+  for (const e of events) {
+    const at = Date.parse(e.at);
+    const seen = (inSecond.get(at) ?? 0) + 1;
+    inSecond.set(at, seen);
+    const slug = e.slug || '';
+    const own = `${slug}\u0000${at}`;
+    const mine = { at, seen: (inVideo.get(own) ?? 0) + 1 };
+    inVideo.set(own, mine.seen);
+    if (!keep(e)) continue;
+    const told = slug ? toldAt(slug) : null;
+    if (!(told ? later(mine, told) : later({ at, seen }, c))) continue;
+    if (fresh.length >= limit) {
+      more = true;
+      break;
+    }
+    fresh.push(e);
+    if (slug) places[slug] = mine;
+    if (later({ at, seen }, next)) next = { at, seen };
+  }
+  return { fresh, places, next: `${new Date(next.at).toISOString()}#${next.seen}`, more };
+}
 
 /**
  * An agent that hears only "no new feedback" for `stopMs` in a row is told to stop waiting and say so: nobody is
@@ -242,7 +358,7 @@ export function registerFeedback(server: McpServer, o: FeedbackOptions): void {
     'wait_for_feedback',
     {
       title: 'Wait for new human feedback',
-      description: `Blocks until a person leaves new feedback (notes, replies, verdicts, requests, references; optionally on one video) or timeout_s passes (default ${DEFAULT_WAIT_S}, max ${MAX_WAIT_S}; raise your client's tool timeout for long waits). Returns only what is new, new notes' drawings as cropped frames, and a cursor: pass it as since next time (without since: what waits for you, then from now on). Call it again after each answer: only while you wait do you hear new notes.`,
+      description: `Blocks until a person leaves new feedback (notes, replies, verdicts, requests, references; optionally on one video) or timeout_s passes (default ${DEFAULT_WAIT_S}, max ${MAX_WAIT_S}; raise your client's tool timeout for long waits). Returns what you weren't told yet (since you last read or heard of the video, whatever the cursor), new notes' drawings as cropped frames, and a cursor: pass it as since next time (without since: what waits for you, then from now on). Call it again after each answer: only while you wait do you hear new notes.`,
       inputSchema: trimmed(
         z.object({
           video: z.string().optional(),
@@ -272,9 +388,24 @@ export function registerFeedback(server: McpServer, o: FeedbackOptions): void {
         o.activity?.({ video: slug }, ctx);
         o.log?.(`wait_for_feedback start timeout_s=${timeout_s}${since ? '' : ' first'}`);
         listening = o.onWait?.() ?? null;
-        // Only what is new since the cursor's second (a hosted server sends that much, not its whole recent log). Every
-        // video's: the cursor counts them all (after's `keep` picks this video's).
-        const feedback = async (from: Cursor) => (await b.events(2000, { since: new Date(from.at - 1000).toISOString() })).filter(isFeedback);
+        // Only what is new since the cursor's second (a hosted server sends that much, not its whole recent log), or
+        // since the oldest place of a video this agent wasn't told everything of. Every video's: the cursor counts them
+        // all (inbox's `keep` picks this video's).
+        const feedback = async (from: Cursor) => {
+          const start = Math.max(Math.min(from.at, ...Object.values(known).map((p) => p.at)), Date.now() - INBOX_LOOKBACK_MS);
+          return (await b.events(start < from.at ? 5000 : 2000, { since: new Date(start - 1000).toISOString() })).filter(isFeedback);
+        };
+        // The places of the videos this wait is about (all of them: every video it was told of), as they were when it
+        // began: another wait of the same agent open meanwhile (a second conversation of a chat app, which has the same
+        // account and name) hears an event too, while every wait after one that handed it out doesn't again.
+        let known: Record<string, Cursor> = {};
+        const places = (): Record<string, Cursor> => {
+          if (!o.told) return {};
+          if (!slug) return o.told.all();
+          const p = o.told.at(slug);
+          return p ? { [slug]: p } : {};
+        };
+        const toldAt = (s: string) => known[s] ?? null;
         const ours = (e: ReviewEvent) => !slug || e.slug === slug;
         // Without a cursor the agent just started to listen: what was assigned to it and came in while it didn't (an MCP
         // client acts only when prompted) is handed over at once, each thing once (`told`), then it waits as usual.
@@ -293,6 +424,7 @@ export function registerFeedback(server: McpServer, o: FeedbackOptions): void {
             return backlog.result;
           }
         }
+        known = places();
         const now = Date.now();
         const first = since ? null : await feedback({ at: Math.floor(now / 1000) * 1000, seen: 0 });
         const cursor = first ? nowCursor(first, now) : parseCursor(since as string);
@@ -306,13 +438,14 @@ export function registerFeedback(server: McpServer, o: FeedbackOptions): void {
             outcome = 'access ended';
             return { content: [{ type: 'text', text: `Error: ${GONE}` }], isError: true };
           }
-          const { fresh, next, more } = after(read ?? (await feedback(cursor)), cursor, MAX_EVENTS, ours);
+          // Everything this agent wasn't told of: after a video's place where it has one, else after the cursor.
+          const { fresh, places: told, next, more } = inbox(read ?? (await feedback(cursor)), cursor, toldAt, MAX_EVENTS, ours);
           read = null;
           if (fresh.length) {
             outcome = `${fresh.length} event${fresh.length === 1 ? '' : 's'}`;
             listening?.({ handed: true });
             listening = null;
-            for (const e of fresh) if (e.slug) o.told?.mark(e.slug, Date.parse(e.at));
+            o.told?.mark(told);
             o.quiet?.something();
             o.handed?.([...new Set(fresh.map((e) => e.slug).filter(Boolean))], ctx);
             return await result(fresh, next, more, images);
@@ -364,7 +497,7 @@ export function registerFeedback(server: McpServer, o: FeedbackOptions): void {
       (r) => !r.archived && matchesSession(r.session, me) && (!slug || slugify(r.video) === slug) && b.stage(r).stage !== 'final',
     );
     if (!mine.length) return null;
-    const told = (s: string) => o.told?.at(s) ?? 0;
+    const told = (s: string) => o.told?.at(s)?.at ?? 0;
     const asked = (await b.events(500)).filter((e) => e.type === 'request' && isFeedback(e) && e.slug);
     const lines: string[] = [];
     const waiting: { video: string; open: number; requests: number }[] = [];
@@ -375,7 +508,8 @@ export function registerFeedback(server: McpServer, o: FeedbackOptions): void {
       // Requests since it was the agent's (events have whole seconds: one in the assignment's second counts) and since
       // it was last told of this video.
       const assigned = Math.floor((Date.parse(r.session?.assigned || '') || 0) / 1000) * 1000;
-      const open = r.comments.filter((c) => c.status === 'open' && (isRequired(c) || isIdea(c)));
+      // open work: a fix it marked before its version (`fix_pending`) is its own hand-over, not work waiting for it
+      const open = r.comments.filter((c) => c.status === 'open' && !fixWaits(c) && (isRequired(c) || isIdea(c)));
       // A person's last word on it (a reply of the agent's own is no news to it).
       const fresh = open.filter((c) => peopleChangedAt(c) > told(s));
       const requests = asked.filter((e) => e.slug === s && Date.parse(e.at) >= assigned && Date.parse(e.at) > told(s));
@@ -389,7 +523,7 @@ export function registerFeedback(server: McpServer, o: FeedbackOptions): void {
       waiting.push({ video: r.video, open: open.length, requests: requests.length });
       slugs.push(s);
       count += open.length + requests.length;
-      o.told?.mark(s, Date.now());
+      if (o.told) o.told.mark({ [s]: await placeNow(b, s) });
     }
     if (!lines.length) return null;
     const at = await cursorNow();
@@ -446,16 +580,32 @@ export function registerFeedback(server: McpServer, o: FeedbackOptions): void {
     let images = 0;
     let unseen = 0;
     for (const e of shown) {
-      if (mode === 'none' || e.type !== 'comment' || !e.id || images >= MAX_IMAGES) continue;
+      if (mode === 'none' || !e.id || images >= MAX_IMAGES) continue;
+      // Still wrong with a drawing on the version it was said on: the picture rides with REOPENED (or the REPLY).
+      if ((e.type === 'status' || e.type === 'reply') && e.reply?.on_v && e.reply.drawing?.length && o.stillWrong) {
+        const pic = await o.stillWrong(e).catch(() => []);
+        if (pic.some((x) => x.type === 'image')) images++;
+        content.push(...pic);
+        continue;
+      }
+      if (e.type !== 'comment') continue;
       if (mode === 'drawn' && o.drawn) {
         const pic = await o.drawn(e.id).catch(() => []);
-        if (pic.length) images++;
-        else unseen++;
+        if (pic.some((x) => x.type === 'image')) images++;
+        else if (!pic.length) unseen++;
         content.push(...pic);
         continue;
       }
       const f = e.shots?.marked;
-      if (!f || !fs.existsSync(f)) continue;
+      if (!f || !fs.existsSync(f)) {
+        // said, never left out: the agent knows to look at the frame itself
+        if (e.scope !== 'video')
+          content.push({
+            type: 'text',
+            text: oneLine(`${e.id} f${e.frame} v${e.v} marked frame: missing (not made yet, or gone); get_frame v ${e.v} frame ${e.frame} shows the frame`),
+          });
+        continue;
+      }
       content.push({ type: 'text', text: oneLine(`${e.id} · ${e.timecode} · marked frame`) });
       content.push(await o.preview(f, 540));
       images++;

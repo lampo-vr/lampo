@@ -38,6 +38,9 @@ data/
   events.jsonl                one line per change, appended
   events.imported.jsonl       another store's history, as `lampo admin import` brought it in
   INBOX.md                    the newest human feedback across all videos (on your machine)
+  told.json                   how far each agent was told of each video's feedback (a wait's
+                              answer, a read of its notes): where its next wait starts
+                              (mcp.md); the newest 4,000 kept, never read by people
   folders.json                the project and folder tree
   shares.json                 review links
   asks.json                   a folder's questions with options, before any render (below);
@@ -278,7 +281,7 @@ render is never final.
 | `author` | the reviewer's name, `agent:<session>`, or `guest:<name>` for a client |
 | `author_id` | the account that wrote it, when a signed-in person did, through the app or `/mcp` (optional; absent on older notes, agents', visitors' and local `lampo` writes). When present it decides who may edit or delete the note: a renamed account keeps its notes, and a new account with a deleted person's name gets none. Otherwise `author` decides |
 | `created`, `edited` | when it was written, and when it was last edited: its text, tags, severity, drawing or words, or a reference's caption or removal (optional) |
-| `replies` | `{by, text, status?, fixed_in_v?, preview?, refs?, at, by_id?, edited?, share?}`. Every status change adds a reply with the new `status`. `preview` names the fix preview a fix or check refers to; `refs` the references that came with the reply (their ids; the references themselves are in the note's `refs`). `by_id`: the account of a signed-in person who wrote it; `edited`: when its author last changed its words (only plain replies change; `at` stays); `share`: the review link a visitor wrote it through (a link that shows only its own visitors' notes shows only their replies too) |
+| `replies` | `{by, text, status?, fixed_in_v?, preview?, refs?, at, by_id?, edited?, share?, on_v?, on_frame?, drawing?}`. Every status change adds a reply with the new `status`. `on_v`: a Still wrong's version (check mode: the one it was found still wrong on), with `drawing` what the person drew on it at `on_frame` (that version's pixels, the note's shapes). `preview` names the fix preview a fix or check refers to; `refs` the references that came with the reply (their ids; the references themselves are in the note's `refs`). `by_id`: the account of a signed-in person who wrote it; `edited`: when its author last changed its words (only plain replies change; `at` stays); `share`: the review link a visitor wrote it through (a link that shows only its own visitors' notes shows only their replies too) |
 | `check_again`, `carried_to` | stores from before fixes were tied to versions: an open note carried into a newer render that nobody has checked again yet (still read so; new versions don't set it) |
 | `fixed_in_v` | the version a fix landed in: the one named (it must exist), else the newest when it is newer than the note (or than the version it was found still wrong in) |
 | `fix_pending` | marked fixed before a version that has the fix existed (optional): the note stays `open`, its last `fixed` reply has no `fixed_in_v`, and the next version registered takes it along (`fixed`, with `fixed_in_v` on the note and that reply; a part only the notes inside its stretch) |

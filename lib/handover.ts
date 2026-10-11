@@ -54,12 +54,16 @@ export function handedOverLines(comments: readonly Pick<Comment, 'id' | 'status'
 export const ridingFlag = (versions: readonly Pick<Version, 'v'>[]): string => `fixed, riding with v${(versions.at(-1)?.v ?? 0) + 1}`;
 
 /**
- * The version a fix of this note has to be newer than: its own, or the one it was found still wrong in (the newest when
- * a person last reopened it). A fix can't be in the version the note is about.
+ * The version a fix of this note has to be newer than: its own, or the one it was found still wrong in (the version its
+ * Still wrong names; for a reopen from before they named one, the newest when a person last reopened it). A fix can't
+ * be in the version the note is about.
  */
 export function fixBase(versions: readonly Pick<Version, 'v' | 'registered'>[], c: Pick<Comment, 'v' | 'replies'>): number {
   let base = c.v;
   const reopened = [...(c.replies || [])].reverse().find((r) => r.status === 'open' && !isAgent(r.by));
+  // A Still wrong names the version it was said on (Reply.on_v): that one, never a guess from times — a version that
+  // came in the same second as the reopen isn't the one the person looked at.
+  if (reopened?.on_v) return Math.max(base, reopened.on_v);
   if (reopened) for (const x of versions) if (x.v > base && x.registered && compareTime(x.registered, reopened.at) <= 0) base = x.v;
   return base;
 }

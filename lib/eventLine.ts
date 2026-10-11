@@ -73,6 +73,13 @@ export function shortEventLine(e: ReviewEvent): string {
   return oneLine(line(e, false));
 }
 
+/**
+ * Still wrong said on a version (check mode): which version the reason is about, and that a picture of it comes with the
+ * answer (the person drew on that version). Appended after the reason: what was there before reads as it did.
+ */
+const stillWrong = (e: ReviewEvent): string =>
+  e.reply?.on_v ? ` · still wrong in v${e.reply.on_v}${e.reply.drawing?.length ? ', drawn on it (get_note shows it)' : ''}` : '';
+
 // What a reply says: picks from a question's options are their own line (PICKED …, quoted inside), words are quoted.
 const said = (e: ReviewEvent): string => (e.reply?.answer ? `${e.reply.text}` : `"${e.reply?.text}"`);
 const options = (e: ReviewEvent): string => (e.options?.length ? ` · options: ${e.options.join(', ')} (the reviewer picks in Lampo)` : '');
@@ -110,11 +117,11 @@ function line(e: ReviewEvent, paths: boolean): string {
       return `[${t}] REFERENCE ${e.id} ${e.timecode} ${name}${to} by ${e.by} — ${e.ref ? describeRef(e.ref) : 'added'} · on: "${e.text}"${vid}`;
     case 'status':
       if (isAnswer(e)) return `[${t}] ANSWERED ${e.id} ${e.timecode} ${name}${to} by ${e.by} — ${said(e)} · on: "${e.text}"${vid}`;
-      return `[${t}] ${statusLabel(e)} ${e.id} ${e.timecode} ${name}${to} by ${e.by}${e.reply?.text ? ` — "${e.reply.text}"` : ''}${vid}`;
+      return `[${t}] ${statusLabel(e)} ${e.id} ${e.timecode} ${name}${to} by ${e.by}${e.reply?.text ? ` — "${e.reply.text}"` : ''}${stillWrong(e)}${vid}`;
     case 'preview':
       return `[${t}] PREVIEW CONFIRMED ${e.id} ${e.timecode} ${name}${to} — "${e.reply?.text}"${vid}`;
     case 'reply':
-      return `[${t}] REPLY ${e.id} ${e.timecode} ${name}${to} by ${e.by} — ${said(e)}${e.reply?.refs?.length ? ` + ${e.reply.refs.length} reference${e.reply.refs.length === 1 ? '' : 's'}` : ''} · on: "${e.text}"${vid}`;
+      return `[${t}] REPLY ${e.id} ${e.timecode} ${name}${to} by ${e.by} — ${said(e)}${e.reply?.refs?.length ? ` + ${e.reply.refs.length} reference${e.reply.refs.length === 1 ? '' : 's'}` : ''}${stillWrong(e)} · on: "${e.text}"${vid}`;
     case 'edit':
       // a reply's author changed its words: the reply as it reads now, and the note it is on
       if (e.reply) return `[${t}] EDITED REPLY ${e.id} ${e.timecode} ${name}${to} by ${e.by} — now: "${e.reply.text}" · on: "${e.text}"${vid}`;

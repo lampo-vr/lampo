@@ -132,6 +132,14 @@ format stays backwards compatible throughout.
 - A review link's ⋯ menu says *Edit link* (German *Link bearbeiten*) for its settings, instead of *Change link*.
 
 ### Added
+- Still wrong can show where. In check mode, while you say what is still wrong, draw on the version you are checking:
+  the agent gets your words, the version ("still wrong in V2") and that picture. The next check compares that version
+  with the agent's next one (V2 → V3), not with the note's first, and the card reminds you what you said ("Still wrong
+  in V2 · drawn on it").
+- Agents see a note's spot then and now: its marked frame beside the same spot in the newest version, with the
+  drawing laid over and cropped alike (`get_note`; `get_open_notes` with `images: "compare"`). Fixes waiting for your
+  check stay in the agent's list of notes, with their pictures, and a screenshot that is missing is said. In Claude's
+  review card a note shows on the card's version, not on the one it was written on.
 - When an agent stops listening while something waits on it — your answer to its question, notes you sent — the
   player says so calmly in the agent's line above the notes and in the agent menu: "Claude isn't listening — tell it
   “go on” in Claude", with "go on" to copy. Told that, it picks up where it was, and the line goes by itself.
@@ -154,6 +162,10 @@ format stays backwards compatible throughout.
   player say "fixing 5 of 5" while the library's card said "fixing 1 of 5": the player counted every note the agent
   had read as one it was working on. Now the card, the run strip, the agent button, the Agent view and the sidebar
   count the same way — the note after those it has answered — and all of them speak of the same piece of work.
+- What you say while an agent works reaches it. A note written while it rendered, or "Still wrong in V2." said while
+  it made V3, came after the place its upload or its last fix told it to wait from, and its waits never looked back:
+  it heard nothing. Now its next wait hands over everything since it last heard of the video or read its notes,
+  whatever place it waits from, each thing once; the server remembers that per agent, and a restart forgets nothing.
 - Back from Settings goes back to where you opened it from. From a video, Settings' back button returned to the
   library; now it and the browser's back both land on the video, with the dialog you came from open again and scrolled
   as it was: the Share dialog's "All links" and "Add your name", the agent picker's "How agents get notes", a limit

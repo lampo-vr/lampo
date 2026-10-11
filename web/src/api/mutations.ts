@@ -216,6 +216,8 @@ export interface CommentPatch {
   ack?: boolean;
   /** The fix preview a verdict refers to (verified on the preview only, until a render has the fix). */
   preview?: string;
+  /** Still wrong: the version it was said on, and what was drawn on it there (the reply's picture for the agent). */
+  on?: { v: number; frame?: number; drawing?: Shape[] };
 }
 
 /** New words for reply `n` of note `id`, written at `at`. */
@@ -264,13 +266,21 @@ function patchedNote(c: Comment, patch: CommentPatch, by: string): Comment {
   if (patch.text !== undefined && patch.text !== c.text) Object.assign(next, { text: patch.text, edited: at });
   if (patch.text_edit_to !== undefined && c.text_edit && patch.text_edit_to.trim() !== c.text_edit.to)
     Object.assign(next, { text_edit: { ...c.text_edit, to: patch.text_edit_to.trim() }, edited: at });
+  // Still wrong said on a version, with what was drawn there (the server keeps it the same way: lib/store.ts)
+  const on = (reply: Reply) => {
+    if (!patch.on) return;
+    reply.on_v = patch.on.v;
+    if (patch.on.drawing?.length) Object.assign(reply, { drawing: patch.on.drawing, on_frame: patch.on.frame });
+  };
   if (patch.status && patch.status !== c.status) {
     const reply: Reply = { by, text: (patch.note || '').trim(), status: patch.status, at };
     if (patch.preview) reply.preview = patch.preview;
+    on(reply);
     Object.assign(next, { status: patch.status, check_again: false, replies: [...c.replies, reply] });
   } else if (patch.note || patch.preview) {
     const reply: Reply = { by, text: (patch.note || '').trim(), at };
     if (patch.preview) reply.preview = patch.preview;
+    on(reply);
     Object.assign(next, { replies: [...c.replies, reply], ...(patch.ack ? { check_again: false } : {}) });
   } else if (patch.ack) next.check_again = false;
   return next;

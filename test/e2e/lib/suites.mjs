@@ -76,6 +76,8 @@ const SECONDS = {
   // what the person is asked to check once fixes belong to their version: two videos, five widths (measured alone,
   // 2026-10-11: 4 s; the version diff it waits for can take longer on a loaded machine)
   'loop-fixes': 8,
+  // Still wrong drawn in check mode, then V2 → V3 (measured alone, 2026-10-11)
+  'check-wrong': 18,
   drafts: 17,
   onboarding: 23,
   'onboarding-setup': 26,

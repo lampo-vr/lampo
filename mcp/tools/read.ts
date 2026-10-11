@@ -17,6 +17,7 @@ import { scopeOf } from '../../lib/taste.ts';
 import { compareTime, instant, isIdea, isQuestion, isRequired, noteRank, oneLine, timecode } from '../../lib/time.ts';
 import { toSrt, toVtt } from '../../lib/transcript.ts';
 import type { Comment } from '../../lib/types.ts';
+import { placeNow, readPlace } from '../feedback.ts';
 import {
   askLines,
   changedAt,
@@ -24,6 +25,7 @@ import {
   header,
   idle,
   markedPicture,
+  missingShot,
   noteLines,
   ok,
   pickVersion,
@@ -33,9 +35,12 @@ import {
   rangePicture,
   refPictures,
   screenshotsLine,
+  spotPicture,
   text,
 } from '../format.ts';
 import type { ToolKit } from '../toolkit.ts';
+
+const isImage = (x: { type: string }): boolean => x.type === 'image';
 
 export function registerReadingTools({ b, o, tool, openReview, me }: ToolKit): void {
   // Paths on this machine mean something only to an agent on it (and a hosted server's must stay its own).
@@ -90,9 +95,11 @@ export function registerReadingTools({ b, o, tool, openReview, me }: ToolKit): v
       inputSchema: z.object({
         video: z.string().describe('path, slug or part of the name'),
         images: z
-          .enum(['drawn', 'all', 'none'])
+          .enum(['drawn', 'compare', 'all', 'none'])
           .optional()
-          .describe('drawn (default): marked frames of notes with a drawing; all: every frame, range and reference'),
+          .describe(
+            'drawn (default): marked frames of notes with a drawing; compare: + their spot in the newest version; all: every frame, range and reference',
+          ),
         max_images: z.number().int().min(0).max(20).optional().describe('default 6'),
         since: z.string().optional(),
         all: z.boolean().optional().describe('every status, not just open'),
@@ -102,20 +109,24 @@ export function registerReadingTools({ b, o, tool, openReview, me }: ToolKit): v
     },
     async ({ video, images, include_images, max_images = 6, since, all = false }) => {
       const mode = images ?? (include_images === undefined ? 'drawn' : include_images ? 'all' : 'none');
+      // How far this read can take the agent in the video's feedback, taken before the notes are: what lands meanwhile
+      // is after it, and the next wait hands it over (mcp/feedback.ts inbox).
+      const place = o.told ? await placeNow(b, (await b.resolve(video)).slug) : null;
       const { slug, review } = await openReview(video);
       // the onboarding sample: a demo for the person, its notes examples — nothing here is an agent's to work on
       if (review.onboarding_sample) return ok(text(`${header(review, b.stage(review))}\n\nNo work here.`));
-      // Read: a wait that starts later doesn't hand these over again as waiting for it (mcp/feedback.ts).
-      o.told?.mark(slug, Date.now());
       // Read now: the next answer's `since` (inclusive, so a change in this very second is shown again, never lost).
       const asOf = new Date(Math.floor(Date.now() / 1000) * 1000).toISOString();
       const after = since ? instant(since) : null;
       if (since && !Number.isFinite(after)) throw new Error(`since must be the "as of" of an earlier answer (a timestamp), got "${since}"`);
       const changed = (c: Comment) => after === null || changedAt(c) >= (after as number);
       // Picks answered since the newest render: what the next one is made of (lib/options.ts picksToRender).
-      const newest = review.versions.at(-1)?.registered;
-      const picked = (c: Comment) => c.status !== 'open' && picksToRender(c, newest);
-      // A fix marked before its version is no work: named after the work, with the fixes the person checks (lib/handover.ts).
+      const newest = review.versions.at(-1);
+      const picked = (c: Comment) => c.status !== 'open' && picksToRender(c, newest?.registered);
+      // Fixed and waiting for the person's check: named after the work (lib/handover.ts handedOverLines), with their
+      // pictures, so the agent sees its fix against the ask. A fix marked before its version is no work either, and has
+      // nothing to show yet: named only.
+      const waiting = (c: Comment) => c.status === 'fixed' && !picked(c);
       const kept = review.comments
         .filter((c) => all || (c.status === 'open' && !fixWaits(c)) || picked(c))
         .sort((a, c) => (all ? a.t - c.t : noteRank(a) - noteRank(c) || a.t - c.t));
@@ -128,7 +139,7 @@ export function registerReadingTools({ b, o, tool, openReview, me }: ToolKit): v
       if (all) body = list.length ? lines(list) : after === null ? 'No notes.' : 'No note changed.';
       else {
         // Required work first; ideas and open questions are separate so they are never mistaken for work items.
-        const open = list.filter((c) => !picked(c));
+        const open = list.filter((c) => c.status === 'open' && !picked(c));
         const required = open.filter(isRequired);
         const ideas = open.filter(isIdea);
         const questions = open.filter(isQuestion);
@@ -141,18 +152,40 @@ export function registerReadingTools({ b, o, tool, openReview, me }: ToolKit): v
         list.splice(0, list.length, ...required, ...ideas, ...questions, ...picks);
         body = parts.join('\n\n');
       }
+      // the notes this answer tells of: in full, by id after the work (fixes handed over), as unchanged, or as no longer open
+      const told = new Set([...list, ...(all ? [] : review.comments.filter((c) => waiting(c) || fixWaits(c)))].map((c) => c.id));
       if (after !== null) {
         const same = kept.filter((c) => !changed(c));
-        const closed = all ? [] : review.comments.filter((c) => c.status !== 'open' && changed(c));
+        const closed = all ? [] : review.comments.filter((c) => c.status !== 'open' && !waiting(c) && changed(c));
         if (same.length) body += `\n\nUnchanged since ${since}: ${same.map((c) => c.id).join(', ')}`;
         if (closed.length) body += `\nNo longer open: ${closed.map((c) => `${c.id} ${c.status}`).join(', ')}`;
+        for (const c of [...same, ...closed]) told.add(c.id);
       }
-      const shown = mode === 'drawn' ? list.filter((c) => c.drawing?.length) : mode === 'all' ? list : [];
+      // Read: the next wait hands over what came after — after what this answer told of, never past what it didn't (an
+      // approval, a request, a verdict on a note it leaves out): mcp/feedback.ts readPlace.
+      if (place && o.told) o.told.mark({ [slug]: await readPlace(b, slug, o.told.at(slug), told, place) });
+      // The fixes waiting for the check keep their pictures after the work's (those that changed, with `since`); a fix
+      // riding with the next version has none yet: no version has it.
+      const checked = all ? [] : review.comments.filter((c) => waiting(c) && changed(c)).sort((a, c) => a.t - c.t);
+      if (checked.length) await b.fetchShots(review, checked);
+      const pictured = [...list, ...checked];
+      // A note on an older version than the newest: compare shows its spot there beside its marked frame.
+      const newer = (c: Comment) => !!newest && newest.v > c.v && c.scope !== 'video';
+      const shown =
+        mode === 'drawn'
+          ? pictured.filter((c) => c.drawing?.length)
+          : mode === 'compare'
+            ? pictured.filter((c) => c.drawing?.length || newer(c))
+            : mode === 'all'
+              ? pictured
+              : [];
       // Where the screenshots are: the old answer's paths once (images: all), else get_note's business.
       let frames = '';
-      if (list.length && mode === 'all') frames = files ? screenshotsLine(b, review) : '';
-      else if (list.length)
-        frames = `\nframes: ${shown.length ? 'notes with a drawing below, cropped to it; ' : ''}get_note <id> shows a note in full (its frames${files ? ' and files' : ''})`;
+      if (pictured.length && mode === 'all') frames = files ? screenshotsLine(b, review) : '';
+      else if (pictured.length && mode === 'compare')
+        frames = `\nframes: each note's marked frame, then its same spot in v${newest?.v} (the drawing laid over), cropped alike; get_note <id> shows a note in full`;
+      else if (pictured.length)
+        frames = `\nframes: ${shown.length ? 'notes with a drawing below, cropped to it; ' : ''}${shown.some(newer) ? `images: "compare" adds each one's spot in v${newest?.v}; ` : ''}get_note <id> shows a note in full (its frames${files ? ' and files' : ''})`;
       const legend = legendLine(Object.values(pointers.notes), pointers.names);
       const content = [text(`${header(review, b.stage(review), legend)}${await playbookPointer(b, review)}${frames}\n\n${body}\n\nas of ${asOf}`)];
       // The same notes as data, for a client that reads it: what each points at, and where a part render may go.
@@ -164,10 +197,15 @@ export function registerReadingTools({ b, o, tool, openReview, me }: ToolKit): v
       let budget = max_images;
       for (const c of shown) {
         if (budget <= 0) break;
-        if (mode === 'drawn') {
+        if (mode === 'drawn' || mode === 'compare') {
           const pic = await markedPicture(b, review, c);
-          if (pic.length) budget--;
+          if (pic.some(isImage)) budget--;
           content.push(...pic);
+          if (mode === 'compare' && newest && newer(c) && budget > 0) {
+            const spot = await spotPicture(b, review, c, newest, { what: 'same spot', count: o.frameGrabs });
+            if (spot.some(isImage)) budget--;
+            content.push(...spot);
+          }
           continue;
         }
         const f = b.shotFile(review, c.shots?.marked);
@@ -175,7 +213,7 @@ export function registerReadingTools({ b, o, tool, openReview, me }: ToolKit): v
           content.push(text(`${c.id} · ${c.timecode} · f${c.frame} · v${c.v} (marked frame, downscaled; coordinates stay in video px)`));
           content.push(await preview(b, f, previewWidth(review)));
           budget--;
-        }
+        } else content.push(...missingShot(c));
         // A note about a stretch: its frames across the range, so the motion it is about is visible.
         if (budget > 0) {
           const strip = await rangePicture(b, review, c);
@@ -219,13 +257,29 @@ export function registerReadingTools({ b, o, tool, openReview, me }: ToolKit): v
           `${header(review, b.stage(review), legend)}${await playbookPointer(b, review)}\n\n${noteLines(b, review, c, { full: true, files: o.principal.via === 'local', pointer: pointerIn(pointers, c.id) })}`,
         ),
       ];
-      const frames: [string, string | null][] = [['marked', b.shotFile(review, c.shots?.marked)]];
+      // Still wrong drawn on a version (check mode): what the person marked there, the latest two.
+      const wrong = (c.replies || []).filter((r) => r.on_v && r.drawing?.length).slice(-2);
+      const newest = review.versions.at(-1);
+      // A newer version than the note's: its spot then and now at one crop, "v1 marked" beside "v3 same spot" (unless a
+      // Still wrong drawn on that version shows it). Not for a fix riding with the next version: no version has it yet,
+      // and the newest would read as the agent's own fix.
+      const later = newest && newest.v > c.v && c.scope !== 'video' && !fixWaits(c) && !wrong.some((r) => r.on_v === newest.v) ? newest : null;
+      // beside a newer version's picture, the marked frame is cropped and named alike ("c_… f20 v1 marked, cropped: …")
+      const paired = !!later || wrong.length > 0;
+      const frames: ['marked' | 'clean', string | null][] = paired ? [] : [['marked', b.shotFile(review, c.shots?.marked)]];
       if (clean) frames.push(['clean', b.shotFile(review, c.shots?.clean)]);
+      if (paired) content.push(...(await markedPicture(b, review, c)));
       for (const [kind, f] of frames)
         if (f && fs.existsSync(f)) {
           content.push(text(`${kind} frame`));
           content.push(await preview(b, f, previewWidth(review)));
-        }
+        } else content.push(...missingShot(c, kind));
+      if (later) content.push(...(await spotPicture(b, review, c, later, { what: 'same spot', count: o.frameGrabs })));
+      for (const r of wrong) {
+        const ver = review.versions.find((x) => x.v === r.on_v);
+        if (ver)
+          content.push(...(await spotPicture(b, review, c, ver, { what: 'still wrong here', drawing: r.drawing, frame: r.on_frame, count: o.frameGrabs })));
+      }
       content.push(...(await rangePicture(b, review, c)));
       content.push(...(await refPictures(b, review, c)));
       return ok(content);

@@ -411,11 +411,15 @@ test('the MCP server works against the hosted server too', async () => {
   );
   try {
     const call = async (name: string, args: object) => (await mcp.callTool({ name, arguments: args as Record<string, unknown> })) as CallToolResult;
-    // A note without a drawing comes as words; asked for, its marked frame comes from the server's screenshot.
+    // A note without a drawing comes as words; the drawn one, fixed and waiting for the person's check, keeps its marked
+    // frame (cropped); asked for, every marked frame comes from the server's screenshot.
     const plain = await call('get_open_notes', { video: 'clip.mp4' });
     assert.ok(!plain.isError, JSON.stringify(plain.content));
     assert.match((plain.content[0] as { text: string }).text, /Farbe kälter/);
-    assert.ok(!plain.content.some((c) => c.type === 'image'), 'no picture without a drawing');
+    const said = plain.content.map((c) => (c.type === 'text' ? c.text : '')).join('\n');
+    assert.match(said, new RegExp(`Fixed, waiting for the person's check \\(no work item\\): ${noteId} \\(v2\\)`));
+    assert.match(said, new RegExp(`${noteId} f12 v1 marked, cropped`));
+    assert.equal(plain.content.filter((c) => c.type === 'image').length, 1, 'no picture without a drawing');
     const notes = await call('get_open_notes', { video: 'clip.mp4', images: 'all' });
     const [first, ...rest] = notes.content;
     assert.match((first as { text: string }).text, /Farbe kälter/);

@@ -20,6 +20,7 @@ import { settings } from '../../lib/env.ts';
 import { CHAT_QUIET_WAITS } from '../../lib/handoff.ts';
 import { cleanAgentName } from '../../lib/names.ts';
 import { GRANTS_FILE, verifyAccess } from '../../lib/oauth/store.ts';
+import { workspaceRoot } from '../../lib/paths.ts';
 import { can } from '../../lib/permissions.ts';
 import { addressKey, RateLimit, Recent } from '../../lib/rateLimit.ts';
 import { currentWorkspace, DEFAULT_WORKSPACE, inWorkspace } from '../../lib/scope.ts';
@@ -29,7 +30,7 @@ import * as store from '../../lib/store.ts';
 import type { AgentKind } from '../../lib/types.ts';
 import * as workspaces from '../../lib/workspaces.ts';
 import { type Access, allowed, changedUris, createReviewServer, MCP_SCOPES, type Principal, TOOL_ACCESS, wayOf } from '../../mcp/core.ts';
-import { type Hold, type QuietRun, quietIn, toldIn, type Wake } from '../../mcp/feedback.ts';
+import { type Hold, type QuietRun, quietIn, toldOnDisk, type Wake } from '../../mcp/feedback.ts';
 import type { Auth } from '../auth.ts';
 import { sessionOf } from '../auth.ts';
 import type { ServerContext } from '../context.ts';
@@ -240,7 +241,8 @@ export function mcpRoutes(ctx: ServerContext): Router {
                 // an answer that ends with the wait-now line handed the next step to the person: unless it waits soon,
                 // the app shows it isn't listening (server/agents.ts)
                 onHandBack: () => ctx.agents.handedBack(agent.session_id),
-                told: toldIn(toldMap, `${ws}\u0000${agent.session_id}`),
+                // what it was told of each video, kept in the workspace's own folder: a restart forgets nothing (lib/told.ts)
+                told: toldOnDisk(() => workspaceRoot(ws).data, agent.session_id),
               }
             : {}),
           ...(LOG_CALLS ? { log: (line: string) => console.log(`mcp: ${ws} ${agent?.session_id ?? '-'} ${line}`) } : {}),
@@ -393,8 +395,6 @@ export function mcpRoutes(ctx: ServerContext): Router {
     res.on('close', () => clearInterval(timer));
     return { session_id: agent.session_id, name: agent.name, kind: agent.kind };
   }
-  // What each agent's waits told it was waiting for it (mcp/feedback.ts Told): by workspace and agent, bounded.
-  const toldMap = new Recent<number>(20_000);
   // Each agent's (or connection's) run of waits that ended with nothing new (mcp/feedback.ts Quiet): bounded the same.
   const quietMap = new Recent<QuietRun>(20_000);
 

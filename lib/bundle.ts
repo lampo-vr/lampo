@@ -288,6 +288,10 @@ const reply = z.strictObject({
   at: time,
   by_id: person.optional(),
   edited: time.optional(),
+  // Still wrong in check mode: the version it was said on, the frame, and what the person drew there
+  on_v: count.optional(),
+  on_frame: frame.optional(),
+  drawing: z.array(shape).max(1000).optional(),
 });
 const optionGroup = z.strictObject({
   id: z.string().max(OPTION_LIMITS.id * 2),

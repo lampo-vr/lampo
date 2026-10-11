@@ -16,8 +16,10 @@ import { partLine, partOk, partOkWords } from '../lib/part.ts';
 import { cacheDir } from '../lib/paths.ts';
 import { describePreview, projectPosition } from '../lib/previews.ts';
 import { FFMPEG, run } from '../lib/probe.ts';
+import { FRAME_CACHE_BYTES, pruneDir } from '../lib/prune.ts';
 import { describeRange, stripFrames } from '../lib/range.ts';
 import { describeRef } from '../lib/refLine.ts';
+import { type GrabCount, renderMarked, TooManyGrabsError } from '../lib/shots.ts';
 import { counts, describeSource } from '../lib/store.ts';
 import { CLIENT_NOTE_FLAG, instant, isAgent, isClient, keepLines, noteLabel, oneLine, parseFramePosition, timeToFrame } from '../lib/time.ts';
 import { textEditLine } from '../lib/transcript.ts';
@@ -193,12 +195,119 @@ function pngSize(file: string): { w: number; h: number } | null {
 }
 
 /**
+ * A screenshot a note should have and hasn't (not made yet, or gone), said rather than left out: the agent knows to
+ * look at the frame itself. Nothing for a note about the whole video (it has no moment, so no screenshot).
+ */
+export function missingShot(c: Comment, kind: 'marked' | 'clean' = 'marked'): Content[] {
+  if (c.scope === 'video') return [];
+  return [text(oneLine(`${c.id} f${c.frame} v${c.v} ${kind} frame: missing (not made yet, or gone); get_frame v ${c.v} frame ${c.frame} shows the frame`))];
+}
+
+/** A note's moment on version `ver`: the same time (by its own version's fps); null without a moment, or past the end. */
+export function momentOn(review: Review, c: Comment, ver: Version): number | null {
+  if (c.scope === 'video') return null;
+  const own = review.versions.find((x) => x.v === c.v);
+  const frame = !own || own.fps === ver.fps ? c.frame : timeToFrame(c.t, ver.fps);
+  return frame >= 0 && frame < ver.frames ? frame : null;
+}
+
+/** A drawing made on a `from`-sized version, where it lies on a `to`-sized one (the same place in the picture). */
+export function scaledDrawing(drawing: Shape[] | null | undefined, from: { w: number; h: number }, to: { w: number; h: number }): Shape[] {
+  const kx = from.w > 0 ? to.w / from.w : 1;
+  const ky = from.h > 0 ? to.h / from.h : 1;
+  if (kx === 1 && ky === 1) return [...(drawing || [])];
+  const r = (n: number) => Math.round(n * 10) / 10;
+  return (drawing || []).map((s): Shape => {
+    if (s.type === 'box') return { ...s, x: r(s.x * kx), y: r(s.y * ky), w: r(s.w * kx), h: r(s.h * ky) };
+    if (s.type === 'arrow') return { ...s, x1: r(s.x1 * kx), y1: r(s.y1 * ky), x2: r(s.x2 * kx), y2: r(s.y2 * ky) };
+    return { ...s, points: s.points.map(([x, y]) => [r(x * kx), r(y * ky)] as [number, number]) };
+  });
+}
+
+/** A note's spot on a version as a file (spotFile): the frame, the drawing laid over it, or why there is none. */
+export type Spot = { file: string; frame: number; drawing: Shape[]; laid: boolean } | { why: string; frame: number | null };
+
+/**
+ * A note's spot on version `ver`: its moment there (or `frame`) with a drawing laid over it — the note's own, scaled to
+ * that version ("same spot"), or one a person made on that version (`drawing`: a Still wrong's). Made on demand: the
+ * frame through the caller's frame budget (counted like get_frame's, cached), the drawing laid over in the cache
+ * (ffmpeg on demand), nothing in versions/.
+ */
+export async function spotFile(
+  b: Backend,
+  review: Review,
+  c: Comment,
+  ver: Version,
+  o: { drawing?: Shape[]; frame?: number; count?: GrabCount | null } = {},
+): Promise<Spot> {
+  const frame = o.frame !== undefined && o.frame >= 0 && o.frame < ver.frames ? o.frame : momentOn(review, c, ver);
+  if (frame === null) return { why: c.scope === 'video' ? 'the note is about the whole video' : `past the end of v${ver.v}`, frame };
+  let png: string;
+  try {
+    png = await b.frame(review, ver, frame, { count: o.count });
+  } catch (e) {
+    return { why: e instanceof TooManyGrabsError ? e.message : 'its frame could not be grabbed', frame };
+  }
+  const own = review.versions.find((x) => x.v === c.v) ?? ver;
+  const drawing = o.drawing ? [...o.drawing] : scaledDrawing(c.drawing, { w: own.width, h: own.height }, { w: ver.width, h: ver.height });
+  if (!drawing.length) return { file: png, frame, drawing, laid: true };
+  const key = crypto
+    .createHash('sha1')
+    .update(`${png}|${ver.width}x${ver.height}|${JSON.stringify(drawing)}`)
+    .digest('hex')
+    .slice(0, 20);
+  const out = path.join(b.kind === 'remote' ? cacheRoot() : cacheDir(), 'mcp', 'spots', `${key}.png`);
+  try {
+    if (!fs.existsSync(out)) {
+      fs.mkdirSync(path.dirname(out), { recursive: true });
+      await renderMarked(png, drawing, ver.width, ver.height, out);
+      pruneDir(path.dirname(out), FRAME_CACHE_BYTES / 4, (f) => f.endsWith('.png') && f !== path.basename(out));
+    }
+    return { file: out, frame, drawing, laid: true };
+  } catch {
+    return { file: png, frame, drawing, laid: false };
+  }
+}
+
+/**
+ * A note's spot on version `ver` for the model (spotFile), cropped as the marked frame is, so the two sit side by side
+ * at one scale: "c_… f20 v3 same spot, cropped: …". When it can't be made, a line says why: never left out silently.
+ */
+export async function spotPicture(
+  b: Backend,
+  review: Review,
+  c: Comment,
+  ver: Version,
+  o: { what: string; drawing?: Shape[]; frame?: number; count?: GrabCount | null } = { what: 'same spot' },
+): Promise<Content[]> {
+  const spot = await spotFile(b, review, c, ver, o);
+  if ('why' in spot) {
+    if (spot.frame === null) return [text(oneLine(`${c.id} v${ver.v} ${o.what}: none (${spot.why})`))];
+    return [text(oneLine(`${c.id} f${spot.frame} v${ver.v} ${o.what}: not made now (${spot.why}); get_frame v ${ver.v} frame ${spot.frame} later`))];
+  }
+  const at = `${c.id} f${spot.frame} v${ver.v} ${o.what}${spot.laid ? '' : ' (the drawing could not be laid over: its place is in the note)'}`;
+  const px = pngSize(spot.file);
+  const area = cropAround(spot.drawing, ver.width, ver.height);
+  if (!area)
+    return [
+      text(`${at}, whole frame (downscaled; coordinates stay in video px)`),
+      await preview(b, spot.file, Math.round(CROP_EDGE * 1.25), px ? { x: 0, y: 0, ...px } : undefined),
+    ];
+  const k = px && ver.width ? px.w / ver.width : 1;
+  const crop = { x: Math.round(area.x * k), y: Math.round(area.y * k), w: Math.round(area.w * k), h: Math.round(area.h * k) };
+  return [
+    text(`${at}, cropped: x${area.x}–${area.x + area.w} y${area.y}–${area.y + area.h} of ${ver.width}×${ver.height}`),
+    await preview(b, spot.file, CROP_EDGE, crop),
+  ];
+}
+
+/**
  * A note's marked frame for the model, cropped to its drawing (the whole frame when the drawing covers most of it),
- * with a line saying which part of the frame it is in video px. Nothing when the note has no marked frame.
+ * with a line saying which part of the frame it is in video px. A line instead when the screenshot is missing.
  */
 export async function markedPicture(b: Backend, review: Review, c: Comment): Promise<Content[]> {
   const f = b.shotFile(review, c.shots?.marked);
-  if (!f || !fs.existsSync(f)) return [];
+  if (!f || !fs.existsSync(f)) return missingShot(c);
   const ver = review.versions.find((x) => x.v === c.v);
   const W = ver?.width || review.width;
   const H = ver?.height || review.height;
@@ -279,7 +388,9 @@ export function noteLines(
   const replies = c.replies || [];
   if (!full && replies.length > 2) L.push(`  ↳ (${replies.length - 2} earlier repl${replies.length === 3 ? 'y' : 'ies'}: get_note)`);
   for (const r of full ? replies : replies.slice(-2))
-    L.push(`  ↳ ${r.by}${r.status ? ` [${r.status}${r.fixed_in_v ? ` v${r.fixed_in_v}` : ''}]` : ''}: ${r.text || '-'}${r.edited ? ' (edited)' : ''}`);
+    L.push(
+      `  ↳ ${r.by}${r.status ? ` [${r.status}${r.fixed_in_v ? ` v${r.fixed_in_v}` : ''}]` : ''}: ${r.text || '-'}${r.edited ? ' (edited)' : ''}${r.on_v ? ` · still wrong in v${r.on_v}${r.drawing?.length ? ', drawn on it' : ''}` : ''}`,
+    );
   for (const p of c.previews || []) L.push(`  preview ${describePreview(p)}`);
   for (const r of c.refs || []) {
     const where = full && files ? r.file || r.still : null;

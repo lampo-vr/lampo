@@ -18,7 +18,7 @@ import { pointersOf } from './elementMaps.ts';
 import { legendLine, onWords, pointerIn } from './elements.ts';
 import { isInboxEvent, statusLabel } from './eventLine.ts';
 import { archivedProjectOf, checkReviewOpen } from './folderIds.ts';
-import { fixBase, fixWaits, inPart, ridingFlag } from './handover.ts';
+import { fixBase, fixWaits, inPart, ridingFlag, waitsForCheck } from './handover.ts';
 import { cleanAgentName, cleanFolderLine, cutChars, shownName } from './names.ts';
 import { answeredAlready, checkPicks, cleanPrompt, OPTION_LIMITS, optionLines, optionRefs, picksLine, picksToRender } from './options.ts';
 import { changeableReply } from './ownership.ts';
@@ -1350,6 +1350,11 @@ export interface CommentPatch {
   by_id?: string;
   /** The review link a visitor writes through (Reply.share). */
   share?: string;
+  /**
+   * Still wrong, said on a version (check mode's): the version, and what the person drew on it there (Reply.on_v,
+   * on_frame, drawing). A reopen of a fix without it is taken as said on the newest version.
+   */
+  on?: { v: number; frame?: number; drawing?: Shape[] };
 }
 
 /** Picks for a question with options, as kept (lib/options.ts checkPicks); throws on a note that offers none. */
@@ -1400,6 +1405,21 @@ export function updateComment(id: string, patch: CommentPatch): Comment {
       delete patch.preview;
     }
     const latest = (review.versions.at(-1) as Version).v;
+    // Still wrong said on a version (check mode): the version it was, where, and the drawing — a reply's picture. A fix
+    // reopened without one was looked at on the newest version. Only a person's, and only on a fix that waits for the
+    // check (lib/handover.ts waitsForCheck: fixed in a version, or an older store's carried note looked at again) —
+    // never on a fix still riding with the next version (`fix_pending`: the agent's own hand-over, nothing to check).
+    const stillWrong =
+      !isAgent(by) && waitsForCheck(c) && ((patch.status === 'open' && c.status === 'fixed') || (!patch.status && !!patch.ack && !!patch.note));
+    const on = patch.on && review.versions.some((x) => x.v === patch.on?.v) ? patch.on : stillWrong ? { v: latest } : null;
+    const said = (reply: Reply) => {
+      if (!on || !stillWrong) return;
+      reply.on_v = on.v;
+      if (on.drawing?.length) {
+        reply.drawing = on.drawing;
+        if (on.frame !== undefined) reply.on_frame = on.frame;
+      }
+    };
     const edits: Partial<Pick<Comment, 'text' | 'tags' | 'severity' | 'drawing' | 'text_edit'>> = {};
     if (patch.text !== undefined) edits.text = patch.text;
     if (patch.tags !== undefined) edits.tags = patch.tags;
@@ -1444,6 +1464,7 @@ export function updateComment(id: string, patch: CommentPatch): Comment {
       // Verified on a preview: the fix is in the project, not in a render yet (the next render is compared with it).
       if (patch.status === 'verified' && patch.preview) c.verified_on = { preview: patch.preview, v: latest };
       else delete c.verified_on;
+      said(reply);
       c.status = patch.status;
       c.check_again = false;
       c.replies.push(reply);
@@ -1457,6 +1478,7 @@ export function updateComment(id: string, patch: CommentPatch): Comment {
       if (patch.preview) reply.preview = patch.preview;
       if (patch.fixed_in_v) reply.fixed_in_v = Number(patch.fixed_in_v);
       if (patch.ack) c.check_again = false;
+      said(reply);
       c.replies.push(reply);
       logEvent({ type: 'reply', by, review, comment: c, reply });
     } else if (patch.ack) {

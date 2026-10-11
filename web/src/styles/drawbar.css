@@ -31,6 +31,11 @@
 .draw-bar.under {
   top: calc(var(--sp-12) + var(--sp-4));
 }
+/* check mode's Still wrong, before and after side by side: over the after picture, the one drawn on (clear of the
+   pictures' labels at their top left) */
+.draw-bar.after {
+  left: 75%;
+}
 .draw-bar .btn,
 .draw-bar .btn.icon-only {
   width: var(--h-lg);

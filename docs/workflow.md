@@ -22,6 +22,11 @@ date.
 back, and notes you saved but haven't sent don't count until you send them. An agent "works on it" while its assigned
 agent is running, or while a status an agent set hasn't run out.
 
+**Checking a fix** shows the version the note was written on beside the newest, or, once you said *Still wrong*, the
+version you said it on (V2 → V3). *Still wrong* asks what is still wrong; while you say it, draw on the version you are
+checking to show where. The agent gets your words, the version and that picture, and the card's next check reminds you
+what you said ("Still wrong in V2 · drawn on it").
+
 ## In the library
 
 The library's lane chips (*All · To review · Being fixed · Approved · Final*), its board layout (key 4) and *Display →

@@ -35,6 +35,8 @@ export function CheckDecision({
   initial = '',
   primary = false,
   children,
+  drawOn = null,
+  drawn = 0,
 }: {
   /** Check mode's card: Looks right is the view's one raised decision (brand primary, as the inbox's), Still wrong the
    * plain one beside it. In the panel's list it stays the plain button with its green check (the view's raised door is
@@ -61,11 +63,25 @@ export function CheckDecision({
   initial?: string;
   /** More at the row's end (check mode's Skip). */
   children?: ReactNode;
+  /** Check mode: the version being checked takes a drawing while the reason is given (it goes with it); its marks so far. */
+  drawOn?: number | null;
+  drawn?: number;
 }) {
   const sm = small ? ' sm' : '';
   if (reopening)
     return (
-      <StillWrong key={id} fixed={fixed} busy={busy} onSend={onWrong} onCancel={() => onReopening(false)} client={client} initial={initial} small={small} />
+      <StillWrong
+        key={id}
+        fixed={fixed}
+        busy={busy}
+        onSend={onWrong}
+        onCancel={() => onReopening(false)}
+        client={client}
+        initial={initial}
+        small={small}
+        drawOn={drawOn ?? null}
+        drawn={drawn ?? 0}
+      />
     );
   return (
     <div className="verify-actions check-decision" data-testid="check-decision">
@@ -89,6 +105,8 @@ function StillWrong({
   client,
   initial,
   small,
+  drawOn,
+  drawn,
 }: {
   fixed: boolean;
   busy: boolean;
@@ -97,6 +115,8 @@ function StillWrong({
   client: string | null;
   initial: string;
   small: boolean;
+  drawOn: number | null;
+  drawn: number;
 }) {
   const [note, setNote] = useState(initial);
   // while the microphone is live or the words are being heard, the reason isn't complete yet
@@ -125,6 +145,15 @@ function StillWrong({
           {fixed ? t('Reopen') : t('Keep open')}
         </button>
       </div>
+      {/* check mode: a box, an arrow or a line on the version being checked shows the agent where (it goes with the reason) */}
+      {drawOn !== null && (
+        <p className={`check-draw-hint${drawn ? ' on' : ''}`} data-testid="check-draw-hint">
+          <I name="pen" size={12} />
+          {drawn
+            ? t('{n} mark on V{v} goes with it|{n} marks on V{v} go with it', { n: drawn, v: drawOn })
+            : t('Draw on V{v} to show where (optional)', { v: drawOn })}
+        </p>
+      )}
       <ClientReads name={client} />
     </>
   );

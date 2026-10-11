@@ -25,12 +25,19 @@ interface DrawBarProps {
   under?: boolean;
   /** A phone: flat in a strip of its own under the picture (the stage keeps the room), never over it. */
   flat?: boolean;
+  /** Two pictures side by side, drawn on the after one (check mode's Still wrong): the tools over it. */
+  after?: boolean;
 }
 
-export function DrawBar({ tools, tool, onTool, onUndo, canUndo, label, undoLabel, under, flat }: DrawBarProps) {
+export function DrawBar({ tools, tool, onTool, onUndo, canUndo, label, undoLabel, under, flat, after }: DrawBarProps) {
   return (
     <div className="draw-layer">
-      <div className={`draw-bar${under ? ' under' : ''}${flat ? ' flat' : ''}`} role="toolbar" aria-label={label} data-testid="draw-bar">
+      <div
+        className={`draw-bar${under ? ' under' : ''}${flat ? ' flat' : ''}${after ? ' after' : ''}`}
+        role="toolbar"
+        aria-label={label}
+        data-testid="draw-bar"
+      >
         {tools.map((x) => (
           <IconButton
             key={x.id}

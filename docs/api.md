@@ -555,7 +555,7 @@ Details:
 | `by` | `agent:<name>`, for an agent's own notes (below) |
 
 **Changing a note** (`PATCH /api/comments/:id`) takes `{status?, note?, text?, text_edit_to?, tags?, severity?,
-fixed_in_v?, preview?, ack?, by?}`:
+fixed_in_v?, preview?, ack?, on?, by?}`:
 
 - `note` alone is a reply. With a `status` it goes with the change (the fix, the reason, the answer).
 - `status`: `verified` and `open` need the verify action, `fixed` and `wontfix` the resolve action (and so does
@@ -566,6 +566,11 @@ fixed_in_v?, preview?, ack?, by?}`:
 - `preview`, with `fixed` or `verified`: the fix preview it refers to. Verified with one means checked on the preview
   only.
 - `ack: true`: the reviewer checked the new version and it is still wrong (the verify action).
+- `on: {v, frame?, drawing?}`, with Still wrong only (`status: "open"`, or `ack` with a `note`; else `400`): the
+  version it was found still wrong on, and what the person drew on it at `frame` (up to 50 shapes, in that version's
+  pixels). Kept on the reply as `on_v`, `on_frame` and `drawing`; agents get the line ` · still wrong in v2, drawn on
+  it` and that version's frame with the drawing. A person's reopen of a fix without it is taken as said on the newest
+  version.
 
 **Your own reply** (`PATCH /api/comments/:id/replies/:n`, `{at, text}`; `DELETE …/replies/:n?at=`): `n` is the
 reply's place in the note's `replies` (from 0), `at` the time it was written, so a thread that moved since it was read

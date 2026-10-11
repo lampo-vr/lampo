@@ -28,7 +28,7 @@ const label = (c: Comment): string => {
 import { agentText } from '../lib/planWords.ts';
 import { publicMessage } from '../lib/publicError.ts';
 import { type Access, audienceOf, hintsFor, type Principal } from './access.ts';
-import { text } from './format.ts';
+import { spotFile, text } from './format.ts';
 import { trimmed } from './lean.ts';
 
 // The card's address keeps `video-review` now that the MCP name is lampo: hosts may hold the UI resource by its URI
@@ -103,12 +103,22 @@ export function registerReviewApp(server: McpServer, o: ReviewAppOptions): void 
 
   async function still(review: Review, ver: Version, frame: number, noteId: string | null, width = CARD_WIDTH): Promise<FrameStill> {
     const note = noteId ? review.comments.find((c) => c.id === noteId) : null;
-    if (note) {
+    if (note && note.v === ver.v) {
       await b.fetchShots(review, [note]);
       const f = b.shotFile(review, note.shots?.marked);
       if (f && fs.existsSync(f)) {
         const img = await o.preview(f, width);
         return { frame: note.frame, timecode: note.timecode, v: note.v, kind: 'marked', note: note.id, image: `data:${img.mimeType};base64,${img.data}` };
+      }
+    }
+    // The card's version is another (a newer one), or the screenshot is missing: the note's spot on the card's version,
+    // its drawing laid over (made on demand, counted like any frame) — never the first version's picture in a v3 card.
+    if (note) {
+      const spot = await spotFile(b, review, note, ver, { count: o.frameGrabs });
+      if ('file' in spot) {
+        const img = await o.preview(spot.file, width);
+        const at = { frame: spot.frame, timecode: timecode(spot.frame, ver.fps), v: ver.v, note: note.id };
+        return { ...at, kind: spot.drawing.length && spot.laid ? 'marked' : 'clean', image: `data:${img.mimeType};base64,${img.data}` };
       }
     }
     // a frame grabbed now counts for the account like any other; one made before (cached) and a note's screenshot don't

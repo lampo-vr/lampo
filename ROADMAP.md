@@ -256,6 +256,11 @@ encode of it); agents only draft (`draft_post`, `lampo post draft`, never "publi
   links' guest notes and their "still not right" the same voice button.
 - Translations beyond German.
 - Plugin points for storage adapters, speech engines and pre-review checks.
+- **Notes that follow a re-cut.** A note's "same spot" in a newer version (agents' `images: "compare"`, `get_note`,
+  the review card) and check mode's before and after are placed by time: in a version whose cuts moved, that is the
+  wrong moment. Map a note through the version diff's moved cuts, and say so where it couldn't be mapped.
+- **Still wrong on a phone and in the panel's card.** Drawing what is still wrong is check mode's on a computer or
+  tablet; a phone's check card and the note's card in the panel send the words and the version only.
 
 ## Deferred from A12
 

@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { setAgentStatus } from '../../lib/agentStatus.ts';
 import { CHOICE_MAX, CHOICES_MAX, CHOICES_MIN } from '../../lib/choices.ts';
 import { cachedCuts } from '../../lib/cuts.ts';
+import { waitsForCheck } from '../../lib/handover.ts';
 import { byName, noteText, previewId, statusText, tagList } from '../../lib/inputs.ts';
 import { isWhole, MAX_HANDLES, PART_HANDLES, snapToShots } from '../../lib/part.ts';
 import { cacheDir, reviewDir, slugify } from '../../lib/paths.ts';
@@ -20,7 +21,7 @@ import { stageForReview } from '../../lib/stageContext.ts';
 import * as store from '../../lib/store.ts';
 import { isAgent, NOTE_KINDS, SEVERITIES, STATUSES } from '../../lib/time.ts';
 import { TEXT_EDIT_MAX } from '../../lib/transcript.ts';
-import type { Comment, FrameRange, MediaInfo, NoteRecording, PartRequest, PartSuggestion, ReviewResponse, Version, VoiceNote } from '../../lib/types.ts';
+import type { Comment, FrameRange, MediaInfo, NoteRecording, PartRequest, PartSuggestion, ReviewResponse, Shape, Version, VoiceNote } from '../../lib/types.ts';
 import type { ServerContext } from '../context.ts';
 import { countStep, noticeMoment } from '../funnel.ts';
 import { accountOf, agentView, finalLock, getReview, getVersion, isOwn, metaOf, sanitizeDrawing, signOffByPerson, summary, versionBytes } from '../helpers.ts';
@@ -85,6 +86,18 @@ const CommentPatch = z.object({
   preview: previewId.optional(),
   /** A text edit's new words (what was heard stays as it is). */
   text_edit_to: z.string().max(TEXT_EDIT_MAX).optional(),
+  /**
+   * Still wrong (a fix reopened, or a carried note looked at, with its reason), said on a version: which one, and what
+   * the person drew on it there (in that version's video px). The reply's picture is made from them when someone reads it.
+   */
+  on: z
+    .object({
+      v: z.number().int().min(1),
+      frame: z.number().int().min(0).optional(),
+      drawing: z.array(z.unknown()).max(50).optional(),
+    })
+    .strict()
+    .optional(),
   by,
 });
 
@@ -342,6 +355,19 @@ export function reviewRoutes(ctx: ServerContext): Router {
     if (b.preview && !hit.comment.previews?.some((p) => p.id === b.preview)) throw fail(400, `this note has no preview ${b.preview}`);
     if (b.preview && b.status && b.status !== 'fixed' && b.status !== 'verified') throw fail(400, 'a preview goes with "fixed" or "verified" only');
     if (b.status === 'fixed' || b.status === 'wontfix') finalLock(req, hit.review);
+    // Still wrong said on a version, with what the person drew there: a version of this video, a frame of it, a drawing
+    // in its px — and only with the verdict it belongs to (a fix reopened, or a carried note looked at with its reason)
+    let on: { v: number; frame?: number; drawing?: Shape[] } | undefined;
+    if (b.on) {
+      if (!(b.status === 'open' || (b.ack && b.note?.trim()))) throw fail(400, 'a version and a drawing go with Still wrong only');
+      // a fix the person checks (lib/handover.ts): never a note nobody fixed, nor a fix riding with the next version
+      if (!waitsForCheck(hit.comment)) throw fail(400, 'a version and a drawing go with Still wrong on a fix to check only');
+      const ver = hit.review.versions.find((x) => x.v === b.on?.v);
+      if (!ver) throw fail(400, `this video has no V${b.on.v}`);
+      if (b.on.frame !== undefined && b.on.frame >= ver.frames) throw fail(400, `V${ver.v} has frames 0–${ver.frames - 1}`);
+      const drawing = sanitizeDrawing(b.on.drawing, ver);
+      on = { v: ver.v, ...(drawing.length ? { drawing, ...(b.on.frame !== undefined ? { frame: b.on.frame } : {}) } : {}) };
+    }
     const who = ctx.actor(req, b.by);
     const c = store.updateComment(id, {
       status: b.status,
@@ -353,6 +379,7 @@ export function reviewRoutes(ctx: ServerContext): Router {
       fixed_in_v: b.fixed_in_v ?? undefined,
       preview: b.preview,
       text_edit_to: b.text_edit_to,
+      ...(on ? { on } : {}),
       by: who,
       by_id: accountOf(req, who),
     });

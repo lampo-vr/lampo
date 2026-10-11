@@ -8,11 +8,13 @@ import { openActivitySink } from '../lib/activity.ts';
 import { readCredentials } from '../lib/backend/credentials.ts';
 import { openBackend } from '../lib/backend/index.ts';
 import { loadConfig } from '../lib/config.ts';
+import { dataDir } from '../lib/paths.ts';
 import { localStopLine } from '../lib/runs.ts';
 import { enterProcessWorkspace } from '../lib/scope.ts';
+import { currentSession } from '../lib/sessions.ts';
 import { checkProcessWorkspace } from '../lib/workspaces.ts';
 import { createReviewServer } from './core.ts';
-import { ownQuiet, ownTold, type Wake } from './feedback.ts';
+import { ownQuiet, ownTold, toldOnDisk, type Wake } from './feedback.ts';
 import { followChanges } from './follow.ts';
 
 // The local store's workspace (LAMPO_WORKSPACE, else #1), for everything this process serves — one the store has.
@@ -55,8 +57,11 @@ const woken = () => {
 // What the agent does through these tools shows live in the app (a line in the cache, or a batch to the hosted server).
 const activity = openActivitySink();
 const remote = !!readCredentials();
-// What this agent (the process) was told was waiting for it, across its connections: each thing once.
-const told = ownTold();
+// What this agent was told of each video, across its connections: each thing once. Inside a Claude Code session on the
+// machine's own store it is kept with the store (lib/told.ts), so the session's next process goes on where it was;
+// otherwise (no session, or a hosted server's store) the process is the agent, and keeps it in memory.
+const session = remote ? null : currentSession();
+const told = session?.sessionId ? toldOnDisk(dataDir, `session:${session.sessionId}`) : ownTold();
 // How long it has heard only "no new feedback" in a row, across its connections (after 30 min it is told to stop).
 const quiet = ownQuiet();
 

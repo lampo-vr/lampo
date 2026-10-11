@@ -69,6 +69,11 @@ export class Recent<V> {
   clear(): void {
     this.map.clear();
   }
+
+  /** What it holds, oldest first. */
+  entries(): IterableIterator<[string, V]> {
+    return this.map.entries();
+  }
 }
 
 export interface MemoOptions<V> {

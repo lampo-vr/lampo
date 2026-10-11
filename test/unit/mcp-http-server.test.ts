@@ -213,7 +213,10 @@ test('request_upload: a one-time URL that takes one plain PUT and becomes a vide
   assert.equal(done.json.next, `Now call wait_for_feedback with since "${cursor}": the person's notes arrive together when they press Send.`);
   const early = store.addComment(done.json.slug as string, { frame: 2, text: 'Before the agent waits', severity: 'must', author: 'Olivia' });
   const heard = (await c.callTool({ name: 'wait_for_feedback', arguments: { since: cursor, timeout_s: 5 } })) as Result;
-  assert.match(textOf(heard), new RegExp(`^1 new:\\n.*${early.id}`), textOf(heard));
+  assert.match(textOf(heard), new RegExp(`\\n.*NEW MUST \\[-\\] ${early.id} `), textOf(heard));
+  // and what it missed on spot.mp4 since its wait there heard "Bitte heller" (Rita's note and reply, the assignments),
+  // though the cursor came after: the inbox never skips (mcp/feedback.ts inbox)
+  assert.match(textOf(heard), /^6 new:\n[\s\S]*"Logo größer"[\s\S]*REPLY .* by Rita — "wie hier"/, textOf(heard));
   const review = store.loadReview(done.json.slug as string);
   assert.equal(review?.folder, 'Acme/Agent');
   assert.equal(review?.added_by, 'Olivia', 'the upload is by whoever asked for the URL');

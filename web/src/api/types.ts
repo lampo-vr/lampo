@@ -196,6 +196,10 @@ export interface Reply {
   by_id?: string;
   /** When its author last changed its words. */
   edited?: string;
+  /** Still wrong said on this version (check mode); with `drawing`, what was drawn on it at `on_frame`. */
+  on_v?: number;
+  on_frame?: number;
+  drawing?: Shape[];
 }
 
 export interface Comment {
