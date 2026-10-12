@@ -90,13 +90,17 @@ export function usePlayback({ ver, url, startFrame, b, quiet = false }: Playback
   if (shownSrc.current.v !== ver.v || !shownSrc.current.url || (!playing && !revSpeed)) shownSrc.current = { v: ver.v, url };
   const src = shownSrc.current.url;
 
+  /** A's frame `f` on B's grid (B can be another version: its own frame rate, its own length). */
+  const bFrame = useCallback((f: number) => (b ? Math.min(timeToFrame(f / fps, b.fps), (b.frames || 1e9) - 1) : f), [fps, b]);
+  const bFrameRef = useRef(bFrame);
+  bFrameRef.current = bFrame;
   const syncB = useCallback(
     (f: number) => {
       const el = bRef.current;
       if (!el || !b || el.readyState < 1) return;
-      seekVideo(el, (Math.min(timeToFrame(f / fps, b.fps), (b.frames || 1e9) - 1) + 0.5) / b.fps);
+      seekVideo(el, (bFrame(f) + 0.5) / b.fps);
     },
-    [fps, b],
+    [b, bFrame],
   );
   // The element's own listeners (below) are set up once per element and source, before a compare may open: they reach
   // B's sync through this ref, or a pause would leave B wherever playing left it (up to the drift check's 1.5 frames
@@ -348,6 +352,49 @@ export function usePlayback({ ver, url, startFrame, b, quiet = false }: Playback
     if (bEl.readyState >= 1) f();
     return () => bEl.removeEventListener('loadedmetadata', f);
   }, [bEl, syncB]);
+
+  // B's picture, paused, is on A's frame or is put there, as A's is below (the drift check): the frame B presented last
+  // (its own requestVideoFrameCallback) is the one on screen. On a busy machine B, a frame or so ahead of A, can present
+  // a frame a moment after the pause, and the pause's seek back may present nothing new: B stayed a frame or two off the
+  // transport and A (3 pauses in 400 at CPU 4×). Once per frame, a quarter second after B settled on another frame.
+  const bFps = b?.fps;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: one watch per element and source; the frames are read at fire time
+  useEffect(() => {
+    const el = bEl;
+    if (!el?.requestVideoFrameCallback || !bFps) return;
+    let shown: number | null = null;
+    let healed = -1;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let id = 0;
+    let alive = true;
+    const wanted = () => bFrameRef.current(frameRef.current);
+    const check = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const a = videoRef.current;
+        if (!alive || !a?.paused || reverse.current || !el.paused || el.seeking || el.readyState < 2 || shown === null) return;
+        const f = wanted();
+        if (shown === f || healed === f) return;
+        healed = f;
+        reseekThroughNeighbour(el, f, bFps, () => wanted() === f);
+      }, 250);
+    };
+    const cb: VideoFrameRequestCallback = (_now, meta) => {
+      if (!alive) return;
+      shown = presentedFrame(meta.mediaTime, bFps);
+      if (!el.paused || shown === wanted()) healed = -1;
+      if (el.paused) check();
+      id = el.requestVideoFrameCallback(cb);
+    };
+    id = el.requestVideoFrameCallback(cb);
+    el.addEventListener('seeked', check);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+      if (id && el.cancelVideoFrameCallback) el.cancelVideoFrameCallback(id);
+      el.removeEventListener('seeked', check);
+    };
+  }, [bEl, bFps, b?.src]);
 
   useEffect(() => {
     if (videoEl) videoEl.muted = muted;

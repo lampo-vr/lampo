@@ -91,6 +91,22 @@ try {
     await videosReady(p, n);
   };
   const shownFrame = (p) => p.$eval('.g-transport .tc .sub b', (e) => Number(e.textContent));
+  /** From now on each of the stage's videos writes down the frame it last presented (its own requestVideoFrameCallback,
+   * read as the player reads it: lib/time.ts presentedFrame), for `presented`. */
+  const watchPresented = (p) =>
+    p.$$eval('.stage video', (vs) => {
+      for (const v of vs) {
+        if (v.__watched) continue;
+        v.__watched = true;
+        const cb = (_now, m) => {
+          v.__presented = Math.max(0, Math.floor(m.mediaTime * 25 + 0.05));
+          v.requestVideoFrameCallback(cb);
+        };
+        v.requestVideoFrameCallback(cb);
+      }
+    });
+  /** The frame each video of the stage last presented (A first), as watchPresented wrote it down. */
+  const presented = (p) => p.$$eval('.stage video', (vs) => vs.map((v) => v.__presented ?? null));
   /** The picture of the stage's `i`th video (A first; in a wipe B is the second), small and grey. */
   const picture = (p, i) =>
     p.evaluate(
@@ -207,17 +223,45 @@ try {
     await sameFrame(p, 57, v2, v1, 'stepped to 57');
     await shot(p, 'compare-01-side');
     // play, then pause, three times: both stop on the frame the transport shows (B plays a frame or so behind A, which
-    // the pause has to make up for)
+    // the pause has to make up for). How far it played is the frame A's picture presented, never currentTime: on a busy
+    // machine currentTime runs frames ahead of the picture, and a pause keeps the frame on screen (CI paused on f90
+    // with currentTime past f92).
+    await watchPresented(p);
     for (const past of [66, 78, 92]) {
       await p.keyboard.press(' ');
-      await until(async () => (await p.$eval('.stage video', (v) => v.currentTime)) * 25 > past, `playing past f${past}`);
+      const seen = await until(async () => {
+        const [a] = await presented(p);
+        return a > past && a;
+      }, `playing past f${past}`);
       await p.keyboard.press(' ');
       await until(() => p.$eval('.stage video', (v) => v.paused), 'paused');
       await videosReady(p, 2);
       const paused = await shownFrame(p);
-      assert(paused > past - 2 && paused < N, `paused on a frame it played to (${paused})`);
+      assert(paused >= seen && paused < N, `paused on a frame it played to (${paused}; A had presented f${seen})`);
+      // the frame the transport says is the one both pictures present, whatever the load
+      await until(
+        async () => (await presented(p)).every((f) => f === paused),
+        async () => `both pictures present f${paused}, the transport's frame: ${(await presented(p)).join(', ')}`,
+      );
       await sameFrame(p, paused, v2, v1, `paused on ${paused}`);
     }
+    // B left on another frame than the pause's, as a busy machine leaves it now and then (B presented a frame after the
+    // pause, and the pause's seek presented nothing new): the player puts B's picture back on the transport's frame
+    const at = await shownFrame(p);
+    await p.$$eval(
+      '.stage video',
+      (vs, f) => {
+        vs[1].__presented = null;
+        vs[1].currentTime = (f + 2.5) / 25;
+      },
+      at,
+    );
+    await until(
+      async () => (await presented(p))[1] === at,
+      async () => `B back on f${at}, the transport's frame: ${(await presented(p)).join(', ')}`,
+    );
+    assert((await shownFrame(p)) === at, `the transport stayed on f${at}: ${await shownFrame(p)}`);
+    await sameFrame(p, at, v2, v1, `B put back on ${at}`);
     // a click on the timeline: both go there
     const tl = await p.$eval('.timeline canvas', (c) => {
       const r = c.getBoundingClientRect();

@@ -5,6 +5,7 @@
 import { useState } from 'react';
 import type { ActivityWords, Run, RunStepLine } from '../api/types.ts';
 import { locale, t } from '../i18n/index.ts';
+import { newestFirstKeys } from '../lib/listKeys.ts';
 import { copyText, toast } from '../lib/toast.ts';
 import { I } from '../ui/icons.tsx';
 import { phrase } from './activityWords.ts';
@@ -77,19 +78,21 @@ export function PrintedLines({ words }: { words: ActivityWords | null | undefine
 }
 
 const timeOf = (iso: string) => new Date(iso).toLocaleTimeString(locale(), { hour: 'numeric', minute: '2-digit' });
+const stepKey = (s: RunStepLine) => `${s.at}-${s.type}-${s.text}`;
 
 /** Why it failed: the error in words, the tool's last lines, and (when given) the steps before it, newest first. */
 export function FailureLines({ run, steps }: { run: { error?: ActivityWords }; steps?: RunStepLine[] }) {
   const err = run.error;
   const before = (steps ?? []).filter((s) => s.type !== 'error').slice(0, 4);
+  const keys = newestFirstKeys(before, stepKey);
   return (
     <div className="rn-fail" data-testid="run-failure">
       <p className="rn-what err">{err ? phrase(err) : t('It stopped with an error')}</p>
       <PrintedLines words={err} />
       {before.length > 0 && (
         <ol className="rn-steps" aria-label={t('Before it stopped')} data-testid="run-steps">
-          {before.map((s) => (
-            <li key={`${s.at}-${s.text}`}>
+          {before.map((s, i) => (
+            <li key={keys[i]}>
               <time dateTime={s.at}>{timeOf(s.at)}</time>
               <span>{phrase(s)}</span>
             </li>
@@ -104,10 +107,11 @@ export function FailureLines({ run, steps }: { run: { error?: ActivityWords }; s
 export function LastSteps({ steps }: { steps?: RunStepLine[] }) {
   const shown = (steps ?? []).slice(0, 4);
   if (!shown.length) return null;
+  const keys = newestFirstKeys(shown, stepKey);
   return (
     <ol className="rn-steps" aria-label={t('Its last steps')} data-testid="run-steps">
-      {shown.map((s) => (
-        <li key={`${s.at}-${s.text}`}>
+      {shown.map((s, i) => (
+        <li key={keys[i]}>
           <time dateTime={s.at}>{timeOf(s.at)}</time>
           <span>{phrase(s)}</span>
         </li>

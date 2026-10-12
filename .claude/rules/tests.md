@@ -58,3 +58,7 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
   is written with a rename (`writeJsonAtomic`, `test/e2e/lib/sharedJson.ts`), and its reader never turns a parse error
   into a default (`readJson`: only a missing file is). A plain write empties the file first: CI's conversion suite read
   half of it, a tight loop tore 1 read in 6, and the module had read a torn file as "Free for everyone".
+- How far playback went is the frame the picture presented (rVFC `mediaTime`; `watchPresented` in `guest-compare.mjs`),
+  never `currentTime`: under load currentTime runs frames ahead of the picture, and a pause keeps the frame on screen
+  (CI paused on f90 with currentTime past f92). After a pause, wait until every picture presents the transport's frame;
+  one that stays off is a product bug (B kept a frame of its own: `usePlayback.ts`), never a margin to widen.

@@ -8,6 +8,7 @@ import { compareTime } from '../../../lib/time.ts';
 import type { PlacedComment, Run, RunDetail, RunPlanItem, RunStepLine, SessionRef } from '../api/types.ts';
 import { locale, t } from '../i18n/index.ts';
 import { pct, secsWords } from '../lib/format.ts';
+import { newestFirstKeys } from '../lib/listKeys.ts';
 import { toastError } from '../lib/toast.ts';
 import { PermissionNeeds, PrintedLines } from '../sessions/RunNeeds.tsx';
 import { clock, isOpen, madeBy, phaseOf, planAt, type RunLike, type Say, workedNow } from '../sessions/runWords.ts';
@@ -212,6 +213,8 @@ function Shown({
   const prog = run.state === 'working' ? run.progress : null;
   const worked = workedNow(run, Date.now(), p.asOf);
   const where = whole?.agent.runner ? t('on {computer}', { computer: whole.agent.runner }) : null;
+  // two steps alike in one second are two lines (listKeys.ts)
+  const stepKeys = steps ? newestFirstKeys(steps, (s) => `${s.at}-${s.type}-${s.text}`) : [];
   return (
     <>
       <section className="av-head" aria-label={run.agent.name}>
@@ -309,8 +312,8 @@ function Shown({
                   <SkLine w={w} />
                 </li>
               ))
-            : (all ? steps : steps.slice(0, SHOWN)).map((s) => (
-                <li key={`${s.at}-${s.text}`} className={`av-step${s.type === 'thought' ? ' thought' : ''}${s.type === 'error' ? ' err' : ''}`}>
+            : (all ? steps : steps.slice(0, SHOWN)).map((s, i) => (
+                <li key={stepKeys[i]} className={`av-step${s.type === 'thought' ? ' thought' : ''}${s.type === 'error' ? ' err' : ''}`}>
                   <time dateTime={s.at}>{timeOf(s.at)}</time>
                   <span className="av-step-text" title={p.say(s)}>
                     {s.type === 'thought' ? t('“{quote}”', { quote: p.say({ ...s, quote: undefined }) }) : p.say(s)}

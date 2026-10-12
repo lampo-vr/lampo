@@ -174,6 +174,13 @@ format stays backwards compatible throughout.
   you list your server's MCP connector there.
 
 ### Fixed
+- Comparing two versions, in the player or on a review link, a pause on a busy computer could leave the other version's
+  picture a frame or two off the frame the timecode shows, and there it stayed. The player now notices and puts it on
+  the same frame, as it already did for the version on screen.
+- An agent that does the same thing twice within a second (reads the notes, is answered at once, reads them again)
+  shows two steps in the agent menu, and its next step goes on top. Until now one of the two lines could stay stuck
+  on top of the menu's steps, so the newest step showed second and the menu listed one step too many until the page was
+  reloaded. The Agent view's steps and a run's last steps are fixed the same way.
 - An opened note on a review link names its writer once: the name and time above the notes of one sitting say it, and
   the card no longer repeats them under it. Reply sits at the end of the note's timecode line, and on a phone its icon
   ends on the card's edge.

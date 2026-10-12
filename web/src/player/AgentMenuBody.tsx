@@ -11,6 +11,7 @@ import { useRunActions } from '../api/runs.ts';
 import type { AgentActivity, AgentRunInfo, SessionRef } from '../api/types.ts';
 import { locale, t } from '../i18n/index.ts';
 import { ago } from '../lib/format.ts';
+import { newestFirstKeys } from '../lib/listKeys.ts';
 import { copyText, toast, toastError } from '../lib/toast.ts';
 import { type NoteAt, say } from '../sessions/activityWords.ts';
 import { activityLine, pick, RunUse, useAgentActivity } from '../sessions/Live.tsx';
@@ -174,6 +175,8 @@ export function AgentMenuBody(p: AgentMenuBodyProps) {
   const asked = now.kind === 'asked' ? recent.find((a) => a.kind === 'ask') : undefined;
   const steps = recent.filter((a) => !(now.kind === 'asked' && ((a === head && a.kind === 'wait') || a === asked)));
   const shownSteps = steps.slice(0, all ? RAIL_ALL : RAIL);
+  // keyed over all of them: two alike in one second are two lines
+  const stepKeys = newestFirstKeys(steps, (a) => `${a.at}-${a.kind}-${a.text}`);
   // a step in the rail; a wait of an agent that no longer listens is over: never "since 12:41" as if it went on
   const stepOf = (a: AgentActivity) => (quiet && a.kind === 'wait' ? say(a, p.noteAt) : activityLine(a, p.noteAt));
   const act = (() => {
@@ -315,8 +318,8 @@ export function AgentMenuBody(p: AgentMenuBodyProps) {
                 </p>
               )}
               <ol className="amc-rail" data-testid="agent-timeline">
-                {shownSteps.map((a) => (
-                  <li key={`${a.at}-${a.text}`} data-kind={a.kind}>
+                {shownSteps.map((a, i) => (
+                  <li key={stepKeys[i]} data-kind={a.kind}>
                     <time dateTime={a.at}>{clock(a.at)}</time>
                     <span className="ellipsis" title={stepOf(a)}>
                       {stepOf(a)}

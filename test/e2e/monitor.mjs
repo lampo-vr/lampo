@@ -279,6 +279,37 @@ try {
     await page.keyboard.press('Escape');
   });
 
+  await check('two steps alike in one second are two lines, and the step after them goes on top', async () => {
+    // Stored times are to the second: an agent that reads the notes, waits, is answered at once and reads them again
+    // has two lines alike in time and words (CI's agent did, its wait answered in 0.4 s). Their row in the rail was one
+    // key twice, and the next render left one of them standing on top for good. Forced here with the times a batch of
+    // a hosted agent's lines carries.
+    await openPlayer(promo);
+    await openMenu();
+    const at = new Date(Math.floor(Date.now() / 1000) * 1000).toISOString();
+    const step = (kind, text, when = at) => ({ ...(when ? { at: when } : {}), agent: 'promo-cut', kind, text, key: text, video: promo });
+    await api('/api/agents/activity', 'POST', {
+      entries: [step('read', 'Reading the open notes'), step('wait', 'Waiting for your answer'), step('read', 'Reading the open notes')],
+    });
+    const said = async () => (await timeline()).join(' | ');
+    await until(
+      async () => /^[^|]*Reading the open notes \| [^|]*Waiting for your answer[^|]* \| [^|]*Reading the open notes$/.test(await said()),
+      async () => `both lines and the wait between them: ${await said()}`,
+    );
+    // the next step, now (the server's time)
+    await api('/api/agents/activity', 'POST', { entries: [step('read', 'Reading the transcript', null)] });
+    await until(
+      async () => (await timeline())[0]?.includes('Reading the transcript'),
+      async () => `the next step on top: ${await said()}`,
+    );
+    const lines = await timeline();
+    assert(
+      lines.length === 3 && lines[1].includes('Reading the open notes') && lines[2].includes('Waiting for your answer'),
+      `three lines, newest first: ${lines.join(' | ')}`,
+    );
+    await page.keyboard.press('Escape');
+  });
+
   await check('a `vr` command an agent runs on this machine arrives through the rolling file', async () => {
     // This store, never a `vr login` of the shell's.
     const vrEnv = { VR_REMOTE: '0', XDG_CONFIG_HOME: path.join(dir, 'xdg-config'), XDG_CACHE_HOME: path.join(dir, 'xdg-cache') };
