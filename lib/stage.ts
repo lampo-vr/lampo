@@ -17,8 +17,7 @@
 //   Fixes verified on a preview are resolved for the reviewer, but a video can't be final while one isn't rendered.
 //   A partial render (lib/part.ts) is a new version to review like any other ("V8 (part)"), but never final: where
 //   "Mark final" would be next, a full render is.
-import { fixWaits } from './handover.ts';
-import { ago, compareTime, isQuestion, isRequired, oneLine } from './time.ts';
+import { ago, compareTime, fixWaits, isQuestion, isRequired, oneLine } from './time.ts';
 import type { ApprovalEntry, ApprovalParty, NextStep, PublishedSignal, Review, ShareSignal, Stage, StageInfo } from './types.ts';
 
 export const STAGES: readonly Stage[] = ['to_review', 'changes', 'in_progress', 'check_fixes', 'team_approved', 'with_client', 'client_approved', 'final'];
@@ -134,7 +133,7 @@ export function stageOf(
   let toVerify = 0;
   let questions = 0;
   let onPreview = 0;
-  // A fix marked before its version (lib/handover.ts fixWaits) is no open work, and nothing to check either: the next
+  // A fix marked before its version (lib/time.ts fixWaits) is no open work, and nothing to check either: the next
   // version brings it. Until then the video is being fixed.
   let waiting = 0;
   for (const c of review.comments) {

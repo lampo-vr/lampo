@@ -1,0 +1,84 @@
+// What people do to a playbook (lib/playbooks.ts), and one skill as it applies: every write answers with the playbook
+// as it now stands, which goes straight into the cache (the stream settles the rest). Apart from api/playbooks.ts, so
+// the library's first paint (the folder tabs' badges) carries none of it.
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { NoteRef, Playbook, PlaybookRevision, PlaybookSkillView, PlaybookView } from '../../../lib/types.ts';
+import { api, enc } from './client.ts';
+import { playbookKeys } from './playbooks.ts';
+import { keys } from './queries.ts';
+
+/** One skill as it applies to a playbook (its own or inherited), with its instructions. */
+export const useSkill = (scope: string, name: string | null) =>
+  useQuery({
+    queryKey: ['playbook', 'skill', scope, name || ''],
+    queryFn: () => api<PlaybookSkillView>(`/api/playbook/skill?folder=${enc(scope)}&name=${enc(name || '')}`),
+    enabled: !!name,
+  });
+
+/** A file as base64 (the API takes small files inline). */
+export async function base64(file: Blob): Promise<string> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
+type Saved = { rev: PlaybookRevision | null; playbook: Playbook };
+
+export interface SkillBody {
+  name: string;
+  description: string;
+  body: string;
+  extra?: string;
+  rename_from?: string;
+  message?: string;
+  base_rev?: number;
+}
+
+/** What people do to a playbook; each call puts the playbook it answers with into the cache. */
+export function usePlaybookActions(scope: string) {
+  const qc = useQueryClient();
+  const keep = (out: Saved) => {
+    qc.setQueryData<PlaybookView>(playbookKeys.one(scope), (v) => (v ? { ...v, playbook: out.playbook } : v));
+    // What it inherits, the merged markdown and the stamp come with the next read.
+    void qc.invalidateQueries({ queryKey: playbookKeys.all });
+    void qc.invalidateQueries({ queryKey: playbookKeys.list });
+    return out;
+  };
+  const decided = () => {
+    void qc.invalidateQueries({ queryKey: playbookKeys.all });
+    void qc.invalidateQueries({ queryKey: playbookKeys.list });
+    void qc.invalidateQueries({ queryKey: keys.forYou });
+  };
+  return {
+    writeText: (section: 'brief' | 'rules', content: string, o: { message?: string; base_rev?: number } = {}) =>
+      api<Saved>('/api/playbook/text', { method: 'PUT', body: { folder: scope, section, content, ...o } }).then(keep),
+    putSkill: (s: SkillBody) => api<Saved>('/api/playbook/skill', { method: 'PUT', body: { folder: scope, ...s } }).then(keep),
+    importSkill: (markdown: string) => api<Saved>('/api/playbook/skill', { method: 'PUT', body: { folder: scope, markdown } }).then(keep),
+    deleteSkill: (name: string) => api<Saved>(`/api/playbook/skill?folder=${enc(scope)}&name=${enc(name)}`, { method: 'DELETE' }).then(keep),
+    addFile: async (skill: string, file: File) =>
+      keep(await api<Saved>('/api/playbook/skill/files', { method: 'POST', body: { folder: scope, skill, name: file.name, data: await base64(file) } })),
+    removeFile: (skill: string, name: string) =>
+      api<Saved>(`/api/playbook/skill/files?folder=${enc(scope)}&skill=${enc(skill)}&name=${enc(name)}`, { method: 'DELETE' }).then(keep),
+    addLink: (url: string, caption?: string) =>
+      api<Saved & { ref: NoteRef }>('/api/playbook/refs', { method: 'POST', body: { folder: scope, kind: 'link', url, caption } }).then(keep),
+    addImage: async (file: File, caption?: string) =>
+      keep(
+        await api<Saved & { ref: NoteRef }>('/api/playbook/refs', {
+          method: 'POST',
+          body: { folder: scope, kind: 'image', caption, data: await base64(file) },
+        }),
+      ),
+    addFrame: (video: string, frame: number, v?: number, caption?: string) =>
+      api<Saved & { ref: NoteRef }>('/api/playbook/refs', { method: 'POST', body: { folder: scope, kind: 'frame', video, frame, v, caption } }).then(keep),
+    removeRef: (id: string) => api<Saved>(`/api/playbook/refs?folder=${enc(scope)}&id=${enc(id)}`, { method: 'DELETE' }).then(keep),
+    // base_rev: the playbook's revision the diff on screen was made against. Refused (that section changed after it):
+    // the playbook is read again, and the diff with it.
+    accept: (id: string, o: { message?: string; base_rev?: number } = {}) =>
+      api(`/api/playbook/proposals/${enc(id)}/accept`, { method: 'POST', body: o }).then(decided, (e: unknown) => {
+        decided();
+        throw e;
+      }),
+    reject: (id: string, reason?: string) => api(`/api/playbook/proposals/${enc(id)}/reject`, { method: 'POST', body: reason ? { reason } : {} }).then(decided),
+  };
+}

@@ -9,7 +9,8 @@ import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'rea
 import { newestFirst, PLAYBOOK_LIMITS, scopeLabel } from '../../../lib/playbookText.ts';
 import type { NoteRef, Playbook, PlaybookLayer, PlaybookProposal, PlaybookView, TasteSuggestion } from '../../../lib/types.ts';
 import { ApiError, enc } from '../api/client.ts';
-import { playbookHref, playbookKeys, playbookRefUrl, usePlaybookActions, useSkill } from '../api/playbooks.ts';
+import { usePlaybookActions, useSkill } from '../api/playbookActions.ts';
+import { playbookHref, playbookKeys, playbookRefUrl } from '../api/playbooks.ts';
 import { useLibrary } from '../api/queries.ts';
 import { t } from '../i18n/index.ts';
 import { toast, toastError, toastUndo } from '../lib/toast.ts';

@@ -217,6 +217,10 @@ export const isQuestion = (c: Pick<NoteLike, 'kind' | 'author'>): boolean => {
   const k = noteKind(c);
   return k === 'question' || k === 'agent';
 };
+/** Marked fixed before a version carried the fix: the agent answered it, and the person has nothing to look at yet. Here
+ * rather than with the rest of what a fix hands over (lib/handover.ts, which says it on): the stage needs only this,
+ * and the library's first paint the stage. */
+export const fixWaits = (c: { status: CommentStatus; fix_pending?: boolean }): boolean => c.status === 'open' && !!c.fix_pending;
 /** List order: must, should, nice, idea, then questions, then info notes. */
 export function noteRank(c: NoteLike): number {
   const k = noteKind(c);

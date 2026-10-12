@@ -22,6 +22,8 @@ import {
   logoPaths,
   MARK_VIEWBOX,
   markPaths,
+  packPath,
+  unpackPath,
 } from '../../web/src/ui/brandMark.ts';
 import { readPng } from '../e2e/lib/png.mjs';
 
@@ -79,6 +81,22 @@ test('the app draws the kit’s geometry: the logo in Wordmark, the frame o in B
   assert.ok(!markPaths('#000', null).includes(FRAME_WINDOW) && markPaths('#000', null).includes(FRAME_RING));
   assert.deepEqual(MARK_VIEWBOX.split(' ').map(Number).slice(2), [124, 124], 'the mark sits in a square');
   assert.equal(LOGO_VIEWBOX.split(' ').length, 4);
+});
+
+test('the paths ride packed and are written out as the kit has them, byte for byte; packPath packs a new kit’s', () => {
+  // the logo in docs/brand/ holds all four, written the way the kit writes them (unpackPath's two ways of numbers)
+  const logo = read('docs/brand/lampo-logo-on-light.svg');
+  const source = read('web/src/ui/brandMark.ts').replace(/\s+/g, '');
+  for (const [name, d] of Object.entries({ LOGO_LETTERS, FRAME_RING, FRAME_WINDOW, FRAME_EXIT })) {
+    assert.ok(logo.includes(`d="${d}"`), `${name} is the kit's path`);
+    const fixed = name === 'LOGO_LETTERS';
+    assert.equal(unpackPath(packPath(d), fixed), d, `${name} packs and unpacks to itself`);
+    // what brandMark.ts carries is what packPath makes of the kit's path: a new kit is packed with it
+    assert.ok(source.includes(`unpackPath('${packPath(d)}',${fixed}`), `${name} is packed from the kit`);
+  }
+  assert.equal(unpackPath(packPath('M1 -2.5L0 0L-0.05 3Z'), false), 'M1 -2.5L0 0L-0.05 3Z');
+  assert.equal(unpackPath(packPath('M1.00-2.50L0 0Q-0.05 3.10 1.20-7.00Z'), true), 'M1.00-2.50L0 0Q-0.05 3.10 1.20-7.00Z');
+  assert.throws(() => packPath('m1 2l3 4'), /absolute commands only/);
 });
 
 test('docs/brand ships the kit: the same geometry, the icon masters’ palette, the favicon, the Norican licence', () => {

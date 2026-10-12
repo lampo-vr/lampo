@@ -13,7 +13,7 @@ import { T } from '../i18n/T.tsx';
 import { tilde } from '../lib/format.ts';
 import { go } from '../lib/nav.ts';
 import { toast, toastError } from '../lib/toast.ts';
-import { pickOf, SessionList, suggested } from '../sessions/Sessions.tsx';
+import { pickOf, SessionList, suggested } from '../sessions/SessionPicker.tsx';
 import { Spinner } from '../ui/feedback.tsx';
 import { I } from '../ui/icons.tsx';
 import { Modal } from '../ui/primitives.tsx';

@@ -7,7 +7,8 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { PLAYBOOK_LIMITS, parseSkill, SKILL_NAME, skillMarkdown, skillProblem } from '../../../lib/playbookText.ts';
 import type { PlaybookSkill, PlaybookSkillSummary } from '../../../lib/types.ts';
-import { playbookHref, skillFileUrl, usePlaybookActions } from '../api/playbooks.ts';
+import { usePlaybookActions } from '../api/playbookActions.ts';
+import { playbookHref, skillFileUrl } from '../api/playbooks.ts';
 import { t } from '../i18n/index.ts';
 import { bytes } from '../lib/format.ts';
 import { copyText, toast, toastError } from '../lib/toast.ts';

@@ -17,7 +17,7 @@ import { type NoteAt, say } from '../sessions/activityWords.ts';
 import { activityShort, LiveSection, stepLine, useAgentNow } from '../sessions/Live.tsx';
 import { GoOn, goOnWords, listenLine, StartListening, useListening, waitsForStart } from '../sessions/listening.tsx';
 import { fullWords, LOOK, phaseOf, type RunLike, tightOf } from '../sessions/runState.ts';
-import { SessionPicker } from '../sessions/Sessions.tsx';
+import { SessionPicker } from '../sessions/SessionPicker.tsx';
 import { useAgentRuns, useWakeChoice, WakeAsk } from '../sessions/Wake.tsx';
 import { AgentMark, I } from '../ui/icons.tsx';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';

@@ -2,13 +2,13 @@
 // "Fixes to check" and check mode (web/src/player/fixCheck.ts), what agents read (mcp/, lib/cli.ts): a fix is the
 // person's to check once a version that carries it exists. A new version doesn't turn open notes into fixes; a fix marked
 // before its version rides with the next one (lib/store.ts). Shared with the browser: no Node imports.
-import { compareTime, isAgent, isRequired, noteKind } from './time.ts';
+import { compareTime, fixWaits, isAgent, isRequired, noteKind } from './time.ts';
 import type { Comment, Version } from './types.ts';
 
 type Note = Pick<Comment, 'status' | 'kind' | 'author' | 'severity' | 'check_again' | 'fix_pending'>;
 
-/** Marked fixed before a version carried the fix: the agent answered it, and the person has nothing to look at yet. */
-export const fixWaits = (c: Pick<Comment, 'status' | 'fix_pending'>): boolean => c.status === 'open' && !!c.fix_pending;
+/** Marked fixed before a version carried the fix (lib/time.ts, where the stage reads it). */
+export { fixWaits };
 
 /**
  * A fix the person checks now: marked fixed in a version that exists — or, in a store from before fixes were tied to

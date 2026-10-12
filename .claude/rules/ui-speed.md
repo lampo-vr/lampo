@@ -13,6 +13,10 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - A new dynamic import in the first paint costs its preload entry: ride an existing chunk, measure a build.
 - A lazy chunk (the styleguide) that imports a library module (`library/Film.tsx`) makes the build split the library's first chunk into shared pieces: +2 KB in the first paint. Show such parts some other way, and measure.
 - Measure the budget with a Node that bundles its own zlib, as CI's does: Homebrew's links macOS zlib and reads ~0.2 KB low.
+- A module in the first paint brings every export any screen uses, not only the ones the first paint calls (a module
+  is one piece of one chunk): what only a later click needs goes in a module of its own (`sessions/SessionPicker.tsx`,
+  `api/playbookActions.ts`). Find such weight by source module from the build's source maps (minified bytes per
+  source), not by chunk; data the first paint draws rides packed (`ui/brandMark.ts`: the logo's paths, 6.3 → 1.8 KB).
 - Loading states use the real layout (`pending` props, `SkLine`, `…Pending` rows); never a separate skeleton tree.
 - What follows playback subscribes to `player/frameStore.ts` (`pb.live`, `useFrame`), never `pb.frame`.
 - Every `usePlayback` is `quiet`: only a small component that shows the frame subscribes, and a button reads `pb.live.get()` when pressed (the review link ran without it and redrew its whole page per frame; a row with the timecode in it renders with the timecode).

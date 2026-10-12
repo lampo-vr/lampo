@@ -8,7 +8,7 @@ import { changedSince, diffStat, lineDiff, skillMarkdown, waitingFor } from '../
 import type { Playbook, PlaybookProposal, PlaybookSection } from '../../../lib/types.ts';
 import { useCan } from '../api/auth.ts';
 import { ApiError } from '../api/client.ts';
-import { usePlaybookActions } from '../api/playbooks.ts';
+import { usePlaybookActions } from '../api/playbookActions.ts';
 import { t } from '../i18n/index.ts';
 import { ago } from '../lib/format.ts';
 import { toast, toastError } from '../lib/toast.ts';

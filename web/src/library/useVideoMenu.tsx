@@ -14,7 +14,6 @@ import { loader, useLoaded } from '../lib/lazy.ts';
 import { go } from '../lib/nav.ts';
 import { copyText, toast, toastError, toastUndo } from '../lib/toast.ts';
 import { getStartedCode } from '../onboarding/state.ts';
-import { SessionPicker } from '../sessions/Sessions.tsx';
 import { LazyShareModal } from '../share/LazyShareModal.tsx';
 import { laneLabel } from '../status/stageText.ts';
 import { LANE_SHAPE } from '../ui/glyphs.ts';
@@ -69,6 +68,8 @@ async function removeVideo(v: VideoSummary, { remove, restore }: ReturnType<type
 /** "Remove … ?": its own mutation, so the button shows it working. */
 // The move dialog's folder picker is its own chunk: asked for when Move is chosen, not in the library's first paint.
 const pickerCode = loader(() => import('./FolderPicker.tsx'));
+// …and Assign agent's list of agents: asked for when Assign agent… is chosen; the dialog opens once it is here, as Move's.
+const agentPickerCode = loader(() => import('../sessions/SessionPicker.tsx'));
 
 function RemoveConfirm({ v, onClose }: { v: VideoSummary; onClose: () => void }) {
   const actions = useVideoActions();
@@ -199,11 +200,12 @@ export function useVideoMenu(v: VideoSummary, { home, folders }: { home?: string
   ];
 
   const Picker = useLoaded(pickerCode, dialog === 'move');
+  const Agents = useLoaded(agentPickerCode, dialog === 'assign');
   const dialogs: ReactNode = (
     <>
-      {dialog === 'assign' && (
+      {dialog === 'assign' && Agents && (
         <Modal title={t('Assign an agent to {name}', { name: v.name })} onClose={close} width={640}>
-          <SessionPicker video={v.video} current={v.session} onAssign={onAssign} home={home} />
+          <Agents.SessionPicker video={v.video} current={v.session} onAssign={onAssign} home={home} />
         </Modal>
       )}
       {dialog === 'move' && Picker && <Picker.MoveModal video={v} folders={folders} onClose={close} />}
