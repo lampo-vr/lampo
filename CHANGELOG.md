@@ -174,6 +174,11 @@ format stays backwards compatible throughout.
   you list your server's MCP connector there.
 
 ### Fixed
+- The marks on a paused frame read on any picture. "Changed since V2" and Auto-check's label sit on a dark chip
+  that fits their words in either language and stays inside the frame. On a white frame they used to show as hollow
+  letters. The chip goes above its box, or below it when there is no room above, so it doesn't cover what the box
+  marks. The changed region's dashed box, which nearly vanished on white, and Auto-check's box now have a dark line
+  under them, so they show on white, black and everything between.
 - Sending notes to a video's agent shows its line ("Sent to … · waiting for it to start") together with the send. It
   used to come up to a second later and push the notes down, so a click aimed a moment before could land beside its
   target: a note's Send pressed right after "Only send" went into the note's text, and nothing was sent.

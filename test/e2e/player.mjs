@@ -11,13 +11,14 @@
 // popover — findings turned into a note or dismissed — a freeze says what, where (its frame's picture, a click plays the
 // stretch) and why, and "That's intended" keeps it away in the next version; a fix preview (a still made in the
 // project) checked in verify mode against the render and verified on it; review mode (N) stepping through the open
-// notes; the timeline's hover label and frame preview; nothing bends a coloured edge along a rounded box; the player
+// notes; the marks on a paused frame (what changed since the last version, Auto-check's pick) on a white and a black
+// picture; the timeline's hover label and frame preview; nothing bends a coloured edge along a rounded box; the player
 // and its composer fit in both themes.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { timecode } from '../../lib/time.ts';
-import { age, FFMPEG, makeFreezeVideo, makeVideo, sleep, until } from '../lib/helpers.ts';
+import { age, encodeOnce, FFMPEG, makeFreezeVideo, makeVideo, sleep, until } from '../lib/helpers.ts';
 import { bentEdges, layoutMatrix } from './layout.mjs';
 import { jsonApi } from './lib/api.mjs';
 import { launch, requireChrome, shotsDir } from './lib/browser.mjs';
@@ -63,6 +64,21 @@ try {
   const rfile = makeVideo(path.join(dir, 'Acme/export/reel.mp4'), { w: 180, h: 320, fps: 25, dur: 2, pattern: 'testsrc2' });
   age(rfile);
   const reel = (await api('/api/library', 'POST', { path: rfile, folder: 'Acme/Reels' })).video;
+  // white.mp4 and black.mp4: a plain picture whose V2 adds a panel, for the changed region's box and label on a light
+  // and a dark picture (on the white one by the top right corner: no room above it, none to its right, so the label
+  // goes below it and moves left).
+  const plain = async (name, panel) => {
+    const file = path.join(dir, `Acme/export/${name}.mp4`);
+    const encode = (vf) =>
+      encodeOnce(file, ['-v', 'error', '-f', 'lavfi', '-i', `color=c=${name}:s=320x180:r=25:d=1`, ...vf, '-c:v', 'libx264', '-pix_fmt', 'yuv420p']);
+    age(encode([]));
+    const { video } = await api('/api/library', 'POST', { path: file, folder: 'Acme/Reels' });
+    age(encode(['-vf', `drawbox=x=${panel.x}:y=${panel.y}:w=${panel.w}:h=${panel.h}:color=${panel.color}:t=fill`]));
+    await api(`/api/review/${enc(video.slug)}/sync`, 'POST', {});
+    return video.slug;
+  };
+  const onWhite = await plain('white', { x: 200, y: 6, w: 110, h: 80, color: '0x2f6bff' });
+  const onBlack = await plain('black', { x: 40, y: 80, w: 110, h: 70, color: '0xff8a3d' });
   // long.mp4: V1 of 90 frames, V2 of 300 — a jump from V1 to V2's frame 250 (a link, a frame reference) lands on 250.
   const lfile = makeVideo(path.join(dir, 'Acme/export/long.mp4'), { w: 320, h: 180, fps: 30, dur: 3, pattern: 'testsrc2' });
   age(lfile);
@@ -677,6 +693,136 @@ try {
       await page.setViewport({ width: 1440, height: 900, isMobile: false, hasTouch: false });
     }
   });
+
+  // The marks on a paused frame lie on the picture, which may be white or black: a label is a dark chip that holds its
+  // words (never an outline round the letters) above or below its box, a box a light (or yellow) line over a dark one.
+  const stageMark = (mark, words) =>
+    page.evaluate(
+      (mark, words) => {
+        const svg = document.querySelector('.vbox svg.layer');
+        const text = [...(svg?.querySelectorAll('text') ?? [])].find((e) => e.textContent === words);
+        if (!text) return null;
+        const paint = (c) => {
+          const [r, g, b, a = 1] = (c.match(/[\d.]+/g) || []).map(Number);
+          return { c, l: (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255, a };
+        };
+        const at = (e) => ((b) => ({ left: b.left, top: b.top, right: b.right, bottom: b.bottom }))(e.getBoundingClientRect());
+        const chip = text.closest('[data-mark-label]')?.querySelector('rect');
+        // the box's lines: its group's (a mark drawn loose on the picture is this one's when nothing else is)
+        const lines = [...svg.querySelectorAll('rect')].filter(
+          (e) => !e.closest('[data-mark-label]') && (e.closest('[data-mark]')?.dataset.mark ?? mark) === mark,
+        );
+        return {
+          frame: at(svg),
+          text: at(text),
+          fill: paint(getComputedStyle(text).fill),
+          outline: getComputedStyle(text).stroke,
+          chip: chip ? { ...at(chip), fill: paint(getComputedStyle(chip).fill) } : null,
+          lines: lines.map((e) => paint(getComputedStyle(e).stroke)),
+          box: lines[0] ? at(lines[0]) : null,
+        };
+      },
+      mark,
+      words,
+    );
+  const readsOnAnyPicture = (m, what) => {
+    assert(m, `${what}: the label is drawn`);
+    assert(m.chip, `${what}: the label sits on a chip`);
+    assert(m.chip.fill.l < 0.15 && m.chip.fill.a >= 0.8, `${what}: the chip is dark: ${m.chip.fill.c}`);
+    const inside = (a, b) => a.left >= b.left - 0.5 && a.top >= b.top - 0.5 && a.right <= b.right + 0.5 && a.bottom <= b.bottom + 0.5;
+    assert(inside(m.text, m.chip), `${what}: the chip holds its words: ${JSON.stringify({ text: m.text, chip: m.chip })}`);
+    const [left, right] = [m.text.left - m.chip.left, m.chip.right - m.text.right];
+    assert(left > 2 && Math.abs(left - right) <= 1, `${what}: as much room left of the words as right: ${left} | ${right}`);
+    assert(inside(m.chip, m.frame), `${what}: the chip stays inside the frame: ${JSON.stringify({ chip: m.chip, frame: m.frame })}`);
+    assert(m.outline === 'none', `${what}: no outline round the letters: ${m.outline}`);
+    // above the box or below it, never over what it points at (each of these boxes has room on one side)
+    assert(
+      m.box && (m.chip.bottom <= m.box.top || m.chip.top >= m.box.bottom),
+      `${what}: the chip leaves the box uncovered: ${JSON.stringify({ chip: m.chip, box: m.box })}`,
+    );
+    assert(
+      m.lines.some((s) => s.l < 0.15 && s.a >= 0.5),
+      `${what}: the box has a dark line: ${m.lines.map((s) => s.c)}`,
+    );
+  };
+  const openAt = async (s, f) => {
+    await page.goto('about:blank');
+    await page.goto(`${BASE}/#/v/${enc(s)}?f=${f}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.note, .side-empty');
+    await page.waitForFunction(() => document.querySelector('.vbox video')?.readyState >= 2, { timeout: 20000 });
+  };
+  const markDrawn = (words) =>
+    page.waitForFunction((words) => [...document.querySelectorAll('.vbox svg.layer text')].some((e) => e.textContent === words), { timeout: 20000 }, words);
+
+  await check(
+    'what changed since V1 reads on a white and a black picture: its label a dark chip inside the frame, its box a dark and a light line',
+    async () => {
+      for (const [name, s] of [
+        ['white', onWhite],
+        ['black', onBlack],
+      ]) {
+        // the diff is worked out in the background: asked for until it is there, the page then gets it whole
+        await until(
+          async () => (await api(`/api/diff/${enc(s)}/2`)).ranges?.some((r) => r.kind === 'video' && r.box && !r.whole),
+          `${name}: V2's panel is a changed region`,
+          120_000,
+        );
+        await openAt(s, 12);
+        await markDrawn('CHANGED SINCE V1');
+        await page.evaluate(() => document.fonts.ready);
+        const m = await stageMark('changed', 'CHANGED SINCE V1');
+        readsOnAnyPicture(m, `on ${name}`);
+        assert(m.fill.l > 0.8, `on ${name}: light words: ${m.fill.c}`);
+        assert(
+          m.lines.some((s) => s.l > 0.8 && s.a > 0.8),
+          `on ${name}: the box has a light line: ${m.lines.map((s) => s.c)}`,
+        );
+        await shot(`changed-${name}`);
+      }
+    },
+  );
+
+  await check(
+    'Auto-check’s picked finding reads on a white picture: its label a dark chip with its yellow words, its box a dark and a yellow line',
+    async () => {
+      const qaUrl = `/api/qa/${enc(onWhite)}/2`;
+      const finding = {
+        key: 'typo:recieve',
+        kind: 'typo',
+        severity: 'should',
+        tags: [],
+        frame: 12,
+        text: 'Possible typo',
+        box: { x: 12, y: 120, w: 120, h: 40 },
+      };
+      const result = { qa_version: 1, hash: 'stand-in', at: new Date().toISOString(), duration_ms: 1, samples: 1, text_language: 'en', items: [finding] };
+      const answer = (r) =>
+        r.method() === 'GET' && r.url().endsWith(qaUrl)
+          ? r.respond({ status: 200, contentType: 'application/json', body: JSON.stringify(result) })
+          : r.continue();
+      await page.setRequestInterception(true);
+      page.on('request', answer);
+      try {
+        await openAt(onWhite, 12);
+        await openChecks();
+        await page.click('.ac-row .ac-thumb');
+        await markDrawn('AUTO-CHECK');
+        await page.keyboard.press('Escape');
+        await page.evaluate(() => document.fonts.ready);
+        const m = await stageMark('auto-check', 'AUTO-CHECK');
+        readsOnAnyPicture(m, 'Auto-check');
+        assert(m.fill.c === 'rgb(255, 192, 67)', `its words in its yellow: ${m.fill.c}`);
+        assert(
+          m.lines.some((s) => s.c === 'rgb(255, 192, 67)'),
+          `the box has a yellow line: ${m.lines.map((s) => s.c)}`,
+        );
+        await shot('autocheck-white');
+      } finally {
+        page.off('request', answer);
+        await page.setRequestInterception(false);
+      }
+    },
+  );
 
   await check('the timeline: hover names the frame, the frame preview comes from the sprite', async () => {
     await openPlayer();
