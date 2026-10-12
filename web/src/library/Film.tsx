@@ -20,6 +20,7 @@ import { ContextMenu, IconButton, Menu } from '../ui/primitives.tsx';
 import { Skeleton, SkLine } from '../ui/Skeleton.tsx';
 import { DRAG_VIDEO, dragChip } from './drag.ts';
 import { PosterChips, ShareState } from './marks.tsx';
+import { PickBox } from './PickBox.tsx';
 import { CARD_FRAME, Poster, posterUrl } from './Poster.tsx';
 import { UnsentMark } from './unsent.tsx';
 import { openVideo, useVideoMenu } from './useVideoMenu.tsx';
@@ -33,26 +34,30 @@ interface FilmProps {
   compact?: boolean;
   /** Among the first cards on screen: its poster comes first. */
   priority?: boolean;
+  /** Ticked for the selection's bar (./select.ts). */
+  checked?: boolean;
 }
 
-export const Film = memo(function Film({ v, home, folders, where, compact, priority }: FilmProps) {
+export const Film = memo(function Film({ v, home, folders, where, compact, priority, checked = false }: FilmProps) {
   useLang(); // memo'd: renders again on a language switch by itself
   const [menuOpen, setMenuOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
   const qc = useQueryClient();
-  const { items, dialogs, assign, organize } = useVideoMenu(v, { home, folders });
+  const { items, dialogs, assign, organize, picks } = useVideoMenu(v, { home, folders });
   const run = cardRun(v);
   return (
     <ContextMenu items={items} onOpenChange={setMenuOpen}>
       {/* biome-ignore lint/a11y/useSemanticElements: the card holds its own buttons, which an <a> or <button> cannot contain */}
       <div
-        className={`film ${compact ? 'compact' : ''} ${v.archived ? 'archived' : ''} ${menuOpen ? 'menu-open' : ''} ${dragging ? 'dragging' : ''}`}
+        className={`film ${compact ? 'compact' : ''} ${v.archived ? 'archived' : ''} ${menuOpen ? 'menu-open' : ''} ${dragging ? 'dragging' : ''} ${checked ? 'checked' : ''}`}
         role="link"
         tabIndex={0}
         aria-label={t('Review {name}', { name: v.name })}
         data-slug={v.slug}
         data-nav
-        onClick={cardClick((e) => openVideo(v.slug, e), '.film-foot, .film-menu')}
+        onMouseDown={(e) => e.shiftKey && e.preventDefault()}
+        // ⌘/Ctrl- and ⇧-clicks tick it (./select.ts), a plain one opens
+        onClick={cardClick((e) => picks?.click(v.slug, e) || openVideo(v.slug, e), '.film-foot, .film-menu, .film-pick')}
         onKeyDown={onActivate(() => go(v.slug))}
         onPointerEnter={() => prefetchVideo(qc, v.slug)}
         onPointerLeave={cancelPrefetch}
@@ -79,6 +84,7 @@ export const Film = memo(function Film({ v, home, folders, where, compact, prior
           >
             <RunEdge run={run} />
           </Poster>
+          {picks && <PickBox name={v.name} checked={checked} onPick={(shift) => picks.box(v.slug, shift)} className="film-pick" />}
           <div className="film-over top">
             <span className="vchip">V{v.v}</span>
             {v.sample && <span className="vchip sample-chip">{t('Sample')}</span>}

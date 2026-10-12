@@ -3,7 +3,7 @@
 // same page: the top bar, the sidebar, the title and the toolbar are real, and only what the data decides (counts,
 // names, posters) waits as placeholders of its own size — so nothing moves when the data arrives.
 import { useQueryClient } from '@tanstack/react-query';
-import { lazy, type ReactNode, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { type KeyboardEvent as KeyEvent, lazy, type ReactNode, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { archivedIn } from '../../../lib/archived.ts';
 import { can as roleCan } from '../../../lib/permissions.ts';
 import { LANES } from '../../../lib/stage.ts';
@@ -75,6 +75,7 @@ import {
 import { moveCode, useMovedVideos, useMoveState, useMoves } from './moved.ts';
 import { SectionHead } from './SectionHead.tsx';
 import { Sidebar } from './Sidebar.tsx';
+import { useLibrarySelection } from './select.ts';
 import { Toolbar } from './Toolbar.tsx';
 import { useUnsentCounts } from './unsent.tsx';
 import { type CardKit, CardKitContext } from './useVideoMenu.tsx';
@@ -112,6 +113,8 @@ const addVideoCode = loader(() => import('./AddVideo.tsx'));
 // The Archived page comes at once when the page opens on it.
 if (/^#\/archived\b/.test(location.hash)) void archivedCode.load().catch(() => {});
 const UploadDialog = lazy(() => import('../uploads/UploadDialog.tsx').then((m) => ({ default: m.UploadDialog })));
+// The bar that acts on ticked videos (./select.ts): its code comes with the first box ticked.
+const selectBarCode = loader(() => import('./SelectBar.tsx'));
 
 /**
  * The agent's way to a first video, an empty page's main action (sessions/agentStart.tsx): one prompt copied for the
@@ -667,7 +670,6 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
       if (seesFiles) FilesCode?.prefetchArea(qc, folderPage);
     });
   }, [painted, folderPage, pending, seesFiles, FilesCode, qc]);
-  const kit = useMemo<CardKit>(() => ({ can, actions: actionsRef, move: moveTo, board: onBoard }), [can, moveTo, onBoard]);
   const group = pick<GroupBy>(prefs.group, ['folder', 'stage', 'none'], 'folder');
   const sort = pick<SortBy>(prefs.sort, ['recent', 'name', 'stage', 'open'], 'recent');
   const lane = pick<LaneFilter>(prefs.lane, ['all', ...LANES.map((l) => l.id)], 'all');
@@ -768,6 +770,47 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
   const lang = useLang();
   // biome-ignore lint/correctness/useExhaustiveDependencies: a section's title is words ("No project")
   const sections = useMemo(() => groupVideos(shown, group, view), [shown, group, view, lang]);
+  // What a ⇧-click's run and ⌘A reach: the videos in view as they stand (a folded section's cards aren't)
+  const foldedKey = String(prefs.collapsed || '');
+  const order = useMemo(() => {
+    const titled = sections.length > 1 || !!sections[0]?.folder;
+    const folded = layout !== 'list' && titled ? collapsedOf(foldedKey) : [];
+    return sections.flatMap((s) => (folded.includes(s.key) ? [] : s.videos.map((v) => v.slug)));
+  }, [sections, layout, foldedKey]);
+  // ticked videos belong to this view and its filters; the board ticks none
+  const sel = useLibrarySelection(order, `${viewHash(view)}|${q}|${session}|${lane}|${rulesKey}|${archived}`, !onBoard);
+  const kit = useMemo<CardKit>(
+    () => ({ can, actions: actionsRef, move: moveTo, board: onBoard, picks: onBoard ? null : sel.picks }),
+    [can, moveTo, onBoard, sel.picks],
+  );
+  const Bar = useLoaded(selectBarCode, sel.picking);
+  const clearPicks = useRef(sel.clear);
+  clearPicks.current = sel.clear;
+  // Esc lets go of every ticked video, from anywhere on the page but a field, a dialog or a menu
+  useEffect(() => {
+    if (!sel.picking) return;
+    const f = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if ((e.target as Element | null)?.closest?.('input, textarea, select, [role=dialog], [role=alertdialog], [role=menu]')) return;
+      clearPicks.current();
+    };
+    window.addEventListener('keydown', f);
+    return () => window.removeEventListener('keydown', f);
+  }, [sel.picking]);
+  // the list's own keys: the arrows, ⌘A ticks every video in view, X the one the keys are on (never in a field)
+  const listKeys = (e: KeyEvent<HTMLElement>) => {
+    arrowNav(e);
+    if (onBoard || e.defaultPrevented || e.altKey || (e.target as Element).closest('input, textarea, select, [contenteditable]')) return;
+    if (e.key === 'a' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+      e.preventDefault();
+      sel.all();
+    } else if (e.key === 'x' && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+      const slug = (e.target as Element).closest('[data-slug]')?.getAttribute('data-slug');
+      if (!slug) return;
+      e.preventDefault();
+      sel.picks.box(slug, false);
+    }
+  };
   const counts = useMemo(() => laneCounts(beforeLane), [beforeLane]);
   const totals = useMemo((): Totals => {
     const live = inScope.filter((v) => !v.archived);
@@ -817,10 +860,7 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
     setPref('lane', 'all');
     setPref('rules', '');
   };
-  let collapsed: string[] = [];
-  try {
-    collapsed = JSON.parse(String(prefs.collapsed || '[]'));
-  } catch {}
+  const collapsed = collapsedOf(foldedKey);
   const toggleSection = (key: string) =>
     setPref('collapsed', JSON.stringify(collapsed.includes(key) ? collapsed.filter((k) => k !== key) : [...collapsed, key]));
   const base = view.kind === 'folder' ? view.id : null;
@@ -907,6 +947,7 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
           home={info?.home}
           folders={openFolders}
           onOpenSection={(f) => goView({ kind: 'folder', id: f })}
+          checked={sel.checked}
         />
       );
     const titled = sections.length > 1 || !!sections[0]?.folder;
@@ -939,6 +980,7 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
                   where={s.key === '~' ? null : whereFor(v, s)}
                   compact={layout === 'compact'}
                   priority={si === 0 && i < 8}
+                  checked={sel.checked.has(v.slug)}
                 />
               )}
             />
@@ -951,8 +993,8 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
   const libContent = (
     // biome-ignore lint/a11y/noStaticElementInteractions: arrow keys move between the items inside (each one focusable)
     <div
-      className={`lib-content layout-${layout}`}
-      onKeyDown={arrowNav}
+      className={`lib-content layout-${layout} ${sel.picking ? 'picking' : ''}`}
+      onKeyDown={listKeys}
       data-testid="library-content"
       data-layout={layout}
       data-tab-body={page.folder ? '' : undefined}
@@ -962,6 +1004,9 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
           {/* a question waiting in an archived project waits as it is: nothing is answered there until it is restored */}
           {base && !shutHere && <AskLead ask={folderAsk} folder={base} />}
           {content()}
+          {sel.picking && !onBoard && Bar && (
+            <Bar.SelectBar videos={picked(shown, order, sel.checked)} folders={openFolders} why={sel.why} can={can} onClear={sel.clear} onKeep={sel.keep} />
+          )}
         </>
       ) : (
         <SkeletonRegion label={t('Loading the library')}>
@@ -1124,6 +1169,7 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
                           archived={archived}
                           archivedCount={archivedCount}
                           onArchived={(x) => setPref('archived', x)}
+                          onPick={onBoard || !shown.length ? undefined : sel.start}
                         />
                         <FilterChips
                           rules={rules}
@@ -1182,6 +1228,7 @@ export default function Library({ view, pending = false }: { view: LibraryView; 
             slug={typeof reshare.slug === 'string' ? reshare.slug : undefined}
             name={typeof reshare.name === 'string' ? reshare.name : undefined}
             folder={typeof reshare.folder === 'string' ? reshare.folder : undefined}
+            videos={videosOf(reshare.videos)}
             top={typeof reshare.top === 'number' ? reshare.top : undefined}
             onClose={() => setReshare(null)}
           />
@@ -1213,4 +1260,34 @@ function MoveAsks() {
   const { ask } = useMoveState();
   const M = moveCode.ready;
   return ask && M ? <M.MoveAsks /> : null;
+}
+
+/** A pref's list of folded sections. */
+function collapsedOf(json: string): string[] {
+  try {
+    const list: unknown = JSON.parse(json || '[]');
+    return Array.isArray(list) ? list.filter((k): k is string => typeof k === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** A link for several videos, as its share dialog was left (ShareModal's leaveTo keeps them as JSON). */
+function videosOf(kept: unknown): { slug: string; name: string }[] | undefined {
+  if (typeof kept !== 'string') return undefined;
+  try {
+    const list: unknown = JSON.parse(kept);
+    if (!Array.isArray(list)) return undefined;
+    const out = list.filter((v): v is { slug: string; name: string } => typeof v?.slug === 'string' && typeof v?.name === 'string');
+    return out.length > 1 ? out : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The ticked videos, in the order the view shows them. */
+function picked(shown: VideoSummary[], order: string[], checked: ReadonlySet<string>): VideoSummary[] {
+  if (!checked.size) return [];
+  const by = new Map(shown.map((v) => [v.slug, v]));
+  return order.flatMap((slug) => (checked.has(slug) ? (by.get(slug) ?? []) : []));
 }

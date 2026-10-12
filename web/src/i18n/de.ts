@@ -239,8 +239,8 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'The server took too long to answer. Try again in a moment.': 'Der Server hat zu lange nicht geantwortet. Versuch es gleich noch einmal.',
   'Review links': 'Review-Links',
   '{name} can see this on the review link.': '{name} sieht das im Review-Link.',
-  'Every review link that still opens, newest first. Make one from a video’s or a folder’s Share.':
-    'Jeder Review-Link, der noch öffnet, der neueste zuerst. Neue legst du über „Teilen“ eines Videos oder Ordners an.',
+  'Every review link that still opens, newest first. Make one from a video’s or a folder’s Share, or for several videos picked in the library.':
+    'Jeder Review-Link, der noch öffnet, der neueste zuerst. Neue legst du über „Teilen“ eines Videos oder Ordners an, oder für mehrere in der Bibliothek ausgewählte Videos.',
   'Active links': 'Aktive Links',
   'Share a video or a folder: its links show here, and any of them can be revoked.':
     'Teile ein Video oder einen Ordner: Seine Links stehen dann hier, und jeden davon kannst du widerrufen.',
@@ -4977,6 +4977,33 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Next: {step}': 'Als Nächstes: {step}',
   'Opened before this version': 'Vor dieser Version geöffnet',
   'V{v} arrived since': 'Seitdem ist V{v} da',
+  // the library's ticked videos and their bar (library/SelectBar.tsx)
+  'Select {name}': '{name} auswählen',
+  'Select videos': 'Videos auswählen',
+  'Selected videos': 'Ausgewählte Videos',
+  'Tap the videos to select them': 'Tippe auf die Videos, um sie auszuwählen',
+  '{names} and {n} more': '{names} und {n} weitere',
+  '{names}: not yours to change': '{names}: kannst du nicht ändern',
+  '{names} has no notes to keep, so it isn’t archived: remove it from its ⋯ menu|{names} have no notes to keep, so they aren’t archived: remove them from their ⋯ menus':
+    '{names} hat keine Notizen zum Aufheben und wird darum nicht archiviert: Entferne es über sein ⋯-Menü|{names} haben keine Notizen zum Aufheben und werden darum nicht archiviert: Entferne sie über ihre ⋯-Menüs',
+  'The sample isn’t archived: remove it from its ⋯ menu': 'Das Beispiel wird nicht archiviert: Entferne es über sein ⋯-Menü',
+  '{names} is in an archived project: only its owners and admins move it out|{names} are in archived projects: only their owners and admins move them out':
+    '{names} liegt in einem archivierten Projekt: Nur seine Inhaber und Admins verschieben es heraus|{names} liegen in archivierten Projekten: Nur deren Inhaber und Admins verschieben sie heraus',
+  'Archived {n} video|Archived {n} videos': '{n} Video archiviert|{n} Videos archiviert',
+  'Move {n} video|Move {n} videos': '{n} Video verschieben|{n} Videos verschieben',
+  'Moved {n} video to {folder}|Moved {n} videos to {folder}': '{n} Video nach {folder} verschoben|{n} Videos nach {folder} verschoben',
+  'Moving {done} of {n}…': 'Verschiebe {done} von {n} …',
+  // one review link for several videos picked in the library (share/ShareModal.tsx, library/SelectBar.tsx)
+  'Share as one link': 'Als ein Link teilen',
+  'Share {n} video|Share {n} videos': '{n} Video teilen|{n} Videos teilen',
+  'Links to these videos': 'Links zu diesen Videos',
+  'A link for these videos opens a review room with exactly them: nothing else from their projects.':
+    'Ein Link für diese Videos öffnet einen Review-Raum mit genau ihnen: nichts sonst aus ihren Projekten.',
+  '{n} video: {names}|{n} videos: {names}': '{n} Video: {names}|{n} Videos: {names}',
+  'Its videos were deleted: it opens nothing': 'Seine Videos wurden gelöscht: Er öffnet nichts',
+  '{names} isn’t shared: archived, or in an archived project|{names} aren’t shared: archived, or in archived projects':
+    '{names} wird nicht geteilt: archiviert oder in einem archivierten Projekt|{names} werden nicht geteilt: archiviert oder in archivierten Projekten',
+  'A link covers at most {max} videos: share a folder for more.': 'Ein Link umfasst höchstens {max} Videos: Teile für mehr einen Ordner.',
 };
 
 export const de: Record<Key, string> = { ...owner, ...client };

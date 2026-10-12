@@ -283,7 +283,7 @@ test('what only a person does: every PERSON_ONLY route is a registered one, and 
   ]);
   const only = new Set(PERSON_ONLY.map(([m, p]) => `${m} ${p}`));
   for (const [m, p] of routes)
-    if (WRITES.has(m) && /^\/api\/(admin|workspaces|auth\/(tokens|apps)|shares|folder-shares|publish\/connections)(\/|$)|\/shares$/.test(p))
+    if (WRITES.has(m) && /^\/api\/(admin|workspaces|auth\/(tokens|apps)|shares|folder-shares|set-shares|publish\/connections)(\/|$)|\/shares$/.test(p))
       if (!only.has(`${m} ${p}`) && !NOT_ONLY_A_PERSON.has(`${m} ${p}`)) problems.push(`${m} ${p} is no person's alone (PERSON_ONLY)`);
   assert.deepEqual(problems, [], problems.join('\n'));
 });

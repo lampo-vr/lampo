@@ -42,6 +42,21 @@ A link is for that video or that folder, not for its name. Deleting the folder e
 and so does deleting a video without notes; a video with notes is archived and keeps them. A video added again under
 the same name, or a project made again with the same name, is another one: an old link never shows it.
 
+### A link for several videos
+
+Pick videos in the library's list or grid and choose *Share as one link* in the bar that comes up: one link for
+exactly those videos (2 to 100 of them). It opens a review room like a project's, with only those videos in it and no
+folder named, and its kinds, settings, password and expiry work as for any link, for each of its videos.
+
+- It is for the videos themselves, by their ids: moved to another project, a video stays in it; a video removed or
+  archived later drops out (restored, it is back), and one added again under the same name is another video. With none
+  of its videos left, it opens like an expired link.
+- A video in an archived project is watch only on such a link; its other videos still take notes.
+- Who may make one: whoever may share, in the app (never an API token, like every review link). Every video must be
+  one of the workspace's, with a version, not archived.
+- *Download all* is a folder link's; a link for several videos offers each video's download (when its settings do),
+  and is never an embed.
+
 ### Where links open
 
 On a hosted server, a link opens for anyone who has it.

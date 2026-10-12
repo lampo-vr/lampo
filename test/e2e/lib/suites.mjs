@@ -108,6 +108,9 @@ const SECONDS = {
   status: 12,
   // archived projects: archive with Undo, the lists, the Archived page, the banner, ⌘K, restore, 390–1440 both themes
   archive: 18,
+  // several videos at once: List and Grid, the keys, the bar's room, Move to… and Archive with Undo, a hosted member,
+  // a phone at 390, both themes (two servers, ten generated clips)
+  'library-select': 30,
   moving: 10,
   // an agent's work in every state: the strip, the Agent view, cards, phone, its own long sentence, 390–1920 both
   // themes and German

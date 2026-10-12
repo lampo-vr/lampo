@@ -206,8 +206,10 @@ export async function accountExport(userId: string): Promise<ExportFile[]> {
           created: s.created,
           ...(s.expires ? { expires: s.expires } : {}),
           ...(s.revoked ? { revoked: s.revoked } : {}),
-          kind: s.folder ? 'folder' : 'video',
+          kind: s.folder ? 'folder' : s.video_ids ? 'set' : 'video',
           ...(s.folder ? { folder: s.folder } : {}),
+          // a set link: how many videos it was made for (a video link names none either)
+          ...(s.video_ids ? { videos: s.video_ids.length } : {}),
         }));
       return { notes, replies, drafts, recordings, audio, verdicts, watching, uploads, links, requests };
     });

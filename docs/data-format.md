@@ -552,7 +552,9 @@ The folders, listed so that empty ones survive. A video's own folder is `folder`
   `video_added` (the review's `id` and `added`), or `folder_id` (the folder's id in `folders.json`). A video added
   again under the same slug is another video, and the link doesn't cover it. Deleting the video (one without notes)
   or the folder revokes its links. Links from before get these fields when the server starts; one whose video or
-  folder is gone by then, or that is older than the video now at its slug, is revoked instead.
+  folder is gone by then, or that is older than the video now at its slug, is revoked instead. A link for a chosen
+  set of videos has neither `slug` nor `folder` but `video_ids`, the reviews' `id`s (2 to 100, in the order picked),
+  looked up on every visit: a video moved stays in it, one removed or archived drops out.
 - **Who and when.** `by` is who made the link and `by_id` their account (optional, newer links); `updated` is when its
   settings last changed.
 - **Settings.** `comment`, `approve`, `notes` (`own` or `all`), `versions` (`latest` or `all`), `download` (`off`,

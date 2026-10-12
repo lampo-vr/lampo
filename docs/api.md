@@ -1260,15 +1260,17 @@ answers `403 {person: true}`: an agent never holds a link it could approve throu
 
 | Route | What it does |
 |---|---|
-| `GET /api/review/:slug/shares` | the video's links and the folder links that include it, as `ShareInfo`, plus `sharer`, `tunnel` and `lan` (below) |
+| `GET /api/review/:slug/shares` | the video's links and the folder and set links that include it, as `ShareInfo`, plus `sharer`, `tunnel` and `lan` (below) |
 | `POST /api/review/:slug/shares` | a link for one video (settings optional) |
 | `GET /api/folder-shares?folder=` · `POST /api/folder-shares {folder, …}` | links for a folder and its subfolders |
+| `POST /api/set-shares {slugs, …}` | a link for a chosen set of videos: 2 to 100 different videos of the workspace, each with a version and not archived (`400` out of bounds or an embed, `404 no such video` for one it doesn't have, `409` archived or from before videos had ids, `423` in an archived project). Kept by the videos' ids |
 | `GET /api/shares` | every link of the workspace that isn't revoked, newest first (`SharesResponse`). `gone: true` marks one whose video or folder was deleted outside the app: it opens nothing, and this is where it can still be found and revoked |
 | `PATCH /api/shares/:token` | change the settings; `password: null` removes it, a new password signs every visitor out |
 | `DELETE /api/shares/:token` | revoke it |
 | `GET /api/shares/:token/qr?base=` | `{url, svg}`: a QR code for `<base>/g/<token>` |
 
-`ShareInfo` holds the settings, `id`, `token` (see above), `kind`, `name`, `password` (true or false), `expired`,
+`ShareInfo` holds the settings, `id`, `token` (see above), `kind` (`video`, `folder` or `set`), `name`, `videos` (a set
+link's: `[{slug, name}]` it covers now, in its order), `password` (true or false), `expired`,
 `sharer` (who visitors are told the link is from; `null` until a name is chosen), `stats {opens, last_opened,
 reviewers, notes, downloads}` and `activity {visitors, videos: [{name, v, watched, heat, viewers}], events, secs}`,
 summed up from the link's records.

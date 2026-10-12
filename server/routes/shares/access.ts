@@ -4,7 +4,20 @@
 import type { Request } from 'express';
 import { addressKey, type RateLimit, type Recent } from '../../../lib/rateLimit.ts';
 import { currentWorkspace } from '../../../lib/scope.ts';
-import { archivedFor, covers, isExpired, isUnlocked, resolveShare, settingsOf, sharerName, slugOfGuestId, visibleVerdicts } from '../../../lib/shares.ts';
+import {
+  archivedFor,
+  archivedForVideo,
+  covers,
+  isExpired,
+  isUnlocked,
+  manyVideos,
+  resolveShare,
+  reviewsOf,
+  settingsOf,
+  sharerName,
+  slugOfGuestId,
+  visibleVerdicts,
+} from '../../../lib/shares.ts';
 import { verdictOn } from '../../../lib/stage.ts';
 import * as store from '../../../lib/store.ts';
 import type { Approval, GuestPerms, Review, ShareWithToken, Version } from '../../../lib/types.ts';
@@ -37,7 +50,8 @@ export function changed(ctx: ServerContext, slug?: string): void {
   ctx.broadcast('library', slug ? { slug } : {});
 }
 
-/** The link a request names: 404 unknown or revoked, 410 expired. */
+/** The link a request names: 404 unknown or revoked, 410 expired — and a set link none of whose videos is left (each
+ * removed, archived or gone from the workspace) as if it had expired: it opens nothing any more. */
 export function link(req: Request<{ token: string }>): ShareWithToken {
   const share = resolveShare(req.params.token);
   if (!share) throw fail(404, 'This review link is not valid any more.');
@@ -48,6 +62,8 @@ export function link(req: Request<{ token: string }>): ShareWithToken {
       ...(share.embed ? {} : { by: sharerName(share) }),
       expired: share.expires,
     });
+  if (share.video_ids && !reviewsOf(share).length)
+    throw fail(410, 'The videos of this review link are no longer there.', { by: sharerName(share), expired: null });
   return share;
 }
 
@@ -65,7 +81,7 @@ export function open(req: Request<{ token: string }>): ShareWithToken {
  */
 export function embedOf(token: unknown): ShareWithToken {
   const share = resolveShare(token);
-  if (!share?.embed || share.password || share.folder) throw fail(404, 'This video isn’t available.');
+  if (!share?.embed || share.password || manyVideos(share)) throw fail(404, 'This video isn’t available.');
   if (isExpired(share)) throw fail(410, 'This video isn’t available any more.');
   return share;
 }
@@ -103,11 +119,13 @@ export function sameSite(req: Request): void {
   } else if (req.headers['sec-fetch-site'] === 'cross-site') throw fail(403, 'bad origin');
 }
 
-/** The review a request names (by the id the link gave it): the link's own video, or one the folder link covers. */
+/** The review a request names (by the id the link gave it): the link's own video, or one the folder or set link covers
+ * (a set link's by its ids alone: slugOfGuestId). */
 export function target(share: ShareWithToken, id?: string): Review {
   const named = id ? slugOfGuestId(share, id) : null;
-  const s = share.folder ? named : share.slug;
-  if (!s || (!share.folder && id && named !== share.slug)) throw fail(404, 'This video is not part of this link.');
+  const many = manyVideos(share);
+  const s = many ? named : share.slug;
+  if (!s || (!many && id && named !== share.slug)) throw fail(404, 'This video is not part of this link.');
   const review = store.loadReview(s);
   if (!review || !covers(share, review) || !review.versions.length) throw fail(404, 'This video is not part of this link.');
   return review;
@@ -126,14 +144,16 @@ export function version(share: ShareWithToken, review: Review, v: unknown): Vers
 /**
  * What a link lets its visitors do now: its settings — watch only while its project is archived (lib/shares.ts
  * archivedFor: they watch, and download what it offers, but leave no note or decision). Restored, it is as it was.
+ * With `review`: on that video (a set link's video in an archived project is watch only, its others not).
  */
-export const perms = (share: ShareWithToken): GuestPerms => {
+export const perms = (share: ShareWithToken, review?: Pick<Review, 'folder'>): GuestPerms => {
   const { expires: _e, ...p } = settingsOf(share);
-  return archivedFor(share) ? { ...p, comment: false, approve: false } : p;
+  return (review ? archivedForVideo(share, review) : archivedFor(share)) ? { ...p, comment: false, approve: false } : p;
 };
 
-export const may = (share: ShareWithToken, what: 'comment' | 'approve'): void => {
-  if (!perms(share)[what]) throw fail(403, what === 'comment' ? 'This link is for watching only.' : 'This link does not ask for an approval.');
+/** Refused (403) when the link — with `review`, on that video — doesn't let its visitors do `what` now. */
+export const may = (share: ShareWithToken, what: 'comment' | 'approve', review?: Pick<Review, 'folder'>): void => {
+  if (!perms(share, review)[what]) throw fail(403, what === 'comment' ? 'This link is for watching only.' : 'This link does not ask for an approval.');
 };
 
 // What a client sees as "approved": the clients' own verdict on that version, never the team's (a team approval must

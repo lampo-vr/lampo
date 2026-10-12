@@ -19,6 +19,7 @@ import {
   isExpired,
   isUnlocked,
   knowsVisitor,
+  manyVideos,
   noteShotShown,
   recordView,
   recordVisit,
@@ -265,7 +266,7 @@ export function guestRoutes(ctx: ServerContext): Router {
   // ---------------------------------------------------------------- the link itself
 
   // Folder names are often client and project names: a visitor learns no folder above what the link shares (A12
-  // GUEST-13). A folder link says its own name and where each video sits below it; a video link names none.
+  // GUEST-13). A folder link says its own name and where each video sits below it; a video or set link names none.
   const ownName = (share: ShareWithToken): string | null => (share.folder ? share.folder.split('/').pop() || null : null);
   const placeBelow = (share: ShareWithToken, review: Review): string | null =>
     share.folder && review.folder?.startsWith(`${share.folder}/`) ? review.folder.slice(share.folder.length + 1) : null;
@@ -299,7 +300,7 @@ export function guestRoutes(ctx: ServerContext): Router {
     const badge = await badgeShown(ctx);
     const out: GuestLinkResponse = {
       ...whose(share),
-      kind: share.folder ? 'folder' : 'video',
+      kind: share.folder ? 'folder' : share.video_ids ? 'set' : 'video',
       // nothing of what it shares before the password (docs/sharing.md), its folder's name included
       folder: locked ? null : ownName(share),
       locked,
@@ -360,8 +361,8 @@ export function guestRoutes(ctx: ServerContext): Router {
     if (fresh) visits.set(key, Date.now());
     const name = nameOf(share, b.name);
     remember(share, req, name);
-    // A folder link's room is a visit of its own; on a video link the video's view says it (recordView).
-    const act = fresh && share.folder ? { kind: 'open' as const, name } : undefined;
+    // A folder or set link's room is a visit of its own; on a video link the video's view says it (recordView).
+    const act = fresh && manyVideos(share) ? { kind: 'open' as const, name } : undefined;
     if (fresh || name) recordVisit(share.token, { open: fresh, name, visitor, act });
     // the workspace's first review link opened by a visitor (never the team's own preview, nor one on the sample): the funnel's step, and a
     // moment for whoever made the link — named by the link's name alone, never by who opened it
@@ -544,7 +545,8 @@ export function guestRoutes(ctx: ServerContext): Router {
   function guestReview(share: ShareWithToken, review: Review, ver: Version, phone = false): GuestReviewResponse {
     const id = guestId(share, slugify(review.video));
     const latest = review.versions.at(-1) as Version;
-    const p = perms(share);
+    // on this video (a set link's video in an archived project is watch only)
+    const p = perms(share, review);
     const dl = (kind: string) => `/api/g/${share.token}/download/${id}/v${ver.v}?kind=${kind}`;
     // What the player plays (see ./media.ts): a copy unless the link offers the original; none while it's being made.
     const play = p.download === 'original' ? playback.playable(review, ver) : playback.preview(review, ver);
@@ -643,6 +645,7 @@ export function guestRoutes(ctx: ServerContext): Router {
     const landed = mayWrite(share, req);
     const b = body(GuestComment, req);
     const review = target(share, b.slug);
+    may(share, 'comment', review);
     const ver = version(share, review, b.v);
     const slug = slugify(review.video);
     // review.json is read and written whole on every change: what a link can add to one video is bounded. Its own
@@ -721,6 +724,7 @@ export function guestRoutes(ctx: ServerContext): Router {
     const landed = mayWrite(share, req);
     const id = parse(commentId, req.params.id, 'note id');
     const { review } = visibleNote(share, id);
+    may(share, 'comment', review);
     const b = body(GuestReply, req);
     const name = guestName(b.name);
     store.updateComment(id, { note: b.text.trim().slice(0, 2000), by: `guest:${name}`, share: shareId(share) });
@@ -741,6 +745,7 @@ export function guestRoutes(ctx: ServerContext): Router {
     roomForNotes();
     const id = parse(commentId, req.params.id, 'note id');
     const { review, comment } = visibleNote(share, id);
+    may(share, 'comment', review);
     const b = body(GuestRefBody, req);
     const name = guestName(b.name);
     const said = b.note?.trim().slice(0, 2000) || undefined;
@@ -835,6 +840,7 @@ export function guestRoutes(ctx: ServerContext): Router {
     may(share, 'comment');
     const id = parse(commentId, req.params.id, 'note id');
     const { review, comment } = visibleNote(share, id);
+    may(share, 'comment', review);
     if (comment.status !== 'fixed') throw fail(409, 'This note is not waiting for a check.');
     const b = body(GuestCheck, req);
     const name = guestName(b.name);
@@ -858,6 +864,7 @@ export function guestRoutes(ctx: ServerContext): Router {
     may(share, 'approve');
     const b = body(GuestApproval, req);
     const review = target(share, b.slug);
+    may(share, 'approve', review);
     const slug = slugify(review.video);
     const landed = mayWrite(share, req, 'verdict');
     const ver = review.versions.at(-1) as Version;

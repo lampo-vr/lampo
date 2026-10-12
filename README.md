@@ -236,6 +236,7 @@ to check a running instance.
 | <kbd>=</kbd> <kbd>−</kbd> <kbd>0</kbd> · <kbd>Z</kbd> <kbd>⇧Z</kbd> | timeline zoom (or ⌘ + scroll; far in, every frame is a cell) · to the section or around the playhead · the whole video |
 | <kbd>⌘K</kbd> (<kbd>Ctrl K</kbd>) · <kbd>⌘,</kbd> | find a video, folder or note anywhere, or run an action · Settings |
 | <kbd>A</kbd> · <kbd>1</kbd>–<kbd>4</kbd> · <kbd>/</kbd> · <kbd>F</kbd> | library: add video · grid, compact, list, board · search this view · filter |
+| ⌘-click · ⇧-click · <kbd>⌘A</kbd> · <kbd>X</kbd> · <kbd>Esc</kbd> | library (List, Grid): tick a video · the run from the last one · every video in view · the one the keys are on · none; the bar moves or archives them all |
 | <kbd>↑</kbd> <kbd>↓</kbd> (⇧ picks) · <kbd>↵</kbd> · <kbd>Space</kbd> · <kbd>⌫</kbd> | Files tab: move through the list · open · look · trash (with Undo); <kbd>⌘A</kbd> picks all, <kbd>⌘↑</kbd> goes up a folder, <kbd>/</kbd> searches |
 | <kbd>?</kbd> | every key |
 

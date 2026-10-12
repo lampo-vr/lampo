@@ -188,6 +188,9 @@ const NESTED: { file: string; outer: string; inner: string; inset: () => number;
   },
   { file: 'code.css', outer: '.set-code', inner: '.set-copy', inset: () => firstOf(decl('code.css', '.set-copy', 'margin')) },
   { file: 'cards.css', outer: '.film-poster', inner: '.vchip', inset: () => px(decl('cards.css', '.film-over', 'left') ?? 'NaN') },
+  // the box that ticks a card for the selection's bar, in the poster's corner; a ticked card's fill around its poster
+  { file: 'cards.css', outer: '.film-poster', inner: '.vchip-pick', inset: () => px(decl('cards.css', '.film-pick', 'left') ?? 'NaN') },
+  { file: 'cards.css', outer: '.film.checked::before', inner: '.film-poster', inset: () => -px(decl('cards.css', '.film.checked::before', 'inset') ?? 'NaN') },
   { file: 'library.css', outer: '.lane', inner: '.bcard', inset: () => firstOf(decl('library.css', '.lane', 'padding')) },
   // Get started's box at the sidebar's foot: the next step is its raised button, inset by the box's padding
   {

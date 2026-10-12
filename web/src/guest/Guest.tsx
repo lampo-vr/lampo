@@ -77,7 +77,9 @@ export default function Guest({ token }: { token: string }) {
   const d = link.data;
   const sharer = { name: d.reviewer, avatar: d.reviewer_avatar, org: d.org };
   if (d.locked) return <PasswordGate token={token} label={d.label} sharer={sharer} foot={d} />;
-  if (d.kind === 'folder' && !slug) return <Room link={d} onOpen={setSlug} name={name} />;
+  // a folder's link, or one for a chosen set of videos: a room of them
+  const room = d.kind !== 'video';
+  if (room && !slug) return <Room link={d} onOpen={setSlug} name={name} />;
   const target = d.kind === 'video' ? d.videos[0]?.slug : slug;
   if (!target) return <Gate kind="empty" label={d.label} sharer={sharer} foot={d} />;
   return (
@@ -87,8 +89,8 @@ export default function Guest({ token }: { token: string }) {
       slug={target}
       name={name}
       setName={setName}
-      onBack={d.kind === 'folder' ? () => setSlug(null) : undefined}
-      onOpen={d.kind === 'folder' ? setSlug : undefined}
+      onBack={room ? () => setSlug(null) : undefined}
+      onOpen={room ? setSlug : undefined}
       link={d}
     />
   );
@@ -166,7 +168,7 @@ function Video({
       startFrame={startAt.current}
       onBack={onBack}
       roomLabel={roomLabel}
-      room={link.kind === 'folder' ? { videos: link.videos, onOpen } : undefined}
+      room={link.kind !== 'video' ? { videos: link.videos, onOpen } : undefined}
       foot={link}
     />
   );

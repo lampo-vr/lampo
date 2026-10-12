@@ -197,6 +197,7 @@ test('reviewers: allowed to watch, comment, confirm and approve — and nothing 
     ['GET', '/api/shares/abcdefghijklmnopqrstuvwx/qr'],
     ['GET', '/api/folder-shares?folder=Acme'],
     ['POST', '/api/folder-shares', { folder: 'Acme', label: 'Client' }],
+    ['POST', '/api/set-shares', { slugs: [decodeURIComponent(slug), 'another'], label: 'Client' }],
     ['GET', '/api/admin/webhooks'],
     ['POST', '/api/admin/webhooks', { url: 'https://hooks.example.com/x' }],
     ['POST', `/api/review/${slug}/request`, { text: 'please fix' }],

@@ -442,11 +442,12 @@ export function useRevokeLink() {
 }
 
 /** Review links for a video or a folder. Any change refreshes every link list (a folder link also shows on its videos). */
-export function useShareActions(target: { slug: string } | { folder: string }) {
+/** A video's links, a folder's, or the links for a chosen set of videos (by their slugs). */
+export function useShareActions(target: { slug: string } | { folder: string } | { slugs: string[] }) {
   const invalidate = useInvalidate();
   const lists = ['shares'] as const;
-  const createUrl = 'slug' in target ? `/api/review/${enc(target.slug)}/shares` : '/api/folder-shares';
-  const extra = 'slug' in target ? {} : { folder: target.folder };
+  const createUrl = 'slug' in target ? `/api/review/${enc(target.slug)}/shares` : 'folder' in target ? '/api/folder-shares' : '/api/set-shares';
+  const extra = 'slug' in target ? {} : 'folder' in target ? { folder: target.folder } : { slugs: target.slugs };
   return {
     create: useMutation({
       mutationFn: (input: ShareInput) => api<ShareInfo>(createUrl, { method: 'POST', body: { ...extra, ...input } }),

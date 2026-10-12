@@ -658,6 +658,12 @@
 .dp-row + .dp-row {
   border-top: 1px solid var(--float-line);
 }
+/* a touch screen's way into ticking videos (no pointer brings their boxes out): a button across the panel's foot */
+.dp-pick.btn {
+  justify-content: center;
+  min-height: var(--h-touch);
+  margin-top: var(--sp-1);
+}
 
 /* ---------------------------------------------------------------- filter chips (library/Filters.tsx) */
 
@@ -1087,6 +1093,11 @@ button.shead-title:hover {
 .lrow.archived {
   opacity: 0.5;
 }
+/* ticked for the selection's bar (library/select.ts): one flat step deeper, under the pointer too */
+.lrow.checked td,
+.lrow.checked:hover td {
+  background: var(--sel-on);
+}
 .lc-name {
   width: 100%;
   max-width: 0;
@@ -1154,6 +1165,19 @@ button.shead-title:hover {
   width: 64px;
   border-radius: var(--r);
   box-shadow: 0 0 0 1px var(--line);
+}
+/* The box that ticks a row (library/PickBox.tsx, drawn in cards.css .vchip-pick) over the thumbnail's start */
+.lrow .lc-name {
+  position: relative;
+}
+.lpick {
+  left: calc(var(--sp-2) + var(--sp-1));
+  top: 50%;
+  translate: 0 -50%;
+}
+.lrow:is(:hover, :focus-within) .lpick,
+.picking .lpick {
+  opacity: 1;
 }
 .lname {
   display: grid;

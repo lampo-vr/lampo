@@ -264,6 +264,36 @@ test('A12-D11: what ends nothing tells no open stream, and leaves the files ever
   assert.ok(oauth.verifyAccess(app.access_token, LIB_RESOURCE, { touch: false }));
 });
 
+// A review link is its own credential, asked about on every request (lib/shares.ts resolveShare): revoking one ends it
+// at once on every route it opens, and it is no account's access, so it tells no stream — a set link like any other.
+test('a review link for a chosen set of videos, made and revoked: no account’s access ends; every route it opened answers 404 at once', async () => {
+  const second = makeVideo(path.join(dir, 'in/teaser.mp4'), { dur: 1 });
+  age(second);
+  const teaser = (
+    await tusUpload(request, second, { filename: 'teaser.mp4', folder: 'Spots' }, { Authorization: `Bearer ${auth.createToken(owner.id, 'two').token}` })
+  ).json().slug as string;
+  let made: { token: string } = { token: '' };
+  assert.equal(
+    await endsLib(async () => {
+      const r = await request('POST', '/api/set-shares', { body: { slugs: [slug, teaser], label: 'Both spots' }, headers: ownerSession });
+      assert.equal(r.status, 200, r.text);
+      made = r.json();
+    }),
+    0,
+    'making it',
+  );
+  const room = await request('GET', `/api/g/${made.token}`);
+  assert.equal(room.status, 200, room.text);
+  const urls = (room.json().videos as { slug: string; poster: string }[]).flatMap((v) => [`/api/g/${made.token}/review/${v.slug}`, v.poster]);
+  for (const u of urls) assert.equal((await request('GET', u)).status, 200, u);
+  assert.equal(
+    await endsLib(async () => assert.equal((await request('DELETE', `/api/shares/${made.token}`, { headers: ownerSession })).status, 200)),
+    0,
+    'revoking it',
+  );
+  for (const u of [`/api/g/${made.token}`, ...urls]) assert.equal((await request('GET', u)).status, 404, u);
+});
+
 test('VE3b-5: every way access really ends tells the open streams (a forgotten call fails here)', async () => {
   const cases: [string, () => Promise<unknown> | unknown][] = [
     ['an API token revoked', async () => auth.revokeToken(auth.createToken((await libPerson()).id, 't').info.id)],

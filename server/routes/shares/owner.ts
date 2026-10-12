@@ -1,11 +1,12 @@
-// The owner's side of review links (behind the guard / sign-in): create, change and revoke links for a video or a
-// folder, list the links that cover a video — or every link, including one whose video or folder is gone — and a QR
-// code for handing one to someone in the room.
+// The owner's side of review links (behind the guard / sign-in): create, change and revoke links for a video, a
+// folder or a chosen set of videos, list the links that cover a video — or every link, including one whose video or
+// folder is gone — and a QR code for handing one to someone in the room.
 import express, { type Router } from 'express';
 import QRCode from 'qrcode';
 import { z } from 'zod';
 import { checkNotArchived } from '../../../lib/folderIds.ts';
 import { allFolders, folderIdFor, folderName } from '../../../lib/folders.ts';
+import { SHARE_SET_MAX, SHARE_SET_MIN } from '../../../lib/shareSet.ts';
 import {
   allShares,
   covers,
@@ -13,11 +14,13 @@ import {
   LinkRefusedError,
   listShares,
   madeFor,
+  NoSuchVideoError,
   resolveShare,
   revokeShare,
   shareInfo,
   sharerName,
   updateShare,
+  VideoNotSharedError,
 } from '../../../lib/shares.ts';
 import { FOLDER_LIMITS } from '../../../lib/store.ts';
 import type { ShareInfo, SharesResponse } from '../../../lib/types.ts';
@@ -53,10 +56,16 @@ function refusable<T>(fn: () => T): T {
     return fn();
   } catch (e) {
     if (e instanceof LinkRefusedError) throw failFrom(400, e);
+    // a set link's video that isn't this workspace's (or anyone's): one answer for both, never which
+    if (e instanceof NoSuchVideoError) throw fail(404, 'no such video');
+    if (e instanceof VideoNotSharedError) throw failFrom(409, e);
     throw e;
   }
 }
 const NewFolderShare = Settings.extend({ folder: z.string().min(1).max(FOLDER_LIMITS.length) });
+/** A link for a chosen set of videos, by the slugs the library has (lib/shares.ts createShare checks each against this
+ * workspace and keeps only their ids). */
+const NewSetShare = Settings.extend({ slugs: z.array(z.string().min(1).max(600)).min(SHARE_SET_MIN).max(SHARE_SET_MAX) });
 const FolderSharesQuery = z.object({ folder: z.string().max(FOLDER_LIMITS.length).optional() });
 
 /**
@@ -82,12 +91,12 @@ export function ownerShareRoutes(ctx: ServerContext): Router {
   });
 
   // Links that include this video: its own (made for it, not for a video removed before it under the same slug), and
-  // folder links whose folder it is filed in.
+  // folder and set links that cover it.
   r.get('/api/review/:slug/shares', (req, res) => {
     const review = getReview(req.params.slug);
     const own = listShares(req.params.slug).filter((s) => madeFor(s, review));
-    const viaFolder = listShares().filter((s) => s.folder && covers(s, review));
-    const out: SharesResponse = { shares: [...own, ...viaFolder].map(shareInfo).map(listedFor(req)), ...reach(req) };
+    const viaOthers = listShares().filter((s) => (s.folder || s.video_ids) && covers(s, review));
+    const out: SharesResponse = { shares: [...own, ...viaOthers].map(shareInfo).map(listedFor(req)), ...reach(req) };
     res.json(out);
   });
 
@@ -138,6 +147,22 @@ export function ownerShareRoutes(ctx: ServerContext): Router {
       const { folder: _f, ...input } = b;
       // The link is on this folder by its id: wherever it moves, and never on another folder made under its name later.
       const s = refusable(() => createShare({ folder, folder_id: folderIdFor(folder) }, { ...input, by: ctx.actor(req), byId: req.auth?.user?.id }));
+      ctx.broadcast('library');
+      if (!onSample(s)) countStep(ctx, 'link_first');
+      res.json(shareInfo(s));
+    },
+  );
+
+  // A link for a chosen set of videos (the library's selection): exactly these, each the video at its slug now, all of
+  // this workspace. A person's (PERSON_ONLY), never an API token's; a read-only plan stops it like any new link.
+  r.post(
+    '/api/set-shares',
+    gate(() => ctx.extension, 'share'),
+    express.json(),
+    (req, res) => {
+      const { slugs, ...input } = body(NewSetShare, req);
+      const s = refusable(() => createShare({ slugs }, { ...input, by: ctx.actor(req), byId: req.auth?.user?.id }));
+      // one library event for every card it covers (its stage reads the link), never a `review` per video
       ctx.broadcast('library');
       if (!onSample(s)) countStep(ctx, 'link_first');
       res.json(shareInfo(s));

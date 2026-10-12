@@ -12,7 +12,7 @@ const MIN_COMPRESS = 1024;
 // Answers that carry secrets are never compressed: a compressed size that changes with attacker-chosen input next to a
 // secret leaks the secret (BREACH). Tokens, sessions, invites, OAuth and review-link tokens live under these. They also
 // say `no-transform`, so a CDN in front (which compresses JSON by itself) leaves them as they are too.
-const NO_COMPRESS = /^\/(?:api\/(?:auth|admin|oauth|shares|folder-shares|push|tunnel)(?:\/|$)|api\/review\/[^/]+\/shares$|oauth(?:\/|$))/;
+const NO_COMPRESS = /^\/(?:api\/(?:auth|admin|oauth|shares|folder-shares|set-shares|push|tunnel)(?:\/|$)|api\/review\/[^/]+\/shares$|oauth(?:\/|$))/;
 
 type Coding = 'br' | 'gzip';
 

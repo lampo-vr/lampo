@@ -1,0 +1,93 @@
+/* ---------------------------------------------------------------- the library's ticked videos: the bar (library/SelectBar.tsx) */
+
+/* One float at the foot of what scrolls: sticky in the flow at the content's end, so it keeps its room there (a gap
+   above, its height, the gap it floats at) and the last row can always be scrolled clear of it. Sticky stops short of
+   the page's padding at its end: --lsel-under (SelectBar.tsx, measured) reaches into it, to the window's foot. */
+.lsel {
+  position: sticky;
+  bottom: calc(var(--sp-3) + env(safe-area-inset-bottom) - var(--lsel-under, 0px));
+  z-index: 3;
+  display: grid;
+  gap: var(--sp-1);
+  width: fit-content;
+  max-width: calc(100% - 2 * var(--sp-2));
+  margin: var(--sp-4) auto var(--sp-3);
+  padding: var(--sp-1);
+  border: 1px solid var(--float-line);
+  border-radius: var(--r-lg);
+  background: var(--float-bg);
+  box-shadow: var(--shadow-float);
+  --float-y: var(--sp-2);
+  animation: float-in var(--dur) var(--ease-out);
+}
+.lsel-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-0_5);
+  min-width: 0;
+}
+/* how many, then a hairline, then what to do with them */
+.lsel-n {
+  flex: none;
+  margin-right: var(--sp-1);
+  padding: 0 var(--sp-3) 0 var(--sp-2);
+  border-right: 1px solid var(--line);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-ui);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.lsel-row > .btn {
+  flex: none;
+}
+.lsel .btn.ghost:hover:where(:not(:disabled)) {
+  background: var(--float-sel);
+}
+.lsel-x.btn {
+  color: var(--muted);
+}
+/* what the last action left ticked, and why: a quiet line above the actions, as wide as they are */
+.lsel-why {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  max-width: 56ch;
+  margin: 0;
+  padding: var(--sp-1) var(--sp-2) 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-ui);
+  color: var(--fg-2);
+}
+.lsel-why .icon {
+  flex: none;
+  margin-top: var(--sp-0_5);
+  color: var(--muted);
+}
+
+/* where its words would run into each other, the glyphs stay (their names are the buttons' labels) */
+@container lib (max-width: 560px) {
+  .lsel-l {
+    display: none;
+  }
+  .lsel {
+    max-width: 100%;
+  }
+  .lsel-n {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+@container lib (max-width: 680px) {
+  :lang(de) .lsel-l {
+    display: none;
+  }
+}
+/* a finger: every action a finger's size */
+@media (hover: none) and (pointer: coarse) {
+  .lsel-row > .btn {
+    min-width: var(--h-touch);
+    min-height: var(--h-touch);
+  }
+}

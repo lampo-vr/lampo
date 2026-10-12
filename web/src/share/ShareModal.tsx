@@ -1,11 +1,12 @@
-// Owner side of review links: make one for a video or a whole folder, decide what visitors may do, see who opened
+// Owner side of review links: make one for a video, a whole folder or several videos picked in the library (exactly
+// those: a link for a set), decide what visitors may do, see who opened
 // it, change or revoke it later, and (locally) make links reachable from anywhere through a Cloudflare tunnel.
 // Who it's for, one of three kinds of link, and every setting in view as a row with its name and its switch
 // (LinkSettings.tsx); the links already made are one line each, and Edit link opens one as its own page in the
 // dialog, with the same rows.
-import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useShareActions } from '../api/mutations.ts';
-import { useFolderShares, useInfo, useShares, useTunnel } from '../api/queries.ts';
+import { useAllShares, useFolderShares, useInfo, useShares, useTunnel } from '../api/queries.ts';
 import type { ShareInfo, ShareInput } from '../api/types.ts';
 import { isProject } from '../lib/folders.ts';
 import { useTouch } from '../lib/media.ts';
@@ -19,7 +20,7 @@ import { EmptyState } from '../ui/system.tsx';
 import { Tip } from '../ui/tip.tsx';
 import { type Access, type Draft, passwordProblem } from './draft.ts';
 import { embedCode, embedSrc } from './embedCode.ts';
-import { LinkCard, type Reach } from './LinkCard.tsx';
+import { LinkCard, namesOf, type Reach } from './LinkCard.tsx';
 import { LinkSettings } from './LinkSettings.tsx';
 import '../styles/share-links.css';
 import { t } from '../i18n/index.ts';
@@ -93,10 +94,14 @@ const presetOf = (d: Draft): PresetId | '' =>
       (d.access === 'watch' || p.set.notes === d.notes),
   )?.id ?? '';
 
+/** The same videos, whatever their order. */
+const sameVideos = (a: { slug: string }[], b: { slug: string }[]) => a.length === b.length && a.every((x) => b.some((y) => y.slug === x.slug));
+
 export function ShareModal({
   slug,
   name,
   folder,
+  videos,
   edit,
   top,
   onClose,
@@ -104,17 +109,30 @@ export function ShareModal({
   slug?: string;
   name?: string;
   folder?: string;
+  /** Several videos picked in the library: one link for exactly these (2 or more). */
+  videos?: { slug: string; name: string }[];
   /** A link of this video or folder to open for changing (from Settings → Review links). */
   edit?: string;
   /** Opened again after a page it was left for (lib/nav.ts leaveFor): scrolled as it was once its links are there. */
   top?: number;
   onClose: () => void;
 }) {
-  const target = folder ? { folder } : { slug: slug as string };
-  const here: 'video' | 'folder' = folder ? 'folder' : 'video';
-  const videoQ = useShares(slug || '');
+  const target = folder ? { folder } : videos ? { slugs: videos.map((v) => v.slug) } : { slug: slug as string };
+  const here: 'video' | 'folder' | 'set' = folder ? 'folder' : videos ? 'set' : 'video';
+  const videoQ = useShares(here === 'video' ? slug || '' : '');
   const folderQ = useFolderShares(folder || '');
-  const { data: d, error } = folder ? folderQ : videoQ;
+  // a set's links are the links for exactly these videos, from the list of every link
+  const allQ = useAllShares(here === 'set');
+  // (once per answer: the effects below follow the list)
+  const setData = useMemo(
+    () =>
+      allQ.data && videos
+        ? { ...allQ.data, shares: allQ.data.shares.filter((s) => s.kind === 'set' && !s.gone && sameVideos(s.videos ?? [], videos)) }
+        : undefined,
+    [allQ.data, videos],
+  );
+  const setQ = { data: setData, error: allQ.error };
+  const { data: d, error } = here === 'folder' ? folderQ : here === 'set' ? setQ : videoQ;
   const info = useInfo();
   // A hosted server is reachable already: links use its public URL, and there is no tunnel to start.
   const hosted = info?.mode === 'server';
@@ -241,7 +259,10 @@ export function ShareModal({
     ? isProject(folder)
       ? t('Share project {folder}', { folder })
       : t('Share folder {folder}', { folder })
-    : t('Share {name}', { name: name ?? '' });
+    : videos
+      ? t('Share {n} video|Share {n} videos', { n: videos.length })
+      : t('Share {name}', { name: name ?? '' });
+  const madeHere = here === 'folder' ? t('Links to this folder') : here === 'set' ? t('Links to these videos') : t('Links to this video');
   const empty = !!d && !d.shares.length;
   // An embed plays one video on someone else's page: a folder's links are the first three kinds. A link is an embed from
   // the moment it is made or never (its token is in other sites' pages), so a link being changed keeps its side: an
@@ -253,6 +274,7 @@ export function ShareModal({
           {t('An embed stays one. For another kind of link, create a new one.')}
         </p>
       );
+    // (a set's link is a room of videos, as a folder's: never an embed)
     const offered = here === 'video' && !existing ? PRESETS : PRESETS.filter((p) => p.id !== 'embed');
     return (
       <Segmented
@@ -345,7 +367,14 @@ export function ShareModal({
   const leaveTo = (hash: string) => {
     const scrolled = views?.closest('.modal-body')?.scrollTop ?? 0;
     onClose();
-    leaveFor(hash, { kind: 'share', slug: slug ?? null, name: name ?? null, folder: folder ?? null, top: scrolled });
+    leaveFor(hash, {
+      kind: 'share',
+      slug: slug ?? null,
+      name: name ?? null,
+      folder: folder ?? null,
+      videos: videos ? JSON.stringify(videos) : null,
+      top: scrolled,
+    });
   };
   const restored = useRef<(() => void) | null>(null);
   useEffect(() => {
@@ -382,9 +411,17 @@ export function ShareModal({
           <p className="link-intro">
             {folder
               ? t('A project or folder link opens a review room with every video in it and in its folders, including ones you add later.')
-              : t('A review link shows this video to people without an account.')}{' '}
+              : videos
+                ? t('A link for these videos opens a review room with exactly them: nothing else from their projects.')
+                : t('A review link shows this video to people without an account.')}{' '}
             {t('They never see your internal notes.')}
           </p>
+          {videos && (
+            <p className="link-videos" data-testid="link-videos">
+              <I name="layers" size={13} />
+              <span className="ellipsis">{namesOf(videos)}</span>
+            </p>
+          )}
           {/* Who the link says it's from: visitors see a name someone chose to go by, never the computer's login name. */}
           <p className={`link-sharer ${d && !d.sharer ? 'unnamed' : ''}`} data-testid="link-sharer">
             <I name="user" size={13} />
@@ -413,10 +450,10 @@ export function ShareModal({
             </SkeletonRegion>
           ) : (
             !empty && (
-              <section className="link-made" aria-label={here === 'folder' ? t('Links to this folder') : t('Links to this video')}>
+              <section className="link-made" aria-label={madeHere}>
                 <div className="link-made-head">
                   <h3>
-                    {here === 'folder' ? t('Links to this folder') : t('Links to this video')} <span className="link-made-n">{d.shares.length}</span>
+                    {madeHere} <span className="link-made-n">{d.shares.length}</span>
                   </h3>
                   <button type="button" className="btn sm ghost" onClick={() => leaveTo('#/settings/links')} data-testid="link-all">
                     {t('All links')} <I name="right" size={12} />
@@ -450,7 +487,7 @@ export function ShareModal({
           <div className="link-view link-change" data-testid="link-change">
             <div className="link-change-head">
               <button type="button" className="btn sm ghost link-back" onClick={leave} data-testid="link-back">
-                <I name="back" size={14} /> {edit ? t('Cancel') : here === 'folder' ? t('Links to this folder') : t('Links to this video')}
+                <I name="back" size={14} /> {edit ? t('Cancel') : madeHere}
               </button>
               <span className={`link-state ${changing.expired ? 'off' : ''}`}>{changing.expired ? t('Expired') : t('Active')}</span>
             </div>

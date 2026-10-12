@@ -194,7 +194,7 @@ export const useFolderSuggestion = (video: string | null) =>
     enabled: !!video,
     retry: false,
   });
-export const useAllShares = () => useQuery({ queryKey: keys.allShares, queryFn: () => api<SharesResponse>('/api/shares') });
+export const useAllShares = (enabled = true) => useQuery({ queryKey: keys.allShares, queryFn: () => api<SharesResponse>('/api/shares'), enabled });
 export const useFolderShares = (folder: string) =>
   useQuery({ queryKey: keys.folderShares(folder), queryFn: () => api<SharesResponse>(`/api/folder-shares?folder=${enc(folder)}`), enabled: !!folder });
 export const useWebhooks = () => useQuery({ queryKey: keys.webhooks, queryFn: () => api<{ webhooks: WebhookInfo[] }>('/api/admin/webhooks') });

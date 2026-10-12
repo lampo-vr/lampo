@@ -46,7 +46,9 @@ export function Links() {
     <>
       <header className="set-head">
         <h1>{t('Review links')}</h1>
-        <p>{t('Every review link that still opens, newest first. Make one from a video’s or a folder’s Share.')}</p>
+        <p>
+          {t('Every review link that still opens, newest first. Make one from a video’s or a folder’s Share, or for several videos picked in the library.')}
+        </p>
       </header>
 
       <Card title={t('Active links')}>
@@ -85,6 +87,7 @@ export function Links() {
           slug={changing.kind === 'video' ? (changing.slug ?? undefined) : undefined}
           name={changing.name ?? undefined}
           folder={changing.kind === 'folder' ? (changing.folder ?? undefined) : undefined}
+          videos={changing.kind === 'set' ? (changing.videos ?? []) : undefined}
           edit={changing.token}
           onClose={() => setChanging(null)}
         />

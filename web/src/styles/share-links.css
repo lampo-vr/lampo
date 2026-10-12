@@ -23,6 +23,21 @@
 .link-sharer .btn-link {
   font-size: var(--fs-sm);
 }
+/* a set's link: which videos it opens, by name (the first two, then how many more) */
+.link-videos {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  margin: calc(-1 * var(--sp-2)) 0 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-ui);
+  color: var(--fg-2);
+}
+.link-videos > .icon {
+  flex: none;
+  color: var(--faint);
+}
 /* Making a link: who it's for and the way in, one of three kinds, then every setting as a small button that says its
    value, in a row that wraps (ShareModal.tsx Details); an expiry and a password are added from the same row and shown
    under it. */

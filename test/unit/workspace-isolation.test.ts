@@ -117,6 +117,8 @@ const ids = {
   notesB: [] as string[],
   linkB: '',
   folderLinkB: '',
+  /** B's link for a chosen set of videos: its two videos (the slug both workspaces hold, and its own). */
+  setLinkB: '',
   linkIdsB: [] as string[],
   inviteB: '',
   tokenIdB: '',
@@ -221,6 +223,7 @@ function secretsOfB(): string[] {
     ...ids.notesB,
     ids.linkB,
     ids.folderLinkB,
+    ids.setLinkB,
     ...ids.linkIdsB,
     ids.inviteB,
     ids.tokenIdB,
@@ -355,6 +358,13 @@ before(async () => {
   ).json();
   ids.folderLinkB = folderB.token;
   ids.linkIdsB.push(folderB.id);
+  // a link for a chosen set: the slug both workspaces hold resolves to B's own video here
+  const setB = ok(
+    await request('POST', '/api/set-shares', { body: { slugs: [ids.slugIntro, ids.slugB2], label: 'BRAVO set link' }, headers: asBob }),
+    'B set link',
+  ).json();
+  ids.setLinkB = setB.token;
+  ids.linkIdsB.push(setB.id);
   ok(await request('GET', `/api/g/${ids.linkB}`), 'B link visited');
   ok(await request('POST', '/api/folders', { body: { path: 'Bravo-folder' }, headers: asBob }), 'B folder');
   ok(
@@ -1034,6 +1044,7 @@ test('every route read by a member of A (or by nobody), with A’s ids and with 
     aimed: [
       { slug: ids.slugB2, token: ids.linkB, id: ids.notesB[1] as string, v: '1' },
       { slug: ids.slugIntro, token: ids.folderLinkB, id: ids.notesB[0] as string, v: '1' },
+      { slug: ids.slugIntro, token: ids.setLinkB, id: ids.notesB[0] as string, v: '1' },
       { slug: ids.slugB2, token: ids.linkB, id: ids.inviteB, v: '1' },
       { slug: ids.slugB2, token: ids.linkB, id: ids.tokenIdB, v: '1' },
       { slug: ids.slugB2, token: ids.linkB, id: ids.bob, v: '1' },
@@ -1427,6 +1438,45 @@ test('review links: A’s links show A’s video under the shared slug and never
   assert.equal(b.status, 200, b.text);
   assert.match(b.text, /bravo-cut/);
   assert.doesNotMatch(b.text, /ALPHA/);
+});
+
+test('set links: B’s covers exactly B’s two videos, never A’s of the same slug; A’s slugs in B’s request answer like unknown ones', async () => {
+  const bob = callerB['bob (session)'] as Record<string, string>;
+  // B's room: its own video under the slug both hold, and its own other one; nothing of A, no folder named
+  const room = await request('GET', `/api/g/${ids.setLinkB}`);
+  assert.equal(room.status, 200, room.text);
+  const r = room.json();
+  assert.equal(r.kind, 'set');
+  assert.equal(r.folder, null);
+  assert.deepEqual(r.videos.map((v: { name: string; folder: string | null }) => [v.name, v.folder]).sort(), [
+    ['bravo-cut.mp4', null],
+    ['intro.mp4', null],
+  ]);
+  assert.deepEqual(leaksOf(secretsOfA)(room.text), []);
+  // each of its videos opens, and is B's (B's note is on B's intro, never A's)
+  for (const v of r.videos as { slug: string }[]) assert.equal((await request('GET', `/api/g/${ids.setLinkB}/review/${v.slug}`)).status, 200);
+  // A's link's ids and A's own slug (raw) through B's set link: 404, as a made-up id
+  const aRoom = (await request('GET', `/api/g/${ids.folderLinkA}`)).json() as { videos: { slug: string }[] };
+  const madeUpId = 'v_AAAAAAAAAAAAAAAA';
+  const unknown = await request('GET', `/api/g/${ids.setLinkB}/review/${madeUpId}`);
+  assert.equal(unknown.status, 404);
+  for (const id of [...aRoom.videos.map((v) => v.slug), enc(ids.slugA2), enc(ids.slugIntro)]) {
+    const x = await request('GET', `/api/g/${ids.setLinkB}/review/${id}`);
+    assert.equal(x.status, 404, id);
+    assert.equal(x.text, unknown.text, `${id}: answered like a made-up id`);
+  }
+  // made in B, a slug only A has is refused exactly like one nobody has (never whether it is somewhere else)
+  const aOnly = await request('POST', '/api/set-shares', { body: { slugs: [ids.slugA2, ids.slugB2] }, headers: bob });
+  const nobody = await request('POST', '/api/set-shares', { body: { slugs: ['nobody__nothing.mp4', ids.slugB2] }, headers: bob });
+  assert.equal(aOnly.status, 404, aOnly.text);
+  assert.equal(nobody.status, 404, nobody.text);
+  assert.equal(aOnly.text, nobody.text);
+  // and from A, B's own slug is unknown too; A's listing never shows B's set link
+  const fromA = await request('POST', '/api/set-shares', { body: { slugs: [ids.slugB2, ids.slugA2] }, headers: caller['alice (session)'] });
+  assert.equal(fromA.status, 404, fromA.text);
+  const listA = await request('GET', '/api/shares', { headers: caller['alice (session)'] });
+  assert.equal(listA.status, 200);
+  assert.deepEqual(leaks(listA.text), []);
 });
 
 // ---------------------------------------------------------------- MCP with A's token

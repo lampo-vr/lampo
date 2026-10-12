@@ -1,5 +1,6 @@
-// Review links: people review without an account. A token grants one video, or every video in a folder (looked up
-// on each request, so new renders and newly filed videos show up). Settings decide what visitors may do; links made
+// Review links: people review without an account. A token grants one video, every video in a folder (looked up
+// on each request, so new renders and newly filed videos show up), or a chosen set of videos (exactly those, by their
+// ids, looked up on each request). Settings decide what visitors may do; links made
 // before the settings existed behave exactly as they did (comment + approve, own notes, newest version, no download).
 // Stored in data/shares.json; revoking keeps the entry (marked) for the record. The file holds no usable token: each
 // entry is keyed by the token's SHA-256 and keeps the token sealed with a key derived from share-secret.key.
@@ -11,6 +12,7 @@ import { archivedProjectOf, checkNotArchived, checkReviewOpen, FoldersUnreadable
 import { cutChars } from './names.ts';
 import { currentWorkspace, DATA, DEFAULT_WORKSPACE, dataDir, inWorkspace, isoLocal, slugify, USER, WORKSPACE_ID } from './paths.ts';
 import { summarizeActivity } from './shareActivity.ts';
+import { SHARE_SET_MAX, SHARE_SET_MIN } from './shareSet.ts';
 import { approvalsOf } from './stage.ts';
 import { listReviews, loadReview, withLock, writeAtomic } from './store.ts';
 import { compareTime } from './time.ts';
@@ -265,18 +267,28 @@ export const settingsOf = (s: Share): ShareSettings =>
 
 /**
  * Why a link can't be an embed, or null: an embed plays one video for anyone who sees the page it is on, so it is never
- * a folder's and never has a password (a visitor in a frame on another site can't type one, and its unlock cookie
- * would be a third party's). `s` is the link as it would be after the change.
+ * a folder's or a set's and never has a password (a visitor in a frame on another site can't type one, and its unlock
+ * cookie would be a third party's). `s` is the link as it would be after the change.
  */
-export function embedRefusal(s: Pick<Share, 'embed' | 'folder' | 'password'>): string | null {
+export function embedRefusal(s: Pick<Share, 'embed' | 'folder' | 'video_ids' | 'password'>): string | null {
   if (!s.embed) return null;
-  if (s.folder) return 'An embed is for one video: make it from the video’s share dialog.';
+  if (s.folder || s.video_ids) return 'An embed is for one video: make it from the video’s share dialog.';
   if (s.password) return 'An embed plays for anyone who sees the page it is on, so it can’t have a password.';
   return null;
 }
 
 /** A link that can't be made or changed so (embedRefusal): the routes answer 400 with its sentence. */
 export class LinkRefusedError extends Error {}
+
+/** A set link names a video that isn't one to share here (unknown, another workspace's, without a version): the route
+ * answers 404, the same for each of those, so it never says whether such a video exists elsewhere. */
+export class NoSuchVideoError extends Error {}
+
+/** A set link names a video it can't be made for: archived, or from before videos had ids (the route answers 409). */
+export class VideoNotSharedError extends Error {}
+
+/** A room of videos: a folder link (every video in the folder) or a set link (exactly the chosen ones). */
+export const manyVideos = (s: Pick<Share, 'folder' | 'video_ids'>): boolean => !!s.folder || !!s.video_ids;
 
 /** The link's public id (stored on notes made through it). Old links get one derived from the token. */
 export const shareId = (s: ShareWithToken): string => s.id || legacyId(s.token);
@@ -346,8 +358,31 @@ export function isUnlocked(s: ShareWithToken, cookieHeader: string | undefined):
 
 // ---------------------------------------------------------------- links
 
-/** What a link is made for: a video (and the review there now: its id and `added`) or a folder (and its id). */
-type Target = { slug: string; video_id?: string; video_added?: string } | { folder: string; folder_id?: string };
+/** What a link is made for: a video (and the review there now: its id and `added`), a folder (and its id), or a chosen
+ * set of videos (by the slugs the library has; createShare keeps only the ids of the reviews there now). */
+type Target = { slug: string; video_id?: string; video_added?: string } | { folder: string; folder_id?: string } | { slugs: string[] };
+
+/**
+ * The ids of the videos a new set link is for (Review.id), in the order given, once each. Every one must be a video of
+ * this workspace with a version (else NoSuchVideoError: the same for an unknown slug and another workspace's), with an
+ * id and not archived (VideoNotSharedError), not in an archived project (checkReviewOpen: 423); 2 to SHARE_SET_MAX of
+ * them (LinkRefusedError). Nothing is written before all of them passed.
+ */
+function idsOf(asked: string[]): string[] {
+  const slugs = [...new Set(asked)];
+  if (slugs.length < SHARE_SET_MIN) throw new LinkRefusedError(`A link for several videos needs at least ${SHARE_SET_MIN} different videos.`);
+  if (slugs.length > SHARE_SET_MAX) throw new LinkRefusedError(`A link covers at most ${SHARE_SET_MAX} videos: share a folder for more.`);
+  const ids = slugs.map((slug) => {
+    const review = loadReview(slug);
+    if (!review || slugify(review.video) !== slug || !review.versions.length) throw new NoSuchVideoError('no such video');
+    if (review.archived) throw new VideoNotSharedError('An archived video can’t be shared: restore it first.');
+    // a review from before ids can't be named by one, and a set link never goes by a name
+    if (!review.id) throw new VideoNotSharedError(`“${path.basename(review.video)}” is from before videos had ids: share it on its own.`);
+    checkReviewOpen(review);
+    return review.id;
+  });
+  return [...new Set(ids)];
+}
 
 /** The longest name a link keeps. */
 export const LABEL_MAX = 80;
@@ -432,12 +467,14 @@ export function createShare(target: string | Target, { label, by = USER, byId, .
   const t: Target = typeof target === 'string' ? { slug: target } : { ...target };
   // no new review link into an archived project (the links it has keep working, watch only: archivedFor)
   if ('slug' in t) checkReviewOpen(loadReview(t.slug));
-  else checkNotArchived(t.folder);
+  else if ('folder' in t) checkNotArchived(t.folder);
   // A video link is for the video at that slug now, not for one added there later (madeFor).
   if ('slug' in t && !t.video_added) Object.assign(t, identityOf(loadReview(t.slug)));
+  // A set link keeps the videos' ids alone, never their slugs (names).
+  const what: Pick<Share, 'slug' | 'video_id' | 'video_added' | 'folder' | 'folder_id' | 'video_ids'> = 'slugs' in t ? { video_ids: idsOf(t.slugs) } : t;
   const token = crypto.randomBytes(18).toString('base64url');
   const share: Share = {
-    ...t,
+    ...what,
     label: cleanLabel(label) || DEFAULT_LABEL,
     created: isoLocal(),
     by,
@@ -513,11 +550,11 @@ export const madeALink = (user: { id: string; name: string }): boolean =>
   Object.values(load()).some((s) => (s.by_id ? s.by_id === user.id : s.by === user.name));
 
 /**
- * Active links; with a filter, the ones for exactly that video or folder. A folder link whose folder is gone isn't one
- * (while folders.json can't be read, every folder link is listed: shownGone).
+ * Active links; with a filter, the ones for exactly that video or folder (never a set link: it is for several). A folder
+ * link whose folder is gone isn't one (while folders.json can't be read, every folder link is listed: shownGone).
  */
-export function listShares(filter?: string | Target): ShareWithToken[] {
-  const f: Target | null = typeof filter === 'string' ? { slug: filter } : filter || null;
+export function listShares(filter?: string | { slug: string } | { folder: string }): ShareWithToken[] {
+  const f = typeof filter === 'string' ? { slug: filter } : filter || null;
   const out: ShareWithToken[] = [];
   for (const s of Object.values(load())) {
     if (s.revoked || shownGone(s) || (f && !('slug' in f ? s.slug === f.slug && !s.folder : s.folder === f.folder))) continue;
@@ -584,7 +621,8 @@ export function allShares(): (ShareWithToken & { gone: boolean })[] {
     const token = unseal(s.sealed);
     if (!token) continue;
     const review = !s.folder && s.slug ? loadReview(s.slug) : null;
-    const gone = s.folder ? shownGone(s) : !review || !madeFor(s, review);
+    // a set link is gone once none of its videos is here any more (an archived one still is: it can be restored)
+    const gone = s.folder ? shownGone(s) : s.video_ids ? !setReviews(s, { archived: true }).length : !review || !madeFor(s, review);
     out.push({ ...withToken(token, s), gone });
   }
   return out.sort((a, b) => compareTime(b.created, a.created));
@@ -857,26 +895,56 @@ export function recordDownload(token: string, d: Omit<ShareDownloadRecord, 'at'>
 
 /**
  * The archived project a link's videos are in (lib/archived.ts), or null: a folder link's by its folder, a video link's
- * by where its video is now. While it is, the link is watch only — its visitors watch, and download what it offers,
- * but leave no note or decision; restored, it is what it was (nothing of the link itself changes).
+ * by where its video is now, a set link's only when every video it covers is in one (each of its videos in an archived
+ * project is watch only on its own: archivedForVideo). While it is, the link is watch only — its visitors watch, and
+ * download what it offers, but leave no note or decision; restored, it is what it was (nothing of the link changes).
  */
-export function archivedFor(s: Pick<Share, 'folder' | 'slug'>): string | null {
+export function archivedFor(s: Pick<Share, 'folder' | 'slug' | 'video_ids'>): string | null {
   if (s.folder) return archivedProjectOf(s.folder);
+  if (s.video_ids) {
+    const projects = setReviews(s).map((r) => archivedProjectOf(r.folder));
+    return projects.length && projects.every((p) => p !== null) ? (projects[0] ?? null) : null;
+  }
   return s.slug ? archivedProjectOf(loadReview(s.slug)?.folder) : null;
 }
 
+/** The archived project one video of a link is in, as the link's visitors meet it: the link's own (archivedFor), or for a
+ * set link the video's (a set spans projects: one archived leaves the others open). */
+export function archivedForVideo(s: Pick<Share, 'folder' | 'slug' | 'video_ids'>, review: Pick<Review, 'folder'>): string | null {
+  return s.video_ids ? archivedProjectOf(review.folder) : archivedFor(s);
+}
+
+/**
+ * A set link's videos as they are now, in its order: each id looked up among this workspace's reviews (the parse-once
+ * list: read, never changed), the first review with it. One removed is left out; so is an archived one, unless
+ * `archived` (the owner's "is anything left": an archived video can come back).
+ */
+function setReviews(s: Pick<Share, 'video_ids'>, { archived = false } = {}): Review[] {
+  const ids = s.video_ids;
+  if (!ids?.length) return [];
+  const wanted = new Set(ids);
+  const byId = new Map<string, Review>();
+  for (const r of listReviews()) if (r.id && wanted.has(r.id) && !byId.has(r.id) && (archived || !r.archived)) byId.set(r.id, r);
+  return ids.flatMap((id) => {
+    const r = byId.get(id);
+    return r ? [r] : [];
+  });
+}
+
 /** Does the link include this review? Folder links cover the folder and everything below it (a folder that is gone
- * is refused before: resolveShare, listShares); a video link only the video it was made for. */
+ * is refused before: resolveShare, listShares); a video link only the video it was made for; a set link exactly the
+ * videos it was made for, by their ids (wherever they are now). */
 export function covers(s: Share, review: Review): boolean {
   if (review.archived) return false;
   if (s.folder) return !!review.folder && (review.folder === s.folder || review.folder.startsWith(`${s.folder}/`));
+  if (s.video_ids) return !!review.id && s.video_ids.includes(review.id);
   return slugify(review.video) === s.slug && madeFor(s, review);
 }
 
 /** A video link was made for this review, not for one removed before it and added again at the same slug: its id (and,
  * for reviews from before ids, when it was added). Links from before they knew (bindShareTargets binds them at
  * start-up) are taken at their word. */
-export const madeFor = (s: Share, review: Pick<Review, 'id' | 'added'>): boolean =>
+export const madeFor = (s: Pick<Share, 'video_id' | 'video_added'>, review: Pick<Review, 'id' | 'added'>): boolean =>
   (!s.video_id || s.video_id === review.id) && (!s.video_added || s.video_added === review.added);
 
 /** What a video link stores of the review it is made for (madeFor). */
@@ -917,10 +985,11 @@ export const guestId = (s: ShareWithToken, slug: string): string =>
     .slice(0, 16)}`;
 
 /** The slug a visitor's id stands for, if the link covers it. Slugs themselves are still accepted (tabs and bookmarks
- * from before ids): a visitor can only name what they were shown, and a miss looks the same either way. */
+ * from before ids): a visitor can only name what they were shown, and a miss looks the same either way. A set link
+ * (newer than ids) takes its ids alone. */
 export function slugOfGuestId(s: ShareWithToken, id: string): string | null {
-  if (!GUEST_ID.test(id)) return id;
-  if (!s.folder) return s.slug && guestId(s, s.slug) === id ? s.slug : null;
+  if (!GUEST_ID.test(id)) return s.video_ids ? null : id;
+  if (!manyVideos(s)) return s.slug && guestId(s, s.slug) === id ? s.slug : null;
   for (const r of reviewsOf(s)) {
     const slug = slugify(r.video);
     if (guestId(s, slug) === id) return slug;
@@ -929,6 +998,8 @@ export function slugOfGuestId(s: ShareWithToken, id: string): string | null {
 }
 
 export function reviewsOf(s: Share): Review[] {
+  // a set link's by their ids, in its order; one removed or archived since drops out
+  if (s.video_ids) return setReviews(s);
   if (!s.folder) {
     const r = s.slug ? loadReview(s.slug) : null;
     return r && covers(s, r) ? [r] : [];
@@ -941,9 +1012,11 @@ export function reviewsOf(s: Share): Review[] {
 /**
  * Whether this is the only link that ever covered the video, active or revoked. Client notes and verdicts from before
  * they carried their link's id can't say whose they are: they count as a link's own only then — otherwise they could be
- * another client's. Asked lazily (`() => boolean`): most reviews have nothing that old.
+ * another client's. Asked lazily (`() => boolean`): most reviews have nothing that old. A set link is newer than link
+ * ids: nothing without one came through it.
  */
 function onlyLinkEver(s: ShareWithToken, review: Review): () => boolean {
+  if (s.video_ids) return () => false;
   let only: boolean | undefined;
   const id = shareId(s);
   // Other links by their stored ids (a key is the token's hash, not the token), this one also by its key.
@@ -1033,16 +1106,22 @@ export function shareInfo(s: ShareWithToken): ShareInfo {
     by: s.by,
     sharer: sharerName(s),
     updated: s.updated || null,
-    kind: s.folder ? 'folder' : 'video',
-    slug: s.folder ? null : s.slug || null,
+    kind: s.folder ? 'folder' : s.video_ids ? 'set' : 'video',
+    slug: s.folder || s.video_ids ? null : s.slug || null,
     folder: s.folder || null,
     name: review ? path.basename(review.video) : null,
+    // (the owner's view: the slugs the library knows them by, looked up now; the link itself keeps only their ids)
+    ...(s.video_ids ? { videos: reviews.map((r) => ({ slug: slugify(r.video), name: path.basename(r.video) })) } : {}),
     ...(newest ? { width: newest.width, height: newest.height } : {}),
     password: !!s.password,
     expired: isExpired(s),
     stats: {
       ...counts,
-      notes: reviews.reduce((n, r) => n + r.comments.filter((c) => c.author?.startsWith('guest:') && (c.share === id || (!c.share && !s.folder))).length, 0),
+      // notes from before notes named their link count for a video link only (a set link is newer than link ids)
+      notes: reviews.reduce(
+        (n, r) => n + r.comments.filter((c) => c.author?.startsWith('guest:') && (c.share === id || (!c.share && !manyVideos(s)))).length,
+        0,
+      ),
     },
     activity: summarizeActivity(stats, reviews),
   };

@@ -6,7 +6,7 @@ import { type ReactNode, type RefObject, useState } from 'react';
 import { LANES } from '../../../lib/stage.ts';
 import { perLang, t } from '../i18n/index.ts';
 import { useCarriedFocus, useScrollEdges } from '../lib/hooks.ts';
-import { usePhone } from '../lib/media.ts';
+import { usePhone, useTouch } from '../lib/media.ts';
 import { laneLabel } from '../status/stageText.ts';
 import { I, type IconName } from '../ui/icons.tsx';
 import { Switch } from '../ui/plain.tsx';
@@ -39,12 +39,15 @@ interface ToolbarProps {
   archived: boolean;
   archivedCount: number;
   onArchived: (on: boolean) => void;
+  /** A touch screen's way into ticking videos (no pointer brings the boxes out): undefined where nothing is ticked. */
+  onPick?: () => void;
 }
 
 export function Toolbar(p: ToolbarProps) {
   const [display, setDisplay] = useState(false);
   const [lanesRef, lanesEdges] = useScrollEdges<HTMLDivElement>();
   const phone = usePhone();
+  const touch = useTouch();
   useCarriedFocus(p.filterRef, 'library-filter');
   return (
     <div className="lib-toolbar" role="toolbar" aria-label={t('Library view')} data-tab-row>
@@ -142,6 +145,19 @@ export function Toolbar(p: ToolbarProps) {
               <label htmlFor="lib-archived">{t('Show archived ({archivedCount})', { archivedCount: p.archivedCount })}</label>
               <Switch id="lib-archived" checked={p.archived} onCheckedChange={p.onArchived} />
             </div>
+          )}
+          {touch && p.onPick && (
+            <button
+              type="button"
+              className="btn dp-pick"
+              onClick={() => {
+                setDisplay(false);
+                p.onPick?.();
+              }}
+              data-testid="lib-pick"
+            >
+              <I name="check" size={14} /> {t('Select videos')}
+            </button>
           )}
         </div>
       </Popover>

@@ -11,6 +11,7 @@ import { useVideoActions } from '../api/mutations.ts';
 import type { SessionPick, VideoSummary } from '../api/types.ts';
 import { t } from '../i18n/index.ts';
 import { loader, useLoaded } from '../lib/lazy.ts';
+import { TOUCH } from '../lib/media.ts';
 import { go } from '../lib/nav.ts';
 import { copyText, toast, toastError, toastUndo } from '../lib/toast.ts';
 import { getStartedCode } from '../onboarding/state.ts';
@@ -23,6 +24,7 @@ import { downloadVersion } from './downloadVersion.ts';
 import type { LaneId } from './model.ts';
 import { moveCode } from './moved.ts';
 import { movesOf, nextMove } from './moves.ts';
+import type { Picks } from './select.ts';
 
 type Dialog = 'assign' | 'move' | 'share' | 'remove' | null;
 
@@ -34,6 +36,8 @@ export interface CardKit {
   move: (v: VideoSummary, to: LaneId, how?: { inPlace?: boolean; focus?: boolean }) => void;
   /** The library shows the board: a move asks for its sentence on the card, and ⌥← / ⌥→ move cards. */
   board: boolean;
+  /** Ticking videos for the bar (List and Grid; ./select.ts); null on the board. */
+  picks: Picks | null;
 }
 export const CardKitContext = createContext<CardKit | null>(null);
 
@@ -106,7 +110,7 @@ function lanesFor(v: VideoSummary, can: (a: Action) => boolean, board: boolean):
 
 export function useVideoMenu(v: VideoSummary, { home, folders }: { home?: string | null; folders: string[] }) {
   const [dialog, setDialog] = useState<Dialog>(null);
-  const { can, actions, move, board } = useCardKit();
+  const { can, actions, move, board, picks } = useCardKit();
   const organize = can('organize');
   // Uploaded renders (hosted server) have no path on anyone's disk.
   const uploaded = v.video.startsWith('/@uploads/');
@@ -141,6 +145,8 @@ export function useVideoMenu(v: VideoSummary, { home, folders }: { home?: string
       .then(() => toast(t('Sample removed'), 'ok'), toastError);
 
   const items: MenuEntry[] = [
+    // a finger has no pointer to bring the boxes out with: picking starts here (a long press or the ⋯), as in Files
+    !!picks && matchMedia(TOUCH).matches && { label: t('Select'), icon: 'check', onClick: () => picks.box(v.slug, false) },
     { label: t('Open'), icon: 'play', shortcut: '↵', onClick: () => openVideo(v.slug) },
     { label: t('Open in new tab'), icon: 'external', onClick: () => window.open(videoLink(v.slug), '_blank', 'noopener') },
     { label: t('Copy link for the team'), icon: 'link', onClick: async () => (await copyText(videoLink(v.slug))) && toast(t('Link copied'), 'ok') },
@@ -214,5 +220,5 @@ export function useVideoMenu(v: VideoSummary, { home, folders }: { home?: string
     </>
   );
 
-  return { items, dialogs, organize, assign: organize && !shut ? () => setDialog('assign') : null };
+  return { items, dialogs, organize, assign: organize && !shut ? () => setDialog('assign') : null, picks };
 }

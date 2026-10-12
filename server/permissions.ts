@@ -143,6 +143,8 @@ export const ROUTE_ACTIONS: [string, string, Rule][] = [
   ['GET', '/api/shares/:token/qr', 'share'],
   ['GET', '/api/folder-shares', 'share'],
   ['POST', '/api/folder-shares', 'share'],
+  // A link for a chosen set of videos (the library's selection; lib/shares.ts checks each video against the workspace).
+  ['POST', '/api/set-shares', 'share'],
   // Taking the renders home — whole folders as a zip, or one version's own file — is more than watching: reviewers see
   // and comment, they don't take the renders home. One rule for both.
   ['GET', '/api/folders/download', 'download'],
@@ -317,6 +319,7 @@ export const PERSON_ONLY: [string, string][] = [
   ['POST', '/api/operator/accounts/:id/enable'],
   ['POST', '/api/review/:slug/shares'],
   ['POST', '/api/folder-shares'],
+  ['POST', '/api/set-shares'],
   // Putting a project away and bringing it back is a person's call: an agent is told "a person can restore it".
   ['POST', '/api/folders/archive'],
   ['POST', '/api/folders/restore'],

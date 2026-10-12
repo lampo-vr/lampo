@@ -96,7 +96,7 @@ export default function LinkActivity({ s }: { s: ShareInfo }) {
     <div className="link-activity" data-testid="link-activity">
       {a.videos.length > 0 && (
         <section className="link-act-sec">
-          <h4>{s.kind === 'folder' ? t('Videos opened') : t('Watched')}</h4>
+          <h4>{s.kind !== 'video' ? t('Videos opened') : t('Watched')}</h4>
           <ul className="link-watches">
             {a.videos.map((v) => (
               <VideoRow key={v.slug} v={v} />

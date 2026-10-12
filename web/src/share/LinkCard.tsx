@@ -24,11 +24,24 @@ function reachText(r: Reach): string {
   return r === 'public' ? t('Anyone with the link can open it.') : r === 'lan' ? t('Reachable on your network only.') : t('Reachable from this computer only.');
 }
 
-/** What the link opens, in a few words: its video, the project or folder, or that it opens nothing now. */
+/** A few videos by name: the first two, then how many more ("a.mp4, b.mp4, +1"). */
+export const namesOf = (videos: { name: string }[]): string =>
+  [...videos.slice(0, 2).map((v) => v.name), ...(videos.length > 2 ? [`+${videos.length - 2}`] : [])].join(', ');
+
+/** What the link opens, in a few words: its video, the project or folder, its videos, or that it opens nothing now. */
 export function whatOf(s: ShareInfo): string {
-  if (s.gone) return s.kind === 'folder' ? t('Its folder was deleted: it opens nothing') : t('Its video was deleted: it opens nothing');
+  if (s.gone)
+    return s.kind === 'folder'
+      ? t('Its folder was deleted: it opens nothing')
+      : s.kind === 'set'
+        ? t('Its videos were deleted: it opens nothing')
+        : t('Its video was deleted: it opens nothing');
   if (s.kind === 'folder')
     return isProject(s.folder ?? '') ? t('Project {folder}', { folder: s.folder ?? '' }) : t('Folder {folder}', { folder: s.folder ?? '' });
+  if (s.kind === 'set') {
+    const videos = s.videos ?? [];
+    return t('{n} video: {names}|{n} videos: {names}', { n: videos.length, names: namesOf(videos) });
+  }
   return s.name ?? t('This video');
 }
 
@@ -62,8 +75,9 @@ interface Props {
   opened?: boolean;
   url: string;
   reach: Reach;
-  /** Where the line is shown: a video's dialog names a folder link's folder; Settings names what every link opens. */
-  here: 'video' | 'folder' | 'all';
+  /** Where the line is shown: a video's dialog names what a folder's or a set's link opens; Settings names what every
+   * link opens. */
+  here: 'video' | 'folder' | 'set' | 'all';
   /** The system share sheet (phones and tablets). */
   canShare: boolean;
   editing: boolean;
@@ -99,7 +113,7 @@ export function LinkCard({ s, opened = false, url, reach, here, canShare, editin
   };
   const until =
     s.expires && !s.expired ? t('until {date}', { date: new Date(s.expires).toLocaleDateString(lang(), { day: 'numeric', month: 'short' }) }) : null;
-  const line = [(here === 'all' || (here === 'video' && s.kind === 'folder')) && whatOf(s), kindOf(s), until, s.expired || s.gone ? null : activityOf(s)]
+  const line = [(here === 'all' || (here === 'video' && s.kind !== 'video')) && whatOf(s), kindOf(s), until, s.expired || s.gone ? null : activityOf(s)]
     .filter(Boolean)
     .join(' · ');
   const name = (
@@ -113,7 +127,7 @@ export function LinkCard({ s, opened = false, url, reach, here, canShare, editin
   return (
     <article className={`link-row ${s.expired ? 'expired' : ''} ${open ? 'open' : ''}`} aria-label={t('Review link “{label}”', { label: s.label })}>
       <div className="link-head">
-        <I name={s.kind === 'folder' ? 'folder' : s.embed ? 'embed' : 'link'} size={16} className="link-icon" />
+        <I name={s.kind === 'folder' ? 'folder' : s.kind === 'set' ? 'layers' : s.embed ? 'embed' : 'link'} size={16} className="link-icon" />
         {opens ? (
           <button type="button" className="link-title link-open" aria-expanded={open} onClick={() => setOpen((x) => !x)} data-testid="link-sum">
             {name}

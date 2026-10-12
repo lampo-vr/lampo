@@ -107,7 +107,16 @@ test('JSON: small answers and answers that can carry secrets are never compresse
   const app = express();
   app.use(fastJson());
   const big = { list: Array.from({ length: 200 }, (_, i) => ({ token: `secret-${i}`, label: 'x'.repeat(20) })) };
-  for (const p of ['/api/auth/tokens', '/api/admin/invites', '/api/review/a/shares', '/api/folder-shares', '/api/shares/t', '/oauth/token', '/api/library'])
+  for (const p of [
+    '/api/auth/tokens',
+    '/api/admin/invites',
+    '/api/review/a/shares',
+    '/api/folder-shares',
+    '/api/set-shares',
+    '/api/shares/t',
+    '/oauth/token',
+    '/api/library',
+  ])
     app.get(p, (_req, res) => {
       res.json(big);
     });
@@ -115,7 +124,15 @@ test('JSON: small answers and answers that can carry secrets are never compresse
   await new Promise<void>((r) => other.listen(0, '127.0.0.1', r));
   const otherPort = (other.address() as AddressInfo).port;
   try {
-    for (const p of ['/api/auth/tokens', '/api/admin/invites', '/api/review/a/shares', '/api/folder-shares', '/api/shares/t', '/oauth/token']) {
+    for (const p of [
+      '/api/auth/tokens',
+      '/api/admin/invites',
+      '/api/review/a/shares',
+      '/api/folder-shares',
+      '/api/set-shares',
+      '/api/shares/t',
+      '/oauth/token',
+    ]) {
       const r = await fetch(`http://127.0.0.1:${otherPort}${p}`, { headers: { 'Accept-Encoding': 'br, gzip' } });
       assert.equal(r.headers.get('content-encoding'), null, p);
       // and no CDN in front compresses them either (Cloudflare compresses JSON by itself unless told no-transform)

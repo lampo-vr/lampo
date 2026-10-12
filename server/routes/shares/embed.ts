@@ -10,7 +10,7 @@ import { BRAND_NAME, SITE_URL } from '../../../lib/brand.ts';
 import { cachedChapters } from '../../../lib/media.ts';
 import { inWorkspace, slugify } from '../../../lib/paths.ts';
 import { RateLimit } from '../../../lib/rateLimit.ts';
-import { guestId, linkWorkspace, resolveShare } from '../../../lib/shares.ts';
+import { guestId, linkWorkspace, manyVideos, resolveShare } from '../../../lib/shares.ts';
 import { SPRITE_VERSION } from '../../../lib/sprite.ts';
 import { captionsMemory, captionsOf, captionsVtt } from '../../../lib/transcripts.ts';
 import type { EmbedResponse, OEmbedResponse, Review, ShareWithToken, Version } from '../../../lib/types.ts';
@@ -102,7 +102,7 @@ export function discoveryTag(ctx: ServerContext, req: Request, token: string, ki
   } catch {
     return '';
   }
-  if (!share?.embed || share.password || share.folder) return '';
+  if (!share?.embed || share.password || manyVideos(share)) return '';
   const page = `${pageBase(ctx, req)}/${kind}/${token}`;
   const href = `${pageBase(ctx, req)}/oembed?url=${encodeURIComponent(page)}&format=json`;
   return `<link rel="alternate" type="application/json+oembed" href="${attr(href)}" />`;

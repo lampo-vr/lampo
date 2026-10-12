@@ -1389,6 +1389,13 @@ export interface Share extends Partial<ShareSettings> {
   /** Folder links: the folder's id (FoldersFile.ids), which follows the folder's renames and ends with it. Links from
    * before get it at the next start. */
   folder_id?: string;
+  /**
+   * Links for a chosen set of videos (several picked in the library): exactly these, in this order, by their ids
+   * (Review.id), looked up on each request — a video keeps its id wherever it is moved, and a slug freed and taken by a
+   * later video is another video. lib/shareSet.ts bounds how many. Never with `slug` or `folder`. A video removed or
+   * archived later drops out. Absent on every other link.
+   */
+  video_ids?: string[];
   label: string;
   created: string;
   by: string;
@@ -1428,11 +1435,15 @@ export interface ShareInfo extends ShareSettings {
   /** Who the link's visitors are told shared it (lib/shares.ts sharerName): null when no name was chosen to show. */
   sharer?: string | null;
   updated: string | null;
-  kind: 'video' | 'folder';
+  /** 'set': a link for a chosen set of videos (Share.video_ids); `slug`, `folder` and `name` are null then. */
+  kind: 'video' | 'folder' | 'set';
   slug: string | null;
   folder: string | null;
   /** The video's file name (video links). */
   name: string | null;
+  /** Set links: the videos it covers now, in its order (one removed or archived since is left out). Optional; the
+   * other kinds and older servers leave it out. */
+  videos?: { slug: string; name: string }[];
   /** Video links: the newest version's frame size (an embed's code keeps its shape). Optional; older servers leave them out. */
   width?: number;
   height?: number;
@@ -2607,7 +2618,8 @@ export interface StageInfo {
  */
 export interface ShareSignal {
   label: string;
-  kind: 'video' | 'folder';
+  /** 'set': a link for a chosen set of videos (Share.video_ids). */
+  kind: 'video' | 'folder' | 'set';
   /** A visitor opened the newest version through the link. */
   opened: boolean;
   /** Views of this video through the link (older stats without per-video views: the link's opens). */
@@ -3316,8 +3328,9 @@ export interface GuestLinkResponse {
   reviewer_avatar?: string | null;
   /** The team's name, when the instance has one (config org_name). */
   org?: string | null;
-  kind: 'video' | 'folder';
-  /** A folder link's own folder, by its name only (never the folders above it); null for a video link and while locked. */
+  /** 'set': a link for a chosen set of videos, a room like a folder link's with exactly those (and no folder). */
+  kind: 'video' | 'folder' | 'set';
+  /** A folder link's own folder, by its name only (never the folders above it); null for a video or set link and while locked. */
   folder: string | null;
   locked: boolean;
   expires: string | null;

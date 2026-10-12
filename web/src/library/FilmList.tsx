@@ -22,6 +22,7 @@ import { DRAG_VIDEO, dragChip } from './drag.ts';
 import { ShareState } from './marks.tsx';
 import type { Section, SortBy } from './model.ts';
 import { summaryLine } from './model.ts';
+import { PickBox } from './PickBox.tsx';
 import { Poster, posterUrl } from './Poster.tsx';
 import { UnsentMark } from './unsent.tsx';
 import { openVideo, useVideoMenu } from './useVideoMenu.tsx';
@@ -31,21 +32,29 @@ interface RowProps {
   where?: string | null;
   home?: string | null;
   folders: string[];
+  /** Ticked for the selection's bar (./select.ts). */
+  checked: boolean;
 }
 
-const Row = memo(function Row({ v, where, home, folders }: RowProps) {
+const Row = memo(function Row({ v, where, home, folders, checked }: RowProps) {
   useLang(); // memo'd: renders again on a language switch by itself
   const [menuOpen, setMenuOpen] = useState(false);
   const qc = useQueryClient();
-  const { items, dialogs, organize } = useVideoMenu(v, { home, folders });
+  const { items, dialogs, organize, picks } = useVideoMenu(v, { home, folders });
   const n = v.counts;
   const run = cardRun(v);
   return (
     <ContextMenu items={items} onOpenChange={setMenuOpen}>
       <tr
-        className={`lrow ${v.archived ? 'archived' : ''} ${menuOpen ? 'menu-open' : ''}`}
+        className={`lrow ${v.archived ? 'archived' : ''} ${menuOpen ? 'menu-open' : ''} ${checked ? 'checked' : ''}`}
         data-slug={v.slug}
-        onClick={cardClick((e) => openVideo(v.slug, e), 'a, .lrow-menu')}
+        aria-selected={picks ? checked : undefined}
+        onMouseDown={(e) => e.shiftKey && e.preventDefault()}
+        // ⌘/Ctrl- and ⇧-clicks tick (the name's link too); a plain one opens, the name's link by itself
+        onClick={cardClick((e) => {
+          if (picks?.click(v.slug, e)) e.preventDefault();
+          else if (!(e.target as Element).closest('a')) openVideo(v.slug, e);
+        }, '.lrow-menu, .lpick')}
         onPointerEnter={() => prefetchVideo(qc, v.slug)}
         onPointerLeave={cancelPrefetch}
         onFocus={() => prefetchVideo(qc, v.slug, { now: true })}
@@ -57,6 +66,7 @@ const Row = memo(function Row({ v, where, home, folders }: RowProps) {
         }}
       >
         <td className="lc-name">
+          {picks && <PickBox name={v.name} checked={checked} onPick={(shift) => picks.box(v.slug, shift)} />}
           <Poster
             src={v.hash ? posterUrl(v) : null}
             sprite={v.hash ? spriteUrl(v.slug, v.hash) : null}
@@ -151,6 +161,8 @@ interface FilmListProps {
   home?: string | null;
   folders: string[];
   onOpenSection: (folder: string) => void;
+  /** The videos ticked for the selection's bar. */
+  checked: ReadonlySet<string>;
 }
 
 function ListHead({ sort, onSort }: { sort: SortBy; onSort: (s: SortBy) => void }) {
@@ -181,11 +193,12 @@ function ListHead({ sort, onSort }: { sort: SortBy; onSort: (s: SortBy) => void 
   );
 }
 
-export function FilmList({ sections, sort, onSort, where, home, folders, onOpenSection }: FilmListProps) {
+export function FilmList({ sections, sort, onSort, where, home, folders, onOpenSection, checked }: FilmListProps) {
   const grouped = sections.length > 1 || !!sections[0]?.title;
   const long = sections.reduce((n, s) => n + s.videos.length, 0) > WINDOW_FROM;
   return (
-    <table className="ltable" data-testid="library-list">
+    // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: rows any number of which are ticked at once (./select.ts), the arrows move between them: a grid that says it is multi-selectable
+    <table className="ltable" role="grid" aria-multiselectable="true" aria-label={t('Videos')} data-testid="library-list">
       <ListHead sort={sort} onSort={onSort} />
       {sections.map((s) => (
         <tbody key={s.key}>
@@ -204,7 +217,11 @@ export function FilmList({ sections, sort, onSort, where, home, folders, onOpenS
               </th>
             </tr>
           )}
-          <SectionRows videos={s.videos} long={long} row={(v) => <Row key={v.slug} v={v} where={where(v, s)} home={home} folders={folders} />} />
+          <SectionRows
+            videos={s.videos}
+            long={long}
+            row={(v) => <Row key={v.slug} v={v} where={where(v, s)} home={home} folders={folders} checked={checked.has(v.slug)} />}
+          />
         </tbody>
       ))}
     </table>

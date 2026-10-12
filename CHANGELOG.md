@@ -154,6 +154,15 @@ format stays backwards compatible throughout.
 - A review link's ⋯ menu says *Edit link* (German *Link bearbeiten*) for its settings, instead of *Change link*.
 
 ### Added
+- Several videos at once in the library's List and Grid. A box shows at a video's start under the pointer, and on
+  every one once one is ticked; ⌘-click (Ctrl-click) ticks one, ⇧-click the run from the last one, ⌘A every video in
+  view and Esc none. A bar at the window's foot says how many and moves them all with one "Move to…" or archives them
+  with one Undo for all. A video its own ⋯ menu wouldn't move or archive stays ticked, and the bar says why. On a phone,
+  "Select videos" in Display (or Select in a video's menu) shows the boxes, and a tap ticks.
+- One review link for several videos: tick them in the library and choose *Share as one link*. The link opens a room
+  with exactly those videos (2 to 100), names none of their projects, and offers the kinds, password and expiry of any
+  link, for each of its videos. A video removed or archived later leaves it; with none left it opens like an expired
+  link. Settings → Review links lists it with its videos ("3 videos: a, b, +1").
 - Still wrong can show where. In check mode, while you say what is still wrong, draw on the version you are checking:
   the agent gets your words, the version ("still wrong in V2") and that picture. The next check compares that version
   with the agent's next one (V2 → V3), not with the note's first, and the card reminds you what you said ("Still wrong

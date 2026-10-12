@@ -40,6 +40,19 @@
 .film.menu-open {
   z-index: 5;
 }
+/* ticked for the selection's bar (library/select.ts): a flat fill around the whole card, never raised; its corners
+   nest around the poster's (R + the inset, which is --r's 8 px) */
+.film.checked {
+  isolation: isolate;
+}
+.film.checked::before {
+  content: '';
+  position: absolute;
+  inset: calc(-1 * var(--sp-2));
+  z-index: -1;
+  border-radius: calc(var(--radius) + var(--r));
+  background: var(--sel-on);
+}
 .film-poster {
   position: relative;
   border-radius: var(--radius);
@@ -115,6 +128,65 @@
 }
 .film-over.top {
   top: var(--sp-2);
+}
+/* The box that ticks a video for the selection's bar (library/PickBox.tsx): on the picture, a dark island in both
+   themes — the chips' glass, the light fill once ticked. A row's sits over its thumbnail's start (library.css .lpick),
+   a card's at the poster's top-left corner, the chips before it sliding over to make room (a transform: nothing else
+   moves). There under the pointer, on the item the keys are on, on every one once one is ticked. */
+.vchip-pick {
+  position: absolute;
+  /* over the picture, under the list's sticky head */
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: var(--ic);
+  height: var(--ic);
+  padding: 0;
+  border: 1.5px solid rgba(244, 241, 234, 0.9);
+  border-radius: var(--r-sm);
+  background: rgba(12, 12, 13, 0.7);
+  box-shadow: var(--raise-drop);
+  color: transparent;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--dur-fast);
+}
+.vchip-pick.on {
+  opacity: 1;
+  border-color: #f4f1ea;
+  background: #f4f1ea;
+  color: #111;
+}
+.vchip-pick:focus-visible {
+  outline: var(--focus-width) solid var(--fg);
+  outline-offset: var(--focus-offset);
+}
+.film-pick {
+  top: calc(var(--sp-2) + (var(--h-xs) - var(--ic)) / 2);
+  left: var(--sp-2);
+}
+.film:is(:hover, :focus-within) .film-pick,
+.picking .film-pick {
+  opacity: 1;
+}
+/* touch: no pointer to bring them out (the last item tapped keeps :hover): only while picking, each a finger's size */
+@media (hover: none) and (pointer: coarse) {
+  .lib-content:not(.picking) .vchip-pick:not(.on) {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .vchip-pick::after {
+    content: '';
+    position: absolute;
+    inset: calc((var(--ic) - var(--h-touch)) / 2);
+  }
+}
+.film-over.top > :not(.grow, .grow ~ *) {
+  transition: translate var(--dur-fast) var(--ease-out);
+}
+.film:is(:hover, :focus-within, .checked) .film-over.top > :not(.grow, .grow ~ *),
+.picking .film-over.top > :not(.grow, .grow ~ *) {
+  translate: calc(var(--ic) + var(--sp-1)) 0;
 }
 .film-over.bottom {
   bottom: var(--sp-2);

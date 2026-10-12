@@ -638,7 +638,8 @@
 .toasts {
   position: fixed;
   left: 50%;
-  bottom: calc(20px + env(safe-area-inset-bottom));
+  /* --toast-lift: a bar floating at the window's foot (library/SelectBar.tsx) sets its height, so they stand above it */
+  bottom: calc(20px + var(--toast-lift, 0px) + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;

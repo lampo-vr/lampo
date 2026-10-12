@@ -55,7 +55,8 @@ export function approvedOlderVersion(review: Review): Version | null {
  * older opens (stats from before per-video views) can't tell the client from the team, so they never say "opened". */
 function signalOf(s: Share, slug: string, latest: Version): ShareSignal {
   const stats = s.stats;
-  const base = { label: s.label, kind: s.folder ? ('folder' as const) : ('video' as const), reviewers: stats?.reviewers ?? [] };
+  const kind = s.folder ? ('folder' as const) : s.video_ids ? ('set' as const) : ('video' as const);
+  const base = { label: s.label, kind, reviewers: stats?.reviewers ?? [] };
   const seen = stats?.videos?.[slug];
   if (!seen) return { ...base, opened: false, opens: 0, last_opened: null, seen_v: null, by: null };
   // How far the newest version was watched: the visitor who got furthest (lib/watch.ts).
