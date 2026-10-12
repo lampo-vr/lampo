@@ -6,13 +6,11 @@
 // show both themes side by side in theme islands (base.css .theme-dark / .theme-light).
 import { type CSSProperties, type ReactNode, useState } from 'react';
 import { AGENT_KIND_LABELS, AGENT_KINDS } from '../../../lib/agentKind.ts';
-import type { RunPlanItem, Stage } from '../../../lib/types.ts';
+import type { Stage } from '../../../lib/types.ts';
 import { toast, toastUndo } from '../lib/toast.ts';
 import { RunStrip, RunStripPending } from '../player/RunStrip.tsx';
 import { say } from '../sessions/activityWords.ts';
-import { GoOn } from '../sessions/listening.tsx';
 import { RunLine } from '../sessions/RunLine.tsx';
-import { planSaid } from '../sessions/runWords.ts';
 import { Code } from '../settings/parts.tsx';
 import '../styles/styleguide.css';
 import { Badge, type Tone } from '../ui/Badge.tsx';
@@ -167,20 +165,21 @@ const TOC: [string, string][] = [
 const noop = () => {};
 const still = { stop: async () => {}, retry: async () => {}, nudge: async () => {}, busy: false };
 const SESSION = { name: 'Claude Code', id: 'mcp-sg', cwd: null, assigned: '2026-10-07T09:00:00.000Z', by: 'Sam', agent: 'claude-code' as const };
-const PLAN: RunPlanItem[] = [
-  { id: 'a', state: 'doing' },
-  { id: 'b', state: 'fixed' },
-  { id: 'c', state: 'fixed', v: 3 },
-  { id: 'd', state: 'asked' },
-  { id: 'e', state: 'wontfix' },
-  { id: 'f', state: 'todo', added: true },
+/** A note row's state on its right (player/CommentCard.tsx): a small label in the system's Badge, green only as its mark. */
+const NOTE_STATES: [string, Tone][] = [
+  ['Fixed in V2', 'ok'],
+  ['Question', 'agent'],
+  ['Agent on it', 'agent'],
+  ['Fixed · waiting for V3', 'neutral'],
+  ['Check again', 'should'],
+  ['Checked', 'neutral'],
 ];
 
-/** An agent at work on a video, in every state (design §5.2): the player's strip, the library's line, a note's plan line. */
+/** An agent at work on a video, in every state (design §5.2): the agent's line, the library's line, a note row's state. */
 function AgentAtWork() {
   const [now] = useState(() => Date.now());
   const runs = runFixtures('sg', ['n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7'], 3, now);
-  const strip = (key: string, run: (typeof runs)[keyof typeof runs]['run'] | null, reachable = true, stalled = false) => (
+  const strip = (key: string, run: (typeof runs)[keyof typeof runs]['run'] | null, stalled = false) => (
     <div key={key} className="sg-strip" data-state={key}>
       <span className="sg-label">{key}</span>
       <div className="sg-strip-box">
@@ -189,17 +188,13 @@ function AgentAtWork() {
           run={run}
           asOf={now}
           session={SESSION}
-          reachable={reachable}
-          copyable
           stalled={stalled}
           toCheck={run?.state === 'done' ? 5 : 0}
           nextV={4}
           canSteer
-          canCheck
           say={(w) => say(w)}
           onOpen={noop}
           onAnswer={noop}
-          onCheck={noop}
           still={now}
           act={still}
         />
@@ -209,10 +204,9 @@ function AgentAtWork() {
   return (
     <>
       <div className="sg-strips" data-testid="sg-strips">
-        {strip('ready', null)}
-        {strip('unreachable', null, false)}
+        {/* ready and unreachable say nothing: the line is there only while something goes on or needs the person */}
         {/* it asked, then stopped listening, and the person answered: the line says to tell it "go on" */}
-        {strip('not listening', runs.working.run, false, true)}
+        {strip('not listening', runs.working.run, true)}
         {RUN_STATES.map((k) => strip(k, runs[k].run))}
       </div>
       <Row label="card line">
@@ -230,29 +224,12 @@ function AgentAtWork() {
           <span className="run-edge" style={{ '--edge': 0.42 } as CSSProperties} />
         </div>
       </Row>
-      <Row label="plan lines">
-        <div className="sg-lines">
-          {PLAN.map((p) => {
-            const l = planSaid(p, 'Claude Code', 3);
-            return (
-              // a row of its own each (in a note's row the line takes the row's second line)
-              <div key={p.id}>
-                <span className="nr-plan" data-state={p.state}>
-                  {l && <KeyGlyph shape={l.shape} className={`nav-kg run-kg ${l.tone}`} />}
-                  <span className="nr-plan-words">{l?.words ?? 'not reached yet: its room is kept, empty'}</span>
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </Row>
-      <Row
-        label="isn’t listening"
-        note="The agent menu’s state line while the agent isn’t listening and something waits on it (an answer to its question, a note sent since it handed over): calm, the outline keyframe, “go on” to copy. The run strip says the same in its own line, once per view: never again on the note. It goes once the agent waits again."
-      >
-        <div className="sg-lines" data-testid="sg-go-on">
-          <GoOn session={SESSION} />
-        </div>
+      <Row label="note states" note="On a note row's right, one small label: never green words, the green is the mark's.">
+        {NOTE_STATES.map(([words, tone]) => (
+          <Badge key={words} tone={tone} size="sm" className="nr-state">
+            {words}
+          </Badge>
+        ))}
       </Row>
     </>
   );
@@ -1225,16 +1202,6 @@ export default function Styleguide() {
               </Panel>
             </div>
             <Row label="banners in use" note="A banner is the neutral surface; green marks a state (a glyph, a dot, one word), never a surface or an outline.">
-              <div className="verify-cta sg-cta">
-                <KeyGlyph shape="half" />
-                <span className="grow">
-                  <b>3 fixes to check</b>
-                  <span>before and after, on V4</span>
-                </span>
-                <button type="button" className="btn sm">
-                  Check now <Kbd>⇧V</Kbd>
-                </button>
-              </div>
               <div className="arch-banner" role="status">
                 <span className="arch-banner-word">
                   <I name="archive" size={14} />

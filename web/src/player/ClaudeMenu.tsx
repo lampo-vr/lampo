@@ -4,7 +4,6 @@
 import { type ReactNode, useCallback, useState } from 'react';
 import { agentKindOfRef, agentShown } from '../../../lib/agentKind.ts';
 import { partWhere } from '../../../lib/part.ts';
-import { timecode } from '../../../lib/time.ts';
 import { api, enc } from '../api/client.ts';
 import { useRequest, useVideoActions } from '../api/mutations.ts';
 import { usePartSuggestion } from '../api/queries.ts';
@@ -14,25 +13,15 @@ import { usePainted } from '../lib/lazy.ts';
 import { ReopenScope, useReopen } from '../lib/leave.tsx';
 import { copyText, toast, toastError } from '../lib/toast.ts';
 import { type NoteAt, say } from '../sessions/activityWords.ts';
-import { activityShort, LiveSection, stepLine, useAgentNow } from '../sessions/Live.tsx';
-import { GoOn, goOnWords, listenLine, StartListening, useListening, waitsForStart } from '../sessions/listening.tsx';
+import { activityShort, stepLine, useAgentNow } from '../sessions/Live.tsx';
+import { goOnWords, useListening, waitsForStart } from '../sessions/listening.tsx';
 import { fullWords, LOOK, phaseOf, type RunLike, tightOf } from '../sessions/runState.ts';
 import { SessionPicker } from '../sessions/SessionPicker.tsx';
 import { useAgentRuns, useWakeChoice, WakeAsk } from '../sessions/Wake.tsx';
 import { AgentMark, I } from '../ui/icons.tsx';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { IconButton, Popover } from '../ui/primitives.tsx';
-
-// Requests in the agent's own words (agent-facing, so in English): what to do, never which command — it knows its way
-// (the server's instructions: MCP, or `lampo render` for a coding agent's renders).
-const QUICK = (v: number): [string, string][] => [
-  [
-    'Look this render over before I watch it: check what changed from the version before, and ask me on the frame about anything that looks off.',
-    t('Look it over before I watch'),
-  ],
-  ['Work through all open notes, put up the next version, then mark each one fixed.', t('Fix all open notes')],
-  [`Tell me in one reply what you changed in v${v} and why.`, t('Summarise what changed in V{v}', { v })],
-];
+import { AgentMenuBody } from './AgentMenuBody.tsx';
 
 /**
  * The agent button's words at their own width: no room kept for the longest state ("fixing 12 of 12"), and a change of
@@ -87,6 +76,12 @@ interface AgentMenuProps {
   /** Something on the video waits on the agent (sessions/listening.tsx waitingOnAgent): while it isn't listening, the
    * menu says to tell it "go on". */
   owed?: boolean;
+  /** The agent's newest open question here, with its words: quoted in the menu, Answer opens it. */
+  question?: { id: string; text: string } | null;
+  /** Opens a note to answer it (Player.tsx answer), shows its frame, and opens the Agent view (its steps, all of them). */
+  onAnswer?: (note: string | null) => void;
+  onShowNote?: (note: string) => void;
+  onAgentView?: () => void;
 }
 
 /** What a request says to the agent; a partial render's opt-in rides along (the server adds its PART RENDER OK line). */
@@ -111,6 +106,10 @@ export function AgentMenu({
   noteAt,
   run: work = null,
   owed = false,
+  question = null,
+  onAnswer,
+  onShowNote,
+  onAgentView,
 }: AgentMenuProps) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<'menu' | 'assign'>('menu');
@@ -269,21 +268,6 @@ export function AgentMenu({
       </span>
     </button>
   );
-  const foot = (canAsk || canAssign) && (
-    <div className="am-foot">
-      {canAsk && (
-        <button type="button" className="btn sm ghost" onClick={copy} title={t('The open notes with their frames and pictures, to paste into any agent')}>
-          <I name="copy" size={14} /> {t('Copy for an agent')}
-        </button>
-      )}
-      {canAssign && (
-        <button type="button" className="btn sm ghost" onClick={() => setMode('assign')} data-testid="assign-agent-open">
-          <I name="terminal" size={14} /> {t('Assign agent…')}
-        </button>
-      )}
-    </div>
-  );
-
   return (
     <div style={{ position: 'relative' }}>
       <Popover open={open} onOpenChange={openChange} className="claude-pop" sideOffset={8} trigger={trigger}>
@@ -297,111 +281,67 @@ export function AgentMenu({
               <SessionPicker video={video} current={session} onAssign={onAssign} home={home} />
             </ReopenScope>
           </div>
+        ) : session ? (
+          <AgentMenuBody
+            slug={slug}
+            session={session}
+            shown={shown}
+            listen={listen}
+            stalled={stalled}
+            active={active}
+            run={work}
+            wakeRun={run}
+            open={open}
+            noteAt={noteAt}
+            canAsk={canAsk}
+            canAssign={canAssign}
+            question={question}
+            onAnswer={onAnswer}
+            onShowNote={onShowNote}
+            onAgentView={onAgentView}
+            asking={
+              asking !== null ? (
+                <WakeAsk
+                  name={session.name}
+                  folder={wake.folder}
+                  busy={request.isPending}
+                  onStart={() => send(asking, 'start')}
+                  onSend={() => send(asking, 'send')}
+                />
+              ) : null
+            }
+            text={text}
+            setText={setText}
+            onSend={() => text.trim() && send(text)}
+            quick={
+              frameNow && !(quick && 'none' in quick)
+                ? {
+                    label: !stretch
+                      ? t('Quick check: render only this part (finding the shots…)')
+                      : stretch.whole
+                        ? t('Quick check: the whole video is one shot')
+                        : t('Quick check: render only this part ({stretch})', {
+                            stretch: partWhere({ at: stretch.part.in, frames: stretch.part.out - stretch.part.in + 1 }, fps),
+                          }),
+                    disabled: !stretch || stretch.whole,
+                    onClick: () =>
+                      stretch && send({ text: 'Quick check: render only this part, not the whole video, and send it as a part.', part: stretch.part }),
+                  }
+                : null
+            }
+            onCopy={copy}
+            onAssign={() => setMode('assign')}
+            close={() => openChange(false)}
+          />
         ) : (
+          // no agent on this video: assigning one is the point, or copying the notes for any agent
           <div className="am" data-testid="agent-menu">
             <div className="am-status">
-              {session ? (
-                <>
-                  <span className="am-who">
-                    <AgentState active={working} />
-                    <AgentMark kind={agentKindOfRef(session)} size={15} />
-                    <b className="ellipsis">{shown}</b>
-                  </span>
-                  {/* stopped while something waits on it: what to do says where it stands ("…until you start it" would not) */}
-                  {canAsk && stalled ? (
-                    <GoOn session={session} />
-                  ) : (
-                    <>
-                      <span className="am-sub" data-testid="agent-listen">
-                        {listen
-                          ? listenLine(listen)
-                          : active
-                            ? t('Running: new notes reach it right away')
-                            : t('Not running: it gets the notes when it starts')}
-                      </span>
-                      {canAsk && waitsForStart(listen) && <StartListening session={session} />}
-                    </>
-                  )}
-                </>
-              ) : (
-                <>
-                  <b>{t('No agent on this video')}</b>
-                  <span className="am-sub">{t('Assign one, or copy the notes for any agent.')}</span>
-                </>
-              )}
+              <b>{t('No agent on this video')}</b>
+              <span className="am-sub">{t('Assign one, or copy the notes for any agent.')}</span>
             </div>
-            {session && canAsk && (
-              <LiveSection slug={slug} agent={session.name} run={run} enabled={open} noteAt={noteAt} listening={listen ? !waitsForStart(listen) : null} />
-            )}
-            {session && canAsk && asking !== null && (
-              <WakeAsk
-                name={session.name}
-                folder={wake.folder}
-                busy={request.isPending}
-                onStart={() => send(asking, 'start')}
-                onSend={() => send(asking, 'send')}
-              />
-            )}
-            {session && canAsk && asking === null && (
-              <section className="am-ask" aria-label={t('Ask {name}', { name: shown })}>
-                <div className="label">{t('Ask {name}', { name: shown })}</div>
-                {/* What people ask most, as quiet answers to pick (the notes panel's Choices), then anything else. */}
-                <div className="choices">
-                  {QUICK(latestV).map(([req, label]) => (
-                    <button type="button" key={label} className="btn sm choice" onClick={() => send(req)} data-testid="agent-ask">
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                <div className="row">
-                  <input
-                    className="input grow"
-                    placeholder={t('Or ask something else…')}
-                    aria-label={t('Ask {name}', { name: shown })}
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && text.trim() && send(text)}
-                  />
-                  <button type="button" className="btn sm" onClick={() => text.trim() && send(text)} disabled={!text.trim()}>
-                    {t('Send')}
-                  </button>
-                </div>
-                {frameNow && !(quick && 'none' in quick) && (
-                  <button
-                    type="button"
-                    className="cm-row am-quick"
-                    disabled={!stretch || stretch.whole}
-                    onClick={() =>
-                      stretch && send({ text: 'Quick check: render only this part, not the whole video, and send it as a part.', part: stretch.part })
-                    }
-                    data-testid="quick-part"
-                  >
-                    <I name="layers" size={14} />
-                    <span className="grow">
-                      <b>{t('Quick check: render only this part')}</b>
-                      <span>
-                        {!stretch
-                          ? t('Finding the shots around {tc}…', { tc: timecode(partAt ?? 0, fps) })
-                          : stretch.whole
-                            ? t('The whole video is one shot: ask for a full version')
-                            : t('{stretch} · the shot around {tc}, the rest stays as V{v}', {
-                                stretch: partWhere({ at: stretch.part.in, frames: stretch.part.out - stretch.part.in + 1 }, fps),
-                                tc: timecode(partAt ?? 0, fps),
-                                v: latestV,
-                              })}
-                      </span>
-                    </span>
-                  </button>
-                )}
-              </section>
-            )}
-            {session && asking === null && foot}
-            {!session && (
-              <>
-                {assignRow}
-                {copyRow}
-              </>
-            )}
+            {assignRow}
+            {copyRow}
           </div>
         )}
       </Popover>

@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// covers: web/src/sessions/ web/src/player/ClaudeMenu.tsx server/routes/sessions.ts server/routes/mcp.ts
+// covers: web/src/sessions/ web/src/player/ClaudeMenu.tsx web/src/player/AgentMenuBody.tsx server/routes/sessions.ts server/routes/mcp.ts
 // covers: server/activity.ts server/agentRuns.ts server/sessionCache.ts server/watch.ts lib/runStream.ts
 // covers: lib/activity.ts lib/activityText.ts lib/agentStatus.ts lib/runs.ts server/runs.ts server/routes/runs.ts
 // Browser end-to-end test of the live agent monitor: what an agent does shows while it does it, built only from what
 // Lampo sees anyway — the agent spends no tokens on it. A run Lampo started (the harness's stand-in prints Claude
-// Code's stream-json a line at a time) shows its step, a timeline and its tokens in the agent menu's Live section and
-// its step in the agent button; an MCP client reading a note and marking it fixed moves another video's timeline
+// Code's stream-json a line at a time) shows its step under the agent menu's sentence, its steps on a thin rail, its
+// tokens and Stop, and its step in the agent button's title; an MCP client reading a note and marking it fixed moves another video's timeline
 // without a reload; a `vr` command on this machine arrives through the rolling file; the sidebar's Agents rows say
 // what each agent is doing; a phone shows the same in its sheet. Nothing real runs. Screenshots land in VR_SHOTS.
 import { execFileSync } from 'node:child_process';
@@ -101,6 +101,12 @@ try {
   };
   const text = (sel) => page.$eval(sel, (e) => e.textContent || '').catch(() => '');
   const timeline = () => page.$$eval('[data-testid=agent-timeline] li', (li) => li.map((e) => e.textContent || '')).catch(() => []);
+  // asks the agent from the menu's one field (Send inside it)
+  const ask = async (words) => {
+    await page.click('[data-testid=agent-field]');
+    await page.keyboard.type(words);
+    await page.keyboard.press('Enter');
+  };
 
   await check('nothing about activity is asked for before the first paint', async () => {
     await openPlayer(spot);
@@ -115,11 +121,10 @@ try {
     assert(t.paint > 0 && t.asked > t.paint, JSON.stringify(t));
   });
 
-  await check('a run Lampo started: the Live section shows its step, a timeline with times and its tokens, live', async () => {
+  await check('a run Lampo started: the menu says its step under its sentence, its steps with times on a rail, its tokens, live', async () => {
     hold(true);
     await openMenu();
-    const rows = await page.$$('[data-testid=agent-menu] [data-testid=agent-ask]');
-    for (const r of rows) if ((await r.evaluate((e) => e.textContent)).includes('Fix all open notes')) await r.click();
+    await ask('Fix all open notes');
     // the menu closes once the request is answered, which can come after the run is already running
     await page.waitForFunction(() => !document.querySelector('[data-testid=agent-menu]'), { timeout: 10000 });
     await until(async () => (await api(`/api/agent-runs?slug=${encodeURIComponent(spot)}`)).runs[0]?.state === 'running', 'the run');
@@ -130,18 +135,21 @@ try {
     assert(!(await text('[data-testid=agent-live]')).includes(project), 'no full paths on screen');
     // The timeline follows within a second (the run's own step is the newest thing known).
     await until(async () => (await timeline()).some((l) => /Reading src\/Logo\.tsx/.test(l)), 'the read step in the timeline');
-    // Three lines in all (the step it is on and two before it), the rest on request.
-    assert((await timeline()).length <= 2, `two lines under the step: ${(await timeline()).join(' | ')}`);
-    await until(async () => /^Show all \d+$/.test(await text('[data-testid=agent-log-more]')), 'Show all');
+    // Three lines on the rail, the rest on request (its head says how many and opens them).
+    assert((await timeline()).length <= 3, `three lines on the rail: ${(await timeline()).join(' | ')}`);
+    await until(async () => /^Steps\s*\d+$/.test((await text('button[data-testid=agent-log-more]')).trim()), 'the steps’ head opens the rest');
     await page.click('[data-testid=agent-log-more]');
-    await until(async () => (await timeline()).length > 2, 'the whole log');
+    await until(async () => (await timeline()).length > 3, 'the whole log');
     const lines = await timeline();
     assert(lines.some((l) => /Started by Lampo/.test(l)) && lines.some((l) => /I’ll read the open notes first\./.test(l)), lines.join(' | '));
     assert(
       lines.every((l) => /^\d{1,2}:\d{2}/.test(l)),
       `each line has its time: ${lines.join(' | ')}`,
     );
-    assert(await page.$('[data-testid=agent-live][data-working] .am-now .kg.live'), 'the working glyph turns');
+    assert(
+      /^spot-edit is (working|fixing \d+ of \d+)$/.test((await text('[data-testid=agent-sentence]')).trim()),
+      `the sentence: ${await text('[data-testid=agent-sentence]')}`,
+    );
     await until(async () => /tokens/.test(await text('[data-testid=agent-run-use]')), 'the tokens so far');
     const use = await text('[data-testid=agent-run-use]');
     assert(!/\$/.test(use), `no cost before the run states one: ${use}`);
@@ -195,15 +203,20 @@ try {
   await check('an agent connected over MCP that isn’t listening says so, with what starts it; a new note says it once', async () => {
     await openPlayer(promo);
     await openMenu();
+    const said = async () => `${(await text('[data-testid=agent-sentence]')).trim()} | ${(await text('[data-testid=agent-now]')).trim()}`;
     // Assigned, never connected: not connected, and new notes wait for it.
-    await until(async () => /Not connected: new notes wait until you start it/.test(await text('[data-testid=agent-listen]')), 'not connected');
+    await until(
+      async () => /^promo-cut isn’t connected \| New notes wait until you start it/.test(await said()),
+      async () => `not connected: ${await said()}`,
+    );
     mcp = new Client({ name: 'promo-cut', version: '1.0.0' }, { versionNegotiation: { mode: 'auto' } });
     await mcp.connect(new StreamableHTTPClientTransport(new URL(`${BASE}/mcp`)));
     await mcp.listTools();
     // Connected: still not listening — an MCP client acts only when prompted — and what to tell it, to copy.
-    await until(async () => /Connected, not listening/.test(await text('[data-testid=agent-listen]')), 'connected, not listening', 40_000);
-    const how = await text('[data-testid=listen-how]');
-    assert(/To start it, tell it:/.test(how) && /Use Lampo: work my notes/.test(how), how);
+    await until(async () => /^promo-cut isn’t listening \| New notes wait until you start it/.test(await said()), 'connected, not listening', 40_000);
+    // its one action: copy what starts it (the sentence to tell it, whole in its title)
+    const how = await page.$eval('[data-testid=agent-start]', (b) => ({ words: b.textContent.trim(), title: b.title }));
+    assert(how.words === 'Copy what starts promo-cut' && /Use Lampo: work my notes/.test(how.title), JSON.stringify(how));
     assert(!(await page.$('[data-testid=agent-button] .kg.live')), 'no turning keyframe for an agent that doesn’t listen');
     await shot('monitor-not-listening', '.claude-pop');
     await page.keyboard.press('Escape');
@@ -222,8 +235,14 @@ try {
     // It read what waited for it, then waits for more.
     await mcp.callTool({ name: 'get_open_notes', arguments: { video: promo } });
     const waiting = mcp.callTool({ name: 'wait_for_feedback', arguments: { video: promo, timeout_s: 30 } });
-    await until(async () => /Listening: new notes reach it right away/.test(await text('[data-testid=agent-listen]')), 'listening, without a reload');
-    assert(!(await page.$('[data-testid=listen-how]')), 'nothing to start');
+    await until(
+      async () =>
+        /^promo-cut is listening \| New notes reach it right away$/.test(
+          `${(await text('[data-testid=agent-sentence]')).trim()} | ${(await text('[data-testid=agent-now]')).trim()}`,
+        ),
+      'listening, without a reload',
+    );
+    assert(!(await page.$('[data-testid=agent-start]')), 'nothing to start');
     assert(await page.$('[data-testid=agent-button] .kg.live'), 'the turning keyframe');
     // A note while it listens reaches it at once.
     const n = await api(`/api/review/${encodeURIComponent(promo)}/comments`, 'POST', { frame: 60, text: 'One more' });
@@ -236,24 +255,26 @@ try {
     await openPlayer(promo);
     await openMenu();
     await mcp.callTool({ name: 'get_open_notes', arguments: { video: promo } });
-    await until(async () => (await text('[data-testid=agent-now]')).includes('Reading the open notes'), 'the first call, live');
+    await until(async () => (await timeline())[0]?.includes('Reading the open notes'), 'the first call, live');
     await mcp.callTool({ name: 'get_note', arguments: { id: note.id } });
     await mcp.callTool({ name: 'mark_fixed', arguments: { id: note.id, note: 'Cut moved two frames' } });
     // A fix is told by what it changed, a note by its moment: never the agent's note ids.
-    await until(async () => (await text('[data-testid=agent-now]')).includes('Fixed “Cut moved two frames”'), 'the fix, live');
+    await until(async () => (await timeline())[0]?.includes('Fixed “Cut moved two frames”'), 'the fix, live');
     const lines = await timeline();
-    assert(lines[0]?.includes(`Reading the note at ${note.timecode}`) && lines[1]?.includes('Reading the open notes'), lines.join(' | '));
+    assert(lines[1]?.includes(`Reading the note at ${note.timecode}`) && lines[2]?.includes('Reading the open notes'), lines.join(' | '));
     assert(!/\bc_[0-9a-f]{6}\b/.test(await text('[data-testid=agent-menu]')), `no note ids: ${await text('[data-testid=agent-menu]')}`);
     // Waiting again and again is one line, "since" when it began.
     await mcp.callTool({ name: 'wait_for_feedback', arguments: { video: promo, timeout_s: 1 } });
     await mcp.callTool({ name: 'wait_for_feedback', arguments: { video: promo, timeout_s: 1 } });
     await until(
-      async () => /Waiting for your answer · since \d{1,2}:\d{2}/.test(await text('[data-testid=agent-now]')),
+      async () => /Waiting for your answer · since \d{1,2}:\d{2}/.test((await timeline())[0] ?? '') && !/Waiting/.test((await timeline())[1] ?? ''),
       async () => {
         const { agents } = await api(`/api/agent-activity?slug=${encodeURIComponent(promo)}`);
-        return `one wait: “${await text('[data-testid=agent-now]')}” · ${JSON.stringify(agents.map((a) => [a.agent, a.recent.slice(0, 3).map((x) => [x.kind, x.text, x.since])]))}`;
+        return `one wait: “${(await timeline()).join(' | ')}” · ${JSON.stringify(agents.map((a) => [a.agent, a.recent.slice(0, 3).map((x) => [x.kind, x.text, x.since])]))}`;
       },
     );
+    // a wait for notes is no question: the menu never says it asked
+    assert(!/asked you/.test(await text('[data-testid=agent-sentence]')) && !(await page.$('[data-testid=agent-answer]')), 'listening, not asking');
     await shot('monitor-mcp', '.claude-pop');
     await page.keyboard.press('Escape');
   });
@@ -298,7 +319,7 @@ try {
     await shot('monitor-board-card', `.bcard[data-slug="${promo}"]`);
   });
 
-  await check('on a phone the button is the mark and the glyph; its sheet has the Live section', async () => {
+  await check('on a phone the button is the mark and the glyph; its sheet has the steps', async () => {
     await page.setViewport({ width: 390, height: 844, deviceScaleFactor: SHOTS ? 3 : 1, isMobile: true, hasTouch: true });
     await openPlayer(promo);
     assert(!(await page.$('[data-testid=agent-step]')), 'no words in the compact button');

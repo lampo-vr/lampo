@@ -5,9 +5,10 @@
 // Browser end-to-end test of what a person sees while an agent works on a video (an agent's "run": never a word in
 // the UI). The runs API answers with real-shaped work in every state (web/src/styleguide/runStates.ts) and the review,
 // library and agents answers carry it, so every state can be shown without an agent; SSE `run` reaches the page the
-// way another tab relays it. Checks: the strip's fixed slot (nothing moves from ready to working, rendering, needs you
-// and done), its words per state, the Agent view's plan and steps, Stop at once and back when refused, a reviewer
-// seeing the work without its controls, the board card's hairline and action slot, the cards without a spinner, the
+// way another tab relays it. Checks: the agent's line under the notes' head (none while the agent is just ready; once it
+// works nothing moves from working to rendering, needs you and done), its sentence and folded line per state with one
+// action, the one raised button (Answer; the To check header's Check once the work is done), the rows' "Agent on it",
+// the Agent view's plan and steps, Stop at once and back when refused, a reviewer seeing the work without its controls, the board card's hairline and action slot, the cards without a spinner, the
 // version picker's ghost and who made a version, the phone's strip and sheet, the agent's own long sentence (the state
 // in the tight places, cut with its whole title where there is room, whole in the Agent view), and every state at
 // 390–1920 in both themes and German. Screenshots land in VR_SHOTS.
@@ -210,14 +211,14 @@ try {
     if (st === 'long') fixtures.long.run.now = { ...fixtures.long.run.now, at: new Date().toISOString() };
     await moved(p);
     const phase = st === 'thinking' || st === 'quiet' || st === 'long' ? 'working' : st === 'permission' ? 'needs_you' : st;
-    // the strip says the state, of this very work (two states can share a phase)
+    // the line says the state, of this very work (two states can share a phase); no line while nothing goes on
     await p.waitForFunction(
       (ph, id) => {
-        const el = document.querySelector('[data-testid=run-strip]');
-        return el?.getAttribute('data-phase') === ph && (el.getAttribute('data-run') ?? '') === id;
+        const el = document.querySelector('[data-testid=run-strip]:not(.pending)');
+        return ph ? el?.getAttribute('data-phase') === ph && (el.getAttribute('data-run') ?? '') === id : !el;
       },
       { timeout: 15000 },
-      st ? phase : listening ? 'ready' : 'unreachable',
+      st ? phase : null,
       st ? fixtures[st].run.id : '',
     );
   };
@@ -233,7 +234,7 @@ try {
   const openPlayer = async (p, s = slug) => {
     await p.goto('about:blank');
     await p.goto(`${BASE}/#/v/${enc(s)}`, { waitUntil: 'domcontentloaded' });
-    await p.waitForSelector('[data-testid=run-strip]:not(.pending)', { timeout: 20000 });
+    await p.waitForSelector('[data-testid=note-row]', { timeout: 20000 });
     // who is looking is known (the controls follow the role): the team's agent button, a reviewer's quiet chip
     await p.waitForSelector(role === 'reviewer' ? '.p-top .session-chip, .p-strip .session-chip' : '[data-testid=agent-button]', { timeout: 20000 });
   };
@@ -248,7 +249,7 @@ try {
     await p.goto(`${BASE}/#/`, { waitUntil: 'domcontentloaded' });
     await p.waitForSelector(`[data-testid=library-content][data-layout=${layout}]`, { timeout: 20000 });
   };
-  /** What sticks out of the window's sides in the panel's head and the strip (sideways() lets a page that scrolls pass). */
+  /** What sticks out of the window's sides in the panel's head and the agent's line (sideways() lets a page that scrolls pass). */
   const outside = (p) =>
     p.$$eval('.side-title > *, .side-title button, [data-testid=run-strip] button', (els) =>
       els.flatMap((e) => {
@@ -257,6 +258,8 @@ try {
       }),
     );
   const text = (p, sel) => p.$eval(sel, (e) => e.textContent || '').catch(() => '');
+  /** The agent's line whole, as its title says it: the sentence, the folded line, the figure. */
+  const lineSaid = (p) => p.$eval('[data-testid=run-open]', (e) => e.title).catch(() => '');
   const rects = (p) =>
     p.evaluate(() => {
       const r = (sel) => {
@@ -273,12 +276,11 @@ try {
       };
     });
 
-  await check('the strip has its slot from the first paint, and nothing moves from ready to working, rendering, needs you and done', async () => {
+  await check('the agent’s line: none while it is just ready; once it works nothing moves from working to rendering, needs you and done', async () => {
     await openPlayer(page);
     await go(page, null);
     await settle(page);
-    const ready = await rects(page);
-    assert(/Claude Code · ready · gets your notes when you send/.test(await text(page, '[data-testid=run-words]')), 'ready: its words');
+    assert(!(await page.$('[data-testid=run-strip]')), 'ready: no line (nothing goes on, nothing needs you)');
     await shot(page, '01-ready');
     const seen = {};
     for (const st of ['working', 'rendering', 'needs_you', 'done']) {
@@ -287,49 +289,69 @@ try {
       seen[st] = await rects(page);
       await shot(page, `01-${st}`);
     }
-    const fixed = ['strip', 'head', 'stage', 'dock'];
-    const moving = Object.entries(seen).flatMap(([st, r]) => fixed.filter((k) => r[k] !== ready[k]).map((k) => `${k} ${ready[k]} → ${r[k]} (${st})`));
+    // one line under the notes' head, its folded line's room kept: nothing moves while the work goes on and when it ends
+    const fixed = ['strip', 'head', 'stage', 'dock', 'first'];
+    const moving = Object.entries(seen).flatMap(([st, r]) =>
+      fixed.filter((k) => r[k] !== seen.working[k]).map((k) => `${k} ${seen.working[k]} → ${r[k]} (${st})`),
+    );
     assert(!moving.length, moving.join('; '));
-    // the first row stays where it was (the plan's line slot under each row is reserved once the work starts, then
-    // nothing in the list moves while it goes on and when it ends)
-    assert(seen.working.first.split(',')[0] === ready.first.split(',')[0], `the list's top: ${ready.first} → ${seen.working.first}`);
     const rowsMoved = ['rendering', 'needs_you'].filter((st) => seen[st].rows !== seen.working.rows);
     assert(!rowsMoved.length, `note rows moved in: ${rowsMoved.join(', ')} (${seen.working.rows} → ${rowsMoved.map((s) => seen[s].rows).join(' | ')})`);
-    // done: the version is there (the player shows it), and Check fixes is the strip's: the list's own call to check
-    // gives way to it (one place to press)
-    assert(!!(await page.$('[data-testid=run-check]')) && !(await page.$('.verify-cta')), 'done: Check fixes on the strip, not twice');
+    const under = await page.evaluate(() => {
+      const head = document.querySelector('.side-title')?.getBoundingClientRect();
+      const line = document.querySelector('[data-testid=run-strip]')?.getBoundingClientRect();
+      return head && line ? Math.round(line.top - head.bottom) : null;
+    });
+    assert(under !== null && Math.abs(under) <= 1, `the line right under the notes' head: ${under}`);
+    // done: the version is there (the player shows it); checking the fixes is the To check header's, never the line's
+    assert(
+      !(await page.$('[data-testid=run-strip] [data-testid=run-check]')) && !!(await page.$('[data-testid=group-check] [data-testid=check-group]')),
+      'done: Check on the To check header',
+    );
   });
 
-  await check('the strip says what happens in each state, with one raised button only where the person is needed', async () => {
+  /** The raised buttons in view (a split button's chevron is the same door). */
+  const raisedIn = (p) =>
+    p.$$eval('.btn.primary', (bs) =>
+      bs
+        .filter((b) => !(b.closest('.so-split') && !b.textContent.trim()))
+        .filter((b) => {
+          const r = b.getBoundingClientRect();
+          return r.width > 0 && r.height > 0 && getComputedStyle(b).visibility !== 'hidden';
+        })
+        .map((b) => b.dataset.testid || b.textContent.trim()),
+    );
+
+  await check('the line says each state in a sentence and a folded line, with one action, and one raised button in the view', async () => {
+    // [the sentence, the folded line and the figure, as the line's title says them whole; its one action; the view's one
+    // raised button]
     const want = {
-      queued: [/^Sent to Claude Code · waiting for it to start/, ['cancel']],
-      starting: [/^Starting Claude Code on Studio Mac/, ['stop']],
-      working: [/^Claude Code · fixing 3 of 7 · Editing src\/Logo\.tsx/, ['stop']],
-      thinking: [/^Claude Code · fixing 3 of 7 · “the spring is too slow; moving the entry to frame 300”/, ['stop']],
-      quiet: [/^Claude Code · fixing 1 of 7 · last: Reading the open notes · 4 min ago/, ['stop']],
-      rendering: [/^Claude Code · rendering V3 · about 1 min left$/, ['stop']],
-      uploading: [/^Claude Code · uploading V3$/, []],
-      needs_you: [/^Claude Code · needs you · a question$/, ['answer']],
-      permission: [/^Claude Code · needs permission · to run npx remotion render$/, ['allow']],
-      done: [/^V3 is ready · 5 fixed · 1 asked · 12 min$/, ['check']],
-      failed: [/^Claude Code · stopped · the render failed at frame 312: the font “Inter Display” is missing$/, ['log', 'retry']],
-      stopped: [/^Stopped after 4 min$/, ['again']],
-      lost: [/^No word from Claude Code for 22 min$/, ['nudge', 'stop']],
+      queued: [/^Sent to Claude Code · waiting for it to start/, 'cancel', 'new-note'],
+      starting: [/^Starting Claude Code on Studio Mac/, 'stop', 'new-note'],
+      working: [/^Claude Code is fixing 3 of 7 · Editing src\/Logo\.tsx/, 'stop', 'new-note'],
+      thinking: [/^Claude Code is fixing 3 of 7 · “the spring is too slow; moving the entry to frame 300”/, 'stop', 'new-note'],
+      quiet: [/^Claude Code is fixing 1 of 7 · last: Reading the open notes · 4 min ago/, 'stop', 'new-note'],
+      rendering: [/^Claude Code is rendering V3 · about 1 min left · 42%$/, 'stop', 'new-note'],
+      uploading: [/^Claude Code is uploading V3/, null, 'new-note'],
+      // the agent asks: Answer is the view's one raised button, + Note steps down
+      needs_you: [/^Claude Code asked you · a question$/, 'answer', 'run-answer'],
+      permission: [/^Claude Code needs permission · to run npx remotion render$/, 'allow', 'new-note'],
+      // done with five notes still open: the top bar waits on the agent, so the To check header's Check is the door
+      done: [/^V3 is ready · 5 fixed · 1 asked · 12 min$/, null, 'check-group'],
+      failed: [/^Claude Code stopped · the render failed at frame 312: the font “Inter Display” is missing$/, 'retry', 'new-note'],
+      stopped: [/^Stopped after 4 min$/, 'again', 'new-note'],
+      lost: [/^No word from Claude Code for 22 min$/, 'nudge', 'new-note'],
     };
     const out = [];
     for (const st of RUN_STATES) {
       await go(page, st);
-      const words = await text(page, '[data-testid=run-words]');
+      const words = await lineSaid(page);
       const acts = await page.$$eval('[data-testid=run-strip] .run-act', (bs) => bs.map((b) => b.dataset.testid.replace('run-', '')));
-      const primary = await page.$$eval('[data-testid=run-strip] .run-act.primary', (bs) => bs.map((b) => b.dataset.testid.replace('run-', '')));
-      const [re, acts0] = want[st];
+      const [re, act0, raised0] = want[st];
       if (!re.test(words)) out.push(`${st}: "${words}"`);
-      if (acts.join() !== acts0.join()) out.push(`${st}: actions ${acts.join() || 'none'}, not ${acts0.join() || 'none'}`);
-      // one raised door per view to checking the fixes: five notes are still open here, so the top bar waits on the
-      // agent and offers no "Check N fixes" — the strip's is the door, raised (with every note answered the top bar's
-      // is, and the strip says it quietly: player.mjs)
-      const raised = acts0.filter((a) => a === 'answer' || a === 'check');
-      if (primary.join() !== raised.join()) out.push(`${st}: raised ${primary.join() || 'none'}`);
+      if (acts.join() !== (act0 ?? '')) out.push(`${st}: actions ${acts.join() || 'none'}, not ${act0 ?? 'none'}`);
+      const up = await raisedIn(page);
+      if (up.join() !== raised0) out.push(`${st}: raised ${up.join() || 'none'}, not ${raised0}`);
       if (st === 'done' && (await page.$('[data-testid=stage-next][data-kind=verify]'))) out.push('done: the top bar offers Check fixes as well');
     }
     // the percentage stands at the line's end, never cut
@@ -350,7 +372,7 @@ try {
     await go(page, 'thinking');
     await page.click('[data-testid=run-open]');
     await page.waitForSelector('[data-testid=agent-plan]', { timeout: 15000 });
-    assert(await page.$eval('[data-testid=panel-agent]', (e) => e.getAttribute('aria-selected') === 'true'), 'the Agent tab is on');
+    assert(await page.$eval('[data-testid=panel-agent]', (e) => e.getAttribute('aria-selected') === 'true'), 'the Agent view is the open tab');
     const plan = await page.$$eval('[data-testid=agent-plan-row]', (rs) => rs.map((r) => r.textContent));
     assert(plan.length === 7, `seven notes in the plan: ${plan.length}`);
     assert(/Typo in the title.*fixed/.test(plan[0]) && /Logo enters late.*on it/.test(plan[2]) && /Music too loud here.*next/.test(plan[3]), plan.join(' | '));
@@ -377,11 +399,18 @@ try {
     await page.waitForSelector('[data-testid=note-row]');
   });
 
-  await check('plan lines on the note rows; Answer opens the question on its frame', async () => {
+  await check('the rows say where the work stands: Agent on it on the note in hand; Answer opens the question on its frame', async () => {
+    await go(page, 'working');
+    const states = async () =>
+      page.$$eval('[data-testid=note-row]', (rs) =>
+        rs.map((r) => [r.closest('.note')?.dataset.note, r.querySelector('[data-testid=note-state]')?.textContent.trim() ?? '']),
+      );
+    await until(
+      async () => (await states()).some(([id, s]) => id === notes[2] && s === 'Agent on it'),
+      async () => `the note in hand: ${JSON.stringify(await states())}`,
+    );
+    assert((await states()).filter(([, s]) => s === 'Agent on it').length === 1, `one note in hand: ${JSON.stringify(await states())}`);
     await go(page, 'needs_you');
-    const lines = await page.$$eval('[data-testid=note-plan]', (ps) => ps.map((p) => `${p.dataset.state}:${p.textContent}`));
-    assert(lines.includes('fixed:fixed · in V3') && lines.includes('asked:asked you'), lines.join(' | '));
-    assert(lines.filter((l) => l === 'todo:').length === 2, `notes not reached keep an empty line: ${lines.join(' | ')}`);
     await page.click('[data-testid=run-answer]');
     await until(async () => (await page.$eval('.note.active', (e) => e.dataset.note).catch(() => null)) === notes[3], 'the question opens');
   });
@@ -461,11 +490,15 @@ try {
       assert(button.text === 'fixing 3 of 7', `the button says the state: "${button.text}"`);
       assert(!button.cut && !button.over, `nothing overflows the button: ${JSON.stringify(button)}`);
       assert(button.label === `Agent Claude Code: fixing 3 of 7 · “${LONG}”` && button.title === button.label, `its name and title: ${button.label}`);
-      // the strip has room for the agent's words after the state: cut with an ellipsis, whole on hover, all on a press
-      const strip = await said(page, '[data-testid=run-open]');
-      assert(strip.text.startsWith('Claude Code · fixing 3 of 7 · “rendering v2 ('), `the strip: ${strip.text}`);
-      assert(strip.cut && strip.ellipsis, `the strip cuts it with an ellipsis: ${JSON.stringify(strip)}`);
-      assert(strip.title.startsWith(`Claude Code · fixing 3 of 7 · “${LONG}”`), `the strip's title: ${strip.title}`);
+      // the line says the state, and its folded line the agent's words: cut with an ellipsis, whole on hover, all on a press
+      assert((await text(page, '[data-testid=run-words]')) === 'Claude Code is fixing 3 of 7', `the line: ${await text(page, '[data-testid=run-words]')}`);
+      const fold = await page.$eval('[data-testid=run-fold]', (e) => {
+        const w = e.querySelector('.ellipsis');
+        return { text: w.textContent, cut: w.scrollWidth > w.clientWidth + 1, ellipsis: getComputedStyle(w).textOverflow === 'ellipsis', title: e.title };
+      });
+      assert(fold.text.startsWith('“rendering v2 (') && fold.cut && fold.ellipsis, `the folded line cuts it with an ellipsis: ${JSON.stringify(fold)}`);
+      assert(fold.title.startsWith(`“${LONG}”`), `the folded line's title: ${fold.title}`);
+      assert((await lineSaid(page)).startsWith(`Claude Code is fixing 3 of 7 · “${LONG}”`), `the line's title: ${await lineSaid(page)}`);
       await page.click('[data-testid=run-open]');
       await page.waitForSelector('[data-testid=agent-thought]', { timeout: 15000 });
       const view = await page.$eval('[data-testid=agent-thought]', (q) => ({
@@ -529,7 +562,7 @@ try {
       await page.click(line);
       await page.waitForSelector('[data-testid=agent-view]', { timeout: 20000 });
       assert(page.url().includes('agent=1'), page.url());
-      assert(await page.$eval('[data-testid=panel-agent]', (e) => e.getAttribute('aria-selected') === 'true'), 'the Agent tab is on');
+      assert(await page.$eval('[data-testid=panel-agent]', (e) => e.getAttribute('aria-selected') === 'true'), 'the Agent view is the open tab');
       assert(/rendering v2 \(/.test(await text(page, '[data-testid=agent-thought]')), 'and says what the agent said');
     },
   );
@@ -580,7 +613,7 @@ try {
     older = false;
   });
 
-  await check('a phone: the strip above the dock, a tap opens the Agent view in the sheet, Answer a thumb’s size', async () => {
+  await check('a phone: the agent’s line above the dock, a tap opens the Agent view in the sheet, Answer a thumb’s size', async () => {
     const p = await browser.newPage();
     p.on('pageerror', (e) => errors.push(e.message));
     await intercept(p);
@@ -707,7 +740,7 @@ try {
       async () => (await phase()) === 'queued',
       async () => `the strip says ${await phase()} after Send`,
     );
-    assert(/^Sent to Claude Code · waiting for it to start/.test(await text(p, '[data-testid=run-words]')), await text(p, '[data-testid=run-words]'));
+    assert(/^Sent to Claude Code · waiting for it to start/.test(await lineSaid(p)), await lineSaid(p));
     // the agent's first call (here `vr` on this machine, as the agent): the work begins, and the page hears it
     const vrEnv = { ...srv.env, VR_BY: 'agent:Claude Code' };
     execFileSync(process.execPath, [path.join(ROOT, 'bin/vr'), 'show', sent.notes[0].id], { env: vrEnv, encoding: 'utf8' });

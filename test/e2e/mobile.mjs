@@ -71,6 +71,23 @@ try {
   await api(`/api/review/${encodeURIComponent(slug)}/sync`, { method: 'POST', body: '{}' });
   await api(`/api/comments/${early.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'fixed', note: 'Moved the logo to 1.0 s', by: 'agent:e2e' }) });
 
+  // The agent's line is there only while its work goes on or needs the person (RunStrip.tsx): a note sent to the
+  // assigned agent opens its work ("Sent to … · waiting for it to start"), as Send does. Once per suite.
+  let sentToAgent = false;
+  const agentAtWork = async () => {
+    await api(`/api/review/${encodeURIComponent(slug)}/session`, {
+      method: 'PUT',
+      body: JSON.stringify({ name: 'launch-edit-agent', agent: 'claude-code' }),
+    });
+    if (sentToAgent) return;
+    await api(`/api/review/${encodeURIComponent(slug)}/drafts`, {
+      method: 'POST',
+      body: JSON.stringify({ frame: 40, text: 'Warmer grade here', severity: 'should' }),
+    });
+    await api(`/api/review/${encodeURIComponent(slug)}/drafts/send`, { method: 'POST', body: '{}' });
+    sentToAgent = true;
+  };
+
   browser = await launch();
   const page = await browser.newPage();
   screenshotFailures(() => page);
@@ -324,7 +341,7 @@ try {
   });
 
   await check('an arrow drawn with a finger is stored in video pixels; the note opens the sheet', async () => {
-    await tapText('.nsheet button.primary', 'Note');
+    await tap('.nsheet [data-testid=new-note]');
     await page.waitForSelector('.nsheet-half .composer textarea');
     // the drawing tools are on the picture, at a thumb's size
     const arrow = await page.$eval('[data-testid=draw-bar] button[aria-label="Arrow"]', (e) => {
@@ -351,7 +368,7 @@ try {
   });
 
   await check('writing a note in the sheet: one toolbar of thumb-sized controls, Send on screen however long the note, × cancels', async () => {
-    await tapText('.nsheet button.primary', 'Note');
+    await tap('.nsheet [data-testid=new-note]');
     await page.waitForSelector('.nsheet .composer textarea');
     // measured once the composer has popped in (its entrance scales everything in it)
     await page.$eval('.composer', (e) => Promise.all(e.getAnimations({ subtree: true }).map((a) => a.finished.catch(() => {}))));
@@ -390,7 +407,8 @@ try {
   await check('verify on a phone: before and after stacked, a swipe switches, "Looks right" closes the fix', async () => {
     await tap('.nsheet-handle');
     await page.waitForSelector('.nsheet-half');
-    await tapText('.nsheet button', 'Check now');
+    // the notes' To check header's Check (the bar's row says it too)
+    await tap('.nsheet [data-testid=check-group]');
     await page.waitForSelector('.nsheet .verify');
     await page.waitForSelector('.stage.stacked');
     await settled();
@@ -622,10 +640,7 @@ try {
         );
       // Save and Send, side by side at the composer's foot
       const sendButton = '.nsheet .composer-send';
-      await api(`/api/review/${encodeURIComponent(slug)}/session`, {
-        method: 'PUT',
-        body: JSON.stringify({ name: 'launch-edit-agent', agent: 'claude-code' }),
-      });
+      await agentAtWork();
       // a stand-in for the visual viewport: a keyboard shrinks it (and the browser pans it to the field) while the page's
       // layout stays, as in Safari and Chrome on a phone; until one is "up" it answers as the real one
       await page.evaluateOnNewDocument(() => {
@@ -668,8 +683,11 @@ try {
           if (half < height * 0.18) problems.push(`${at} the picture with the notes half open is ${half} px`);
           const list = await page.$eval('.nsheet .side-scroll', (e) => e.clientHeight);
           if (list < 88) problems.push(`${at} the notes' list is ${list} px tall`);
-          const tabs = await page.$$eval('.nsheet .note-tabs [role=tab]', (els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
-          if (tabs.some((x) => x < 40)) problems.push(`${at} the filters are ${tabs.join('/')} px tall`);
+          // the head's tools (the filter, ⋯, Record, + Note) a finger's height
+          const headTools = await page.$$eval('.nsheet .side-title .btn', (els) =>
+            els.filter((e) => e.getBoundingClientRect().width).map((e) => Math.round(e.getBoundingClientRect().height)),
+          );
+          if (!headTools.length || headTools.some((x) => x < 40)) problems.push(`${at} the head's buttons are ${headTools.join('/')} px tall`);
           await shot(`09-half-${height}`);
           // a note: the drawing tools in their own strip under the picture, the text and Send on the screen
           hs = await film(() => tap('[data-testid=new-note]'));
@@ -763,10 +781,7 @@ try {
   await check(
     'a phone held sideways: the player takes the width with an agent’s line too, the notes clear the notch; a finger’s taps never zoom or pull the page',
     async () => {
-      await api(`/api/review/${encodeURIComponent(slug)}/session`, {
-        method: 'PUT',
-        body: JSON.stringify({ name: 'launch-edit-agent', agent: 'claude-code' }),
-      });
+      await agentAtWork();
       try {
         await page.emulate({
           viewport: { width: 844, height: 390, deviceScaleFactor: 2, isMobile: true, hasTouch: true, isLandscape: true },
@@ -849,7 +864,10 @@ try {
     );
     await tap('[data-testid=notes-open]');
     await page.waitForSelector('.nsheet-half .nr');
-    assert(await page.$('.nsheet-half [data-testid=panel-notes]'), 'open, the views are back');
+    assert(
+      (await page.$('.nsheet-half [data-testid=notes-filter]')) && (await page.$('.nsheet-half [data-testid=notes-more]')),
+      'open, the head’s tools are back',
+    );
     await shot('11-notes-open');
     await tap('.nsheet-handle');
     await page.waitForSelector('.nsheet-peek');
@@ -979,7 +997,7 @@ try {
         await until(paused, `${where}: paused by its button`);
         // a drawing tool in hand: a tap draws (or starts to), it never plays
         if (where === 'player') {
-          await tapText('.nsheet button.primary', 'Note');
+          await tap('.nsheet [data-testid=new-note]');
           await page.waitForSelector('.composer textarea');
           await page.waitForSelector('[data-testid=draw-bar] .btn.on');
         } else {
@@ -1169,7 +1187,8 @@ try {
         share: ['.modal', () => page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.includes('Share folder'))?.click())],
         compose: [
           '.composer',
-          () => page.evaluate(() => [...document.querySelectorAll('.side button.primary')].find((b) => b.textContent.includes('Note'))?.click()),
+          // + Note, raised or stepped down beside another door
+          () => page.evaluate(() => document.querySelector('.side [data-testid=new-note]')?.click()),
         ],
       };
       const keep = async (action) => {

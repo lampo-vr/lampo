@@ -137,18 +137,68 @@ try {
   const word = (i) => `[data-testid=transcript] [data-w="${i}"]`;
 
   console.log(`transcript e2e against ${BASE} (store ${dir})`);
+  // The panel's views are text tabs in its head: "Notes 3 · Transcript" (the video has speech). A phone's sheet opens
+  // first (at rest it shows only its name and + Note).
+  const toTranscript = async () => {
+    if (await page.$('[data-testid=transcript]')) return;
+    const peek = await page.$('.nsheet-peek [data-testid=notes-open]');
+    if (peek) {
+      await peek.evaluate((e) => e.click());
+      await page.waitForSelector('.nsheet-half, .nsheet-full');
+    }
+    await page.$eval('[data-testid=panel-transcript]', (e) => e.click());
+    await page.waitForSelector('[data-testid=transcript]');
+  };
+  const selectedTab = () => page.$eval('.np-tabs [role=tab][aria-selected=true]', (e) => e.dataset.testid).catch(() => null);
 
   await check('the Transcript tab hears the render once and shows what is said, line by line', async () => {
     await openPlayer();
-    await page.click('[data-testid=panel-transcript]');
+    await toTranscript();
     await page.waitForSelector('[data-testid=transcript] .tr-line [data-w]', { timeout: 60000 });
     assert(JSON.stringify(await lines()) === JSON.stringify(['Every morning we start the day.', 'Coffee first, then the plan.']), `lines: ${await lines()}`);
     const meta = await page.$eval('.side-count', (e) => e.textContent);
     assert(meta === 'English · 11 words', `the head names the language and the words: ${meta}`);
     assert(heard === 1, `heard once: ${heard}`);
-    const selected = await page.$eval('[data-testid=panel-transcript]', (e) => e.getAttribute('aria-selected'));
-    assert(selected === 'true', 'the tab is chosen');
+    assert((await selectedTab()) === 'panel-transcript', `the Transcript tab is the open one: ${await selectedTab()}`);
     await shot('transcript-dark-1440-tab');
+  });
+
+  await check('the head’s tabs: Notes with its count and Transcript, quiet text; the arrows move between them, as tabs do', async () => {
+    const tabs = await page.$$eval('.np-tabs [role=tab]', (els) =>
+      els.map((e) => {
+        const s = getComputedStyle(e);
+        return {
+          id: e.dataset.testid,
+          words: e.textContent.trim(),
+          on: e.getAttribute('aria-selected'),
+          focusable: e.tabIndex,
+          box: s.borderTopWidth,
+          bg: s.backgroundColor,
+          color: s.color,
+        };
+      }),
+    );
+    assert(
+      tabs.length === 2 && tabs[0].id === 'panel-notes' && /^Notes\s*\d+$/.test(tabs[0].words) && tabs[1].words === 'Transcript',
+      `two tabs: ${JSON.stringify(tabs)}`,
+    );
+    assert(
+      tabs.every((x) => x.box === '0px' && /rgba\(0, 0, 0, 0\)|transparent/.test(x.bg)),
+      `text only, no boxes: ${JSON.stringify(tabs)}`,
+    );
+    assert(
+      tabs[1].on === 'true' && tabs[1].focusable === 0 && tabs[0].focusable === -1 && tabs[0].color !== tabs[1].color,
+      `the open one in the text colour, the other quiet: ${JSON.stringify(tabs)}`,
+    );
+    // the keyboard: ← to the Notes, → back to the Transcript, the focus going with the choice
+    await page.focus('[data-testid=panel-transcript]');
+    await page.keyboard.press('ArrowLeft');
+    await until(async () => (await selectedTab()) === 'panel-notes', 'ArrowLeft picks the Notes');
+    assert((await page.evaluate(() => document.activeElement?.dataset.testid)) === 'panel-notes', 'the focus on the Notes tab');
+    await page.waitForSelector('[data-testid=note-row], .side-empty');
+    await page.keyboard.press('ArrowRight');
+    await until(async () => (await selectedTab()) === 'panel-transcript', 'ArrowRight picks the Transcript');
+    await page.waitForSelector('[data-testid=transcript]');
   });
 
   await check('the foot says what heard the words and in which language; captions are one download menu', async () => {
@@ -321,7 +371,7 @@ try {
     }));
     assert(diff.del === 'morning we' && diff.ins === 'evening we', JSON.stringify(diff));
     await shot('transcript-dark-1440-note');
-    await page.click('[data-testid=panel-transcript]');
+    await toTranscript();
   });
 
   await check('a new version is compared with the one before, word by word', async () => {
@@ -329,10 +379,9 @@ try {
     age(file);
     await api(`/api/review/${enc(slug)}/sync`, 'POST', {});
     await openPlayer();
-    // the "Change the words" note above is open, so the player opens on Notes (the Transcript tab isn't restored
-    // over open notes): pick the tab, the way a person would
-    if ((await page.$eval('[data-testid=panel-transcript]', (e) => e.getAttribute('aria-selected'))) !== 'true')
-      await page.click('[data-testid=panel-transcript]');
+    // the "Change the words" note above is open, so the player opens on Notes (the Transcript isn't restored over open
+    // notes): pick it in the panel's ⋯, the way a person would
+    await toTranscript();
     await page.waitForSelector('[data-testid=transcript] .tr-line [data-w]', { timeout: 60000 });
     await until(async () => (await lines())[0] === 'Every evening we start the day.', 'V2’s words');
     await page.click('[data-testid=transcript-diff-toggle]');
@@ -394,8 +443,8 @@ try {
             await page.setViewport({ width: w, height: h, deviceScaleFactor: 2, isMobile: mobile, hasTouch: mobile });
             await openPlayer();
             const at = `${theme}-${w}`;
-            // on a phone the tab opens the notes sheet (it peeks after a load)
-            await page.$eval('[data-testid=panel-transcript]', (e) => e.click());
+            // on a phone the notes sheet opens first (it peeks after a load)
+            await toTranscript();
             await page.waitForSelector('[data-testid=transcript] .tr-line [data-w]');
             const reveal = () => mobile && page.$eval('.side', (e) => e.scrollIntoView({ block: 'start' }));
             await reveal();
@@ -448,7 +497,7 @@ try {
             await page.$eval('.note [data-testid=text-edit]', (e) => e.scrollIntoView({ block: 'center' }));
             await sleep(300);
             await shot(`transcript-${at}-note`);
-            await page.$eval('[data-testid=panel-transcript]', (e) => e.click());
+            await toTranscript();
           }
         await page.emulateMediaFeatures([]);
       },
@@ -461,8 +510,7 @@ try {
     await page.evaluate(() => localStorage.setItem('vr.lang', 'de'));
     await openPlayer();
     assert((await page.evaluate(() => document.documentElement.lang)) === 'de', 'the page is German');
-    if ((await page.$eval('[data-testid=panel-transcript]', (e) => e.getAttribute('aria-selected'))) !== 'true')
-      await page.click('[data-testid=panel-transcript]');
+    await toTranscript();
     await page.waitForSelector('[data-testid=transcript-heard]');
     const said = await page.$eval('[data-testid=transcript-heard]', (e) => e.textContent);
     assert(said === 'Auf Englisch angehört · Whisper', `the foot: ${said}`);

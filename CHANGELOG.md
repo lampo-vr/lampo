@@ -8,6 +8,22 @@ format stays backwards compatible throughout.
 ## [Unreleased]
 
 ### Changed
+- The notes panel reads like a list, not a dashboard. Its head is two quiet text tabs, "Notes 6 · Transcript" (the
+  Transcript where the video has speech), then a filter button, ⋯, Record as its own round button and "+ Note"; where
+  the panel is narrow it says less rather than crowd. The notes come in groups of where they stand: "Needs you" (an
+  agent's questions), "To check" with its "Check ⇧V", "Open", and "Done" folded at the end. Mine, Closed, All,
+  Questions and the tags are in the filter menu, and a filter that is on shows as a chip that takes it off; the Agent
+  view and going through the open notes (N) are in ⋯. Each note is one line: its time, its mark, its words and a
+  small label of where it stands ("Fixed in V2", "Question", "Agent on it", "Fixed · waiting for V3"), with Reply and
+  ⋯ on hover. The author shows only when more than one person wrote the notes. Auto-check shows in the head only
+  once it found something; on a phone it stands on the line under the head, with the filter and ⋯.
+- An agent at work is one line under the notes' head: "Claude Code is fixing 1 of 3", "asked you" or "stopped
+  listening", with one action (Stop, Answer, Copy "go on") and a folded line with its latest step, the question or what
+  to tell it. There is no line while the agent is only ready. Answer is the view's one raised button while the agent
+  asks; otherwise it is "+ Note", or the "To check" header's Check once the agent's work is done.
+- The agent menu says where the agent stands in one sentence, with one action and the question it asked quoted. Its
+  latest three steps are on a thin rail, all of them a click away, and "Ask Claude Code…" is one field with Send
+  inside it. The quick check, Copy for an agent and Assign agent… are in its ⋯.
 - The Versions menu reads at a glance: one short line a version — "V4 · 8 min ago · 3 fixed", "V3 · 3 h ago · by
   Mia", a part's stretch — with a quiet "current", "newest" or "approved" after it. Who made it and from which notes,
   how long it runs (beside the version before, when it changed) and the playbook it was made under are the row's
@@ -20,23 +36,23 @@ format stays backwards compatible throughout.
   and Looks right is its one raised button. It no longer wears a green box or edge, and it sits under the before and
   after instead of over them. "Check 1 of 2" says where you are, with a dot per fix. On a phone the card is the notes
   sheet, its decision always in reach.
-- One way into checking fixes at a time: the top bar's "Check 2 fixes" is the raised one and the agent's line says it
-  quietly; while notes are still open the top bar waits on the agent, and the agent's line is the one. In check mode
-  neither asks again.
+- One way into checking fixes at a time: the top bar's "Check 2 fixes" is the raised one and the notes' "To check"
+  header says it quietly; while notes are still open the top bar waits on the agent, and the header's Check is the
+  one once the agent's work is done. In check mode neither asks again.
 - A fix belongs to the version that has it. "Fixes to check" lists only what an agent said it fixed, in a version
   that exists: a new version no longer asks you to check every open note again, nor a question or a note outside a
   partial render. The notes nobody worked on stay open, with a quiet "V3 changed here" where the new version differs
-  at their spot, and the banner says how many are still open beside the fixes to check. A fix an agent marks before
-  its version is up reads "Fixed · waiting for V3" and comes to be checked with that version. The note's row, check
-  mode and the agent's line under the row name the same version. Notes an older version carried over still read
+  at their spot, under "Open" beside the "To check" ones. A fix an agent marks before its version is up reads
+  "Fixed · waiting for V3" and comes to be checked with that version. The note's row and check mode name the same
+  version. Notes an older version carried over still read
   "Check again" until you check them.
 - Agents hear the same: a version they put up while notes it may have fixed are unmarked tells them to mark what it
   fixed before it says to wait; a version number that doesn't exist is refused instead of taken as given; their list
   of open notes names the fixes waiting for your check and those riding with their next version apart from the work.
 - German prices say VAT, like the English ones: "exkl. VAT", "inkl. 19 % VAT", and the checkout's tax line reads
   "VAT". The VAT ID keeps its German name, "USt-IdNr.".
-- Green marks a state now, never a box: the player's "3 fixes to check" banner is a plain card with the green
-  keyframe of a fix waiting for its check and a plain "Check now" button; "Looks right" and "Got it" are plain buttons
+- Green marks a state now, never a box: a fixed note's "Fixed in V2" keeps green only in its mark; "Looks right" and
+  "Got it" are plain buttons
   with a green check; a review link's verdict, a For you note, the Publishing settings' return note, Billing's "paid"
   note, an upload's done tile and the checkout's amount due lost their green tint and keep green only in their mark.
 - The sidebar's foot shows what to do next. Get started is a box of its own — "Get started · 2 of 5" over the next

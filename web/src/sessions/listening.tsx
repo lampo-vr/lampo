@@ -13,9 +13,7 @@ import type { Review, SessionRef } from '../api/types.ts';
 import { t } from '../i18n/index.ts';
 import { usePainted } from '../lib/lazy.ts';
 import { copyText, toast } from '../lib/toast.ts';
-import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { IconButton } from '../ui/primitives.tsx';
-import '../styles/listening.css';
 
 /** Claude Code lists the server's `watch` prompt as this command (typing /mcp__lampo__watch runs it too). */
 export const WATCH_COMMAND = `/${MCP_NAME}:watch`;
@@ -40,14 +38,6 @@ export function useListening(session: SessionRef | null, summary?: { active: boo
   if (!a) return 'offline';
   // an older server lists only agents that follow the notes (`lampo watch`)
   return a.state ?? 'listening';
-}
-
-/** The status line for an agent's state. */
-export function listenLine(state: Listen): string {
-  if (state === 'listening') return t('Listening: new notes reach it right away');
-  if (state === 'working') return t('Working on its notes: it listens again when it’s done');
-  if (state === 'idle') return t('Connected, not listening: new notes wait until you start it');
-  return t('Not connected: new notes wait until you start it');
 }
 
 /** Whether new notes wait for the person to start the agent. */
@@ -109,23 +99,6 @@ export function goOnWords(session: SessionRef): string {
 /** Copies "go on", and says where it goes. */
 export async function copyGoOn(session: SessionRef): Promise<void> {
   if (await copyText(GO_ON)) toast(t('Copied: paste it into {name}', { name: AGENT_KIND_LABELS[agentKindOfRef(session)] ?? session.name }), 'ok');
-}
-
-/**
- * An agent that stopped listening while something waits on it (waitingOnAgent): calm, a muted line with the outline
- * keyframe — nothing is wrong, it only has to be told to go on —, and "go on" to copy. The agent menu's state line; the
- * run strip says the same in its own line (RunStrip.tsx), once per view: never again on the note it owes. It goes by
- * itself once the agent waits again (the agents' state comes live: server/agents.ts → `sessions`).
- */
-export function GoOn({ session, className = '' }: { session: SessionRef; className?: string }) {
-  const words = goOnWords(session);
-  return (
-    <div className={`go-on ${className}`} data-testid="go-on">
-      <KeyGlyph shape="outline" className="nav-kg run-kg quiet" />
-      <span className="go-on-words">{words}</span>
-      <IconButton className="btn sm ghost icon-only" label={t('Copy “go on”')} icon="copy" size={14} onClick={() => void copyGoOn(session)} />
-    </div>
-  );
 }
 
 /** What starts it: the command in Claude Code, a sentence for any other agent. */

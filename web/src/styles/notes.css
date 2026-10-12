@@ -7,29 +7,126 @@
   flex-direction: column;
   min-height: 0;
 }
-/* the filters (or the transcript's search) keep the same room above the line under them as the title has above them;
-   a size container, so the head row's Auto-check chip can drop its name where the panel is narrow */
+/* The head: "Notes 7", then the filter, ⋯, Record and + Note, one row; a filter on as a chip under it, then the agent's
+   line (RunStrip.tsx) on its own hairline. A size container: the Auto-check chip drops its name where the panel is
+   narrow. */
 .side-head {
   container: notes-head / inline-size;
-  padding: var(--sp-3);
-  border-bottom: 1px solid var(--line);
   display: grid;
-  gap: var(--sp-3);
+  border-bottom: 1px solid var(--line);
 }
 .side-title {
   display: flex;
   align-items: center;
-  gap: var(--sp-2);
+  gap: var(--sp-1);
   min-width: 0;
+  min-height: calc(var(--h) + 2 * var(--sp-2));
+  padding: var(--sp-2) var(--sp-3) var(--sp-2) var(--sp-4);
 }
-/* the spacer between the views and the buttons takes one gap, not two */
-.side-title > .grow {
-  margin-left: calc(-1 * var(--sp-2));
-}
-.side-title h2 {
+/* The panel's views as quiet text tabs — no track, no boxes, the clean lines kept: the open one in --fg, the others
+   muted and pressed to open (one weight for both, so a switch moves nothing) */
+.np-tabs {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  min-width: 0;
   margin: 0;
+  font: inherit;
+}
+.np-tab {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--muted);
   font: var(--fw-strong) var(--fs-lg) / var(--lh-tight) var(--ui);
   letter-spacing: var(--track-title);
+  white-space: nowrap;
+}
+button.np-tab {
+  cursor: pointer;
+}
+button.np-tab:hover:where(:not([aria-selected='true'])) {
+  color: var(--fg-2);
+}
+.np-tab:is([aria-selected='true'], [aria-current]) {
+  color: var(--fg);
+}
+button.np-tab[aria-selected='true'] {
+  cursor: default;
+}
+.np-tab > .kg {
+  align-self: center;
+}
+.np-count {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-ui);
+  letter-spacing: normal;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+/* the spacer keeps the tools at the end; the head's tools stand a step apart */
+.side-title > .grow {
+  flex: 1;
+}
+/* Nothing in the head squeezes (the transcript's line aside, cut with an ellipsis): where its words don't fit it says
+   less, measured (NotesPanel.tsx `data-fit`) — Auto-check's chip without its name (autocheck.css reads --ac-*), the
+   tabs a size smaller, the chip its number alone, + Note its plus alone, then the count left to the groups' headers */
+.np-head > :not(.grow, .side-count) {
+  flex: none;
+}
+.np-head:not([data-fit='0']) {
+  --ac-name: none;
+}
+.np-head:is([data-fit='2'], [data-fit='3'], [data-fit='4'], [data-fit='5']) .np-tab {
+  font-size: var(--fs-md);
+}
+.np-head:is([data-fit='3'], [data-fit='4'], [data-fit='5']) {
+  --ac-words: none;
+  --ac-num: inline;
+}
+.np-head:is([data-fit='4'], [data-fit='5']) .new-note-word {
+  display: none;
+}
+.np-head[data-fit='5'] .np-count {
+  display: none;
+}
+/* Record: its own round button beside + Note, never joined to it */
+.np-head .rec-btn {
+  border-color: var(--line-2);
+  border-radius: var(--r-full);
+}
+.np-head .new-note {
+  margin-left: var(--sp-1);
+}
+/* the line under the head: a filter on as a chip that takes it off; on a phone also what Auto-check found, and the
+   filter and ⋯ at its end */
+.np-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 0 var(--sp-3) var(--sp-2) var(--sp-4);
+}
+.np-tools {
+  display: flex;
+  gap: var(--sp-1);
+  margin-left: auto;
+}
+.np-chip {
+  gap: var(--sp-1);
+  padding-right: var(--sp-1);
+}
+.np-chip > .icon {
+  color: var(--muted);
+}
+/* the transcript's search under the head */
+.side-head > .tr-tools {
+  padding: 0 var(--sp-3) var(--sp-3);
 }
 .side-count {
   font-size: var(--fs-xs);
@@ -38,100 +135,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
-}
-/* The filters: the segmented track across the panel's width, every word in sight, and under it the notes' tags as
-   chips — one line each, whatever the video holds (a language's words or many tags that don't fit scroll, with soft
-   edges, rather than wrap or cut one). The tags' line is there from the first paint, so the list never moves down. */
-.note-filters {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--sp-2);
-}
-.note-tabs {
-  display: flex;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.note-tabs button {
-  flex: 1 0 auto;
-  justify-content: center;
-  padding: 0 var(--sp-1);
-  white-space: nowrap;
-  font-size: var(--fs-sm);
-}
-.note-tagf {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-1);
-  min-width: 0;
-  min-height: var(--h-sm);
-  margin: 0;
-  padding: 0;
-  border: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.note-tagnone {
-  font-size: var(--fs-xs);
-  color: var(--muted);
-  white-space: nowrap;
-}
-.tagf.pending {
-  pointer-events: none;
-  border-color: var(--line);
-}
-/* a phone's sheet: the Auto-check chip opens the tags' line (its head row has no room), a hairline after it */
-.note-tagf-ac {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: var(--sp-1);
-  padding-right: var(--sp-1);
-  border-right: 1px solid var(--line-2);
-}
-/* a tag: a quiet outlined chip with its count; picked, the raised material every selection wears */
-.tagf {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  height: var(--h-sm);
-  padding: 0 var(--sp-2);
-  border: 1px solid var(--line-2);
-  border-radius: var(--r-full);
-  background: transparent;
-  color: var(--fg-2);
-  font: var(--fw-ui) var(--fs-sm) / var(--lh-tight) var(--ui);
-  white-space: nowrap;
-  cursor: pointer;
-  transition:
-    color var(--dur-fast) var(--ease-out),
-    border-color var(--dur-fast) var(--ease-out);
-}
-/* a quiet second word, as every chip's count (controls.css .tabs button .n) */
-.tagf .n {
-  font: var(--fw-ui) var(--fs-xs) / 1 var(--ui);
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-}
-.tagf .icon {
-  color: var(--ok);
-}
-.tagf:hover {
-  color: var(--fg);
-  border-color: var(--line-3);
-}
-.tagf.on {
-  color: var(--fg);
-  border-color: transparent;
-  background: var(--raise-sheen), var(--ink-3);
-  box-shadow: var(--raise);
-}
-.tagf.on .n {
-  color: var(--fg-2);
-}
-.tagf:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
 }
 .side-scroll {
   flex: 1;
@@ -152,10 +155,58 @@
   margin: 0 calc(-1 * var(--sp-2));
 }
 
+/* ---------------------------------------------------------------- the notes, in their groups
+   Needs you · To check · Open, then Done folded at the end (noteGroups.ts): a quiet header with its count, the rows
+   under it, one left edge. "To check" carries the panel's door to check mode on its header. */
+.note-sect-wrap {
+  display: grid;
+  min-width: 0;
+}
+.note-sect {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  min-height: var(--h);
+  padding: var(--sp-2) var(--sp-2) var(--sp-1);
+  font: var(--fw-ui) var(--fs-sm) / var(--lh-ui) var(--ui);
+  color: var(--fg-2);
+}
+.note-list > .note-sect-wrap:first-child > .note-sect {
+  padding-top: 0;
+}
+/* the count a step quieter, still read (--muted: AA) */
+.note-sect .n {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.note-sect > .btn {
+  margin-right: calc(-1 * var(--sp-1));
+}
+/* Done: a header that folds and unfolds the done notes */
+button.note-sect {
+  width: 100%;
+  border: 0;
+  border-radius: var(--r);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+button.note-sect:hover {
+  color: var(--fg);
+}
+.note-fold-chev {
+  color: var(--faint);
+}
+.side-scroll > .note-fold {
+  width: auto;
+  margin: var(--sp-2) calc(-1 * var(--sp-2)) 0;
+}
+
 /* ---------------------------------------------------------------- a note as a row
-   Timecode · severity glyph · the first line · (state, replies), one line at a control's height. Who wrote it and when
-   is said once, above the first row of each person's sitting (.note-group). Colour sits in the glyph; hover changes
-   the ground only, and the picture that comes under the pointer lies over the row's end, so nothing moves. */
+   Timecode · severity glyph · the first line · where it stands (a small Badge), one line at a control's height; its
+   author's avatar at the end only where several people wrote notes (who and when in its title). Colour sits in the
+   glyph and the badge's mark; hover changes the ground and shows the row's actions (reply, ⋯) over its end. */
 .note-row {
   display: grid;
   min-width: 0;
@@ -180,10 +231,36 @@
 .note-group-dot {
   color: var(--faint);
 }
+.nr-line {
+  position: relative;
+  min-width: 0;
+}
+/* the row's actions: over its end while the pointer or the focus is on it */
+.nr-acts {
+  position: absolute;
+  top: 50%;
+  right: var(--sp-1);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-0_5);
+  padding-left: var(--sp-2);
+  /* its buttons sit flush at its end: the same corner as theirs (concentric) */
+  border-radius: var(--r);
+  /* the hovered row's own ground, opaque, so the badge under it doesn't show through */
+  background: linear-gradient(var(--sel), var(--sel)), var(--ink-2);
+  transform: translateY(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.nr-line:is(:hover, :focus-within) .nr-acts {
+  opacity: 1;
+  pointer-events: auto;
+}
 .nr {
   position: relative;
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: var(--sp-2);
   width: 100%;
@@ -237,39 +314,6 @@
 .nr-kind.nr-info {
   color: var(--muted);
 }
-.nr.planned {
-  grid-template-rows: auto auto;
-  row-gap: 0;
-  padding-bottom: var(--sp-1);
-}
-/* A sent note's line in the agent's plan, under its words: quiet, one line, its room kept from the start (empty until
-   the agent reaches it) so the row never grows twice. */
-.nr-plan {
-  grid-row: 2;
-  grid-column: 3 / -1;
-  display: flex;
-  align-items: center;
-  gap: var(--sp-1);
-  min-width: 0;
-  height: calc(var(--fs-xs) * var(--lh-ui));
-  font: var(--fw-text) var(--fs-xs) / var(--lh-ui) var(--ui);
-  color: var(--muted);
-}
-.nr-plan .kg {
-  --kg-size: 8px;
-}
-.nr-plan-words {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.nr-plan[data-state='asked'] {
-  color: var(--agent-2);
-}
-.nr-plan[data-state='fixed'] {
-  color: var(--fg-2);
-}
 .nr-text {
   min-width: 0;
   overflow: hidden;
@@ -311,6 +355,18 @@
 }
 .nr-state.nr-open:not(.again) {
   color: var(--agent-2);
+}
+/* a player row's state is a Badge: it lies on the row's end, the actions over it on hover. A fix's green is its mark
+   alone, never the label's surface or ring (green marks a state) */
+.nr > .sbadge.nr-state {
+  justify-self: end;
+}
+.sbadge.nr-state[data-tone='ok'] {
+  background: color-mix(in srgb, var(--fg-2) 9%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg-2) 17%, transparent);
+}
+.nr > .avatar {
+  flex: none;
 }
 /* the picture, only while the pointer (or the focus) is on the row: over its end, so the row keeps its shape */
 .nr-thumb {
@@ -355,10 +411,12 @@
 }
 /* the selected note, open as its card in the row's place: a step of room above and below, back on the content edge,
    its picture large enough to read */
-.note-list > .comment {
+.note-list > .comment,
+.note-sect-wrap > .comment {
   margin: var(--sp-2) var(--sp-2);
 }
-.note-list > .comment .c-thumb {
+.note-list > .comment .c-thumb,
+.note-sect-wrap > .comment .c-thumb {
   width: calc(var(--sp-20) + var(--sp-4));
 }
 
@@ -581,73 +639,12 @@ button.c-tc:hover {
 .note-body:empty {
   display: none;
 }
-/* Notes · Transcript: the panel's two views, as its heading */
-.side-views {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  flex: none;
-}
-.side-views button {
-  height: var(--h-sm);
-  padding: 0;
-  border: 0;
-  background: none;
-  font: var(--fw-strong) var(--fs-lg) / var(--lh-tight) var(--ui);
-  letter-spacing: var(--track-title);
-  color: var(--muted);
-  cursor: pointer;
-  white-space: nowrap;
-  border-radius: var(--r-sm);
-}
-.side-views button:hover {
-  color: var(--muted);
-}
-.side-views button.on {
-  color: var(--fg);
-}
-/* Notes · Transcript · Agent: three views keep the one row the head has. They say less as the panel narrows, never
-   wrap or push + Note away: the views a step smaller and Auto-check its glyph and number (its words are in its label),
-   then the tools closer together and + Note its plus alone (named by its label). */
-.side-views.three {
-  gap: var(--sp-2);
-}
-@container notes-head (max-width: 400px) {
-  .side-views.three button {
-    font-size: var(--fs-md);
-  }
-  .side-title:has(.side-views.three) :is(.ac-chip-name, .ac-chip-sep, .ac-chip-n) {
-    display: none;
-  }
-  .side-title:has(.side-views.three) .ac-chip-num {
-    display: inline;
-  }
-}
-@container notes-head (max-width: 340px) {
-  .side-title:has(.side-views.three) {
-    gap: var(--sp-1);
-  }
-  .side-title:has(.side-views.three) > .grow {
-    margin-left: 0;
-  }
-  .side-title:has(.side-views.three) .new-note-word {
-    display: none;
-  }
-}
-.side-views button .side-view-kg {
-  margin-left: var(--sp-1);
-  vertical-align: 1px;
-}
 /* The Agent view's place in the panel (player/AgentView.tsx fills it: its list scrolls, "Tell it…" stays at the foot) */
 .av-host {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-}
-.side-views button:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
 }
 /* The composer's "Change the words": heard → say, the words field first */
 .cw {
@@ -935,41 +932,6 @@ button.c-tc:hover {
 }
 
 /* ---------------------------------------------------------------- above the list */
-/* Fixes to check: the neutral banner (a card's surface and hairline); green only in its mark, the "half" keyframe of a
-   fix waiting for its check. Its button is a plain one: the top bar's "Check N fixes" is the page's primary. */
-.verify-cta {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
-  border-radius: var(--radius);
-  background: var(--ink-2);
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-.verify-cta > .kg {
-  --kg-size: 12px;
-  color: var(--ok);
-}
-/* its button sits --sp-2 inside the banner's corner: concentric with it */
-.verify-cta > .btn {
-  border-radius: calc(var(--radius) - var(--sp-2));
-}
-.verify-cta .grow {
-  display: grid;
-  gap: 1px;
-  min-width: 0;
-}
-.verify-cta b {
-  font-size: var(--fs-md);
-  font-weight: var(--fw-strong);
-}
-.verify-cta .grow span {
-  font-size: var(--fs-sm);
-  color: var(--muted);
-}
-.verify-cta .still {
-  white-space: nowrap;
-}
 .composer {
   position: relative;
   /* the foot's severity word gives way before anything wraps (narrow panels) */

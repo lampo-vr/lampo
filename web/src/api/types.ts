@@ -310,6 +310,8 @@ export interface Review {
   agent_status?: AgentStatus | null;
   qa_dismissed?: string[];
   qa_stretches?: Record<string, FrameRange>;
+  /** The newest full version's streams as probed (lib/types.ts MediaMeta): `audio` null where it has no sound. */
+  meta?: { audio?: { codec: string; sample_rate: number; channels: number } | null };
 }
 
 export interface VideoSummary {

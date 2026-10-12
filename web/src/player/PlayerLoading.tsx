@@ -61,7 +61,8 @@ interface Props {
   phone: boolean;
   /** Height / width of the video when the library already said (tablets size the stage by it). */
   ar?: number;
-  /** The library said the video has an agent: the run strip's slot is there already (RunStrip.tsx). */
+  /** The library said an agent's work is going on there: the agent line's slot is there already (RunStrip.tsx; a
+   * line only while something goes on or needs the person). */
   agent?: boolean;
   /** How many versions the library said it has: a phone's dock has its foot only from a second one (DockFoot.tsx). */
   versions?: number;

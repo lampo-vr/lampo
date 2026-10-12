@@ -89,7 +89,7 @@
     .p-strip .btn,
     .run-act,
     .run-main,
-    .side-views button,
+    .al-fold,
     button.tr-tc,
     .crumb button,
     .hero-tabs button,
@@ -97,7 +97,7 @@
     .range-more,
     .topbar.bare .user-chip,
     .ac-chip,
-    .tagf,
+    .np-chip,
     .arch-banner-act,
     button.c-tc
   ) {
@@ -120,7 +120,7 @@
     .p-strip .btn,
     .run-act,
     .run-main,
-    .side-views button,
+    .al-fold,
     button.tr-tc,
     .crumb button,
     .hero-tabs button,
@@ -128,7 +128,7 @@
     .range-more,
     .topbar.bare .user-chip,
     .ac-chip,
-    .tagf,
+    .np-chip,
     .arch-banner-act,
     button.c-tc
   )::after {
@@ -150,11 +150,10 @@
     width: 70px;
     height: var(--h-touch);
   }
-  /* a note's row is a finger's height, and so is the fold of Auto-check's minor findings; the tags' line is too, so its
-     chips' tap areas stay inside the strip that scrolls them */
+  /* a note's row is a finger's height, and so are the fold of Auto-check's minor findings and the Done group's fold */
   .nr,
   .ac-more,
-  .note-tagf {
+  button.note-sect {
     min-height: var(--h-touch);
   }
   .btn,
@@ -616,11 +615,11 @@
   }
   /* A short screen — an iPhone in Safari keeps about 660 px under its bars — can't hold the whole dock and a picture
      worth looking at (it got 105 px). At rest the play button is a step smaller; with the notes open the timecode's
-     line and the tags' line step aside too (each note says its time; the tags are in the full sheet), and writing a
-     note the picture keeps a little less. */
+     line and the active filter's line step aside too (each note says its time; the filter is in the full sheet), and
+     writing a note the picture keeps a little less. */
   @media (max-height: 760px) {
     .phone-player.ps-half .ptc,
-    .phone-player.ps-half .nsheet .note-tagf {
+    .phone-player.ps-half .nsheet .np-chips {
       display: none;
     }
     .phone-player .pbtns .playbtn {
@@ -637,20 +636,23 @@
     grid-area: run;
     min-width: 0;
   }
-  /* the sheet's head with the Agent view open (three views): + Note says its plus alone (named by its label) */
-  .nsheet .side-title:has(.side-views.three) .new-note-word {
-    display: none;
-  }
   /* its buttons a step smaller than the band, their tap areas a finger's size (the ::after above) */
   .run-strip.phone .run-act {
     height: var(--h);
     min-height: 0;
   }
   .run-strip.phone {
-    height: var(--h-touch);
+    align-content: center;
+    min-height: var(--h-touch);
     margin: 0;
+    background: var(--ink-1);
     padding: 0 max(var(--sp-2), env(safe-area-inset-right)) 0 max(var(--sp-3), env(safe-area-inset-left));
     border-bottom: 0;
+  }
+  /* a phone's line is one thumb-high row, as the strip was: its folded line is the Agent view's, a tap away (the picture
+     keeps its room on a short screen) */
+  .run-strip.phone .al-fold {
+    display: none;
   }
   .p-bar {
     gap: var(--sp-1);
@@ -928,12 +930,16 @@
     background: var(--line-3);
   }
   .nsheet .side-head {
-    padding: 0 var(--sp-3) var(--sp-2);
-    gap: var(--sp-2);
+    padding: 0;
   }
   .nsheet .side-title {
     min-height: 48px;
+    padding: 0 var(--sp-3);
     gap: var(--sp-2);
+  }
+  /* the line under the sheet's head: Auto-check, a filter on, and the filter and ⋯ at its end */
+  .nsheet .np-chips {
+    padding: 0 var(--sp-3) var(--sp-2);
   }
   .nsheet .side-head h2 {
     font-size: var(--fs-lg);
@@ -942,23 +948,18 @@
     font-size: var(--fs-xs);
     color: var(--muted);
   }
-  .nsheet-peek .tabs,
   .nsheet-peek .tr-tools,
   .nsheet-peek .side-scroll {
     visibility: hidden;
   }
+  /* the line under the head (a filter on, Auto-check's chip) comes with the opened sheet: at rest the sheet is its head
+     alone, as tall as while it loads */
+  .nsheet-peek .np-chips {
+    display: none;
+  }
   .nsheet .tabs {
     overflow-x: auto;
     scrollbar-width: none;
-  }
-  /* the filters a finger's height: 40 px tabs, each hit across the track's 44 (its padding box, which clips) */
-  .nsheet .note-tabs button {
-    height: var(--h-lg);
-  }
-  .nsheet .note-tabs button::after {
-    content: '';
-    position: absolute;
-    inset: calc(-1 * var(--sp-0_5)) 0;
   }
   .nsheet .side-scroll {
     padding-bottom: var(--sp-6);
@@ -978,8 +979,7 @@
   }
   /* the pick bar keeps one height with its actions at a thumb's size */
   /* writing a note: no tabs, and Save stays on screen however long the note gets */
-  .nsheet.composing .tabs,
-  .nsheet.composing .note-tagf,
+  .nsheet.composing .np-chips,
   .nsheet.composing .tr-tools,
   .nsheet.composing .side-scroll > :not(.composer) {
     display: none;
@@ -1214,10 +1214,12 @@
   .tabs button {
     min-height: 40px;
   }
-  /* the notes' head (+ Note, Record, review mode), the composer's foot (both players') and Check now */
+  /* the notes' head (+ Note, Record, the mic), the filter and ⋯ on the line under it, the composer's foot (both
+     players') and the To check group's Check */
   .side-title .btn.sm,
+  .np-tools .btn.sm,
   .composer-foot .btn.sm,
-  .verify-cta .btn.sm {
+  .note-sect .btn.sm {
     min-height: var(--h-lg);
   }
 }

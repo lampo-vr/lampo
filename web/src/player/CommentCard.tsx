@@ -31,7 +31,6 @@ import { GOTO_FRAME, type GotoFrame, ownerRefs, splitRefs, type ViewRef } from '
 import { RefStrip } from '../refs/RefStrip.tsx';
 import { RefTools, usePendingRefs } from '../refs/RefTools.tsx';
 import { RefViewer } from '../refs/RefViewer.tsx';
-import { planSaid } from '../sessions/runWords.ts';
 import { Badge, type Tone } from '../ui/Badge.tsx';
 import { Choices } from '../ui/Choices.tsx';
 import { AutoTextarea, Avatar } from '../ui/controls.tsx';
@@ -385,8 +384,8 @@ interface CommentCardProps {
   here: boolean;
   /** The selected note: open as the card (one at a time); every other note is a row. */
   selected: boolean;
-  /** The row starts a group: who wrote it and when, said above it (noteRows.ts groupStarts). */
-  groupHead?: boolean;
+  /** More than one person wrote this video's notes: the row ends with its author's avatar (who and when in its title). */
+  showAuthor?: boolean;
   onSelect: (c: PlacedComment) => void;
   onLightbox: (src: string) => void;
   /** A range note: the video's frame rate (its duration), playing its range (loop: on repeat), and whether it is. */
@@ -419,7 +418,7 @@ export const CommentCard = memo(function CommentCard({
   latestV,
   here,
   selected,
-  groupHead = false,
+  showAuthor = false,
   onSelect,
   onLightbox,
   fps,
@@ -427,7 +426,6 @@ export const CommentCard = memo(function CommentCard({
   looping,
   checkMode = false,
   plan,
-  planName = '',
   changedIn,
 }: CommentCardProps) {
   useLang(); // memo'd: renders again on a language switch by itself
@@ -645,26 +643,29 @@ export const CommentCard = memo(function CommentCard({
     ) : (
       <KeyGlyph shape={KIND_SHAPE[look as keyof typeof KIND_SHAPE]} size={10} className={`nr-kind nr-${look}`} />
     );
-    // what a row says besides its words: where it stands when that is news (fixed, carried over, closed, a question)
-    const status =
+    // where it stands, as a small label at the row's end (the system's Badge: the glyph carries the hue, the words stay
+    // in the body colour) — only when that is news: fixed, riding with the next version, to check again, a question, the
+    // agent on it, done, or changed here
+    const doing = plan?.state === 'doing' && c.status === 'open';
+    const label: [string, Tone] | null =
       c.status === 'fixed'
-        ? t('Fixed')
+        ? [c.fixed_in_v ? t('Fixed in V{v}', { v: c.fixed_in_v }) : t('Fixed'), 'ok']
         : c.status === 'verified'
-          ? asks
-            ? t('Answered')
-            : t('Checked')
+          ? [asks ? t('Answered') : t('Checked'), 'neutral']
           : c.status === 'wontfix'
-            ? t("Won't fix")
+            ? [t("Won't fix"), 'neutral']
             : c.fix_pending
-              ? t('Fixed · waiting for V{v}', { v: latestV + 1 })
+              ? [t('Fixed · waiting for V{v}', { v: latestV + 1 }), 'neutral']
               : c.check_again
-                ? t('Check again')
+                ? [t('Check again'), 'should']
                 : asks
-                  ? t('Question')
-                  : null;
-    const said = (c.replies || []).filter((r) => !r.status).length;
+                  ? [t('Question'), 'agent']
+                  : doing
+                    ? [t('Agent on it'), 'agent']
+                    : changedIn
+                      ? [t('V{v} changed here', { v: changedIn }), 'neutral']
+                      : null;
     const ghost = c.rangeHere && c.scope !== 'video' ? c.rangeHere : null;
-    const planLine = plan ? planSaid(plan, planName, latestV, c.fix_pending ? null : c.fixed_in_v) : null;
     const show = () => {
       setPeek(true);
       if (ghost) setRangeHint({ ghost });
@@ -672,86 +673,67 @@ export const CommentCard = memo(function CommentCard({
     const hide = () => {
       if (ghost) setRangeHint({ ghost: null });
     };
+    const who = `${displayName(c.author)} · ${ago(c.created)}`;
     return (
       <ContextMenu items={items}>
-        {/* biome-ignore lint/a11y/useKeyWithClickEvents: the row's button is the keyboard's way in; a click on its group header picks it too */}
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: the row's button is the keyboard's way in; a click anywhere on the row picks it too */}
         <article
-          onClick={cardClick(() => onSelect(c), '.nr')}
+          onClick={cardClick(() => onSelect(c), '.nr, .nr-acts')}
           className={`note note-row ${state} ${here ? 'here' : ''}`}
           data-kind={look}
           data-severity={feedback ? c.severity : undefined}
           data-note={c.id}
           aria-label={t('{kindLabel} note at {timecodeHere}', { kindLabel, timecodeHere: c.timecodeHere })}
         >
-          {groupHead && (
-            <div className="note-group">
-              <Avatar name={c.author} size={20} src={avatarOf(c.author)} />
-              <b className="ellipsis">{displayName(c.author)}</b>
-              {role && <span className="note-role">{role}</span>}
-              <span className="note-group-dot" aria-hidden="true">
-                ·
+          <div className="nr-line">
+            <button
+              type="button"
+              className="nr"
+              onClick={() => onSelect(c)}
+              onPointerEnter={show}
+              onPointerLeave={hide}
+              onFocus={() => setPeek(true)}
+              onBlur={() => clearRangeHint()}
+              aria-expanded={false}
+              title={who}
+              data-testid="note-row"
+            >
+              <span className="c-id" hidden>
+                {c.id}
               </span>
-              <When at={c.created} />
-            </div>
-          )}
-          <button
-            type="button"
-            className={plan ? 'nr planned' : 'nr'}
-            onClick={() => onSelect(c)}
-            onPointerEnter={show}
-            onPointerLeave={hide}
-            onFocus={() => setPeek(true)}
-            onBlur={() => clearRangeHint()}
-            aria-expanded={false}
-            data-testid="note-row"
-          >
-            <span className="c-id" hidden>
-              {c.id}
-            </span>
-            <span className={`nr-tc ${c.scope === 'video' ? 'overall' : ''}`}>{c.scope === 'video' ? t('Whole video') : c.timecodeHere}</span>
-            <span className="nr-kg">
-              {glyph}
-              <span className="sr-only">{kindLabel}</span>
-            </span>
-            <span className="nr-text">
-              {c.text_edit ? <WordsChange edit={c.text_edit} inline /> : c.text ? firstLine(c.text) : <span className="muted">{t('(marked frame)')}</span>}
-            </span>
-            {(status || said > 0 || c.v !== currentV || !!ghost || !!changedIn) && (
-              <span className="nr-meta">
-                {ghost && fps && <span className="nr-len">{formatSeconds(rangeSeconds(ghost, fps))}</span>}
-                {c.v !== currentV && <span className="nr-v">V{c.v}</span>}
-                {said > 0 && (
-                  <span className="nr-said" title={t('{n} reply|{n} replies', { n: said })}>
-                    <I name="reply" size={12} />
-                    {said}
-                  </span>
-                )}
-                {changedIn && !status && (
-                  <span className="nr-changed" data-testid="note-changed">
-                    {t('V{v} changed here', { v: changedIn })}
-                  </span>
-                )}
-                {status && (
-                  <span
-                    className={`nr-state ${c.fix_pending && c.status === 'open' ? 'riding' : `nr-${c.status}`}${c.check_again && c.status === 'open' && !c.fix_pending ? ' again' : ''}`}
-                  >
-                    {status}
-                  </span>
-                )}
+              <span className={`nr-tc ${c.scope === 'video' ? 'overall' : ''}`}>{c.scope === 'video' ? t('Whole video') : c.timecodeHere}</span>
+              <span className="nr-kg">
+                {glyph}
+                <span className="sr-only">{kindLabel}</span>
               </span>
-            )}
-            {plan && (
-              <span className="nr-plan" data-testid="note-plan" data-state={plan.state}>
-                {planLine && (
-                  <>
-                    <KeyGlyph shape={planLine.shape} className={`nav-kg run-kg ${planLine.tone}`} />
-                    <span className="nr-plan-words">{planLine.words}</span>
-                  </>
-                )}
+              <span className="nr-text">
+                {c.text_edit ? <WordsChange edit={c.text_edit} inline /> : c.text ? firstLine(c.text) : <span className="muted">{t('(marked frame)')}</span>}
               </span>
-            )}
-            {peek && marked && <img className="nr-thumb" src={shot(marked)} alt="" decoding="async" />}
-          </button>
+              {label && (
+                <Badge size="sm" tone={label[1]} className="nr-state" testId="note-state">
+                  {label[0]}
+                </Badge>
+              )}
+              {showAuthor && <Avatar name={c.author} size={18} src={avatarOf(c.author)} />}
+              {peek && marked && <img className="nr-thumb" src={shot(marked)} alt="" decoding="async" />}
+            </button>
+            {/* what a row does, there on hover or focus: reply, and the rest under ⋯ */}
+            <span className="nr-acts">
+              {may && (
+                <IconButton
+                  className="btn sm ghost icon-only"
+                  label={t('Reply')}
+                  icon="reply"
+                  size={14}
+                  onClick={() => {
+                    onSelect(c);
+                    open('reply');
+                  }}
+                />
+              )}
+              <Menu trigger={<IconButton className="btn sm ghost icon-only" label={t('More')} icon="more" size={14} />} items={items} />
+            </span>
+          </div>
         </article>
       </ContextMenu>
     );

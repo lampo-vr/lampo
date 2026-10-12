@@ -128,14 +128,22 @@ try {
     await api(`/api/review/${enc(slug)}/session`, 'PUT', { name: 'promo-edit' });
     await openPlayer(100);
     await page.click('[data-testid=agent-button]');
-    await page.waitForSelector('[data-testid=quick-part]');
-    await until(async () => !(await page.$eval('[data-testid=quick-part]', (e) => e.disabled)), 'the stretch is known');
-    const row = await text('[data-testid=quick-part]');
-    const sub = await text('[data-testid=quick-part] .grow > span');
-    assert(row.startsWith('Quick check: render only this part'), `the row: ${row}`);
-    assert(sub === '00:03–00:04 · the shot around 00:04:00, the rest stays as V1', `what it would render: ${sub}`);
+    await page.waitForSelector('[data-testid=agent-menu]');
+    // the quick check is in the menu's ⋯, what it would render in its words
+    await page.click('[data-testid=agent-more]');
+    const quick = () =>
+      page.$$eval('.menu[data-state=open] [role=menuitem]', (els) =>
+        els.map((e) => ({ text: e.textContent.trim(), off: e.hasAttribute('data-disabled') })).find((x) => x.text.startsWith('Quick check')),
+      );
+    await until(
+      async () => (await quick())?.off === false,
+      async () => `the stretch is known: ${JSON.stringify(await quick())}`,
+    );
+    assert((await quick()).text === 'Quick check: render only this part (00:03–00:04)', `what it would render: ${JSON.stringify(await quick())}`);
     await shot('partial-01b-agent-menu');
-    await page.click('[data-testid=quick-part]');
+    await page.evaluate(() =>
+      [...document.querySelectorAll('.menu[data-state=open] [role=menuitem]')].find((e) => e.textContent.trim().startsWith('Quick check'))?.click(),
+    );
     // the agent isn't running: send without starting it
     await page
       .waitForFunction(() => [...document.querySelectorAll('.am button')].some((b) => b.textContent.includes('Only send')), { timeout: 2000 })

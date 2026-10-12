@@ -1,27 +1,36 @@
-// The notes sidebar: its head (Notes · Transcript, the Auto-check chip, Record, + Note), the filters — Open · Questions ·
-// Mine · Closed · All, then the notes' tags with their counts —, the verify call to action, what is not sent yet, the
-// composer and the notes: a row each, the selected one open as its card (CommentCard.tsx), a group header where the
-// author or the sitting changes (noteRows.ts). While playing, the note at the playhead is marked and the list follows
-// it, unless the person is scrolling or typing. While the review loads (`counts: null`) it is the same panel: the head
-// and tabs are real, their numbers and the rows wait as placeholders of the same shape, so nothing moves when they arrive.
+// The notes sidebar, in Linear's lines: its head ("Notes 7", then a filter, ⋯ with the other views and review mode,
+// Record, + Note), the agent's line under it (RunStrip.tsx), and the notes grouped by where they stand — what needs you
+// (an agent's questions), the fixes to check (its header is the panel's door to check mode), the open ones, and the done
+// ones folded at the end (noteGroups.ts). A row each, the selected one open as its card (CommentCard.tsx). While playing,
+// the note at the playhead is marked and the list follows it, unless the person is scrolling or typing. While the review
+// loads (`counts: null`) it is the same panel: the head is real, the rows wait as placeholders of the same shape.
 
-import { Tabs } from 'radix-ui';
-import { type CSSProperties, type ReactNode, type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  type PointerEvent as ReactPointerEvent,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import type { FrameRange, PlacedComment, RunPlanItem } from '../api/types.ts';
 import { perLang, t } from '../i18n/index.ts';
 import { T } from '../i18n/T.tsx';
 import { tagLabel } from '../i18n/terms.ts';
-import { useScrollEdges } from '../lib/hooks.ts';
 import { useMeasuredWindow, WINDOW_FROM } from '../lib/windowing.ts';
 import type { EmptyArtName } from '../ui/emptyArt.tsx';
 import { I } from '../ui/icons.tsx';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
-import { IconButton, Kbd, Tip } from '../ui/primitives.tsx';
+import { IconButton, Kbd, Menu, type MenuEntry, Tip } from '../ui/primitives.tsx';
 import { Skeleton, SkeletonRegion, SkLine } from '../ui/Skeleton.tsx';
-import { EmptyState } from '../ui/system.tsx';
+import { Button, EmptyState } from '../ui/system.tsx';
 import { CommentCard, type RangePlay } from './CommentCard.tsx';
 import type { FrameStore } from './frameStore.ts';
-import { groupStarts, noteAt } from './noteRows.ts';
+import type { GroupId } from './noteGroups.ts';
+import { noteAt } from './noteRows.ts';
 import { NO_FIND, type TranscriptFind, TranscriptMeta, TranscriptTools, TranscriptView, type TranscriptViewProps } from './Transcript.tsx';
 
 export type Filter = 'active' | 'questions' | 'mine' | 'closed' | 'all';
@@ -51,13 +60,13 @@ type Counts = { open: number; fixed: number; active: number; mine: number; close
 /** What a phone's peeking sheet says it holds: the open notes, else how many there are, else that there are none. */
 const peekCount = (n: Counts): string => (n.active ? t('{n} open', { n: n.active }) : n.all ? t('{n} note|{n} notes', { n: n.all }) : t('No notes yet'));
 
-const FILTERS = perLang((): { id: Filter; label: string; count: keyof Counts; title?: string }[] => [
-  { id: 'active', label: t('Open'), count: 'active', title: t('Open notes and fixes waiting to be checked') },
-  { id: 'questions', label: t('Questions'), count: 'questions', title: t('Questions from agents, waiting for your answer') },
-  { id: 'mine', label: t('Mine'), count: 'mine', title: t('Your own notes that are still open') },
+const FILTERS = perLang((): { id: Exclude<Filter, 'active'>; label: string; count: keyof Counts }[] => [
+  { id: 'questions', label: t('Questions'), count: 'questions' },
+  { id: 'mine', label: t('Mine'), count: 'mine' },
   { id: 'closed', label: t('Closed'), count: 'closed' },
   { id: 'all', label: t('All'), count: 'all' },
 ]);
+const GROUP_LABEL = perLang((): Record<GroupId, string> => ({ needs: t('Needs you'), check: t('To check'), open: t('Open'), done: t('Done') }));
 const EMPTY = perLang(
   (): Record<Filter, { art: EmptyArtName; title: string }> => ({
     active: { art: 'clear', title: t('All clear') },
@@ -100,8 +109,6 @@ interface NotesPanelProps {
   quietNew?: boolean;
   onCompose: () => void;
   verifyCount: number;
-  /** Required notes nobody has answered (lib/handover.ts handover().withAgent): said beside the fixes to check. */
-  stillOpen?: number;
   /** Open notes from an earlier version where the version on screen changed (its diff): a hint on their rows. */
   changedHere?: ReadonlySet<string>;
   /** An archived project's video (lib/archived.ts): its notes are read, nothing new is written. */
@@ -111,7 +118,7 @@ interface NotesPanelProps {
   /** Review mode: start (or leave) stepping through the open notes. */
   onReview: () => void;
   reviewing: boolean;
-  /** The Auto-check chip (AutoCheck.tsx), in the head row beside Record and + Note. */
+  /** The Auto-check chip (AutoCheck.tsx), in the head when it found something. */
   autoCheck: ReactNode;
   composer: ReactNode;
   /** The Record button (recorded feedback), beside + Note. */
@@ -136,8 +143,20 @@ interface NotesPanelProps {
   plans?: Map<string, RunPlanItem>;
   planName?: string;
   planPending?: boolean;
-  /** The strip offers Check fixes: the list's own call to check steps back (one place to press). */
-  verifyInStrip?: boolean;
+  /** The list's groups: the first row of each (its header goes above it), how many each holds, and whether the done ones
+   * are shown (folded at the end otherwise). */
+  firsts?: Map<string, GroupId>;
+  groupCounts?: Record<GroupId, number>;
+  doneOpen?: boolean;
+  setDoneOpen?: (open: boolean) => void;
+  /** Auto-check found something (or couldn't run): its chip in the head; with nothing to say it stays away. */
+  autoCheckFound?: boolean;
+  /** The "To check" header's Check is the view's raised door (the top bar doesn't offer it). */
+  checkPrimary?: boolean;
+  /** More than one person wrote the notes: each row ends with its author's avatar. */
+  showAuthor?: boolean;
+  /** The video has speech, or a transcript is on its way or there: the head offers the Transcript beside the Notes. */
+  transcriptTab?: boolean;
   /** What the transcript tab needs from the player. */
   transcript: Pick<TranscriptViewProps, 'base' | 'onSeek' | 'onPlay' | 'onChangeWords' | 'onRerun' | 'edits'>;
 }
@@ -231,31 +250,33 @@ function NoteRows({ list, note, reveal }: { list: PlacedComment[]; note: (c: Pla
   );
 }
 
-/** The rows while the notes load: a group header and rows of the loaded anatomy, so nothing moves when they arrive. */
+/** The rows while the notes load: a group's header and rows of the loaded anatomy, so nothing moves when they arrive. */
 function NoteRowsPending() {
+  const row = (w: string) => (
+    <div key={w} className="note note-row pending">
+      <div className="nr">
+        <span className="nr-tc">
+          <SkLine w="5.5em" />
+        </span>
+        <span className="nr-kg">
+          <Skeleton w={10} h={10} r={2} />
+        </span>
+        <span className="nr-text">
+          <SkLine w={w} />
+        </span>
+      </div>
+    </div>
+  );
+  const [first, ...rest] = ['72%', '54%', '80%', '46%', '64%'];
   return (
     <SkeletonRegion label={t('Loading the notes')} className="note-list">
-      {['72%', '54%', '80%', '46%', '64%'].map((w, i) => (
-        <div key={w} className="note note-row pending">
-          {i === 0 && (
-            <div className="note-group">
-              <Skeleton w={18} h={18} r={999} />
-              <SkLine w="9em" />
-            </div>
-          )}
-          <div className="nr">
-            <span className="nr-tc">
-              <SkLine w="5.5em" />
-            </span>
-            <span className="nr-kg">
-              <Skeleton w={10} h={10} r={2} />
-            </span>
-            <span className="nr-text">
-              <SkLine w={w} />
-            </span>
-          </div>
+      <div className="note-sect-wrap">
+        <div className="note-sect">
+          <SkLine w="4em" />
         </div>
-      ))}
+        {row(first)}
+      </div>
+      {rest.map(row)}
     </SkeletonRegion>
   );
 }
@@ -283,12 +304,7 @@ export function NotesPanel(p: NotesPanelProps) {
   // the note at the playhead: while playing it stays marked a second past its frame (one frame is 1/25 s)
   const hold = p.playing ? Math.round(p.fps ?? 25) : 0;
   const here = useSyncExternalStore(p.live ? p.live.subscribe : still, () => noteAt(p.list, p.live ? p.live.get() : p.frame, hold) ?? '');
-  const starts = useMemo(() => groupStarts(p.list), [p.list]);
   const { live, handle } = useSheetDrag(sheet);
-  // the filters fit the panel; where a language's words (or many tags) don't, they scroll with soft edges rather than
-  // being cut
-  const [filtersRef, filtersEdges] = useScrollEdges<HTMLDivElement>();
-  const [tagsRef, tagsEdges] = useScrollEdges<HTMLFieldSetElement>();
   // Phones: a new note starts at the top of the sheet, tools first, whatever was scrolled before.
   const scroller = useRef<HTMLDivElement>(null);
   const composing = !!p.composer;
@@ -338,9 +354,6 @@ export function NotesPanel(p: NotesPanelProps) {
   // a phone in check mode: the sheet is check mode's card (p.top) and nothing else; on a desk the card floats on the stage
   const checking = !!sheet && !!p.verifying && !!p.top;
   const agent = p.view === 'agent';
-  // the Agent tab, where the video has an agent; a phone's sheet shows it only while it is open (the strip above the dock
-  // is the way in there, and the sheet's head has no room for a third view beside its thumb-sized tools)
-  const agentTab = !!p.agentTab && (!sheet || agent);
   // The transcript's search and comparison stay while you switch back and forth; a first version has nothing to compare.
   const [find, setFind] = useState<TranscriptFind>(NO_FIND);
   const base = p.transcript.base;
@@ -352,257 +365,369 @@ export function NotesPanel(p: NotesPanelProps) {
     // a tab picked on a peeking sheet shows what it picked
     if (sheet?.state === 'peek') sheet.setState('half');
   };
-  return (
-    <Tabs.Root asChild value={filter} onValueChange={(f) => p.setFilter(f as Filter)}>
-      <div
-        className={
-          sheet
-            ? `side grain nsheet nsheet-${sheet.state}${p.composer ? ' composing' : ''}${words ? ' words' : ''}${live !== null ? ' dragging' : ''}`
-            : `side grain${words ? ' words' : ''}`
-        }
-        style={style}
-      >
-        {sheet && (
-          <button type="button" className="nsheet-handle" {...handle} aria-label={sheet.state === 'peek' ? t('Show notes') : t('Hide notes')}>
-            <span />
-          </button>
-        )}
-        <div className="side-head">
-          <div className="side-title">
-            {/* A phone's sheet at rest says what is in it and opens with a tap anywhere on its row (mobile.css: shown in
-                place of the views and their tools while it peeks); the handle alone, 22 px, was the way in and the
-                notes' count sat on tabs the peek hid. */}
-            {sheet && (
-              <button
-                type="button"
-                className="nsheet-open"
-                onClick={() => sheet.setState('half')}
-                data-testid="notes-open"
-                aria-label={p.view === 'notes' && n ? `${t('Show notes')} · ${peekCount(n)}` : t('Show notes')}
-              >
-                <span className="nsheet-open-word">{VIEWS().find((x) => x.id === p.view)?.label ?? t('Notes')}</span>
-                {p.view === 'notes' && <span className="nsheet-open-n">{n ? peekCount(n) : <SkLine w="4em" />}</span>}
-                <I name="down" size={16} className="nsheet-open-chev" />
-              </button>
-            )}
-            <div className={`side-views${agentTab ? ' three' : ''}`} role="tablist" aria-label={t('Notes or transcript')}>
-              {VIEWS()
-                .filter((x) => x.id !== 'agent' || agentTab)
-                .map((x) => (
-                  <button
-                    key={x.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={p.view === x.id}
-                    className={p.view === x.id ? 'on' : ''}
-                    onClick={() => pickView(x.id)}
-                    data-testid={`panel-${x.id}`}
-                  >
-                    {x.label}
-                    {x.id === 'agent' && p.agentTab?.live && <KeyGlyph shape="ease" className="nav-kg live side-view-kg" />}
-                  </button>
-                ))}
-            </div>
-            {/* the notes' numbers are on the tabs below; the transcript's head says which version it heard */}
-            {words && (
-              <span className="side-count">
-                <TranscriptMeta slug={p.slug} v={p.v} />
-              </span>
-            )}
-            <span className="grow" />
-            {!words && !agent && !sheet && p.autoCheck}
-            {/* review mode walks the notes over the picture with the keyboard's N: a phone's list is that walk (a tap a note) */}
-            {!words && !agent && !sheet && n && n.active > 1 && (
-              <IconButton
-                className={`btn sm ghost icon-only ${p.reviewing ? 'on' : ''}`}
-                label={p.reviewing ? t('Leave review mode') : t('Go through the open notes')}
-                shortcut="N"
-                icon="reviewMode"
-                size={16}
-                onClick={p.onReview}
-                aria-pressed={p.reviewing}
-              />
-            )}
-            {sheet?.mic}
-            {p.record}
-            {!p.readOnly && (
-              <Tip content={t('New note')} shortcut="C">
-                <button
-                  type="button"
-                  className={p.quietNew ? 'btn sm new-note' : 'btn sm primary new-note'}
-                  onClick={p.onCompose}
-                  disabled={!p.canCompose}
-                  data-testid="new-note"
-                  aria-label={t('Note')}
-                >
-                  <I name="plus" size={14} /> <span className="new-note-word">{t('Note')}</span>
-                </button>
-              </Tip>
-            )}
-          </div>
-          {p.strip}
-          {agent || checking ? null : words ? (
-            <TranscriptTools find={find} setFind={setFind} v={p.v} base={base} />
-          ) : (
-            <div className="note-filters">
-              <Tabs.List ref={filtersRef} className={`tabs note-tabs ${filtersEdges}`} aria-label={t('Which notes')}>
-                {FILTERS()
-                  .filter((f) => f.id !== 'questions' || (n && n.questions > 0) || filter === 'questions')
-                  .map((f) => (
-                    <Tabs.Trigger key={f.id} value={f.id} className={filter === f.id ? 'on' : ''} title={f.title}>
-                      {/* a list with nothing in it is just its word: the row fits the panel in every language */}
-                      {f.label} {(!n || n[f.count] > 0) && <span className="n">{n ? n[f.count] : <SkLine w="1ch" />}</span>}
-                    </Tabs.Trigger>
-                  ))}
-              </Tabs.List>
-              {/* the notes' tags under them, one line that is always there (its room doesn't wait for the notes): one
-                  picked narrows the list, combined with the filter above */}
-              <fieldset ref={tagsRef} className={`note-tagf ${tagsEdges}`} aria-label={t('Tags')} data-testid="tag-filters">
-                {sheet && p.autoCheck && <span className="note-tagf-ac">{p.autoCheck}</span>}
-                {!n ? (
-                  ['3em', '4em', '3.5em'].map((w) => (
-                    <span key={w} className="tagf pending">
-                      <SkLine w={w} />
-                    </span>
-                  ))
-                ) : !p.tags?.length ? (
-                  <span className="note-tagnone">{t('No tags yet · type # in a note')}</span>
-                ) : (
-                  p.tags.map(([tag, count]) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      className={`tagf ${p.tag === tag ? 'on' : ''}`}
-                      aria-pressed={p.tag === tag}
-                      onClick={() => p.setTag?.(p.tag === tag ? null : tag)}
-                      data-tag={tag}
-                    >
-                      {tag === 'love-it' && <I name="heart" size={11} />}
-                      {tagLabel(tag)} <span className="n">{count}</span>
-                    </button>
-                  ))
-                )}
-              </fieldset>
-            </div>
-          )}
-        </div>
-        {words && (
-          <TranscriptView
-            {...p.transcript}
-            slug={p.slug}
-            v={p.v}
-            fps={p.fps ?? 25}
-            frame={p.frame}
-            live={p.live}
-            find={find}
-            composer={p.composer}
-            scroller={scroller}
-          />
-        )}
-        {agent && (
-          <div className="av-host" data-testid="agent-panel">
-            {p.agentView ?? <NoteRowsPending />}
-          </div>
-        )}
-        {!words && !agent && (
-          <Tabs.Content value={filter} asChild>
-            <div className="side-scroll" ref={scroller}>
-              {checking ? p.top : null}
-              {!checking && !n && <NoteRowsPending />}
-              {!checking && p.top}
-              {!checking && p.recording}
-              {!checking && p.verifyCount > 0 && filter !== 'closed' && !p.verifying && !p.verifyInStrip && (
-                <div className="verify-cta" data-testid="verify-cta">
-                  <KeyGlyph shape="half" />
-                  <span className="grow">
-                    <b>{t('{n} fix to check|{n} fixes to check', { n: p.verifyCount })}</b>
-                    <span>
-                      {t('before and after, on V{latestV}', { latestV: p.latestV })}
-                      {/* the rest of the work, whole on its line where the banner wraps */}
-                      {p.stillOpen ? (
-                        <>
-                          {' · '}
-                          <span className="still">{t('{n} note still open|{n} notes still open', { n: p.stillOpen })}</span>
-                        </>
-                      ) : null}
-                    </span>
-                  </span>
-                  <button type="button" className="btn sm" onClick={p.onVerify}>
-                    {t('Check now')} {!sheet && <Kbd>⇧V</Kbd>}
-                  </button>
-                </div>
-              )}
-              {!checking && p.composer}
-              {!checking && (
-                <NoteRows
-                  list={p.list}
-                  reveal={following ? here : p.selected}
-                  note={(c) => (
-                    <CommentCard
-                      key={c.id}
-                      c={c}
-                      slug={p.slug}
-                      videoName={p.videoName}
-                      currentV={p.v}
-                      latestV={p.latestV}
-                      here={here === c.id}
-                      selected={p.selected === c.id}
-                      groupHead={starts.has(c.id)}
-                      onSelect={p.onSelect}
-                      onLightbox={p.onLightbox}
-                      fps={p.fps}
-                      onPlayRange={p.onPlayRange}
-                      looping={!!p.rangeLoop && !!c.rangeHere && p.rangeLoop.in === c.rangeHere.in && p.rangeLoop.out === c.rangeHere.out}
-                      checkMode={!!p.verifying}
-                      plan={
-                        p.plans?.get(c.id) ??
-                        (p.planPending && (c.status === 'open' || c.status === 'fixed') && (!c.kind || c.kind === 'feedback') ? PLAN_PENDING : undefined)
-                      }
-                      planName={p.planName}
-                      changedIn={p.changedHere?.has(c.id) ? p.v : undefined}
-                    />
-                  )}
-                />
-              )}
-              {!checking && n && !p.list.length && !p.composer && !p.recording && p.tag && (
-                <EmptyState
-                  size="sm"
-                  className="side-empty"
-                  art="list"
-                  title={t('No {tag} notes here', { tag: tagLabel(p.tag) })}
-                  action={
-                    <button type="button" className="btn sm" onClick={() => p.setTag?.(null)}>
-                      {t('Show every tag')}
-                    </button>
-                  }
-                />
-              )}
-              {!checking && n && !p.list.length && !p.composer && !p.recording && !p.tag && (
-                <EmptyState
-                  size="sm"
-                  className="side-empty"
-                  art={filter === 'active' && !n.all ? 'note' : EMPTY()[filter].art}
-                  title={filter === 'active' && !n.all ? t('No notes yet') : EMPTY()[filter].title}
-                  tips={
-                    filter === 'active' && !sheet && !p.readOnly
-                      ? [
-                          <T k="<0>C</0> writes a note on this frame" key="c" tags={[(c) => <kbd>{c}</kbd>]} />,
-                          <T k="Set <0>I</0> and <1>O</1> first to note a range" key="r" tags={[(c) => <kbd>{c}</kbd>, (c) => <kbd>{c}</kbd>]} />,
-                        ]
-                      : undefined
-                  }
-                >
-                  {filter === 'active' &&
-                    !p.readOnly &&
-                    (sheet
-                      ? t('Pause on a frame, tap + Note, draw on it — or hold the mic and talk.')
-                      : t('Pause on a frame and say what should change: the note stays on that exact frame.'))}
-                </EmptyState>
-              )}
-            </div>
-          </Tabs.Content>
+  const notesView = !words && !agent;
+  // The head is one row whatever its words: where they don't fit, it says less, measured, step by step — Auto-check's
+  // chip without its name, the tabs a size smaller, the chip its number alone, + Note its plus alone, then the notes'
+  // count left to the groups' headers (`data-fit`, notes.css).
+  const titleRef = useRef<HTMLDivElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a sheet opening shows the head's words (at rest they are hidden): fit them again
+  useLayoutEffect(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    // every item inside the head's padding (its last one stops at the content box's end)
+    const fits = () => {
+      const end = el.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(el).paddingRight);
+      return [...el.children].every((c) => c.getBoundingClientRect().right <= end + 0.5);
+    };
+    const fit = () => {
+      for (const level of ['0', '1', '2', '3', '4', '5']) {
+        el.dataset.fit = level;
+        if (fits()) return;
+      }
+    };
+    fit();
+    // the panel's width (the window, a phone turned): the head's own box, whose size its words never change …
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    // … and its words: a count, a view, the language, Auto-check's answer (the levels are an attribute: not watched)
+    const mo = new MutationObserver(fit);
+    mo.observe(el, { childList: true, subtree: true, characterData: true });
+    void document.fonts?.ready.then(fit);
+    return () => {
+      ro.disconnect();
+      mo.disconnect();
+    };
+  }, [sheet?.state]);
+  // The filter's menu: the lists (the groups are what it shows by default) and the tags; a filter on shows as a chip
+  const filterItems: MenuEntry[] = [
+    ...FILTERS()
+      .filter((f) => f.id !== 'questions' || (n && n.questions > 0) || filter === 'questions')
+      .map((f) => ({
+        label: n ? `${f.label} · ${n[f.count]}` : f.label,
+        checked: filter === f.id,
+        onClick: () => p.setFilter(filter === f.id ? 'active' : f.id),
+      })),
+    !!p.tags?.length && { heading: t('Tags') },
+    ...(p.tags ?? []).map(([tag, count]) => ({
+      label: `${tagLabel(tag)} · ${count}`,
+      checked: p.tag === tag,
+      onClick: () => p.setTag?.(p.tag === tag ? null : tag),
+    })),
+  ];
+  const listFilter = filter !== 'active' ? FILTERS().find((f) => f.id === filter) : null;
+  // The views as quiet text tabs in the head: the Notes with their count, the Transcript where there is speech (or the
+  // transcript is open), and the Agent view only while it is open (the agent's line and ⋯ open it: a third word in
+  // the head at 360 px would crowd it).
+  const tabs = (['notes', (p.transcriptTab || words) && 'transcript', agent && 'agent'] as const).filter((v): v is PanelView => !!v);
+  const tabKeys = (e: ReactKeyboardEvent<HTMLButtonElement>, at: number) => {
+    const to = e.key === 'ArrowRight' ? at + 1 : e.key === 'ArrowLeft' ? at - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : null;
+    if (to === null) return;
+    // handled here: the player's arrows step frames otherwise (useShortcuts.ts leaves a handled key alone)
+    e.preventDefault();
+    const v = tabs[(to + tabs.length) % tabs.length];
+    pickView(v);
+    document.getElementById(`np-tab-${v}`)?.focus();
+  };
+  const tabWords = (v: PanelView) => (
+    <>
+      {VIEWS().find((x) => x.id === v)?.label}
+      {v === 'notes' && <span className="np-count">{n ? n.all : <SkLine w="1.5em" />}</span>}
+      {v === 'agent' && p.agentTab?.live && <KeyGlyph shape="ease" className="nav-kg live" />}
+    </>
+  );
+  // ⋯: the Agent view, and review mode (N) where there are notes to go through
+  const moreItems: MenuEntry[] = [
+    !!p.agentTab && { label: t('Agent'), checked: agent, onClick: () => pickView(agent ? 'notes' : 'agent') },
+    'sep',
+    notesView &&
+      !!n &&
+      n.active > 1 && {
+        label: p.reviewing ? t('Leave review mode') : t('Go through the open notes'),
+        icon: 'reviewMode',
+        shortcut: 'N',
+        checked: p.reviewing,
+        onClick: p.onReview,
+      },
+  ];
+  const filterButton = notesView && (
+    <Menu
+      align="end"
+      trigger={
+        <IconButton
+          className={`btn sm ghost icon-only ${listFilter || p.tag ? 'on' : ''}`}
+          label={t('Filter')}
+          icon="filter"
+          size={16}
+          data-testid="notes-filter"
+        />
+      }
+      items={filterItems}
+    />
+  );
+  const moreButton = (
+    <Menu
+      align="end"
+      trigger={<IconButton className="btn sm ghost icon-only" label={t('More')} icon="more" size={16} data-testid="notes-more" />}
+      items={moreItems}
+    />
+  );
+  const groupCounts = p.groupCounts;
+  // a group's header: its name and count; "To check" carries the panel's door to check mode, "Done" folds
+  const sectionHead = (g: GroupId) =>
+    g === 'done' ? (
+      <button type="button" className="note-sect note-fold" data-group="done" aria-expanded onClick={() => p.setDoneOpen?.(false)} data-testid="group-done">
+        <span className="note-sect-name">{GROUP_LABEL()[g]}</span>
+        <span className="n">{groupCounts?.[g] ?? 0}</span>
+        <I name="down" size={14} className="note-fold-chev" />
+      </button>
+    ) : (
+      <div className="note-sect" data-group={g} data-testid={`group-${g}`}>
+        <span className="note-sect-name">{GROUP_LABEL()[g]}</span>
+        <span className="n">{groupCounts?.[g] ?? 0}</span>
+        <span className="grow" />
+        {g === 'check' && p.verifyCount > 0 && !p.verifying && !p.readOnly && (
+          <Button size="sm" variant={p.checkPrimary ? 'primary' : 'ghost'} onClick={p.onVerify} data-testid="check-group">
+            {t('Check')} {!sheet && <Kbd>⇧V</Kbd>}
+          </Button>
         )}
       </div>
-    </Tabs.Root>
+    );
+  return (
+    <div
+      className={
+        sheet
+          ? `side grain nsheet nsheet-${sheet.state}${p.composer ? ' composing' : ''}${words ? ' words' : ''}${live !== null ? ' dragging' : ''}`
+          : `side grain${words ? ' words' : ''}`
+      }
+      style={style}
+    >
+      {sheet && (
+        <button type="button" className="nsheet-handle" {...handle} aria-label={sheet.state === 'peek' ? t('Show notes') : t('Hide notes')}>
+          <span />
+        </button>
+      )}
+      <div className="side-head">
+        <div className="side-title np-head" ref={titleRef}>
+          {/* A phone's sheet at rest says what is in it and opens with a tap anywhere on its row (mobile.css: shown in
+              place of the head's tools while it peeks); the handle alone, 22 px, was the way in. */}
+          {sheet && (
+            <button
+              type="button"
+              className="nsheet-open"
+              onClick={() => sheet.setState('half')}
+              data-testid="notes-open"
+              aria-label={p.view === 'notes' && n ? `${t('Show notes')} · ${peekCount(n)}` : t('Show notes')}
+            >
+              <span className="nsheet-open-word">{VIEWS().find((x) => x.id === p.view)?.label ?? t('Notes')}</span>
+              {p.view === 'notes' && <span className="nsheet-open-n">{n ? peekCount(n) : <SkLine w="4em" />}</span>}
+              <I name="down" size={16} className="nsheet-open-chev" />
+            </button>
+          )}
+          {tabs.length > 1 ? (
+            <div className="np-tabs" role="tablist" aria-label={t('Notes or transcript')}>
+              {tabs.map((v, i) => (
+                <button
+                  key={v}
+                  type="button"
+                  role="tab"
+                  id={`np-tab-${v}`}
+                  className="np-tab"
+                  aria-selected={p.view === v}
+                  tabIndex={p.view === v ? 0 : -1}
+                  onClick={() => pickView(v)}
+                  onKeyDown={(e) => tabKeys(e, i)}
+                  data-testid={`panel-${v}`}
+                >
+                  {tabWords(v)}
+                </button>
+              ))}
+            </div>
+          ) : (
+            // one view: its name, as the open tab would read
+            <h2 className="np-tabs">
+              <span className="np-tab" aria-current="true" data-testid="panel-notes">
+                {tabWords('notes')}
+              </span>
+            </h2>
+          )}
+          {/* the transcript's head says which version it heard */}
+          {words && (
+            <span className="side-count">
+              <TranscriptMeta slug={p.slug} v={p.v} />
+            </span>
+          )}
+          <span className="grow" />
+          {/* Auto-check only when it found something: in the head on a desk, on the line under it on a phone (no room) */}
+          {notesView && p.autoCheckFound && !sheet && p.autoCheck}
+          {!sheet && filterButton}
+          {!sheet && moreButton}
+          {sheet?.mic}
+          {p.record}
+          {!p.readOnly && (
+            <Tip content={t('New note')} shortcut="C">
+              <button
+                type="button"
+                className={p.quietNew ? 'btn sm new-note' : 'btn sm primary new-note'}
+                onClick={p.onCompose}
+                disabled={!p.canCompose}
+                data-testid="new-note"
+                aria-label={t('Note')}
+              >
+                <I name="plus" size={14} /> <span className="new-note-word">{t('Note')}</span>
+              </button>
+            </Tip>
+          )}
+        </div>
+        {/* The line under the head: a filter that is on (a chip that takes it off); on a phone also what Auto-check
+            found, the filter and ⋯, so its head keeps room for the views, the mic, Record and + Note */}
+        {notesView && !checking && (sheet || listFilter || p.tag) && (
+          <div className="np-chips" data-testid="notes-filters-on">
+            {sheet && p.autoCheckFound && p.autoCheck}
+            {listFilter && (
+              <button type="button" className="chip np-chip" onClick={() => p.setFilter('active')} data-filter={listFilter.id}>
+                {listFilter.label}
+                <I name="x" size={12} />
+                <span className="sr-only">{t('Clear the filter')}</span>
+              </button>
+            )}
+            {p.tag && (
+              <button type="button" className="chip np-chip" onClick={() => p.setTag?.(null)} data-tag={p.tag}>
+                #{tagLabel(p.tag)}
+                <I name="x" size={12} />
+                <span className="sr-only">{t('Clear the filter')}</span>
+              </button>
+            )}
+            {sheet && (
+              <span className="np-tools">
+                {filterButton}
+                {moreButton}
+              </span>
+            )}
+          </div>
+        )}
+        {p.strip}
+        {words && !checking && <TranscriptTools find={find} setFind={setFind} v={p.v} base={base} />}
+      </div>
+      {words && (
+        <TranscriptView
+          {...p.transcript}
+          slug={p.slug}
+          v={p.v}
+          fps={p.fps ?? 25}
+          frame={p.frame}
+          live={p.live}
+          find={find}
+          composer={p.composer}
+          scroller={scroller}
+        />
+      )}
+      {agent && (
+        <div className="av-host" data-testid="agent-panel">
+          {p.agentView ?? <NoteRowsPending />}
+        </div>
+      )}
+      {notesView && (
+        <div className="side-scroll" ref={scroller}>
+          {checking ? p.top : null}
+          {!checking && !n && <NoteRowsPending />}
+          {!checking && p.top}
+          {!checking && p.recording}
+          {!checking && p.composer}
+          {!checking && (
+            <NoteRows
+              list={p.list}
+              reveal={following ? here : p.selected}
+              note={(c) => {
+                const card = (
+                  <CommentCard
+                    key={c.id}
+                    c={c}
+                    slug={p.slug}
+                    videoName={p.videoName}
+                    currentV={p.v}
+                    latestV={p.latestV}
+                    here={here === c.id}
+                    selected={p.selected === c.id}
+                    showAuthor={p.showAuthor}
+                    onSelect={p.onSelect}
+                    onLightbox={p.onLightbox}
+                    fps={p.fps}
+                    onPlayRange={p.onPlayRange}
+                    looping={!!p.rangeLoop && !!c.rangeHere && p.rangeLoop.in === c.rangeHere.in && p.rangeLoop.out === c.rangeHere.out}
+                    checkMode={!!p.verifying}
+                    plan={
+                      p.plans?.get(c.id) ??
+                      (p.planPending && (c.status === 'open' || c.status === 'fixed') && (!c.kind || c.kind === 'feedback') ? PLAN_PENDING : undefined)
+                    }
+                    planName={p.planName}
+                    changedIn={p.changedHere?.has(c.id) ? p.v : undefined}
+                  />
+                );
+                const g = p.firsts?.get(c.id);
+                return g ? (
+                  <div key={c.id} className="note-sect-wrap" data-group-start={g}>
+                    {sectionHead(g)}
+                    {card}
+                  </div>
+                ) : (
+                  card
+                );
+              }}
+            />
+          )}
+          {/* the done notes, folded at the end */}
+          {!checking && n && !p.doneOpen && (groupCounts?.done ?? 0) > 0 && (
+            <button
+              type="button"
+              className="note-sect note-fold"
+              data-group="done"
+              aria-expanded={false}
+              onClick={() => p.setDoneOpen?.(true)}
+              data-testid="group-done"
+            >
+              <span className="note-sect-name">{GROUP_LABEL().done}</span>
+              <span className="n">{groupCounts?.done}</span>
+              <I name="right" size={14} className="note-fold-chev" />
+            </button>
+          )}
+          {!checking && n && !p.list.length && !p.composer && !p.recording && p.tag && (
+            <EmptyState
+              size="sm"
+              className="side-empty"
+              art="list"
+              title={t('No {tag} notes here', { tag: tagLabel(p.tag) })}
+              action={
+                <button type="button" className="btn sm" onClick={() => p.setTag?.(null)}>
+                  {t('Show every tag')}
+                </button>
+              }
+            />
+          )}
+          {!checking && n && !p.list.length && !p.composer && !p.recording && !p.tag && (
+            <EmptyState
+              size="sm"
+              className="side-empty"
+              art={filter === 'active' && !n.all ? 'note' : EMPTY()[filter].art}
+              title={filter === 'active' && !n.all ? t('No notes yet') : EMPTY()[filter].title}
+              tips={
+                filter === 'active' && !n.all && !sheet && !p.readOnly
+                  ? [
+                      <T k="<0>C</0> writes a note on this frame" key="c" tags={[(c) => <kbd>{c}</kbd>]} />,
+                      <T k="Set <0>I</0> and <1>O</1> first to note a range" key="r" tags={[(c) => <kbd>{c}</kbd>, (c) => <kbd>{c}</kbd>]} />,
+                    ]
+                  : undefined
+              }
+            >
+              {filter === 'active' &&
+                !n.all &&
+                !p.readOnly &&
+                (sheet
+                  ? t('Pause on a frame, tap + Note, draw on it — or hold the mic and talk.')
+                  : t('Pause on a frame and say what should change: the note stays on that exact frame.'))}
+            </EmptyState>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

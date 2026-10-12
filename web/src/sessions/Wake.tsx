@@ -1,16 +1,13 @@
 // Starting the video's agent when it isn't running, on this machine only (server/wake.ts checks the same): whether it
 // can be done here, what the person chose to happen (Settings → Connect an agent), the question when they chose to be
-// asked, and the run Lampo started — what it's doing, Stop, its log.
+// asked, and the runs Lampo started (the agent menu says how the newest goes: player/AgentMenuBody.tsx).
 import { useQuery } from '@tanstack/react-query';
 import { WAKE_DEFAULT, wakeBlocker } from '../../../lib/agentRun.ts';
 import { useAuthStatus } from '../api/auth.ts';
 import { api, enc } from '../api/client.ts';
-import { useStopRun } from '../api/mutations.ts';
 import { useInfo } from '../api/queries.ts';
 import type { AgentRunInfo, SessionRef, WakePref } from '../api/types.ts';
 import { t } from '../i18n/index.ts';
-import { toastError } from '../lib/toast.ts';
-import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 
 export interface WakeChoice {
   /** This machine can start the video's agent (a Claude Code session with its id and folder, seen from the machine). */
@@ -94,34 +91,5 @@ export function WakeAsk({
 }
 
 // How a run ended (literal keys, so the translations find them).
-const ended = (s: AgentRunInfo['state']) =>
+export const ended = (s: AgentRunInfo['state']) =>
   s === 'finished' ? t('Finished') : s === 'failed' ? t('Couldn’t start') : s === 'timeout' ? t('Stopped after the time limit') : t('Stopped');
-
-/** The newest run: working (with Stop) while it goes, how it ended afterwards; its log either way. */
-export function RunLine({ run }: { run: AgentRunInfo }) {
-  const stop = useStopRun();
-  const going = run.state === 'running';
-  return (
-    <div className="wake-run" data-testid="agent-run" data-state={run.state}>
-      <KeyGlyph shape={going ? 'ease' : 'outline'} className={`nav-kg ${going ? 'live' : ''}`} />
-      <span className="grow">
-        {going ? t('Working · started by Lampo') : ended(run.state)}
-        {!going && run.state === 'finished' && run.exit ? ` · ${t('exit {code}', { code: run.exit })}` : ''}
-      </span>
-      <a className="how-agents" href={`/api/agent-runs/${enc(run.id)}/log`} target="_blank" rel="noreferrer">
-        {t('Log')}
-      </a>
-      {going && (
-        <button
-          type="button"
-          className="btn sm"
-          data-testid="agent-run-stop"
-          disabled={stop.isPending}
-          onClick={() => stop.mutateAsync(run.id).catch(toastError)}
-        >
-          {t('Stop')}
-        </button>
-      )}
-    </div>
-  );
-}

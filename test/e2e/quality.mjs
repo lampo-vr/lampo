@@ -242,7 +242,7 @@ try {
           composer
             ? ':is(.composer :is(.composer-head, .composer-foot), [data-testid=draw-bar]) button'
             : notes
-              ? '.side-scroll .note-row .nr, .note-filters .tagf, .side-title [data-testid=ac-chip]'
+              ? '.side-scroll .note-row .nr, .side-title .btn, .side-title [data-testid=ac-chip]'
               : inbox
                 ? '.nav .nav-item, .inbox-view .inbox-row, .inbox-view-preview .btn'
                 : '.nav .nav-item, .lib-toolbar button, .film, .lrow',
@@ -346,7 +346,7 @@ try {
       const found = await again(async () => {
         const page = await open(screen, DESKTOP);
         const found = await page.evaluate(() =>
-          [...document.querySelectorAll(':is(.seg-count, .tabs button .n, .tagf .n)')]
+          [...document.querySelectorAll(':is(.seg-count, .tabs button .n)')]
             .filter((n) => n.getClientRects().length && /\d/.test(n.textContent))
             .map((n) => {
               const s = getComputedStyle(n);

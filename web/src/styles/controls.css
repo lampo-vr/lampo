@@ -247,7 +247,7 @@ select.input {
   align-items: center;
   white-space: nowrap;
 }
-/* A count in a chip, a segment or a tab (here, the lanes' .seg-count, the tags' .tagf .n): a quiet second word — the
+/* A count in a chip, a segment or a tab (here, the lanes' .seg-count): a quiet second word — the
    UI's face a step smaller than the label, tabular figures, muted. The mono face at 11 px stood as tall as the 12 px
    label beside it and sat on its own baseline: the numbers read bigger than the words. */
 .tabs button .n {

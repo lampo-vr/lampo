@@ -188,7 +188,6 @@ const NESTED: { file: string; outer: string; inner: string; inset: () => number;
   },
   { file: 'code.css', outer: '.set-code', inner: '.set-copy', inset: () => firstOf(decl('code.css', '.set-copy', 'margin')) },
   { file: 'cards.css', outer: '.film-poster', inner: '.vchip', inset: () => px(decl('cards.css', '.film-over', 'left') ?? 'NaN') },
-  { file: 'notes.css', outer: '.verify-cta', inner: '.verify-cta > .btn', inset: () => firstOf(decl('notes.css', '.verify-cta', 'padding')) },
   { file: 'library.css', outer: '.lane', inner: '.bcard', inset: () => firstOf(decl('library.css', '.lane', 'padding')) },
   // Get started's box at the sidebar's foot: the next step is its raised button, inset by the box's padding
   {
@@ -196,6 +195,14 @@ const NESTED: { file: string; outer: string; inner: string; inset: () => number;
     outer: '.ob-sn',
     inner: '.ob-sn-step',
     inset: () => edgeOf('onboarding.css', '.ob-sn') + firstOf(decl('onboarding.css', '.ob-sn', 'padding')),
+  },
+  // the agent menu's field: Send sits inside it, inset from its edge
+  {
+    file: 'loop.css',
+    outerFile: 'controls.css',
+    outer: '.input',
+    inner: '.amc-field > .amc-send',
+    inset: () => px(decl('loop.css', '.amc-field > .amc-send', 'top') ?? 'NaN'),
   },
   // billing's switch: one raised thumb that slides in the segmented track
   {

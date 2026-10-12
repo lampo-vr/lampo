@@ -442,7 +442,7 @@ try {
   });
 
   // Where the pinned head stands, against what scrolls — the notes list, or the page where the notes sit under the
-  // picture (≤ 820 px) — and the filters above the list.
+  // picture (≤ 820 px) — and the panel's head above the list.
   const pinned = () =>
     page.evaluate(() => {
       const box = (s) => document.querySelector(s)?.getBoundingClientRect();
@@ -450,7 +450,7 @@ try {
       const own = getComputedStyle(list).overflowY !== 'visible';
       const top = document.querySelector('[data-testid=unsent] .unsent-top');
       const head = top.getBoundingClientRect();
-      const filters = box('.note-filters');
+      const filters = box('.side-head');
       const btn = document.querySelector('[data-testid=drafts-send]');
       const b = btn.getBoundingClientRect();
       const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);

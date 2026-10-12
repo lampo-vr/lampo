@@ -745,7 +745,7 @@ None of it costs you a token or asks anything of you, and none of it is written 
 memory and a small rolling file in the cache, and the spine of it is kept with the video as a run (below). So `lampo status` and `set_status` are optional: use them for what Lampo
 can't see ("waiting for the client's logo file", an estimate for a long render), not to narrate your steps; what you
 say there shows as your own words, quoted, until your next step: whole in the Agent view (up to 200 characters), cut to
-fit in the run strip and on the board's card. The places with room for only a word or two (the agent button, a
+fit in the agent's line under the notes' head and on the board's card. The places with room for only a word or two (the agent button, a
 poster, the sidebar) say where your work stands instead ("fixing 3 of 6", "rendering V4 · 42%"), with your words in
 their tooltip.
 

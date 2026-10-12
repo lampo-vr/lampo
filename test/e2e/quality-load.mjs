@@ -365,9 +365,8 @@ try {
           { name: 'dock', sel: '.player .dock', every: true },
           { name: 'timeline', sel: '.player .timeline', every: true },
           { name: 'notes head', sel: '.player .side-head', every: true },
-          { name: 'notes tabs', sel: '.player .note-filters', every: true },
-          // the tags' line is there before the notes; the first row (its group header with it) where the rows start
-          { name: 'notes tags', sel: '.player .note-tagf', every: true },
+          { name: 'notes title', sel: '.player .np-title', every: true },
+          // the first row (its group's header with it) where the rows start
           { name: 'first note row', sel: '.player .side-scroll .note-row', pos: true },
         ],
       },

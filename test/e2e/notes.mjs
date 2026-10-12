@@ -1,15 +1,17 @@
 #!/usr/bin/env node
-// covers: web/src/player/NotesPanel.tsx web/src/player/noteRows.ts web/src/player/AutoCheck.tsx
+// covers: web/src/player/NotesPanel.tsx web/src/player/noteRows.ts web/src/player/noteGroups.ts web/src/player/AutoCheck.tsx
 // covers: web/src/player/findingWords.ts web/src/player/hashtags.ts web/src/styles/notes.css
 // covers: web/src/styles/autocheck.css server/routes/analysis.ts lib/qa.ts lib/findings.ts lib/text/
 // Browser suite of the notes panel with many notes (local mode, temp store, headless Chrome): 30 notes are 30 rows —
-// timecode, the severity's keyframe glyph, the first line, no pill and no coloured outline — under a group header only
-// where the author or the sitting changes; the selected note (a click, ↑ / ↓) opens in place into its card while every
-// other stays a row; the notes' tags are chips with counts that narrow the list with the filter above; while playing
-// the note at the playhead is marked and the list follows it, until the person scrolls it. Auto-check is one chip in
-// the head — running, minor findings only, problems — whose popover lists the problems first, folds the minor ones,
-// runs again, turns a finding into a note or puts it away, and names the spelling language only when it was checked in
-// it. A phone has the same rows at a finger's height and the chip in the tags' line.
+// timecode, the severity's keyframe glyph, the first line, no pill and no coloured outline — in the groups of where each
+// stands (all open here: one "Open" header), each ending with its author's avatar since two people wrote them; the
+// selected note (a click, ↑ / ↓) opens in place into its card while every other stays a row; the filter menu holds the
+// lists and the notes' tags with their counts, a tag picked narrows the list and shows as a chip that takes it off, the
+// done ones fold into "Done" at the end; while playing the note at the playhead is marked and the list follows it, until
+// the person scrolls it. Auto-check is one chip in the head once it found something — minor findings only, problems,
+// and while a Run again it started runs — whose popover lists the problems first, folds the minor ones, runs again,
+// turns a finding into a note or puts it away, and names the spelling language only when it was checked in it. A phone
+// has the same rows at a finger's height and the chip on the line under its head.
 import fs from 'node:fs';
 import path from 'node:path';
 import { tagCounts } from '../../web/src/player/noteRows.ts';
@@ -120,21 +122,24 @@ try {
     await shot('rows-1440');
   });
 
-  await check('a group header only where the author or the sitting changes', async () => {
-    const heads = await page.$$eval('.side-scroll .note-group', (els) =>
-      els.map((e) => ({ who: e.querySelector('b')?.textContent, note: e.closest('.note')?.dataset.note })),
-    );
-    const ids = made.map((c) => c.id);
+  await check('grouped where each note stands: one Open header over the 30; two people wrote them, so each row ends with its author', async () => {
+    const heads = await page.$$eval('.side-scroll .note-sect', (els) => els.map((e) => [e.dataset.group, e.querySelector('.n')?.textContent]));
+    assert(JSON.stringify(heads) === JSON.stringify([['open', '30']]), `one group, its count: ${JSON.stringify(heads)}`);
+    // the header goes with its group's first note (the windowed list measures one element a note)
+    const first = await page.$eval('.side-scroll .note-sect-wrap', (e) => ({
+      head: !!e.querySelector(':scope > .note-sect'),
+      note: e.querySelector('.note')?.dataset.note,
+    }));
+    assert(first.head && first.note === made[0].id, `the header with its first note: ${JSON.stringify(first)}`);
+    const who = await page.$$eval('.side-scroll .note-row .nr', (els) => els.map((e) => ({ avatar: !!e.querySelector(':scope > .avatar'), title: e.title })));
     assert(
-      JSON.stringify(heads.map((h) => [h.who, h.note])) ===
-        JSON.stringify([
-          ['Sam', ids[0]],
-          ['Mia Lang', ids[10]],
-          ['Sam', ids[15]],
-        ]),
-      `three groups: ${JSON.stringify(heads)}`,
+      who.every((w) => w.avatar),
+      'every row ends with its author’s avatar',
     );
-    assert(/ago/.test(await page.$eval('.side-scroll .note-group .when', (e) => e.textContent)), 'the group says when');
+    assert(
+      who[0].title.startsWith('Sam · ') && who[10].title.startsWith('Mia Lang · ') && /ago|now/.test(who[0].title),
+      `who and when in the row’s title: ${who[0].title} · ${who[10].title}`,
+    );
   });
 
   await check('the selected note opens in place into its card, every other stays a row; ↑ ↓ move it, Esc closes it', async () => {
@@ -183,30 +188,69 @@ try {
     await page.waitForSelector(`.side-scroll [data-note="${target.id}"].active`);
   });
 
-  await check('tag chips: the notes’ tags with their counts; one picked narrows the list, with the filter above', async () => {
+  // the filter menu's items, as they read
+  const filterMenu = async () => {
+    // a menu still closing is in the page for a few ms: the filter opens once it has gone
+    await page.waitForFunction(() => !document.querySelector('.menu'), { timeout: 5000 });
+    await page.click('[data-testid=notes-filter]');
+    await page.waitForSelector('.menu[data-state=open] [role=menuitemcheckbox]');
+    return page.$$eval('.menu[data-state=open] [role=menuitemcheckbox]', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim()));
+  };
+  const pick = async (label) => {
+    await filterMenu();
+    await page.evaluate(
+      (l) =>
+        [...document.querySelectorAll('.menu[data-state=open] [role=menuitemcheckbox]')].find((e) => e.textContent.replace(/\s+/g, ' ').trim() === l)?.click(),
+      label,
+    );
+    await page.waitForFunction(() => !document.querySelector('.menu[data-state=open]'), { timeout: 5000 });
+  };
+
+  await check('the filter menu: the lists and the notes’ tags with their counts; a tag picked narrows the list and is a chip that takes it off', async () => {
     await openPlayer();
-    const open = (await review()).comments.filter((c) => c.status === 'open' || c.status === 'fixed');
-    const want = tagCounts(open).map(([tag, n]) => `${tag} ${n}`);
-    const chips = await page.$$eval('.note-tagf .tagf', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim()));
-    assert(JSON.stringify(chips) === JSON.stringify(want), `chips ${JSON.stringify(chips)}, want ${JSON.stringify(want)}`);
-    assert(chips[0] === 'sfx 10' && chips.includes('story 10') && chips.includes('motion 5'), `counts: ${chips}`);
-    await page.click('.tagf[data-tag="motion"]');
+    const want = tagCounts((await review()).comments).map(([tag, n]) => `${tag} · ${n}`);
+    const items = await filterMenu();
+    // (Mia's five are hers: Sam's are 25)
+    assert(items.includes('Mine · 25') && items.includes('All · 30') && !items.some((x) => x.startsWith('Questions')), `the lists: ${JSON.stringify(items)}`);
+    assert(JSON.stringify(items.slice(-want.length)) === JSON.stringify(want), `the tags ${JSON.stringify(items)}, want ${JSON.stringify(want)}`);
+    assert(want[0] === 'sfx · 10' && want.includes('story · 10') && want.includes('motion · 5'), `counts: ${want}`);
+    await page.keyboard.press('Escape');
+    assert(!(await page.$('[data-testid=notes-filters-on]')), 'no filter on: no chip line');
+    await pick('motion · 5');
     await until(async () => (await rows()).length === 5, 'five motion notes');
-    assert(await page.$eval('.tagf[data-tag="motion"]', (b) => b.getAttribute('aria-pressed') === 'true'), 'the chip says it is picked');
+    await page.waitForSelector('[data-testid=notes-filters-on] .np-chip[data-tag="motion"]');
+    assert(await page.$eval('[data-testid=notes-filter]', (b) => b.classList.contains('on')), 'the filter button says a filter is on');
     const texts = await page.$$eval('.side-scroll .note-row .nr-text', (els) => els.map((e) => e.textContent));
     assert(
       texts.every((x) => x.startsWith('Text eases in too fast')),
       `only motion: ${texts}`,
     );
     await shot('tag-motion');
-    // with the filter above: two motion notes closed leave three open; All has all five
+    // two motion notes done: three stay open, the two fold into Done at the end; All shows all five
     for (const c of made.filter((_, i) => i % WORDS.length === 2).slice(0, 2)) await api(`/api/comments/${c.id}`, 'PATCH', { status: 'verified' });
     await until(async () => (await rows()).length === 3, 'three motion notes still open');
-    assert((await page.$eval('.tagf[data-tag="motion"]', (b) => b.textContent.replace(/\s+/g, ' ').trim())) === 'motion 3', 'the count follows the filter');
-    for (const h of await page.$$('.note-filters [role=tab]')) if ((await h.evaluate((e) => e.textContent.trim())).startsWith('All')) await h.click();
+    const done = () =>
+      page.$eval('[data-testid=group-done]', (e) => `${e.querySelector('.note-sect-name')?.textContent} ${e.querySelector('.n')?.textContent}`).catch(() => '');
+    await until(
+      async () => (await done()) === 'Done 2',
+      async () => `Done 2, folded: ${await done()}`,
+    );
+    await page.click('[data-testid=group-done]');
+    await until(async () => (await rows()).length === 5, 'Done unfolded: five');
+    await page.click('[data-testid=group-done]');
+    await until(async () => (await rows()).length === 3, 'folded again');
+    await pick('All · 30');
     await until(async () => (await rows()).length === 5, 'All: five');
-    await page.click('.tagf[data-tag="motion"]');
+    await page.waitForSelector('[data-testid=notes-filters-on] .np-chip[data-filter="all"]');
+    // each chip takes its filter off: the tag, then the list
+    await page.click('[data-testid=notes-filters-on] .np-chip[data-tag="motion"]');
     await until(async () => (await rows()).length === 30, 'the tag put down: all 30');
+    await page.click('[data-testid=notes-filters-on] .np-chip[data-filter="all"]');
+    await until(async () => (await rows()).length === 28, 'back to the groups: 28, the done two folded');
+    assert(
+      !(await page.$('[data-testid=notes-filters-on]')) && !(await page.$eval('[data-testid=notes-filter]', (b) => b.classList.contains('on'))),
+      'no filter on',
+    );
   });
 
   await check('while playing, the note at the playhead is marked and the list follows it, until the person scrolls it', async () => {
@@ -300,7 +344,7 @@ try {
     return r.continue();
   });
   const chip = () =>
-    page.$eval('.side-title [data-testid=ac-chip]', (e) => ({
+    page.$eval('.side-head [data-testid=ac-chip]', (e) => ({
       state: e.dataset.state,
       text: e.innerText.replace(/\s+/g, ' ').trim(),
       label: e.getAttribute('aria-label'),
@@ -319,12 +363,13 @@ try {
     await page.waitForSelector('.ac-pop .autocheck');
   };
 
-  await check('the Auto-check chip: running, minor findings only, problems in the problem colour', async () => {
+  await check('the Auto-check chip only once it found something: minor findings only, problems in the problem colour', async () => {
     mode = 'running';
     await openPlayer();
-    await page.waitForSelector('.side-title [data-testid=ac-chip][data-state=running] .spinner');
+    // a first run says nothing in the head: the chip comes once it found something
+    await until(async () => !!(await page.$('[data-testid=new-note]')), 'the head');
+    assert(!(await page.$('[data-testid=ac-chip]')), 'no chip while the first check runs');
     assert(!(await page.$('.side-scroll .autocheck')), 'no Auto-check card in the notes list');
-    assert(/Checking/.test((await chip()).text), JSON.stringify(await chip()));
     mode = 'minor';
     await openPlayer();
     await page.waitForSelector('.side-title [data-testid=ac-chip][data-state=minor]');
@@ -339,9 +384,12 @@ try {
     assert(c.text === '2 to check' && /2 findings to check/.test(c.label), JSON.stringify(c));
     const look = await page.$eval('[data-testid=ac-chip]', (e) => getComputedStyle(e).color);
     assert(look === (await colourOf('--should')), `the problem colour: ${look}`);
-    // the head stays one row: + Note on it, beside the chip
-    const head = await page.$eval('.side-title', (t) => t.scrollWidth <= t.clientWidth + 1);
-    assert(head, 'the head row fits');
+    // the head stays one row with the chip in it, every item inside its padding (it says less where it must)
+    const head = await page.$eval('.side-title', (t) => {
+      const end = t.getBoundingClientRect().right - parseFloat(getComputedStyle(t).paddingRight);
+      return [...t.children].every((c) => c.getBoundingClientRect().right <= end + 1) && !!t.querySelector('[data-testid=ac-chip]');
+    });
+    assert(head, 'the head row fits with the chip in it');
     await shot('autocheck-chip');
   });
 
@@ -371,7 +419,7 @@ try {
     // Run again: asked of the server, the chip running
     await page.click('.ac-pop .ac-rerun');
     await until(() => sent.rerun === 1, 'Run again asks the server');
-    await page.waitForSelector('.side-title [data-testid=ac-chip][data-state=running]');
+    await page.waitForSelector('.side-head [data-testid=ac-chip][data-state=running]');
     await page.keyboard.press('Escape');
   });
 
@@ -409,7 +457,7 @@ try {
     await page.keyboard.press('Escape');
   });
 
-  await check('a phone: rows at a finger’s height, the chip in the tags’ line, its findings a sheet', async () => {
+  await check('a phone: rows at a finger’s height, the chip on the line under the head, its findings a sheet', async () => {
     await page.emulate({
       viewport: { width: 390, height: 844, deviceScaleFactor: 1, isMobile: true, hasTouch: true },
       userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
@@ -427,7 +475,7 @@ try {
     );
     const head = await page.$$eval('.nsheet .side-title button', (bs) => bs.every((b) => b.getBoundingClientRect().right <= innerWidth + 1));
     assert(head, 'every button of the head row on the screen');
-    assert(await page.$('.nsheet .note-tagf [data-testid=ac-chip]'), 'the chip opens the tags’ line');
+    assert(await page.$('.nsheet .np-chips [data-testid=ac-chip]'), 'the chip on the line under the head (the head has no room)');
     await page.$eval('.nsheet [data-testid=ac-chip]', (b) => b.click());
     await page.waitForSelector('.ac-pop .ac-row');
     const sheet = await page.$eval('.ac-pop', (e) => e.getBoundingClientRect().toJSON());

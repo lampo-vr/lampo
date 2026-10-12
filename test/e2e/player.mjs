@@ -7,7 +7,7 @@
 // version preselected, swap, Esc and the remembered mode; notes as rows that open into threads (activity lines,
 // replies), editing in place (no resize handle, grows, ⌘↵ saves, Esc cancels); the composer (the text first, one
 // toolbar: severity, tags and #, the paperclip, voice; the whole video in the head's menu; ⌘↵ saves, Esc cancels); the
-// filters; an agent question answered on its card; Auto-check — its chip in the notes panel's head, the findings in its
+// panel's head and its groups (Needs you, To check, Open), its filter menu and ⋯; an agent question answered on its card; Auto-check — its chip in the notes panel's head, the findings in its
 // popover — findings turned into a note or dismissed — a freeze says what, where (its frame's picture, a click plays the
 // stretch) and why, and "That's intended" keeps it away in the next version; a fix preview (a still made in the
 // project) checked in verify mode against the render and verified on it; review mode (N) stepping through the open
@@ -288,7 +288,7 @@ try {
     // at rest a row: its timecode, its words, and that it is fixed — no thread until it is opened
     const row = await cardOf(fixed.id);
     assert(row, 'the fixed note is listed');
-    assert(!(await row.$('.act-line')) && /Fixed/.test(await row.$eval('.nr-meta', (e) => e.textContent)), 'a row says it is fixed');
+    assert(!(await row.$('.act-line')) && /Fixed in V2/.test(await row.$eval('[data-testid=note-state]', (e) => e.textContent)), 'a row says it is fixed');
     const c = await openCard(fixed.id);
     const act = await c.$eval('.act-line', (e) => e.textContent);
     assert(/promo-edit/.test(act) && /fixed it in V2/.test(act), `activity line: ${act}`);
@@ -340,35 +340,136 @@ try {
     await until(async () => (await note(open.id)).text === 'Music softer in the intro', '⌘↵ saves');
   });
 
-  await check('filters: Open, Questions (only while there are some), Mine, Closed, All; a question is answered on the card', async () => {
-    const tabs = await page.$$eval('.note-filters [role=tab]', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim()));
-    // an empty list is just its word (the row fits the panel in every language)
-    assert(tabs.join('|') === 'Open 3|Questions 1|Mine 2|Closed|All 3', `tabs: ${tabs.join('|')}`);
-    // the panel's head is one calm row: + Note says its word (the key lives in its tooltip), Record is its dot
+  // the filter menu's items as they read, and one picked
+  const filterMenu = async () => {
+    // a menu still closing is in the page for a few ms: the filter opens once it has gone
+    await page.waitForFunction(() => !document.querySelector('.menu'), { timeout: 5000 });
+    await page.click('[data-testid=notes-filter]');
+    await page.waitForSelector('.menu[data-state=open] [role=menuitemcheckbox]');
+    return page.$$eval('.menu[data-state=open] [role=menuitemcheckbox]', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim()));
+  };
+  const pickFilter = async (label) => {
+    await filterMenu();
+    await page.evaluate(
+      (l) => [...document.querySelectorAll('.menu[data-state=open] [role=menuitemcheckbox]')].find((e) => e.textContent.trim().startsWith(l))?.click(),
+      label,
+    );
+    await page.waitForFunction(() => !document.querySelector('.menu[data-state=open]'), { timeout: 5000 });
+  };
+
+  await check('the head is one calm row; the notes in their groups: Needs you, To check, Open — each row with its state on its end', async () => {
+    // the panel's head: Notes and its count (no speech here, so no Transcript tab beside it), then the filter, ⋯,
+    // Record (its round dot) and + Note (its word; the key in its tooltip), all on one line
     const head = await page.$eval('.side-title', (e) => {
       const mids = [...e.querySelectorAll('button')].map((b) => b.getBoundingClientRect()).map((r) => r.top + r.height / 2);
+      const rec = e.querySelector('[data-testid=record]');
       return {
+        title: [...(e.querySelector('[data-testid=panel-notes]')?.childNodes ?? [])]
+          .filter((x) => x.nodeType === 3)
+          .map((x) => x.textContent)
+          .join('')
+          .trim(),
+        tabs: e.querySelectorAll('[role=tab]').length,
+        count: e.querySelector('.np-count')?.textContent.trim(),
+        order: [...e.querySelectorAll('[data-testid]')]
+          .map((b) => b.dataset.testid)
+          .filter((x) => ['notes-filter', 'notes-more', 'record', 'new-note'].includes(x)),
         note: e.querySelector('[data-testid=new-note]')?.textContent.trim(),
         kbd: !!e.querySelector('[data-testid=new-note] kbd'),
-        rec: e.querySelector('[data-testid=record]')?.textContent.trim(),
+        rec: rec?.textContent.trim(),
+        round: rec ? getComputedStyle(rec).borderTopLeftRadius : null,
+        split: !!e.querySelector('.split, .so-split'),
         spread: Math.max(...mids) - Math.min(...mids),
       };
     });
-    assert(head.note === 'Note' && !head.kbd && head.rec === '' && head.spread < 3, JSON.stringify(head));
-    await pressText('.note-filters [role=tab]', 'Questions');
-    await until(async () => (await page.$$('.note')).length === 1, 'one question');
-    assert(/Question/.test(await (await cardOf(question.id)).$eval('.nr-meta', (e) => e.textContent)), 'its row says it is a question');
-    const q = await openCard(question.id);
-    assert(/Question/.test(await q.$eval('.note-meta', (e) => e.textContent)), 'labelled a question');
-    await q.$eval('.note-answer textarea', (e) => e.focus());
-    await page.keyboard.type('Yes, keep it');
-    await ctrlEnter();
-    await until(async () => (await note(question.id)).status === 'verified', 'answered');
-    await until(
-      async () => !(await page.$$eval('.note-filters [role=tab]', (els) => els.some((e) => e.textContent.startsWith('Questions')))),
-      'no questions left: the tab goes',
+    assert(head.title === 'Notes' && head.count === '3' && head.tabs === 0, `Notes and its count, alone: ${JSON.stringify(head)}`);
+    assert(head.order.join(' ') === 'notes-filter notes-more record new-note', `filter, ⋯, Record, + Note: ${JSON.stringify(head)}`);
+    assert(head.note === 'Note' && !head.kbd && head.rec === '' && !head.split && parseFloat(head.round) >= 13 && head.spread < 3, JSON.stringify(head));
+    // the groups, in their order; each header goes with its group's first note
+    const groups = await page.$$eval('.side-scroll .note-sect', (els) => els.map((e) => [e.dataset.group, e.querySelector('.n')?.textContent]));
+    assert(
+      JSON.stringify(groups) ===
+        JSON.stringify([
+          ['needs', '1'],
+          ['check', '1'],
+          ['open', '1'],
+        ]),
+      `Needs you, To check, Open: ${JSON.stringify(groups)}`,
+    );
+    const order = await page.$$eval('.side-scroll .note', (els) => els.map((e) => e.dataset.note));
+    assert(JSON.stringify(order) === JSON.stringify([question.id, fixed.id, open.id]), `the question, the fix, the open note: ${JSON.stringify(order)}`);
+    // each row's state, a small label on its end: the fix's green is its mark alone, never its words or its surface
+    const states = await page.$$eval('.side-scroll [data-testid=note-state]', (els) =>
+      els.map((e) => {
+        const probe = document.createElement('i');
+        probe.style.color = 'var(--ok)';
+        document.body.append(probe);
+        const ok = getComputedStyle(probe).color;
+        probe.remove();
+        const s = getComputedStyle(e);
+        return {
+          note: e.closest('.note')?.dataset.note,
+          words: e.textContent.trim(),
+          tone: e.dataset.tone,
+          green: [getComputedStyle(e.querySelector('.sb-label')).color, s.backgroundColor, s.boxShadow].some((c) =>
+            c.replace(/\s/g, '').includes(ok.replace(/\s/g, '').slice(4, -1)),
+          ),
+          mark: getComputedStyle(e.querySelector('.kg')).color === ok,
+        };
+      }),
+    );
+    const q = states.find((x) => x.note === question.id);
+    const f = states.find((x) => x.note === fixed.id);
+    assert(q?.words === 'Question' && f?.words === 'Fixed in V2', `the rows say where they stand: ${JSON.stringify(states)}`);
+    assert(f.mark && !f.green, `Fixed in V2: a green mark, no green words or surface: ${JSON.stringify(f)}`);
+    // one person wrote them (the agent's question aside): no author on the rows
+    assert(!(await page.$('.side-scroll .nr > .avatar')), 'no author on the rows');
+    // the To check header is the panel's door to check mode: quiet while + Note is the view's raised one
+    const doors = await page.evaluate(() => ({
+      check: document.querySelector('[data-testid=group-check] [data-testid=check-group]')?.className ?? null,
+      kbd: document.querySelector('[data-testid=check-group] kbd')?.textContent ?? null,
+      note: document.querySelector('[data-testid=new-note]')?.className ?? null,
+    }));
+    assert(
+      /\bghost\b/.test(doors.check ?? '') && doors.kbd === '⇧V' && /\bprimary\b/.test(doors.note ?? ''),
+      `Check ⇧V quiet, + Note raised: ${JSON.stringify(doors)}`,
     );
   });
+
+  await check('⋯ holds review mode (N), and the Agent view where an agent works on the video (not here)', async () => {
+    await page.click('[data-testid=notes-more]');
+    await page.waitForSelector('.menu[data-state=open] [role^=menuitem]');
+    const items = await page.$$eval('.menu[data-state=open] [role^=menuitem]', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim()));
+    assert(items.length === 1 && /^Go through the open notes ?N$/.test(items[0]), `⋯: ${JSON.stringify(items)}`);
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.querySelector('.menu'), { timeout: 5000 });
+  });
+
+  await check(
+    'the filter menu: Questions (only while there are some), Mine, Closed, All; a list picked is a chip; a question is answered on its card',
+    async () => {
+      const items = await filterMenu();
+      assert(items.slice(0, 4).join('|') === 'Questions · 1|Mine · 2|Closed · 0|All · 3', `the lists: ${items.join('|')}`);
+      await page.keyboard.press('Escape');
+      await pickFilter('Questions');
+      await until(async () => (await page.$$('.note')).length === 1, 'one question');
+      await page.waitForSelector('[data-testid=notes-filters-on] .np-chip[data-filter=questions]');
+      assert(
+        (await (await cardOf(question.id)).$eval('[data-testid=note-state]', (e) => e.textContent.trim())) === 'Question',
+        'its row says it is a question',
+      );
+      const q = await openCard(question.id);
+      assert(/Question/.test(await q.$eval('.note-meta', (e) => e.textContent)), 'labelled a question');
+      await q.$eval('.note-answer textarea', (e) => e.focus());
+      await page.keyboard.type('Yes, keep it');
+      await ctrlEnter();
+      await until(async () => (await note(question.id)).status === 'verified', 'answered');
+      // no questions left: the list and its chip go, and the menu no longer offers it
+      await until(async () => !(await page.$('[data-testid=notes-filters-on]')), 'the chip goes');
+      assert(!(await filterMenu()).some((x) => x.startsWith('Questions')), 'no Questions in the menu');
+      await page.keyboard.press('Escape');
+    },
+  );
 
   await check('review mode: N steps through the open notes on their frames, Esc leaves', async () => {
     await openPlayer();
@@ -490,8 +591,8 @@ try {
           await page.click('.nsheet-handle');
           await sleep(400);
         }
-        // a phone: the chip opens the tags' line, its findings come up as a sheet
-        await page.waitForSelector('.note-tagf [data-testid=ac-chip]', { timeout: 90000 });
+        // a phone: the chip on the line under the head, its findings come up as a sheet
+        await page.waitForSelector('.np-chips [data-testid=ac-chip]', { timeout: 90000 });
         await page.$eval('[data-testid=ac-chip]', (b) => b.click());
         await page.waitForSelector('.ac-pop .ac-row', { timeout: 90000 });
         const sheet = await page.$eval('.ac-pop', (e) => ((r) => ({ left: r.left, right: r.right, bottom: r.bottom }))(e.getBoundingClientRect()));
@@ -557,14 +658,14 @@ try {
       await shot('autocheck-failed');
       await page.click('.ac-pop .ac-rerun');
       await until(() => reruns.length === 1, 'Run again asks the server once more');
-      // a phone: the chip in the tags' line, the words in the sheet, inside the screen
+      // a phone: the chip on the line under the head, the words in the sheet, inside the screen
       await page.setViewport({ width: 390, height: 800, isMobile: true, hasTouch: true });
       await openPlayer(reel.slug);
       for (let i = 0; i < 3 && !(await page.$('.nsheet-half, .nsheet-full')); i++) {
         await page.click('.nsheet-handle');
         await sleep(400);
       }
-      await page.waitForSelector('.note-tagf [data-testid=ac-chip][data-state=failed]');
+      await page.waitForSelector('.np-chips [data-testid=ac-chip][data-state=failed]');
       await page.$eval('[data-testid=ac-chip]', (b) => b.click());
       await page.waitForSelector('.ac-pop [data-testid=ac-failed]');
       const box = await page.$eval('.ac-pop [data-testid=ac-failed]', (e) => ((r) => ({ left: r.left, right: r.right }))(e.getBoundingClientRect()));
@@ -627,7 +728,8 @@ try {
     await page.keyboard.press('y');
     await until(async () => (await note(title.id)).verified_on?.preview === preview.id, 'verified on the preview');
     await openPlayer();
-    await pressText('.note-filters [role=tab]', 'All');
+    // checked: it is in Done, folded at the end
+    await page.click('[data-testid=group-done]');
     await until(async () => !!(await cardOf(title.id)), 'the note is listed');
     const c = await openCard(title.id);
     assert(/Checked on the preview/.test(await c.$eval('.note-meta', (e) => e.textContent)), 'the card says it was checked on a preview');
@@ -860,22 +962,56 @@ try {
     );
 
   await check(
-    'fixes waiting after an agent’s work: one raised door to checking them — the top bar’s; the strip’s is quiet, the banner steps back',
+    'fixes waiting after an agent’s work: one raised door to checking them — the top bar’s; the To check header’s is quiet, + Note steps down',
     async () => {
       await page.setViewport({ width: 1440, height: 900 });
       await openPlayer(card);
-      await page.waitForSelector('[data-testid=run-strip][data-phase=done] [data-testid=run-check]', { timeout: 20000 });
+      await page.waitForSelector('[data-testid=run-strip][data-phase=done]', { timeout: 20000 });
+      await page.waitForSelector('[data-testid=stage-next][data-kind=verify]', { timeout: 20000 });
+      await page.waitForSelector('[data-testid=group-check] [data-testid=check-group]');
       const doors = await page.evaluate(() => ({
         top: document.querySelector('[data-testid=stage-next]')?.className ?? null,
-        strip: document.querySelector('[data-testid=run-check]')?.className ?? null,
-        banner: !!document.querySelector('[data-testid=verify-cta]'),
+        group: document.querySelector('[data-testid=check-group]')?.className ?? null,
+        line: [...document.querySelectorAll('[data-testid=run-strip] button')].map((b) => b.dataset.testid),
         note: document.querySelector('[data-testid=new-note]')?.className ?? null,
       }));
-      assert(/\bprimary\b/.test(doors.top ?? '') && /\bghost\b/.test(doors.strip ?? '') && !/\bprimary\b/.test(doors.strip ?? ''), JSON.stringify(doors));
-      assert(!doors.banner && !/\bprimary\b/.test(doors.note ?? ''), `the banner steps back, + Note too: ${JSON.stringify(doors)}`);
+      assert(/\bprimary\b/.test(doors.top ?? '') && /\bghost\b/.test(doors.group ?? '') && !/\bprimary\b/.test(doors.group ?? ''), JSON.stringify(doors));
+      assert(
+        !doors.line.some((x) => /check/.test(x ?? '')) && !/\bprimary\b/.test(doors.note ?? ''),
+        `the agent's line offers no Check, + Note steps down: ${JSON.stringify(doors)}`,
+      );
       const up = await raised();
       assert(up.length === 1 && /Check 2 fixes/.test(up[0]), `one raised door: ${JSON.stringify(up)}`);
       await shot('check-doors');
+    },
+  );
+
+  await check(
+    'the keys the panel names: ⇧V opens check mode (the To check header’s Check), Esc leaves it; Esc closes the filter menu and N then goes through the notes',
+    async () => {
+      await page.setViewport({ width: 1440, height: 900 });
+      await openPlayer(card);
+      assert((await text('[data-testid=group-check] [data-testid=check-group] kbd')) === '⇧V', 'the header says its key');
+      await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
+      await page.keyboard.down('Shift');
+      await page.keyboard.press('V');
+      await page.keyboard.up('Shift');
+      await page.waitForSelector('.verify', { timeout: 5000 });
+      assert(!(await page.$('[data-testid=check-group]')), 'in check mode the header offers no Check: the card decides');
+      // (an Esc in a field first leaves the field)
+      await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
+      await page.keyboard.press('Escape');
+      await until(async () => !(await page.$('.verify')), 'Esc leaves check mode', 5000);
+      // a menu's Esc is the menu's; the keys are the player's again once it closed
+      await openPlayer();
+      await page.click('[data-testid=notes-filter]');
+      await page.waitForSelector('.menu[data-state=open]');
+      await page.keyboard.press('Escape');
+      await until(async () => !(await page.$('.menu[data-state=open]')), 'Esc closes the filter menu', 5000);
+      await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
+      await page.keyboard.press('n');
+      await page.waitForSelector('[data-testid=review-hud]', { timeout: 5000 });
+      // (Esc leaving review mode is the review mode check's)
     },
   );
 
@@ -977,12 +1113,12 @@ try {
     async () => {
       await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
       await page.goto('about:blank');
-      // the phone's row under its bar says "Check" (the stage's next step), and the agent's line says it quietly
+      // the phone's row under its bar says "Check" (the stage's next step); the notes' To check header says it quietly
       await page.goto(`${BASE}/#/v/${enc(card)}`, { waitUntil: 'domcontentloaded' });
-      await page.waitForSelector('[data-testid=run-strip][data-phase=done] [data-testid=run-check]', { timeout: 20000 });
+      await page.waitForSelector('[data-testid=run-strip][data-phase=done]', { timeout: 20000 });
       await page.waitForSelector('[data-testid=stage-next][data-kind=verify]', { timeout: 20000 });
-      const door = await page.$eval('[data-testid=run-check]', (b) => b.className);
-      assert(!/\bprimary\b/.test(door), `the strip's Check fixes is quiet beside the bar's Check: ${door}`);
+      const door = await page.$eval('[data-testid=check-group]', (b) => b.className);
+      assert(!/\bprimary\b/.test(door), `the To check header's Check is quiet beside the bar's Check: ${door}`);
       const up = await raised();
       assert(up.length === 1 && /^Check$/.test(up[0]), `one raised door on a phone: ${JSON.stringify(up)}`);
       await page.goto('about:blank');
@@ -994,7 +1130,7 @@ try {
         const r = document.querySelector('.nsheet [data-testid=check-right]').getBoundingClientRect();
         return {
           rows: sheet.querySelectorAll('[data-testid=note-row]').length,
-          filters: !!sheet.querySelector('.note-filters'),
+          filters: !!sheet.querySelector('.np-chips, .note-sect'),
           right: { top: r.top, bottom: r.bottom, h: innerHeight },
         };
       });

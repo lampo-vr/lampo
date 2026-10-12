@@ -5,7 +5,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { projectOfFolder } from '../../../lib/archived.ts';
 import { stretchOf } from '../../../lib/findings.ts';
-import { handover } from '../../../lib/handover.ts';
 import { isOwner } from '../../../lib/ownership.ts';
 import { rangeOnGrid } from '../../../lib/range.ts';
 import { renderKey } from '../../../lib/renderKey.ts';
@@ -16,7 +15,7 @@ import { ReadOnlyScope, useAuthStatus, useCan } from '../api/auth.ts';
 import { api, enc } from '../api/client.ts';
 import { useSSE } from '../api/events.ts';
 import { type NewComment, useCommentActions, useRequest } from '../api/mutations.ts';
-import { keys, useAnalysis, useAudience, useInfo, useLibrary, useReview, useTracks, useWaveform } from '../api/queries.ts';
+import { keys, useAnalysis, useAudience, useInfo, useLibrary, useReview, useTracks, useTranscript, useWaveform } from '../api/queries.ts';
 import { useRunActions, useRunDetail, useRuns } from '../api/runs.ts';
 import { spriteUrl, useSprite } from '../api/sprite.ts';
 import type { ActivityWords, DraftsSent, FrameRange, LibraryResponse, PlacedComment, QaItem, ReviewResponse, Shape, Tool, Version } from '../api/types.ts';
@@ -56,6 +55,7 @@ import { HelpModal } from './HelpModal.tsx';
 import { MicButton } from './MicButton.tsx';
 import { frameMarks } from './marks.ts';
 import { type Filter, NotesPanel, type PanelView, type SheetState } from './NotesPanel.tsx';
+import { grouped } from './noteGroups.ts';
 import { noteAt, stepNote, tagCounts, withTag } from './noteRows.ts';
 import { PhoneTools, PhoneTransport } from './PhoneDock.tsx';
 import { PlayerLoading } from './PlayerLoading.tsx';
@@ -160,7 +160,7 @@ export default function Player({ slug, focus, startFrame, startV = null, verifyA
         slug={slug}
         phone={phone}
         ar={known?.width ? known.height / known.width : undefined}
-        agent={!!known && (!!known.session || !!known.run)}
+        agent={!!known?.run && known.run.state !== 'done'}
         versions={known?.versions}
       />
     );
@@ -325,6 +325,8 @@ function PlayerView({
   const [filter, setFilter] = useState<Filter>('active');
   // a tag picked in the filter row narrows the list, with the filter beside it; it belongs to its video
   const [tag, setTag] = useState<string | null>(null);
+  // the done notes, folded at the end of the list until asked for (or a filter that is about them)
+  const [doneOpen, setDoneOpen] = useState(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: a picked tag belongs to the video it was picked on
   useEffect(() => setTag(null), [slug]);
   const [lightbox, setLightbox] = useState<string | null>(null);
@@ -384,6 +386,11 @@ function PlayerView({
   // Notes or the transcript. The transcript comes back only on the video it was open on, only while speech-to-text
   // runs, and never over open notes: a remembered tab must not hide another video's notes behind an empty panel.
   const speech = info ? (info.stt ? info.stt.backend !== 'off' && info.stt.available : info.whisper) : false;
+  // The Transcript's tab: where the version has speech, or its transcript is on its way or there. What was heard is
+  // read only if the Transcript asked for it already (never heard just to decide): heard and silent, or speech-to-text
+  // off, it stays away; not heard yet, a version with sound on a server that hears offers it.
+  const heard = useTranscript(slug, ver.v, false).data;
+  const transcriptTab = heard ? heard.state !== 'off' && !(heard.state === 'ready' && !heard.transcript.words.length) : speech && review.meta?.audio !== null;
   const [view, setViewState] = useState<PanelView>(() =>
     atAgent ? 'agent' : prefs.panel === slug && speech && !review.comments.some((c) => c.status === 'open' || c.status === 'fixed') ? 'transcript' : 'notes',
   );
@@ -415,6 +422,12 @@ function PlayerView({
   const { tracks, words, segments } = useProjectTracks(slug, fps);
   const { diff, pending: diffPending, changes } = useDiff(slug, ver.v);
   const qa = useQa({ slug, v: ver.v, fps, review, onAccepted: setSelected });
+  // Auto-check is in the panel's head only once it found something on this version; a Run again it started keeps it
+  // there while it runs (its popover stays on it)
+  const acFound = !qa.pending && (!!qa.failed || (qa.suggestions?.length ?? 0) > 0);
+  const [acHad, setAcHad] = useState<{ v: number; found: boolean }>({ v: ver.v, found: false });
+  if (!qa.pending && (acHad.v !== ver.v || acHad.found !== acFound)) setAcHad({ v: ver.v, found: acFound });
+  const autoCheckFound = acFound || (!!qa.pending && acHad.v === ver.v && acHad.found);
   // a diamond picked on the timeline opens Auto-check's findings, the same one again too (a new number each time)
   const [findingAsked, setFindingAsked] = useState(0);
   // biome-ignore lint/correctness/useExhaustiveDependencies: the findings' labels are words
@@ -461,20 +474,26 @@ function PlayerView({
     const mine = active.filter((c) => (me ? isOwner(c.author, c.author_id, me) : !isAgent(c.author) && !c.author.startsWith('guest:')));
     return { active, questions, mine, closed, all: placed };
   }, [placed, me]);
-  // The tags of the notes in this filter with their counts; the picked one stays offered even where none has it, so
-  // it can always be put down again.
+  // What the list holds: every note in its group by default (the done ones folded at the end), or one of the filter's
+  // lists. Its tags with their counts; the picked one stays offered even where none has it, so it can be put down again.
+  const shownBase = filter === 'active' ? placed : byStatus[filter];
   const tags = useMemo(() => {
-    const counted = tagCounts(byStatus[filter]);
+    const counted = tagCounts(shownBase);
     return tag && !counted.some(([x]) => x === tag) ? [...counted, [tag, 0] as [string, number]] : counted;
-  }, [byStatus, filter, tag]);
-  // Notes about the whole video first (they have no moment), then in timeline order.
-  const list = useMemo(
-    () => withTag(byStatus[filter], tag).sort((a, b) => Number(b.scope === 'video') - Number(a.scope === 'video') || a.frameHere - b.frameHere),
-    [byStatus, filter, tag],
+  }, [shownBase, tag]);
+  // In their groups (noteGroups.ts); within each, notes about the whole video first (they have no moment), then in
+  // timeline order. ↑ / ↓ and the panel go by this order.
+  const groups = useMemo(
+    () =>
+      grouped(
+        withTag(shownBase, tag).sort((a, b) => Number(b.scope === 'video') - Number(a.scope === 'video') || a.frameHere - b.frameHere),
+        doneOpen || filter === 'all' || filter === 'closed',
+      ),
+    [shownBase, tag, doneOpen, filter],
   );
-  // What the agent handed over, counted as the stage and agents count it (lib/handover.ts): fixes to check, fixes riding
-  // with the next version, notes still with the agent.
-  const handed = useMemo(() => handover(placed), [placed]);
+  const list = groups.rows;
+  // more than one person wrote the notes: the rows say whose each is
+  const authors = useMemo(() => new Set(placed.filter((c) => !isAgent(c.author)).map((c) => c.author)).size, [placed]);
   // Open notes from an earlier version where the version on screen changed (its diff against the one before): a quiet
   // "V3 changed here" on their rows — a hint, never a fix to check (only what an agent marks fixed is one).
   const changedHere = useMemo(() => {
@@ -1030,7 +1049,7 @@ function PlayerView({
       (recent && newest.state === 'done' && verify.queue.length > 0))
       ? newest
       : null;
-  // the slot is there from the first paint wherever the video has an agent (assigned, or at work on it)
+  // a video with an agent (assigned, or at work on it) has the agent's line, there while its work goes on or needs you
   const hasAgent = !!review.session || !!brief;
   const reachable = listen === 'listening' || listen === 'working' || (listen === null && !!data.summary.sessionActive);
   const noteAtId = useCallback((id: string) => review.comments.find((c) => c.id === id)?.timecode ?? null, [review.comments]);
@@ -1314,6 +1333,11 @@ function PlayerView({
     const c = placed.find((x) => x.id === id);
     if (c) selectComment(c);
   });
+  // the Agent view, open (the agent menu's way to all its steps)
+  const openAgentView = useStableCallback(() => {
+    setView('agent');
+    if (phone) setSheet((x) => (x === 'peek' ? 'half' : x));
+  });
   const warmAgent = useCallback(() => setWarm(true), []);
   // the Agent view's writes, here so its own chunk carries none of their code
   const runActs = useRunActions(slug);
@@ -1349,33 +1373,28 @@ function PlayerView({
   // checking is the stage's next step: not with notes still open (it waits on the agent then), not on an archived
   // project's video (its banner stands there), not while a phone's row is the compare bar.
   const topChecks = !frozen && data.summary.stage.next.kind === 'verify' && !(phone && ab && !verifying);
-  // + Note steps down while the view's raised door is another: the strip's Answer, or checking the fixes (the top bar's
-  // Check N fixes or the strip's, the card's Looks right in check mode)
-  const stripPrimary =
-    !goOn &&
-    !!stripRun &&
-    ((stripRun.state === 'needs_you' && stripRun.needs?.kind !== 'permission' && stripRun.needs?.kind !== 'sign_in') ||
-      (stripRun.state === 'done' && verify.queue.length > 0 && canCheck));
+  // + Note steps down while the view's raised door is another: the agent line's Answer, or checking the fixes (the top
+  // bar's Check N fixes, the "To check" header's Check, the card's Looks right in check mode)
+  const stripPrimary = !goOn && !!stripRun && stripRun.state === 'needs_you' && stripRun.needs?.kind !== 'permission' && stripRun.needs?.kind !== 'sign_in';
+  // The panel's door to check mode is the "To check" header's Check: raised once the agent handed its work over (its
+  // run done) where the top bar doesn't offer it — one raised door per view —, quiet while it still works or waits on
+  // the person (+ Note is the view's one then), never while check mode runs (the card's Looks right is).
+  const checkPrimary = !goOn && !topChecks && !frozen && canCheck && verify.queue.length > 0 && !verify.active && !stripPrimary && stripRun?.state === 'done';
   const strip = showStrip ? (
     <RunStrip
       slug={slug}
       run={stripRun}
       asOf={asOf}
       session={review.session}
-      reachable={reachable}
-      copyable={listen !== null}
       stalled={goOn}
-      // checking the fixes: one raised door per view — the top bar's where it offers it (the strip says it quietly then),
-      // else the strip's, and none while check mode runs (its card decides)
-      toCheck={verify.active ? 0 : verify.queue.length}
-      quietCheck={topChecks}
+      // a finished run's line stays while its fixes wait to be checked (the doors to checking are the top bar's and the
+      // notes' "To check" header's)
+      toCheck={verify.queue.length}
       nextV={latestV + 1}
       canSteer={canSteer}
-      canCheck={canCheck}
       say={sayRun}
       onOpen={openAgent}
       onAnswer={answer}
-      onCheck={verify.start}
       phone={phone}
       open={view === 'agent'}
       onWarm={warmAgent}
@@ -1469,6 +1488,9 @@ function PlayerView({
           frameNow={pb.live.get}
           runs={runs}
           run={stripRun}
+          onAnswer={answer}
+          onShowNote={showNote}
+          onAgentView={openAgentView}
           archived={
             frozen
               ? {
@@ -1694,17 +1716,23 @@ function PlayerView({
           rangeLoop={pb.rangeLoop}
           canCompose={!composer && !!m?.ready && !recorder.active}
           readOnly={frozen}
-          quietNew={(unsentShown && unsent.count > 0) || stripPrimary || verify.active}
+          quietNew={(unsentShown && unsent.count > 0) || stripPrimary || checkPrimary || (topChecks && canCheck && verify.queue.length > 0) || verify.active}
           strip={phone ? null : strip}
           agentTab={showStrip || runs?.length ? { live: !!stripRun && isOpen(stripRun) && stripRun.state !== 'needs_you' && stripRun.state !== 'lost' } : null}
           agentView={agentView}
           plans={plans}
           planName={planRun?.agent.name ?? brief?.agent.name ?? review.session?.name ?? ''}
           planPending={planPending}
-          verifyInStrip={stripRun?.state === 'done' && verify.queue.length > 0 && canCheck && showStrip}
+          firsts={groups.firsts}
+          groupCounts={groups.counts}
+          doneOpen={doneOpen || filter === 'all' || filter === 'closed'}
+          setDoneOpen={setDoneOpen}
+          checkPrimary={checkPrimary}
+          showAuthor={authors > 1}
+          transcriptTab={transcriptTab}
+          autoCheckFound={autoCheckFound}
           onCompose={openComposer}
           verifyCount={frozen ? 0 : verify.queue.length}
-          stillOpen={handed.withAgent}
           changedHere={changedHere}
           verifying={verify.active}
           onVerify={verify.start}

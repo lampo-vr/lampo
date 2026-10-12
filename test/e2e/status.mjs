@@ -204,9 +204,14 @@ try {
     // the assigned agent that isn't running is the picker's first row and chosen; Assign does nothing until it changes
     await page.click('[data-testid=agent-button]');
     await page.waitForSelector('[data-testid=agent-menu]');
-    const status = await page.$eval('[data-testid=agent-menu] .am-status', (e) => e.textContent);
-    assert(/launch-edit/.test(status) && /Not running/.test(status), `the popover says where the agent stands: ${status}`);
-    await page.click('[data-testid=assign-agent-open]');
+    const status = await page.$eval('[data-testid=agent-sentence]', (e) => e.textContent);
+    assert(status === 'launch-edit isn’t running', `the popover says where the agent stands: ${status}`);
+    // Assign agent… is in its ⋯
+    await page.click('[data-testid=agent-more]');
+    await page.waitForSelector('.menu[data-state=open] [role=menuitem]');
+    await page.evaluate(() =>
+      [...document.querySelectorAll('.menu[data-state=open] [role=menuitem]')].find((e) => e.textContent.trim() === 'Assign agent…')?.click(),
+    );
     await page.waitForSelector('[data-testid=agent-picker] .session');
     await until(async () => (await page.$eval('[data-testid=agent-picker] .session', (e) => e.className)).includes('sel'), 'the current agent is chosen');
     const first = await page.$eval('[data-testid=agent-picker] .session', (e) => e.textContent);

@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// covers: lib/handover.ts web/src/player/NotesPanel.tsx web/src/player/CommentCard.tsx web/src/player/fixCheck.ts
+// covers: lib/handover.ts web/src/player/NotesPanel.tsx web/src/player/noteGroups.ts web/src/player/CommentCard.tsx web/src/player/fixCheck.ts
 // covers: web/src/sessions/runWords.ts
 // Browser suite of what a person is asked to check once fixes belong to the version that carries them (local mode,
 // temp store, headless Chrome). V2 is up with one note the agent fixed in it, two it didn't touch, its own question and
-// a fix it marked before its next version: "1 fix to check" says the two still open beside it, check mode walks the one
-// fix only, an untouched note stays plain Open with a quiet "V2 changed here" where the version's diff saw a change, the
-// early fix reads "Fixed · waiting for V3", and a note an older store carried over still reads "Check again" and is
-// still asked about. Every row fits 390–1920. Screenshots (VR_SHOTS).
+// a fix it marked before its next version: "To check 1" holds the one fix ("Fixed in V2") with the notes still open
+// under "Open" beside it, its Check walks the one fix only, an untouched note stays plain Open with a quiet "V2 changed
+// here" where the version's diff saw a change, the early fix reads "Fixed · waiting for V3", and a note an older store
+// carried over still reads "Check again" and is still asked about. Every row fits 390–1920. Screenshots (VR_SHOTS).
 import fs from 'node:fs';
 import path from 'node:path';
 import { age, makeVideo, until } from '../lib/helpers.ts';
@@ -79,22 +79,36 @@ try {
   };
   const row = (id) => `.side-scroll [data-note="${id}"]`;
   const state = (id) => text(`${row(id)} .nr-state`);
+  // the groups as the list shows them: [group, count, its notes]
+  const groups = () =>
+    page.$$eval('.side-scroll .note', (els) => {
+      const out = [];
+      for (const e of els) {
+        const head = e.parentElement?.matches('.note-sect-wrap') ? e.parentElement.querySelector(':scope > .note-sect') : null;
+        if (head) out.push([head.dataset.group, head.querySelector('.n')?.textContent, []]);
+        out.at(-1)?.[2].push(e.dataset.note);
+      }
+      return out;
+    });
 
-  await check('one fix to check: the note the agent marked fixed in V2, with the two it left open said beside it', async () => {
+  await check('one fix to check: To check holds the note the agent marked fixed in V2, the notes it left open are Open beside it', async () => {
     await page.setViewport({ width: 1440, height: 900 });
     await open();
-    await page.waitForSelector('[data-testid=verify-cta]');
-    const cta = (await text('[data-testid=verify-cta]')) || '';
-    assert(/1 fix to check/.test(cta), `one fix, not every open note: ${cta}`);
-    assert(/before and after, on V2 · 2 notes still open/.test(cta), `the work still with the agent: ${cta}`);
-    assert((await state(fixed.id)) === 'Fixed', `the fix: ${await state(fixed.id)}`);
-    for (const id of [untouched.id, other.id]) assert((await state(id)) === null, `an untouched note is plain Open: ${await state(id)}`);
+    await page.waitForSelector('[data-testid=group-check]');
+    const g = await groups();
+    const of = (id) => g.find(([, , ids]) => ids.includes(id))?.[0];
+    assert(JSON.stringify(g.find(([x]) => x === 'check')) === JSON.stringify(['check', '1', [fixed.id]]), `one fix, not every open note: ${JSON.stringify(g)}`);
+    assert(of(untouched.id) === 'open' && of(other.id) === 'open' && of(early.id) === 'open', `the work still with the agent: ${JSON.stringify(g)}`);
+    assert(of(question.id) === 'needs', `the question needs the person: ${JSON.stringify(g)}`);
+    assert((await state(fixed.id)) === 'Fixed in V2', `the fix: ${await state(fixed.id)}`);
+    for (const id of [untouched.id, other.id])
+      assert([null, 'V2 changed here'].includes(await state(id)), `an untouched note is plain Open: ${await state(id)}`);
     assert((await state(question.id)) === 'Question', 'the question asks, it is no fix');
   });
 
   await check('a fix marked before its version reads "Fixed · waiting for V3" and is not asked about', async () => {
     assert((await state(early.id)) === 'Fixed · waiting for V3', `the early fix: ${await state(early.id)}`);
-    await page.click('[data-testid=verify-cta] button');
+    await page.click('[data-testid=group-check] [data-testid=check-group]');
     await page.waitForSelector('.verify');
     const head = (await text('[data-testid=verify-step]')) || '';
     assert(head === 'Check 1 of 1', `check mode walks the one fix: ${head}`);
@@ -110,15 +124,19 @@ try {
       async () => {
         await open();
         return page
-          .waitForSelector(`${row(untouched.id)} [data-testid=note-changed]`, { timeout: 5000 })
+          .waitForFunction(
+            (sel) => document.querySelector(sel)?.textContent.trim() === 'V2 changed here',
+            { timeout: 5000 },
+            `${row(untouched.id)} [data-testid=note-state]`,
+          )
           .then(() => true)
           .catch(() => false);
       },
       'the diff arrived',
       120_000,
     );
-    assert((await text(`${row(untouched.id)} [data-testid=note-changed]`)) === 'V2 changed here', 'the hint');
-    assert(!(await page.$(`${row(fixed.id)} [data-testid=note-changed]`)), 'a fix says where it stands instead');
+    assert((await state(untouched.id)) === 'V2 changed here', 'the hint');
+    assert((await state(fixed.id)) === 'Fixed in V2', 'a fix says where it stands instead');
     await shot('1440-light');
   });
 
@@ -131,8 +149,12 @@ try {
         await page.click('.nsheet-handle');
         await page.waitForSelector('.nsheet-half');
       }
-      await page.waitForSelector(`${row(untouched.id)} [data-testid=note-changed]`, { visible: true, timeout: 30_000 });
-      const over = await page.$$eval('.side-scroll .note-row .nr, [data-testid=verify-cta]', (els) =>
+      await page.waitForFunction(
+        (sel) => document.querySelector(sel)?.textContent.trim() === 'V2 changed here',
+        { timeout: 30_000 },
+        `${row(untouched.id)} [data-testid=note-state]`,
+      );
+      const over = await page.$$eval('.side-scroll .note-row .nr, .side-scroll .note-sect', (els) =>
         els
           .filter((r) => r.getBoundingClientRect().width > 0)
           .filter((r) => r.scrollWidth > r.clientWidth + 1 || r.getBoundingClientRect().right > window.innerWidth + 1)
@@ -147,8 +169,8 @@ try {
     await page.setViewport({ width: 1440, height: 900 });
     await open(cut);
     assert((await state(carried.id)) === 'Check again', `the carried note: ${await state(carried.id)}`);
-    await page.waitForSelector('[data-testid=verify-cta]');
-    assert(/1 fix to check/.test((await text('[data-testid=verify-cta]')) || ''), 'counted as before');
+    await page.waitForSelector('[data-testid=group-check]');
+    assert((await text('[data-testid=group-check] .n')) === '1', 'counted as before');
   });
 
   await check('no page errors along the way', async () => {

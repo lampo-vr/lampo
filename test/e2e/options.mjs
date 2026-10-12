@@ -531,8 +531,9 @@ try {
     await shot(p, 'player-1440');
     await p.click('[data-testid=audition-send]');
     await p.waitForFunction(() => !document.querySelector('[data-testid=audition]'), { timeout: 10000 });
-    // answered: the question is closed — under All it shows what was picked, in words
-    for (const tab of await p.$$('.note-filters [role=tab]')) if (/^All/.test(await tab.evaluate((b) => b.textContent))) await tab.click();
+    // answered: the question is closed — in Done, folded at the list's end, it shows what was picked, in words
+    await p.waitForSelector('[data-testid=group-done]');
+    await p.click('[data-testid=group-done]');
     await p.waitForSelector('[data-testid=options-picked]', { timeout: 10000 });
     const picked = await p.$eval('[data-testid=options-picked]', (el) => el.innerText);
     assert(/Closing line\s+lampo\.app/.test(picked), picked);

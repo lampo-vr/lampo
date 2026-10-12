@@ -35,8 +35,17 @@
 .ac-chip-sep {
   color: var(--faint);
 }
+/* Where the notes' head has no room for its words, it says less (NotesPanel.tsx measures it, notes.css sets these):
+   the name first, then the words, leaving the glyph and the number */
+.ac-chip-name,
+.ac-chip-sep {
+  display: var(--ac-name, inline);
+}
+.ac-chip-n {
+  display: var(--ac-words, inline);
+}
 .ac-chip-num {
-  display: none;
+  display: var(--ac-num, none);
   font-variant-numeric: tabular-nums;
 }
 .ac-chip.problems {
@@ -53,7 +62,7 @@
   height: var(--ic-sm);
 }
 /* A narrower head says less, never wraps or pushes + Note away: the name goes first (it is in the chip's label), then
-   the words, leaving the glyph and the number. A phone's sheet has it in the tags' line, where there is room. */
+   the words, leaving the glyph and the number. A phone's sheet has it on the line under its head, where there is room. */
 @container notes-head (max-width: 380px) {
   .ac-chip-name,
   .ac-chip-sep {

@@ -1337,8 +1337,16 @@ try {
       await page.goto(`${BASE}/${at}`, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('[data-testid=agent-button]', { timeout: 15000 });
       await page.click('[data-testid=agent-button]');
-      await page.waitForSelector('[data-testid=assign-agent-open]', { visible: true });
-      await page.click('[data-testid=assign-agent-open]');
+      // Assign agent… is the agent menu's ⋯ (with no agent yet, its own row)
+      await page.waitForSelector('[data-testid=agent-more], [data-testid=assign-agent-open]', { visible: true });
+      if (await page.$('[data-testid=assign-agent-open]')) await page.click('[data-testid=assign-agent-open]');
+      else {
+        await page.click('[data-testid=agent-more]');
+        await page.waitForSelector('.menu[data-state=open] [role=menuitem]');
+        await page.evaluate(() =>
+          [...document.querySelectorAll('.menu[data-state=open] [role=menuitem]')].find((e) => e.textContent.trim() === 'Assign agent…')?.click(),
+        );
+      }
       await page.waitForSelector('[data-testid=agent-picker] .how-agents', { visible: true });
       await page.click('[data-testid=agent-picker] .how-agents');
       await until(

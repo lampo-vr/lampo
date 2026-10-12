@@ -1,18 +1,18 @@
-// The run strip: one line in a fixed slot wherever a video has an agent — under the side panel's head on a desk and a
-// tablet, above the dock on a phone — saying what the agent is doing now ("Claude Code · fixing 3 of 6 · editing
-// Logo.tsx  6:12"), with a 2 px edge along its foot that fills while a render or an upload says how far it is. States
-// swap words, never heights. Pressing it opens the Agent view. Its only raised button is the one that needs the person:
-// Answer (or Check fixes once it is done); Stop, Try again, Nudge and the rest stay quiet and only for who may steer
-// agents. Reviewers and review-link visitors see the line, never those controls.
+// The agent's line, Cursor's way: one line wherever a video has an agent at work — under the notes panel's head on a
+// desk and a tablet, above the dock on a phone — saying who and what in one sentence ("Claude Code is fixing 1 of 3",
+// "asked you", "stopped listening") with ONE action at its end (Stop, Answer, Copy "go on", Try again …), and under it
+// one folded line: its latest step and how long, the question it asked, or what to tell it. Pressing either opens the
+// Agent view. Only while something is going on or needs the person: an agent that is just ready says nothing here.
+// Checking the fixes is the notes' "To check" header's (NotesPanel.tsx), not this line's. Reviewers and review-link
+// visitors see the line, never its controls.
 import { type CSSProperties, memo, useEffect, useState } from 'react';
-import { agentKindOfRef } from '../../../lib/agentKind.ts';
-import { enc } from '../api/client.ts';
+import { AGENT_KIND_LABELS, agentKindOfRef, agentShown } from '../../../lib/agentKind.ts';
 import type { SessionRef } from '../api/types.ts';
 import { t } from '../i18n/index.ts';
 import { useLang } from '../i18n/T.tsx';
 import { copyText, toast, toastError } from '../lib/toast.ts';
 import { copyGoOn, goOnWords, startWith } from '../sessions/listening.tsx';
-import { idleSaid, type RunAction, type RunLike, type RunSaid, runSaid, type Say, stalledSaid } from '../sessions/runWords.ts';
+import { type RunAction, type RunLike, type RunSaid, runSaid, type Say, stalledSaid } from '../sessions/runWords.ts';
 import { AgentMark, I } from '../ui/icons.tsx';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { SkLine } from '../ui/Skeleton.tsx';
@@ -35,26 +35,19 @@ export interface RunStripProps {
   run: RunLike | null;
   /** When `run` was answered (worked time counts on from it while the agent works). */
   asOf: number;
-  /** The assigned agent: with no run going, whether it hears notes. */
+  /** The assigned agent: its name and app when no run is going (it stopped listening). */
   session: SessionRef | null;
-  reachable: boolean;
-  /** An agent connected over MCP (its start command can be copied). */
-  copyable: boolean;
   /** It stopped listening while something waits on it: the line says to tell it "go on" (sessions/listening.tsx). */
   stalled?: boolean;
-  /** Fixes waiting to be checked: done offers Check fixes while there are some. */
+  /** Fixes waiting to be checked: a finished run's line stays while there are some (checking them is the notes'
+   * "To check" header's and the top bar's, never this line's). */
   toCheck: number;
-  /** Check fixes as a quiet button: the view's raised door to checking is another (the top bar's "Check N fixes"). */
-  quietCheck?: boolean;
   nextV: number;
   /** May steer agents (Stop, Try again, Nudge, copy the start): the `agents` right. */
   canSteer: boolean;
-  /** May check fixes. */
-  canCheck: boolean;
   say?: Say;
   onOpen: () => void;
   onAnswer: (note: string | null) => void;
-  onCheck: () => void;
   /** Phones: above the dock, a thumb's height; pressing it opens the Agent view in the sheet. */
   phone?: boolean;
   /** The view it opens is showing (the line is its head then). */
@@ -101,83 +94,130 @@ function actionLabel(a: RunAction): string {
 }
 
 /** Who may press which: steering is the agents right's, checking the verify right's; Answer and Log are for anyone. */
-const allowedFor = (a: RunAction, steer: boolean, check: boolean) => (a === 'check' ? check : a === 'answer' || a === 'log' || a === 'allow' ? true : steer);
+const allowedFor = (a: RunAction, steer: boolean) => (a === 'answer' || a === 'log' || a === 'allow' ? true : steer);
+
+/** The one action a line offers, of those its state allows: what needs the person first, Log never (the Agent view has it). */
+const ONE: RunAction[] = ['answer', 'allow', 'go_on', 'retry', 'again', 'nudge', 'stop', 'cancel', 'copy'];
+/** A name as the line says it: an app's own id by its app's name ("Claude Code"), whose it is in the line's title. */
+const lineName = (name: string, kind?: Parameters<typeof agentShown>[1]) => agentShown(name, kind).split(' · ')[0] || name;
 
 export const RunStrip = memo(function RunStrip(p: RunStripProps) {
   useLang(); // memo'd: renders again on a language switch by itself
-  const run = p.run;
+  const kind = p.run ? p.run.agent.kind : p.session ? agentKindOfRef(p.session) : null;
+  const shown = p.run ? agentShown(p.run.agent.name, p.run.agent.kind) : p.session ? agentShown(p.session.name, kind) : '';
+  const name = p.run ? lineName(p.run.agent.name, p.run.agent.kind) : p.session ? lineName(p.session.name, kind) : '';
+  // the run as the line says it: its agent by the line's name
+  const run = p.run ? { ...p.run, agent: { ...p.run.agent, name } } : null;
   const counting = !!run && (run.state === 'queued' || run.state === 'starting' || (run.state === 'working' && !run.progress?.pct));
   const ticked = useTick(counting && p.still === undefined);
   const now = p.still ?? ticked;
   const said: RunSaid | null =
-    p.stalled && p.session
-      ? stalledSaid(goOnWords(p.session))
-      : run
-        ? runSaid(run, { now, asOf: p.asOf, nextV: p.nextV, say: p.say, toCheck: p.toCheck })
-        : p.session
-          ? idleSaid(p.session.name, p.reachable, p.copyable)
-          : null;
-  if (!said) return null;
-  const kind = run ? run.agent.kind : p.session ? agentKindOfRef(p.session) : null;
-  const actions = said.actions.filter((a) => allowedFor(a, p.canSteer, p.canCheck));
+    p.stalled && p.session ? stalledSaid(goOnWords(p.session)) : run ? runSaid(run, { now, asOf: p.asOf, nextV: p.nextV, say: p.say }) : null;
+  // nothing going on and nothing needing the person: no line (an agent that is just ready, or not running with nothing
+  // waiting on it, or done with nothing of its left to check)
+  if (!said || (said.phase === 'done' && !p.toCheck)) return null;
+  const phase = said.phase;
+  const action = ONE.find((a) => said.actions.includes(a) && allowedFor(a, p.canSteer)) ?? null;
   const busy = p.act.busy;
-  // the line as it is cut with an ellipsis where it doesn't fit: whole in its title, and pressing opens all of it
-  const full = [said.name, said.words, said.figure].filter(Boolean).join(' · ');
+  const asked = phase === 'needs_you' && (run?.needs?.kind === 'question' || run?.needs?.kind === 'options' || !run?.needs);
+  const working = phase === 'working' || phase === 'rendering' || phase === 'uploading' || phase === 'checking';
+  // The line's words are the strip's (runWords.ts), split in two: where it stands in a few words is the sentence, after
+  // the agent's name ("Claude Code is fixing 3 of 7", "… needs permission"), and the rest is the folded line under it
+  // (its latest step, how long, why it stopped); a line without a name says its own ("V3 is ready", "Stopped after 4 min").
+  const [head = '', ...rest] = said.words.split(' · ');
+  const what =
+    phase === 'not_listening' ? t('stopped listening') : asked ? t('asked you') : said.name ? (working ? t('is {doing}', { doing: head }) : head) : null;
+  // the folded line: what to tell it, the question in its words, or the rest of the strip's words
+  const fold =
+    phase === 'not_listening' && p.session
+      ? ['mcp', 'api', 'cli'].includes(agentKindOfRef(p.session))
+        ? t('Tell it “go on”: your notes are waiting for it.')
+        : t('Tell it “go on” in {app}: your notes are waiting for it.', { app: AGENT_KIND_LABELS[agentKindOfRef(p.session)] })
+      : asked && run?.needs?.text
+        ? t('“{quote}”', { quote: p.say ? p.say(run.needs.text) : run.needs.text.text })
+        : rest.join(' · ') || null;
+  // how far, beside the folded words and never cut ("42%")
+  const figure = working ? said.figure : null;
+  // the line whole, as it is cut where it doesn't fit: in its title, and pressing opens all of it
+  const sentence = what ? `${name} ${what}` : head;
+  const full = [shown !== name && what ? `${sentence} (${shown})` : sentence, fold, figure].filter(Boolean).join(' · ');
   const act = (a: RunAction) => {
     if (a === 'answer') return p.onAnswer(run?.needs?.note ?? null);
-    if (a === 'check') return p.onCheck();
-    if (a === 'allow' || (a === 'log' && !(run && 'log' in run && run.log))) return p.onOpen();
-    if (a === 'log' && run) return void window.open(`/api/runs/${enc(run.id)}/log`, '_blank', 'noopener');
+    if (a === 'allow') return p.onOpen();
     if (a === 'go_on' && p.session) return void copyGoOn(p.session);
     if (a === 'copy' && p.session) {
       const how = startWith(p.session);
-      return void copyText(how.text).then((ok) => ok && toast(t('Copied: paste it into {name}', { name: p.session?.name ?? '' }), 'ok'));
+      return void copyText(how.text).then((ok) => ok && toast(t('Copied: paste it into {name}', { name: shown }), 'ok'));
     }
     if (!run) return;
     const write = a === 'stop' || a === 'cancel' ? p.act.stop : a === 'nudge' ? p.act.nudge : p.act.retry;
-    write(run.id).then(() => a === 'nudge' && toast(t('Nudged {name}', { name: run.agent.name }), 'ok'), toastError);
+    write(run.id).then(() => a === 'nudge' && toast(t('Nudged {name}', { name }), 'ok'), toastError);
   };
-  const primary = (a: RunAction) => a === 'answer' || (a === 'check' && !p.quietCheck);
+  // the one raised button: Answer, when the agent asks (the view's one: + Note steps down); everything else is quiet
+  const primary = action === 'answer';
+  const live = phase === 'working' || phase === 'rendering' || phase === 'uploading' || phase === 'checking' || phase === 'starting' || phase === 'queued';
   return (
-    <div className={`run-strip${p.phone ? ' phone' : ''}${p.open ? ' open' : ''}`} data-testid="run-strip" data-phase={said.phase} data-run={run?.id}>
-      <button
-        type="button"
-        className="run-main"
-        onClick={p.onOpen}
-        aria-label={p.open ? full : t('{line} · show what the agent is doing', { line: full })}
-        title={full}
-        aria-expanded={p.phone ? undefined : p.open}
-        data-testid="run-open"
-        onPointerEnter={p.onWarm}
-        onFocus={p.onWarm}
-      >
-        <KeyGlyph shape={said.shape} className={`nav-kg run-kg ${said.tone}`} />
-        <AgentMark kind={kind} size={14} />
-        <span className="run-words" data-testid="run-words">
-          {said.name && <b>{said.name}</b>}
-          {said.name && said.words ? ' · ' : ''}
-          {said.words}
+    <div className={`run-strip${p.phone ? ' phone' : ''}${p.open ? ' open' : ''}`} data-testid="run-strip" data-phase={phase} data-run={run?.id}>
+      <div className="al-line">
+        <span className={`al-mark${phase === 'not_listening' ? ' quiet' : ''}`} aria-hidden="true">
+          <AgentMark kind={kind} size={14} />
         </span>
-        {said.figure && (
-          <span className="run-fig" data-testid="run-fig">
-            {said.figure}
-          </span>
-        )}
-        {!p.open && !actions.length && <I name="right" size={14} className="run-go" />}
-      </button>
-      {actions.map((a) => (
         <button
-          key={a}
           type="button"
-          className={primary(a) ? 'btn sm primary run-act' : 'btn sm ghost run-act'}
-          onClick={() => act(a)}
-          disabled={busy && !primary(a)}
-          data-testid={`run-${a}`}
-          aria-label={a === 'copy' && p.session ? t('Copy what starts {name}', { name: p.session.name }) : a === 'go_on' ? t('Copy “go on”') : undefined}
+          className="run-main"
+          onClick={p.onOpen}
+          aria-label={p.open ? full : t('{line} · show what the agent is doing', { line: full })}
+          title={full}
+          aria-expanded={p.phone ? undefined : p.open}
+          data-testid="run-open"
+          onPointerEnter={p.onWarm}
+          onFocus={p.onWarm}
         >
-          {a === 'copy' || a === 'go_on' ? <I name="copy" size={14} /> : actionLabel(a)}
+          <span className="run-words" data-testid="run-words">
+            {what ? (
+              <>
+                <b>{name}</b> {what}
+              </>
+            ) : (
+              head
+            )}
+          </span>
+          {live && <KeyGlyph shape={said.shape} className={`nav-kg run-kg ${said.tone}`} />}
         </button>
-      ))}
+        {action && (
+          <button
+            type="button"
+            className={primary ? 'btn sm primary run-act' : 'btn sm run-act'}
+            onClick={() => act(action)}
+            disabled={busy && !primary}
+            data-testid={`run-${action}`}
+            aria-label={action === 'copy' && p.session ? t('Copy what starts {name}', { name: shown }) : undefined}
+          >
+            {action === 'copy' || action === 'go_on' ? (
+              <>
+                <I name="copy" size={14} /> {action === 'go_on' ? t('Copy “go on”') : t('Copy')}
+              </>
+            ) : (
+              actionLabel(action)
+            )}
+          </button>
+        )}
+      </div>
+      {/* the folded line keeps its room whatever the state, so the notes under it never move */}
+      {fold || figure ? (
+        <button type="button" className="al-fold" onClick={p.onOpen} title={[fold, figure].filter(Boolean).join(' · ')} data-testid="run-fold">
+          {asked || phase === 'not_listening' ? null : <span aria-hidden="true">›</span>}
+          {fold && <span className="ellipsis">{fold}</span>}
+          {fold && figure && <span aria-hidden="true">·</span>}
+          {figure && (
+            <span className="run-fig" data-testid="run-fig">
+              {figure}
+            </span>
+          )}
+        </button>
+      ) : (
+        <span className="al-fold" aria-hidden="true" />
+      )}
       {said.edge !== null && <span className="run-edge" data-testid="run-edge" style={{ '--edge': said.edge } as CSSProperties} aria-hidden="true" />}
     </div>
   );
@@ -187,11 +227,16 @@ export const RunStrip = memo(function RunStrip(p: RunStripProps) {
 export function RunStripPending({ phone = false }: { phone?: boolean }) {
   return (
     <div className={`run-strip pending${phone ? ' phone' : ''}`} data-testid="run-strip" aria-hidden="true">
-      <span className="run-main">
-        <KeyGlyph shape="outline" className="nav-kg run-kg quiet" />
-        <span className="run-words">
-          <SkLine w="14em" />
+      <div className="al-line">
+        <span className="al-mark quiet" />
+        <span className="run-main">
+          <span className="run-words">
+            <SkLine w="14em" />
+          </span>
         </span>
+      </div>
+      <span className="al-fold">
+        <SkLine w="10em" />
       </span>
     </div>
   );

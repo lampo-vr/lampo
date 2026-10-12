@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// covers: web/src/sessions/Wake.tsx web/src/player/ClaudeMenu.tsx web/src/settings/Mcp.tsx server/wake.ts
+// covers: web/src/sessions/Wake.tsx web/src/player/ClaudeMenu.tsx web/src/player/AgentMenuBody.tsx web/src/settings/Mcp.tsx server/wake.ts
 // covers: server/agents.ts server/agentRuns.ts lib/agentRun.ts lib/sessions.ts
 // Browser end-to-end test of starting an agent that isn't running, on the machine: the assigned Claude Code session
 // is started for a request from the agent menu ("Send and start", asked each time by default), the stand-in the harness
@@ -59,10 +59,11 @@ try {
     await page.click('[data-testid=agent-button]');
     await page.waitForSelector('[data-testid=agent-menu]');
   };
-  const request = async (label) => {
-    const rows = await page.$$('[data-testid=agent-menu] [data-testid=agent-ask]');
-    for (const r of rows) if ((await r.evaluate((e) => e.textContent)).includes(label)) return r.click();
-    throw new Error(`no request "${label}" in the menu`);
+  // a request, asked in the menu's one field (Send inside it; Enter sends)
+  const request = async (words) => {
+    await page.click('[data-testid=agent-menu] [data-testid=agent-field]');
+    await page.keyboard.type(words);
+    await page.keyboard.press('Enter');
   };
 
   await check('not running: a request asks first — "Send and start" says where it starts and with whose settings', async () => {

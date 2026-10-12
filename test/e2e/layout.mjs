@@ -284,12 +284,11 @@ export async function layoutMatrix(page, states, { themes = ['dark', 'light'], s
 // soft edge rather than break inside a token); anything else that scrolls sideways overflows, and a
 // control that sticks out of the viewport outside a scroller can't be reached. Returns one line per problem. The
 // player's strip and tools row are not scrollers any more: they fit a phone (a strip that scrolled cut "Safe zones"
-// off at the screen's edge). The notes' tags are a line of chips built to scroll, with soft edges (.note-tagf), and so
-// are the operator’s table of sign-up weeks and its lists’ filter chips on a narrow screen (.op-table-wrap, .op-chips) and
-// the Files tab’s kinds (.pf-kinds).
+// off at the screen's edge). The operator’s table of sign-up weeks and its lists’ filter chips on a narrow screen
+// (.op-table-wrap, .op-chips) and the Files tab’s kinds (.pf-kinds) are built to scroll, with soft edges.
 export const sideways = (
   page,
-  strips = '.dock-foot, .tabs, .reels, .tl-scroll, .set-nav, .lib-lanes, .board, .set-code pre, .note-tagf, .op-table-wrap, .op-chips, .pf-kinds',
+  strips = '.dock-foot, .tabs, .reels, .tl-scroll, .set-nav, .lib-lanes, .board, .set-code pre, .op-table-wrap, .op-chips, .pf-kinds',
 ) =>
   page.evaluate((strips) => {
     const vw = innerWidth;

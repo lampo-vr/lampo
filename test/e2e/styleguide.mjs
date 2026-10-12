@@ -92,7 +92,7 @@ try {
         stages: document.querySelectorAll('.sbadge[data-stage]').length,
         logo: document.querySelectorAll('[data-testid=sg-brand] svg.brand-logo[aria-label=Lampo]').length,
         marks: document.querySelectorAll('[data-testid=sg-marks] .agent-mark').length,
-        // an agent's work in every state of the design's table (ready and isn't running included)
+        // an agent's work in every state of the design's table (ready and unreachable say nothing: no line)
         strips: document.querySelectorAll('[data-testid=sg-strips] [data-testid=run-strip]').length,
         sections: document.querySelectorAll('.sg-toc button').length,
       }));
@@ -106,14 +106,15 @@ try {
           counts.stages >= 8 &&
           counts.logo === 1 &&
           counts.marks >= 12 &&
-          counts.strips === 16 &&
+          counts.strips === 14 &&
           counts.sections === blocks.length,
         JSON.stringify(counts),
       );
       // the orange tone is an agent's, not a product's: the glyph table's column and the tone badges say "agent"
       const tones = await page.evaluate(() => ({
         glyphs: [...document.querySelectorAll('[data-testid=sg-glyphs] > .sg-label')].map((e) => e.textContent.trim()),
-        badges: [...document.querySelectorAll('.sbadge[data-tone]')].map((e) => e.dataset.tone),
+        // (the note rows' state labels are samples of their own, in the Agent at work block)
+        badges: [...document.querySelectorAll('.sbadge[data-tone]:not(.nr-state)')].map((e) => e.dataset.tone),
       }));
       const TONES = JSON.stringify(['neutral', 'must', 'should', 'nice', 'idea', 'ok', 'agent']);
       assert(JSON.stringify(tones.glyphs) === TONES && JSON.stringify(tones.badges) === TONES, JSON.stringify(tones));

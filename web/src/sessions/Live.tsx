@@ -4,14 +4,12 @@
 // second).
 import { useQuery } from '@tanstack/react-query';
 import { type ReactNode, useEffect, useState } from 'react';
-import { compareTime } from '../../../lib/time.ts';
 import { api } from '../api/client.ts';
 import type { ActivityWords, AgentActivity, AgentActivityResponse, AgentLive, AgentRunInfo } from '../api/types.ts';
 import { locale, t } from '../i18n/index.ts';
-import { ago, pct } from '../lib/format.ts';
+import { pct } from '../lib/format.ts';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { type NoteAt, phrase, say } from './activityWords.ts';
-import { RunLine } from './Wake.tsx';
 
 // The sidebar's Agents section rides this chunk (it loads after the first paint anyway).
 export { SidebarAgents } from './SidebarAgents.tsx';
@@ -22,9 +20,6 @@ export const sayWords = (w: ActivityWords): string => say(w);
 /** How long the latest action counts as "now". A wait is re-asked every few minutes while it lasts. */
 const FRESH_MS = 90_000;
 const WAIT_FRESH_MS = 15 * 60_000;
-/** Earlier actions shown under the current one, at most; `SHOWN` lines in all until the person asks for the rest. */
-const TIMELINE = 10;
-const SHOWN = 3;
 
 const fresh = (a: AgentActivity | null | undefined, now: number): boolean =>
   !!a && a.kind !== 'run' && now - (Date.parse(a.at) || 0) < (a.kind === 'wait' ? WAIT_FRESH_MS : FRESH_MS);
@@ -61,7 +56,7 @@ export function useAgentActivity(slug: string | null, agent: string | null, enab
  * last. An agent can reach Lampo under another name than its assignment's (an MCP client without `by` is named after
  * its app), and someone working on the video is what the person wants to see.
  */
-function pick(all: AgentLive[], agent: string | null): AgentLive | null {
+export function pick(all: AgentLive[], agent: string | null): AgentLive | null {
   return all.find((a) => a.agent === agent && a.recent.length) ?? all.find((a) => a.slug && a.recent.length) ?? null;
 }
 
@@ -200,89 +195,16 @@ const compact = (n: number) => new Intl.NumberFormat(locale(), { notation: 'comp
 const usd = (n: number) => new Intl.NumberFormat(locale(), { style: 'currency', currency: 'USD', maximumFractionDigits: n < 1 ? 3 : 2 }).format(n);
 
 /** Tokens a run Lampo started reports (and its cost, only when it states it). */
-function RunUse({ run }: { run: AgentRunInfo }) {
+export function RunUse({ run }: { run: AgentRunInfo }) {
   const l = run.live;
   if (!l) return null;
   const used = l.tokens.input + l.tokens.output + l.tokens.cache_write;
   if (!used && !l.tokens.cache_read && l.cost_usd == null) return null;
   return (
-    <div className="am-use" data-testid="agent-run-use">
+    <span className="am-use" data-testid="agent-run-use">
       <span>{t('{count} tokens', { count: compact(used) })}</span>
       {l.tokens.cache_read > 0 && <span>{t('{count} from cache', { count: compact(l.tokens.cache_read) })}</span>}
       {l.cost_usd != null && <span>{usd(l.cost_usd)}</span>}
-    </div>
-  );
-}
-
-/**
- * The agent menu's Live part: what it is doing now (a turning keyframe while it works), the actions before it with
- * their times — three lines in all, the rest on request —, and for a run Lampo started its tokens, Stop and Log.
- * Nothing at all before an agent did anything. `noteAt` names a note by its moment instead of its id.
- */
-export function LiveSection({
-  slug,
-  agent,
-  run,
-  enabled,
-  noteAt,
-  listening = null,
-}: {
-  slug: string;
-  agent: string;
-  run: AgentRunInfo | null;
-  enabled: boolean;
-  noteAt?: NoteAt;
-  /** Whether it hears notes now (server/agents.ts; null: Lampo can't tell): a wait it stopped is said as past. */
-  listening?: boolean | null;
-}) {
-  const [all, setAll] = useState(false);
-  const mine = pick(useAgentActivity(slug, agent, enabled), agent);
-  const recent = mine?.recent ?? [];
-  const going = run?.state === 'running';
-  const now = useNow(recent.length > 0 || going);
-  const head = recent[0] ?? null;
-  // An agent that isn't listening is doing nothing now, whatever it did a moment ago: its last action is the latest,
-  // not live — "Waiting for your answer · since 12:41" was true only until it stopped.
-  const stale = listening === false;
-  const working = going || (fresh(head, now) && !stale);
-  const total = Math.min(recent.length, TIMELINE + 1);
-  if (!head && !run) return null;
-  // While a run goes, its own step is the newest thing known (the activity follows within a second).
-  const step = going && run?.live?.step && (!head || compareTime(run.live.updated, head.at) > 0) ? run.live.step : null;
-  return (
-    <div className="am-live" data-testid="agent-live" data-working={working || undefined}>
-      <div className="label">
-        {working ? t('Live') : t('Latest')}
-        {mine && mine.agent !== agent ? ` · ${mine.agent}` : ''}
-      </div>
-      {(head || step) && (
-        <div className="am-now" data-testid="agent-now">
-          <KeyGlyph shape={working ? 'ease' : 'outline'} className={`nav-kg ${working ? 'live' : ''}`} />
-          <span className="am-now-text">
-            {step ? say(step, noteAt) : head && (stale && head.kind === 'wait' ? say(head, noteAt) : activityLine(head, noteAt))}
-          </span>
-          {head && !step && <span className="am-when">{ago(head.at)}</span>}
-        </div>
-      )}
-      {recent.length > 1 && (
-        <ol className="am-timeline" data-testid="agent-timeline">
-          {recent.slice(1, all ? TIMELINE + 1 : SHOWN).map((a) => (
-            <li key={`${a.at}-${a.text}`} data-kind={a.kind}>
-              <time dateTime={a.at}>{clock(a.at)}</time>
-              <span className="ellipsis" title={activityLine(a, noteAt)}>
-                {activityLine(a, noteAt)}
-              </span>
-            </li>
-          ))}
-        </ol>
-      )}
-      {total > SHOWN && (
-        <button type="button" className="btn sm ghost am-more" onClick={() => setAll(!all)} aria-expanded={all} data-testid="agent-log-more">
-          {all ? t('Show fewer') : t('Show all {n}', { n: total })}
-        </button>
-      )}
-      {run && <RunUse run={run} />}
-      {run && <RunLine run={run} />}
-    </div>
+    </span>
   );
 }

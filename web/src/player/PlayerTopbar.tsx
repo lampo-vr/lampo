@@ -2,6 +2,7 @@
 // next-step button; then the inbox and ⋯. One control per job: the agent is one button (ClaudeMenu.tsx), sharing is
 // one "Share" button (on phones in ⋯).
 import { memo, type ReactNode, useRef } from 'react';
+import { compareTime, isAgent, isQuestion } from '../../../lib/time.ts';
 import { useCan } from '../api/auth.ts';
 import { enc } from '../api/client.ts';
 import type { ReviewResponse, Run, Version } from '../api/types.ts';
@@ -53,6 +54,10 @@ interface PlayerTopbarProps {
    * agent button's words follow it). */
   runs?: Run[];
   run?: RunLike | null;
+  /** The agent menu's actions: open a note to answer it, show a note's frame, open the Agent view. */
+  onAnswer?: (note: string | null) => void;
+  onShowNote?: (note: string) => void;
+  onAgentView?: () => void;
 }
 
 export const PlayerTopbar = memo(function PlayerTopbar({
@@ -74,6 +79,9 @@ export const PlayerTopbar = memo(function PlayerTopbar({
   archived = null,
   runs,
   run = null,
+  onAnswer,
+  onShowNote,
+  onAgentView,
 }: PlayerTopbarProps) {
   useLang(); // memo'd: renders again on a language switch by itself
   const { review, summary, slug } = data;
@@ -138,6 +146,13 @@ export const PlayerTopbar = memo(function PlayerTopbar({
       noteAt={(id) => review.comments.find((c) => c.id === id)?.timecode ?? null}
       run={run}
       owed={!!review.session && !!waitingOnAgent(review)}
+      question={(() => {
+        const q = review.comments.filter((c) => c.status === 'open' && isAgent(c.author) && isQuestion(c)).sort((a, b) => compareTime(b.created, a.created))[0];
+        return q ? { id: q.id, text: q.text } : null;
+      })()}
+      onAnswer={onAnswer}
+      onShowNote={onShowNote}
+      onAgentView={onAgentView}
     />
   ) : (
     review.session && <SessionChip session={review.session} active={summary.sessionActive} listening={summary.sessionListening} disabled />

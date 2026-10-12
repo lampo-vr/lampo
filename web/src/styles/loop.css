@@ -192,67 +192,6 @@
   white-space: nowrap;
   overflow-wrap: normal;
 }
-.am-sep {
-  height: 1px;
-  margin: var(--sp-1) 0;
-  background: var(--line);
-}
-/* Ask the agent: what people ask most as quiet answers (the notes panel's .choices), the field, and the quick check
- * as a smaller option under them — no accent: the popover needs none. */
-.am-ask {
-  display: grid;
-  gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-2) 0;
-  border-top: 1px solid var(--line);
-}
-.am-ask .label {
-  margin: 0;
-}
-.am-ask .choices {
-  gap: var(--sp-1);
-}
-.cm-row.am-quick {
-  padding: var(--sp-1);
-  margin-inline: calc(-1 * var(--sp-1));
-  width: calc(100% + 2 * var(--sp-1));
-  font-size: var(--fs-sm);
-}
-.cm-row.am-quick .icon {
-  color: var(--muted);
-}
-.cm-row.am-quick b {
-  color: var(--fg-2);
-  font-weight: var(--fw-text);
-}
-.cm-row.am-quick:disabled {
-  cursor: default;
-  opacity: 0.7;
-}
-/* the quiet foot: copy the notes, assign another agent */
-.am-foot {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-1);
-  margin-top: var(--sp-1);
-  padding: var(--sp-2) var(--sp-1) 0;
-  border-top: 1px solid var(--line);
-}
-.am-foot .btn {
-  color: var(--fg-2);
-}
-/* "Show all 11": under the three lines of the log, where its times stand */
-.am-more {
-  justify-self: start;
-  margin-left: var(--sp-4);
-}
-.am-back {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-1);
-}
-.am-back .label {
-  margin: 0;
-}
 /* starting an agent that isn't running: the question (send and start, or only send) and the run Lampo started */
 .wake-ask {
   flex: 1 1 100%;
@@ -286,79 +225,163 @@
   flex-wrap: wrap;
   gap: var(--sp-2);
 }
-/* Live: what the agent is doing now, the last actions with their times, a run's tokens (sessions/Live.tsx) */
-.am-live {
-  display: grid;
-  gap: var(--sp-1);
-  padding: 0 var(--sp-2) var(--sp-1);
+/* The agent menu (player/AgentMenuBody.tsx), Cursor's way: the mark and one sentence with a sub line and ⋯; the
+ * moment's one action; a question quoted in a quiet inset; the steps as a thin rail; one field with Send inside. */
+.am-cursor {
+  gap: var(--sp-3);
 }
-.am-live .label {
-  margin: 0;
-}
-.am-now {
+.amc-head {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   gap: var(--sp-2);
   min-width: 0;
-  font-size: var(--fs-md);
-  color: var(--fg);
 }
-.am-now .kg {
-  align-self: center;
+.amc-head > .al-mark {
+  margin-top: 1px;
 }
-.am-now-text {
-  flex: 1;
+.amc-what {
+  flex: 1 1 auto;
+  display: grid;
+  gap: var(--sp-0_5);
   min-width: 0;
+}
+.amc-sentence {
+  margin: 0;
+  font-size: var(--fs-md);
+  line-height: var(--lh-ui);
+  color: var(--fg-2);
   overflow-wrap: anywhere;
 }
-.am-when {
-  flex: none;
+.amc-sentence b {
+  color: var(--fg);
+  font-weight: var(--fw-strong);
+}
+.amc-sub {
+  margin: 0;
   font-size: var(--fs-sm);
   color: var(--muted);
 }
-.am-timeline {
-  display: grid;
-  gap: var(--sp-0_5);
+.amc-head > .amc-more {
+  flex: none;
+  margin: calc(-1 * var(--sp-0_5)) calc(-1 * var(--sp-1)) 0 0;
+}
+/* the question in the agent's words: a quiet inset, never a card */
+.amc-quote {
   margin: 0;
-  padding: 0 0 0 var(--sp-4);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r);
+  background: var(--ink-2);
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+.amc-note {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.amc-act {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+/* its steps: a quiet head, then a thin rail on the left with the times beside it */
+.amc-steps {
+  display: grid;
+  gap: var(--sp-1);
+  min-width: 0;
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--line);
+}
+.amc-steps-head {
+  display: inline-flex;
+  justify-self: start;
+  align-items: center;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  font: var(--fw-ui) var(--fs-xs) / var(--lh-ui) var(--ui);
+  color: var(--muted);
+}
+button.amc-steps-head {
+  cursor: pointer;
+}
+button.amc-steps-head:hover {
+  color: var(--fg-2);
+}
+.amc-steps-head .n {
+  font-variant-numeric: tabular-nums;
+}
+.amc-rail {
+  display: grid;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: 0 0 0 var(--sp-3);
+  border-left: 1px solid var(--line-2);
+  margin-left: calc(var(--h-xs) / 2);
   list-style: none;
   font-size: var(--fs-sm);
   color: var(--fg-2);
 }
-.am-timeline li {
+.amc-rail li {
   display: flex;
   gap: var(--sp-2);
   min-width: 0;
 }
-.am-timeline time {
+.amc-rail li:first-child {
+  color: var(--fg);
+}
+.amc-rail time {
   flex: none;
   min-width: 5ch;
   font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
-/* the run's own line (Stop, Log) under its timeline: the head's keyframe already says it works */
-.am-live .wake-run {
-  padding-left: var(--sp-4);
-}
-.am-live .wake-run .kg {
-  display: none;
-}
-.am-use {
+/* a run Lampo started: how it goes, its tokens, its log — one quiet line under the rail */
+.amc-run {
   display: flex;
   flex-wrap: wrap;
+  align-items: baseline;
   gap: var(--sp-1) var(--sp-3);
-  padding-left: var(--sp-4);
+  margin: 0;
   font-size: var(--fs-sm);
-  font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
-.wake-run {
+.am-use {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-3);
+  font-variant-numeric: tabular-nums;
+}
+.amc-all {
+  justify-self: start;
+}
+/* one field with Send inside it, at the field's own height: Send sits inset, so its corner is the field's less that */
+.amc-field {
+  position: relative;
   display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  min-height: var(--h-sm);
-  font-size: var(--fs-sm);
-  color: var(--fg-2);
+  min-width: 0;
+}
+.amc-field > .input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: var(--h);
+  padding-right: calc(var(--h-xs) + 2 * var(--sp-1));
+}
+.amc-field > .amc-send {
+  position: absolute;
+  top: var(--sp-1);
+  right: var(--sp-1);
+  width: calc(var(--h) - 2 * var(--sp-1));
+  height: calc(var(--h) - 2 * var(--sp-1));
+  min-height: 0;
+  padding: 0;
+  border-radius: calc(var(--radius-sm) - var(--sp-1));
 }
 /* the one way to how agents get their notes, in the picker's foot */
 .how-agents {

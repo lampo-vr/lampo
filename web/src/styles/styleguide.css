@@ -623,10 +623,6 @@
   gap: var(--sp-4);
   align-items: start;
 }
-.sg .sg-cta {
-  flex: 1 1 360px;
-  max-width: 480px;
-}
 .sg .sg-list {
   padding: var(--sp-1);
 }
