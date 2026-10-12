@@ -163,6 +163,7 @@ import type {
   PartSuggestion,
   QaWhy,
   Retime,
+  Run,
   RunBrief,
   AssignedSession as SessionRef,
   Severity,
@@ -264,6 +265,8 @@ export interface DraftsSent {
   left: number;
   error?: string;
   run?: AgentRunInfo | null;
+  /** The agent's run the batch went to (lib/types.ts): its line comes with the send. */
+  opened?: Run;
 }
 
 export interface Version {

@@ -174,6 +174,9 @@ format stays backwards compatible throughout.
   you list your server's MCP connector there.
 
 ### Fixed
+- Sending notes to a video's agent shows its line ("Sent to … · waiting for it to start") together with the send. It
+  used to come up to a second later and push the notes down, so a click aimed a moment before could land beside its
+  target: a note's Send pressed right after "Only send" went into the note's text, and nothing was sent.
 - Comparing two versions, in the player or on a review link, a pause on a busy computer could leave the other version's
   picture a frame or two off the frame the timecode shows, and there it stayed. The player now notices and puts it on
   the same frame, as it already did for the version on screen.

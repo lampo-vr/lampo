@@ -10,6 +10,7 @@ import { flushSync } from 'react-dom';
 import { deleteDraft as removeDraft, saveDraft, sendDrafts, useDrafts } from '../../api/drafts.ts';
 import type { NewComment } from '../../api/mutations.ts';
 import { keys } from '../../api/queries.ts';
+import { runKeys, settleRun } from '../../api/runs.ts';
 import type { Comment, DraftsSent, Recording } from '../../api/types.ts';
 import { t } from '../../i18n/index.ts';
 import { toast, toastError } from '../../lib/toast.ts';
@@ -198,6 +199,13 @@ export function useUnsent({ slug, enabled, recordings, wake, agent, waiting = fa
       const kept = qc.getQueryData<{ drafts: Comment[] }>(keys.drafts(slug))?.drafts ?? [];
       const ids = one ? (note ? [one] : []) : kept.filter((d) => !hiddenNow.current.has(d.id)).map((d) => d.id);
       const sent = await sendDrafts(slug, { ids, recordings: one ? (note ? false : [one]) : true, start: w === 'start' });
+      // The agent's line comes with the send, as the drafts leave: from the live stream it came up to a second later, and
+      // pushed the notes down under whatever the person was about to click (the composer's Send). A list asked for
+      // before the send would land after it, without the run: dropped.
+      if (sent.opened) {
+        await qc.cancelQueries({ queryKey: runKeys.of(slug), exact: true });
+        settleRun(qc, slug, sent.opened);
+      }
       // what leaves: the notes (one write: all or none), and the recording drafts that went (all, unless some stayed)
       const spokenOut = one ? (note ? [] : sent.notes.length ? [one] : []) : sent.left ? [] : spoken;
       // On screen as leaving before they are off the list: the list's own update reaches the page on a schedule of its

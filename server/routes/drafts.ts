@@ -37,6 +37,7 @@ import { checkWake, startAgent } from '../wake.ts';
 import { type PreparedRecording, prepareRecording, refusal, settleRecording } from './recordings.ts';
 import { inlineRef, RefBody, withInlineFile } from './refs.ts';
 import { NewComment, prepareNote, shotsToFollow } from './review.ts';
+import { runFor } from './runs.ts';
 
 const DraftPatch = z.object({
   text: z.string().max(20000).optional(),
@@ -265,7 +266,16 @@ export function draftRoutes(ctx: ServerContext): Router {
         error ??= refusal({ id: '-' }, e).error;
       }
     }
-    const out: DraftsSent = { notes, left, ...(error ? { error } : {}), ...(b.start ? { run: run ?? null } : {}) };
+    // The run as it stands now (a start moved it on), for the page's line: with the send's answer, not up to a second
+    // later from the stream, when the line pushing the notes down would move what the person is about to click.
+    const now = opened && (ctx.runs.find(opened.id)?.run ?? opened);
+    const out: DraftsSent = {
+      notes,
+      left,
+      ...(error ? { error } : {}),
+      ...(b.start ? { run: run ?? null } : {}),
+      ...(now ? { opened: runFor(req)(now) } : {}),
+    };
     res.json(out);
   });
 

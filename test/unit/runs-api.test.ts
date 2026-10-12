@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { before, test } from 'node:test';
-import type { LibraryResponse, Run, RunDetail, RunsResponse, VideoSummary } from '../../lib/types.ts';
+import type { DraftsSent, LibraryResponse, Run, RunDetail, RunsResponse, VideoSummary } from '../../lib/types.ts';
 import { startApp } from '../lib/app.ts';
 import { isolatedEnv, makeVideo, until } from '../lib/helpers.ts';
 import { cookieFrom, tusUpload } from '../lib/http.ts';
@@ -56,10 +56,13 @@ const draft = async (who: Record<string, string>, text: string) => {
   assert.equal(r.status, 200, r.text);
   return r.json().id as string;
 };
+// the last send's whole answer (the run it opened or joined rides with it: the app shows the agent's line at once)
+let sentLast: DraftsSent | null = null;
 const send = async (who: Record<string, string>) => {
   const r = await request('POST', `/api/review/${enc()}/drafts/send`, { body: {}, headers: who });
   assert.equal(r.status, 200, r.text);
-  return (r.json().notes as { id: string }[]).map((n) => n.id);
+  sentLast = r.json() as DraftsSent;
+  return sentLast.notes.map((n) => n.id);
 };
 const runs = async (who: Record<string, string> = as.mia) => {
   const r = await request('GET', `/api/runs?slug=${enc()}`, { headers: who });
@@ -70,7 +73,7 @@ const runEvents = () => store.readEvents({ limit: 5000 }).filter((e) => e.type =
 
 let first: Run;
 
-test('a member’s Send opens the run of the video’s agent: queued, its plan the notes sent; the read API shows it', async () => {
+test('a member’s Send opens the run of the video’s agent: queued, its plan the notes sent; the read API and the send’s answer show it', async () => {
   const ids = [await draft(as.mia, 'Logo too late'), await draft(as.mia, 'Caption too low')];
   const sent = await send(as.mia);
   assert.deepEqual(sent.sort(), ids.sort());
@@ -87,6 +90,7 @@ test('a member’s Send opens the run of the video’s agent: queued, its plan t
   assert.equal(first.ended, null);
   assert.equal(first.worked_s, 0);
   assert.equal(Object.hasOwn(first, 'steps') || Object.hasOwn(first, 'clock'), false, 'the head only');
+  assert.deepEqual(sentLast?.opened, first, 'the send’s answer carries the run as the read API shows it');
   const one = await request('GET', `/api/runs/${first.id}`, { headers: as.mia });
   assert.equal(one.status, 200, one.text);
   const detail = one.json() as RunDetail;
@@ -155,6 +159,7 @@ test('whoever may read the video reads its runs (a reviewer without the agent’
 test('a reviewer’s Send goes out and opens nothing; Ask and stop are the agents right’s, never an API token’s', async () => {
   const note = await draft(as.rafa, 'Too dark here');
   assert.deepEqual(await send(as.rafa), [note]);
+  assert.equal(sentLast?.opened, undefined, 'no run in the reviewer’s answer');
   const list = await runs();
   assert.equal(list.length, 1, 'no run of the reviewer’s');
   assert.ok(!list[0]?.plan.some((p) => p.id === note), 'nor a note added to the open one');
@@ -171,6 +176,8 @@ test('a second Send adds to the open run (added while it works); Stop ends it at
   const run = (await runs())[0] as Run;
   assert.equal(run.id, first.id, 'one open run per agent and video');
   assert.deepEqual(run.plan.find((p) => p.id === later)?.added, true);
+  assert.equal(sentLast?.opened?.id, first.id, 'the answer carries the run that took them');
+  assert.equal(sentLast?.opened?.plan.find((p) => p.id === later)?.added, true);
   const stopped = await request('POST', `/api/runs/${first.id}/stop`, { body: {}, headers: as.mia });
   assert.equal(stopped.status, 200, stopped.text);
   assert.equal(stopped.json().run.state, 'stopped');

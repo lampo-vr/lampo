@@ -16,7 +16,8 @@
 // it says the agent is waiting, the toast that it got them; a reply still reaches it at once. The raised one of Save
 // and Send is always the last: Save · Send without an agent, Send · Save with one; an agent assigned, waiting or
 // unassigned while a note is written swaps them in the same room, each as wide as before (1440, and 390 with a note
-// long enough to pin the foot).
+// long enough to pin the foot). The agent's line comes with "Only send"'s answer, not later from the live stream (the
+// video's runs held): Send, aimed once the drafts have left, is still under the pointer when the runs come in.
 import fs from 'node:fs';
 import path from 'node:path';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
@@ -501,11 +502,15 @@ try {
   await check('on a phone the head stays pinned in the notes sheet too', async () => {
     await page.setViewport({ width: 390, height: 844, deviceScaleFactor: SHOTS ? 3 : 1, isMobile: true, hasTouch: true });
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await videoReady();
-    const show = await page.waitForFunction(
+    // the reminder shows for 8 s from when the drafts are in, which can be before the video is ready: watched from the
+    // reload on (as in "the drafts fit")
+    const reminder = page.waitForFunction(
       () => [...document.querySelectorAll('[data-testid=toast]')].find((t) => t.textContent.includes('not sent yet'))?.querySelector('.toast-act'),
       { polling: 100, timeout: 20000 },
     );
+    reminder.catch(() => {}); // awaited below
+    await videoReady();
+    const show = await reminder;
     await show.click();
     await page.waitForSelector('.nsheet-half [data-testid=unsent]', { timeout: 20000 });
     await sleep(400);
@@ -874,6 +879,132 @@ try {
       const reply = await hearing;
       assert(/^1 new:\n.*REPLY/.test(reply) && reply.includes('And keep the logo where it is'), `the reply, at once: ${reply}`);
       assert((await drafts3()).length === 0, 'nothing kept');
+    },
+  );
+
+  // The agent's line ("Sent to spot-edit · waiting for it to start") pushes the notes down. It came from the live stream,
+  // up to a second after "Only send" answered, under whatever was aimed at by then: CI's click on the composer's Send
+  // landed in the note's text, the line's height above it. Here the video's runs, as the stream asks for them, are held
+  // until the next note is written and Send aimed at, so only the send's own answer can bring the line before then.
+  const lineFile = makeVideo(path.join(dir, 'Spot/export/line.mp4'), { w: 320, h: 180, fps: 25, dur: 8, pattern: 'testsrc2' });
+  age(lineFile);
+  const slug5 = (await api('/api/library', 'POST', { path: lineFile })).video.slug;
+  await check(
+    'the agent’s line comes with "Only send"’s answer, not later from the live stream: Send, aimed once the drafts left, stays under the pointer',
+    async () => {
+      await api(`/api/review/${enc(slug5)}/session`, 'PUT', {
+        name: 'spot-edit',
+        sessionId: '0f8fad5b-d9cb-469f-a165-70867728950e',
+        cwd: dir,
+        agent: 'claude-code',
+      });
+      await api(`/api/review/${enc(slug5)}/drafts`, 'POST', { v: 1, frame: 30, text: 'Tighter cut here' });
+      // The page's fetch from its first request on: the video's runs go through (counted once the app has read them)
+      // until `__holdRuns()`, then wait for `__letRuns()`; what moved is noted for a failure's message.
+      const wrapped = await page.evaluateOnNewDocument((s) => {
+        const real = window.fetch;
+        let go;
+        const gate = new Promise((r) => {
+          go = r;
+        });
+        const t0 = performance.now();
+        const seen = [];
+        const note = (k) => seen.at(-1)?.k !== k && seen.push({ k, t: Math.round(performance.now() - t0) });
+        const runs = { read: 0, holding: false, held: 0, shown: 0, seen };
+        window.__runs = runs;
+        window.__holdRuns = () => {
+          runs.holding = true;
+          // the line's phase, Send's top and the drafts' block, as they change
+          new MutationObserver(() => {
+            const send = document.querySelector('[data-testid=composer-send]')?.getBoundingClientRect().top;
+            const line = document.querySelector('[data-testid=run-strip]')?.dataset.phase ?? 'no line';
+            note(`${line} send@${send ?? '-'}${document.querySelector('[data-testid=unsent]') ? ' drafts' : ''}`);
+          }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-phase'] });
+        };
+        window.__letRuns = () => {
+          runs.holding = false;
+          go();
+        };
+        window.fetch = async (input, init) => {
+          const at = new URL(String(input), location.href);
+          if (init?.method === 'POST' && at.pathname.endsWith('/drafts/send')) {
+            const res = await real(input, init);
+            res
+              .clone()
+              .json()
+              .then(
+                (j) => note(`answer: ${j.opened ? `opened ${j.opened.state}` : 'no run'}`),
+                () => {},
+              );
+            return res;
+          }
+          if ((init?.method ?? 'GET') !== 'GET' || at.pathname !== '/api/runs' || at.searchParams.get('slug') !== s) return real(input, init);
+          const held = runs.holding;
+          if (held) {
+            note('runs asked: held');
+            runs.held++;
+            await gate;
+          }
+          const res = await real(input, init);
+          // read by the app and shown: the query cache tells the screen on a zero timer of its own, set after the read
+          const read = res.json.bind(res);
+          res.json = async () => {
+            const data = await read();
+            setTimeout(() =>
+              setTimeout(() => {
+                if (held) runs.shown++;
+                else runs.read++;
+              }),
+            );
+            return data;
+          };
+          return res;
+        };
+      }, slug5);
+      await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: SHOTS ? 2 : 1, isMobile: false, hasTouch: false });
+      await page.goto('about:blank');
+      await page.goto(`${BASE}/#/v/${enc(slug5)}`, { waitUntil: 'domcontentloaded' });
+      await page.removeScriptToEvaluateOnNewDocument(wrapped.identifier);
+      await videoReady();
+      await page.waitForFunction(() => /spot-edit/.test(document.querySelector('[data-testid=agent-button]')?.getAttribute('aria-label') || ''), {
+        polling: 100,
+        timeout: 20000,
+      });
+      await page.waitForSelector('[data-testid=unsent]');
+      // the page has read the video's runs (none yet): from now on the line can come only from an answer
+      await until(() => page.evaluate(() => window.__runs.read > 0), 'the runs read');
+      assert(!(await page.$('[data-testid=run-strip]')), 'no line before the send');
+      await page.evaluate(() => window.__holdRuns());
+      await page.click('[data-testid=drafts-send]');
+      await page.waitForSelector('[data-testid=unsent] [data-testid=wake-ask]');
+      await page.click('[data-testid=wake-send]');
+      // the drafts' area taken off, not only closed: closed, it keeps the list's gap (8 px) until its motion's time is up
+      await page.waitForFunction(() => !document.querySelector('[data-testid=unsent]'), { polling: 100, timeout: 20000 });
+      await write(90, 'Start on this one', slug5);
+      // where a person aims: Send as it stands once the drafts have left and the note is written
+      const sendBox = () =>
+        page.$eval('[data-testid=composer-send]', (b) => {
+          const r = b.getBoundingClientRect();
+          return { x: r.x + r.width / 2, y: r.y + r.height / 2, top: r.top };
+        });
+      const aim = await sendBox();
+      const lineThen = !!(await page.$('[data-testid=run-strip][data-phase=queued]'));
+      // the stream asks for the runs (the send opened one): let them in, and wait until the page has shown them
+      await until(() => page.evaluate(() => window.__runs.held > 0), 'the live stream asks for the runs');
+      await page.evaluate(() => window.__letRuns());
+      await until(() => page.evaluate(() => window.__runs.shown >= window.__runs.held), 'the runs shown');
+      await page.waitForSelector('[data-testid=run-strip][data-phase=queued]', { timeout: 20000 });
+      const now = await sendBox();
+      assert(
+        Math.abs(now.top - aim.top) < 0.5,
+        `Send stays where it was aimed at: top ${aim.top} → ${now.top} (the agent's line ${lineThen ? 'was there' : 'came only after it was aimed at'}); ${JSON.stringify(await page.evaluate(() => window.__runs.seen))}`,
+      );
+      // a person's click lands where they aimed
+      await page.mouse.click(aim.x, aim.y);
+      await composerGone();
+      await page.waitForSelector('[data-testid=unsent] [data-testid=wake-ask]', { timeout: 20000 });
+      await page.click('[data-testid=wake-send]');
+      await until(async () => (await api(`/api/review/${enc(slug5)}`)).review.comments.some((c) => c.text === 'Start on this one'), 'the note sent');
     },
   );
 

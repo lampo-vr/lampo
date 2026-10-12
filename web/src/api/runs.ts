@@ -27,8 +27,9 @@ function guessRun(qc: QueryClient, slug: string, id: string, patch: Partial<Pick
   ]);
 }
 
-/** The server's answer in every cached copy (the follow-up run of Try again joins the video's list at the top). */
-function settleRun(qc: QueryClient, slug: string, run: Run) {
+/** The server's answer in every cached copy (the follow-up run of Try again, or the one a send opened, joins the video's
+ * list at the top). */
+export function settleRun(qc: QueryClient, slug: string, run: Run) {
   qc.setQueryData<RunsResponse>(runKeys.of(slug), (old) =>
     old ? { ...old, runs: old.runs.some((r) => r.id === run.id) ? old.runs.map((r) => (r.id === run.id ? run : r)) : [run, ...old.runs] } : old,
   );

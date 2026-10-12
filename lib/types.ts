@@ -536,6 +536,9 @@ export interface DraftsSent {
   error?: string;
   /** With `start`: the agent Lampo started for the batch (null when it was running already). */
   run?: AgentRunInfo | null;
+  /** The run the batch opened for the video's agent, or the open one that took it, as GET /api/runs shows it (only for
+   * the agents right): the page shows the agent's line with the send, not a moment later from the live stream. */
+  opened?: Run;
 }
 
 /** GET /api/drafts: how many of your notes are not sent yet, per video (typed drafts and drafts from recordings). */

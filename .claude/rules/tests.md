@@ -62,3 +62,7 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
   never `currentTime`: under load currentTime runs frames ahead of the picture, and a pause keeps the frame on screen
   (CI paused on f90 with currentTime past f92). After a pause, wait until every picture presents the transport's frame;
   one that stays off is a product bug (B kept a frame of its own: `usePlayback.ts`), never a margin to widen.
+- A click that did nothing visible may have landed where its target was a moment before: check what came in between
+  puppeteer's measuring and its press (the agent's line from the live stream moved the composer's Send 71 px), and force
+  it by holding that request and comparing the target's box before and after (`drafts.mjs`). `{ hidden: true }` is not
+  gone: the drafts' area closed to no height still holds the list's grid gap until it is taken off.

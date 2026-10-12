@@ -610,7 +610,7 @@ author's own) gets `403`, and anyone else's draft is a `404`.
 | `PATCH` · `DELETE /api/review/:slug/drafts/:id` | change `{text?, tags?, severity?, text_edit_to?}`; delete it with its files |
 | `POST /api/review/:slug/drafts/:id/refs` · `DELETE …/refs/:ref` | references on a draft, as on a note (without `note`: drafts have no replies) |
 | `GET /api/review/:slug/drafts/:id/:file` | a draft's screenshot or voice note |
-| `POST /api/review/:slug/drafts/send` | send your drafts: `{ids?, recordings?, start?}` → `DraftsSent {notes, left, error?, run?}` (below) |
+| `POST /api/review/:slug/drafts/send` | send your drafts: `{ids?, recordings?, start?}` → `DraftsSent {notes, left, error?, run?, opened?}` (below) |
 | `GET /api/drafts` | how many notes you haven't sent, per video: `{videos: {<slug>: n}}` |
 
 Saving, changing and deleting a draft writes no event. **Sending** turns your drafts (all, or `ids`; with
@@ -619,7 +619,8 @@ with their recording) into ordinary notes in one write. One draft alone is `{ids
 [id]}` for a recording's; that is how each draft gets its own Send. It is one batch of `comment` events, in
 the order they were saved (then said). Each note is created now, on the newest version if one arrived meanwhile.
 `start` (the agents action, from the machine itself, checked before anything is sent) starts the video's agent once
-for the batch.
+for the batch. `opened` is the run the batch opened for the video's agent, or the open one that took it, as
+`GET /api/runs` shows it (only for the agents action): the app shows the agent's line with the send.
 
 ### Recorded feedback
 
