@@ -18,6 +18,10 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - A loading state in the real layout shows the screen's title too: wait for the loaded screen's testid (`consent`),
   never its words. After a navigation, a click waits for the View Transition to end (`document.activeViewTransition`):
   until then it lands on the snapshot.
+- A click into something that slides in (the phone's drawer) waits until it is in place: no animation pending or
+  running, its edge where it rests (`archive.mjs`, `inbox.mjs`). Until the compositor has started the slide, Chrome holds
+  its first keyframe, off the window, even under reduced motion's 1 ms; a row found by `waitForSelector` is then outside
+  it, and CI's click threw "Node is either not clickable". Force it by pausing the element's animations as it mounts.
 - What shows first is not yet the answer: an optimistic switch turns before the server has it (read the API after its
   toast), a line built from two requests shows one before the other (wait for the whole line), a dialog is scaled while
   it comes in (measure a box once it holds still two frames with no animation of its own; `options.mjs`).

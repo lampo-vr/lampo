@@ -258,8 +258,30 @@ try {
     await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: SHOTS ? 3 : 1 });
     try {
       await open();
+      // The drawer comes in from the left edge: until the compositor has started its slide (pending: later on a loaded
+      // runner, under reduced motion's 1 ms too) it stands on its first keyframe, off the window, and a click finds no
+      // point on its rows (CI: "Node is either not clickable"). Held there until this test lets it go, it always does.
+      await page.evaluate(() => {
+        new MutationObserver((_, seen) => {
+          const held = document.querySelector('.drawer')?.getAnimations() ?? [];
+          if (!held.length) return;
+          seen.disconnect();
+          for (const a of held) a.pause();
+          window.letDrawerGo = () => {
+            for (const a of held) a.play();
+          };
+        }).observe(document.body, { childList: true, subtree: true });
+      });
       await page.click('[aria-label="Folders and views"]');
       const row = await page.waitForSelector('[role=dialog] [data-testid=nav-archived]');
+      const off = await row.evaluate((e) => e.getBoundingClientRect().right);
+      assert(off <= 0, `held, the drawer’s row is left of the window: its right edge at ${off}`);
+      await page.evaluate(() => window.letDrawerGo());
+      // a finger's tap comes once it is in place: no animation pending or running, its edge at the window's
+      await page.waitForFunction(() => {
+        const d = document.querySelector('.drawer');
+        return !!d && d.getBoundingClientRect().left >= 0 && d.getAnimations().every((a) => !a.pending && a.playState !== 'running');
+      });
       await shot('08-phone-menu');
       await row.click();
       await page.waitForSelector('[data-testid=archived-row]');
