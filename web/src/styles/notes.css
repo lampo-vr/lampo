@@ -260,7 +260,9 @@ button.note-sect:hover {
 .nr {
   position: relative;
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-auto-columns: auto;
+  grid-auto-flow: column;
   align-items: center;
   gap: var(--sp-2);
   width: 100%;

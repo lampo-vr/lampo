@@ -12,6 +12,7 @@ import { t } from '../i18n/index.ts';
 import { useLang } from '../i18n/T.tsx';
 import { copyText, toast, toastError } from '../lib/toast.ts';
 import { copyGoOn, goOnWords, startWith } from '../sessions/listening.tsx';
+import { stateWords } from '../sessions/runState.ts';
 import { type RunAction, type RunLike, type RunSaid, runSaid, type Say, stalledSaid } from '../sessions/runWords.ts';
 import { AgentMark, I } from '../ui/icons.tsx';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
@@ -121,10 +122,16 @@ export const RunStrip = memo(function RunStrip(p: RunStripProps) {
   const busy = p.act.busy;
   const asked = phase === 'needs_you' && (run?.needs?.kind === 'question' || run?.needs?.kind === 'options' || !run?.needs);
   const working = phase === 'working' || phase === 'rendering' || phase === 'uploading' || phase === 'checking';
-  // The line's words are the strip's (runWords.ts), split in two: where it stands in a few words is the sentence, after
-  // the agent's name ("Claude Code is fixing 3 of 7", "… needs permission"), and the rest is the folded line under it
-  // (its latest step, how long, why it stopped); a line without a name says its own ("V3 is ready", "Stopped after 4 min").
-  const [head = '', ...rest] = said.words.split(' · ');
+  // The line's words are the strip's (runWords.ts), split in two: where it stands is the sentence, after the agent's
+  // name ("Claude Code is fixing 3 of 7", "… needs permission"), and the rest is the folded line under it (its latest
+  // step, how long, why it stopped); a line without a name says its own ("V3 is ready", "Stopped after 4 min"). While it
+  // works, where it stands is runPlan's one wording and count, whole ("wrapping up · 5 of 5 done"), as the card, the
+  // agent button and the Agent view say it (sessions/runState.ts stateWords).
+  const doing = working && run ? stateWords(run) : null;
+  const [head = '', ...rest] =
+    doing && (said.words === doing || said.words.startsWith(`${doing} · `))
+      ? [doing, ...(said.words === doing ? [] : [said.words.slice(doing.length + 3)])]
+      : said.words.split(' · ');
   const what =
     phase === 'not_listening' ? t('stopped listening') : asked ? t('asked you') : said.name ? (working ? t('is {doing}', { doing: head }) : head) : null;
   // the folded line: what to tell it, the question in its words, or the rest of the strip's words

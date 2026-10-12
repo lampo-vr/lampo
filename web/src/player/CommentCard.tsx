@@ -666,6 +666,8 @@ export const CommentCard = memo(function CommentCard({
                       ? [t('V{v} changed here', { v: changedIn }), 'neutral']
                       : null;
     const ghost = c.rangeHere && c.scope !== 'video' ? c.rangeHere : null;
+    // its replies (a status change is no reply): counted on the row, read in the card
+    const said = (c.replies || []).filter((r) => !r.status).length;
     const show = () => {
       setPeek(true);
       if (ghost) setRangeHint({ ghost });
@@ -709,6 +711,18 @@ export const CommentCard = memo(function CommentCard({
               <span className="nr-text">
                 {c.text_edit ? <WordsChange edit={c.text_edit} inline /> : c.text ? firstLine(c.text) : <span className="muted">{t('(marked frame)')}</span>}
               </span>
+              {(ghost || said > 0 || c.v !== currentV) && (
+                <span className="nr-meta">
+                  {ghost && fps && <span className="nr-len">{formatSeconds(rangeSeconds(ghost, fps))}</span>}
+                  {c.v !== currentV && <span className="nr-v">V{c.v}</span>}
+                  {said > 0 && (
+                    <span className="nr-said" title={t('{n} reply|{n} replies', { n: said })}>
+                      <I name="reply" size={12} />
+                      {said}
+                    </span>
+                  )}
+                </span>
+              )}
               {label && (
                 <Badge size="sm" tone={label[1]} className="nr-state" testId="note-state">
                   {label[0]}

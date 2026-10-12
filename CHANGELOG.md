@@ -13,9 +13,9 @@ format stays backwards compatible throughout.
   the panel is narrow it says less rather than crowd. The notes come in groups of where they stand: "Needs you" (an
   agent's questions), "To check" with its "Check ⇧V", "Open", and "Done" folded at the end. Mine, Closed, All,
   Questions and the tags are in the filter menu, and a filter that is on shows as a chip that takes it off; the Agent
-  view and going through the open notes (N) are in ⋯. Each note is one line: its time, its mark, its words and a
-  small label of where it stands ("Fixed in V2", "Question", "Agent on it", "Fixed · waiting for V3"), with Reply and
-  ⋯ on hover. The author shows only when more than one person wrote the notes. Auto-check shows in the head only
+  view and going through the open notes (N) are in ⋯. Each note is one line: its time, its mark, its words, a
+  section's length, how many replies it has, and a small label of where it stands ("Fixed in V2", "Question", "Agent
+  on it", "Fixed · waiting for V3"), with Reply and ⋯ on hover. The author shows only when more than one person wrote the notes. Auto-check shows in the head only
   once it found something; on a phone it stands on the line under the head, with the filter and ⋯.
 - An agent at work is one line under the notes' head: "Claude Code is fixing 1 of 3", "asked you" or "stopped
   listening", with one action (Stop, Answer, Copy "go on") and a folded line with its latest step, the question or what

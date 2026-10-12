@@ -258,9 +258,14 @@ try {
     await p.setViewport({ width: 1440, height: 900 });
     await p.goto(`${BASE}/#/v/${enc(teaser)}`, { waitUntil: 'domcontentloaded' });
     await p.waitForSelector('[data-testid=run-strip]:not(.pending)', { timeout: 20000 });
-    const words = await p.$eval('[data-testid=run-words]', (e) => e.textContent);
-    assert(words === 'Claude Code · needs permission to run npx remotion render', `the strip: ${words}`);
-    await p.click('[data-testid=run-allow]');
+    // the agent's line: one sentence, and its one action, "How to allow it"
+    const line = await p.$eval('[data-testid=run-strip]', (e) => ({
+      words: e.querySelector('[data-testid=run-words]')?.textContent,
+      acts: [...e.querySelectorAll('.run-act')].map((b) => `${b.dataset.testid}:${b.textContent.trim()}`),
+    }));
+    assert(line.words === 'Claude Code needs permission to run npx remotion render', `the line: ${JSON.stringify(line)}`);
+    assert(line.acts.join() === 'run-allow:How to allow it', `its one action: ${JSON.stringify(line)}`);
+    await p.click('[data-testid=run-strip] [data-testid=run-allow]');
     await p.waitForSelector('[data-testid=agent-view] [data-testid=run-permission] [data-testid=run-allow]', { timeout: 20000 });
     const rule = await p.$eval('[data-testid=agent-view] [data-testid=run-allow] pre', (e) => e.textContent);
     assert(rule === ALLOW, `the rule: ${rule}`);
