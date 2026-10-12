@@ -189,13 +189,6 @@
   /* Shadows cast onto the page: dark islands don't redeclare these, so a film strip on paper casts a paper shadow. */
   --cast: #000;
   --cast-k: 1;
-  /* The old names of --agent and its tints: the site's names until it moves to --agent (site/assets/site.css); the app
-     uses none of them. Remove once the website has moved. Declared here, where the theme and every island work them out
-     again, so each is the --agent of the theme it stands in. */
-  --claude: var(--agent);
-  --claude-bg: var(--agent-bg);
-  --claude-2: var(--agent-2);
-  --claude-3: var(--agent-3);
   /* a sheet on the light table: the frames' mat (the setup's pictures) */
   --fr-bg: var(--fb-mat);
   --fr-edge: var(--fb-edge);

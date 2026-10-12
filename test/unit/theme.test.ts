@@ -24,24 +24,22 @@ function block(selectorStart: string): Record<string, string> {
 }
 const dark = block(':root,\n');
 
-// An agent's colour is --agent (the thing is the Agent, not one product); --claude and its tints stay in base.css only as
-// aliases for the website until it moves, and nothing in the app uses them.
-test('the agent tone is --agent: the old --claude names are the website’s aliases, unused by the app', () => {
+// An agent's colour is --agent (the thing is the Agent, not one product); the old --claude names are gone from base.css
+// (the website moved to --agent on 2026-10-12) and nothing may bring them back.
+test('the agent tone is --agent: no --claude name anywhere in the app', () => {
   const uses: string[] = [];
   const web = path.join(import.meta.dirname, '../../web/src');
   const walk = (dir: string) => {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       const p = path.join(dir, e.name);
       if (e.isDirectory()) walk(p);
-      else if (/\.(css|tsx?)$/.test(e.name) && e.name !== 'base.css')
+      else if (/\.(css|tsx?)$/.test(e.name))
         for (const [i, line] of fs.readFileSync(p, 'utf8').split('\n').entries())
           if (/--(on-)?claude\b/.test(line)) uses.push(`${path.relative(web, p)}:${i + 1}`);
     }
   };
   walk(web);
   assert.deepEqual(uses, [], 'use --agent, --agent-bg, --agent-2, --agent-3, --on-agent');
-  for (const old of ['--claude', '--claude-bg', '--claude-2', '--claude-3'])
-    assert.match(base, new RegExp(`\\n\\s*${old}: var\\(--agent${old.slice('--claude'.length)}\\);`), `${old} stays an alias of the --agent token`);
 });
 
 // Green marks a state — a glyph, a dot, one word — never a surface or an outline (Valentino on the check-fixes banner
