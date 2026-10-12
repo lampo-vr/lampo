@@ -18,9 +18,10 @@ export interface ToldPlace {
 /** How many marks a workspace keeps: agents × videos they read. */
 export const TOLD_KEEP = 4000;
 
-/** On disk: `<agent>\0<slug>` → [second, seen, when written]. */
+/** On disk: `<agent>\0<slug>` → [second, seen, when written]. `broken`: in memory only, the file couldn't be read. */
 interface ToldFile {
   marks: Record<string, [number, number, number]>;
+  broken?: true;
 }
 
 const fileIn = (dataDir: string) => path.join(dataDir, 'told.json');
@@ -29,29 +30,40 @@ const key = (agent: string, slug: string) => `${agent}\u0000${slug}`;
 // The file as last read, per workspace folder: a wait asks for its marks on every look, and the file changes only when
 // something is told.
 const read = new Map<string, { mtime: number; data: ToldFile }>();
+// An unreadable file said in the log: once per state of it (its mtime), not on every look.
+const saidBroken = new Map<string, number>();
 
+/**
+ * A told.json that can't be read is never taken for an empty one (store.md: a registry file that can't be read refuses
+ * writes): waits go by their cursor alone, as before told marks existed, and nothing is written over it until it is put
+ * right (or removed). Said once in the log per state of the file.
+ */
 function load(dataDir: string): ToldFile {
   const file = fileIn(dataDir);
   let mtime = -1;
   try {
     mtime = fs.statSync(file).mtimeMs;
-  } catch {
-    return { marks: {} };
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return { marks: {} };
   }
   const hit = read.get(file);
-  if (hit && hit.mtime === mtime) return hit.data;
-  let data: ToldFile = { marks: {} };
+  if (hit && hit.mtime === mtime && mtime !== -1) return hit.data;
+  let data: ToldFile;
   try {
     const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as Partial<ToldFile>;
-    if (parsed && typeof parsed.marks === 'object' && parsed.marks) data = { marks: parsed.marks };
-  } catch {
-    // unreadable: as if nothing was told (the cursor decides), and written anew with the next mark
+    if (!parsed || typeof parsed.marks !== 'object' || !parsed.marks || Array.isArray(parsed.marks)) throw new Error('no marks in it');
+    data = { marks: parsed.marks };
+  } catch (e) {
+    data = { marks: {}, broken: true };
+    if (saidBroken.get(file) !== mtime)
+      console.error(`told: ${file} can't be read (${(e as Error).message}): waits go by their cursor alone, and nothing is written over it`);
+    saidBroken.set(file, mtime);
   }
   read.set(file, { mtime, data });
   return data;
 }
 
-/** Where `agent` stands in `slug`'s feedback, or null when nothing of it was told. */
+/** Where `agent` stands in `slug`'s feedback, or null when nothing of it was told (or the file can't be read). */
 export function toldPlace(dataDir: string, agent: string, slug: string): ToldPlace | null {
   const m = load(dataDir).marks[key(agent, slug)];
   return Array.isArray(m) && Number.isFinite(m[0]) && Number.isFinite(m[1]) ? { at: m[0], seen: m[1] } : null;
@@ -76,6 +88,8 @@ export function markTold(dataDir: string, agent: string, places: Record<string, 
     withLock(path.join(dataDir, '.told'), () => {
       read.delete(fileIn(dataDir));
       const data = load(dataDir);
+      // can't be read: never written over (the marks it holds may be put right); this mark is told once more instead
+      if (data.broken) return;
       let changed = false;
       for (const s of slugs) {
         const k = key(agent, s);

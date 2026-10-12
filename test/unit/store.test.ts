@@ -102,7 +102,10 @@ test('a render still being written is left alone, a settled one becomes v2; open
   age(video);
   const res = must(store.sync(slug));
   assert.equal(res.version?.v, 2);
-  assert.equal(res.carried, 0, 'no fix was marked before it');
+  // the count agents have always read (its open notes go on with it, still open), and the fixes it took along
+  assert.equal(res.carried, 2, 'its two open notes go on with it');
+  assert.equal(res.took, 0, 'no fix was marked before it');
+  assert.match(store.readEvents().at(-1)?.text ?? '', /^v2 registered, 2 open comment\(s\) carried forward$/);
   const review = load();
   assert.equal(review.frames, 36);
   for (const c of review.comments) {

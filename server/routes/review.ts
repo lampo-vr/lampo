@@ -320,7 +320,7 @@ export function reviewRoutes(ctx: ServerContext): Router {
     // A version registered here gets the same work as one the file watcher or an upload brings: poster, analysis, the
     // diff, and its transcript when the one before was heard (otherwise "what changed" waits for someone to ask).
     if (s.version) ctx.background.warm(s.review);
-    res.json({ changed: s.changed, pending: !!s.pending, version: s.version || null, carried: s.carried || 0, review: s.review });
+    res.json({ changed: s.changed, pending: !!s.pending, version: s.version || null, carried: s.carried || 0, took: s.took || 0, review: s.review });
   });
 
   r.get('/api/comments/:id', (req, res) => {

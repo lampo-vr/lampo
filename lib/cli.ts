@@ -363,12 +363,13 @@ function commentLines(b: Backend, review: Review, c: Comment, { full = false, br
   const flags: string[] = [];
   if (c.check_again) flags.push(`CHECK AGAIN in v${c.carried_to}`);
   if (c.status === 'fixed') flags.push(`fixed in v${c.fixed_in_v}`);
-  if (fixWaits(c)) flags.push(ridingFlag(review.versions));
   if (c.verified_on) flags.push(`verified on preview ${c.verified_on.preview}: the next render must contain it`);
   if (c.scope === 'video') flags.push('OVERALL: about the whole video, not frame 0');
   if (isAgent(c.author)) flags.push(`by ${c.author}`);
   if (isClient(c.author)) flags.push(CLIENT_NOTE_FLAG);
   if (c.status !== 'open' && picksToRender(c, review.versions.at(-1)?.registered)) flags.push('PICKED: render with these');
+  // newer flags after the ones agents know (append, never reword: .claude/rules/agent-text.md)
+  if (fixWaits(c)) flags.push(ridingFlag(review.versions));
   L.push(
     `${c.id}  ${c.status.toUpperCase().padEnd(8)} ${noteLabel(c).padEnd(6)} ${c.timecode}  f${c.frame}${range}  v${c.v}  [${tags(c.tags)}]${flags.length ? `  ${flags.join(' · ')}` : ''}${onWords(pointerIn(pointers, c.id))}${partOkWords(partOk(review.versions, c))}`,
   );
@@ -894,7 +895,10 @@ const commands: Record<string, Command> = {
       return;
     }
     out(oneLine(`${r.created ? 'added' : `new version`}: ${r.review.video} (v${r.v})${r.review.folder ? `  [${r.review.folder}]` : ''}`));
-    // fixes marked before it came with it (lib/store.ts registerVersion); open notes stay open until marked
+    // the line agents have always read (its open notes go on with it, still open until marked), then the fixes marked
+    // before it that came with it (lib/store.ts registerVersion): append, never reword (.claude/rules/agent-text.md)
+    const carried = r.v > 1 ? r.review.comments.filter((c) => c.status === 'open').length : 0;
+    if (carried) out(`    ${carried} open comment(s) carried forward: check them against v${r.v}`);
     const took = r.review.comments.filter((c) => c.status === 'fixed' && c.fixed_in_v === r.v).length;
     if (took) out(`    ${took} fix${took === 1 ? '' : 'es'} marked before it now in v${r.v}: the person checks them`);
     if (mapLine) out(mapLine);
@@ -962,7 +966,11 @@ const commands: Record<string, Command> = {
     const { slug } = await b.resolve(pos[0] || die('missing <video>'));
     const r = (await b.sync(slug)) || die(`no review for ${slug}`);
     const latest = latestOf(r.review);
-    if (r.version) out(`registered v${latest.v}${r.carried ? `, ${r.carried} fix${r.carried === 1 ? '' : 'es'} marked before it now in it` : ''}`);
+    // the line agents have always read, then what the version took along (append, never reword)
+    if (r.version)
+      out(
+        `registered v${latest.v}${r.carried ? `, ${r.carried} open comment(s) carried forward` : ''}${r.took ? `, ${r.took} fix${r.took === 1 ? '' : 'es'} marked before it now in it` : ''}`,
+      );
     // a new render waits on disk: nothing new in an archived project
     else if (r.archived) die(archivedWords(r.archived));
     else if (r.pending) out(`the file is still being written; try again in a moment (current v${latest.v})`);

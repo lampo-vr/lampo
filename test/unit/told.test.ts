@@ -34,7 +34,7 @@ test('a place per agent and video, kept in the workspace’s folder, never movin
   assert.ok(!fs.readFileSync(file, 'utf8').includes('Title'), 'agents and videos, nothing anyone wrote');
 });
 
-test('bounded: past TOLD_KEEP marks the oldest go, and an unreadable file is as if nothing was told', () => {
+test('bounded: past TOLD_KEEP marks the oldest go; a file that can’t be read tells nothing and is never written over', () => {
   const a = folder();
   const many: Record<string, { at: number; seen: number }> = {};
   for (let i = 0; i < TOLD_KEEP; i++) many[`v${i}.mp4`] = { at: 1000, seen: 0 };
@@ -43,11 +43,28 @@ test('bounded: past TOLD_KEEP marks the oldest go, and an unreadable file is as 
   const marks = JSON.parse(fs.readFileSync(path.join(a, 'told.json'), 'utf8')).marks;
   assert.equal(Object.keys(marks).length, TOLD_KEEP);
   assert.deepEqual(toldPlace(a, 'new', 'x.mp4'), { at: 5000, seen: 1 });
+  // can't be read (cut short, edited by hand): no floor — waits go by their cursor — and the file stays as it is
   const b = folder();
-  fs.writeFileSync(path.join(b, 'told.json'), '{ not json');
+  const file = path.join(b, 'told.json');
+  fs.writeFileSync(file, '{ not json');
+  const said: string[] = [];
+  const was = console.error;
+  console.error = (...a: unknown[]) => said.push(a.join(' '));
+  try {
+    assert.equal(toldPlace(b, 'mcp-1', 'loop.mp4'), null);
+    assert.deepEqual(toldPlaces(b, 'mcp-1'), {});
+    markTold(b, 'mcp-1', { 'loop.mp4': { at: 1000, seen: 1 } });
+    markTold(b, 'mcp-1', { 'loop.mp4': { at: 2000, seen: 1 } });
+  } finally {
+    console.error = was;
+  }
+  assert.equal(fs.readFileSync(file, 'utf8'), '{ not json', 'never written over');
   assert.equal(toldPlace(b, 'mcp-1', 'loop.mp4'), null);
-  markTold(b, 'mcp-1', { 'loop.mp4': { at: 1000, seen: 1 } });
-  assert.deepEqual(toldPlace(b, 'mcp-1', 'loop.mp4'), { at: 1000, seen: 1 }, 'written anew');
+  assert.equal(said.filter((l) => /told\.json can't be read/.test(l)).length, 1, `said once in the log: ${JSON.stringify(said)}`);
+  // put right (here: removed), it is written again
+  fs.rmSync(file);
+  markTold(b, 'mcp-1', { 'loop.mp4': { at: 3000, seen: 1 } });
+  assert.deepEqual(toldPlace(b, 'mcp-1', 'loop.mp4'), { at: 3000, seen: 1 });
 });
 
 test('the inbox: after a video’s place whatever the cursor; after the cursor where nothing was told; each thing once; a read moves the place only past what it told of', async () => {

@@ -75,7 +75,8 @@ export function shortEventLine(e: ReviewEvent): string {
 
 /**
  * Still wrong said on a version (check mode): which version the reason is about, and that a picture of it comes with the
- * answer (the person drew on that version). Appended after the reason: what was there before reads as it did.
+ * answer (the person drew on that version). Appended after the line's last token of its own (a REPLY's ` · on: "…"`, a
+ * REOPENED's reason), before only the file path `lampo watch` ends with: what was there before reads as it did.
  */
 const stillWrong = (e: ReviewEvent): string =>
   e.reply?.on_v ? ` · still wrong in v${e.reply.on_v}${e.reply.drawing?.length ? ', drawn on it (get_note shows it)' : ''}` : '';
@@ -121,7 +122,7 @@ function line(e: ReviewEvent, paths: boolean): string {
     case 'preview':
       return `[${t}] PREVIEW CONFIRMED ${e.id} ${e.timecode} ${name}${to} — "${e.reply?.text}"${vid}`;
     case 'reply':
-      return `[${t}] REPLY ${e.id} ${e.timecode} ${name}${to} by ${e.by} — ${said(e)}${e.reply?.refs?.length ? ` + ${e.reply.refs.length} reference${e.reply.refs.length === 1 ? '' : 's'}` : ''}${stillWrong(e)} · on: "${e.text}"${vid}`;
+      return `[${t}] REPLY ${e.id} ${e.timecode} ${name}${to} by ${e.by} — ${said(e)}${e.reply?.refs?.length ? ` + ${e.reply.refs.length} reference${e.reply.refs.length === 1 ? '' : 's'}` : ''} · on: "${e.text}"${stillWrong(e)}${vid}`;
     case 'edit':
       // a reply's author changed its words: the reply as it reads now, and the note it is on
       if (e.reply) return `[${t}] EDITED REPLY ${e.id} ${e.timecode} ${name}${to} by ${e.by} — now: "${e.reply.text}" · on: "${e.text}"${vid}`;

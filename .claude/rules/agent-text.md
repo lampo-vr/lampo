@@ -33,6 +33,11 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - Clean agent names where they come in (`cleanAgentName`) and stored ones on read (`shownName`, `shownEvent`).
 - What a caller posts under an agent's name carries the caller's account (`ownedAgentName`).
 - Agent formats keep their tokens (`lampo` lines, INBOX.md, `CHANGE WORDS`, `PICKED`): append, never reword.
+  Appending means after: new words after a line's closing token (a REPLY's ` · on: "…"`; only `lampo watch`'s file path
+  comes later), a new flag after the flags agents know, a new section after theirs, a heading's new words after its
+  count ("## Fixed, waiting for alex to verify (1) · the person's check"); a count keeps what it counted ("N open
+  comment(s) carried forward"), and what else there is to count comes after it. The contract snapshots hold the old
+  lines byte for byte.
 - New texts say `lampo` and `LAMPO_*`, never `vr` or `VR_*` (those are only the aliases' own code and their docs);
   a setting is read through `lib/env.ts` (`setting`, `settings`), never `process.env.LAMPO_X ?? process.env.VR_X`.
 - A new MCP tool, field or line must fit `token-budget.test.ts`; raise a budget only with a `bench/tokens/` run.

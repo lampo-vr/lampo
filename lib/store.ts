@@ -13,7 +13,7 @@ import path from 'node:path';
 import { ProjectArchivedError } from './archived.ts';
 import { StoppedError, signalsHeard } from './backend/types.ts';
 import { cleanChoices } from './choices.ts';
-import { describeShape } from './drawing.ts';
+import { describeShape, fitDrawing } from './drawing.ts';
 import { pointersOf } from './elementMaps.ts';
 import { legendLine, onWords, pointerIn } from './elements.ts';
 import { isInboxEvent, statusLabel } from './eventLine.ts';
@@ -219,10 +219,44 @@ function shownNames(r: Review): Review {
   return r;
 }
 
+// How many drawings of a review read back within reach of their picture (lib/drawing.ts fitDrawing): a store kept one
+// from before sizes were held (a box 1e15 wide, sent through a review link), and everything that reads the review —
+// the app, agents, a store's export — gets it within the picture; the next change writes it so. versions/ is untouched.
+const fittedIn = new WeakMap<Review, number>();
+
+function fitDrawings(r: Review): Review {
+  let n = 0;
+  const size = (v: number | undefined) => r.versions?.find((x) => x.v === v) ?? r.versions?.at(-1) ?? { width: r.width, height: r.height };
+  for (const c of r.comments || []) {
+    const own = size(c.v);
+    if (c.drawing != null) {
+      const f = fitDrawing(c.drawing, own.width, own.height);
+      if (f.fixed) {
+        c.drawing = f.shapes;
+        n += f.fixed;
+      }
+    }
+    for (const rp of c.replies || []) {
+      if (rp.drawing == null) continue;
+      const at = size(rp.on_v ?? c.v);
+      const f = fitDrawing(rp.drawing, at.width, at.height);
+      if (f.fixed) {
+        rp.drawing = f.shapes;
+        n += f.fixed;
+      }
+    }
+  }
+  if (n) fittedIn.set(r, n);
+  return r;
+}
+
+/** How many of a review's drawings were brought within their picture when it was read (0: none needed it). */
+export const drawingsFitted = (r: Review): number => fittedIn.get(r) ?? 0;
+
 export function loadReview(slug: string): Review | null {
   if (!validSlug(slug)) return null;
   try {
-    return shownNames(JSON.parse(fs.readFileSync(reviewFile(slug), 'utf8')));
+    return fitDrawings(shownNames(JSON.parse(fs.readFileSync(reviewFile(slug), 'utf8'))));
   } catch (e) {
     if (errCode(e) === 'ENOENT') return null;
     throw e;
@@ -469,6 +503,8 @@ export interface SyncResult {
   changed: boolean;
   version?: Version;
   carried?: number;
+  /** Fixes marked before it that it took along (lib/handover.ts). */
+  took?: number;
   /** The file looks mid-render; try again later. */
   pending?: boolean;
   /** A new render is on disk, but its project is archived (lib/archived.ts): it isn't registered until it is restored. */
@@ -542,9 +578,10 @@ export const setVersionRunProvider = (fn: (slug: string, by: string) => string |
 /**
  * Appends the next version. Open notes stay open: a new version is no fix (lib/handover.ts), so nothing asks the person
  * to check a note nobody worked on. Fixes marked before a version carried them ride with this one (`fix_pending`): they
- * become fixed in it — a part takes only the notes inside its stretch. `carried`: how many it took along.
+ * become fixed in it — a part takes only the notes inside its stretch. `carried`: the open notes that go on with it (the
+ * count agents have always read: "N open comment(s) carried forward"); `took`: the fixes it took along.
  */
-function registerVersion(review: Review, n: NewVersion): { version: Version; carried: number } {
+function registerVersion(review: Review, n: NewVersion): { version: Version; carried: number; took: number } {
   const v = (review.versions.at(-1)?.v || 0) + 1;
   // the run an agent is at on this video made it ("V4 by Claude Code · 12 min · 5 fixed"), never a guess from names alone
   const run = review.onboarding_sample ? undefined : versionRun?.(slugify(review.video), n.by);
@@ -578,6 +615,7 @@ function registerVersion(review: Review, n: NewVersion): { version: Version; car
   if (!base) review.meta = { codec: meta.codec, pix_fmt: meta.pix_fmt, color_space: meta.color_space, color_range: meta.color_range, audio: meta.audio };
   delete review.agent_status;
   const carried: { c: Comment; reply: Reply | null }[] = [];
+  let open = 0;
   if (v > 1) {
     for (const c of review.comments) {
       if (!fixWaits(c) || (n.part && !inPart(c, n.part))) continue;
@@ -595,13 +633,16 @@ function registerVersion(review: Review, n: NewVersion): { version: Version; car
         }
       carried.push({ c, reply });
     }
+    open = review.comments.filter((c) => c.status === 'open').length;
     const what = n.part ? ` (a part: frames ${n.part.at}–${n.part.at + n.part.frames - 1} of v${n.part.of})` : '';
+    // the line agents have always read, then what it took along (append, never reword: .claude/rules/agent-text.md)
+    const kept = open ? `, ${open} open comment(s) carried forward` : '';
     const took = carried.length ? `, ${carried.length} fix${carried.length === 1 ? '' : 'es'} marked before it now in it` : '';
-    logEvent({ type: 'version', by: n.by, review, v, text: `v${v} registered${what}${took}` });
+    logEvent({ type: 'version', by: n.by, review, v, text: `v${v} registered${what}${kept}${took}` });
     // each fix it carries is a fix to check now, told as such (runs, push, webhooks), by whoever marked it
     for (const { c, reply } of carried) logEvent({ type: 'status', by: reply?.by ?? n.by, review, comment: c, ...(reply ? { reply } : {}) });
   }
-  return { version, carried: carried.length };
+  return { version, carried: open, took: carried.length };
 }
 
 // Registers a new version when the file behind review.video changed. Uploads get new versions by being uploaded
@@ -654,8 +695,8 @@ export function syncVersions(review: Review, { force = false, by = 'system' } = 
     return { changed, pending: true };
   }
   const sample = sampleHash(snapshotPath(slug, v, path.extname(review.video)));
-  const { version, carried } = registerVersion(review, { hash, sample, mtime, size: st.size, meta, by });
-  return { changed: true, version, carried };
+  const { version, carried, took } = registerVersion(review, { hash, sample, mtime, size: st.size, meta, by });
+  return { changed: true, version, carried, took };
 }
 
 /**
@@ -1272,7 +1313,8 @@ export function buildComment(review: Review, input: CommentInput): Comment {
     tags: input.tags || [],
     severity: kind === 'feedback' ? input.severity || 'should' : 'nice',
     ...(kind !== 'feedback' || isAgent(author) ? { kind } : {}),
-    drawing: input.drawing || [],
+    // within reach of the picture whoever sent it (a link visitor, an agent, lampo): lib/drawing.ts fitDrawing
+    drawing: fitDrawing(input.drawing, ver.width, ver.height).shapes,
     shots: input.shots ?? null,
     voice: input.voice || null,
     status: 'open',
@@ -1415,8 +1457,10 @@ export function updateComment(id: string, patch: CommentPatch): Comment {
     const said = (reply: Reply) => {
       if (!on || !stillWrong) return;
       reply.on_v = on.v;
-      if (on.drawing?.length) {
-        reply.drawing = on.drawing;
+      const ver = review.versions.find((x) => x.v === on.v) as Version;
+      const drawing = fitDrawing(on.drawing, ver.width, ver.height).shapes;
+      if (drawing.length) {
+        reply.drawing = drawing;
         if (on.frame !== undefined) reply.on_frame = on.frame;
       }
     };
@@ -1424,7 +1468,10 @@ export function updateComment(id: string, patch: CommentPatch): Comment {
     if (patch.text !== undefined) edits.text = patch.text;
     if (patch.tags !== undefined) edits.tags = patch.tags;
     if (patch.severity !== undefined) edits.severity = patch.severity;
-    if (patch.drawing !== undefined) edits.drawing = patch.drawing;
+    if (patch.drawing !== undefined) {
+      const own = review.versions.find((x) => x.v === c.v) ?? (review.versions.at(-1) as Version);
+      edits.drawing = fitDrawing(patch.drawing, own.width, own.height).shapes;
+    }
     if (patch.text_edit_to !== undefined && c.text_edit) edits.text_edit = { from: c.text_edit.from, to: cutChars(patch.text_edit_to.trim(), TEXT_EDIT_MAX) };
     if (Object.keys(edits).length) {
       Object.assign(c, edits);
@@ -2777,9 +2824,10 @@ export function commentBlock(review: Review, c: Comment, { heading = '###', file
   const flags: string[] = [];
   if (c.check_again) flags.push(`check again in v${c.carried_to || latest}`);
   if (c.status === 'fixed') flags.push(`fixed in v${c.fixed_in_v}, waiting for verification`);
-  if (fixWaits(c)) flags.push(ridingFlag(review.versions));
   if (isAgent(c.author)) flags.push(isQuestion(c) ? `asked by ${c.author}` : `by ${c.author}`);
   if (c.scope === 'video') flags.push('overall: about the whole video, not frame 0');
+  // newer flags after the ones agents know (append, never reword: .claude/rules/agent-text.md)
+  if (fixWaits(c)) flags.push(ridingFlag(review.versions));
   lines.push(`${heading} ${c.id} · ${noteLabel(c)} · ${tagList(c.tags)} · ${where}${flags.length ? ` · ${flags.join(' · ')}` : ''}`);
   lines.push('');
   lines.push(c.text ? c.text : c.text_edit ? '_(a change to the words, below)_' : '_(no text, see drawing)_');
@@ -2849,15 +2897,21 @@ export function renderReviewMd(review: Review, { files = 'paths' }: { files?: Md
     ...(open.length ? open.map((c) => commentBlock(review, c, { files })) : ['_None._', '']),
     ...(ideas.length ? [`## Ideas — optional, your call (${ideas.length})`, '', ...ideas.map((c) => commentBlock(review, c, { files }))] : []),
     ...(fromAgents.length
-      ? [`## Questions and notes from agents, waiting for the person (${fromAgents.length})`, '', ...fromAgents.map((c) => commentBlock(review, c, { files }))]
+      ? [
+          // the heading agents know, then who it really waits for (a hosted server's own user name isn't the person)
+          `## Questions and notes from agents, waiting for ${USER} (${fromAgents.length}) · the person's answer`,
+          '',
+          ...fromAgents.map((c) => commentBlock(review, c, { files })),
+        ]
       : []),
     ...(picked.length
       ? [`## Picked since the last render — render with these (${picked.length})`, '', ...picked.map((c) => commentBlock(review, c, { files }))]
       : []),
-    ...(riding.length ? [`## Fixed, riding with the next version (${riding.length})`, '', ...riding.map((c) => commentBlock(review, c, { files }))] : []),
-    `## Fixed, waiting for the person's check (${fixed.length})`,
+    `## Fixed, waiting for ${USER} to verify (${fixed.length}) · the person's check`,
     '',
     ...(fixed.length ? fixed.map((c) => commentBlock(review, c, { files })) : ['_None._', '']),
+    // after the sections agents know: fixes marked before their version (lib/handover.ts), none to check yet
+    ...(riding.length ? [`## Fixed, riding with the next version (${riding.length})`, '', ...riding.map((c) => commentBlock(review, c, { files }))] : []),
     `## Closed (${closed.length})`,
     '',
     ...(closed.length

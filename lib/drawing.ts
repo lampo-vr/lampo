@@ -88,3 +88,46 @@ export function simplifyPoints(points: readonly (readonly number[])[], min = 4):
     out.push([Math.round(end[0]), Math.round(end[1])]);
   return out;
 }
+
+const finite = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
+
+/**
+ * A drawing kept within reach of its picture (`w`×`h` video px): every point, a box's corners included, at most one
+ * picture beyond each edge — so its size is too — with finite numbers; what isn't a shape goes. Shapes already within
+ * reach come back as they were (their colour and fractions kept). `fixed`: how many it brought back or left out — a
+ * drawing someone sent out of all proportion, or a store from before sizes were held.
+ */
+export function fitDrawing(drawing: unknown, w: number, h: number): { shapes: Shape[]; fixed: number } {
+  if (!Array.isArray(drawing)) return { shapes: [], fixed: drawing == null ? 0 : 1 };
+  const W = finite(w) && w > 0 ? w : 1920;
+  const H = finite(h) && h > 0 ? h : 1080;
+  const cx = (x: number) => Math.max(-W, Math.min(2 * W, x));
+  const cy = (y: number) => Math.max(-H, Math.min(2 * H, y));
+  const shapes: Shape[] = [];
+  let fixed = 0;
+  for (const s of drawing as Record<string, unknown>[]) {
+    if (s?.type === 'box' && finite(s.x) && finite(s.y) && finite(s.w) && finite(s.h)) {
+      const x0 = cx(Math.min(s.x, s.x + s.w));
+      const x1 = cx(Math.max(s.x, s.x + s.w));
+      const y0 = cy(Math.min(s.y, s.y + s.h));
+      const y1 = cy(Math.max(s.y, s.y + s.h));
+      if (x0 === s.x && y0 === s.y && x1 - x0 === s.w && y1 - y0 === s.h) shapes.push(s as unknown as Shape);
+      else {
+        shapes.push({ ...(s as unknown as Shape & object), x: x0, y: y0, w: x1 - x0, h: y1 - y0 } as Shape);
+        fixed++;
+      }
+    } else if (s?.type === 'arrow' && finite(s.x1) && finite(s.y1) && finite(s.x2) && finite(s.y2)) {
+      const at = { x1: cx(s.x1), y1: cy(s.y1), x2: cx(s.x2), y2: cy(s.y2) };
+      const same = at.x1 === s.x1 && at.y1 === s.y1 && at.x2 === s.x2 && at.y2 === s.y2;
+      shapes.push(same ? (s as unknown as Shape) : ({ ...(s as object), ...at } as Shape));
+      if (!same) fixed++;
+    } else if (s?.type === 'freehand' && Array.isArray(s.points)) {
+      const pts = (s.points as unknown[]).filter((p): p is [number, number] => Array.isArray(p) && finite(p[0]) && finite(p[1]));
+      const kept = pts.map(([x, y]): [number, number] => [cx(x), cy(y)]);
+      const same = pts.length === s.points.length && kept.every(([x, y], i) => x === pts[i][0] && y === pts[i][1]);
+      if (kept.length) shapes.push(same ? (s as unknown as Shape) : ({ ...(s as object), points: kept } as Shape));
+      if (!same || !kept.length) fixed++;
+    } else fixed++;
+  }
+  return { shapes, fixed };
+}

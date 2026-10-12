@@ -158,6 +158,14 @@ format stays backwards compatible throughout.
   you list your server's MCP connector there.
 
 ### Fixed
+- A drawing keeps to its picture, whoever sends it — someone on a review link, a reviewer, a Still wrong — so one
+  drawing out of all proportion can no longer stop a store from being moved to another server. One a store already
+  holds is brought within its picture, and the move says so instead of refusing.
+- The lines agents read say what they said before: "Fixed, waiting for … to verify", "open comment(s) carried
+  forward", the note a reply is on. What is new comes after them, so an agent or a script that reads them goes on
+  working.
+- When the file that remembers what each agent was told can't be read, it is left as it is (and said in the log);
+  agents go on hearing feedback as before it existed, until it is put right.
 - How far an agent is reads the same everywhere. An agent that read all of a video's notes before fixing any made the
   player say "fixing 5 of 5" while the library's card said "fixing 1 of 5": the player counted every note the agent
   had read as one it was working on. Now the card, the run strip, the agent button, the Agent view and the sidebar

@@ -45,7 +45,7 @@ Warmer grade at the end?
 - clean: <store>/data/__@uploads__Demo__Reels__teaser.mp4/c_a5b4dc_clean.png
 - reply agent:fixture-edit: Will try a warmer LUT in v3
 
-## Fixed, waiting for the person's check (1)
+## Fixed, waiting for alex to verify (1) · the person's check
 
 ### c_1d55b9 · MUST · logo, timing · 00:00:12 (frame 12) · v1 · fixed in v2, waiting for verification
 

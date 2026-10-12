@@ -188,9 +188,10 @@ export function sanitizeDrawing(drawing: unknown, ver: Pick<Version, 'width' | '
   const out: Shape[] = [];
   for (const s of drawing.slice(0, 50)) {
     if (s?.type === 'box' && num(s.x) && num(s.y) && num(s.w) && num(s.h)) {
-      const x = Math.min(s.x, s.x + s.w);
-      const y = Math.min(s.y, s.y + s.h);
-      out.push({ type: 'box', x: cx(x), y: cy(y), w: Math.round(Math.abs(s.w)), h: Math.round(Math.abs(s.h)) });
+      // both corners within reach, the size from them: a box can't be wider or taller than the room around the picture
+      const x0 = cx(Math.min(s.x, s.x + s.w));
+      const y0 = cy(Math.min(s.y, s.y + s.h));
+      out.push({ type: 'box', x: x0, y: y0, w: cx(Math.max(s.x, s.x + s.w)) - x0, h: cy(Math.max(s.y, s.y + s.h)) - y0 });
     } else if (s?.type === 'arrow' && num(s.x1) && num(s.y1) && num(s.x2) && num(s.y2)) {
       out.push({ type: 'arrow', x1: cx(s.x1), y1: cy(s.y1), x2: cx(s.x2), y2: cy(s.y2) });
     } else if (s?.type === 'freehand' && Array.isArray(s.points)) {

@@ -152,6 +152,8 @@ export async function exportBundle(o: ExportOptions): Promise<ExportResult> {
   const above = (f: string) => wanted.some((w) => w.startsWith(`${f}/`));
 
   const all = store.listReviews();
+  // drawings the store kept out of all proportion, read back within their picture (lib/store.ts fitDrawings): said below
+  const fittedOf = new Map(all.map((r) => [slugify(r.video), store.drawingsFitted(r)]));
   const samples = all.filter((r) => r.onboarding_sample).length;
   const reviews = all
     .filter((r) => !r.onboarding_sample && inside(r.folder))
@@ -308,6 +310,9 @@ export async function exportBundle(o: ExportOptions): Promise<ExportResult> {
     }
     const parsed = BundleReview.safeParse(mapStrings(b, paths.scrub));
     if (!parsed.success) throw new Error(`${path.basename(r.video)} doesn't fit a bundle (${problemOf(parsed.error)}): nothing was written`);
+    // drawings the store kept out of all proportion went along within their picture, said rather than refused
+    const fitted = fittedOf.get(from) ?? 0;
+    if (fitted) warnings.push(`${fitted} drawing${fitted === 1 ? '' : 's'} on ${path.basename(r.video)} went far past the picture: brought within it`);
     json.set(bundlePath.review(key), Buffer.from(`${JSON.stringify(parsed.data, null, 2)}\n`));
     counts.notes += r.comments.length;
     counts.replies += r.comments.reduce((n, c) => n + c.replies.length, 0);

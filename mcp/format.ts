@@ -357,11 +357,12 @@ export function noteLines(
   const flags: string[] = [];
   if (c.check_again) flags.push(`CHECK AGAIN in v${c.carried_to}`);
   if (c.status === 'fixed') flags.push(`fixed in v${c.fixed_in_v}`);
-  if (fixWaits(c)) flags.push(ridingFlag(review.versions));
   if (c.verified_on) flags.push(`verified on preview ${c.verified_on.preview}: the next render must contain it`);
   if (c.scope === 'video') flags.push('OVERALL: about the whole video, not frame 0');
   if (isAgent(c.author)) flags.push(`by ${c.author}`);
   if (isClient(c.author)) flags.push(CLIENT_NOTE_FLAG);
+  // newer flags after the ones agents know (append, never reword: .claude/rules/agent-text.md)
+  if (fixWaits(c)) flags.push(ridingFlag(review.versions));
   L.push(
     `${c.id} ${c.status.toUpperCase()} ${noteLabel(c)} ${c.timecode} f${c.frame}${c.range ? ` range ${c.range.in}-${c.range.out}` : ''} v${c.v} [${(c.tags || []).join(',') || '-'}]${flags.length ? ` · ${flags.join(' · ')}` : ''}${onWords(pointer)}${partOkWords(partOk(review.versions, c))}`,
   );
