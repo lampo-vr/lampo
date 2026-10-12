@@ -213,9 +213,12 @@
   gap: var(--sp-2, 8px);
   flex: none;
 }
-/* the notes' head: the heading, how many, and the name the visitor writes under (tap it to change) */
+/* the notes' head: the heading, how many, and the name the visitor writes under (tap it to change). The heading stands on
+   the list's edge (the composer's and the notes', .side-scroll's padding), as far down as the app's (.side-title); a
+   read-only link's line a step under it. Its own: the app's head keeps its padding on .side-title, which this has not. */
 .g-side-head {
-  padding-bottom: var(--sp-3, 12px);
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
 }
 .g-notes-title {
   display: flex;
@@ -258,7 +261,6 @@
   box-shadow: var(--focus-ring);
 }
 .g-side-note {
-  margin-top: var(--sp-1);
   font-size: var(--fs-sm);
   line-height: var(--lh-body);
   color: var(--muted);
@@ -391,6 +393,31 @@
 }
 .g-note .c-thumb:hover {
   transform: none;
+}
+/* An opened note has no head of its own: who wrote it and when is its group's header (player/noteRows.ts groupStarts),
+   inside the card for a group's first note and above it for the rest. Inside, the header stands on the card's content
+   edge, one of the card's gaps above the meta row, like every other part of it. */
+.g-note.comment > .note-group {
+  padding: 0;
+}
+/* Reply ends the meta row, on its first line: a narrow screen wraps the chips among themselves, never Reply under them */
+.g-note .note-meta {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+.g-meta {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+/* the first line as tall as Reply beside it, so its chips sit on Reply's middle: a strut, its gap given back */
+.g-note .note-meta:has(> .note-tools) > .g-meta::before {
+  content: '';
+  height: var(--h-sm);
+  margin-right: calc(-1 * var(--sp-1));
 }
 /* how a note is written, said once under the composer while the list is empty (the composer is the invitation) */
 .g-player .g-howto {
@@ -644,14 +671,15 @@
   .g-foot a {
     position: relative;
   }
-  /* a card's Reply and a section's play keep their quiet size (a finger's tap area around them), so the head isn't a row
-     taller than its badges */
+  /* a card's Reply and a section's play keep their quiet size (a finger's tap area around them), so the meta row isn't
+     taller than a control and Reply's icon ends on the card's edge, as on a desktop */
   .g-note .note-tools .btn,
   .g-note .note-range .btn {
     position: relative;
     min-height: 0;
     height: var(--h-sm);
   }
+  .g-note .note-tools .btn.icon-only,
   .g-note .note-range .btn.icon-only {
     min-width: 0;
     width: var(--h-sm);

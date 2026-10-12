@@ -174,6 +174,9 @@ format stays backwards compatible throughout.
   you list your server's MCP connector there.
 
 ### Fixed
+- An opened note on a review link names its writer once: the name and time above the notes of one sitting say it, and
+  the card no longer repeats them under it. Reply sits at the end of the note's timecode line, and on a phone its icon
+  ends on the card's edge.
 - A drawing keeps to its picture, whoever sends it — someone on a review link, a reviewer, a Still wrong — so one
   drawing out of all proportion can no longer stop a store from being moved to another server. One a store already
   holds is brought within its picture, and the move says so instead of refusing.

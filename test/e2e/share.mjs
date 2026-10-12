@@ -696,24 +696,24 @@ try {
     assert(overflow <= 1, `no sideways scrolling on a phone (${overflow}px)`);
     const stage = await page.$eval('.vbox', (e) => e.getBoundingClientRect().width);
     assert(stage >= 390 - 2 * 8 - 1, `the video uses the width (${stage}px)`);
-    // no keyboard, no shortcuts: "Add note" without its ⌘↵; a note opened by a tap has its Reply in its head, as the
-    // app's card does
+    // no keyboard, no shortcuts: "Add note" without its ⌘↵; a note opened by a tap has its Reply on its meta row (the
+    // card's head is its group's header), there without a hover
     await page.waitForSelector('.g-note.note-row .nr', { timeout: 10000 });
     await page.tap('.g-note.note-row .nr');
-    await page.waitForSelector('.g-note.comment.active .note-head [data-testid=g-reply]', { timeout: 10000 });
+    await page.waitForSelector('.g-note.comment.active .note-meta [data-testid=g-reply]', { timeout: 10000 });
     const touch = await page.evaluate(() => {
       const add = [...document.querySelectorAll('.g-composer .btn')].find((b) => b.textContent.includes('Add note'));
       const note = document.querySelector('.g-note.comment.active');
-      const head = note.querySelector('.note-head').getBoundingClientRect();
+      const meta = note.querySelector('.note-meta').getBoundingClientRect();
       const reply = note.querySelector('[data-testid=g-reply]').getBoundingClientRect();
       return {
         keys: add ? getComputedStyle(add, '::after').display : 'no button',
-        inHead: reply.top >= head.top - 6 && reply.bottom <= head.bottom + 6,
+        onMeta: reply.top >= meta.top - 1 && reply.bottom <= meta.bottom + 1,
         shown: getComputedStyle(note.querySelector('.note-tools')).opacity === '1',
       };
     });
     assert(touch.keys === 'none', `no ⌘↵ on a touch screen: ${JSON.stringify(touch)}`);
-    assert(touch.inHead && touch.shown, `Reply in the note's head, there to tap: ${JSON.stringify(touch)}`);
+    assert(touch.onMeta && touch.shown, `Reply on the note's meta row, there to tap: ${JSON.stringify(touch)}`);
     await sleep(400);
     await shot('06-phone-player');
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));

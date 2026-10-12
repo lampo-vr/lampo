@@ -2,13 +2,16 @@
 // covers: web/src/guest/GuestNotes.tsx web/src/guest/GuestPlayer.tsx web/src/guest/Room.tsx web/src/styles/guest.css web/src/styles/notes.css web/src/player/CommentCard.tsx web/src/i18n/de.client.ts
 // Browser end-to-end test of how a review link looks next to the app: a real server (local mode, temp store, free
 // port) + headless Chrome. A note on the link is the app's note — a row at rest, the card opened (same padding, type,
-// timecode chip, a person's name in the UI face, the marked frame's size) —; a fix waiting for the visitor's check
-// asks on one line and answers with both buttons together, also on a phone and in German; the replies reach the card's
-// edge; opening Still wrong moves nothing above it; the states are words with a capital ("Fixed · V2", green), an agent
-// is "Editor" ("Schnitt" in German) and German never says "on V1". The list under a fresh composer says how, not
-// "No notes yet". After Approve the thank-you lies centred on the picture, clear of the drawing tools. A delivery shows
-// its Download on a phone, and a link without notes ends with its foot at the bottom of the screen. The folder room
-// grows with a wide screen, and a phone's room cards have no dead band. Screenshots land in VR_SHOTS when it is set.
+// timecode chip, a person's name in the UI face, the marked frame's size) —; an opened card names its writer once,
+// through its group's header (inside it for a group's first, above it for the rest), with Reply at the end of its
+// timecode's line; the notes' heading stands on the list's edge (as far in as the composer and the first note, as far
+// down as the app's), a read-only link's line a step under it; a fix waiting for the visitor's check asks on one line
+// and answers with both buttons together, also on a phone and in German; the replies reach the card's edge; opening
+// Still wrong moves nothing above it; the states are words with a capital ("Fixed · V2", green), an agent is "Editor"
+// ("Schnitt" in German) and German never says "on V1". The list under a fresh composer says how, not "No notes yet".
+// After Approve the thank-you lies centred on the picture, clear of the drawing tools. A delivery shows its Download on
+// a phone, and a link without notes ends with its foot at the bottom of the screen. The folder room grows with a wide
+// screen, and a phone's room cards have no dead band. Screenshots land in VR_SHOTS when it is set.
 import path from 'node:path';
 import { age, makeVideo } from '../lib/helpers.ts';
 import { settle } from './layout.mjs';
@@ -60,6 +63,11 @@ try {
   const first = await api(`/api/review/${encodeURIComponent(fresh.slug)}/shares`, 'POST', { label: 'First look' });
   for (const n of [1, 2, 3, 4]) await add(`Room/export/cut-${n}.mp4`, 'Room', { pattern: n % 2 ? 'smptebars' : 'testsrc2' });
   const room = await api('/api/folder-shares', 'POST', { folder: 'Room', label: 'All the cuts' });
+  // a review link with a note, switched to take none: its notes stay, to read, under the read-only line
+  const board = await api(`/api/review/${enc}/shares`, 'POST', { label: 'Board review' });
+  const bid = (await api(`/api/g/${board.token}`)).videos[0].slug;
+  await api(`/api/g/${board.token}/comments`, 'POST', { name: 'Noor', slug: bid, frame: 12, drawing: [], text: 'The title could come in a beat later.' });
+  await api(`/api/shares/${board.token}`, 'PATCH', { comment: false, approve: false });
 
   browser = await launch();
   const errors = [];
@@ -98,7 +106,8 @@ try {
         const thumb = c?.querySelector('.c-thumb')?.getBoundingClientRect();
         return {
           card: st(c, 'paddingTop', 'paddingLeft', 'borderRadius', 'rowGap'),
-          who: st(c?.querySelector('.note-who b'), 'fontFamily', 'fontSize', 'fontWeight'),
+          // the app's card names its writer in its head; the link's under its group's header (one name per card)
+          who: st(c?.querySelector('.note-who b, .note-group b'), 'fontFamily', 'fontSize', 'fontWeight'),
           tc: st(c?.querySelector('.note-meta .c-tc'), 'fontFamily', 'fontSize', 'fontWeight', 'paddingLeft'),
           text: st(c?.querySelector('.c-text'), 'fontSize', 'lineHeight'),
           thumbW: thumb ? Math.round(thumb.width) : null,
@@ -146,6 +155,125 @@ try {
     await close(link);
   });
 
+  await check('an opened card says who wrote it once — its group’s header, no name of its own —; Reply on the timecode’s line opens the field', async () => {
+    for (const [viewport, where] of [
+      [DESKTOP, '1440'],
+      [PHONE, 'iPhone 390'],
+    ]) {
+      const p = await open(`/g/${review.token}`, viewport);
+      await ready(p);
+      // Mia's fix waiting for her check is open, the first of her group (its header inside the card); her other note,
+      // a later one of the same group (its header above the first), opened by hand
+      await p.waitForSelector(`.g-note.comment[data-note="${logo.id}"]`);
+      const row = `.g-note.note-row[data-note="${music.id}"] .nr`;
+      await p.waitForSelector(row);
+      await p.$eval(row, (e) => e.scrollIntoView({ block: 'center' }));
+      if (viewport.hasTouch) await p.tap(row);
+      else await p.click(row);
+      await p.waitForSelector(`.g-note.comment.active[data-note="${music.id}"]`);
+      await settle(p);
+      const cards = await p.evaluate(
+        (ids) =>
+          ids.map((id) => {
+            const card = document.querySelector(`.g-note.comment[data-note="${id}"]`);
+            // the group header that names this card's writer: its own, else the last one above it
+            const head = [...document.querySelectorAll('.note-list .note-group')]
+              .filter((h) => card.contains(h) || h.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING)
+              .at(-1);
+            const tc = card.querySelector('.note-meta .c-tc').getBoundingClientRect();
+            const reply = card.querySelector('[data-testid=g-reply]')?.getBoundingClientRect();
+            return {
+              id,
+              names: [...card.querySelectorAll('b')].filter((b) => b.textContent.trim() === 'Mia').length,
+              who: card.querySelectorAll('.note-who, .note-head .avatar').length,
+              ownHead: !!card.querySelector('.note-group'),
+              header: head?.querySelector('b')?.textContent ?? null,
+              reply: !!reply,
+              onTcLine: !!reply && Math.abs(reply.top + reply.height / 2 - (tc.top + tc.height / 2)) <= 1,
+              atEnd: !!reply && card.getBoundingClientRect().right - reply.right <= 16,
+            };
+          }),
+        [logo.id, music.id],
+      );
+      const [first, later] = cards;
+      assert(first.ownHead && !later.ownHead, `${where}: the group's header inside its first card only: ${JSON.stringify(cards)}`);
+      for (const [c, names] of [
+        [first, 1],
+        [later, 0],
+      ])
+        assert(
+          c.header === 'Mia' && c.names === names && c.who === 0,
+          `${where}: the card names its writer through its group's header alone, no name and avatar of its own: ${JSON.stringify(c)}`,
+        );
+      assert(
+        cards.every((c) => c.reply && c.onTcLine && c.atEnd),
+        `${where}: Reply at the end of the timecode's line: ${JSON.stringify(cards)}`,
+      );
+      await shot(p, `look-01b-one-name-${where.replace(/\W+/g, '-')}`);
+      // Reply still opens the field, in its own card
+      const reply = `.g-note.comment[data-note="${music.id}"] [data-testid=g-reply]`;
+      if (viewport.hasTouch) await p.tap(reply);
+      else await p.click(reply);
+      await p.waitForFunction(
+        (id) => document.activeElement?.closest(`.g-note.comment[data-note="${id}"] .note-editor`) && document.activeElement.tagName === 'TEXTAREA',
+        { timeout: 5000 },
+        music.id,
+      );
+      await close(p);
+    }
+  });
+
+  await check('the notes’ head stands on the list’s edge, as high as the app’s; a read-only link’s line a step under the heading', async () => {
+    // the app's head: how far down its heading's middle stands
+    const app = await open(`/#/v/${enc}`);
+    await app.waitForSelector('.side-head [data-testid=panel-notes]', { timeout: 20000 });
+    await settle(app);
+    const appMid = await app.$eval('.side-head', (h) => {
+      const t = h.querySelector('[data-testid=panel-notes]').getBoundingClientRect();
+      return Math.round(t.top + t.height / 2 - h.getBoundingClientRect().top);
+    });
+    await close(app);
+    for (const [token, viewport, where] of [
+      [review.token, DESKTOP, 'review link 1440'],
+      [review.token, PHONE, 'review link iPhone 390'],
+      [board.token, DESKTOP, 'read only 1440'],
+      [board.token, PHONE, 'read only iPhone 390'],
+    ]) {
+      const p = await open(`/g/${token}`, viewport);
+      await ready(p);
+      await p.waitForSelector('.note-list > .g-note');
+      await settle(p);
+      const m = await p.evaluate(() => {
+        const side = document.querySelector('.g-player .side').getBoundingClientRect();
+        const head = document.querySelector('.g-side-head').getBoundingClientRect();
+        const title = document.querySelector('.g-notes-title').getBoundingClientRect();
+        const h2 = document.querySelector('.g-notes-title h2').getBoundingClientRect();
+        // a note's left edge: an opened card's frame, a row's timecode (its hover ground reaches a step further out)
+        const first = document.querySelector('.note-list > .g-note');
+        const edge = (first.classList.contains('comment') ? first : first.querySelector('.nr-tc')).getBoundingClientRect();
+        const composer = document.querySelector('.g-composer')?.getBoundingClientRect();
+        const line = document.querySelector('.g-side-note')?.getBoundingClientRect();
+        return {
+          heading: Math.round(h2.left - side.left),
+          note: Math.round(edge.left - side.left),
+          composer: composer ? Math.round(composer.left - side.left) : null,
+          line: line ? Math.round(line.left - side.left) : null,
+          mid: Math.round(h2.top + h2.height / 2 - head.top),
+          gap: line ? Math.round(line.top - title.bottom) : null,
+        };
+      });
+      const readOnly = token === board.token;
+      assert(
+        m.heading > 0 && m.heading === m.note && m.composer === (readOnly ? null : m.heading) && m.line === (readOnly ? m.heading : null),
+        `${where}: the heading (and the read-only line) as far in from the panel's edge as the first note and the composer: ${JSON.stringify(m)}`,
+      );
+      assert(Math.abs(m.mid - appMid) <= 1, `${where}: the heading as far down its head as the app's (${appMid}): ${JSON.stringify(m)}`);
+      if (readOnly) assert(m.gap >= 8, `${where}: the read-only line a step under the heading: ${JSON.stringify(m)}`);
+      await shot(p, `look-01c-head-${where.replace(/\W+/g, '-')}`);
+      await close(p);
+    }
+  });
+
   await check('a fix waiting for the visitor: the question on its line, Looks right and Still wrong together; states in words', async () => {
     for (const [viewport, lang, where] of [
       [PHONE, null, 'iPhone 390'],
@@ -185,7 +313,7 @@ try {
         const before = await p.$eval('.g-check', (e) => {
           const c = e.closest('.g-note');
           return JSON.stringify(
-            [c.querySelector('.note-head'), c.querySelector('.note-meta'), c.querySelector('.note-body')].map((x) => x.getBoundingClientRect().toJSON()),
+            [c.querySelector('.note-group'), c.querySelector('.note-meta'), c.querySelector('.note-body')].map((x) => x.getBoundingClientRect().toJSON()),
           );
         });
         await p.evaluate(() => [...document.querySelectorAll('.g-check .check-decision .btn')][1].click());
@@ -193,7 +321,7 @@ try {
         const after = await p.$eval('.g-note .note-editor', (e) => {
           const c = e.closest('.g-note');
           return JSON.stringify(
-            [c.querySelector('.note-head'), c.querySelector('.note-meta'), c.querySelector('.note-body')].map((x) => x.getBoundingClientRect().toJSON()),
+            [c.querySelector('.note-group'), c.querySelector('.note-meta'), c.querySelector('.note-body')].map((x) => x.getBoundingClientRect().toJSON()),
           );
         });
         assert(before === after, `opening Still wrong moves nothing above it: ${before} → ${after}`);

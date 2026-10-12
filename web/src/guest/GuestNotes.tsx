@@ -301,9 +301,12 @@ export function NameDialog({ name, sharer, onSave, onClose }: { name: string; sh
 // The same anatomy as the app's (player/CommentCard.tsx, notes.css): at rest a row — the timecode, the kind as a
 // keyframe glyph, the first line, where it stands when that is news, the picture under the pointer — under a group
 // header where someone else wrote it or wrote it at another sitting; opened (the selected note, or one that waits for
-// the visitor's check) the card: who and when, Reply; the timecode, its kind, its version and where it stands; the words
-// and the marked frame; the thread (replies as messages, status changes as one line each); the decision on a fix (Looks
-// right · Still wrong, together); Reply… In the visitors' words; nothing a visitor can't do (editing, won't fix, ids).
+// the visitor's check) the card: the timecode, its kind, its version and where it stands, Reply at the line's end; the
+// words and the marked frame; the thread (replies as messages, status changes as one line each); the decision on a fix
+// (Looks right · Still wrong, together); Reply… Every note sits under its group's header — inside the card for a group's
+// first, above it for the rest, the same person at the same sitting —, so the card never names who wrote it and when
+// a second time (the app's card has no group headers and keeps its head). In the visitors' words; nothing a visitor
+// can't do (editing, won't fix, ids).
 
 /** What a status change in the thread says happened, in the visitors' words. */
 function activity(status: string, fixedIn: number | null): { icon: IconName; verb: string; tone: string } {
@@ -474,11 +477,40 @@ export function GuestNoteCard({
       onClick={cardClick(onSelect, '.note-tools, .note-editor, .g-check, .c-thumb, .c-actions, .ref-strip, .note-range .icon-only, button, a, audio')}
     >
       {group}
-      <header className="note-head">
-        <Avatar name={author} size={24} />
-        <div className="note-who">
-          <b className="ellipsis">{c.author}</b>
-          <When at={c.created} />
+      <div className="note-meta">
+        <div className="g-meta">
+          {c.scope === 'video' ? (
+            <span className="c-tc overall">{tc}</span>
+          ) : c.rangeHere ? (
+            <span className="note-range">
+              <button
+                type="button"
+                className="c-tc range"
+                onClick={onSelect}
+                aria-label={t('client::Go to {timecode}', { timecode: tc })}
+                data-testid="note-range"
+              >
+                {rangeTimecodes(c.rangeHere, fps)}
+                <span className="note-range-len">{formatSeconds(rangeSeconds(c.rangeHere, fps))}</span>
+              </button>
+              {onPlayRange && (
+                <IconButton className="btn sm ghost icon-only" label={t('client::Play this stretch')} icon="play" size={12} onClick={onPlayRange} />
+              )}
+            </span>
+          ) : (
+            <button type="button" className="c-tc" onClick={onSelect} aria-label={t('client::Go to {timecode}', { timecode: tc })}>
+              {tc}
+            </button>
+          )}
+          <Badge size="sm" tone={c.idea ? 'idea' : 'should'}>
+            {kind}
+          </Badge>
+          {c.v !== v && <span className="note-tag mono">V{c.v}</span>}
+          {status && (
+            <Badge size="sm" tone={closed && c.status === 'wontfix' ? 'neutral' : 'ok'} className="note-state">
+              {status}
+            </Badge>
+          )}
         </div>
         {perms.comment && (
           <div className="note-tools">
@@ -491,41 +523,6 @@ export function GuestNoteCard({
               data-testid="g-reply"
             />
           </div>
-        )}
-      </header>
-
-      <div className="note-meta">
-        {c.scope === 'video' ? (
-          <span className="c-tc overall">{tc}</span>
-        ) : c.rangeHere ? (
-          <span className="note-range">
-            <button
-              type="button"
-              className="c-tc range"
-              onClick={onSelect}
-              aria-label={t('client::Go to {timecode}', { timecode: tc })}
-              data-testid="note-range"
-            >
-              {rangeTimecodes(c.rangeHere, fps)}
-              <span className="note-range-len">{formatSeconds(rangeSeconds(c.rangeHere, fps))}</span>
-            </button>
-            {onPlayRange && (
-              <IconButton className="btn sm ghost icon-only" label={t('client::Play this stretch')} icon="play" size={12} onClick={onPlayRange} />
-            )}
-          </span>
-        ) : (
-          <button type="button" className="c-tc" onClick={onSelect} aria-label={t('client::Go to {timecode}', { timecode: tc })}>
-            {tc}
-          </button>
-        )}
-        <Badge size="sm" tone={c.idea ? 'idea' : 'should'}>
-          {kind}
-        </Badge>
-        {c.v !== v && <span className="note-tag mono">V{c.v}</span>}
-        {status && (
-          <Badge size="sm" tone={closed && c.status === 'wontfix' ? 'neutral' : 'ok'} className="note-state">
-            {status}
-          </Badge>
         )}
       </div>
 

@@ -181,8 +181,9 @@ On a video, visitors can:
 
 The notes look as they do in the app: a row each (the timecode, *Change* or *Idea* as a keyframe glyph, the first
 line, the version it was written on, its replies, where it stands when that is news), under the name of whoever wrote
-them; the selected note, and every fix waiting for the visitor's check, opens into its card (who and when, the
-timecode, the kind, the version, *Fixed · V3*, the words and the marked frame, the thread, the decision, *Reply…*).
+them and when, said once for the notes of one sitting; the selected note, and every fix waiting for the visitor's
+check, opens into its card under that same name, never repeating it (the timecode, the kind, the version,
+*Fixed · V3* and Reply on one line, the words and the marked frame, the thread, the decision, *Reply…*).
 Under an empty list's composer, one line says how a note is written.
 
 **Compare.** On a link that shows every version, a video with two or more has *Compare* beside the version switcher
