@@ -113,7 +113,7 @@ and how far the furthest visitor got through a video. Open that line for the det
 ![A link’s activity opened in the share dialog: Mia and Jonas, 85% watched, the strip of the parts watched, the visitors and the newest activity](assets/link-activity.webp)
 
 The same shows elsewhere. Once someone has opened the newest version through a link, the library card says "Mia ·
-85%" next to an eye, and the player shows it beside where the video stands, with who and which link in its tooltip.
+85%" next to an eye, and the player shows it beside where the video stands, with who and which link in its card.
 *Insights* lists under *Review links* who watched in the period (through which link, which version, how far, the
 stretch they went back to), the links nobody has opened yet, and the videos out for review with *Send a reminder*
 beside them.

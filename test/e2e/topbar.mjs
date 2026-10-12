@@ -251,7 +251,7 @@ try {
     await p.browserContext().close();
   });
 
-  await check('another stage: the status is a quiet pill, what it waits for in its tooltip (and for screen readers)', async () => {
+  await check('another stage: the status is a quiet pill, what it waits for in its card (and for screen readers)', async () => {
     mode = 'needs';
     const p = await open();
     await p.waitForSelector('[data-testid=stage-control]');
@@ -262,11 +262,12 @@ try {
       return { seen: seen.textContent, sr: e.querySelector('.so-wait')?.textContent ?? '', width: Math.round(e.getBoundingClientRect().width) };
     });
     assert(!/Waiting for/.test(pill.seen) && /Waiting for fixes/.test(pill.sr), `no long words in sight: ${JSON.stringify(pill)}`);
-    // its tooltip says what it waits for
+    // its card says what it waits for
     const b = await (await p.$('[data-testid=stage-control]')).boundingBox();
     await p.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 3 });
-    await p.waitForSelector('.tip .so-tip', { timeout: 5000 });
-    assert(/Waiting for fixes/.test(await p.$eval('.tip .so-tip', (e) => e.textContent)), 'the tooltip says what it waits for');
+    await p.waitForSelector('[data-testid=stage-card-next]', { timeout: 5000 });
+    const next = await p.$eval('[data-testid=stage-card-next]', (e) => e.textContent);
+    assert(/^Waiting for fixes from /.test(next), `the card says what it waits for: ${next}`);
     await p.browserContext().close();
   });
 

@@ -2,8 +2,9 @@
 // the fixes, send to the client, mark final, carry an approval over, reopen — always the raised orange (the ✓ says
 // "approve"), and "Decide ▾" when nothing is next. Everything else a role may do sits behind its chevron: requesting
 // changes, approving anyway, deciding with a note, withdrawing, marking final, the history. Beside it the stage's
-// glyph (the five steps in its tooltip); its words only when the button doesn't already say them.
-import { useState } from 'react';
+// glyph, its words only when the button doesn't already say them, and on hover or focus its card (StageCard.tsx): the
+// steps, where it stands, what comes next.
+import { useId, useState } from 'react';
 import type { FinalEntry, StageInfo } from '../../../lib/types.ts';
 import { useCan } from '../api/auth.ts';
 import type { ReviewResponse } from '../api/types.ts';
@@ -16,14 +17,16 @@ import { AutoTextarea } from '../ui/controls.tsx';
 import { STAGE_SHAPE } from '../ui/glyphs.ts';
 import { I, type IconName } from '../ui/icons.tsx';
 import { KeyGlyph, useChanged } from '../ui/KeyGlyph.tsx';
-import { Menu, type MenuEntry, Modal, Tip } from '../ui/primitives.tsx';
+import { HoverCard, Menu, type MenuEntry, Modal } from '../ui/primitives.tsx';
 import { ApprovalHistory } from './ApprovalHistory.tsx';
 import { useStageActions } from './api.ts';
-import { clientInvolved, StageStepper } from './StageStepper.tsx';
+import { StageCard, StageSummary } from './StageCard.tsx';
+import { clientInvolved } from './StageStepper.tsx';
 import { stageNote } from './StatusPill.tsx';
+import { nextWords, stageFacts } from './stageFacts.ts';
 import { pillLabel } from './stageUi.ts';
 import '../styles/status.css';
-import { nextLabel, stageDetail } from './stageText.ts';
+import { nextLabel } from './stageText.ts';
 
 /** After the team's approval a review through a link is a choice, not a must: say what can come next. */
 const nextLine = (info: StageInfo): string | null =>
@@ -100,6 +103,7 @@ export function StageControl({ data, latestV, onShare, onVerify, onPublish, comp
   const final = info.stage === 'final';
   // The stage glyph pops when the stage changes while the player is open, like a keyframe being set.
   const popped = useChanged(info.stage);
+  const described = useId();
 
   const run = async (fn: () => Promise<unknown>, done: string) => {
     try {
@@ -152,7 +156,7 @@ export function StageControl({ data, latestV, onShare, onVerify, onPublish, comp
                   ? { kind: 'publish', label: t('Publish…'), short: t('Publish'), icon: 'upload', onClick: onPublish }
                   : null;
   // Where the video stands. With a next step the button says it ("Check 2 fixes", "Approve V1"): then the words are
-  // for screen readers only, and the glyph (its tooltip holds the steps) stays.
+  // for screen readers only, and the glyph (its card holds the steps) stays.
   const status = primary?.kind === 'verify' ? t('{n} fix waiting|{n} fixes waiting', { n: info.to_verify }) : pillLabel(info);
 
   // What we wait for, when nothing is this person's to do.
@@ -193,47 +197,54 @@ export function StageControl({ data, latestV, onShare, onVerify, onPublish, comp
   ];
   const finals: FinalEntry[] = data.review.finals || [];
   const tone = primary ? 'primary' : '';
-  // How far the client got through this version, through the review link (the furthest visitor; web/src/guest/watch.ts).
-  const share = info.share;
-  const watched = share?.watched ?? null;
-  const watchedLine =
-    share && watched !== null
-      ? share.watched_by
-        ? t('{name} watched {pct} of V{v} through “{label}”', { name: share.watched_by, pct: pct(watched), v: info.v, label: share.label })
-        : t('A visitor watched {pct} of V{v} through “{label}”', { pct: pct(watched), v: info.v, label: share.label })
-      : null;
+  // How far the client got through this version, through the review link (the furthest visitor; web/src/guest/watch.ts):
+  // the card says who, through which link.
+  const watched = info.share?.watched ?? null;
+  // The card's last line: what comes after approving (a choice), else what it waits for when nothing is this person's to
+  // do — never the words the button or the status already say.
+  const after = nextLine(info) ?? (waiting && waiting !== status ? nextWords(next, waiting) : null);
+  // A hover card isn't read out (the tooltip was, as the status's description): its facts describe the status instead.
+  const card = !compact && !agentSays;
+  const facts = card ? stageFacts(info) : [];
 
   return (
     <div className={compact ? 'signoff compact' : 'signoff'} data-stage={info.stage}>
-      {!compact && !agentSays && (
-        <Tip
+      {card && (
+        <HoverCard
           side="bottom"
-          content={
-            <div className="so-tip">
-              <StageStepper info={info} />
-              <span>{stageDetail(info)}</span>
-              {watchedLine && <span>{watchedLine}</span>}
-              {waiting && waiting !== status && <span className="so-next">{waiting}</span>}
-              {nextLine(info) && <span className="so-next">{nextLine(info)}</span>}
-            </div>
+          align="start"
+          className="stage-card"
+          trigger={
+            <span
+              className="so-status"
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: focusable so keyboard users get its card (Esc closes it)
+              tabIndex={0}
+              data-stage={info.stage}
+              data-testid="stage-control"
+              aria-describedby={facts.length ? described : undefined}
+            >
+              <KeyGlyph key={info.stage} shape={STAGE_SHAPE[info.stage]} pop={popped} />
+              <span className={primary && primary.kind !== 'publish' ? 'so-label sr-only' : 'so-label'}>{status}</span>
+              {info.published && <Published info={info} />}
+              {watched !== null && (
+                <span className="so-watch" data-testid="stage-watched">
+                  <I name="eye" size={12} /> {pct(watched)}
+                </span>
+              )}
+              {stageNote(info) && <span className="so-note">{stageNote(info)}</span>}
+              {/* never the same words twice (check mode leaves the stage saying "Check 2 fixes" and nothing to press) */}
+              {/* what it waits for: in its card for the eye, here for screen readers */}
+              {waiting && waiting !== status && <span className="so-wait sr-only">· {waiting}</span>}
+            </span>
           }
         >
-          {/* biome-ignore lint/a11y/noNoninteractiveTabindex: focusable so keyboard users get the steps in its tooltip */}
-          <span className="so-status" tabIndex={0} data-stage={info.stage} data-testid="stage-control">
-            <KeyGlyph key={info.stage} shape={STAGE_SHAPE[info.stage]} pop={popped} />
-            <span className={primary && primary.kind !== 'publish' ? 'so-label sr-only' : 'so-label'}>{status}</span>
-            {info.published && <Published info={info} />}
-            {watched !== null && (
-              <span className="so-watch" data-testid="stage-watched">
-                <I name="eye" size={12} /> {pct(watched)}
-              </span>
-            )}
-            {stageNote(info) && <span className="so-note">{stageNote(info)}</span>}
-            {/* never the same words twice (check mode leaves the stage saying "Check 2 fixes" and nothing to press) */}
-            {/* what it waits for: in its tooltip for the eye (its steps say it), here for screen readers */}
-            {waiting && waiting !== status && <span className="so-wait sr-only">· {waiting}</span>}
-          </span>
-        </Tip>
+          <StageCard info={info} next={after} />
+        </HoverCard>
+      )}
+      {facts.length > 0 && (
+        <span id={described} hidden data-testid="stage-described">
+          {facts.join(' · ')}
+        </span>
       )}
       <fieldset className="so-split" aria-label={t('Decision')}>
         {primary && (
@@ -306,10 +317,8 @@ export function StageControl({ data, latestV, onShare, onVerify, onPublish, comp
       {history && (
         <Modal title={t('History')} onClose={() => setHistory(false)} width={520}>
           <div className="so-history" data-testid="stage-history">
-            <StageStepper info={info} />
-            <p className="so-now">
-              <b>{pillLabel(info)}</b> · {stageDetail(info)}
-            </p>
+            {/* where it stands in the card's words: one wording, in German too */}
+            <StageSummary info={info} />
             <ApprovalHistory approvals={data.approvals} finals={finals} />
           </div>
         </Modal>

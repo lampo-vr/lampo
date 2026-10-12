@@ -75,8 +75,11 @@ V4*. Everything else is behind the chevron beside it, which reads *Decide* when 
 - *Mark V3 final*, once the version is approved (on a part: *Final needs a full version: V8 is a part*);
 - *History…*: every decision and every final, with who, when, the version and the note.
 
-Pointing at the stage shows the steps a video walks through: Review → Fixes → Approved → Shared → Final. *Shared* is
-there only when a review link takes part: one covers the video, or someone has decided through one.
+Pointing at the stage, or tabbing to it, opens its card (Esc closes it): the stage and its version once (*Changes
+requested · V4*), the steps a video walks through — Review → Fixes → Approved → Shared → Final —, where it stands in
+short lines (*4 fixes to check*, *1 note open*, who approved, the review link and who watched it) and what comes next
+(*Next: Assign an agent*, *Waiting for their decision*). *Shared* is there only when a review link takes part: one
+covers the video, or someone has decided through one.
 
 ![The player’s top bar on an approved V3: the stage glyph, Share V3 and its menu open with Request changes, Decide with a note…, Withdraw your decision, Mark V3 final and History…](assets/player-next-step.webp)
 

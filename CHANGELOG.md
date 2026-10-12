@@ -8,6 +8,12 @@ format stays backwards compatible throughout.
 ## [Unreleased]
 
 ### Changed
+- The stage beside the player's decision opens a calm card on hover or keyboard focus (Esc closes it), on the same
+  surface as the other cards in both themes: the stage and its version once ("Changes requested · V4"), the steps
+  evenly spaced with the track only between them, settled steps solid, the current one hollow and larger and the ones
+  ahead quieter but readable, then short facts one a line ("4 fixes to check", "1 note open") and the next step as quiet
+  words ("Next: Assign an agent"). The History dialog says where the video stands in the same lines (in German too,
+  where it used to fall back to English), and long German step names no longer run into each other.
 - The notes panel reads like a list, not a dashboard. Its head is two quiet text tabs, "Notes 6 · Transcript" (the
   Transcript where the video has speech), then a filter button, ⋯, Record as its own round button and "+ Note"; where
   the panel is narrow it says less rather than crowd. The notes come in groups of where they stand: "Needs you" (an

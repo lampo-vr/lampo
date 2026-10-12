@@ -4963,6 +4963,20 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'Z to A': 'Z bis A',
   'Opens in a tab of its own': 'Öffnet sich in einem eigenen Tab',
   View: 'Ansicht',
+  // the stage's card in the player's top bar: the facts, one a line, and what comes next
+  '{n} fix checked on a preview, not rendered yet|{n} fixes checked on a preview, not rendered yet':
+    '{n} Korrektur an einer Vorschau geprüft, noch nicht gerendert|{n} Korrekturen an Vorschauen geprüft, noch nicht gerendert',
+  '{n} fix coming in V{v}|{n} fixes coming in V{v}': '{n} Korrektur kommt mit V{v}|{n} Korrekturen kommen mit V{v}',
+  '{n} note still open|{n} notes still open': '{n} Notiz noch offen|{n} Notizen noch offen',
+  'Approved by {name}': 'Freigegeben von {name}',
+  'Approved by {name} via review link': 'Von {name} über den Review-Link freigegeben',
+  'Changes requested by {name}': 'Änderungen gewünscht von {name}',
+  'Changes requested by {name} via review link': 'Änderungen gewünscht von {name} über den Review-Link',
+  'Identical to approved V{v}': 'Gleich wie die freigegebene V{v}',
+  'Marked final by {name}': 'Von {name} als final markiert',
+  'Next: {step}': 'Als Nächstes: {step}',
+  'Opened before this version': 'Vor dieser Version geöffnet',
+  'V{v} arrived since': 'Seitdem ist V{v} da',
 };
 
 export const de: Record<Key, string> = { ...owner, ...client };

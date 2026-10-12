@@ -238,6 +238,259 @@ try {
     await page.keyboard.press('Escape');
   });
 
+  // The stage's card (status/StageCard.tsx): a video like the one in the maintainer's picture — a note still open and four
+  // fixes to check, no agent assigned — so the card says "Changes requested · V1", "4 fixes to check", "1 note open" and
+  // "Next: Assign an agent".
+  const file3 = makeVideo(path.join(dir, 'Acme/export/third.mp4'), { w: 320, h: 180, fps: 30, dur: 2, pattern: 'smptebars' });
+  age(file3);
+  const third = (await api('/api/library', 'POST', { path: file3 })).video.slug;
+  for (const frame of [3, 9, 15, 21, 27]) {
+    const id = (await api(`/api/review/${encodeURIComponent(third)}/comments`, 'POST', { frame, text: `Note at ${frame}`, severity: 'must' })).id;
+    if (frame > 3) await api(`/api/comments/${id}`, 'PATCH', { status: 'fixed', note: 'done', by: 'agent:promo-edit', fixed_in_v: 1 });
+  }
+  const STATUS = '[data-testid=stage-control]';
+  const CARD = '[data-testid=stage-card]';
+  const openThird = async ({ theme = null, lang = null } = {}) => {
+    await page.goto(`${BASE}/#/`, { waitUntil: 'domcontentloaded' });
+    await page.evaluate(
+      (theme, lang) => {
+        for (const [k, v] of [
+          ['vr.theme', theme],
+          ['vr.lang', lang],
+        ])
+          v ? localStorage.setItem(k, v) : localStorage.removeItem(k);
+      },
+      theme,
+      lang,
+    );
+    await page.goto('about:blank');
+    await page.goto(`${BASE}/#/v/${encodeURIComponent(third)}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector(`${STATUS}[data-stage=changes]`, { timeout: 20000 });
+  };
+  // the card once it is there and holds still (no animation of its own)
+  const cardShown = async () => {
+    await page.waitForSelector(CARD, { timeout: 5000 });
+    await page.waitForFunction((sel) => !document.querySelector(sel)?.closest('.hovercard')?.getAnimations().length, {}, CARD);
+  };
+  const hoverStatus = async () => {
+    await page.mouse.move(4, 600);
+    const b = await (await page.$(STATUS)).boundingBox();
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 3 });
+    await cardShown();
+  };
+  const cardGone = () => page.waitForFunction((sel) => !document.querySelector(sel), { timeout: 5000 }, CARD);
+
+  await check('the stage’s card: it opens on keyboard focus and on hover, Esc and leaving close it, on the float layer’s material', async () => {
+    await openThird();
+    // a fresh page: the focus that comes before the card's code is played on to it
+    await page.focus(STATUS);
+    await cardShown();
+    const look = await page.$eval(CARD, (card) => {
+      const hc = card.closest('.hovercard');
+      const probe = document.createElement('div');
+      probe.style.background = 'var(--float-bg)';
+      document.body.append(probe);
+      const float = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return { hovercard: !!hc, tooltip: !!card.closest('.tip'), bg: hc && getComputedStyle(hc).backgroundColor, float };
+    });
+    assert(look.hovercard && !look.tooltip && look.bg === look.float, `a hover card on --float-bg, not a tooltip: ${JSON.stringify(look)}`);
+    await page.keyboard.press('Escape');
+    await cardGone();
+    assert(await page.$eval(STATUS, (e) => document.activeElement === e), 'Esc leaves the focus on the status');
+    await page.$eval(STATUS, (e) => e.blur());
+    await hoverStatus();
+    await page.mouse.move(4, 600, { steps: 3 });
+    await cardGone();
+  });
+
+  await check('the stage’s card: the stage and its version once, one fact a line, the next step as quiet words (no link, no button)', async () => {
+    await hoverStatus();
+    const said = await page.$eval(CARD, (card) => {
+      const facts = [...card.querySelectorAll('[data-testid=stage-facts] li')].map((li) => {
+        const r = li.getBoundingClientRect();
+        return { text: li.textContent, top: r.top, bottom: r.bottom };
+      });
+      const next = card.querySelector('[data-testid=stage-card-next]');
+      const s = next && getComputedStyle(next);
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--muted)';
+      card.append(probe);
+      const muted = getComputedStyle(probe).color;
+      probe.remove();
+      return {
+        head: card.querySelector('[data-testid=stage-head]')?.textContent,
+        versions: (card.innerText.match(/\bV1\b/g) || []).length,
+        facts,
+        next: next && {
+          text: next.textContent,
+          tag: next.tagName,
+          interactive: !!next.closest('a, button, [role=link], [role=button], [tabindex]') || !!next.querySelector('a, button, [tabindex]'),
+          cursor: s.cursor,
+          underline: s.textDecorationLine,
+          quiet: s.color === muted,
+        },
+      };
+    });
+    assert(said.head === 'Changes requested · V1', `the head: "${said.head}"`);
+    assert(said.versions === 1, `the version is said once, in the head: ${said.versions}×`);
+    assert(
+      JSON.stringify(said.facts.map((f) => f.text)) === JSON.stringify(['4 fixes to check', '1 note open']),
+      `the facts: ${said.facts.map((f) => f.text).join(' | ')}`,
+    );
+    assert(
+      said.facts.every((f, i) => i === 0 || f.top >= said.facts[i - 1].bottom - 0.5),
+      `one fact a line: ${JSON.stringify(said.facts)}`,
+    );
+    const n = said.next;
+    assert(n?.text === 'Next: Assign an agent', `the next step: "${n?.text}"`);
+    assert(n.tag === 'P' && !n.interactive && n.cursor !== 'pointer' && n.underline === 'none' && n.quiet, `quiet words, not a link: ${JSON.stringify(n)}`);
+    await page.mouse.move(4, 600, { steps: 3 });
+    await cardGone();
+    // a hover card isn't read out: the facts describe the status, card or not (the words "waiting" are in its name)
+    const described = await page.$eval(STATUS, (e) => document.getElementById(e.getAttribute('aria-describedby') ?? '')?.textContent ?? null);
+    assert(described === '4 fixes to check · 1 note open', `a screen reader hears the facts: ${described}`);
+  });
+
+  // How a stepper sits (StageStepper.tsx), measured: its dots and labels, the track's pieces (each step's ::before and
+  // ::after), every dot's and label's contrast on what is under it. What's wrong comes back as sentences.
+  const stepsProblems = (sel) =>
+    page.$eval(sel, (ol) => {
+      const rgba = (c) => {
+        const m = c.match(/^rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?\)$/);
+        if (m) return [+m[1], +m[2], +m[3], m[4] === undefined ? 1 : +m[4]];
+        const s = c.match(/^color\(srgb ([\d.e-]+) ([\d.e-]+) ([\d.e-]+)(?: \/ ([\d.e-]+))?\)$/);
+        if (s) return [s[1] * 255, s[2] * 255, s[3] * 255, s[4] === undefined ? 1 : +s[4]];
+        return [0, 0, 0, 0];
+      };
+      const over = (top, below) => [0, 1, 2].map((k) => top[k] * top[3] + below[k] * (1 - top[3])).concat(1);
+      const layers = [];
+      for (let n = ol; n; n = n.parentElement) {
+        const c = rgba(getComputedStyle(n).backgroundColor);
+        if (c[3] > 0) layers.push(c);
+        if (c[3] >= 1) break;
+      }
+      const bg = layers.reverse().reduce((below, top) => over(top, below), [255, 255, 255, 1]);
+      const lum = ([r, g, b]) => {
+        const lin = (v) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4);
+        return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+      };
+      const ratio = (c) => {
+        const [x, y] = [lum(over(rgba(c), bg)), lum(bg)].sort((p, q) => q - p);
+        return (x + 0.05) / (y + 0.05);
+      };
+      const lis = [...ol.children];
+      const steps = lis.map((li) => {
+        const kg = li.querySelector('.kg');
+        const lbl = li.querySelector('.lbl');
+        const range = document.createRange();
+        range.selectNodeContents(lbl);
+        const d = kg.getBoundingClientRect();
+        const t = range.getBoundingClientRect();
+        return {
+          label: lbl.textContent,
+          state: li.classList.contains('now') ? 'now' : li.classList.contains('done') ? 'settled' : 'ahead',
+          settled: li.classList.contains('done'),
+          shape: kg.dataset.shape,
+          dot: { left: d.left, right: d.right, cx: d.left + d.width / 2, size: d.width, color: getComputedStyle(kg).backgroundColor },
+          text: { left: t.left, right: t.right, cx: t.left + t.width / 2 },
+          dotRatio: ratio(getComputedStyle(kg).backgroundColor),
+          labelRatio: ratio(getComputedStyle(li).color),
+        };
+      });
+      const track = lis.flatMap((li) =>
+        ['::before', '::after'].flatMap((pe) => {
+          const s = getComputedStyle(li, pe);
+          if (s.content === 'none' || s.display === 'none') return [];
+          const left = li.getBoundingClientRect().left + parseFloat(s.left);
+          return [{ left, right: left + parseFloat(s.width) }];
+        }),
+      );
+      const out = [];
+      const cx = steps.map((s) => s.dot.cx);
+      const gaps = cx.slice(1).map((x, i) => x - cx[i]);
+      if (Math.max(...gaps) - Math.min(...gaps) > 1) out.push(`uneven steps: ${gaps.map((g) => g.toFixed(1)).join(', ')} px apart`);
+      for (const s of steps) {
+        if (Math.abs(s.text.cx - s.dot.cx) > 1) out.push(`"${s.label}" is ${(s.text.cx - s.dot.cx).toFixed(1)} px off its dot`);
+        if (s.dotRatio < 3) out.push(`"${s.label}"'s dot (${s.state}) ${s.dotRatio.toFixed(2)}:1`);
+        if (s.labelRatio < 3) out.push(`"${s.label}" (${s.state}) ${s.labelRatio.toFixed(2)}:1`);
+      }
+      for (let i = 1; i < steps.length; i++)
+        if (steps[i].text.left - steps[i - 1].text.right < 4)
+          out.push(`"${steps[i - 1].label}" and "${steps[i].label}" ${(steps[i].text.left - steps[i - 1].text.right).toFixed(1)} px apart`);
+      // the track: only between two dots, and between every two
+      for (const p of track) {
+        const j = steps.findIndex((s, i) => i < steps.length - 1 && p.left >= s.dot.right - 0.5 && p.right <= steps[i + 1].dot.left + 0.5);
+        if (j < 0) out.push(`a piece of track (${p.left.toFixed(1)}–${p.right.toFixed(1)}) runs into or beyond a dot`);
+      }
+      for (let i = 0; i < steps.length - 1; i++)
+        if (!track.some((p) => p.left >= steps[i].dot.right - 0.5 && p.right <= steps[i + 1].dot.left + 0.5))
+          out.push(`no track between "${steps[i].label}" and "${steps[i + 1].label}"`);
+      // settled solid, the current one hollow (unless settled: final) and larger, the ones ahead hollow and quieter
+      const now = steps.find((s) => s.state === 'now');
+      for (const s of steps) {
+        if (s.settled && s.shape !== 'diamond') out.push(`settled "${s.label}" is ${s.shape}`);
+        if (!s.settled && s.shape !== 'outline') out.push(`"${s.label}" (${s.state}) is ${s.shape}`);
+        if (s !== now && s.dot.size >= now.dot.size) out.push(`"${s.label}"'s dot is as large as the current one's`);
+        if (s.state === 'ahead' && s.labelRatio >= now.labelRatio) out.push(`"${s.label}" ahead is as strong as the current step`);
+        if (s.state === 'ahead' && s.dot.color === now.dot.color) out.push(`"${s.label}" ahead wears the stage's tone`);
+      }
+      return { steps: steps.map((s) => `${s.label}:${s.state}`).join(' '), out };
+    });
+
+  await check('the stage’s card: its steps evenly apart, labels under their dots, the track only between dots, 3:1 — light, dark, German', async () => {
+    const out = [];
+    for (const theme of ['light', 'dark'])
+      for (const lang of ['en', 'de']) {
+        await openThird({ theme, lang });
+        await hoverStatus();
+        const head = 'Changes requested · V1';
+        if (lang === 'de') await until(async () => (await page.$eval(`${CARD} [data-testid=stage-head]`, (e) => e.textContent)) !== head, 'the card in German');
+        const r = await stepsProblems(`${CARD} .st-steps`);
+        for (const p of r.out) out.push(`${theme} ${lang} (${r.steps}): ${p}`);
+        await shot(`09-stage-card-${theme}-${lang}`);
+      }
+    await openThird();
+    assert(!out.length, out.join('\n        '));
+  });
+
+  await check('the History dialog’s steps: evenly apart, the track only between dots, 3:1 — light and dark', async () => {
+    const out = [];
+    for (const theme of ['light', 'dark']) {
+      await openThird({ theme });
+      await chooseInMenu('History');
+      await page.waitForSelector('[data-testid=stage-history] .st-steps');
+      await page.waitForFunction(() => !document.querySelector('.modal')?.getAnimations().length);
+      const r = await stepsProblems('[data-testid=stage-history] .st-steps');
+      for (const p of r.out) out.push(`${theme} (${r.steps}): ${p}`);
+      await shot(`10-history-steps-${theme}`);
+      await page.keyboard.press('Escape');
+    }
+    await openThird();
+    assert(!out.length, out.join('\n        '));
+  });
+
+  // The dialog said the server's one line (stageDetail), which German left in English when it had no words for all of
+  // it ("1 note open on V1 · 4 fixes to check in V1"): now it says the card's lines.
+  await check('the History dialog in German: where the video stands in the card’s words, no English left', async () => {
+    await openThird({ lang: 'de' });
+    await until(async () => (await page.$eval(STATUS, (e) => e.textContent)).includes('Änderungen gewünscht'), 'the player in German');
+    await chooseInMenu('Verlauf');
+    await page.waitForSelector('[data-testid=stage-history]');
+    const said = await page.$eval('[data-testid=stage-history]', (e) => ({
+      head: e.querySelector('[data-testid=stage-head]')?.textContent ?? null,
+      facts: [...e.querySelectorAll('[data-testid=stage-facts] li')].map((li) => li.textContent),
+      text: e.innerText,
+    }));
+    await shot('11-history-de');
+    await page.keyboard.press('Escape');
+    await openThird();
+    assert(said.head === 'Änderungen gewünscht · V1', `the head: "${said.head}"`);
+    assert(JSON.stringify(said.facts) === JSON.stringify(['4 Korrekturen zu prüfen', '1 Notiz offen']), `the facts: ${said.facts.join(' | ')}`);
+    const english = said.text.match(/\b(notes?|open|fix(es)?|check|requested|nobody|decided|approved)\b/gi);
+    assert(!english, `English in the German dialog (${english}): ${said.text}`);
+  });
+
   await check('on a phone: the board fits, the sign-off fits, the stage reads the same', async () => {
     await page.setViewport({ width: 390, height: 844, deviceScaleFactor: SHOTS ? 3 : 1, isMobile: true, hasTouch: true });
     await page.goto(`${BASE}/#/status`, { waitUntil: 'domcontentloaded' });

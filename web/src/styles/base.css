@@ -9,8 +9,8 @@
    (Light · Dark · System, web/src/lib/theme.ts). Dark is the original cutting-room palette; light is paper and ink, a
    contact sheet on a lightbox. The picture keeps its dark surround in both: the stage, the film stock on cards,
    thumbnails, the inbox preview, the countdown leader and the lit frame's stage on a review link's invitation are
-   dark islands that redeclare the dark tokens for everything inside them — as is what sits on a tooltip, which is dark
-   in both themes (the stage's steps). */
+   dark islands that redeclare the dark tokens for everything inside them. What floats over the page (menus, hover
+   cards, dialogs: the stage's steps too) is the page's own theme, on --float-bg. */
 :root,
 :root[data-theme='light']
   :is(
@@ -28,7 +28,6 @@
     .inbox-stage,
     .inbox-stage-box,
     .inbox-thumb,
-    .so-tip,
     .aud-media,
     .aud-thumb,
     .cv-loop,
