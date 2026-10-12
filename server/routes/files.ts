@@ -13,7 +13,7 @@ import express, { type Request, type Response, type Router } from 'express';
 import { z } from 'zod';
 import { AGENT_KINDS } from '../../lib/agentKind.ts';
 import { scopeOf } from '../../lib/fileAreas.ts';
-import { MEDIA_KINDS, mediaOf, posterable, posterOf, scrubOf } from '../../lib/fileMedia.ts';
+import { MEDIA_KINDS, mediaOf, posterable, posterOf, SCRUB_FRAMES, scrubOf } from '../../lib/fileMedia.ts';
 import {
   type AreaRef,
   areaRefOf,
@@ -383,7 +383,8 @@ export function fileRoutes(ctx: ServerContext): Router {
       const id = idOf(req);
       const q = query(PosterQuery, req);
       const found = FILE_ID.test(id) ? findFile(id) : null;
-      if (!found) throw fail(404, 'no such file');
+      // a trashed file shows nothing (its row is gone), as a purged one
+      if (!found || found.trashed) throw fail(404, 'no such file');
       const version = versionOf(found.entry, q.v);
       if (!version || !heldBlob(version.hash)) throw fail(404, 'no picture for this file');
       const count = grabsOf(ctx, req);
@@ -400,11 +401,13 @@ export function fileRoutes(ctx: ServerContext): Router {
       const id = idOf(req);
       const q = query(PosterQuery, req);
       const found = FILE_ID.test(id) ? findFile(id) : null;
-      if (!found) throw fail(404, 'no such file');
+      // a trashed file shows nothing (its row is gone), as a purged one
+      if (!found || found.trashed) throw fail(404, 'no such file');
       const version = versionOf(found.entry, q.v);
       if (!version || !heldBlob(version.hash)) throw fail(404, 'no strip for this file');
       const count = grabsOf(ctx, req);
-      const out = await scrubOf(version.hash, found.entry.kind, (work) => countedGrab(count, work));
+      // a strip decodes SCRUB_FRAMES frames: counted as that many of the account's new pictures
+      const out = await scrubOf(version.hash, found.entry.kind, (work) => countedGrab(count, work, SCRUB_FRAMES));
       if (!out) throw fail(404, 'no strip for this file');
       res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
       sendInternal(res, out);

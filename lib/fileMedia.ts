@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { blobKey } from './files.ts';
 import { cacheDir } from './paths.ts';
-import { FFMPEG, INCOMING_LIMITS, probe, probeAudio, run } from './probe.ts';
+import { FFMPEG, INCOMING_LIMITS, MediaBusyError, probe, probeAudio, run } from './probe.ts';
 import { pruneDir } from './prune.ts';
 import { filesStorage } from './storage/index.ts';
 import type { FileKind, FileMedia } from './types.ts';
@@ -22,6 +22,14 @@ export const POSTER_KINDS: ReadonlySet<FileKind> = new Set<FileKind>(['footage',
 export const POSTER_BOX = { width: 128, height: 72 } as const;
 /** What the posters of a workspace may take on its disk before the oldest go (they are made again when seen). */
 const POSTERS_CAP_BYTES = 256e6;
+/**
+ * The facts and the "nothing to make" marks (a few bytes each, kept by content: no file's deletion says when a blob's
+ * last one went) are bounded by count: each weighs a disk block, so about 16,000 of them stay, the oldest go first. One
+ * that goes is read again (ffprobe) or tried again (a mark) when its file is seen next.
+ */
+const FACTS_CAP_BYTES = 64e6;
+const BLOCK = 4096;
+let factWrites = 0;
 
 const SHA256 = /^[0-9a-f]{64}$/;
 const dir = (): string => path.join(cacheDir(), 'file-media');
@@ -49,7 +57,35 @@ function putFile(to: string, text: string): void {
   } catch {
     fs.rmSync(tmp, { force: true });
   }
+  // (every so many writes: reading the folder on each would cost more than the files)
+  if (++factWrites % 64 === 0) pruneDir(dir(), FACTS_CAP_BYTES, (f) => f.endsWith('.json') || f.endsWith('.none'), BLOCK);
 }
+
+/**
+ * ffmpeg making a new picture under `grab`, the caller's budget for new pictures (lib/shots.ts countedGrab): true when it
+ * wrote one into `tmp`. A run that started and made nothing (a file ffmpeg can't read, a timeout) is false and stays
+ * counted: it cost what a picture costs, and a broken file asked for again and again must not run for free. Only what
+ * never started is given back: the on-demand gate full (MediaBusyError, thrown) — and the budget spent throws before.
+ */
+async function madeUnder(grab: <T>(work: () => Promise<T>) => Promise<T>, args: string[], tmp: string): Promise<boolean> {
+  const ran = await grab(async () => {
+    try {
+      await run(FFMPEG, args, { nice: 5, incoming: true, onDemand: true, timeout: 30_000 });
+      return true;
+    } catch (e) {
+      if (e instanceof MediaBusyError) throw e;
+      return false;
+    }
+  });
+  try {
+    return ran && fs.statSync(tmp).size > 0;
+  } catch {
+    return false;
+  }
+}
+
+/** The gate full or the budget spent: asked again later, nothing remembered. */
+const askAgain = (e: unknown): boolean => (e as { status?: number }).status === 503 || (e as { status?: number }).status === 429;
 
 /**
  * A version's length and size in pixels (footage: both; sound: its length; a picture: its size), or null when it is no
@@ -113,27 +149,25 @@ export async function posterOf(hash: string, kind: FileKind, grab: <T>(work: () 
   const tmp = tmpOf(out, '.jpg');
   fs.mkdirSync(dir(), { recursive: true });
   const { width: w, height: h } = POSTER_BOX;
+  // someone is looking at the row: a place in the on-demand gate (lib/probe.ts ON_DEMAND), one frame's time
+  const args = [
+    ...['-v', 'error', ...(at ? ['-ss', String(at)] : []), '-i', file, '-map', '0:v:0', '-frames:v', '1'],
+    ...['-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease:force_divisible_by=2`, '-q:v', '5', '-y', tmp],
+  ];
+  let made = false;
   try {
-    await grab(() =>
-      run(
-        FFMPEG,
-        [
-          ...['-v', 'error', ...(at ? ['-ss', String(at)] : []), '-i', file, '-map', '0:v:0', '-frames:v', '1'],
-          ...['-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease:force_divisible_by=2`, '-q:v', '5', '-y', tmp],
-        ],
-        // someone is looking at the row: a place in the on-demand gate (lib/probe.ts ON_DEMAND), one frame's time
-        { nice: 5, incoming: true, onDemand: true, timeout: 30_000 },
-      ),
-    );
-    if (!fs.statSync(tmp).size) throw new Error('no picture');
-    fs.renameSync(tmp, out);
+    made = await madeUnder(grab, args, tmp);
   } catch (e) {
     fs.rmSync(tmp, { force: true });
-    // the gate full or the budget spent: asked again later; anything else ffmpeg couldn't read: never again
-    if ((e as { status?: number }).status === 503 || (e as { status?: number }).status === 429) throw e;
+    if (askAgain(e)) throw e;
+  }
+  if (!made) {
+    // what ffmpeg couldn't make a picture of: never tried again
+    fs.rmSync(tmp, { force: true });
     putFile(noPosterFile(hash), '');
     return null;
   }
+  fs.renameSync(tmp, out);
   pruneDir(dir(), POSTERS_CAP_BYTES, (f) => f.endsWith('.jpg') && f !== path.basename(out));
   return out;
 }
@@ -144,13 +178,16 @@ export const SCRUB_BOX = { width: 160, height: 90 } as const;
 
 /**
  * The path of a clip's scrub strip, or null (no footage, no length, bytes not here, nothing ffmpeg reads). One ffmpeg
- * seeks to each frame on its own input (a seek and one frame each: cheap, never the whole clip), in the on-demand gate,
- * counted as one of the account's new pictures; kept like the poster.
+ * seeks to each frame on its own input (a seek and one frame each, never the whole clip), in the on-demand gate. It
+ * decodes SCRUB_FRAMES frames, so `grab` counts it as that many of the account's new pictures (the route passes the
+ * cost); kept like the poster, and a clip ffmpeg made no strip of is remembered as such, never tried again.
  */
 export async function scrubOf(hash: string, kind: FileKind, grab: <T>(work: () => Promise<T>) => Promise<T>): Promise<string | null> {
   if (!SHA256.test(hash) || kind !== 'footage') return null;
   const out = path.join(dir(), `${hash}.scrub.jpg`);
+  const none = path.join(dir(), `${hash}.scrub.none`);
   if (fs.existsSync(out)) return out;
+  if (fs.existsSync(none)) return null;
   const facts = await mediaOf(hash, kind);
   const file = facts && localBytes(hash);
   if (!facts?.seconds || !file || !posterable(hash, kind, facts)) return null;
@@ -161,26 +198,25 @@ export async function scrubOf(hash: string, kind: FileKind, grab: <T>(work: () =
   const filter = `${chains.join(';')};${at.map((_, i) => `[f${i}]`).join('')}hstack=inputs=${at.length}[out]`;
   const tmp = tmpOf(out, '.jpg');
   fs.mkdirSync(dir(), { recursive: true });
+  const args = [
+    '-v',
+    'error',
+    ...at.flatMap((t) => ['-ss', t.toFixed(3), '-i', file]),
+    ...['-filter_complex', filter, '-map', '[out]', '-frames:v', '1', '-q:v', '6', '-y', tmp],
+  ];
+  let made = false;
   try {
-    await grab(() =>
-      run(
-        FFMPEG,
-        [
-          '-v',
-          'error',
-          ...at.flatMap((t) => ['-ss', t.toFixed(3), '-i', file]),
-          ...['-filter_complex', filter, '-map', '[out]', '-frames:v', '1', '-q:v', '6', '-y', tmp],
-        ],
-        { nice: 5, incoming: true, onDemand: true, timeout: 30_000 },
-      ),
-    );
-    if (!fs.statSync(tmp).size) throw new Error('no picture');
-    fs.renameSync(tmp, out);
+    made = await madeUnder(grab, args, tmp);
   } catch (e) {
     fs.rmSync(tmp, { force: true });
-    if ((e as { status?: number }).status === 503 || (e as { status?: number }).status === 429) throw e;
+    if (askAgain(e)) throw e;
+  }
+  if (!made) {
+    fs.rmSync(tmp, { force: true });
+    putFile(none, '');
     return null;
   }
+  fs.renameSync(tmp, out);
   pruneDir(dir(), POSTERS_CAP_BYTES, (f) => f.endsWith('.jpg') && f !== path.basename(out));
   return out;
 }

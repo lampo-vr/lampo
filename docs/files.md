@@ -179,7 +179,8 @@ are in Settings → Files. Reviewers have neither.
   columns on a phone. The arrows move by tiles and by rows of them.
 - **Scrubbing**: under a mouse (never a finger) a clip's tile shows the frame for where the pointer is across it, from
   a strip of 8 frames the server makes on the first hover (`GET /api/files/:id/scrub`: one ffmpeg seeking once per
-  frame, never decoding the clip, counted as one of the account's new frames, kept like the poster). In the list, a
+  frame, never decoding the clip, counted as the 8 new frames it decodes, kept like the poster; a clip it can't make
+  a strip of is remembered, never tried again). In the list, a
   clip's or a picture's row shows a card with it larger after a short rest, above the row (under it near the window's
   top), a clip flipping through its strip; it goes when the pointer moves on, and never shows while files are picked or
   in Quick Look.

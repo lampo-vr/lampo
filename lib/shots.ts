@@ -289,12 +289,22 @@ export const grabCount = (limit: RateLimit, key: string): GrabCount => ({
  * A new frame made for `count`'s account: counted before the grab starts, given back when it fails. Counted once it had
  * landed, a burst of requests in flight together all passed the check made before any of them landed.
  */
-export async function countedGrab<T>(count: GrabCount | null | undefined, grab: () => Promise<T>): Promise<T> {
-  const giveBack = count?.take();
+export async function countedGrab<T>(count: GrabCount | null | undefined, grab: () => Promise<T>, cost = 1): Promise<T> {
+  // `cost` new frames at once (a strip of them): all taken before the work, or none
+  const taken: (() => void)[] = [];
+  try {
+    for (let i = 0; i < cost; i++) {
+      const back = count?.take();
+      if (back) taken.push(back);
+    }
+  } catch (e) {
+    for (const back of taken) back();
+    throw e;
+  }
   try {
     return await grab();
   } catch (e) {
-    giveBack?.();
+    for (const back of taken) back();
     throw e;
   }
 }

@@ -21,6 +21,10 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - Per-address limits key by `addressKey` (IPv6 by its /64); guest write limits count only writes that landed.
 - A limit on costly work (a new frame) is taken before the work starts and given back if it fails (`RateLimit.reserve`,
   `countedGrab`): checked first and counted once it landed, every request of a burst in flight together passes.
+- What is given back is only work that never started (the on-demand gate full): a run that started and made nothing
+  (a broken file) stays counted and is remembered (`madeUnder`, `.none` marks in lib/fileMedia.ts), and work that
+  costs several frames takes them all up front (`countedGrab(…, cost)`). Given back on any failure, a broken clip ran
+  ffmpeg 8 times past a budget of 5.
 - ffmpeg runs through `run` / `spawnMedia` (timeout, stderr tail), `incoming: true` for outside files; never `spawn`.
 - ffmpeg someone waits for outside the job queue (a frame, a screenshot, a reference) passes `onDemand: true`; a
   whole-video decode streams into a fixed window of frames, never holds them all; analysis heights go through `analysisRows`.
