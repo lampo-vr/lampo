@@ -189,6 +189,14 @@ format stays backwards compatible throughout.
   you list your server's MCP connector there.
 
 ### Fixed
+- A picture or clip a visitor was about to add through a review link isn't taken once its video has left the link
+  (archived, or moved out of the shared folder) or takes no notes there any more. On a link for several videos, a video
+  in an archived project is watch only for removing a reference and for its transcript too, as for everything else a
+  visitor would leave.
+- A file sent to a one-time upload URL is checked again once all of it has arrived, however long that took: a
+  visitor's file whose note's video left the review link meanwhile, or a file from a team member removed meanwhile, is
+  not kept.
+- A link for several videos answers faster in a workspace with many videos: each request looks its videos up once.
 - The marks on a paused frame read on any picture. "Changed since V2" and Auto-check's label sit on a dark chip
   that fits their words in either language and stays inside the frame. On a white frame they used to show as hollow
   letters. The chip goes above its box, or below it when there is no room above, so it doesn't cover what the box

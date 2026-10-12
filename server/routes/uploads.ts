@@ -583,6 +583,18 @@ export function uploadRoutes(ctx: ServerContext): Router {
       // its bytes are on the disk now (or gone): the disk's free space says the rest
       held.delete(id);
     }
+    // The bytes may take as long as an upload may (hours): what the URL was checked for above is asked again now that
+    // they are in, before anything is made of them — a note's video gone from its review link, the link revoked, the
+    // member who asked removed since. Refused, the file goes, the answer is the first check's, and nothing was used.
+    if (t.check) {
+      try {
+        inWorkspace(t.ws, t.check);
+      } catch (e) {
+        fs.rmSync(file, { force: true });
+        t.used = false;
+        throw e;
+      }
+    }
     t.outcome = { status: 'processing' };
     // A one-time URL works in the workspace it was handed out in.
     const work: Promise<UploadResult | Attached | RefAttached | OptionAttached | FileUploadResult> = inWorkspace(t.ws, () =>

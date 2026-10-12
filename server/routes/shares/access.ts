@@ -8,11 +8,11 @@ import {
   archivedFor,
   archivedForVideo,
   covers,
+  holdSet,
   isExpired,
   isUnlocked,
   manyVideos,
   resolveShare,
-  reviewsOf,
   settingsOf,
   sharerName,
   slugOfGuestId,
@@ -51,7 +51,8 @@ export function changed(ctx: ServerContext, slug?: string): void {
 }
 
 /** The link a request names: 404 unknown or revoked, 410 expired — and a set link none of whose videos is left (each
- * removed, archived or gone from the workspace) as if it had expired: it opens nothing any more. */
+ * removed, archived or gone from the workspace) as if it had expired: it opens nothing any more. A set link's videos
+ * are looked up here once for the whole request (holdSet): target, perms and the room ask this object, not the store. */
 export function link(req: Request<{ token: string }>): ShareWithToken {
   const share = resolveShare(req.params.token);
   if (!share) throw fail(404, 'This review link is not valid any more.');
@@ -62,7 +63,7 @@ export function link(req: Request<{ token: string }>): ShareWithToken {
       ...(share.embed ? {} : { by: sharerName(share) }),
       expired: share.expires,
     });
-  if (share.video_ids && !reviewsOf(share).length)
+  if (share.video_ids && !holdSet(share).length)
     throw fail(410, 'The videos of this review link are no longer there.', { by: sharerName(share), expired: null });
   return share;
 }

@@ -628,6 +628,8 @@ export function guestRoutes(ctx: ServerContext): Router {
     const share = open(req);
     may(share, 'comment');
     const review = target(share, req.params.slug);
+    // on this video: a set link's video in an archived project takes no notes, so nothing is heard for it
+    may(share, 'comment', review);
     const ver = version(share, review, query(VersionQuery, req).v);
     const a = ctx.background.startTranscript(review, ver.v);
     res.setHeader('Cache-Control', 'no-store');
@@ -778,11 +780,14 @@ export function guestRoutes(ctx: ServerContext): Router {
             cfg.public_url || null,
             {
               // The file arrives later: a link revoked, expired or made watch-only in between takes nothing, nor one whose
-              // password was set or changed since (the visitor would have to know it now)
+              // password was set or changed since (the visitor would have to know it now). Nor does a note the link no
+              // longer shows (its video archived, moved out or removed since: like an unknown note), or one whose video
+              // takes no notes now (a set link's video in a project archived since): asked of the video, as the POST was.
               check: () => {
                 const now = resolveShare(share.token);
                 if (!now || isExpired(now) || !perms(now).comment) throw fail(410, 'This review link is not valid any more.');
                 if ((now.password_v || 0) !== passwordAsked) throw fail(401, 'This review link asks for its password now: open it again.');
+                may(now, 'comment', visibleNote(now, id).review);
               },
               // a visitor holds only so many open at once, and the link's visitors together (server/uploadTickets.ts)
               owner: `guest:${share.token}|${ipOf(req)}`,
@@ -813,6 +818,8 @@ export function guestRoutes(ctx: ServerContext): Router {
     may(share, 'comment');
     const id = parse(commentId, req.params.id, 'note id');
     const { review, comment } = visibleNote(share, id);
+    // on this video: a set link's video in an archived project is watch only (403, never the store's 423)
+    may(share, 'comment', review);
     const ref = comment.refs?.find((x) => x.id === req.params.ref);
     if (!ref) throw fail(404, 'no such reference');
     if (ref.share !== shareId(share)) throw fail(403, 'Only references added through this link can be removed here.');

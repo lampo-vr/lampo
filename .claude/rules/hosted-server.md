@@ -19,6 +19,10 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
 - A path that goes to the log goes through `loggedPath`: review-link tokens and tickets live in paths.
 - Maps keyed by what visitors send are `Recent` / `RateLimit`, listed with `keptInMemory`; never a bare `Map`.
 - Per-address limits key by `addressKey` (IPv6 by its /64); guest write limits count only writes that landed.
+- A link's videos that a guest request asks about more than once (a set link's) are looked up once in `link()` and held
+  by that request's link object (`holdSet`), never kept across requests: a video removed or archived drops out on the next.
+- A one-time URL's guard (`t.check`) runs before the bytes and again once they are in, before any work: a PUT's body
+  may take as long as an upload (6 h), and a check made only at its start let a file land on a video archived meanwhile.
 - A limit on costly work (a new frame) is taken before the work starts and given back if it fails (`RateLimit.reserve`,
   `countedGrab`): checked first and counted once it landed, every request of a burst in flight together passes.
 - What is given back is only work that never started (the on-demand gate full): a run that started and made nothing

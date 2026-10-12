@@ -24,3 +24,6 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
   (checked in its lock, after every await, a body read too) or call `stillSignedIn(req)` with nothing left to await.
 - Account answers are the same for every address (sign-up, reset, invite, add user): no enumeration.
 - Read the session cookie with `sessionOf(req)` (`__Host-` over https), a query string with zod (`query`/`queryOr`).
+- A guest route asks the video, not only the link: `may(share, what, review)` once `target` / `visibleNote` named it
+  (a set link's video in an archived project is watch only on its own), and a guard that runs later (an upload URL's
+  `check`) asks the note again through the link as it is then (`visibleNote(now, …)`), never the link alone.

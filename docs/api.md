@@ -1173,9 +1173,10 @@ limit of a proxy in front of the app ([below](#the-media-host)).
 - `410` when the URL was used or has expired, `411` without a `Content-Length`, `413` when the file is too big, `507`
   when the disk is short, `402` when the workspace's plan has no room for it (uploads under way count for both, as
   for tus), `422` when the render is refused.
-- Whoever asked for the URL is checked again when it is used: removed from the workspace, the token or app revoked, the
-  account disabled, or no longer allowed the action (a member made a reviewer), the `PUT` answers `403` and nothing is
-  stored. The same holds for the one-time URLs of fix previews and references. An app connected through sign-in is
+- Whoever asked for the URL is checked again when it is used, before the bytes and once more when they are all in:
+  removed from the workspace, the token or app revoked, the account disabled, or no longer allowed the action (a member
+  made a reviewer), the `PUT` answers `403` and nothing is stored. The same holds for the one-time URLs of fix previews
+  and references. An app connected through sign-in is
   checked by its grant, not the hour-long access token it asked with, so a URL outlives a refresh and ends when the app
   is disconnected.
 - One account holds at most 50 URLs open at once (unused and unexpired), a workspace's team 500 and one review link's
@@ -1207,7 +1208,11 @@ Details:
 - **Review links**: `POST /api/g/:token/comments/:id/refs` (on the visitor's own note, or with a reply; moments only of
   videos the link covers, named by the link's ids), `DELETE …/refs/:ref` for references added through the same link,
   files at `/api/g/:token/refs/<video id>/<file>`. A link never shows agents' references or moments of videos it
-  doesn't cover.
+  doesn't cover. Both ask the note's video: one that is watch only on the link (a set link's video in an archived
+  project) answers `403`. A visitor's upload URL asks again when it is used and once its bytes are in, and nothing is
+  stored when the `PUT` answers: `410` once the link was revoked, expired or became watch only, `401` once its password changed, `404` (like
+  an unknown note) once the note's video has left the link (archived, moved out, removed), `403` once that video is
+  watch only on its own.
 
 ## Live updates
 
@@ -1292,7 +1297,7 @@ summed up from the link's records.
 | `GET /api/g/:token/archive/info?kind=` | folder links: `ArchiveInfo` for Download all (files, bytes, `preparing` previews, `resumable`); starts computing the checksums |
 | `GET /api/g/:token/archive?kind=&name=` | folder links: the zip (below) |
 | `POST /api/g/:token/comments` | a note from `guest:<name>` (below) → `{id, timecode}` |
-| `GET /api/g/:token/review/:id/transcript?v=` | on links that take notes: what is said, as above, without the version's hash, the engine or `repairs`; `403` on watch-only links |
+| `GET /api/g/:token/review/:id/transcript?v=` | on links that take notes: what is said, as above, without the version's hash, the engine or `repairs`; `403` on watch-only links and on a video that is watch only on its own (a set link's video in an archived project), and nothing is heard for it |
 | `POST /api/g/:token/comments/:id/replies` | `{name, text}` on a note the link shows |
 | `POST /api/g/:token/comments/:id/check` | `{name, verdict: confirm \| reopen, text?}` on a note marked fixed |
 | `POST /api/g/:token/approval` | the client's decision (below) → `{approval}` |

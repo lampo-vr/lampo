@@ -915,6 +915,24 @@ export function archivedForVideo(s: Pick<Share, 'folder' | 'slug' | 'video_ids'>
 }
 
 /**
+ * A set link's videos as one request found them (holdSet), kept by the link object resolveShare made for it: a new one
+ * on every call, gone with the request. Never kept across requests, where a video removed or archived since would
+ * still be in the link.
+ */
+const heldSets = new WeakMap<Pick<Share, 'video_ids'>, Review[]>();
+
+/**
+ * For one request (server/routes/shares/access.ts `link`): a set link's videos looked up once, and taken from this
+ * link object by everything the request asks after it (reviewsOf, slugOfGuestId, archivedFor). Each lookup lists the
+ * workspace's reviews, and a guest route asked two or three on every media range, poster and beacon.
+ */
+export function holdSet(s: ShareWithToken): Review[] {
+  const videos = setReviews(s);
+  heldSets.set(s, videos);
+  return videos;
+}
+
+/**
  * A set link's videos as they are now, in its order: each id looked up among this workspace's reviews (the parse-once
  * list: read, never changed), the first review with it. One removed is left out; so is an archived one, unless
  * `archived` (the owner's "is anything left": an archived video can come back).
@@ -922,6 +940,8 @@ export function archivedForVideo(s: Pick<Share, 'folder' | 'slug' | 'video_ids'>
 function setReviews(s: Pick<Share, 'video_ids'>, { archived = false } = {}): Review[] {
   const ids = s.video_ids;
   if (!ids?.length) return [];
+  const held = archived ? undefined : heldSets.get(s);
+  if (held) return held;
   const wanted = new Set(ids);
   const byId = new Map<string, Review>();
   for (const r of listReviews()) if (r.id && wanted.has(r.id) && !byId.has(r.id) && (archived || !r.archived)) byId.set(r.id, r);
