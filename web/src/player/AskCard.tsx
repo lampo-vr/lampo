@@ -39,8 +39,13 @@ export interface AskCardProps {
   children?: ReactNode;
 }
 
-/** Whether a note asks with answers or options to pick from: it stands open as an AskCard while it waits. */
-export const asksWithPicks = (c: Pick<PlacedComment, 'status' | 'choices' | 'options'>) => c.status === 'open' && (!!c.choices?.length || !!c.options?.length);
+/** Whether a note asks with answers or options to pick from: it stands open as an AskCard while it waits. A person
+ *  who answered in words (a reply, status unchanged) has had the last word: it waits on the asker then, and is a row. */
+export const asksWithPicks = (c: Pick<PlacedComment, 'status' | 'choices' | 'options' | 'replies' | 'author'>) => {
+  if (c.status !== 'open' || !(c.choices?.length || c.options?.length)) return false;
+  const last = c.replies?.at(-1)?.by;
+  return !last || last === c.author || isAgent(last);
+};
 
 export function AskCard({ c, slug, name, avatar, here, selected, fps, busy, items, onSelect, onAnswer, children }: AskCardProps) {
   const qid = useId();

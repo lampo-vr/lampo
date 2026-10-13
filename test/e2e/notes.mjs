@@ -125,6 +125,19 @@ try {
   const onPhone = await ask(60, 'Hold the last shot a beat longer?', ['Yes, a beat longer', 'No, as it is']);
   await api(`/api/review/${enc(picks)}/comments`, 'POST', { v: 1, frame: 80, text: 'Logo a touch smaller', severity: 'should' });
   const pickNote = async (id) => (await api(`/api/review/${enc(picks)}`)).review.comments.find((c) => c.id === id);
+  // worded.mp4: an agent's question with answers to pick that the person answered in words (a reply, still open)
+  const wfile = makeVideo(path.join(dir, 'Acme/export/worded.mp4'), { w: 320, h: 180, fps: FPS, dur: 2, pattern: 'testsrc2' });
+  age(wfile);
+  const worded = (await api('/api/library', 'POST', { path: wfile, folder: 'Acme' })).video.slug;
+  const inWords = await api(`/api/review/${enc(worded)}/comments`, 'POST', {
+    v: 1,
+    frame: 10,
+    kind: 'question',
+    text: 'Title in white or in yellow?',
+    choices: ['White', 'Yellow'],
+    by: 'agent:claude-ai',
+  });
+  await api(`/api/comments/${inWords.id}`, 'PATCH', { note: 'Yellow, and a touch smaller' });
   // opts.mp4: the agent's question with options to audition, and an open note
   const ofile = makeVideo(path.join(dir, 'Acme/export/opts.mp4'), { w: 320, h: 180, fps: FPS, dur: 4, pattern: 'smptebars' });
   age(ofile);
@@ -480,6 +493,21 @@ try {
       await shot('picks-answered');
     },
   );
+
+  await check('a question with answers to pick that the person answered in words is a row again, the picks gone: it waits on the agent', async () => {
+    await page.setViewport({ width: 1440, height: 900 });
+    await page.goto('about:blank');
+    await page.goto(`${BASE}/#/v/${enc(worded)}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector(`.side-scroll .note-row[data-note="${inWords.id}"] .nr`, { timeout: 20000 });
+    const left = await page.evaluate(
+      (id) => ({
+        card: !!document.querySelector(`[data-testid=ask-card][data-note="${id}"]`),
+        picks: document.querySelectorAll('[data-testid=ask-pick]').length,
+      }),
+      inWords.id,
+    );
+    assert(!left.card && !left.picks, `no card, no picks once the person had the last word: ${JSON.stringify(left)}`);
+  });
 
   await check(
     'a question with options to audition stands open the same way: the groups and the way into the audition; the card is the door, + Note steps down',
