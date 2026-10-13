@@ -2,6 +2,7 @@
 // covers: web/src/player/NotesPanel.tsx web/src/player/noteRows.ts web/src/player/noteGroups.ts web/src/player/AutoCheck.tsx
 // covers: web/src/player/findingWords.ts web/src/player/hashtags.ts web/src/styles/notes.css
 // covers: web/src/styles/autocheck.css server/routes/analysis.ts lib/qa.ts lib/findings.ts lib/text/
+// covers: web/src/player/NoteRow.tsx web/src/player/CommentCard.tsx
 // Browser suite of the notes panel with many notes (local mode, temp store, headless Chrome): 30 notes are 30 rows —
 // timecode, the severity's keyframe glyph and the first line with nothing after it, no pill and no coloured outline —
 // in the groups of where each stands (all open here: one "Open" header), each naming its author on a second line under
@@ -12,7 +13,8 @@
 // selected note (a click, ↑ / ↓) opens in place into its card while every other stays a row; the filter menu holds the
 // lists and the notes' tags with their counts, a tag picked narrows the list and shows as a chip that takes it off, the
 // done ones fold into "Done" at the end; while playing the note at the playhead is marked and the list follows it, until
-// the person scrolls it. Auto-check is one chip in the head once it found something — minor findings only, problems,
+// the person scrolls it; that mark is the list's flat fill a step deeper, never a raised ground (it was a white box in
+// the light theme), and opened, the card keeps its own ground under it, in both themes. Auto-check is one chip in the head once it found something — minor findings only, problems,
 // and while a Run again it started runs — whose popover lists the problems first, folds the minor ones, runs again,
 // turns a finding into a note or puts it away, and names the spelling language only when it was checked in it. A phone
 // has the same rows at a finger's height and the chip on the line under its head; it shows what needs you and what is
@@ -166,6 +168,12 @@ try {
     by: 'agent:claude-ai',
   });
   await api(`/api/review/${enc(opts)}/comments`, 'POST', { v: 1, frame: 30, text: 'Logo a touch later', severity: 'should' });
+  // here.mp4: a note on the first frame, where the player opens (the note the playhead is at, still a row), and another
+  const hfile = makeVideo(path.join(dir, 'Acme/export/here.mp4'), { w: 320, h: 180, fps: FPS, dur: 2, pattern: 'testsrc2' });
+  age(hfile);
+  const hereVideo = (await api('/api/library', 'POST', { path: hfile, folder: 'Acme' })).video.slug;
+  const onFirst = await api(`/api/review/${enc(hereVideo)}/comments`, 'POST', { v: 1, frame: 0, text: 'Title card a beat later', severity: 'should' });
+  await api(`/api/review/${enc(hereVideo)}/comments`, 'POST', { v: 1, frame: 25, text: 'Logo a touch smaller', severity: 'should' });
 
   browser = await launch();
   page = await browser.newPage();
@@ -639,6 +647,74 @@ try {
     await page.keyboard.press(' ');
     assert(Math.abs(after - put) < 2, `the list stays where it was scrolled while the note at the playhead moves on: ${put} → ${after}`);
   });
+
+  await check(
+    'the note the playhead is at wears the list’s flat fill, a step deeper than hover and kept under it — never a raised ground; opened, its card keeps its own ground under that fill; light and dark, desk and phone',
+    async () => {
+      const problems = [];
+      for (const theme of ['light', 'dark'])
+        for (const phone of [false, true]) {
+          const ctx = await browser.createBrowserContext();
+          const p = await ctx.newPage();
+          p.on('pageerror', (e) => errors.push(e.message));
+          await p.setViewport({ width: phone ? 390 : 1440, height: phone ? 844 : 900, isMobile: phone, hasTouch: phone });
+          await p.evaluateOnNewDocument((theme) => localStorage.setItem('vr.theme', theme), theme);
+          await p.goto(`${BASE}/#/v/${enc(hereVideo)}`, { waitUntil: 'domcontentloaded' });
+          const row = `[data-note="${onFirst.id}"]`;
+          // the player opens on the first frame: its note is the one at the playhead, a row (opening on a frame opens nothing)
+          await p.waitForSelector(`${row}.note-row.here`, { timeout: 20000 });
+          if (phone) {
+            await p.tap('.nsheet-handle');
+            await p.waitForSelector('.nsheet-half');
+          }
+          const at = `${phone ? '390' : '1440'} ${theme}`;
+          const look = () =>
+            p.evaluate((sel) => {
+              const colour = (name) => {
+                const s = document.createElement('span');
+                s.style.color = `var(${name})`;
+                document.body.append(s);
+                const c = getComputedStyle(s).color;
+                s.remove();
+                return c;
+              };
+              const note = document.querySelector(sel);
+              const ground = getComputedStyle(note.classList.contains('comment') ? note : note.querySelector('.nr'));
+              return {
+                theme: document.documentElement.dataset.theme,
+                fill: ground.backgroundColor,
+                image: ground.backgroundImage,
+                selOn: colour('--sel-on'),
+                card: colour('--ink-1'),
+                raised: colour('--ink-3'),
+              };
+            }, row);
+          const rest = await look();
+          if (rest.theme !== theme) problems.push(`${at}: the page is ${rest.theme}`);
+          if (rest.fill !== rest.selOn)
+            problems.push(
+              `${at}: the row at the playhead is ${rest.fill}, not the list's fill ${rest.selOn}${rest.fill === rest.raised ? ' (the raised --ink-3)' : ''}`,
+            );
+          if (!phone) {
+            const words = await (await p.$(`${row} .nr-text`)).boundingBox();
+            await p.mouse.move(words.x + 30, words.y + words.height / 2);
+            await until(() => p.$eval(`${row} .nr-acts`, (e) => getComputedStyle(e).opacity === '1'), 'the row lit');
+            const lit = await look();
+            if (lit.fill !== rest.selOn) problems.push(`${at}: hovered, the row at the playhead is ${lit.fill}, not ${rest.selOn}`);
+          }
+          if (SHOTS) await p.screenshot({ path: path.join(SHOTS, `notes-here-${at.replace(' ', '-')}.png`) });
+          // opened (picked from the list, the playhead still on it): the card's own ground with the list's fill over it
+          if (phone) await p.tap(`${row} .nr`);
+          else await p.click(`${row} .nr`);
+          await p.waitForSelector(`${row}.comment.active.here`);
+          const card = await look();
+          if (card.fill !== card.card || !/gradient/.test(card.image) || card.fill === card.raised)
+            problems.push(`${at}: the card at the playhead is ${card.fill} ${card.image}, not its own ${card.card} under a flat fill`);
+          await ctx.close();
+        }
+      assert(!problems.length, problems.join('\n'));
+    },
+  );
 
   // Auto-check's answers, held here: running, minor findings only, problems, and a result whose language was a guess
   const minor = [

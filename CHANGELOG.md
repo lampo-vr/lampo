@@ -26,6 +26,12 @@ format stays backwards compatible throughout.
   row with nothing more to say stays one line. On hover the row lights up flat, Reply and ⋯ sit inside the end of its
   first line and the words fade out under them; no tooltip covers the row below, and no picture comes over the row
   (the opened note shows it).
+- Review links show their notes in the same two lines: the words first, then "V1 · 2 replies" under them and where the
+  note stands as a small label at the end ("Fixed · V2", "Won't change"). On hover the row lights up flat with Reply
+  inside its end (a link that takes no notes shows none); the picture no longer comes over the row. The note the
+  playhead is at is marked with the list's own quiet fill, in the app as on a review link, instead of a white box in
+  the light theme. On a phone the line under the notes' head stays one line in German too, saying less where it has
+  no room ("Prüfen 12") instead of wrapping.
 - An agent's question that offers answers to pick no longer waits behind Answer: it stands open at the top of the
   notes, under "Needs you", as a card in the agent's colour — who asks, the question in the reading size, its answers
   as rows one tap sends (or their number, 1–9, while the card has the focus), and "Or write an answer…" under them.

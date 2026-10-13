@@ -637,6 +637,14 @@
   .g-hide-sm {
     display: none;
   }
+  /* a note's row as the phone player's (notes.css): its type steps are a step up here too, so line 2 takes the smaller
+     one and stays a step under the words, and the timecodes' column holds "Whole video" whole */
+  .g-player .nr-sub {
+    font-size: var(--fs-xs);
+  }
+  .g-player .nr-stack > .nr-tc {
+    width: calc(var(--sp-16) + var(--sp-3));
+  }
   .g-player .g-top {
     gap: var(--sp-2);
     padding-left: max(var(--sp-2), env(safe-area-inset-left));

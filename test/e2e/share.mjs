@@ -205,7 +205,7 @@ try {
     await page.reload({ waitUntil: 'domcontentloaded' });
     await videoReady();
     // a row at rest says it has a reply; opened, the card shows it as a message, as the app's does
-    await page.waitForFunction(() => document.querySelector('.g-note.note-row .nr-said')?.textContent === '1', { timeout: 10000 });
+    await page.waitForFunction(() => document.querySelector('.g-note.note-row .nr-said')?.textContent === '1 reply', { timeout: 10000 });
     await page.click('.g-note.note-row .nr');
     await page.waitForFunction(() => [...document.querySelectorAll('.g-note [data-testid=reply]')].some((e) => e.textContent.includes('schiebe ich')), {
       timeout: 10000,

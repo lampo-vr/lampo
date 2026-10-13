@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 // covers: web/src/guest/GuestNotes.tsx web/src/guest/GuestPlayer.tsx web/src/guest/Room.tsx web/src/styles/guest.css web/src/styles/notes.css web/src/player/CommentCard.tsx web/src/i18n/de.client.ts
+// covers: web/src/player/NoteRow.tsx
 // Browser end-to-end test of how a review link looks next to the app: a real server (local mode, temp store, free
 // port) + headless Chrome. A note on the link is the app's note — a row at rest, the card opened (same padding, type,
-// timecode chip, a person's name in the UI face, the marked frame's size) —; an opened card names its writer once,
+// timecode chip, a person's name in the UI face, the marked frame's size) —; its row is the app's two lines (V1 ·
+// 1 reply under the words, where it stands as a label at the end, no picture), hovered the visitor's Reply alone inside
+// its end on the list's flat fill (none on a link that takes no notes), and the note at the playhead wears that fill a
+// step deeper, never a raised ground, in both themes; an opened card names its writer once,
 // through its group's header (inside it for a group's first, above it for the rest), with Reply at the end of its
 // timecode's line; the notes' heading stands on the list's edge (as far in as the composer and the first note, as far
 // down as the app's), a read-only link's line a step under it; a fix waiting for the visitor's check asks on one line
@@ -13,7 +17,7 @@
 // a phone, and a link without notes ends with its foot at the bottom of the screen. The folder room grows with a wide
 // screen, and a phone's room cards have no dead band. Screenshots land in VR_SHOTS when it is set.
 import path from 'node:path';
-import { age, makeVideo } from '../lib/helpers.ts';
+import { age, makeVideo, until } from '../lib/helpers.ts';
 import { settle } from './layout.mjs';
 import { jsonApi } from './lib/api.mjs';
 import { launch, requireChrome, shotsDir } from './lib/browser.mjs';
@@ -54,6 +58,11 @@ try {
   });
   const music = await post({ frame: 60, text: 'The music is too abrupt; a softer fade-in, please.' });
   await api(`/api/comments/${music.id}`, 'PATCH', { note: 'Sure, I will soften it in the next version.' });
+  // one the team won't change (a row with where it stands as its label), and another visitor's on the first frame (the
+  // note the playhead is at when the link opens)
+  const kept = await post({ frame: 70, text: 'The end card could use the new claim' });
+  await api(`/api/comments/${kept.id}`, 'PATCH', { status: 'wontfix', note: 'The claim is fixed by the brief' });
+  const opening = await post({ frame: 0, name: 'Jonas', text: 'The opening title could hold a second longer' });
   makeVideo(film.file, { w: 320, h: 180, fps: 25, dur: 3, pattern: 'testsrc2', freq: 880 });
   age(film.file);
   await api(`/api/review/${enc}/sync`, 'POST');
@@ -71,19 +80,24 @@ try {
 
   browser = await launch();
   const errors = [];
-  const open = async (url, viewport = DESKTOP, lang = null) => {
+  const open = async (url, viewport = DESKTOP, lang = null, theme = null) => {
     const ctx = await browser.createBrowserContext();
     const p = await ctx.newPage();
     p.on('pageerror', (e) => errors.push(e.message));
     p.on('console', (m) => m.type() === 'error' && !m.text().startsWith('Failed to load resource') && errors.push(m.text()));
     await p.setViewport(viewport);
-    await p.evaluateOnNewDocument((lang) => {
-      try {
-        localStorage.setItem('vr.zoomhint', '{"seen":true}');
-        localStorage.setItem('vr.guestName', 'Mia');
-        if (lang) localStorage.setItem('vr.lang', lang);
-      } catch {}
-    }, lang);
+    await p.evaluateOnNewDocument(
+      (lang, theme) => {
+        try {
+          localStorage.setItem('vr.zoomhint', '{"seen":true}');
+          localStorage.setItem('vr.guestName', 'Mia');
+          if (lang) localStorage.setItem('vr.lang', lang);
+          if (theme) localStorage.setItem('vr.theme', theme);
+        } catch {}
+      },
+      lang,
+      theme,
+    );
     await p.goto(BASE + url, { waitUntil: 'domcontentloaded' });
     page = p;
     return p;
@@ -112,11 +126,16 @@ try {
           text: st(c?.querySelector('.c-text'), 'fontSize', 'lineHeight'),
           thumbW: thumb ? Math.round(thumb.width) : null,
           stub: st(c?.querySelector('.reply-stub'), 'height', 'fontSize'),
-          // a row's first line: its words start as far in (the app's row says who · V2 · replies on a second line under
-          // them, the link's keeps its marks at the end of its one line, so their heights differ)
+          // a row: its words start as far in, and under them the second line in the same type (the app's says who
+          // wrote it too, where several did: the link's names them in its group headers), the row as tall
           rowWords: r ? Math.round(r.querySelector('.nr-text').getBoundingClientRect().left - r.querySelector('.nr').getBoundingClientRect().left) : null,
           rowTc: st(r?.querySelector('.nr-tc'), 'fontFamily', 'fontSize'),
           rowText: st(r?.querySelector('.nr-text'), 'fontSize'),
+          rowSub: st(r?.querySelector('.nr-sub'), 'fontSize', 'color'),
+          rowSubLeft: r?.querySelector('.nr-sub')
+            ? Math.round(r.querySelector('.nr-sub').getBoundingClientRect().left - r.querySelector('.nr').getBoundingClientRect().left)
+            : null,
+          rowH: r ? Math.round(r.querySelector('.nr').getBoundingClientRect().height) : null,
         };
       },
       card,
@@ -130,7 +149,7 @@ try {
     await app.waitForSelector(`.comment.note.active[data-note="${logo.id}"]`, { timeout: 20000 });
     await app.waitForFunction(() => document.querySelector('.comment.note.active .c-thumb')?.complete, { timeout: 10000 });
     await settle(app);
-    const own = await measure(app, '.comment.note.active', '.note-row');
+    const own = await measure(app, '.comment.note.active', `.note-row[data-note="${music.id}"]`);
     await close(app);
     const link = await open(`/g/${review.token}`);
     await ready(link);
@@ -139,7 +158,7 @@ try {
     await link.click(`.g-note.comment[data-note="${logo.id}"] .c-text`);
     await link.waitForSelector(`.g-note.comment.active[data-note="${logo.id}"] .reply-stub`);
     await settle(link);
-    const theirs = await measure(link, '.g-note.comment.active', '.g-note.note-row');
+    const theirs = await measure(link, '.g-note.comment.active', `.g-note.note-row[data-note="${music.id}"]`);
     await shot(link, 'look-01-notes');
     const diff = Object.keys(own).filter((k) => JSON.stringify(own[k]) !== JSON.stringify(theirs[k]));
     assert(
@@ -224,6 +243,154 @@ try {
       await close(p);
     }
   });
+
+  /** A row on the link as it is now: its two lines, its label, its actions and what floats over it. */
+  const rowNow = (p, id) =>
+    p.$eval(`.g-note.note-row[data-note="${id}"]`, (note) => {
+      const nr = note.querySelector('.nr');
+      const box = nr.getBoundingClientRect();
+      const end = box.right - Number.parseFloat(getComputedStyle(nr).paddingRight);
+      const words = note.querySelector('.nr-text').getBoundingClientRect();
+      const label = note.querySelector('[data-testid=note-state]');
+      const acts = note.querySelector('.nr-acts');
+      return {
+        stack: nr.classList.contains('nr-stack'),
+        about: note.querySelector('.nr-about')?.textContent ?? null,
+        label: label?.textContent.trim() ?? null,
+        badge: !!label && label.classList.contains('sbadge') && !!label.querySelector(':scope > .kg'),
+        tone: label?.dataset.tone ?? null,
+        labelAtEnd: !!label && Math.abs(label.getBoundingClientRect().right - end) <= 1 && label.getBoundingClientRect().top >= words.bottom,
+        pictures: note.querySelectorAll('img').length,
+        fill: getComputedStyle(nr).backgroundColor,
+        fade: getComputedStyle(note.querySelector('.nr-text')).maskImage,
+        shown: !!acts && getComputedStyle(acts).opacity === '1',
+        buttons: [...(acts?.querySelectorAll('button') ?? [])].map((b) => {
+          const r = b.getBoundingClientRect();
+          const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          return {
+            label: b.getAttribute('aria-label'),
+            inside: r.left >= box.left - 0.5 && r.right <= box.right + 0.5 && r.top >= box.top - 0.5 && r.bottom <= box.bottom + 0.5,
+            onLine1: Math.abs(r.top + r.height / 2 - (words.top + words.height / 2)) <= 1.5,
+            reachable: !!hit && b.contains(hit),
+          };
+        }),
+      };
+    });
+  /** What `var(name)` is on the page, as a computed colour. */
+  const colourOf = (p, name) =>
+    p.evaluate((name) => {
+      const s = document.createElement('span');
+      s.style.color = `var(${name})`;
+      document.body.append(s);
+      const c = getComputedStyle(s).color;
+      s.remove();
+      return c;
+    }, name);
+
+  await check(
+    'a row on the link is the app’s row: its words, then V1 · 1 reply under them and where it stands as a label at the end; hovered, the visitor’s Reply inside its end on its flat fill',
+    async () => {
+      for (const [viewport, lang, where] of [
+        [DESKTOP, null, '1440'],
+        [PHONE, 'de', 'iPhone 390 German'],
+      ]) {
+        const p = await open(`/g/${review.token}`, viewport, lang);
+        await ready(p);
+        await p.waitForSelector(`.g-note.note-row[data-note="${kept.id}"]`);
+        await settle(p);
+        const de = lang === 'de';
+        const said = await rowNow(p, music.id);
+        const closed = await rowNow(p, kept.id);
+        assert(
+          said.stack && said.about === (de ? 'V1 · 1 Antwort' : 'V1 · 1 reply') && said.label === null && !said.pictures,
+          `${where}: the row says its version and replies in words under its words, no picture: ${JSON.stringify(said)}`,
+        );
+        assert(
+          closed.stack && closed.label === (de ? 'Bleibt so' : 'Won’t change') && closed.badge && closed.tone === 'neutral' && closed.labelAtEnd,
+          `${where}: where it stands, the system's label at the end of the second line: ${JSON.stringify(closed)}`,
+        );
+        // the visitor's words: never a role, nor the app's actions
+        const text = await p.$eval('.g-player .side', (e) => e.innerText);
+        assert(!/client|kunde/i.test(text), `${where}: no "client" on the link: ${text.match(/.{20}(client|kunde).{0,20}/i)?.[0]}`);
+        await shot(p, `look-01d-rows-${where.replace(/\W+/g, '-')}`);
+        await close(p);
+      }
+      // a desk: the pointer on a row's words shows Reply alone (no ⋯: nothing else is the visitor's) inside its end on the
+      // app's flat fill, the words fading under it; Reply opens the note with its field
+      const p = await open(`/g/${review.token}`);
+      await ready(p);
+      await p.waitForSelector(`.g-note.note-row[data-note="${music.id}"]`);
+      await settle(p);
+      await p.mouse.move(5, 5);
+      const rest = await rowNow(p, music.id);
+      assert(!rest.shown && rest.fade === 'none' && rest.fill === 'rgba(0, 0, 0, 0)', `at rest: the words alone: ${JSON.stringify(rest)}`);
+      const words = await (await p.$(`.g-note.note-row[data-note="${music.id}"] .nr-text`)).boundingBox();
+      await p.mouse.move(words.x + 40, words.y + words.height / 2);
+      await until(async () => (await rowNow(p, music.id)).shown, 'Reply shows on hover');
+      const lit = await rowNow(p, music.id);
+      assert(
+        lit.buttons.length === 1 && lit.buttons[0].label === 'Reply' && lit.buttons.every((b) => b.inside && b.onLine1 && b.reachable),
+        `Reply alone, inside the row on its first line: ${JSON.stringify(lit.buttons)}`,
+      );
+      assert(lit.fill === (await colourOf(p, '--sel')) && lit.fade !== 'none', `the list's flat fill, the words fading under Reply: ${JSON.stringify(lit)}`);
+      await shot(p, 'look-01e-row-hover');
+      await p.click(`.g-note.note-row[data-note="${music.id}"] .nr-acts button`);
+      await p.waitForFunction(
+        (id) => document.activeElement?.closest(`.g-note.comment[data-note="${id}"] .note-editor`) && document.activeElement.tagName === 'TEXTAREA',
+        { timeout: 5000 },
+        music.id,
+      );
+      await close(p);
+      // a link that takes no notes: rows to read and open, no Reply, the words whole under the pointer
+      const ro = await open(`/g/${board.token}`);
+      await ready(ro);
+      await ro.waitForSelector('.g-note.note-row .nr');
+      await settle(ro);
+      const id = await ro.$eval('.g-note.note-row', (e) => e.dataset.note);
+      const at = await (await ro.$('.g-note.note-row .nr-text')).boundingBox();
+      await ro.mouse.move(at.x + 20, at.y + at.height / 2);
+      await until(async () => (await rowNow(ro, id)).fill !== 'rgba(0, 0, 0, 0)', 'the row lit');
+      const read = await rowNow(ro, id);
+      assert(!read.buttons.length && read.fade === 'none', `read only: no actions, the words whole: ${JSON.stringify(read)}`);
+      await close(ro);
+    },
+  );
+
+  await check(
+    'the note the playhead is at wears the list’s flat fill, a step deeper than hover — never a raised ground; light and dark, desk and phone',
+    async () => {
+      const problems = [];
+      for (const theme of ['light', 'dark'])
+        for (const [viewport, where] of [
+          [DESKTOP, '1440'],
+          [PHONE, 'iPhone 390'],
+        ]) {
+          const p = await open(`/g/${review.token}`, viewport, null, theme);
+          await ready(p);
+          await p.waitForSelector(`.g-note.note-row.here[data-note="${opening.id}"]`);
+          await settle(p);
+          const at = `${where} ${theme}`;
+          const want = await colourOf(p, '--sel-on');
+          const raised = await colourOf(p, '--ink-3');
+          const m = await rowNow(p, opening.id);
+          const shown = await p.evaluate(() => document.documentElement.dataset.theme);
+          if (shown !== theme) problems.push(`${at}: the page is ${shown}`);
+          if (m.fill !== want)
+            problems.push(`${at}: the row at the playhead is ${m.fill}, not the list's fill ${want}${m.fill === raised ? ' (the raised --ink-3)' : ''}`);
+          if (!viewport.hasTouch) {
+            // under the pointer it keeps its fill
+            const words = await (await p.$(`.g-note.note-row[data-note="${opening.id}"] .nr-text`)).boundingBox();
+            await p.mouse.move(words.x + 30, words.y + words.height / 2);
+            await until(async () => (await rowNow(p, opening.id)).shown, 'Reply shows on hover');
+            const lit = await rowNow(p, opening.id);
+            if (lit.fill !== want) problems.push(`${at}: hovered, the row at the playhead is ${lit.fill}, not ${want}`);
+          }
+          await shot(p, `look-01f-here-${at.replace(/\W+/g, '-')}`);
+          await close(p);
+        }
+      assert(!problems.length, problems.join('\n'));
+    },
+  );
 
   await check('the notes’ head stands on the list’s edge, as high as the app’s; a read-only link’s line a step under the heading', async () => {
     // the app's head: how far down its heading's middle stands

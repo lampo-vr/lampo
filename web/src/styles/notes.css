@@ -117,6 +117,20 @@ button.np-tab[aria-selected='true'] {
   gap: var(--sp-1);
   margin-left: auto;
 }
+/* A phone's line stays one row however long its words (German, a count of 12) and however narrow the phone: where they
+   don't fit it says less, measured (NotesPanel.tsx `data-fit`) — what Auto-check found as its number alone
+   (autocheck.css reads --ac-*), then the door to checking fixes in its short words, "Check 2" (its label says them
+   all). */
+.np-chips:is([data-fit='1'], [data-fit='2']) {
+  --ac-words: none;
+  --ac-num: inline;
+}
+.np-chips[data-fit='2'] .np-check-words {
+  display: none;
+}
+.np-chips[data-fit='2'] .np-check::before {
+  content: attr(data-short) / '';
+}
 /* a phone's selector of which notes the sheet shows, at the start of that line: its words, its count a step quieter */
 .np-pick {
   gap: var(--sp-1);
@@ -215,11 +229,11 @@ button.note-sect:hover {
 }
 
 /* ---------------------------------------------------------------- a note as a row
-   The player's row (.nr-stack, CommentCard.tsx): line 1 its timecode, its kind's glyph and its words, to the row's end;
-   line 2 under the words, smaller and quieter, what there is to say about it in words — who · V2 · 1.0 s · 2 replies —
-   and at its end where it stands, a small label; a row with nothing to say is one line. Colour sits in the glyphs.
-   Hover is the list's flat fill; Reply and ⋯ come inside the end of line 1, over no label, the words fading out under
-   them. A review link's row (guest/GuestNotes.tsx) is the plain .nr: one line, its marks at the end. */
+   The row (.nr-stack, player/NoteRow.tsx: the player's and a review link's alike): line 1 its timecode, its kind's
+   glyph and its words, to the row's end; line 2 under the words, smaller and quieter, what there is to say about it in
+   words — who · V2 · 1.0 s · 2 replies — and at its end where it stands, a small label; a row with nothing to say is
+   one line. Colour sits in the glyphs. Hover is the list's flat fill; Reply and ⋯ (a link's visitor: Reply alone) come
+   inside the end of line 1, over no label, the words fading out under them. */
 .note-row {
   display: grid;
   min-width: 0;
@@ -279,8 +293,8 @@ button.note-sect:hover {
 .nr-acts .btn.ghost:hover:where(:not(:disabled, .on)) {
   background: var(--sel);
 }
-/* the words fade out under the actions instead of running under them */
-.nr-line:is(:hover, :focus-within, :has([data-state='open'])) .nr-text {
+/* the words fade out under the actions instead of running under them (a row without any keeps its words whole) */
+.nr-line[data-acts]:is(:hover, :focus-within, :has([data-state='open'])) .nr-text {
   mask-image: linear-gradient(to left, transparent var(--nr-acts-w), #000 calc(var(--nr-acts-w) + var(--sp-6)));
 }
 .nr {
@@ -349,10 +363,6 @@ button.note-sect:hover {
 .nr-tc.overall {
   font: var(--fw-ui) var(--fs-xs) var(--ui);
 }
-.nr-len {
-  font: var(--fw-ui) var(--fs-xs) var(--mono);
-  font-stretch: 87.5%;
-}
 .nr-kg {
   display: inline-grid;
   place-items: center;
@@ -377,35 +387,6 @@ button.note-sect:hover {
 }
 .nr-text .muted {
   color: var(--muted);
-}
-.nr-meta {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  font-size: var(--fs-xs);
-  color: var(--muted);
-  white-space: nowrap;
-}
-.nr-v {
-  font: var(--fw-ui) var(--fs-xs) var(--mono);
-}
-.nr-said {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-0_5);
-  font-variant-numeric: tabular-nums;
-}
-.nr-state {
-  color: var(--muted);
-}
-.nr-state.nr-fixed {
-  color: var(--ok);
-}
-.nr-state.again {
-  color: var(--should);
-}
-.nr-state.nr-open:not(.again) {
-  color: var(--agent-2);
 }
 /* line 2: on its left what there is to say about the note, in words, quiet (a long name gives way first); at its end
    where the note stands, the system's label, so the labels stand in one column down the list. As tall as a label
@@ -437,19 +418,21 @@ button.note-sect:hover {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.nr-about > :is(.nr-v, .nr-len) {
-  font: inherit;
+.nr-about > :is(.nr-v, .nr-len, .nr-said) {
   font-variant-numeric: tabular-nums;
 }
 .nr-dot {
   margin: 0 var(--sp-1);
   color: var(--faint);
 }
-/* the label at the line's end: a fix's green is its mark alone, never the label's surface or ring (green marks a
-   state) */
+/* the label at the line's end, its words a step quieter: a fix's green is its mark alone, never the label's surface or
+   ring (green marks a state) */
 .nr-sub > .sbadge.nr-state {
   flex: none;
   margin-left: auto;
+}
+.nr-state {
+  color: var(--muted);
 }
 .sbadge.nr-state[data-tone='ok'] {
   background: color-mix(in srgb, var(--fg-2) 9%, transparent);
@@ -465,36 +448,18 @@ button.note-sect:hover {
     width: calc(var(--sp-16) + var(--sp-3));
   }
 }
-/* a review link's row: the picture, only while the pointer (or the focus) is on the row, over its end */
-.nr-thumb {
-  position: absolute;
-  top: 50%;
-  right: var(--sp-1);
-  height: calc(var(--h) - var(--sp-1));
-  max-width: var(--sp-16);
-  object-fit: cover;
-  border-radius: var(--r-sm);
-  background: var(--ink-0);
-  box-shadow: 0 0 0 1px var(--line-2);
-  transform: translateY(-50%);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--dur-fast) var(--ease-out);
-}
-.nr:hover .nr-thumb,
-.nr:focus-visible .nr-thumb {
-  opacity: 1;
-}
-/* the note the playhead is at: a raised ground, its timecode in the ink */
-.note-row.here .nr {
-  background: var(--ink-3);
-}
-.note-row.here .nr-tc {
-  color: var(--fg);
-}
 /* under the pointer the row's ground, also while the pointer is on its actions */
 .nr-line:hover > .nr {
   background: var(--sel);
+}
+/* the note the playhead is at: the list's flat fill a step deeper, kept under the pointer, its timecode in the ink —
+   never a raised ground (--ink-3 was a white box on the light theme's panel) */
+.note-row.here .nr,
+.note-row.here .nr-line:hover > .nr {
+  background: var(--sel-on);
+}
+.note-row.here .nr-tc {
+  color: var(--fg);
 }
 .note-row.closed .nr-text,
 .note-row.closed .nr-tc {
@@ -550,8 +515,10 @@ button.note-sect:hover {
 .comment:hover {
   border-color: var(--line-3);
 }
+/* an opened note the playhead is at: the list's flat fill over the card's own ground, as on its row — never a raised
+   one (--ink-3 turned the card white on the light theme's panel) */
 .comment.here {
-  background: var(--ink-3);
+  background: linear-gradient(var(--sel), var(--sel)), var(--ink-1);
 }
 .comment.active {
   border-color: color-mix(in srgb, var(--fg) 45%, transparent);

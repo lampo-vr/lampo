@@ -13,6 +13,7 @@ import { useTouch } from '../lib/media.ts';
 import { toast, toastError } from '../lib/toast.ts';
 import type { DrawTool } from '../player/DrawBar.tsx';
 import type { FrameStore } from '../player/frameStore.ts';
+import { NoteRow } from '../player/NoteRow.tsx';
 import { firstLine } from '../player/noteRows.ts';
 import { RangeControl, RangeExtend, rangeItems, useFrameOnScreen } from '../player/RangeControl.tsx';
 import { litHandlers } from '../player/rangeHint.ts';
@@ -20,7 +21,7 @@ import { guestRefs, splitRefs, type ViewRef } from '../refs/model.ts';
 import { RefStrip } from '../refs/RefStrip.tsx';
 import { AttachMenu, LinkField, PendingList, type PendingRefs } from '../refs/RefTools.tsx';
 import { RefViewer } from '../refs/RefViewer.tsx';
-import { Badge } from '../ui/Badge.tsx';
+import { Badge, type Tone } from '../ui/Badge.tsx';
 import { AutoTextarea, Avatar } from '../ui/controls.tsx';
 import { Spinner } from '../ui/feedback.tsx';
 import { I, type IconName } from '../ui/icons.tsx';
@@ -298,15 +299,16 @@ export function NameDialog({ name, sharer, onSave, onClose }: { name: string; sh
 }
 
 // ---------------------------------------------------------------- a note, as the app shows one
-// The same anatomy as the app's (player/CommentCard.tsx, notes.css): at rest a row — the timecode, the kind as a
-// keyframe glyph, the first line, where it stands when that is news, the picture under the pointer — under a group
-// header where someone else wrote it or wrote it at another sitting; opened (the selected note, or one that waits for
-// the visitor's check) the card: the timecode, its kind, its version and where it stands, Reply at the line's end; the
-// words and the marked frame; the thread (replies as messages, status changes as one line each); the decision on a fix
-// (Looks right · Still wrong, together); Reply… Every note sits under its group's header — inside the card for a group's
-// first, above it for the rest, the same person at the same sitting —, so the card never names who wrote it and when
-// a second time (the app's card has no group headers and keeps its head). In the visitors' words; nothing a visitor
-// can't do (editing, won't fix, ids).
+// The same anatomy as the app's (player/CommentCard.tsx, notes.css): at rest the app's row (player/NoteRow.tsx) — the
+// timecode, the kind as a keyframe glyph and the first line; under the words V1 · 1.0 s · 2 replies and where it stands
+// as a label at the end, when that is news; Reply inside its end on hover — under a group header where someone else
+// wrote it or wrote it at another sitting (the header names the writer, so the row doesn't); opened (the selected
+// note, or one that waits for the visitor's check) the card: the timecode, its kind, its version and where it stands,
+// Reply at the line's end; the words and the marked frame; the thread (replies as messages, status changes as one line
+// each); the decision on a fix (Looks right · Still wrong, together); Reply… Every note sits under its group's header —
+// inside the card for a group's first, above it for the rest, the same person at the same sitting —, so the card never
+// names who wrote it and when a second time (the app's card has no group headers and keeps its head). In the visitors'
+// words; nothing a visitor can't do (editing, won't fix, ids, an agent's actions).
 
 /** What a status change in the thread says happened, in the visitors' words. */
 function activity(status: string, fixedIn: number | null): { icon: IconName; verb: string; tone: string } {
@@ -367,7 +369,6 @@ export function GuestNoteCard({
 }: NoteProps) {
   const [mode, setMode] = useState<'reply' | 'reopen' | null>(null);
   const [viewing, setViewing] = useState<ViewRef | null>(null);
-  const [peek, setPeek] = useState(false);
   const { own, byReply } = splitRefs(guestRefs(c.refs), c.replies);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -413,8 +414,15 @@ export function GuestNoteCard({
   );
 
   if (!opened) {
+    // the app's row (player/NoteRow.tsx): under the words what there is to say about the note — V1 · 1.0 s · 2 replies —
+    // and where it stands as a label at the end; Reply inside its end on hover, the visitor's one action on a note
     const said = c.replies.filter((r) => !r.status).length;
     const ghost = c.rangeHere && c.scope !== 'video' ? c.rangeHere : null;
+    const about: [string, string][] = [];
+    if (c.v !== v) about.push(['v', `V${c.v}`]);
+    if (ghost) about.push(['len', formatSeconds(rangeSeconds(ghost, fps))]);
+    if (said > 0) about.push(['said', t('client::{n} reply|{n} replies', { n: said })]);
+    const label: [string, Tone] | null = status ? [status, c.status === 'fixed' ? 'ok' : 'neutral'] : null;
     return (
       <article
         className={`note note-row g-note ${state} ${here ? 'here' : ''}`}
@@ -423,22 +431,13 @@ export function GuestNoteCard({
         data-severity={c.idea ? 'idea' : 'should'}
       >
         {group}
-        <button
-          type="button"
-          className="nr"
-          onClick={onSelect}
-          onPointerEnter={() => setPeek(true)}
-          onFocus={() => setPeek(true)}
-          aria-expanded={false}
-          aria-label={t('client::{kind} at {timecode}: {text}', { kind, timecode: tc, text: firstLine(c.text) || t('client::(marked area)') })}
-          data-testid="note-row"
-        >
-          <span className={`nr-tc ${c.scope === 'video' ? 'overall' : ''}`}>{tc}</span>
-          <span className="nr-kg">
-            <SevMark s={c.idea ? 'idea' : 'should'} size={10} />
-          </span>
-          <span className="nr-text">
-            {c.text_edit ? (
+        <NoteRow
+          tc={tc}
+          overall={c.scope === 'video'}
+          glyph={<SevMark s={c.idea ? 'idea' : 'should'} size={10} />}
+          kind={kind}
+          text={
+            c.text_edit ? (
               <span className="c-edit">
                 <del className="c-edit-from">{c.text_edit.from}</del> → <ins className="c-edit-to">{c.text_edit.to}</ins>
               </span>
@@ -446,23 +445,27 @@ export function GuestNoteCard({
               firstLine(c.text)
             ) : (
               <span className="muted">{t('client::(marked area)')}</span>
-            )}
-          </span>
-          {(status || said > 0 || c.v !== v || !!ghost) && (
-            <span className="nr-meta">
-              {ghost && <span className="nr-len">{formatSeconds(rangeSeconds(ghost, fps))}</span>}
-              {c.v !== v && <span className="nr-v">V{c.v}</span>}
-              {said > 0 && (
-                <span className="nr-said" title={t('client::{n} reply|{n} replies', { n: said })}>
-                  <I name="reply" size={12} />
-                  {said}
-                </span>
-              )}
-              {status && <span className={`nr-state nr-${c.status}`}>{status}</span>}
-            </span>
-          )}
-          {peek && c.marked && <img className="nr-thumb" src={c.marked} alt="" decoding="async" />}
-        </button>
+            )
+          }
+          about={about}
+          label={label}
+          onOpen={onSelect}
+          actsCount={1}
+          acts={
+            perms.comment && (
+              <IconButton
+                className="btn sm ghost icon-only"
+                label={t('client::Reply')}
+                icon="reply"
+                size={14}
+                onClick={() => {
+                  onSelect();
+                  setMode('reply');
+                }}
+              />
+            )
+          }
+        />
       </article>
     );
   }

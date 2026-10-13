@@ -877,6 +877,123 @@ try {
     await page.waitForSelector('.nsheet-peek');
   });
 
+  // The line under the sheet's head holds the selector, what Auto-check found, the door to checking fixes and ⋯. In
+  // German ("Offen 12 ▾ · 3 kleinere Funde · 12 Korrekturen prüfen · ⋯") it took a second line at 390. Where its words
+  // don't fit it says less, measured: Auto-check its number alone, then the door "Prüfen 12" — never a word cut.
+  await check('a phone’s line under the notes’ head is one row in German and English at 390 and 360, with wider letters too: no word cut', async () => {
+    const file = makeVideo(path.join(dir, 'Acme/Reels/line.mp4'), { w: W, h: H, fps: 30, dur: 2 });
+    age(file);
+    const { video: lined } = await api('/api/library', { method: 'POST', body: JSON.stringify({ path: file, folder: 'Acme/Reels' }) });
+    const at = encodeURIComponent(lined.slug);
+    const note = (frame, text) => api(`/api/review/${at}/comments`, { method: 'POST', body: JSON.stringify({ frame, text, severity: 'should' }) });
+    // twelve open notes and twelve fixes waiting to be checked: two-digit counts on both
+    const fixes = [];
+    for (let i = 0; i < 12; i++) fixes.push(await note(2 + i * 2, `Fix ${i + 1}`));
+    for (let i = 0; i < 12; i++) await note(30 + i * 2, `Open ${i + 1}`);
+    makeVideo(file, { w: W, h: H, fps: 30, dur: 2, pattern: 'testsrc2' });
+    age(file);
+    await api(`/api/review/${at}/sync`, { method: 'POST', body: '{}' });
+    for (const c of fixes) await api(`/api/comments/${c.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'fixed', note: 'Done', by: 'agent:e2e' }) });
+    // what Auto-check found, held: three minor findings ("3 kleinere Funde", its longest words)
+    const minor = [0, 20, 40].map((frame) => ({
+      key: `silence:${frame}`,
+      kind: 'silence',
+      severity: 'nice',
+      frame,
+      range: { in: frame, out: frame + 5 },
+      text: 'Silence',
+    }));
+    const found = { hash: 'x', items: minor, text_language: 'en', spelling: { state: 'checked', words: 10, languages: ['en'] } };
+    const problems = [];
+    for (const lang of ['en', 'de'])
+      for (const spacing of ['0', '0.04em']) {
+        const ctx = await browser.createBrowserContext();
+        const p = await ctx.newPage();
+        p.on('pageerror', (e) => errors.push(e.message));
+        await p.emulate(IPHONE);
+        await p.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+        // Linux sets letters wider than a Mac: a little letter-spacing stands in for them, there from the first paint
+        await p.evaluateOnNewDocument(
+          (lang, spacing) => {
+            localStorage.setItem('vr.lang', lang);
+            const wider = () => {
+              const st = document.createElement('style');
+              st.textContent = `.np-chips * { letter-spacing: ${spacing} !important; }`;
+              document.head.append(st);
+            };
+            if (spacing !== '0') document.addEventListener('DOMContentLoaded', wider);
+          },
+          lang,
+          spacing,
+        );
+        await p.setRequestInterception(true);
+        p.on('request', (r) => {
+          if (r.method() === 'GET' && new URL(r.url()).pathname === `/api/qa/${at}/2`)
+            return r.respond({ status: 200, contentType: 'application/json', body: JSON.stringify(found) });
+          return r.continue();
+        });
+        await p.goto(`${BASE}/#/v/${at}`, { waitUntil: 'domcontentloaded' });
+        // the loaded player's sheet (the loading state has one of its own, replaced as the notes arrive), held still
+        await p.waitForSelector('.nsheet .note-row:not(.pending)');
+        await settle(p);
+        const open = await p.$eval('.nsheet-peek [data-testid=notes-open]', (e) => {
+          const r = e.getBoundingClientRect();
+          return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+        });
+        await p.touchscreen.tap(open.x, open.y);
+        await p.waitForSelector('.nsheet-half .np-chips [data-testid=check-sheet]');
+        await p.waitForSelector('.nsheet-half .np-chips [data-testid=ac-chip]');
+        for (const [width, height] of [
+          [390, 844],
+          [360, 780],
+        ]) {
+          if (width !== 390) await p.setViewport({ ...IPHONE.viewport, width, height });
+          await settle(p);
+          const m = await p.evaluate(() => {
+            const l = document.querySelector('.nsheet .np-chips');
+            const box = l.getBoundingClientRect();
+            const start = box.left + Number.parseFloat(getComputedStyle(l).paddingLeft);
+            const end = box.right - Number.parseFloat(getComputedStyle(l).paddingRight);
+            const items = ['notes-view', 'ac-chip', 'check-sheet', 'notes-more'].map((id) => {
+              const e = l.querySelector(`[data-testid=${id}]`);
+              if (!e) return { id, missing: true };
+              const r = e.getBoundingClientRect();
+              const before = getComputedStyle(e, '::before').content;
+              return {
+                id,
+                l: Math.round(r.left * 10) / 10,
+                r: Math.round(r.right * 10) / 10,
+                mid: Math.round((r.top + r.height / 2) * 10) / 10,
+                // what it says: its words, or the short ones its ::before shows (attr(data-short))
+                says: `${e.innerText.trim() || (e.querySelector('.np-check-words') ? '' : e.getAttribute('aria-label'))}${before !== 'none' && before !== 'normal' ? ` [${e.dataset.short}]` : ''}`.trim(),
+                cut: e.scrollWidth > e.clientWidth + 1,
+                label: e.getAttribute('aria-label'),
+              };
+            });
+            return { start: Math.round(start), end: Math.round(end), items, fit: l.dataset.fit };
+          });
+          const where = `${lang} @${width} letter-spacing ${spacing} (fit ${m.fit})`;
+          const shown = m.items.filter((i) => !i.missing);
+          if (shown.length < 4) problems.push(`${where}: missing ${m.items.filter((i) => i.missing).map((i) => i.id)}`);
+          const row = shown[0]?.mid;
+          for (const [i, it] of shown.entries()) {
+            if (Math.abs(it.mid - row) > 1) problems.push(`${where}: ${it.id} "${it.says}" on another line (${it.mid} vs ${row})`);
+            if (it.l < m.start - 0.5 || it.r > m.end + 0.5)
+              problems.push(`${where}: ${it.id} "${it.says}" past the line (${it.l}–${it.r} of ${m.start}–${m.end})`);
+            if (it.cut || !it.says) problems.push(`${where}: ${it.id} cut: "${it.says}"`);
+            const next = shown[i + 1];
+            if (next && Math.abs(next.mid - it.mid) <= 1 && next.l < it.r - 0.5) problems.push(`${where}: ${it.id} under ${next.id}`);
+          }
+          const door = shown.find((i) => i.id === 'check-sheet');
+          const full = lang === 'de' ? '12 Korrekturen prüfen' : 'Check 12 fixes';
+          if (door && door.label !== full) problems.push(`${where}: the door's label is "${door.label}", not "${full}"`);
+          if (SHOTS) await p.screenshot({ path: path.join(SHOTS, `11b-notes-line-${lang}-${width}-${spacing}.png`), captureBeyondViewport: false });
+        }
+        await ctx.close();
+      }
+    assert(!problems.length, problems.join('\n'));
+  });
+
   // Valentino: "the play in itself is laggy". While a video plays only what shows the frame may render per frame: the
   // timecode, the playhead, a note's "here" mark, a section chip's "→". Before: the review link rendered the whole page
   // 25 times a second (usePlayback without `quiet`), and the phone's tools row and transport rendered with the timecode.

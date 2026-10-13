@@ -79,7 +79,6 @@ export const client: Record<ClientKey, string> = {
     'Damit das Team weiß, von wem jede Notiz ist. Es sieht Ihre Notizen, ebenso alle mit diesem Link oder einem anderen, der die Notizen aller Links zeigt.',
   'client::Thanks, marked as done': 'Danke, als erledigt markiert',
   // a note as the app shows one (GuestNotes.tsx GuestNoteCard): its state, the thread's lines, the decision on a fix
-  'client::{kind} at {timecode}: {text}': '{kind} bei {timecode}: {text}',
   'client::{n} reply|{n} replies': '{n} Antwort|{n} Antworten',
   'client::Checked': 'Geprüft',
   'client::checked the fix': 'hat die Korrektur geprüft',

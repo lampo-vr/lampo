@@ -1129,7 +1129,6 @@ export const EN = [
   'client::{done} of {n} reviewed',
   'client::{done} of {n} reviewed.',
   'client::{key} + scroll or pinch to zoom the timeline',
-  'client::{kind} at {timecode}: {text}',
   'client::{n} fix to check|{n} fixes to check',
   'client::{n} frame|{n} frames',
   'client::{n} mark|{n} marks',

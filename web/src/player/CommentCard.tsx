@@ -1,11 +1,11 @@
-// One note in the sidebar. At rest a row — its timecode, its severity as a keyframe glyph and the first line, then under
-// the words, quieter, who · V2 · replies and at the end where it stands (a label), when there is something. The
-// selected note opens in place into the card: who wrote it and when, what it is, the thread under it (replies as
-// messages, status changes as activity lines) and the actions that move it through open → fixed → verified. The same
-// <article> either way, so what holds it (a suite, the focus) keeps holding it as it opens.
+// One note in the sidebar. At rest a row (NoteRow.tsx, a review link's too) — its timecode, its severity as a keyframe
+// glyph and the first line, then under the words, quieter, who · V2 · replies and at the end where it stands (a label),
+// when there is something. The selected note opens in place into the card: who wrote it and when, what it is, the
+// thread under it (replies as messages, status changes as activity lines) and the actions that move it through open →
+// fixed → verified. The same <article> either way, so what holds it (a suite, the focus) keeps holding it as it opens.
 
 import { useQueryClient } from '@tanstack/react-query';
-import { Fragment, memo, type ReactNode, useEffect, useId, useState } from 'react';
+import { memo, type ReactNode, useEffect, useId, useState } from 'react';
 import { agentShown } from '../../../lib/agentKind.ts';
 import { optionsSeen } from '../../../lib/options.ts';
 import { changeableReply, isOwner } from '../../../lib/ownership.ts';
@@ -44,6 +44,7 @@ import { SayButton, withSaid } from '../ui/VoiceButton.tsx';
 import { AskCard, asksWithPicks } from './AskCard.tsx';
 import { CheckDecision, ClientReads } from './CheckDecision.tsx';
 import { checkVerdict, waitsForCheck } from './fixCheck.ts';
+import { NoteRow } from './NoteRow.tsx';
 import { firstLine } from './noteRows.ts';
 import { previewSource, previewState, previewUrl } from './previews.ts';
 import { clearRangeHint, setRangeHint } from './rangeHint.ts';
@@ -404,13 +405,6 @@ interface CommentCardProps {
   changedIn?: number;
 }
 
-/** The quiet dot between the parts of a row's second line (decoration: the words say it). */
-const Dot = () => (
-  <span className="nr-dot" aria-hidden="true">
-    {' · '}
-  </span>
-);
-
 // Memoised: the player re-renders on every frame during playback, the cards only when their own props change.
 /** A recorded note's clip, in seconds (the stretch the server cut for it). */
 const clipSeconds = (r: { t0: number; t1: number }) => {
@@ -740,63 +734,42 @@ export const CommentCard = memo(function CommentCard({
           data-note={c.id}
           aria-label={t('{kindLabel} note at {timecodeHere}', { kindLabel, timecodeHere: c.timecodeHere })}
         >
-          <div className="nr-line" data-acts={may ? 2 : 1}>
-            <button
-              type="button"
-              className="nr nr-stack"
-              onClick={() => onSelect(c)}
-              onPointerEnter={showHint}
-              onPointerLeave={hideHint}
-              onBlur={() => clearRangeHint()}
-              aria-expanded={false}
-              data-testid="note-row"
-            >
-              <span className="c-id" hidden>
-                {c.id}
-              </span>
-              <span className={`nr-tc ${c.scope === 'video' ? 'overall' : ''}`}>{c.scope === 'video' ? t('Whole video') : c.timecodeHere}</span>
-              <span className="nr-kg">
-                {glyph}
-                <span className="sr-only">{kindLabel}</span>
-              </span>
-              <span className="nr-text">
-                {c.text_edit ? <WordsChange edit={c.text_edit} inline /> : c.text ? firstLine(c.text) : <span className="muted">{t('(marked frame)')}</span>}
-              </span>
-              {(sub.length > 0 || label) && (
-                <span className="nr-sub" data-testid="note-sub">
-                  <span className="nr-about" data-testid="note-about">
-                    {sub.map(([k, words], i) => (
-                      <Fragment key={k}>
-                        {i > 0 && <Dot />}
-                        <span className={`nr-${k}`}>{words}</span>
-                      </Fragment>
-                    ))}
-                  </span>
-                  {label && (
-                    <Badge size="sm" tone={label[1]} className="nr-state" testId="note-state">
-                      {label[0]}
-                    </Badge>
-                  )}
-                </span>
-              )}
-            </button>
-            {/* what a row does, there on hover or focus, inside the row's end: reply, and the rest under ⋯ */}
-            <span className="nr-acts">
-              {may && (
-                <IconButton
-                  className="btn sm ghost icon-only"
-                  label={t('Reply')}
-                  icon="reply"
-                  size={14}
-                  onClick={() => {
-                    onSelect(c);
-                    open('reply');
-                  }}
-                />
-              )}
-              <Menu trigger={<IconButton className="btn sm ghost icon-only" label={t('More')} icon="more" size={14} />} items={items} />
+          <NoteRow
+            tc={c.scope === 'video' ? t('Whole video') : c.timecodeHere}
+            overall={c.scope === 'video'}
+            glyph={glyph}
+            kind={kindLabel}
+            text={c.text_edit ? <WordsChange edit={c.text_edit} inline /> : c.text ? firstLine(c.text) : <span className="muted">{t('(marked frame)')}</span>}
+            about={sub}
+            label={label}
+            onOpen={() => onSelect(c)}
+            onPointerEnter={showHint}
+            onPointerLeave={hideHint}
+            onBlur={() => clearRangeHint()}
+            // what a row does: reply, and the rest under ⋯
+            actsCount={may ? 2 : 1}
+            acts={
+              <>
+                {may && (
+                  <IconButton
+                    className="btn sm ghost icon-only"
+                    label={t('Reply')}
+                    icon="reply"
+                    size={14}
+                    onClick={() => {
+                      onSelect(c);
+                      open('reply');
+                    }}
+                  />
+                )}
+                <Menu trigger={<IconButton className="btn sm ghost icon-only" label={t('More')} icon="more" size={14} />} items={items} />
+              </>
+            }
+          >
+            <span className="c-id" hidden>
+              {c.id}
             </span>
-          </div>
+          </NoteRow>
         </article>
       </ContextMenu>
     );

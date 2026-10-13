@@ -328,6 +328,57 @@ function bringIntoView(scroller: HTMLElement, row: HTMLElement, follow: boolean)
 
 const rowOf = (scroller: HTMLElement, id: string) => scroller.querySelector<HTMLElement>(`[data-note="${CSS.escape(id)}"]`);
 
+/** Where `el`'s items stop: the end of its content box. */
+const contentEnd = (el: HTMLElement) => el.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(el).paddingRight);
+/** Every item of `el` inside its padding. */
+const inside = (el: HTMLElement) => {
+  const end = contentEnd(el);
+  return [...el.children].every((c) => c.getBoundingClientRect().right <= end + 0.5);
+};
+/** …and on one row: a line that wraps puts an item on a second row rather than past its end. */
+const oneRow = (el: HTMLElement) => {
+  const end = contentEnd(el);
+  const shown = [...el.children].map((c) => c.getBoundingClientRect()).filter((r) => r.width > 0);
+  const mid = (r: DOMRect) => r.top + r.height / 2;
+  const first = shown[0];
+  return !first || shown.every((r) => r.right <= end + 0.5 && Math.abs(mid(r) - mid(first)) < 1);
+};
+
+/**
+ * Puts `data-fit` on `el` at the first level, 0 … `last`, at which `fits` holds (what it says less at each is notes.css's)
+ * — again when its width changes (the window, a phone turned) and when its words do (a count, a view, the language,
+ * Auto-check's answer), and when `again` does. The levels are an attribute and are not watched, nor is the height a
+ * level changes.
+ */
+function useFit(el: HTMLElement | null, last: number, fits: (el: HTMLElement) => boolean, again?: unknown) {
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `again` says the words shown changed without a mutation (a sheet opening shows its head's)
+  useLayoutEffect(() => {
+    if (!el) return;
+    const fit = () => {
+      for (let level = 0; level <= last; level++) {
+        el.dataset.fit = String(level);
+        if (fits(el)) return;
+      }
+    };
+    fit();
+    let width = el.getBoundingClientRect().width;
+    const ro = new ResizeObserver(() => {
+      const now = el.getBoundingClientRect().width;
+      if (now === width) return;
+      width = now;
+      if (now) fit();
+    });
+    ro.observe(el);
+    const mo = new MutationObserver(fit);
+    mo.observe(el, { childList: true, subtree: true, characterData: true });
+    void document.fonts?.ready.then(fit);
+    return () => {
+      ro.disconnect();
+      mo.disconnect();
+    };
+  }, [el, last, fits, again]);
+}
+
 export function NotesPanel(p: NotesPanelProps) {
   const { counts: n, filter, sheet } = p;
   // the note at the playhead: while playing it stays marked a second past its frame (one frame is 1/25 s)
@@ -460,36 +511,15 @@ export function NotesPanel(p: NotesPanelProps) {
   const notesView = !words && !agent;
   // The head is one row whatever its words: where they don't fit, it says less, measured, step by step — Auto-check's
   // chip without its name, the tabs a size smaller, the chip its number alone, + Note its plus alone, then the notes'
-  // count left to the groups' headers (`data-fit`, notes.css).
-  const titleRef = useRef<HTMLDivElement>(null);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a sheet opening shows the head's words (at rest they are hidden): fit them again
-  useLayoutEffect(() => {
-    const el = titleRef.current;
-    if (!el) return;
-    // every item inside the head's padding (its last one stops at the content box's end)
-    const fits = () => {
-      const end = el.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(el).paddingRight);
-      return [...el.children].every((c) => c.getBoundingClientRect().right <= end + 0.5);
-    };
-    const fit = () => {
-      for (const level of ['0', '1', '2', '3', '4', '5']) {
-        el.dataset.fit = level;
-        if (fits()) return;
-      }
-    };
-    fit();
-    // the panel's width (the window, a phone turned): the head's own box, whose size its words never change …
-    const ro = new ResizeObserver(fit);
-    ro.observe(el);
-    // … and its words: a count, a view, the language, Auto-check's answer (the levels are an attribute: not watched)
-    const mo = new MutationObserver(fit);
-    mo.observe(el, { childList: true, subtree: true, characterData: true });
-    void document.fonts?.ready.then(fit);
-    return () => {
-      ro.disconnect();
-      mo.disconnect();
-    };
-  }, [sheet?.state]);
+  // count left to the groups' headers (`data-fit`, notes.css). A sheet opening shows the head's words (at rest they are
+  // hidden): fit them again.
+  const [titleEl, setTitleEl] = useState<HTMLDivElement | null>(null);
+  useFit(titleEl, 5, inside, sheet?.state);
+  // A phone's line under the head is one row too, in German as in English, at 360 px as at 390: what Auto-check found
+  // as its number alone (its words are in its label), then the door to checking fixes in its short words — never a word
+  // cut, and never a second line for what fits on one.
+  const [chipsEl, setChipsEl] = useState<HTMLDivElement | null>(null);
+  useFit(sheet ? chipsEl : null, 2, oneRow, sheet?.state);
   // The filter's menu: the lists (the groups are what it shows by default) and the tags; a filter on shows as a chip
   const filterItems: MenuEntry[] = [
     ...FILTERS()
@@ -576,10 +606,20 @@ export function NotesPanel(p: NotesPanelProps) {
     />
   );
   // A phone's door to checking the fixes while its list doesn't show their group (the selector's To check does): on the
-  // line under the head, beside ⋯, raised as the To check header's would be
+  // line under the head, beside ⋯, raised as the To check header's would be. Where the line has no room for its words
+  // it says "Check 2" (the line's last level, notes.css); its label keeps them all.
+  const checkWords = t('Check {n} fix|Check {n} fixes', { n: p.verifyCount });
   const sheetCheck = sheet && notesView && p.verifyCount > 0 && !p.verifying && !p.readOnly && !p.groupCounts?.check && (
-    <Button size="sm" variant={p.checkPrimary ? 'primary' : 'ghost'} onClick={p.onVerify} data-testid="check-sheet">
-      {t('Check {n} fix|Check {n} fixes', { n: p.verifyCount })}
+    <Button
+      size="sm"
+      variant={p.checkPrimary ? 'primary' : 'ghost'}
+      onClick={p.onVerify}
+      aria-label={checkWords}
+      data-short={`${t('Check')} ${p.verifyCount}`}
+      className="np-check"
+      data-testid="check-sheet"
+    >
+      <span className="np-check-words">{checkWords}</span>
     </Button>
   );
   const filterButton = notesView && (
@@ -640,7 +680,7 @@ export function NotesPanel(p: NotesPanelProps) {
         </button>
       )}
       <div className="side-head">
-        <div className="side-title np-head" ref={titleRef}>
+        <div className="side-title np-head" ref={setTitleEl}>
           {/* A phone's sheet at rest says what is in it and opens with a tap anywhere on its row (mobile.css: shown in
               place of the head's tools while it peeks); the handle alone, 22 px, was the way in. */}
           {sheet && (
@@ -715,7 +755,7 @@ export function NotesPanel(p: NotesPanelProps) {
             notes it shows, what Auto-check found, the door to checking fixes and ⋯, so its head keeps room for the
             views, the mic, Record and + Note */}
         {notesView && !checking && (sheet || listFilter || p.tag) && (
-          <div className="np-chips" data-testid="notes-filters-on">
+          <div className="np-chips" data-testid="notes-filters-on" ref={setChipsEl}>
             {viewPick}
             {sheet && p.autoCheckFound && p.autoCheck}
             {listFilter && !sheet && (
