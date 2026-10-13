@@ -94,7 +94,7 @@
   --scroll: #2a2a2c;
   /* behind a dialog: dimmed, not blacked out — the page stays readable as the place the dialog came from */
   --backdrop: rgba(0, 0, 0, 0.56);
-  /* tooltips and toasts: a step lighter than the floats in the dark, so a passing message still stands out */
+  /* tooltips: a step lighter than the floats in the dark, so a passing note still stands out */
   --tip-bg: #2d2d2f;
   --tip-fg: var(--fg);
   --tip-fg-2: var(--fg-2);
@@ -250,6 +250,8 @@
   --track-pad: var(--sp-0_5);
   --r-track-in: calc(var(--r) - 1px - var(--track-pad));
   --r-menu-in: calc(var(--r) - 1px - var(--sp-1));
+  /* a toast's buttons sit 6 px in from its --r-lg edge (half --sp-3), all round */
+  --r-toast-in: calc(var(--r-lg) - var(--sp-3) / 2);
   /* Icons follow the type beside them: 14 beside 12 px (small buttons, segments, tabs, toasts) · 16 beside 13 px
      (buttons, menus, nav) and alone in a 26–30 px button · 20 alone in a 40 px button and in empty states. */
   --ic-sm: 14px;
@@ -267,7 +269,7 @@
      round play button (dock.css .playbtn); pause bars stand exactly in the middle. */
   --ic-play-nudge: 1px;
   /* Three shadows: what floats (menus, popovers, dialogs, toasts), what is lifted (a dragged card), the focus ring. */
-  /* What floats (menus, popovers, hover cards, dialogs, the palette): one material — the lightest surface, a hairline
+  /* What floats (menus, popovers, hover cards, dialogs, the palette, toasts): one material — the lightest surface, a hairline
      edge, a lit top edge and a shadow in three depths (contact, near, far) that softens on paper. */
   --shadow-float:
     inset 0 1px 0 color-mix(in srgb, var(--hi) 6%, transparent), 0 1px 2px color-mix(in srgb, var(--cast) calc(24% * var(--cast-k)), transparent),
@@ -434,7 +436,7 @@ body.printing,
   --on-agent: #fff6f1;
   --scroll: #cbc5b8;
   --backdrop: rgba(42, 34, 22, 0.2);
-  /* on paper, tooltips and toasts are ink: a passing message in the page's own type colour */
+  /* on paper, tooltips are ink: a passing note in the page's own type colour */
   --tip-bg: var(--fg);
   --tip-fg: var(--on-fg);
   --tip-fg-2: var(--on-fg-2);

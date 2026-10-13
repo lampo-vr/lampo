@@ -1,0 +1,249 @@
+/* ---------------------------------------------------------------- toasts (ui/layers.tsx Toaster, Radix Toast)
+
+   One stack, the newest in front. Collapsed it is one toast tall: the two before it tuck in behind, a step smaller and
+   a little higher (lower on a phone, where the stack hangs from the top), their words faded; any older ones wait
+   inside it, unseen. Hovered or focused it opens into a list with even gaps, and every timer waits. The toaster sets
+   on each toast its place from the front (--i) and, for the open list, how much of the newer toasts stands before it
+   (--off, measured); on the stack the front toast's height (--front-h) and the open list's (--open-h). Only transform
+   and opacity move. */
+
+.toasts {
+  /* -1: the stack grows upward from the bottom of the window; 1 (phones): downward from under the top bar */
+  --grow: -1;
+  position: fixed;
+  left: 50%;
+  /* --toast-lift: a bar floating at the window's foot (library/SelectBar.tsx) sets its height, so the stack stands above it */
+  bottom: calc(var(--sp-4) + var(--sp-1) + var(--toast-lift, 0px) + env(safe-area-inset-bottom));
+  translate: -50% 0;
+  width: min(360px, calc(100vw - 2 * var(--sp-4)));
+  height: var(--front-h, 0px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  z-index: var(--z-toast);
+  outline: none;
+}
+/* the stack's whole area holds the pointer, gaps included: moving from one toast to the next never closes it */
+.toasts::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(var(--front-h, 0px) + 2 * var(--sp-3));
+}
+.toasts[data-expanded]::before {
+  height: var(--open-h, 0px);
+}
+.toasts:empty::before {
+  display: none;
+}
+
+.toast {
+  border-radius: var(--r-lg);
+  background: var(--float-bg);
+  color: var(--fg);
+  box-shadow:
+    0 0 0 1px var(--float-line),
+    var(--shadow-float);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-ui);
+}
+/* in the stack: every toast at its foot, moved to its place */
+.toasts > .toast {
+  --y: calc(var(--i, 0) * var(--sp-3));
+  --sc: calc(1 - var(--i, 0) * 0.05);
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transform-origin: 50% 100%;
+  transform: translateY(calc(var(--grow) * var(--y) + var(--swipe, 0px))) scale(var(--sc));
+  transition:
+    transform 420ms var(--ease-out),
+    opacity var(--dur-slow) var(--ease-out);
+  animation: toast-in 420ms var(--ease-spring);
+}
+.toasts[data-expanded] > .toast {
+  --y: calc(var(--off, 0px) + var(--i, 0) * var(--sp-3));
+  --sc: 1;
+}
+/* collapsed: the ones behind take the front one's height and keep their words to themselves; older ones wait unseen */
+.toasts:not([data-expanded]) > .toast:is([data-depth='behind'], [data-depth='hidden']) {
+  height: var(--front-h, auto);
+  overflow: hidden;
+}
+.toasts:not([data-expanded]) > .toast:is([data-depth='behind'], [data-depth='hidden']) > .toast-body {
+  opacity: 0;
+}
+.toasts:not([data-expanded]) > .toast[data-depth='hidden'] {
+  opacity: 0;
+  pointer-events: none;
+}
+.toast-body {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  /* The buttons at the end sit 6 px in from the edge, all round: their corners follow the toast's (--r-toast-in) */
+  min-height: calc(var(--h-sm) + var(--sp-3));
+  padding: calc(var(--sp-3) / 2) calc(var(--sp-3) / 2) calc(var(--sp-3) / 2) var(--sp-3);
+  transition: opacity var(--dur) var(--ease-out);
+}
+.toast-body > .icon {
+  flex: none;
+}
+.toast.ok .toast-body > .icon {
+  color: var(--ok);
+}
+.toast.error {
+  background: var(--must);
+  color: var(--on-must);
+  box-shadow: var(--shadow-float);
+}
+.toast-title {
+  flex: 1;
+  min-width: 0;
+  line-height: var(--lh-ui);
+}
+/* The words end where the toast would end without buttons: 12 px, like the start */
+.toast-title:not(:last-child) {
+  margin-right: var(--sp-1);
+}
+.toasts > .toast[data-state='closed'] {
+  animation: toast-out var(--dur-slow) var(--ease-in) forwards;
+}
+.toasts > .toast[data-swipe='move'] {
+  --swipe: var(--radix-toast-swipe-move-y);
+  transition: none;
+}
+.toasts > .toast[data-swipe='end'] {
+  animation: toast-swipe var(--dur) var(--ease-in) forwards;
+}
+@keyframes toast-in {
+  from {
+    translate: 0 calc(-1 * var(--grow) * 100%);
+    scale: 0.96;
+    opacity: 0;
+  }
+}
+@keyframes toast-out {
+  to {
+    translate: 0 calc(-1 * var(--grow) * var(--sp-4));
+    scale: 0.96;
+    opacity: 0;
+  }
+}
+@keyframes toast-swipe {
+  from {
+    translate: 0 var(--radix-toast-swipe-end-y);
+  }
+  to {
+    translate: 0 calc(-1 * var(--grow) * 120%);
+    opacity: 0;
+  }
+}
+
+.toast-act {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex: none;
+  height: var(--h-sm);
+  border: 0;
+  border-radius: var(--r-toast-in);
+  padding: 0 var(--sp-3);
+  background: var(--fg);
+  color: var(--ink-1);
+  font: var(--fw-strong) var(--fs-sm) var(--ui);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.toast-act:hover:where(:not(:disabled)) {
+  transform: scale(1.04);
+}
+.toast.error .toast-act {
+  background: var(--on-must);
+  color: var(--must);
+}
+.toast-x {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--h-sm);
+  height: var(--h-sm);
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-toast-in);
+  /* a quiet button, so it holds its place at the end like the action beside it */
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  color: color-mix(in srgb, currentColor 72%, transparent);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast),
+    color var(--dur-fast);
+}
+.toast-act + .toast-x {
+  margin-left: calc(-1 * var(--sp-1));
+}
+.toast-x:hover:where(:not(:disabled)),
+.toast-x:focus-visible {
+  background: color-mix(in srgb, currentColor 20%, transparent);
+  color: inherit;
+}
+
+/* phones: the stack hangs under the top bar, full width but for the gutters, clear of the notes sheet, the transport
+   and the home bar at the bottom; a toast is swiped up and away; a finger gets 44 px around the buttons */
+@media (max-width: 639px), (max-height: 480px) and (hover: none) and (pointer: coarse) {
+  .toasts {
+    --grow: 1;
+    top: calc(env(safe-area-inset-top) + 62px);
+    bottom: auto;
+    left: var(--sp-4);
+    right: var(--sp-4);
+    width: auto;
+    translate: none;
+  }
+  .toasts::before {
+    top: 0;
+    bottom: auto;
+  }
+  .toasts > .toast {
+    top: 0;
+    bottom: auto;
+    transform-origin: 50% 0;
+  }
+}
+@media (pointer: coarse) {
+  .toast-act,
+  .toast-x {
+    position: relative;
+  }
+  .toast-act::after,
+  .toast-x::after {
+    content: '';
+    position: absolute;
+    inset: min(0px, calc(50% - 22px));
+  }
+}
+
+/* reduced motion: the stack moves at once; a toast only fades in and out */
+@media (prefers-reduced-motion: reduce) {
+  .toasts > .toast {
+    transition: opacity 160ms linear !important;
+    animation: toast-fade-in 160ms linear !important;
+  }
+  .toasts > .toast[data-state='closed'],
+  .toasts > .toast[data-swipe='end'] {
+    animation: toast-fade-out 160ms linear forwards !important;
+  }
+  @keyframes toast-fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes toast-fade-out {
+    to {
+      opacity: 0;
+    }
+  }
+}

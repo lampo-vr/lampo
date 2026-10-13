@@ -8,6 +8,11 @@ format stays backwards compatible throughout.
 ## [Unreleased]
 
 ### Changed
+- Toasts stack. The newest stands in front with the two before it tucked in behind, a step smaller, so a few at once
+  take the room of one; hovering or focusing the stack fans it out into a list you can read, and every toast waits
+  while it is open. A new toast springs in, a closed one slides out and the others close the gap; with reduced motion
+  they only fade. On a phone the stack hangs under the top bar, full width, and a toast is swiped up to dismiss it. An
+  error stays until you close it.
 - The stage beside the player's decision opens a calm card on hover or keyboard focus (Esc closes it), on the same
   surface as the other cards in both themes: the stage and its version once ("Changes requested · V4"), the steps
   evenly spaced with the track only between them, settled steps solid, the current one hollow and larger and the ones
@@ -182,7 +187,8 @@ format stays backwards compatible throughout.
 - Several videos at once in the library's List and Grid. A box shows at a video's start under the pointer, and on
   every one once one is ticked; ⌘-click (Ctrl-click) ticks one, ⇧-click the run from the last one, ⌘A every video in
   view and Esc none. A bar at the window's foot says how many and moves them all with one "Move to…" or archives them
-  with one Undo for all. A video its own ⋯ menu wouldn't move or archive stays ticked, and the bar says why. On a phone,
+  with one Undo for all. A video its own ⋯ menu wouldn't move or archive stays ticked, and the bar says why. Toasts
+  keep clear of the bar: above it, or at the window's foot under it when a short list leaves the room. On a phone,
   "Select videos" in Display (or Select in a video's menu) shows the boxes, and a tap ticks.
 - One review link for several videos: tick them in the library and choose *Share as one link*. The link opens a room
   with exactly those videos (2 to 100), names none of their projects, and offers the kinds, password and expiry of any

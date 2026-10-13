@@ -14,6 +14,7 @@ import {
   Tooltip,
 } from 'radix-ui';
 import {
+  type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
@@ -48,6 +49,7 @@ import {
 } from './primitives.tsx';
 import { setRef } from './slot.ts';
 import { IconButton, Kbd, type TipNote, tipOf, tipTarget, watchTip } from './tip.tsx';
+import '../styles/toasts.css';
 
 // Where a billing provider runs: the library's banner, the trial's line and the moments of value (billing/Banner.tsx).
 // Its import() lives here, after the first paint, rather than in the screens that ask for it (billing/code.ts): an
@@ -740,22 +742,40 @@ export function TooltipLayer() {
 
 // ---------------------------------------------------------------- toasts
 
-const MAX = 3;
+// Toasts kept at once; the oldest beyond make room, and a deferred change they carried goes through now. The newest
+// three show (styles/toasts.css): the front one, two tucked behind it; the others wait in the stack, unseen until it
+// opens or newer ones leave.
+const MAX = 5;
+const SHOWN = 3;
 // Gone without its action used (timed out, swiped, closed, pushed out): a change it deferred goes through now.
 const dismissed = (acted: Set<number>, t: ToastItem) => {
   if (!acted.delete(t.id)) t.onDismiss?.();
 };
-const lifetime = (t: ToastItem) => t.duration ?? (t.kind === 'error' ? 7000 : t.action ? 6500 : 3200);
+// An error stays until it is closed; an Undo gives its few seconds, every other toast a moment.
+const lifetime = (t: ToastItem) => t.duration ?? (t.kind === 'error' ? Number.POSITIVE_INFINITY : t.action ? 6500 : 3200);
+// A closed toast leaves on its way-out animation (styles/toasts.css), then the toaster forgets it.
+const LEAVE_MS = 400;
 // A limit reached opens its sheet instead of a toast (conversion/limits/): its code comes the first time one is asked for.
 const limitCode = loader(() => import('../conversion/limits/LimitSheet.tsx'));
 // The sheets of this page's life by id, the newest few: one left for Settings → Billing (its card's Change) opens again
 // when its entry is back. What it asks holds what to do once there is room (`retry`), so it stays here, not in history.
 const limitsShown = new Map<number, LimitAsk>();
 
-/** Toasts (Radix Toast: announced to screen readers, paused while hovered or focused, swipe to dismiss, F8 jumps to
- * them), including the ones asked for before this layer arrived. */
+/**
+ * Toasts (Radix Toast: announced to screen readers, swipe to dismiss, F8 jumps to them), including the ones asked for
+ * before this layer arrived. One stack, the newest in front: collapsed it is one toast tall with the two before it
+ * tucked behind; hovered, focused or tapped it opens into a list, and every toast's time stands still until it closes.
+ * The toaster says where each one stands (its place from the front, and how tall the newer ones before it are,
+ * measured); the stylesheet draws it.
+ */
 export function Toaster() {
   const [items, setItems] = useState<ToastItem[]>([]);
+  // the ones on their way out: they keep their place while they leave, the others close the gap at once
+  const [leaving, setLeaving] = useState<ReadonlySet<number>>(new Set());
+  // the stack opened: by a mouse over it, the focus in it, or a finger's tap
+  const [expanded, setExpanded] = useState(false);
+  // each toast's own height (its body, measured): where the open list puts the ones behind it
+  const [heights, setHeights] = useState<ReadonlyMap<number, number>>(new Map());
   // the limit asked about now (a newer one takes its place), and its sheet's code once here
   const [limit, setLimit] = useState<{ id: number; ask: LimitAsk } | null>(null);
   const Limit = useLoaded(limitCode, !!limit);
@@ -767,9 +787,12 @@ export function Toaster() {
   const phone = usePhone();
   const shown = useRef<ToastItem[]>([]);
   shown.current = items;
+  const stack = useRef<HTMLOListElement>(null);
   // Toasts whose action was used: closing them is not a dismissal.
   const acted = useRef(new Set<number>());
+  const leaveTimers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
   useEffect(() => {
+    const timers = leaveTimers.current;
     const add = (t: ToastItem) => {
       if (t.limit) {
         limitsShown.set(t.id, t.limit);
@@ -810,47 +833,232 @@ export function Toaster() {
       window.removeEventListener('vr-toast', onToast);
       window.removeEventListener('vr-toast-close', onClose);
       window.removeEventListener('keydown', onEscape, true);
+      for (const t of timers.values()) clearTimeout(t);
     };
   }, []);
-  const closeToast = (t: ToastItem) => {
-    dismissed(acted.current, t);
-    setItems((xs) => xs.filter((x) => x.id !== t.id));
+  // Measured once a toast is in, and again when its words change its height (they wrap): a ResizeObserver, no reads
+  // in a render. Made on first use: the toasts asked for before this layer arrived attach before any effect runs.
+  const measure = useRef<ResizeObserver | null>(null);
+  const observer = () =>
+    (measure.current ??= new ResizeObserver((entries) => {
+      setHeights((was) => {
+        let next: Map<number, number> | null = null;
+        for (const e of entries) {
+          const id = Number((e.target as HTMLElement).dataset.toast);
+          const h = Math.round(e.borderBoxSize?.[0]?.blockSize ?? (e.target as HTMLElement).offsetHeight);
+          if (was.get(id) === h) continue;
+          next ??= new Map(was);
+          next.set(id, h);
+        }
+        return next ?? was;
+      });
+    }));
+  useEffect(() => () => measure.current?.disconnect(), []);
+  const bodies = useRef(new Map<number, (el: HTMLDivElement | null) => () => void>());
+  const body = (id: number) => {
+    let ref = bodies.current.get(id);
+    if (!ref) {
+      ref = (el: HTMLDivElement | null) => {
+        if (el) {
+          el.dataset.toast = String(id);
+          observer().observe(el);
+        }
+        return () => {
+          if (el) measure.current?.unobserve(el);
+          bodies.current.delete(id);
+        };
+      };
+      bodies.current.set(id, ref);
+    }
+    return ref;
   };
+  // Nothing left to open: the stack closes (a pointer that left with the last toast never says so).
+  useEffect(() => {
+    if (!items.length) setExpanded(false);
+  }, [items.length]);
+  // The stack opens while a mouse is over it or the focus is in it, and with a finger's tap (not on a button); it
+  // closes when the mouse leaves, the focus goes elsewhere, or a finger taps anywhere else. The stack's own element
+  // listens (as Radix's pause does), whatever React's synthetic enter makes of the toasts' layer.
+  useEffect(() => {
+    const el = stack.current;
+    if (!el) return;
+    const enter = (e: PointerEvent) => e.pointerType === 'mouse' && setExpanded(true);
+    // a keyboard's focus keeps it open; a click's leftover (Radix hands the stack the focus of a toast that closed) doesn't
+    const keyed = () => el.matches(':focus-visible') || !!el.querySelector(':focus-visible');
+    const leave = (e: PointerEvent) => e.pointerType === 'mouse' && !keyed() && setExpanded(false);
+    // a finger opens it with a tap (not on a button), never with a swipe: lifted near where it went down
+    let down: { id: number; x: number; y: number } | null = null;
+    const press = (e: PointerEvent) => {
+      down = e.pointerType !== 'mouse' && !(e.target as Element).closest('button') ? { id: e.pointerId, x: e.clientX, y: e.clientY } : null;
+    };
+    const tap = (e: PointerEvent) => {
+      if (down?.id === e.pointerId && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 10) setExpanded(true);
+      down = null;
+    };
+    const focusIn = () => setExpanded(true);
+    const focusOut = (e: FocusEvent) => !el.contains(e.relatedTarget as Node | null) && !el.matches(':hover') && setExpanded(false);
+    el.addEventListener('pointerenter', enter);
+    el.addEventListener('pointerleave', leave);
+    el.addEventListener('pointerdown', press);
+    el.addEventListener('pointerup', tap);
+    el.addEventListener('focusin', focusIn);
+    el.addEventListener('focusout', focusOut);
+    return () => {
+      el.removeEventListener('pointerenter', enter);
+      el.removeEventListener('pointerleave', leave);
+      el.removeEventListener('pointerdown', press);
+      el.removeEventListener('pointerup', tap);
+      el.removeEventListener('focusin', focusIn);
+      el.removeEventListener('focusout', focusOut);
+    };
+  }, []);
+  useEffect(() => {
+    if (!expanded) return;
+    const away = (e: PointerEvent) => {
+      if (e.pointerType !== 'mouse' && !stack.current?.contains(e.target as Node)) setExpanded(false);
+    };
+    document.addEventListener('pointerdown', away, true);
+    return () => document.removeEventListener('pointerdown', away, true);
+  }, [expanded]);
+  // places from the front: the newest staying toast is 0; one on its way out keeps the place it had
+  const staying = items.filter((x) => !leaving.has(x.id));
+  const place = new Map<number, number>();
+  for (const [n, x] of staying.entries()) place.set(x.id, staying.length - 1 - n);
+  // where a toast stood when it was closed: it leaves from there
+  const leftAt = useRef(new Map<number, number>());
+  const closeToast = (t: ToastItem) => {
+    if (leftAt.current.has(t.id)) return;
+    dismissed(acted.current, t);
+    leftAt.current.set(t.id, place.get(t.id) ?? 0);
+    setLeaving((was) => new Set(was).add(t.id));
+    leaveTimers.current.set(
+      t.id,
+      setTimeout(() => {
+        leaveTimers.current.delete(t.id);
+        leftAt.current.delete(t.id);
+        shown.current = shown.current.filter((x) => x.id !== t.id);
+        setItems(shown.current);
+        setLeaving((was) => {
+          const next = new Set(was);
+          next.delete(t.id);
+          return next;
+        });
+      }, LEAVE_MS),
+    );
+  };
+  // Each toast's time (Radix's own timers stay off): it runs while the stack is closed and the window in front, and
+  // stands still while the stack is open or another window is (as Radix's did), going on from where it was.
+  const closing = useRef(closeToast);
+  closing.current = closeToast;
+  const [away, setAway] = useState(false);
+  useEffect(() => {
+    const blur = () => setAway(true);
+    const focus = () => setAway(false);
+    window.addEventListener('blur', blur);
+    window.addEventListener('focus', focus);
+    return () => {
+      window.removeEventListener('blur', blur);
+      window.removeEventListener('focus', focus);
+    };
+  }, []);
+  const clocks = useRef(new Map<number, { left: number; at: number; handle: ReturnType<typeof setTimeout> | null }>());
+  const ticking = !expanded && !away;
+  useEffect(() => {
+    const now = performance.now();
+    const live = items.filter((x) => !leaving.has(x.id));
+    for (const [id, c] of clocks.current)
+      if (!live.some((x) => x.id === id)) {
+        if (c.handle) clearTimeout(c.handle);
+        clocks.current.delete(id);
+      }
+    for (const x of live) {
+      let c = clocks.current.get(x.id);
+      if (!c) {
+        c = { left: lifetime(x), at: now, handle: null };
+        clocks.current.set(x.id, c);
+      }
+      if (ticking && !c.handle && Number.isFinite(c.left)) {
+        const run = c;
+        run.at = now;
+        run.handle = setTimeout(
+          () => {
+            run.handle = null;
+            closing.current(x);
+          },
+          Math.max(0, run.left),
+        );
+      } else if (!ticking && c.handle) {
+        clearTimeout(c.handle);
+        c.handle = null;
+        c.left -= now - c.at;
+      }
+    }
+  }, [ticking, items, leaving]);
+  useEffect(
+    () => () => {
+      for (const c of clocks.current.values()) if (c.handle) clearTimeout(c.handle);
+    },
+    [],
+  );
+  const front = staying.at(-1);
+  const frontH = front ? (heights.get(front.id) ?? 0) : 0;
+  // the open list: each toast stands above (below, on a phone) the newer ones, their heights summed
+  const offsets = new Map<number, number>();
+  let sum = 0;
+  for (const x of [...staying].reverse()) {
+    offsets.set(x.id, sum);
+    sum += heights.get(x.id) ?? frontH;
+  }
+  const gaps = Math.max(0, staying.length - 1);
   return (
-    <Toast.Provider swipeDirection={phone ? 'up' : 'down'} label={t('Notification')}>
-      {items.map((item) => (
-        <Toast.Root
-          key={item.id}
-          className={`toast ${item.kind}`}
-          duration={lifetime(item)}
-          type={item.kind === 'error' ? 'foreground' : 'background'}
-          onOpenChange={(open) => !open && closeToast(item)}
-          data-testid="toast"
-        >
-          {item.kind === 'ok' && <I name="check" size={14} />}
-          {item.kind === 'error' && <I name="x" size={14} />}
-          <Toast.Title className="toast-title">{item.message}</Toast.Title>
-          {item.action && (
-            <Toast.Action
-              asChild
-              altText={t('{label} (also in the page’s own controls)', { label: item.action.label })}
-              onClick={() => {
-                acted.current.add(item.id);
-                item.action?.onClick();
-              }}
-            >
-              <button type="button" className="toast-act">
-                {item.action.undo && <I name="undo" size={14} />}
-                {item.action.label}
-              </button>
-            </Toast.Action>
-          )}
-          <Toast.Close asChild>
-            <IconButton className="toast-x" label={t('Dismiss')} icon="x" size={13} />
-          </Toast.Close>
-        </Toast.Root>
-      ))}
-      <Toast.Viewport className="toasts" />
+    <Toast.Provider swipeDirection={phone ? 'up' : 'down'} swipeThreshold={phone ? 32 : 48} label={t('Notification')}>
+      {items.map((item) => {
+        const i = place.get(item.id) ?? leftAt.current.get(item.id) ?? 0;
+        const depth = i === 0 ? 'front' : i < SHOWN ? 'behind' : 'hidden';
+        return (
+          <Toast.Root
+            key={item.id}
+            className={`toast ${item.kind}`}
+            open={!leaving.has(item.id)}
+            duration={Number.POSITIVE_INFINITY}
+            type={item.kind === 'error' ? 'foreground' : 'background'}
+            onOpenChange={(isOpen) => !isOpen && closeToast(item)}
+            data-depth={depth}
+            style={{ '--i': i, '--off': `${offsets.get(item.id) ?? 0}px`, zIndex: MAX + 1 - i } as CSSProperties}
+            data-testid="toast"
+          >
+            <div className="toast-body" ref={body(item.id)}>
+              {item.kind === 'ok' && <I name="check" size={14} />}
+              {item.kind === 'error' && <I name="x" size={14} />}
+              <Toast.Title className="toast-title">{item.message}</Toast.Title>
+              {item.action && (
+                <Toast.Action
+                  asChild
+                  altText={t('{label} (also in the page’s own controls)', { label: item.action.label })}
+                  onClick={() => {
+                    acted.current.add(item.id);
+                    item.action?.onClick();
+                  }}
+                >
+                  <button type="button" className="toast-act">
+                    {item.action.undo && <I name="undo" size={14} />}
+                    {item.action.label}
+                  </button>
+                </Toast.Action>
+              )}
+              <Toast.Close asChild>
+                <IconButton className="toast-x" label={t('Dismiss')} icon="x" size={13} />
+              </Toast.Close>
+            </div>
+          </Toast.Root>
+        );
+      })}
+      <Toast.Viewport
+        ref={stack}
+        className="toasts"
+        data-expanded={expanded || undefined}
+        style={{ '--front-h': `${frontH}px`, '--open-h': `calc(${sum}px + ${gaps} * var(--sp-3))` } as CSSProperties}
+      />
       {limit && Limit && (
         <ReopenScope reopen={{ kind: 'limit', id: limit.id }} close={() => setLimit(null)}>
           <Limit.LimitSheet key={limit.id} ask={limit.ask} onClose={() => setLimit(null)} />

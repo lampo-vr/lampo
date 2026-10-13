@@ -336,12 +336,57 @@ try {
     const why = await page.$eval('[data-testid=library-selbar-why]', (e) => e.textContent);
     assert(why.includes('“behind-the-scenes.mp4” has no notes to keep'), `the bar says why: ${why}`);
     await settle(page);
+    // the toasts' stack stands above the bar at the window's foot (--toast-lift), never over its reason or its buttons
+    const over = await page.evaluate(() => {
+      const bar = document.querySelector('[data-testid=library-selbar]').getBoundingClientRect();
+      const toast = document.querySelector('[data-testid=toast][data-state=open]').getBoundingClientRect();
+      return { bar: Math.round(bar.top), toast: Math.round(toast.bottom) };
+    });
+    assert(over.toast <= over.bar, `the toast stands above the bar: ${JSON.stringify(over)}`);
     await shot('05-archive-why');
     await page.click('[data-testid=toast] .toast-act');
     await until(async () => !(await archivedOf(v.interview)) && !(await archivedOf(v.social)), 'Undo restores both');
     await toastGone();
     await page.keyboard.press('Escape');
     await noBar();
+  });
+
+  await check('under a short list the bar stands above the foot: the toasts stand above it, or keep the foot when there is room under it', async () => {
+    // a window taller than the list: the bar stands under its last row, not at the window's foot
+    await page.setViewport({ width: 1440, height: 2400, deviceScaleFactor: SHOTS ? 2 : 1 });
+    await open();
+    for (const s of [v.interview, v.social]) await clickRow(s, ['Meta']);
+    await until(async () => (await barText()) === '2 selected', 'two');
+    await page.evaluate(() =>
+      window.dispatchEvent(new CustomEvent('vr-toast', { detail: { id: Math.random(), kind: 'error', message: 'Couldn’t send: the server didn’t answer.' } })),
+    );
+    await page.waitForSelector('[data-testid=toast][data-state=open]');
+    const where = async () => {
+      await settle(page);
+      return page.evaluate(() => {
+        const b = document.querySelector('[data-testid=library-selbar]').getBoundingClientRect();
+        const t = document.querySelector('[data-testid=toast][data-state=open]').getBoundingClientRect();
+        return { h: innerHeight, bar: [Math.round(b.top), Math.round(b.bottom)], toast: [Math.round(t.top), Math.round(t.bottom)] };
+      });
+    };
+    const clear = (at) => at.toast[1] <= at.bar[0] || at.toast[0] >= at.bar[1];
+    // plenty of room under the bar: the toast keeps the window's foot
+    const far = await where();
+    assert(far.h - far.bar[1] > 200, `the bar stands well above the foot: ${JSON.stringify(far)}`);
+    assert(clear(far) && Math.abs(far.h - 20 - far.toast[1]) <= 1, `the toast at the foot, under the bar: ${JSON.stringify(far)}`);
+    // a window a little taller than the list (its margin and the page's 64 px end still fit): the bar stands a step
+    // above the foot, where the toasts lifted by its height alone covered it
+    await page.setViewport({ width: 1440, height: far.bar[1] + 84, deviceScaleFactor: SHOTS ? 2 : 1 });
+    await until(async () => (await where()).bar[1] === far.bar[1], 'the bar where it stood');
+    const near = await where();
+    assert(near.h - near.bar[1] > 12 && near.h - near.bar[1] < 120, `the bar a step above the foot: ${JSON.stringify(near)}`);
+    assert(clear(near) && near.toast[1] <= near.bar[0], `the toast stands above the bar: ${JSON.stringify(near)}`);
+    await shot('05b-toast-over-short-list');
+    await page.$eval('[data-testid=toast] .toast-x', (b) => b.click());
+    await toastGone();
+    await page.keyboard.press('Escape');
+    await noBar();
+    await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: SHOTS ? 2 : 1 });
   });
 
   await check('Share as one link: one review link for exactly the ticked videos; its visitor sees those and nothing else', async () => {

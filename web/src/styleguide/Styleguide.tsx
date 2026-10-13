@@ -13,6 +13,7 @@ import { say } from '../sessions/activityWords.ts';
 import { RunLine } from '../sessions/RunLine.tsx';
 import { Code } from '../settings/parts.tsx';
 import '../styles/styleguide.css';
+import '../styles/toasts.css';
 import { Badge, type Tone } from '../ui/Badge.tsx';
 import { AutoTextarea, Avatar, Checkbox, Progress, Slider, Switch } from '../ui/controls.tsx';
 import type { EmptyArtName } from '../ui/emptyArt.tsx';
@@ -417,6 +418,17 @@ function LiveLayers() {
       <Button onClick={() => toast('Saved', 'ok')}>Toast</Button>
       <Button onClick={() => toastUndo('Archived spot.mp4', noop)}>Toast with Undo</Button>
       <Button onClick={() => toast('Couldn’t reach the server', 'error')}>Error toast</Button>
+      {/* the stack: three toasts a beat apart, the newest in front, the two before it tucked behind */}
+      <Button
+        data-testid="sg-toast-stack"
+        onClick={() => {
+          toast('Saved', 'ok', undefined, { duration: 12000 });
+          setTimeout(() => toast('Archived spot.mp4', 'ok', { label: 'Undo', undo: true, onClick: noop }, { duration: 12000 }), 220);
+          setTimeout(() => toast('Couldn’t reach the server', 'error'), 440);
+        }}
+      >
+        Three toasts
+      </Button>
       <IconButton label="A tooltip, with its key" icon="search" shortcut="⌘K" className="btn icon-only" />
       {dialog && (
         <Modal
@@ -1220,7 +1232,7 @@ export default function Styleguide() {
           <Block
             id="floating"
             title="Floating"
-            note="Everything that floats is one material: the lightest surface, a hairline edge, a lit top edge, the float shadow. Dialogs rise over a dimmed page; menus and popovers grow out of what opened them; tooltips and toasts are passing messages (ink on paper). On a phone, dialogs and menus are sheets from the bottom edge. A question before what can’t be undone names the thing, says in one sentence what happens and carries its keys: Esc keeps things, ⌘↵ goes ahead."
+            note="Everything that floats is one material: the lightest surface, a hairline edge, a lit top edge, the float shadow. Dialogs rise over a dimmed page; menus and popovers grow out of what opened them; tooltips are passing notes (ink on paper); toasts float too, one stack with the newest in front, opening on hover or focus. On a phone, dialogs and menus are sheets from the bottom edge. A question before what can’t be undone names the thing, says in one sentence what happens and carries its keys: Esc keeps things, ⌘↵ goes ahead."
           >
             <div className="sg-floats">
               <div className="modal alert sg-float" data-testid="sg-confirm">
@@ -1309,24 +1321,30 @@ export default function Styleguide() {
                   Display <Kbd>⇧D</Kbd>
                 </span>
                 <span className="toast ok">
-                  <I name="check" size={14} />
-                  <span className="toast-title">Archived spot.mp4</span>
-                  <button type="button" className="toast-act">
-                    <I name="undo" size={14} /> Undo
-                  </button>
+                  <span className="toast-body">
+                    <I name="check" size={14} />
+                    <span className="toast-title">Archived spot.mp4</span>
+                    <button type="button" className="toast-act">
+                      <I name="undo" size={14} /> Undo
+                    </button>
+                  </span>
                 </span>
                 <span className="toast info">
-                  <span className="toast-title">Copied the link</span>
-                  <button type="button" className="toast-x" aria-label="Dismiss">
-                    <I name="x" size={13} />
-                  </button>
+                  <span className="toast-body">
+                    <span className="toast-title">Copied the link</span>
+                    <button type="button" className="toast-x" aria-label="Dismiss">
+                      <I name="x" size={13} />
+                    </button>
+                  </span>
                 </span>
                 <span className="toast error">
-                  <I name="x" size={14} />
-                  <span className="toast-title">Couldn’t reach the server</span>
-                  <button type="button" className="toast-act">
-                    Try again
-                  </button>
+                  <span className="toast-body">
+                    <I name="x" size={14} />
+                    <span className="toast-title">Couldn’t reach the server</span>
+                    <button type="button" className="toast-act">
+                      Try again
+                    </button>
+                  </span>
                 </span>
               </div>
             </div>

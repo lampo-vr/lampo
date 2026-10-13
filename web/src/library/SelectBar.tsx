@@ -22,6 +22,12 @@ import { IconButton, Modal } from '../ui/primitives.tsx';
 import { FolderPicker } from './FolderPicker.tsx';
 import '../styles/library-select.css';
 
+// How far up from the window's foot the stuck bar stands (library-select.css .lsel: --sp-3), and the room the toasts'
+// stack takes at the foot (toasts.css: the 20 px foot, a two-line toast, the two tucked behind it, a gap): with that
+// much under the bar, the toasts stay at the foot.
+const BAR_FOOT = 12;
+const TOAST_ROOM = 120;
+
 interface Props {
   /** The ticked videos, in the view's order. */
   videos: VideoSummary[];
@@ -95,14 +101,24 @@ export function SelectBar({ videos, folders, why, can, onClear, onKeep }: Props)
     const view = scroller.getBoundingClientRect().top + scroller.clientTop + scroller.clientHeight;
     if (before.getBoundingClientRect().bottom <= view + 1) scroller.scrollTop = scroller.scrollHeight;
     // Sticky stops short of the page's own room at its end (its padding): the bar reaches into it, so it floats at the
-    // window's foot (library-select.css). The toasts at the foot stand above it, however tall it is: ui.css .toasts.
+    // window's foot (library-select.css). The toasts at the foot (toasts.css .toasts) stand above it, however tall it is
+    // and wherever it stands: under a short list it stands higher than the foot, and lifted by its height alone they
+    // covered it. With room under it for the stack, they keep the foot.
     const root = document.documentElement.style;
+    const lift = () => {
+      const r = el.getBoundingClientRect();
+      const under = window.innerHeight - r.bottom;
+      // stuck at the foot this is the bar's height, as the toasts' foot (20 px) is 8 px under the stuck bar's (12 px)
+      root.setProperty('--toast-lift', `${under >= TOAST_ROOM ? 0 : Math.max(0, Math.round(window.innerHeight - r.top - BAR_FOOT))}px`);
+    };
     const sized = new ResizeObserver(() => {
       el.style.setProperty('--lsel-under', getComputedStyle(scroller).paddingBottom);
-      root.setProperty('--toast-lift', `${el.offsetHeight}px`);
+      lift();
     });
     sized.observe(el);
     sized.observe(scroller);
+    // the list before it: rows that come or go move the bar
+    sized.observe(before);
     return () => {
       sized.disconnect();
       root.removeProperty('--toast-lift');

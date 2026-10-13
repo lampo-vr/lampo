@@ -72,7 +72,7 @@
 
 /* ---------------------------------------------------------------- tooltip */
 
-/* Tooltips and toasts are passing messages: ink on paper, a lifted step in the dark (--tip-* in base.css). */
+/* Tooltips are passing notes: ink on paper, a lifted step in the dark (--tip-* in base.css). Toasts float: toasts.css. */
 .tip {
   z-index: var(--z-top);
   display: inline-flex;
@@ -633,171 +633,7 @@
   height: 7px;
 }
 
-/* ---------------------------------------------------------------- toasts (Radix Toast) */
-
-.toasts {
-  position: fixed;
-  left: 50%;
-  /* --toast-lift: a bar floating at the window's foot (library/SelectBar.tsx) sets its height, so they stand above it */
-  bottom: calc(20px + var(--toast-lift, 0px) + env(safe-area-inset-bottom));
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--sp-2);
-  width: max-content;
-  max-width: calc(100vw - 24px);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  z-index: var(--z-toast);
-  outline: none;
-}
-.toast {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  max-width: 100%;
-  /* The buttons at the end sit in the pill's curve: the same 6 px around them on top, bottom and right */
-  min-height: calc(var(--h-sm) + var(--sp-3));
-  padding: 0 calc(var(--sp-3) / 2) 0 var(--sp-3);
-  border-radius: var(--r-full);
-  background: var(--tip-bg);
-  color: var(--tip-fg);
-  box-shadow:
-    0 0 0 1px var(--tip-edge),
-    var(--shadow-float);
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-ui);
-  animation: toast-in 0.34s var(--ease-spring);
-}
-.toast > .icon {
-  flex: none;
-}
-.toast.ok > .icon {
-  color: var(--tip-ok);
-}
-.toast.error {
-  background: var(--must);
-  color: var(--on-must);
-}
-.toast-title {
-  min-width: 0;
-}
-/* The words end where the toast would end without buttons: 12 px, like the start */
-.toast-title:not(:last-child) {
-  margin-right: var(--sp-1);
-}
-.toast[data-state='closed'] {
-  animation: toast-out var(--dur) var(--ease-in) forwards;
-}
-.toast[data-swipe='move'] {
-  transform: translateY(var(--radix-toast-swipe-move-y));
-}
-.toast[data-swipe='cancel'] {
-  transform: translateY(0);
-  transition: transform var(--dur) var(--ease-out);
-}
-.toast[data-swipe='end'] {
-  animation: toast-swipe var(--dur) var(--ease-in) forwards;
-}
-@keyframes toast-in {
-  from {
-    transform: translateY(16px) scale(0.94);
-    opacity: 0;
-  }
-}
-@keyframes toast-out {
-  to {
-    transform: translateY(8px) scale(0.97);
-    opacity: 0;
-  }
-}
-@keyframes toast-swipe {
-  from {
-    transform: translateY(var(--radix-toast-swipe-end-y));
-  }
-  to {
-    transform: translateY(120%);
-    opacity: 0;
-  }
-}
-/* phones: under the top bar, clear of the notes sheet and the transport at the bottom */
-@media (max-width: 639px), (max-height: 480px) and (hover: none) and (pointer: coarse) {
-  .toasts {
-    top: calc(env(safe-area-inset-top) + 62px);
-    bottom: auto;
-    flex-direction: column-reverse;
-  }
-  .toast {
-    animation-name: toast-in-top;
-  }
-  .toast[data-swipe='end'] {
-    animation-name: toast-swipe-up;
-  }
-  @keyframes toast-in-top {
-    from {
-      transform: translateY(-16px) scale(0.94);
-      opacity: 0;
-    }
-  }
-  @keyframes toast-swipe-up {
-    from {
-      transform: translateY(var(--radix-toast-swipe-end-y));
-    }
-    to {
-      transform: translateY(-120%);
-      opacity: 0;
-    }
-  }
-}
-.toast-act {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  flex: none;
-  height: var(--h-sm);
-  border: 0;
-  border-radius: var(--r-full);
-  padding: 0 var(--sp-3);
-  background: var(--tip-fg);
-  color: var(--tip-bg);
-  font: var(--fw-strong) var(--fs-sm) var(--ui);
-  cursor: pointer;
-  transition: transform var(--dur-fast) var(--ease-out);
-}
-.toast-act:hover {
-  transform: scale(1.04);
-}
-.toast.error .toast-act {
-  background: var(--on-must);
-  color: var(--must);
-}
-.toast-x {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: var(--h-sm);
-  height: var(--h-sm);
-  padding: 0;
-  border: 0;
-  border-radius: var(--r-full);
-  /* a quiet round button, so it holds its place in the curve like the action beside it */
-  background: color-mix(in srgb, currentColor 16%, transparent);
-  color: color-mix(in srgb, currentColor 72%, transparent);
-  cursor: pointer;
-  transition:
-    background var(--dur-fast),
-    color var(--dur-fast);
-}
-.toast-act + .toast-x {
-  margin-left: calc(-1 * var(--sp-1));
-}
-.toast-x:hover,
-.toast-x:focus-visible {
-  background: color-mix(in srgb, currentColor 26%, transparent);
-  color: inherit;
-}
+/* toasts: styles/toasts.css, with the toaster's code (ui/layers.tsx) */
 
 /* ---------------------------------------------------------------- icons in the control families
 
@@ -811,7 +647,7 @@
   height: var(--ic);
   stroke-width: var(--ic-stroke);
 }
-:where(:is(.btn.sm:not(.icon-only), .seg:not(.icons) button, .tabs button, .toast, .toast-act) > .icon:first-child) {
+:where(:is(.btn.sm:not(.icon-only), .seg:not(.icons) button, .tabs button, .toast-body, .toast-act) > .icon:first-child) {
   width: var(--ic-sm);
   height: var(--ic-sm);
   stroke-width: var(--ic-stroke-sm);

@@ -8,8 +8,8 @@ export const SCALE = {
   fontSize: [11, 12, 13, 15, 18, 24, 36, 56, 16],
   fontWeight: [400, 500, 650],
   // 4 · 8 · 12 and round (a pill or a circle), 2 for hairline marks, and the nested corners (base.css: a row in a menu
-  // 3, an item in a track 5 — concentric() checks that they follow the corner around them)
-  radius: [0, 2, 3, 4, 5, 8, 12],
+  // 3, an item in a track 5, a button in a toast 6 — concentric() checks that they follow the corner around them)
+  radius: [0, 2, 3, 4, 5, 6, 8, 12],
   // 20 · 26 · 30 · 40, 44 on touch screens, 52 for the one way into a page (the invitation), and the items inside a segmented track (the track's height - 6)
   controlHeight: [20, 26, 30, 40, 44, 52, 24, 38],
   // icons in the control families (ui.css): 12 in chips and as a chevron, 14 beside 12 px type, 16, 20 alone in 40 px
@@ -69,7 +69,7 @@ export function inventory({ scale, allow, root = null }) {
     }
   }
   // an icon in a control family takes its size step (the family's own, whatever a screen asked for)
-  const ICONS = ':is(.btn, .seg > button, .tabs > button, .menu button, .ch, .badge, .toast, .toast-act) > svg.icon';
+  const ICONS = ':is(.btn, .seg > button, .tabs > button, .menu button, .ch, .badge, .toast-body, .toast-act) > svg.icon';
   for (const ic of scope ? scope.querySelectorAll(ICONS) : []) {
     if (!vis(ic) || allowed(ic)) continue;
     // its box as set, not as drawn this moment (a toast scales in from 94 %)

@@ -102,6 +102,8 @@ const SECONDS = {
   // a folder's tabs switched round, every frame measured: two projects, six sizes (measured alone, 2026-10-10: 23 s)
   'folder-tabs': 25,
   styleguide: 15,
+  // the toast stack: collapsed, opened by hover with every timer waiting, a dismissal, reduced motion, a phone's swipe
+  toasts: 14,
   zoom: 17,
   // a folder's zip, then one version from the player's and a card's ⋯, the menus at 1440 and 390 in both themes
   download: 14,

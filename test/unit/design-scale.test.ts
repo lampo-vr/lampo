@@ -207,6 +207,9 @@ const NESTED: { file: string; outer: string; inner: string; inset: () => number;
     inner: '.amc-field > .amc-send',
     inset: () => px(decl('loop.css', '.amc-field > .amc-send', 'top') ?? 'NaN'),
   },
+  // a toast's action and its ×: inset by the toast body's padding (the toast's edge is a ring, it takes no room)
+  { file: 'toasts.css', outer: '.toast', inner: '.toast-act', inset: () => firstOf(decl('toasts.css', '.toast-body', 'padding')) },
+  { file: 'toasts.css', outer: '.toast', inner: '.toast-x', inset: () => firstOf(decl('toasts.css', '.toast-body', 'padding')) },
   // billing's switch: one raised thumb that slides in the segmented track
   {
     file: 'billing.css',
@@ -227,9 +230,10 @@ test('a raised or filled thing inside a rounded one has the outer corner less it
     else if (Math.abs(r - (R - inset)) > 0.01) off.push(`${n.file} ${n.inner}: ${r} px in ${n.outer} (${R} px, inset ${inset} px) — wants ${R - inset}`);
   }
   assert.deepEqual(off, []);
-  // the tokens say the same: an item in a track, a row in a menu
+  // the tokens say the same: an item in a track, a row in a menu, a button in a toast
   assert.equal(px('var(--r-track-in)'), px('var(--r)') - 1 - px('var(--track-pad)'));
   assert.equal(px('var(--r-menu-in)'), px('var(--r)') - 1 - px('var(--sp-1)'));
+  assert.equal(px('var(--r-toast-in)'), px('var(--r-lg)') - px('var(--sp-3)') / 2);
 });
 
 test('every focus ring is the one ring: --focus-width in the text colour (the brand’s on the way in), on the focus offsets', () => {
