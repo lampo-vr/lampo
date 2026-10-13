@@ -5,14 +5,13 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import type { QaKind, Version } from '../lib/types.ts';
-import { must } from './lib/helpers.ts';
+import { must, tmpdir } from './lib/helpers.ts';
 
 // Store and cache first: lib/paths.ts resolves them when it is first imported.
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vr-qa-test-'));
+const tmp = tmpdir('vr-qa-test-');
 process.env.VR_DATA = path.join(tmp, 'data');
 process.env.VR_CACHE = path.join(tmp, 'cache');
 const { textTools } = await import('../lib/text/index.ts');

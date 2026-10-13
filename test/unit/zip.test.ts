@@ -5,13 +5,13 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import zlib from 'node:zlib';
 import { planZip, type ZipEntry, type ZipPlan } from '../../lib/zip.ts';
+import { tmpdir } from '../lib/helpers.ts';
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vr-zip-'));
+const dir = tmpdir('vr-zip-');
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 async function* slices(buf: Buffer, start: number, end: number, chunk = 1000): AsyncGenerator<Buffer> {

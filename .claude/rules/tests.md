@@ -27,6 +27,12 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
   it comes in (measure a box once it holds still two frames with no animation of its own; `options.mjs`).
 - Imports go above a unit file's first test once it has a top-level `after()` (`startApp()` too): Node 22 runs the
   hook while a later top-level await is pending (`test-files.test.ts`).
+- A temp dir comes from `tmpdir()` (in the process's run root, removed when it exits however it exits), never a
+  `mkdtemp` in `os.tmpdir()`; a server or browser a test starts ends with it: spawned `detached` and `ownChild`, a
+  server with `WITH_PARENT`, Chrome over a pipe (test/lib/tmp.ts). Beside the root and over a socket, one Mac held
+  97,000 test dirs (54 GB), 3,900 Chrome profiles (24 GB) and test servers running for days (`tmp.test.ts`). The root
+  goes after every other `exit` listener (lib/shares.ts writes its stats then) and after its servers have stopped: a
+  server watched only by `WITH_PARENT` still wrote its store as a Ctrl-C'd test removed it.
 - Tests never run the real `claude` CLI or send mail: the harness's stand-in and the outbox transport.
 - Review a screen with real-shaped data (`test/e2e/lib/insightsStore.ts`) at 390–1920, both themes.
 - A double tap goes through CDP's `Input.dispatchTouchEvent` with each touch's `timestamp`: sent one by one, a loaded

@@ -12,10 +12,10 @@
 // removed at the end.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { ROOT } from '../lib/paths.ts';
 import { FFMPEG } from '../lib/probe.ts';
+import { tmpdir } from '../test/lib/tmp.ts';
 import { renderDemoMedia } from './demo/media.ts';
 import { freePort, startServer } from './demo/server.ts';
 import { populate } from './demo/store.ts';
@@ -34,7 +34,8 @@ const out = path.resolve(arg('out') || path.join(ROOT, 'docs/assets'));
 for (const f of ['web/dist/index.html', 'web/dist-mcp/review.html'])
   if (!fs.existsSync(path.join(ROOT, f))) throw new Error(`${f} is missing: run \`npm run build\` first`);
 
-const dir = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'vr-shots-'));
+// in this process's run root: gone when it ends, Ctrl-C included (test/lib/tmp.ts)
+const dir = tmpdir('vr-shots-');
 const stops: (() => unknown)[] = [];
 try {
   console.log('rendering the demo footage…');

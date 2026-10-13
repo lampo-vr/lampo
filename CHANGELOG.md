@@ -169,6 +169,10 @@ format stays backwards compatible throughout.
   given it is remembered for the workspace. The checkout asks for the business's name; the VAT ID stays optional.
   In German: "für Unternehmen".
 - A review link's ⋯ menu says *Edit link* (German *Link bearbeiten*) for its settings, instead of *Change link*.
+- The tests clean up after themselves, a failed or interrupted run too: the temp folders a test makes, and the
+  browsers and servers it starts, go when its process ends (Ctrl-C and a killed run included), and the next run clears
+  what older runs left in the temp folder. A failed browser suite no longer keeps its stores; `LAMPO_KEEP_TMP=1` keeps
+  them for a look (CONTRIBUTING.md).
 
 ### Added
 - **Lampo as a plugin** for Claude Code, claude.ai, Cowork, ChatGPT and Codex: Lampo Cloud's connector and the Lampo

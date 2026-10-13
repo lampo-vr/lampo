@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { after, test } from 'node:test';
 import { age, freePort, isolatedEnv, makeVideo, ROOT, until } from '../lib/helpers.ts';
+import { ownChild, WITH_PARENT } from '../lib/tmp.ts';
 
 const { dir } = isolatedEnv({ vars: { VR_REMOTE: '0' } });
 const { createAgentRuns } = await import('../../server/agentRuns.ts');
@@ -196,7 +197,9 @@ test('closing the terminal the app runs in (SIGHUP) stops it as SIGTERM does: it
     XDG_CONFIG_HOME: path.join(home, 'xdg-config'),
     XDG_CACHE_HOME: path.join(home, 'xdg-cache'),
   };
-  const app = spawn(process.execPath, [path.join(ROOT, 'server/index.ts')], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  // stops with this test however it ends, before its store goes (test/lib/tmp.ts), and by itself if it is SIGKILLed
+  const app = spawn(process.execPath, [...WITH_PARENT, path.join(ROOT, 'server/index.ts')], { env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+  ownChild(app);
   if (app.pid) started.add(app.pid);
   let log = '';
   app.stdout.on('data', (d) => (log += d));

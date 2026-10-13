@@ -3,10 +3,9 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import { ROOT } from '../lib/helpers.ts';
+import { ROOT, tmpdir } from '../lib/helpers.ts';
 
 const script = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).scripts.link as string;
 const run = (home: string, PATH: string) =>
@@ -14,7 +13,7 @@ const run = (home: string, PATH: string) =>
 const NODE_PATH = path.dirname(process.execPath);
 
 test('npm run link puts lampo (and vr, its older name) in ~/.local/bin on a machine without the folder, and says when the shell won’t look there', () => {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'vr-link-'));
+  const home = tmpdir('vr-link-');
   try {
     const out = run(home, `${NODE_PATH}:/usr/bin:/bin`);
     const link = path.join(home, '.local/bin/lampo');
@@ -37,7 +36,7 @@ const runAll = (home: string) =>
   spawnSync('sh', ['-c', script], { cwd: ROOT, env: { HOME: home, PATH: `${NODE_PATH}:/usr/bin:/bin`, PWD: ROOT }, encoding: 'utf8' });
 
 test('another program’s lampo or vr in ~/.local/bin is never replaced: the person is told, a folder of that name too', () => {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'vr-link-'));
+  const home = tmpdir('vr-link-');
   const bin = path.join(home, '.local/bin');
   try {
     fs.mkdirSync(bin, { recursive: true });
@@ -78,7 +77,7 @@ function checkoutAt(folder: string, name = 'video-review') {
 }
 
 test('someone’s own link stays: one to a script that is gone, one into another project called video-review', () => {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'vr-link-'));
+  const home = tmpdir('vr-link-');
   const bin = path.join(home, '.local/bin');
   try {
     fs.mkdirSync(bin, { recursive: true });
@@ -109,7 +108,7 @@ test('someone’s own link stays: one to a script that is gone, one into another
 });
 
 test('a link from another Lampo checkout, or one to nothing, is replaced', () => {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'vr-link-'));
+  const home = tmpdir('vr-link-');
   const bin = path.join(home, '.local/bin');
   try {
     // an older checkout (before the rename) the links pointed into

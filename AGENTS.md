@@ -64,9 +64,10 @@ Tests wait for states, never for times (a loaded machine is slow, not wrong): `u
 (test/e2e/layout.mjs). API tests start their app with `startApp()` (test/lib/app.ts: production keep-alive, its own
 `after`; top level, before the tests). A browser suite is any `test/e2e/*.mjs` on `./lib/checks.mjs` — no list to keep.
 Generated clips are cached per machine in `<tmp>/vr-test-media/` (`LAMPO_TEST_MEDIA_CACHE=off` to encode afresh).
-CI (`.github/workflows/ci.yml`: Linux on GitHub's `ubuntu-latest`; only a private copy sends its own jobs to a
-self-hosted runner; `macos.yml` only on the `macos` label or by hand) is described in CONTRIBUTING.md; its styleguide
-comparison is skipped until Linux baselines are committed.
+Everything else a test makes in `<tmp>` goes when its process exits, failed or killed (`tmpdir()`, test/lib/tmp.ts;
+`LAMPO_KEEP_TMP=1` keeps it). CI (`.github/workflows/ci.yml`: Linux on GitHub's `ubuntu-latest`; only a private copy
+sends its own jobs to a self-hosted runner; `macos.yml` only on the `macos` label or by hand) is described in
+CONTRIBUTING.md; its styleguide comparison is skipped until Linux baselines are committed.
 
 Anything you start by hand (server, `lampo`, scripts) must use a throwaway store: `LAMPO_DATA=<tmp>/data LAMPO_CACHE=<tmp>/cache`
 (and `LAMPO_STT=off` unless you test speech). A checkout with a `data/` folder next to the app **is a live store**.

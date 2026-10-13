@@ -13,6 +13,7 @@ import path from 'node:path';
 import { after, test } from 'node:test';
 import { freePort, isolatedEnv, makeVideo, ROOT, until } from '../lib/helpers.ts';
 import { client, cookieFrom, tusUpload } from '../lib/http.ts';
+import { ownChild, WITH_PARENT } from '../lib/tmp.ts';
 
 // The engine: before the stop it holds what it is asked (the hearing in flight when the deploy comes) until `release`,
 // then fails it; after the restart it answers.
@@ -70,7 +71,13 @@ let proc: ChildProcess | null = null;
 let log = '';
 async function start(): Promise<ChildProcess> {
   log = '';
-  const p = spawn(process.execPath, [path.join(ROOT, 'server/index.ts')], { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
+  // stops with this test however it ends, before its store goes (test/lib/tmp.ts), and by itself if it is SIGKILLed
+  const p = spawn(process.execPath, [...WITH_PARENT, path.join(ROOT, 'server/index.ts')], {
+    env: { ...process.env, ...env },
+    stdio: ['ignore', 'pipe', 'pipe'],
+    detached: true,
+  });
+  ownChild(p);
   p.stdout?.on('data', (d) => (log += d));
   p.stderr?.on('data', (d) => (log += d));
   proc = p;

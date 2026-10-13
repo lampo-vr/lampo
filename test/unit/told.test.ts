@@ -4,15 +4,15 @@
 // wait hands everything after a video's place whatever cursor it brings, after the cursor where nothing was told.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import type { ReviewEvent } from '../../lib/types.ts';
+import { tmpdir } from '../lib/helpers.ts';
 
 const { markTold, toldPlace, toldPlaces, TOLD_KEEP } = await import('../../lib/told.ts');
 const { inbox, parseCursor, readPlace } = await import('../../mcp/feedback.ts');
 
-const folder = () => fs.mkdtempSync(path.join(os.tmpdir(), 'vr-told-'));
+const folder = () => tmpdir('vr-told-');
 
 test('a place per agent and video, kept in the workspace’s folder, never moving back; other workspaces and agents apart', () => {
   const a = folder();

@@ -48,11 +48,21 @@ Your real reviews are never touched by the tests or the demo: each uses its own 
 | `npm run test:webkit` | frame exactness in WebKit on an emulated iPhone (Playwright's Linux WebKit has no H.264: there it reports a skip) |
 | `npm run test:all` | the build, then all of the above |
 | `LAMPO_TEST_MEDIA_CACHE=off npm test` | encode every generated clip afresh; by default each is made once per machine and copied from `<tmp>/vr-test-media/` (ffmpeg gives the same bytes for the same arguments) |
+| `LAMPO_KEEP_TMP=1 npm test` | keep each test process's temp dirs after it exits, for a look at a failed run's stores (see below); kept ones are removed a day later |
 | `LAMPO_PERF_STRICT=1 npm run test:perf` | the speed budgets as hard failures even on a busy machine; by default a time budget missed while the 1-minute load is above 10 is reported, not failed (the numbers then measure the machine) — run this on a quiet machine before merging speed work |
 | `npm run build` | build the web UI into `web/dist` |
 | `npm run screenshots` | make every picture of the app in `docs/assets/` again (README and docs, dark and light) from the synthetic demo; `npm run screenshots -- --only a,b` for some |
 
 Tests generate their clips with ffmpeg, so there are no fixtures to download.
+
+Tests clean up after themselves, failed ones too. Every temp dir a test makes comes from `tmpdir()`
+(`test/lib/helpers.ts`), which puts it in its process's run root, `<tmp>/vr-runs/<pid>-XXXXXX/`. The root is removed
+when the process exits, however it exits (a failed check, a thrown error, Ctrl-C, SIGTERM), and so are the browsers
+and servers it started (`test/lib/tmp.ts`). A process killed with SIGKILL runs no hook: its server stops by itself once
+it sees its test gone, its Chrome quits when the pipe to it closes, and the next test process that starts removes its
+run root. That start also clears what tests left in `<tmp>` before the run root: `vr-<name>-XXXXXX` dirs and
+`puppeteer_dev_chrome_profile-*` older than a day. With `LAMPO_KEEP_TMP=1` the roots are kept (the process says where)
+and removed a day later.
 
 A browser suite that can't run (no Chrome, no `web/dist`, no WebKit) **fails** instead of passing silently, so a
 green run always means the suites ran. On a machine without a browser, `LAMPO_E2E_SKIP_OK=1 npm run test:all` turns

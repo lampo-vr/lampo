@@ -3,11 +3,12 @@
 // end up in screenshots). Settings from the shell that change what a server is (mode, storage, URLs, tokens,
 // proxies, tunnels) are dropped; a suite states the ones it needs. Its environment (srv.env) never sees the machine's
 // `vr login`, so a `vr` run with it stays on the suite's store. The server is stopped when the suite exits, however it
-// exits, so no test server outlives its run.
+// exits (a SIGKILL'd suite's server stops by itself once it sees its parent gone), so no test server outlives its run.
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { freePort, ROOT, sleep, tmpdir } from '../../lib/helpers.ts';
+import { ownChild, WITH_PARENT } from '../../lib/tmp.ts';
 
 // Mail settings are dropped too: a suite never reaches a real relay, its messages land in <cache>/outbox/.
 const DROPPED =
@@ -115,15 +116,16 @@ export async function startServer({ prefix, mode = 'local', user, publicUrl, con
 
   let log = '';
   let stdout = '';
-  const proc = spawn(process.execPath, [path.join(ROOT, 'server/index.ts')], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  // A process group of its own, which the suite's run root ends with the suite however it ends (test/lib/tmp.ts), and
+  // what the server starts (ffmpeg, the `claude` stand-in) goes with it.
+  const proc = spawn(process.execPath, [...WITH_PARENT, path.join(ROOT, 'server/index.ts')], { env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+  ownChild(proc);
   proc.stdout.on('data', (d) => {
     log += d;
     stdout += d;
   });
   proc.stderr.on('data', (d) => (log += d));
   const running = () => proc.exitCode === null && proc.signalCode === null;
-  // A suite that throws or exits early still takes its server down.
-  process.on('exit', () => running() && proc.kill('SIGKILL'));
 
   const srv = {
     dir,

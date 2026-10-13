@@ -4,6 +4,7 @@ import { type ChildProcess, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { ROOT } from '../../lib/paths.ts';
 
 export const DEMO_SESSIONS = [
@@ -55,7 +56,10 @@ export async function startServer(
     ...vars,
   };
   let out = '';
-  const proc = spawn(process.execPath, [path.join(ROOT, 'server/index.ts')], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  // stops by itself once this process is gone, a SIGKILL'd one too (where the checkout has its tests)
+  const withParent = path.join(ROOT, 'test/lib/withParent.ts');
+  const watch = fs.existsSync(withParent) ? ['--import', `${pathToFileURL(withParent).href}?parent=${process.pid}`] : [];
+  const proc = spawn(process.execPath, [...watch, path.join(ROOT, 'server/index.ts')], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   proc.stdout?.on('data', (d) => {
     out += d;
   });

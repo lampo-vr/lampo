@@ -4,10 +4,14 @@ import { type ChildProcessWithoutNullStreams, execFileSync, spawn } from 'node:c
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import net from 'node:net';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LAMPO_NAMES, settings } from '../../lib/env.ts';
+import { TMP, tmpdir } from './tmp.ts';
+
+// A test's temp dirs live in its process's run root and go when it exits (./tmp.ts; loading it sweeps what earlier
+// processes left).
+export { tmpdir };
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const VR_BIN = path.join(ROOT, 'bin/vr');
@@ -22,10 +26,6 @@ for (const k of LAMPO_NAMES) delete process.env[k];
 
 const bin = (name: string) => ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin'].map((d) => `${d}/${name}`).find((p) => fs.existsSync(p)) || name;
 export const FFMPEG = settings.LAMPO_FFMPEG || bin('ffmpeg');
-
-export function tmpdir(prefix = 'vr-test-'): string {
-  return fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), prefix));
-}
 
 // Isolated store: data, versions and cache all under one temp dir, plus a config.json. Call before importing lib/*.
 export function isolatedEnv({ config = {}, vars = {} }: { config?: object; vars?: Record<string, string> } = {}): { dir: string; env: NodeJS.ProcessEnv } {
@@ -99,7 +99,7 @@ export interface VideoOptions {
 // encode is kept in <tmp>/vr-test-media/ under a hash of the arguments and the ffmpeg build, and every later call copies
 // it (a fresh file each time, as before: tests write, age and upload their own copy). Most of the unit suite's time was
 // encoding the same small clips again. VR_TEST_MEDIA_CACHE=off encodes every time.
-const MEDIA_CACHE = path.join(fs.realpathSync(os.tmpdir()), 'vr-test-media');
+const MEDIA_CACHE = path.join(TMP, 'vr-test-media');
 let ffmpegBuild: string | null = null;
 /** An ffmpeg encode (its arguments without the output) made once per machine and copied to `file`. */
 export function encodeOnce(file: string, args: string[]): string {

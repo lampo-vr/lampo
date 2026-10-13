@@ -5,13 +5,12 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
-import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import express from 'express';
 import type { Comment, LibraryResponse, ReviewResponse } from '../../lib/types.ts';
 import { startApp } from '../lib/app.ts';
-import { age, FFMPEG, isolatedEnv, makeVideo, must } from '../lib/helpers.ts';
+import { age, FFMPEG, isolatedEnv, makeVideo, must, tmpdir } from '../lib/helpers.ts';
 
 const { dir } = isolatedEnv();
 
@@ -295,7 +294,7 @@ test('voice: a body past the limit sent in pieces (no length said first) is refu
 });
 
 test('machine endpoints never fall back to the web page', async () => {
-  const dist = fs.mkdtempSync(path.join(os.tmpdir(), 'vr-dist-'));
+  const dist = tmpdir('vr-dist-');
   fs.writeFileSync(path.join(dist, 'index.html'), '<!doctype html><title>app</title>');
   const { staticUi } = await import('../../server/app.ts');
   const app = express();

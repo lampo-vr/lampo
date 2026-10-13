@@ -9,6 +9,7 @@ import path from 'node:path';
 import puppeteer, { type Browser, type Page } from 'puppeteer-core';
 import { ROOT } from '../../lib/paths.ts';
 import { FFMPEG, FFPROBE } from '../../lib/probe.ts';
+import { ownChild, tmpdir } from '../../test/lib/tmp.ts';
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -43,11 +44,17 @@ export function findChrome(): string {
   throw new Error('no Chrome found: run `npm run chrome:install` (chrome-headless-shell), or set CHROME_PATH');
 }
 
+/** As the browser suites launch theirs (test/e2e/lib/browser.mjs): it ends with this process, however that ends. */
 export async function launch(args: string[]): Promise<Browser> {
   const chrome = findChrome();
-  return puppeteer.launch({
+  const browser = await puppeteer.launch({
     executablePath: chrome,
     headless: path.basename(chrome) === 'chrome-headless-shell' ? 'shell' : true,
+    userDataDir: tmpdir('chrome-'),
+    pipe: true,
+    handleSIGINT: false,
+    handleSIGTERM: false,
+    handleSIGHUP: false,
     args: [
       '--no-sandbox',
       '--no-first-run',
@@ -60,6 +67,9 @@ export async function launch(args: string[]): Promise<Browser> {
     ],
     env: { ...process.env, LANG: 'en_US.UTF-8', LANGUAGE: 'en_US' },
   });
+  const proc = browser.process();
+  if (proc) ownChild(proc);
+  return browser;
 }
 
 /**

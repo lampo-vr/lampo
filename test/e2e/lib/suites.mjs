@@ -202,7 +202,8 @@ async function main() {
   const gha = process.env.GITHUB_ACTIONS === 'true';
   const limit = (Number(settings.LAMPO_E2E_SUITE_MINUTES) || 15) * 60_000;
   const running = new Set();
-  // Stopped by hand: every running suite closes its Chrome and server (SIGINT), then their groups go.
+  // Stopped by hand: every running suite stops its Chrome and server and removes its run root (SIGINT, test/lib/tmp.ts),
+  // then their groups go.
   const stopAll = (signal) => {
     for (const p of running) kill(p, 'SIGINT', false);
     setTimeout(() => {
@@ -221,7 +222,8 @@ async function main() {
       const alone = o.jobs === 1;
       let out = '';
       if (alone) console.log(gha ? `::group::${name}` : `\n── ${name}`);
-      // Its own process group: a suite stopped for hanging takes its server and anything else it started with it.
+      // Its own process group: a suite stopped for hanging takes what it started with it. Its Chrome and server lead groups
+      // of their own and end when it does (test/lib/tmp.ts), by themselves after a SIGKILL.
       const p = spawn(process.execPath, [path.join(E2E, `${name}.mjs`)], { cwd: ROOT, env: process.env, stdio: alone ? 'inherit' : 'pipe', detached: true });
       running.add(p);
       p.stdout?.on('data', (d) => (out += d));
@@ -230,14 +232,14 @@ async function main() {
       let force;
       const timer = setTimeout(() => {
         hung = true;
-        // SIGINT first: puppeteer kills its Chrome and exits, and the suite's exit handler stops its server; then the group.
+        // SIGINT first: the suite stops its Chrome and server and removes its run root (test/lib/tmp.ts); then the group.
         kill(p, 'SIGINT', false);
         force = setTimeout(() => kill(p, 'SIGKILL'), 10_000);
       }, limit);
       p.on('close', (code, signal) => {
         clearTimeout(timer);
         clearTimeout(force);
-        // Whatever the suite left in its group (a server it had no time to stop) goes with it.
+        // Whatever the suite left in its group goes with it.
         kill(p, 'SIGKILL');
         running.delete(p);
         const s = Math.round((Date.now() - t) / 1000);

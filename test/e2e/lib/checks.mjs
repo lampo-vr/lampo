@@ -1,9 +1,10 @@
 // What every browser suite shares: named checks that report and carry on, and one summary line at the end
-// ("8/8 status e2e checks passed") with the exit code CI reads. Temp stores are removed when every check passed and
-// kept for inspection otherwise.
+// ("8/8 status e2e checks passed") with the exit code CI reads. Temp stores go with the suite's run root when it exits,
+// passed or failed (test/lib/tmp.ts); LAMPO_KEEP_TMP=1 keeps them for inspection.
 import fs from 'node:fs';
 import path from 'node:path';
 import { settings } from '../../../lib/env.ts';
+import { keepTmp } from '../../lib/tmp.ts';
 
 const results = [];
 let failureShot = null;
@@ -98,9 +99,10 @@ export function crashed(e, ...servers) {
 }
 
 /**
- * Closes the browser, stops the servers, prints the summary and exits: 0 when every check passed (the temp stores
- * are removed then), 1 otherwise (they're kept, and the servers' last output is printed). With `skipped` (a reason the
- * suite found out only after starting, e.g. a browser that can't decode the clip) it says so and exits 0.
+ * Closes the browser, stops the servers, prints the summary and exits: 0 when every check passed, 1 otherwise (the
+ * servers' last output is printed then). The temp stores go either way, unless LAMPO_KEEP_TMP keeps them. With
+ * `skipped` (a reason the suite found out only after starting, e.g. a browser that can't decode the clip) it says so
+ * and exits 0.
  */
 export async function finish(label, { browser, servers = [], dirs = [], skipped = null } = {}) {
   await browser?.close().catch(() => {});
@@ -117,9 +119,11 @@ export async function finish(label, { browser, servers = [], dirs = [], skipped 
     `\n${passed}/${results.length} ${label} checks passed${skips.length ? `, ${skips.length} skipped (${skips.map((r) => r.name).join('; ')})` : ''}`,
   );
   const kept = [...servers.filter(Boolean).map((s) => s.dir), ...dirs];
-  if (!failed) for (const d of kept) fs.rmSync(d, { recursive: true, force: true });
-  else {
-    if (kept.length) console.log(`kept ${kept.join(', ')} for inspection`);
+  if (keepTmp()) {
+    if (kept.length) console.log(`kept ${kept.join(', ')} for inspection (LAMPO_KEEP_TMP)`);
+  } else for (const d of kept) fs.rmSync(d, { recursive: true, force: true });
+  if (failed) {
+    if (kept.length && !keepTmp()) console.log('LAMPO_KEEP_TMP=1 keeps the stores for inspection');
     for (const s of servers) if (s) console.log(s.log().slice(-600));
   }
   process.exit(failed ? 1 : 0);

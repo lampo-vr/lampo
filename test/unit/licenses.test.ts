@@ -2,11 +2,11 @@
 // its licence and the licence text the package ships.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { artworkNotices, bundledNotices, describePackage, packageRoot, productionPackages, renderNotices, vendoredNotices } from '../../scripts/licenses.ts';
+import { tmpdir } from '../lib/helpers.ts';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 
@@ -31,7 +31,7 @@ test('module ids map to their package, scoped or nested', () => {
 });
 
 test('a bundle lists each package once, with its licence text or at least its SPDX id', () => {
-  const nm = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'vr-lic-')), 'node_modules');
+  const nm = path.join(tmpdir('vr-lic-'), 'node_modules');
   const a = fakePackage(nm, 'alpha', 'MIT', 'MIT License\n\nCopyright (c) Alpha');
   const b = fakePackage(nm, '@scope/beta', 'ISC', null);
   const notices = bundledNotices([path.join(a, 'index.js'), path.join(a, 'index.js?x'), path.join(b, 'index.js'), '/app/web/src/main.tsx']);

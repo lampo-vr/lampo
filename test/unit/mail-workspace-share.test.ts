@@ -6,10 +6,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
-import os from 'node:os';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
-import { isolatedEnv } from '../lib/helpers.ts';
+import { isolatedEnv, tmpdir } from '../lib/helpers.ts';
 import { client, type Request } from '../lib/http.ts';
 
 const PUBLIC = 'http://review.test';
@@ -76,7 +75,7 @@ test('the share: a quarter of the server’s hour unless set, never more than al
 });
 
 test('the mailer: a workspace’s invites stop at its share; other workspaces and account mail go on', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vr-share-'));
+  const dir = tmpdir('vr-share-');
   const lines: string[] = [];
   const mailer = createMailer({
     config: { transport: 'log', smtp_url: null, from: null, reply_to: null, per_hour: 8 },
@@ -165,7 +164,7 @@ test('one account’s workspaces add up to one share; its address changes are ca
 });
 
 test('a password reset is never held back by the hour’s other mail: it goes first, with a part of the hour kept for it', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vr-lane-'));
+  const dir = tmpdir('vr-lane-');
   const mailer = createMailer({
     config: { transport: 'log', smtp_url: null, from: null, reply_to: null, per_hour: 8 },
     dir: path.join(dir, 'mail'),
@@ -199,7 +198,7 @@ test('a password reset is never held back by the hour’s other mail: it goes fi
 // takes 20 an hour (per_hour below), 80 confirmations to throwaway addresses held a real person's reset back four hours,
 // past its link's life.
 test('a flood of sign-up confirmations never holds a reset back: resets have a lane, and a part of the hour, of their own', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vr-lane-'));
+  const dir = tmpdir('vr-lane-');
   let clock = Date.parse('2026-10-06T10:00:00Z');
   const mailer = createMailer({
     config: { transport: 'log', smtp_url: null, from: null, reply_to: null, per_hour: 20 },
@@ -240,7 +239,7 @@ test('a flood of sign-up confirmations never holds a reset back: resets have a l
 // sign-ups of its own) kept a real person's reset waiting past its link's hour. One asked from an address waits at a
 // time now; more from it are dropped (the asker hears the same either way).
 test('a reset flood from one address holds one place in the resets’ lane: a real reset goes out within minutes', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vr-lane-'));
+  const dir = tmpdir('vr-lane-');
   const t0 = Date.parse('2026-10-06T10:00:00Z');
   let clock = t0;
   const mailer = createMailer({
@@ -289,7 +288,7 @@ test('a reset flood from one address holds one place in the resets’ lane: a re
 });
 
 test('mail dropped because its link expired counts nothing toward the hour', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vr-lane-'));
+  const dir = tmpdir('vr-lane-');
   const t0 = Date.parse('2026-10-06T10:00:00Z');
   let clock = t0;
   const mailer = createMailer({

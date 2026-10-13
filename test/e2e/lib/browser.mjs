@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { settings } from '../../../lib/env.ts';
 import { ROOT } from '../../lib/helpers.ts';
+import { ownChild, tmpdir } from '../../lib/tmp.ts';
 import { unavailable } from '../prereq.mjs';
 import { watchBrowser } from './checks.mjs';
 
@@ -148,9 +149,19 @@ export async function launch({ locale = 'en-US', reducedMotion = true, args = []
   if (!chrome) throw new Error('no Chrome/Chromium found (set CHROME_PATH)');
   const puppeteer = (await import('puppeteer-core')).default;
   const lang = locale.replace('-', '_');
+  // The browser ends with the suite, however the suite ends. Its profile is in the suite's run root (test/lib/tmp.ts),
+  // which stops the browser and removes the root when the suite exits, on Ctrl-C and SIGTERM too: puppeteer's own
+  // handlers are off for that. Over a pipe rather than a socket, Chrome quits by itself once a SIGKILL'd suite is gone
+  // (its end of the pipe closes); with a socket it ran on, and its profile was never removed.
+  const profile = tmpdir('chrome-');
   const browser = await puppeteer.launch({
     executablePath: chrome,
     headless: path.basename(chrome) === 'chrome-headless-shell' ? 'shell' : true,
+    userDataDir: profile,
+    pipe: true,
+    handleSIGINT: false,
+    handleSIGTERM: false,
+    handleSIGHUP: false,
     args: [
       '--no-sandbox',
       '--no-first-run',
@@ -162,6 +173,16 @@ export async function launch({ locale = 'en-US', reducedMotion = true, args = []
     ],
     env: { ...process.env, LANG: `${lang}.UTF-8`, LANGUAGE: lang },
   });
+  const proc = browser.process();
+  if (proc) {
+    ownChild(proc);
+    // a suite that launches one browser after another keeps only the open ones' profiles (what is left goes with the root)
+    proc.once('exit', () => {
+      try {
+        fs.rmSync(profile, { recursive: true, force: true, maxRetries: 3 });
+      } catch {}
+    });
+  }
   // A whole Chrome (new headless) treats pages as tabs of one window: the one opened last is in front and every other
   // goes hidden — no animation frames at all, timers about once a second (measured: 0 frames in 5 s, 6 timeouts in
   // 6 s), so a settle there can only time out. Each page in a window of its own stays visible. chrome-headless-shell
