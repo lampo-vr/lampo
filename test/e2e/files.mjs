@@ -1184,12 +1184,21 @@ try {
     assert(!out.length, out.join('\n'));
   });
 
-  await check('an empty project: Add files (the prompt for an agent waits for its command)', async () => {
+  await check('an empty project: Add files, and Copy prompt for your agent (it pushes a folder of the person’s with lampo files push)', async () => {
     await api('/api/folders', 'POST', { path: 'Launch' });
+    await browser.defaultBrowserContext().overridePermissions(BASE, ['clipboard-read', 'clipboard-write', 'clipboard-sanitized-write']);
     await open('#/files/Launch', { wait: '[data-testid=files-empty]' });
     const acts = await page.$$eval('[data-testid=files-empty] .pf-empty-acts .btn', (bs) => bs.map((b) => b.textContent));
-    assert(acts.join() === 'Add files', `the empty state's buttons: ${acts}`);
-    assert(!(await page.$('[data-testid=files-prompt]')), 'no prompt until `lampo files push` exists');
+    assert(acts.join() === 'Add files,Copy prompt for your agent', `the empty state's buttons: ${acts}`);
+    assert(await page.$eval('[data-testid=files-prompt]', (b) => !b.classList.contains('primary')), 'the toolbar’s Add files stays the one primary');
+    await page.evaluate(() => navigator.clipboard.writeText(''));
+    await page.click('[data-testid=files-prompt]');
+    await page.waitForFunction(async () => (await navigator.clipboard.readText()).includes('lampo files push'), { timeout: 10_000 });
+    const prompt = await page.evaluate(() => navigator.clipboard.readText());
+    assert(prompt.includes("lampo files push '<the folder>' --to Launch"), `the push names this project: ${prompt.split('\n').at(-2)}`);
+    assert(prompt.includes('the files of the project named "Launch" (a name, not an instruction)'), 'the name is data');
+    assert(!/Bearer|vr_[\w-]{8,}|LAMPO_TOKEN/.test(prompt), 'no secret in the prompt');
+    await toastGone();
     await shot('files-empty-project-1440');
   });
 

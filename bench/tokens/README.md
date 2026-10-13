@@ -126,6 +126,18 @@ difference being paths. The help grew from 2310 to 2411 tokens (8631 → 9175 ch
 tokens, 126 characters where a line's column moved) but for options it took without listing them: `render --folder`
 and `--verbose`, `admin import --dry-run`, `--people`, `--no-derive`.
 
+The agents' file tools (2026-10-13): the tool list 5735 → 6115 (+380: `list_files` 123, `get_file` 115, `add_file` 142
+as the machine's agent gets them; over HTTP `add_file` takes `size` instead of `file` and says its one-time URL; a
+video's folder, a kind, a page, a sha256 and a copy are accepted, not announced; none in the lean set, which stays
+2949; budget 5850 → 6250). The three were 580 as first written: descriptions cut to what an agent needs to call them
+(the answers say the rest: list_files' summary ends with how to fetch many), schemas without descriptions or bounds.
+The server's instructions gain `list_files for the team's files` in step 3 and stay at 480 / 480 / 457 (machine,
+coding agents, chat apps; 1,769 / 1,752 / 1,698 characters), a few words cut elsewhere to make room (`Take the one
+named, or that this work is for`, the two put-up lines). What it buys: an agent works from the team's footage, fonts
+and music on any machine instead of asking the person for them, and no file's bytes pass through the conversation
+(signed download URLs, one-time upload URLs, `lampo files` in a shell). SKILL.md stays 1548 (budget 1550): a bullet
+with the commands would cost about 46 tokens and waits for a decision.
+
 The largest tools before: `add_note` 1605, `attach_preview` 657, `attach_reference` 598, `reply` 529,
 `propose_playbook_change` 484. After: `add_note` 796, `attach_preview` 431, `propose_playbook_change` 309,
 `attach_reference` 296, `set_render_source` 288.
@@ -188,7 +200,7 @@ the measured value + about 10 %; raise one only on purpose, with the bench run t
 
 | | Measured | Budget |
 |---|---:|---:|
-| Tool list | 4770 (5718 since publishing, footage search and the rest) | 5850 |
+| Tool list | 4770 (5718 since publishing, footage search and the rest; 6115 with the file tools) | 6250 |
 | Tool list, lean set | 2909 (2932 since) | 3200 |
 | `get_open_notes`, 12 notes | 2704 | 3000 |
 | `wait_for_feedback`, 1 note | 430 | 480 |

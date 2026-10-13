@@ -308,8 +308,11 @@ export function shellWord(s: string): string {
   return `'${s.replaceAll("'", "'\\''")}'`;
 }
 
-/** The area's name for `lampo files`: the folder's path, or "House" for the House's. */
-const areaArg = (area: string) => (area ? shellWord(area) : 'House');
+/**
+ * The area's name for `lampo files`: the folder's path, or "House" for the House's — a project that is called "House"
+ * is `House/` there (lib/filesSync.ts areaOf reads it so), never the House.
+ */
+const areaArg = (area: string) => (area ? shellWord(area === 'House' ? 'House/' : area) : 'House');
 
 /**
  * What an agent needs to fetch these, nothing more: one `lampo files pull` (files by their path, folders as a glob of

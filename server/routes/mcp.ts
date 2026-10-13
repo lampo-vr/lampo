@@ -37,6 +37,7 @@ import type { ServerContext } from '../context.ts';
 import { router } from '../http.ts';
 import { SUSPENDED_ERROR } from '../permissions.ts';
 import { type TicketGuard, type TicketIssuer, teamGuard } from '../uploadTickets.ts';
+import { commitPush, fileStamp, offerPush, signedFileUrls } from './files.ts';
 import { oauthBase, resourceMetadataUrl } from './oauth.ts';
 
 const MAX_BODY = 1024 * 1024;
@@ -270,6 +271,43 @@ export function mcpRoutes(ctx: ServerContext): Router {
           requestRefUpload: (target, by) => ctx.uploadTickets.issueRef(target, by, appUrl, guardFor(principal, issuer, 'comment')),
           requestOptionUpload: (target, by, offered) => ctx.uploadTickets.issueOption(target, by, appUrl, guardFor(principal, issuer, 'comment'), offered),
           dropUpload: (url) => ctx.uploadTickets.drop(url),
+          // Project files (server/routes/files.ts): download URLs signed for whoever asked (asked again when used), and a
+          // file an agent saves through the push's own checks, one PUT that commits it. The machine's own agent reads and
+          // writes its store's files on its disk instead (mcp/tools/files.ts).
+          ...(principal.via === 'local'
+            ? {}
+            : {
+                fileUrls: (ids: string[], v?: number) =>
+                  signedFileUrls(ctx, issuer, ids, v, appUrl ?? '', principal.via === 'token' || principal.via === 'oauth'),
+                requestFileUpload: async (f: {
+                  folder: string;
+                  path: string;
+                  size: number;
+                  sha256?: string;
+                  base: number | null;
+                  copy: boolean;
+                  agent: string | null;
+                }) => {
+                  const stamp = fileStamp(
+                    { name: principal.name, ...(principal.id ? { id: principal.id } : {}), role: principal.role, via: principal.via },
+                    { ...(f.agent ? { agent: f.agent } : {}), ...(agent?.kind ? { agent_kind: agent.kind } : {}), via: 'mcp' },
+                  );
+                  const offer = await offerPush(
+                    ctx,
+                    { stamp, ws, issuer, base: appUrl ?? '', agent: true },
+                    {
+                      folder: f.folder,
+                      files: [{ path: f.path, size: f.size, ...(f.sha256 ? { sha256: f.sha256 } : {}), base: f.base }],
+                      conflict: f.copy ? 'copy' : 'refuse',
+                    },
+                  );
+                  const slot = offer.uploads[0];
+                  if (slot?.url && slot.expires) return { url: slot.url, expires: slot.expires };
+                  // its bytes are in the workspace already: committed now, nothing to send
+                  const add = [{ path: slot?.path ?? f.path, sha256: f.sha256 as string, size: f.size, base: f.base }];
+                  return { committed: await commitPush(ctx, ws, { folder: f.folder, add, conflict: f.copy ? 'copy' : 'refuse' }, stamp) };
+                },
+              }),
           // The plan's gate on team files, as `POST /api/comments/:id/refs|previews` ask it (A12 AGENT-6).
           checkUpload: (bytes) => ctx.extension.check(ws, 'upload', bytes),
           // A workspace the server's operator suspended: its agents read on, but write nothing (A13 CLOUD-5).

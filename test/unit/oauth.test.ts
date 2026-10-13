@@ -402,8 +402,8 @@ test('Claude’s and ChatGPT’s callbacks: a registration with them gets its co
     );
     assert.equal(view.verified, false, `${callback}: a registered name is the app's own say`);
     assert.equal(view.local_redirect, false);
-    // an app that names no scope is asked for what the MCP tools need, not the project files' scopes no tool uses yet
-    assert.deepEqual(view.scopes, ['review:read', 'review:comment', 'review:act', 'post:draft']);
+    // an app that names no scope is asked for what the MCP tools need: the project files' scopes by name too
+    assert.deepEqual(view.scopes, ['review:read', 'review:comment', 'review:act', 'post:draft', 'files:read', 'files:write']);
     assert.equal(`${redirect.origin}${redirect.pathname}`, callback);
     assert.equal(redirect.searchParams.get('iss'), base);
     const r = await fetch(

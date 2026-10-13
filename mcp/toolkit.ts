@@ -19,7 +19,7 @@ import type { RefTarget } from '../lib/refs.ts';
 import { currentSession } from '../lib/sessions.ts';
 import type { GrabCount } from '../lib/shots.ts';
 import type { SessionInput } from '../lib/store.ts';
-import type { AgentKind, OptionGroup, Review, ReviewEvent } from '../lib/types.ts';
+import type { AgentKind, FileCommitAnswer, FileUrls, OptionGroup, Review, ReviewEvent } from '../lib/types.ts';
 import { allowed, audienceOf, hintsFor, type Principal, TOOL_ACCESS } from './access.ts';
 import type { Hold, Quiet, Told, Wake } from './feedback.ts';
 import { clientName, fail, isIdle, nextStep } from './format.ts';
@@ -72,6 +72,25 @@ export interface ReviewServerOptions {
   requestOptionUpload?: (target: OptionTarget, by: string, offered?: OptionGroup[]) => { url: string; expires: string };
   /** Takes back an upload URL handed out for something that wasn't made after all. */
   dropUpload?: (url: string) => void;
+  /**
+   * The HTTP server's download URLs for project files (`get_file`): signed ones (a bucket's, the media host's, asking
+   * again who they were handed to), else its own download route — never a path on its disk.
+   */
+  fileUrls?: (ids: string[], v?: number) => FileUrls;
+  /**
+   * The HTTP server's way in for a file an agent saves (`add_file`): the push's checks before any byte moves (the version
+   * it replaces, the plan, the disk), then a one-time URL for one PUT that commits it — or, when the workspace holds
+   * those bytes already, the file committed at once. `agent`: the writing agent's name (its account is the principal's).
+   */
+  requestFileUpload?: (input: {
+    folder: string;
+    path: string;
+    size: number;
+    sha256?: string;
+    base: number | null;
+    copy: boolean;
+    agent: string | null;
+  }) => Promise<{ url: string; expires: string } | { committed: FileCommitAnswer }>;
   /** Where this server's source is (AGPL-3.0 §13), announced as the implementation's website. */
   sourceUrl?: string | null;
   /** Which tools to offer: `all` (default), `lean` (the review loop only) or a comma-separated list; default LAMPO_MCP_TOOLS. */

@@ -31,10 +31,11 @@ test('help and unknown commands', () => {
   // until elements maps took two (`vr push … --elements`, `vr elements`) and `vr admin`'s deletion and export (A13
   // PEOPLE-1) one, 8360 until `vr render` and `vr render wait` took three, 8660 until the command became `lampo` (3
   // letters more on each line that starts with it and was past its column: the same tokens, bench/tokens/count.ts),
-  // 8790 until `render --folder/--verbose` and `admin import`'s options were named (they were taken, not listed)
+  // 8790 until `render --folder/--verbose` and `admin import`'s options were named (they were taken, not listed), 9250
+  // until `lampo files` (ls, pull, push, status) took five
   // measured with the data folder's path as a placeholder: the temp folder's length differs by machine
   const sized = help.replace(/\(data: [^)\n]*\)/, '(data: <data>)').length;
-  assert.ok(sized < 9250, `help is ${sized} characters`);
+  assert.ok(sized < 9800, `help is ${sized} characters`);
   assert.ok(help.includes('lampo footage find "<request>"'), 'help names lampo footage');
   assert.ok(help.includes('lampo post draft <video> --platform yt|ig|fb'), 'help names lampo post');
   assert.doesNotMatch(help, /(^|\s)vr\s/, 'the command’s one name');

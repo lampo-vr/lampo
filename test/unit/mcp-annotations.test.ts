@@ -81,7 +81,8 @@ test('every tool: a title, all three hints as booleans, a short name; read-only 
       const a = t.annotations ?? {};
       for (const hint of ['readOnlyHint', 'destructiveHint', 'openWorldHint'])
         assert.equal(typeof a[hint], 'boolean', `${at}: ${hint} is ${JSON.stringify(a[hint])}`);
-      const reads = TOOL_ACCESS[t.name] === 'view';
+      // reading the project files changes nothing either
+      const reads = TOOL_ACCESS[t.name] === 'view' || TOOL_ACCESS[t.name] === 'files';
       assert.equal(a.readOnlyHint, reads, `${at}: readOnlyHint follows TOOL_ACCESS (${TOOL_ACCESS[t.name]})`);
       assert.equal(a.destructiveHint, OVERWRITES.has(t.name), `${at}: destructive only when it overwrites`);
       assert.ok(!(a.readOnlyHint && a.destructiveHint), `${at}: a read is never destructive`);

@@ -341,7 +341,7 @@ accuracy is kept end to end. The HTTP API is in [docs/api.md](docs/api.md).
 | [docs/data-format.md](docs/data-format.md) | `review.json`, `events.jsonl`, the files in `data/` |
 | [docs/playbooks.md](docs/playbooks.md) | playbooks: brief, rules, references and skills per studio and folder; agents' suggestions; trust |
 | [docs/taste.md](docs/taste.md) | the taste file: what the notes taught, for agents to read before they render |
-| [docs/files.md](docs/files.md) | project files: footage, music, fonts and project files per House, project and folder; versions, the trash, the plan, the Files tab, the API |
+| [docs/files.md](docs/files.md) | project files: footage, music, fonts and project files per House, project and folder; versions, the trash, the plan, the Files tab, `lampo files` and the agents' tools, the API |
 | [docs/sharing.md](docs/sharing.md) | review links for clients and colleagues, what they record, webhooks |
 | [docs/workflow.md](docs/workflow.md) | where a video stands: stages, approvals per party, final, who can do what |
 | [docs/publishing.md](docs/publishing.md) | posting a final video to YouTube, Instagram and Facebook; the publish kit; what to set up first |

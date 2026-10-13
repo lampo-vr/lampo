@@ -13,6 +13,12 @@ import type {
   Comment,
   DiffResult,
   ElementsAttached,
+  FileCommitAnswer,
+  FileConflict,
+  FileConflictMode,
+  FileKind,
+  FilesListing,
+  FilesSummary,
   FixPreview,
   FrameRange,
   NoteKind,
@@ -189,6 +195,79 @@ export class StoppedError extends Error {
  */
 export const signalsHeard = (): Promise<void> => new Promise((done) => setImmediate(() => setImmediate(done)));
 
+/** Which files of a folder a listing names (GET /api/files takes the same). */
+export interface FileListOptions {
+  /** A folder inside the area ('' the top). */
+  path?: string;
+  /** Every file under `path`, not only those directly in it. */
+  deep?: boolean;
+  /** The folder's own files only, not those it inherits from the areas above it. */
+  own?: boolean;
+  kind?: FileKind;
+  q?: string;
+  limit?: number;
+  cursor?: string;
+}
+
+/**
+ * Where a version of a file is read from: a URL (a server's signed one; its own download route goes with `headers`,
+ * the token, which never goes anywhere else) or a file on this machine (the store's own bytes: read only, copied out,
+ * never handed out to change).
+ */
+export interface FileSource {
+  id: string;
+  /** The area it lives in ('' = the House) and its path there. */
+  area: string;
+  path: string;
+  v: number;
+  size: number;
+  sha256: string;
+  url?: string;
+  headers?: Record<string, string>;
+  file?: string;
+}
+
+/** One file of a push: where it is on this disk, its path in the area, its bytes, and the version it replaces. */
+export interface PushFileInput {
+  file: string;
+  path: string;
+  size: number;
+  sha256: string;
+  /** The version of the file at `path` it replaces (null: a new file, refused where the path is taken). */
+  base: number | null;
+}
+
+export interface PushFilesOptions {
+  /** A file changed since its base (or a path taken): refused (409, nothing written), or kept beside it as a copy. */
+  conflict: FileConflictMode;
+  by: string;
+  /** How it came: `lampo` (the default) or an agent's MCP tool. */
+  via?: 'vr' | 'mcp';
+  /** Bytes sent so far of all of it (a server; the store on this machine takes them in one go). */
+  onProgress?: (sent: number, total: number) => void;
+  /** An upload an earlier push left unfinished goes on. */
+  onResume?: (path: string) => void;
+  signal?: AbortSignal;
+}
+
+/** What a push did: each commit (one change of the area per FILE_LIMITS.batch files), and the bytes that moved. */
+export interface PushFilesResult {
+  commits: FileCommitAnswer[];
+  /** Bytes sent (a server), or copied in (the store on this machine). */
+  sent: number;
+  /** Files whose bytes the workspace held already: nothing moved for them. */
+  held: number;
+}
+
+/** A push refused because files changed since the versions it was based on (or their paths are taken): nothing written. */
+export class FilesConflict extends Error {
+  conflicts: FileConflict[];
+  constructor(message: string, conflicts: FileConflict[]) {
+    super(message);
+    this.conflicts = conflicts;
+  }
+}
+
 export interface PushResult {
   review: Review;
   created: boolean;
@@ -300,6 +379,19 @@ export interface Backend {
   footageSheet(ids: string[], out?: string): Promise<{ file: string }>;
   /** How far the workspace's footage index is. */
   footageStatus(): Promise<FootageStatus>;
+  /** Project files (docs/files.md): the tree in short for a folder ('' = the House) — its areas, deepest first. */
+  filesSummary(folder: string): Promise<FilesSummary>;
+  /** A page of the files that apply in a folder ('' = the House). Unknown folder: an error that says so. */
+  listFiles(folder: string, o?: FileListOptions): Promise<FilesListing>;
+  /** Where to read files' bytes (their current version, or `v`): ids that are gone or not kept come back as `missing`. */
+  fileSources(ids: string[], v?: number): Promise<{ sources: FileSource[]; missing: string[] }>;
+  /**
+   * Files on this disk into a folder's files ('' = the House), each a new file or the next version of its base: the
+   * bytes first (those the workspace holds already never move; a server's upload that broke off goes on where it
+   * stopped), then one change of the area per FILE_LIMITS.batch files. A file changed since its base: FilesConflict
+   * (that change is refused whole) unless `conflict: 'copy'`.
+   */
+  pushFiles(folder: string, files: PushFileInput[], o: PushFilesOptions): Promise<PushFilesResult>;
   /** Turns footage search on or off for the workspace (a hosted server lets owners and admins). */
   setFootage(on: boolean, by: string): Promise<FootageStatus>;
   /**

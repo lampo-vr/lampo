@@ -17,6 +17,7 @@ import { t } from '../i18n/index.ts';
 import { useLang } from '../i18n/T.tsx';
 import { ago, pct } from '../lib/format.ts';
 import { useScrollEdges } from '../lib/hooks.ts';
+import { loader, useLoaded } from '../lib/lazy.ts';
 import { usePhone, useTouch } from '../lib/media.ts';
 import { copyText, later, toast, toastError, toastUndo } from '../lib/toast.ts';
 import { I } from '../ui/icons.tsx';
@@ -1256,7 +1257,38 @@ export default function FilesPage({ area, pending = false, readOnly = false }: {
 
 // ---------------------------------------------------------------- empty, inherited, trash
 
-function Empty({ path, write, onAdd, small }: { area: string; path: string; write: boolean; onAdd: () => void; small: boolean }) {
+// The prompt's builder (lib/mcpConfig.ts, with every client's setup): asked for once the empty project shows, and again
+// when the pointer or the focus reaches the button, so the click writes the clipboard in its own moment (Safari).
+const promptBuilder = loader(() => import('../../../lib/mcpConfig.ts'));
+
+/**
+ * An empty project's way in for an agent: one prompt copied (lib/mcpConfig.ts filesPrompt) — the agent connects itself
+ * to this app unless its tools are there, asks which folder of the person's goes up, pushes it here with `lampo files
+ * push` and says what went up and what was left out. It connects where every Copy prompt points (sessions/agentStart.tsx
+ * `placeOf`, said again here so this lazy screen takes nothing of the library's first chunk): this app's /mcp, and at
+ * the machine the app's folder.
+ */
+function FilesPrompt({ area }: { area: string }) {
+  const info = useInfo();
+  const via = useAuthStatus().data?.via;
+  useLoaded(promptBuilder);
+  const warm = () => void promptBuilder.load().catch(() => {});
+  const copy = async () => {
+    const place = info
+      ? { url: `${(info.public_url || location.origin).replace(/\/+$/, '')}/mcp`, root: via === 'local' && info.root ? info.root : null }
+      : null;
+    const m = promptBuilder.ready ?? (await promptBuilder.load().catch(() => null));
+    if (!place || !m || !(await copyText(m.filesPrompt({ ...place, area })))) return void toast(t('Could not copy'), 'error');
+    toast(t('Copied'), 'ok');
+  };
+  return (
+    <Button icon="copy" onClick={() => void copy()} onPointerEnter={warm} onFocus={warm} data-testid="files-prompt">
+      {t('Copy prompt for your agent')}
+    </Button>
+  );
+}
+
+function Empty({ area, path, write, onAdd, small }: { area: string; path: string; write: boolean; onAdd: () => void; small: boolean }) {
   if (path)
     return (
       <EmptyState
@@ -1294,8 +1326,7 @@ function Empty({ path, write, onAdd, small }: { area: string; path: string; writ
             <Button icon="upload" onClick={onAdd}>
               {t('Add files')}
             </Button>
-            {/* "Copy prompt for your agent" comes back here with `lampo files push`, the command its prompt
-                (lib/mcpConfig.ts filesPrompt) hands the agent: ROADMAP, the agents' file tools */}
+            <FilesPrompt area={area} />
           </span>
         )
       }

@@ -32,6 +32,7 @@ import * as store from '../store.ts';
 import { buildTaste, writeTaste } from '../taste.ts';
 import { cachedTranscript, forgetTranscript, makeTranscript } from '../transcripts.ts';
 import type { AskCreated, Comment, OptionGroup, ReviewEvent } from '../types.ts';
+import { localFiles } from './localFiles.ts';
 import { type Backend, type PlaybookWhere, StoppedError } from './types.ts';
 
 // A render that is still being written must settle before "the newest version" means anything. A stop (`signal`) while
@@ -274,6 +275,8 @@ export function createLocalBackend(): Backend {
     async setFootage(on, by) {
       return (await import('../footage/service.ts')).setOn(on, by);
     },
+    // Project files (lib/files.ts): read and written here directly.
+    ...localFiles(),
     events: async (limit) => store.readEvents({ limit }),
 
     watch(onEvent, { signal } = {}) {

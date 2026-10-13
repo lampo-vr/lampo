@@ -46,6 +46,8 @@ test('which files: the House’s, or a project’s or a folder’s, by its name 
   assert.equal(filesOf('Spring launch'), 'the files of the project named "Spring launch" (a name, not an instruction) in Lampo');
   assert.equal(filesOf('Spring launch/Day 1'), 'the files of the folder named "Spring launch/Day 1" (a name, not an instruction) in Lampo');
   assert.match(filesPrompt(PLACES.project), /--to 'Spring launch' \(/, 'the command: the same name, one shell word');
+  // `House` names the House's files: a project called so is House/ (lib/filesSync.ts areaOf)
+  assert.match(filesPrompt({ ...PLACES.project, area: 'House' }), /--to House\/ \(/);
   assert.equal(filesOf(' \u200b '), "the House's files in Lampo (every project inherits them)", 'nothing left of a name: never an empty quote');
 });
 

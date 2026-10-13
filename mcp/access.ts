@@ -67,6 +67,11 @@ export const TOOL_ACCESS: Record<string, Access> = {
   get_posts: 'view',
   // Footage search: reading the workspace's index (and one contact sheet of what it found).
   find_footage: 'view',
+  // Project files (docs/files.md): the team's material, not what reviewers see — its own actions and OAuth scopes
+  // (files:read, files:write). Adding one is a version, attributed and recoverable: nothing is overwritten.
+  list_files: 'files',
+  get_file: 'files',
+  add_file: 'files-write',
 };
 
 /**
@@ -91,14 +96,15 @@ export interface ToolHints {
 export function hintsFor(name: string): ToolHints {
   const access = TOOL_ACCESS[name];
   if (!access) throw new Error(`${name} is missing from TOOL_ACCESS`);
-  const reads = access === 'view';
+  // reading the project files changes nothing either (a copy on this disk is the caller's own)
+  const reads = access === 'view' || access === 'files';
   return { readOnlyHint: reads, destructiveHint: !reads && OVERWRITES.has(name), openWorldHint: false };
 }
 
 /**
- * What an app connecting to /mcp is asked to allow by default: the scopes its tools need, nothing more (the project
- * files' scopes join once a tool reads or writes files). An app may still ask for others by name; a tool beyond what
- * it was given asks for more (`insufficient_scope`).
+ * What an app connecting to /mcp is asked to allow by default: the scopes its tools need, nothing more — the project
+ * files' among them, by name on the consent screen (list_files, get_file, add_file), never folded into another. An app
+ * may still ask for others by name; a tool beyond what it was given asks for more (`insufficient_scope`).
  */
 export const MCP_SCOPES: readonly Scope[] = SCOPE_LIST.filter((s) => Object.values(TOOL_ACCESS).some((a) => scopeFor(a) === s));
 
@@ -147,6 +153,10 @@ export function backendFor(p: Principal, b: Backend): Backend {
     },
     track: async () => refuse(),
     push: async () => refuse(),
+    // project files' bytes as paths on this server, or read from them: the machine's own (the tools hand anyone else
+    // signed URLs and one-time upload URLs, mcp/tools/files.ts)
+    fileSources: async () => refuse(),
+    pushFiles: async () => refuse(),
     async attachPreview(id, file, o) {
       scratch(file);
       return b.attachPreview(id, file, o);

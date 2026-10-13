@@ -41,6 +41,7 @@ import type {
   Version,
 } from '../types.ts';
 import type { Credentials } from './credentials.ts';
+import { remoteFiles } from './remoteFiles.ts';
 import { type Backend, type PlaybookWhere, type PushResult, StoppedError } from './types.ts';
 
 // Exported by tus-js-client's Node build, missing from its type declarations.
@@ -53,9 +54,12 @@ const whereBody = (w: PlaybookWhere) => (w.video ? { video: w.video } : { folder
 
 export class RemoteError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  /** The server's answer as it said it (JSON), when it said more than its sentence (a conflict's files). */
+  body?: Record<string, unknown>;
+  constructor(status: number, message: string, body?: Record<string, unknown>) {
     super(message);
     this.status = status;
+    if (body) this.body = body;
   }
 }
 
@@ -78,14 +82,16 @@ export function createApi(c: Credentials) {
     const text = await res.text();
     if (!res.ok) {
       let msg = text.slice(0, 300);
+      let said: Record<string, unknown> | undefined;
       try {
         const j = JSON.parse(text) as { error?: string; next?: string };
         msg = j.error || msg;
         // what to do instead, when the server says (a post drafted before final: the stage's next step)
         if (j.next) msg = `${msg} (next: ${j.next})`;
+        if (j && typeof j === 'object' && !Array.isArray(j)) said = j as Record<string, unknown>;
       } catch {}
       if (res.status === 401) msg = `${msg} (${base}: the token was rejected, run lampo login again)`;
-      throw new RemoteError(res.status, msg);
+      throw new RemoteError(res.status, msg, said);
     }
     const type = res.headers.get('content-type') || '';
     return (type.includes('json') ? JSON.parse(text) : text) as T;
@@ -100,7 +106,7 @@ export function createApi(c: Credentials) {
   }
   return { base, auth, call, download, get: <T>(u: string) => call<T>('GET', u) };
 }
-type Api = ReturnType<typeof createApi>;
+export type Api = ReturnType<typeof createApi>;
 
 const enc = encodeURIComponent;
 /** The files a question sends inline at most, together (raw bytes): as base64 with the rest of it, under 26 MB of JSON. */
@@ -484,6 +490,8 @@ export function createRemoteBackend(c: Credentials, { cacheRoot }: { cacheRoot: 
     },
     footageStatus: () => api.get<FootageStatus>('/api/footage/status'),
     setFootage: (on, by) => api.call<FootageStatus>('PUT', '/api/footage/settings', { on, by }),
+    // Project files (server/routes/files.ts): read through the API, bytes over signed URLs and resumable tus uploads.
+    ...remoteFiles(api, cacheRoot),
 
     async askView(id) {
       try {

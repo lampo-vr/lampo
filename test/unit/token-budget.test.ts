@@ -15,8 +15,9 @@ import { FFMPEG, isolatedEnv, makeVideo, ROOT, vr } from '../lib/helpers.ts';
 
 const BUDGET = {
   /** Every tool's name, description and input schema: on every turn of the agent's conversation (5250 until publishing's
-   * draft_post and get_posts, 5550 until footage search's find_footage: bench/tokens/README.md). */
-  toolList: 5850,
+   * draft_post and get_posts, 5550 until footage search's find_footage, 5850 until the file tools list_files, get_file
+   * and add_file, measured 6115: bench/tokens/README.md). */
+  toolList: 6250,
   /** The same for VR_MCP_TOOLS=lean (the review loop only). */
   leanToolList: 3200,
   /** get_open_notes on the 12-note review, text and pictures (the notes with a drawing, cropped). */

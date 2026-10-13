@@ -187,6 +187,18 @@ format stays backwards compatible throughout.
   them for a look (CONTRIBUTING.md).
 
 ### Added
+- **Your agent works from the team's files.** `lampo files pull <project> --to <dir>` fetches a project's footage,
+  music, fonts and project files (with what it inherits from the House) onto any machine — only what changed, going on
+  where a download broke off, never over a file changed there — and *Copy for an agent* in the Files tab now hands out
+  a line that runs as it is. `lampo files push` saves files and folders back as versions (resumable, nothing sent
+  twice), `lampo files status` says what changed on either side, `lampo files ls` what is there. Over MCP the same is
+  `list_files`, `get_file` (a download link, never the file through the conversation) and `add_file` (a one-time
+  upload link). Nothing is ever overwritten: a file someone changed meanwhile is refused with who changed it, and kept
+  beside it or made the next version only when you say so. A pull writes only inside the folder it was given and never
+  through a link there; a push takes only what it was named, never a folder's hidden files (like `.env`) or links.
+  OAuth apps connecting to Lampo are asked for the project files' permissions by name.
+- An empty project's Files offer *Copy prompt for your agent*: your agent connects to Lampo, asks which folder of yours
+  goes up, puts it there with `lampo files push` and tells you what went up.
 - **Lampo as a plugin** for Claude Code, claude.ai, Cowork, ChatGPT and Codex: Lampo Cloud's connector and the Lampo
   skill in one install, so your agent knows the review loop from its first call. In Claude Code:
   `claude plugin install lampo --marketplace lampo-vr/lampo`; elsewhere from the plugin directories once Lampo is

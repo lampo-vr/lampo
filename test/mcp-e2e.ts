@@ -118,12 +118,14 @@ try {
   const { tools } = await client.listTools();
   const names = tools.map((t) => t.name).sort();
   assert.deepEqual(names, [
+    'add_file',
     'add_note',
     'ask_options',
     'attach_preview',
     'attach_reference',
     'draft_post',
     'find_footage',
+    'get_file',
     'get_frame',
     'get_note',
     'get_open_notes',
@@ -132,6 +134,7 @@ try {
     'get_skill',
     'get_taste',
     'get_transcript',
+    'list_files',
     'list_folders',
     'list_videos',
     'mark_fixed',

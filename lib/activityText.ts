@@ -52,6 +52,12 @@ export const ACTIVITY_KEYS = [
   'Drafted a post',
   'Reading the posts',
   'Looking for footage',
+  // project files (`lampo files`, list_files / get_file / add_file)
+  'Looking through the files',
+  'Fetching files',
+  'Fetching {name}',
+  'Saving files',
+  'Saving {name}',
   'Rendering… {mb} MB, still growing',
   'Rendering a new version',
   // how a render through `lampo render` ended (lib/render/job.ts)
@@ -159,6 +165,16 @@ export function toolActivity(tool: string, args: Args = {}): ActivityGuess | nul
       return guess('read', words('Reading the transcript'), { video });
     case 'find_footage':
       return guess('read', words('Looking for footage', undefined, str(args, 'query')));
+    case 'list_files':
+      return guess('read', words('Looking through the files'), { video });
+    case 'get_file': {
+      const p = str(args, 'path');
+      return guess('read', p ? words('Fetching {name}', { name: excerpt(p.slice(p.lastIndexOf('/') + 1), 40) }) : words('Fetching files'), { video });
+    }
+    case 'add_file': {
+      const p = str(args, 'path');
+      return guess('tool', p ? words('Saving {name}', { name: excerpt(p.slice(p.lastIndexOf('/') + 1), 40) }) : words('Saving files'), { video });
+    }
     case 'get_taste':
       return guess('playbook', words('Reading your taste'), { video });
     case 'get_playbook':
@@ -232,6 +248,14 @@ export function cliActivity(cmd: string, positional: string[] = [], flags: Args 
       return guess('read', words('Looking at the marked frames'), { video: first });
     case 'transcript':
       return guess('read', words('Reading the transcript'), { video: first });
+    case 'files':
+      return first === 'pull'
+        ? guess('read', words('Fetching files'))
+        : first === 'push'
+          ? guess('tool', words('Saving files'))
+          : first === 'ls' || first === 'status'
+            ? guess('read', words('Looking through the files'))
+            : null;
     case 'footage':
       return first === 'find' || first === 'sheet'
         ? guess('read', words('Looking for footage', undefined, first === 'find' ? (positional[1] ?? null) : null))

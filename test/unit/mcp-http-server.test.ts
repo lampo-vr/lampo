@@ -54,7 +54,7 @@ test('no token: 401 with a Bearer challenge that points at the OAuth metadata; a
   assert.equal(none.status, 401);
   assert.equal(
     none.headers.get('www-authenticate'),
-    `Bearer realm="video-review", resource_metadata="${PUBLIC}/.well-known/oauth-protected-resource/mcp", scope="review:read review:comment review:act post:draft"`,
+    `Bearer realm="video-review", resource_metadata="${PUBLIC}/.well-known/oauth-protected-resource/mcp", scope="review:read review:comment review:act post:draft files:read files:write"`,
     'clients can discover the OAuth sign-in from the challenge (RFC 9728)',
   );
   const wrong = await fetch(`${base}/mcp`, { method: 'POST', headers: { 'content-type': 'application/json', Authorization: 'Bearer vr_forged' }, body });

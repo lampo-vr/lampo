@@ -3,7 +3,7 @@
 // the server; the SDK calls it per HTTP request (2026-07-28 is stateless) or once per stdio connection.
 //   access.ts   who may call what (TOOL_ACCESS, the permission table)
 //   toolkit.ts  the options and the shared tool wrapper (access check, errors as results, authorship)
-//   tools/      the tools: read.ts, notes.ts, videos.ts, footage.ts; feedback.ts (wait_for_feedback), app.ts (the MCP App card)
+//   tools/      the tools: read.ts, notes.ts, videos.ts, footage.ts, files.ts; feedback.ts (wait_for_feedback), app.ts (the MCP App card)
 //   format.ts   what the tools say: note lines, headers, downscaled frames
 //   follow.ts   change notifications over stdio (over HTTP, server/routes/mcp.ts sends them from the app's feed)
 import fs from 'node:fs';
@@ -24,6 +24,7 @@ import { INBOX_URI, markedPicture, OLD_INBOX_URI, preview, reviewUri, spotPictur
 import { instructionsFor, WATCH_PROMPT, watchPromptText, wayOf } from './loop.ts';
 import { createToolKit, type ReviewServerOptions } from './toolkit.ts';
 import { registerAskTools } from './tools/asks.ts';
+import { registerFileTools } from './tools/files.ts';
 import { registerFootageTools } from './tools/footage.ts';
 import { registerNoteTools } from './tools/notes.ts';
 import { registerPlaybookTools } from './tools/playbooks.ts';
@@ -68,6 +69,7 @@ export function createReviewServer(options: ReviewServerOptions): McpServer {
   registerPlaybookTools(kit);
   registerPostTools(kit);
   registerFootageTools(kit);
+  registerFileTools(kit);
   if (kit.offers('wait_for_feedback'))
     registerFeedback(server, {
       backend: b,

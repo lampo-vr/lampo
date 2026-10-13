@@ -20,6 +20,7 @@ import {
   blobKey,
   bytesToCount,
   bytesToRestore,
+  type CommitItem,
   checkVersionsRoom,
   commitFiles,
   DIR_ID,
@@ -66,14 +67,27 @@ import { currentWorkspace, DEFAULT_WORKSPACE, inWorkspace, WORKSPACE_ID } from '
 import { countedGrab } from '../../lib/shots.ts';
 import { filesStorage, SIGNED_URL_SECONDS } from '../../lib/storage/index.ts';
 import { openMedia, sealMedia } from '../../lib/storage/mediaHost.ts';
-import type { AgentKind, FileEntry, FilesMedia, FileUploadAnswer, FileUploadSlot, FileUrl, FileUrls, FileVersion, TrashedFile } from '../../lib/types.ts';
+import type {
+  AgentKind,
+  FileCommitAnswer,
+  FileConflictMode,
+  FileEntry,
+  FilesMedia,
+  FileUploadAnswer,
+  FileUploadSlot,
+  FileUrl,
+  FileUrls,
+  FileVersion,
+  Role,
+  TrashedFile,
+} from '../../lib/types.ts';
 import * as workspaces from '../../lib/workspaces.ts';
 import type { ServerContext } from '../context.ts';
 import { mediaHostOf, requestHost } from '../guard.ts';
 import { body, fail, query, router, sendInternal } from '../http.ts';
 import { streamFile } from '../playback.ts';
 import { freeBytes } from '../ready.ts';
-import { issuerOf, issuerStill, type TicketGuard, teamGuard } from '../uploadTickets.ts';
+import { issuerOf, issuerStill, type TicketGuard, type TicketIssuer, teamGuard } from '../uploadTickets.ts';
 import { grabsOf } from './media.ts';
 
 const Sha = z.string().regex(/^[0-9a-f]{64}$/, 'a sha256: 64 lowercase hex');
@@ -219,6 +233,212 @@ const shownAs = (type: string): string | null => (inlineType(type) ? (type === '
 
 const urlName = (name: string): string => encodeURIComponent(name.replace(/[/\\\0]/g, '_').slice(0, 200) || 'file');
 
+/** Who writes: the account, the agent it says it is (only a role that may hand work to agents: `actor`'s rule), how. */
+export function fileStamp(
+  a: { name: string; id?: string; role: string; via: TicketIssuer['via'] },
+  b: { agent?: string; agent_kind?: AgentKind; via?: 'vr' | 'mcp'; machine?: string },
+): FileStampIn {
+  const named = b.agent ? cleanAgentName(b.agent.replace(/^agent:/, '')) : '';
+  const agent = named && can(a.role as Role, 'agents') ? named : undefined;
+  const via = b.via ?? (a.via === 'token' ? 'vr' : 'browser');
+  const kind = b.agent_kind ?? (agent ? (via === 'mcp' ? 'mcp' : a.via === 'token' ? 'cli' : undefined) : undefined);
+  const machine = b.machine && a.via !== 'cookie' ? cleanAgentName(b.machine, 60) : '';
+  return {
+    by: a.name,
+    ...(a.id ? { by_id: a.id } : {}),
+    ...(agent ? { agent } : {}),
+    ...(agent && kind ? { agent_kind: kind } : {}),
+    via,
+    ...(machine ? { machine } : {}),
+  };
+}
+
+/** The area of a folder someone names for a write: there (404 otherwise), not archived (423), made when new. */
+function writeArea(raw: string | null | undefined): AreaRef {
+  const folder = namedFolder(raw);
+  checkNotArchived(folder);
+  return areaRefOf(folder, { create: true }) as AreaRef;
+}
+
+/** An area's change, heard live by the team's streams (never a reviewer's: they don't see files). */
+const toldOf = (ctx: ServerContext) => (area: string) => ctx.broadcast('files', { area, rev: readAreaRev(area) }, 'files');
+
+/**
+ * Where a version of a file is fetched from, living `seconds`: the bucket's own signed URL (files in a bucket), else
+ * the media host's (it asks again, on every request, whether `issuer` may still read files), else null (the app
+ * streams it, to whoever is signed in).
+ */
+function urlFor(
+  ctx: ServerContext,
+  issuer: TicketIssuer | null,
+  version: FileVersion,
+  name: string,
+  type: string,
+  seconds: number,
+  inline: boolean,
+): string | null {
+  const mediaOrigin = ctx.hosted ? ctx.cfg.media_origin : null;
+  const key = blobKey(version.hash);
+  const s = filesStorage();
+  // A picture's preview comes from this app, as posters do: pictures stay on the app host (the page's img-src), and
+  // the media host is there to keep video off the app host's front, not pictures
+  if (inline && shownAs(type)?.startsWith('image/')) return null;
+  if (s.kind !== 'local' && !inline) {
+    const u = s.url(key, seconds, name);
+    if (u && !(mediaOrigin && u.startsWith(`${mediaOrigin}/`))) return u;
+  }
+  if (!mediaOrigin) return null;
+  if (!issuer) throw fail(401, 'please sign in');
+  const as = inline ? shownAs(type) : null;
+  const claims = { w: currentWorkspace(), k: version.hash, i: issuer, ...(as ? { t: as } : {}) };
+  return `${mediaOrigin}/media/f/${sealMedia({ f: claims, n: name }, seconds)}/${urlName(name)}`;
+}
+
+/**
+ * Download URLs for files of the workspace (their current version, or `v`): a signed one where the server has one (a
+ * bucket's, the media host's), else its own download route on `base` (it asks for the caller's credentials). An API
+ * token's (and an OAuth app's, over /mcp) live an hour, a person's six. Ids not found, trashed or without bytes come back
+ * as `missing`.
+ */
+export function signedFileUrls(
+  ctx: ServerContext,
+  issuer: TicketIssuer | null,
+  ids: readonly string[],
+  v: number | undefined,
+  base: string,
+  token: boolean,
+): FileUrls {
+  const seconds = token ? URL_SECONDS.token : URL_SECONDS.person;
+  const urls: FileUrl[] = [];
+  const missing: string[] = [];
+  for (const id of [...new Set(ids)]) {
+    const found = FILE_ID.test(id) ? findFile(id) : null;
+    const version = found && !found.trashed ? versionOf(found.entry, v) : null;
+    const blob = version ? heldBlob(version.hash) : null;
+    if (!found || !version || !blob) {
+      missing.push(id);
+      continue;
+    }
+    const e = found.entry;
+    const url = urlFor(ctx, issuer, version, nameOf(e.path), blob.type, seconds, false) ?? `${base}/api/files/${e.id}/download?v=${version.v}`;
+    const expires = new Date(Date.now() + seconds * 1000).toISOString();
+    urls.push({ id: e.id, area: scopeOf(found.area), path: e.path, v: version.v, size: version.size, sha256: version.hash, url, expires });
+  }
+  return { urls, missing };
+}
+
+/** A push as `POST /api/files/uploads` takes it (and MCP add_file over HTTP). */
+export interface PushOffer {
+  folder?: string | null;
+  files: { path: string; size: number; sha256?: string; base?: number | null }[];
+  commit?: boolean;
+  conflict?: FileConflictMode;
+}
+
+/**
+ * A push: the version check (409 before any byte moves), the disk and the plan for all of it at once (507, 402 with
+ * the limit sheet's numbers), then per file nothing to send (its bytes are here: commit it) or a one-time ticket — one
+ * plain PUT to its URL, or tus with the ticket. `who`: the writer, the workspace, who asked (the ticket asks again
+ * whether they may still write files), the address the URLs start with, and whether an agent reads the refusals.
+ */
+export async function offerPush(
+  ctx: ServerContext,
+  who: { stamp: FileStampIn; ws: string; issuer: TicketIssuer | null; base: string; agent?: boolean },
+  b: PushOffer,
+): Promise<FileUploadAnswer> {
+  const items = b.files.map((f, i) => {
+    try {
+      return { ...f, path: cleanFilePath(f.path) };
+    } catch (e) {
+      throw fail(400, `files.${i}: ${(e as Error).message}`);
+    }
+  });
+  const seen = new Set<string>();
+  for (const it of items) {
+    if (seen.has(it.path.toLowerCase())) throw fail(400, `${it.path} is named twice`);
+    seen.add(it.path.toLowerCase());
+  }
+  const area = writeArea(b.folder);
+  const conflict = b.conflict ?? 'refuse';
+  if (conflict === 'refuse') {
+    const conflicts = pushConflicts(area.scope, items);
+    if (conflicts.length) throw new FileConflictError(conflicts);
+  }
+  // a push saving as a copy is never refused for the day's versions; any other, before any byte moves
+  if (conflict !== 'copy') checkVersionsRoom(area.scope, items, who.stamp);
+  // bytes the workspace holds already: nothing to send
+  const held = heldBlobs(items.flatMap((i) => (i.sha256 ? [i.sha256] : [])));
+  const stored = (i: (typeof items)[number]) => !!i.sha256 && held.get(i.sha256)?.size === i.size;
+  const sending = items.filter((i) => !stored(i));
+  const bytes = sending.reduce((n, i) => n + i.size, 0);
+  const free = freeBytes(path.join(CACHE, 'uploads'));
+  if (bytes && free !== null && bytes > free - (ctx.cfg.min_free_bytes ?? 0)) throw fail(507, 'not enough disk space on the server for these files');
+  await capFor(ctx, who.ws);
+  const counted = bytes + bytesToCount(items.filter(stored).map((i) => ({ sha256: i.sha256 as string, size: i.size })));
+  if (counted) await oneAtATime(who.ws, () => ctx.extension.check(who.ws, 'upload', counted));
+  // only a push the plan took: what a file names now is kept for its commit (an upload's bytes keep their first day)
+  touchBlobs(items.filter(stored).map((i) => i.sha256 as string));
+  const team = teamGuard(who.issuer, 'files-write');
+  // a ticket per file of a push: more open at once than other upload URLs, still bounded per account and workspace
+  const guard: TicketGuard = {
+    ...team,
+    ...(who.issuer ? { owner: `files:user:${who.issuer.user}` } : {}),
+    pool: 'files',
+    limits: { owner: FILE_LIMITS.batch, pool: FILE_LIMITS.batch * 5 },
+    ...(who.agent ? { agent: true } : {}),
+  };
+  const uploads: FileUploadSlot[] = [];
+  try {
+    for (const it of items) {
+      if (stored(it)) {
+        uploads.push({ path: it.path, stored: true });
+        continue;
+      }
+      const t = ctx.uploadTickets.issueFile(
+        {
+          area: area.id,
+          folder: area.scope,
+          path: it.path,
+          size: it.size,
+          ...(it.sha256 ? { sha256: it.sha256 } : {}),
+          base: it.base ?? null,
+          commit: b.commit ?? true,
+          conflict,
+          stamp: who.stamp,
+        },
+        who.stamp.by,
+        who.base,
+        guard,
+      );
+      uploads.push({ path: it.path, url: t.url, ticket: t.ticket, expires: t.expires });
+    }
+  } catch (e) {
+    for (const u of uploads) if (u.url) ctx.uploadTickets.drop(u.url);
+    throw e;
+  }
+  return { folder: area.scope, uploads, tus: `${who.base}/api/uploads` };
+}
+
+/** Files whose bytes the workspace holds, as one change of an area: the version check again (409), the plan for what starts counting. */
+export async function commitPush(
+  ctx: ServerContext,
+  ws: string,
+  b: { folder?: string | null; add: CommitItem[]; conflict?: FileConflictMode },
+  stamp: FileStampIn,
+): Promise<FileCommitAnswer> {
+  const area = writeArea(b.folder);
+  // the plan's check and the change, one at a time per workspace: two at once can't both pass on the same usage
+  const out = await oneAtATime(ws, async () => {
+    await capFor(ctx, ws);
+    const counted = bytesToCount(b.add);
+    if (counted) await ctx.extension.check(ws, 'upload', counted);
+    return commitFiles(area.id, b.add, { conflict: b.conflict ?? 'refuse', stamp });
+  });
+  await keepSafetyNet(ctx, ws);
+  toldOf(ctx)(out.folder);
+  return out;
+}
+
 export function fileRoutes(ctx: ServerContext): Router {
   const r = router();
   const mediaOrigin = ctx.hosted ? ctx.cfg.media_origin : null;
@@ -226,56 +446,14 @@ export function fileRoutes(ctx: ServerContext): Router {
   const appOrigin = ctx.cfg.public_url ? new URL(ctx.cfg.public_url).origin : null;
   const baseOf = (req: Request) => ctx.cfg.public_url || `${req.protocol}://${req.get('host')}`;
 
-  /** Who writes: the account, the agent it says it is (who may hand work to agents only: `actor`'s rule), how. */
+  /** Who writes: the account, the agent it says it is, how (fileStamp). */
   function stampOf(req: Request, b: { agent?: string; agent_kind?: AgentKind; via?: 'vr' | 'mcp'; machine?: string }): FileStampIn {
     const a = req.auth;
     if (!a) throw fail(401, 'please sign in');
-    const named = b.agent ? cleanAgentName(b.agent.replace(/^agent:/, '')) : '';
-    const agent = named && can(a.role, 'agents') ? named : undefined;
-    const via = b.via ?? (a.via === 'token' ? 'vr' : 'browser');
-    const kind = b.agent_kind ?? (agent ? (via === 'mcp' ? 'mcp' : a.via === 'token' ? 'cli' : undefined) : undefined);
-    const machine = b.machine && a.via !== 'cookie' ? cleanAgentName(b.machine, 60) : '';
-    return {
-      by: a.name,
-      ...(a.user?.id ? { by_id: a.user.id } : {}),
-      ...(agent ? { agent } : {}),
-      ...(agent && kind ? { agent_kind: kind } : {}),
-      via,
-      ...(machine ? { machine } : {}),
-    };
+    return fileStamp({ name: a.name, ...(a.user?.id ? { id: a.user.id } : {}), role: a.role, via: a.via }, b);
   }
 
-  /** The area of a folder someone names for a write: there (404 otherwise), not archived (423), made when new. */
-  function writeArea(raw: string | null | undefined): AreaRef {
-    const folder = namedFolder(raw);
-    checkNotArchived(folder);
-    return areaRefOf(folder, { create: true }) as AreaRef;
-  }
-
-  /** An area's change, heard live by the team's streams (never a reviewer's: they don't see files). */
-  const told = (area: string) => ctx.broadcast('files', { area, rev: readAreaRev(area) }, 'files');
-
-  /**
-   * Where a version of a file is fetched from, living `seconds`: the bucket's own signed URL (files in a bucket), else
-   * the media host's (it asks again who it was handed to), else null (the app streams it, to whoever is signed in).
-   */
-  function urlFor(req: Request, version: FileVersion, name: string, type: string, seconds: number, inline: boolean): string | null {
-    const key = blobKey(version.hash);
-    const s = filesStorage();
-    // A picture's preview comes from this app, as posters do: pictures stay on the app host (the page's img-src), and
-    // the media host is there to keep video off the app host's front, not pictures
-    if (inline && shownAs(type)?.startsWith('image/')) return null;
-    if (s.kind !== 'local' && !inline) {
-      const u = s.url(key, seconds, name);
-      if (u && !(mediaOrigin && u.startsWith(`${mediaOrigin}/`))) return u;
-    }
-    if (!mediaOrigin) return null;
-    const issuer = issuerOf(req);
-    if (!issuer) throw fail(401, 'please sign in');
-    const as = inline ? shownAs(type) : null;
-    const claims = { w: currentWorkspace(), k: version.hash, i: issuer, ...(as ? { t: as } : {}) };
-    return `${mediaOrigin}/media/f/${sealMedia({ f: claims, n: name }, seconds)}/${urlName(name)}`;
-  }
+  const told = toldOf(ctx);
 
   /** The bytes of a version, streamed by this app: ranges (a download picks up where it broke off), HEAD reads nothing. */
   async function sendBytes(req: Request, res: Response, hash: string, name: string, as: string | null): Promise<void> {
@@ -428,7 +606,7 @@ export function fileRoutes(ctx: ServerContext): Router {
       if (!blob) throw fail(410, 'the bytes of this file are gone');
       const name = nameOf(found.entry.path);
       const as = on(q.inline) ? shownAs(blob.type) : null;
-      const url = urlFor(req, version, name, blob.type, SIGNED_URL_SECONDS.download, !!as);
+      const url = urlFor(ctx, issuerOf(req), version, name, blob.type, SIGNED_URL_SECONDS.download, !!as);
       if (url) {
         res.setHeader('Cache-Control', 'no-store');
         return void res.redirect(302, url);
@@ -441,24 +619,9 @@ export function fileRoutes(ctx: ServerContext): Router {
   r.post('/api/files/urls', express.json(), (req, res) =>
     run(() => {
       const b = body(UrlsBody, req);
-      const seconds = req.auth?.via === 'token' ? URL_SECONDS.token : URL_SECONDS.person;
-      const urls: FileUrl[] = [];
-      const missing: string[] = [];
-      for (const id of [...new Set(b.ids)]) {
-        const found = FILE_ID.test(id) ? findFile(id) : null;
-        const version = found && !found.trashed ? versionOf(found.entry, b.v) : null;
-        const blob = version ? heldBlob(version.hash) : null;
-        if (!found || !version || !blob) {
-          missing.push(id);
-          continue;
-        }
-        const e = found.entry;
-        const url = urlFor(req, version, nameOf(e.path), blob.type, seconds, false) ?? `${baseOf(req)}/api/files/${e.id}/download?v=${version.v}`;
-        const expires = new Date(Date.now() + seconds * 1000).toISOString();
-        urls.push({ id: e.id, area: scopeOf(found.area), path: e.path, v: version.v, size: version.size, sha256: version.hash, url, expires });
-      }
+      const out = signedFileUrls(ctx, issuerOf(req), b.ids, b.v, baseOf(req), req.auth?.via === 'token');
       res.setHeader('Cache-Control', 'no-store');
-      res.json({ urls, missing } satisfies FileUrls);
+      res.json(out satisfies FileUrls);
     }),
   );
 
@@ -476,80 +639,10 @@ export function fileRoutes(ctx: ServerContext): Router {
   r.post('/api/files/uploads', express.json({ limit: '2mb' }), (req, res) =>
     run(async () => {
       const b = body(UploadsBody, req);
-      const items = b.files.map((f, i) => {
-        try {
-          return { ...f, path: cleanFilePath(f.path) };
-        } catch (e) {
-          throw fail(400, `files.${i}: ${(e as Error).message}`);
-        }
-      });
-      const seen = new Set<string>();
-      for (const it of items) {
-        if (seen.has(it.path.toLowerCase())) throw fail(400, `${it.path} is named twice`);
-        seen.add(it.path.toLowerCase());
-      }
-      const area = writeArea(b.folder);
-      const conflict = b.conflict ?? 'refuse';
-      if (conflict === 'refuse') {
-        const conflicts = pushConflicts(area.scope, items);
-        if (conflicts.length) throw new FileConflictError(conflicts);
-      }
-      // a push saving as a copy is never refused for the day's versions; any other, before any byte moves
-      if (conflict !== 'copy') checkVersionsRoom(area.scope, items, stampOf(req, b));
-      // bytes the workspace holds already: nothing to send
-      const held = heldBlobs(items.flatMap((i) => (i.sha256 ? [i.sha256] : [])));
-      const stored = (i: (typeof items)[number]) => !!i.sha256 && held.get(i.sha256)?.size === i.size;
-      const sending = items.filter((i) => !stored(i));
-      const bytes = sending.reduce((n, i) => n + i.size, 0);
-      const free = freeBytes(path.join(CACHE, 'uploads'));
-      if (bytes && free !== null && bytes > free - (ctx.cfg.min_free_bytes ?? 0)) throw fail(507, 'not enough disk space on the server for these files');
       const ws = req.auth?.workspace ?? currentWorkspace();
-      await capFor(ctx, ws);
-      const counted = bytes + bytesToCount(items.filter(stored).map((i) => ({ sha256: i.sha256 as string, size: i.size })));
-      if (counted) await oneAtATime(ws, () => ctx.extension.check(ws, 'upload', counted));
-      // only a push the plan took: what a file names now is kept for its commit (an upload's bytes keep their first day)
-      touchBlobs(items.filter(stored).map((i) => i.sha256 as string));
-      const stamp = stampOf(req, b);
-      const issuer = issuerOf(req);
-      const team = teamGuard(issuer, 'files-write');
-      // a ticket per file of a push: more open at once than other upload URLs, still bounded per account and workspace
-      const guard: TicketGuard = {
-        ...team,
-        ...(issuer ? { owner: `files:user:${issuer.user}` } : {}),
-        pool: 'files',
-        limits: { owner: FILE_LIMITS.batch, pool: FILE_LIMITS.batch * 5 },
-      };
-      const uploads: FileUploadSlot[] = [];
-      try {
-        for (const it of items) {
-          if (stored(it)) {
-            uploads.push({ path: it.path, stored: true });
-            continue;
-          }
-          const t = ctx.uploadTickets.issueFile(
-            {
-              area: area.id,
-              folder: area.scope,
-              path: it.path,
-              size: it.size,
-              ...(it.sha256 ? { sha256: it.sha256 } : {}),
-              base: it.base ?? null,
-              commit: b.commit ?? true,
-              conflict,
-              stamp,
-            },
-            stamp.by,
-            baseOf(req),
-            guard,
-          );
-          uploads.push({ path: it.path, url: t.url, ticket: t.ticket, expires: t.expires });
-        }
-      } catch (e) {
-        for (const u of uploads) if (u.url) ctx.uploadTickets.drop(u.url);
-        throw e;
-      }
+      const answer = await offerPush(ctx, { stamp: stampOf(req, b), ws, issuer: issuerOf(req), base: baseOf(req) }, b);
       res.setHeader('Cache-Control', 'no-store');
-      res.json({ folder: area.scope, uploads, tus: `${baseOf(req)}/api/uploads` } satisfies FileUploadAnswer);
+      res.json(answer satisfies FileUploadAnswer);
     }),
   );
 
@@ -557,18 +650,7 @@ export function fileRoutes(ctx: ServerContext): Router {
   r.post('/api/files/commit', express.json({ limit: '2mb' }), (req, res) =>
     run(async () => {
       const b = body(CommitBody, req);
-      const area = writeArea(b.folder);
-      const ws = req.auth?.workspace ?? currentWorkspace();
-      // the plan's check and the change, one at a time per workspace: two at once can't both pass on the same usage
-      const out = await oneAtATime(ws, async () => {
-        await capFor(ctx, ws);
-        const counted = bytesToCount(b.add);
-        if (counted) await ctx.extension.check(ws, 'upload', counted);
-        return commitFiles(area.id, b.add, { conflict: b.conflict ?? 'refuse', stamp: stampOf(req, b) });
-      });
-      await keepSafetyNet(ctx, ws);
-      told(out.folder);
-      res.json(out);
+      res.json(await commitPush(ctx, req.auth?.workspace ?? currentWorkspace(), b, stampOf(req, b)));
     }),
   );
 

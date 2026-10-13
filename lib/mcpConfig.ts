@@ -325,7 +325,8 @@ export const filesOf = (area: string): string => {
  */
 export function filesPrompt({ url, root, area }: FilesPlace): string {
   const name = area ? quotedName(area) : '';
-  const to = name ? shellQuote(name) : 'House';
+  // `House` names the House's files; a project called so is `House/` (lib/filesSync.ts areaOf)
+  const to = name ? shellQuote(name === 'House' ? 'House/' : name) : 'House';
   return `Put a folder of mine into ${filesOf(area)}, with me: footage, music, fonts or project files my team and its agents work from.
 ${connectStep({ url, root }, false)}
 2. Ask me which folder to put up, unless I named one. Read it only: change, move or delete nothing in it. A chat app can't reach my folders: say so.

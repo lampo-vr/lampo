@@ -140,6 +140,12 @@ Acting
   lampo status <video> "rendering v4" [--eta 90] | --clear   show what you are doing on the video's card
   lampo sessions [--for <video>]        the agents you can assign (ranked for a video)
 
+Project files (footage, music, fonts; <area>: a project's or folder's path, or House; docs/files.md)
+  lampo files ls [<area>] [<path>]      what applies there (inherited too), or one folder's files
+  lampo files pull <area> [<glob>…] [--only <glob>]… --to <dir> [--dry-run] [--force]   what changed, into <dir>
+  lampo files push <file|folder>… --to <area> [--path <folder>] [--copy | --replace] [--dry-run]   as versions (folder/: its files)
+  lampo files status [--to <dir>]       what changed here and there since a pull
+
 Hosted server
   lampo login <url> [--expires 90d] [--insecure]   use a Lampo server from now on: you allow it in the browser (over SSH:
                                         open the address it prints elsewhere; plain http to another machine: --insecure)
@@ -201,7 +207,7 @@ interface Args {
 
 const MULTI = new Set(['box', 'arrow', 'choice']);
 /** Options a command takes more than once beyond those (`lampo export --folder A --folder B`). */
-const MULTI_OF: Record<string, string[]> = { export: ['folder'] };
+const MULTI_OF: Record<string, string[]> = { export: ['folder'], files: ['only'] };
 
 function parseArgs(argv: string[], multi: ReadonlySet<string> = MULTI): Args {
   const pos: string[] = [];
@@ -1416,6 +1422,7 @@ const commands: Record<string, Command> = {
   admin: ({ pos, opt }) => admin({ pos, opt }),
   mcp: ({ pos, opt }) => mcpCommand({ pos, opt }),
   render: ({ pos, opt, cmd = [] }, b) => render({ pos, opt, cmd }, b, { out, fail: die, by: author(opt) }),
+  files: async ({ pos, opt }, b) => (await import('./cliFiles.ts')).filesCommand({ pos, opt }, b, { out, fail: die, by: author(opt) }),
 };
 
 async function setStatus(b: Backend, id: string | undefined, status: Comment['status'], opt: Opts): Promise<void> {

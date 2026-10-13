@@ -757,10 +757,11 @@ the person who allowed it, so a reviewer's app can't mark notes fixed, whatever 
 | `files:write` | the above, plus add, replace, rename, move and trash project files (every change a version anyone can bring back) |
 
 The project files have scopes of their own, so an app connected with `review:act` (which uploads renders) never gains
-a project's footage without being asked for it; an app connected before they existed has neither. What `/mcp` asks a
-connecting app for (the `scope` of its 401 challenge, and what an authorization request without a `scope` gets) is
-what its tools need — `review:read review:comment review:act post:draft` — so nobody is asked to allow what no tool
-uses; an app may still name more.
+a project's footage without being asked for it, by name on the consent screen; an app connected before they existed
+has neither, and its client asks again when one of its calls needs them. What `/mcp` asks a connecting app for (the
+`scope` of its 401 challenge, and what an authorization request without a `scope` gets) is what its tools need —
+`review:read review:comment review:act post:draft files:read files:write`, the last two for `list_files`, `get_file` and
+`add_file` — so nobody is asked to allow what no tool uses; an app may still name more.
 
 Apps never check fixes, approve, mark final, edit other people's notes, remove videos, make review links, download
 folders, edit playbooks, publish or administer the server. A call outside the granted scopes gets 403 with an

@@ -602,6 +602,8 @@ anything elsewhere.
 | `show_review` | shows the person a video's review as a card ([above](#the-review-card-mcp-app)) |
 | `get_posts` | where the posts of final videos stand: drafted, scheduled, posted with the link, failed with the platform's reason ([publishing.md](publishing.md)) |
 | `find_footage` | B-roll from the workspace's videos: shots with exact in and out frames, one line each, and on request one labelled contact sheet ([footage.md](footage.md)) |
+| `list_files` | the team's project files (footage, music, fonts, project files) of a project or folder, its inherited ones too: a summary, or one line per file ([files.md](files.md#agents)) |
+| `get_file` | one project file: over HTTP a signed download URL, never a path on the server; on the machine a copy of its own |
 
 ### Answering and acting
 
@@ -621,6 +623,7 @@ anything elsewhere.
 | `move_video` | files a video into a folder (`""`: no project) |
 | `set_status` | optional: a status on the video's card for a long step ("rendering v4") |
 | `draft_post` | after Final: drafts the post of the final version for YouTube, Instagram or Facebook. A person publishes it; no tool does ([publishing.md](publishing.md)) |
+| `add_file` | saves a project file as a new file or its next version: over HTTP a one-time URL for one `PUT`, on the machine from a file there. Every version is kept |
 
 ### Parameters
 
@@ -720,6 +723,20 @@ anything elsewhere.
   picture shows, filters in its words read as well ("9:16, slow push-in, ≥ 2 s, no text"); the other fields win over
   the words. One line per shot (`s412 Footage/take_031.mp4 00:20:03–00:23:02 3.0s 9:16 push-in slow · 3.3`), best
   first, six by default; `sheet: true` adds one contact sheet of them. Not in the lean set ([footage.md](footage.md)).
+- **`list_files({folder, path?, query?})`**, **`get_file({id | path + folder, v?})`** and **`add_file({folder, path,
+  base?, file | size})`.** The project files ([files.md](files.md#agents)), with their own rights: `files` to read,
+  `files-write` to add (reviewers have neither; an OAuth app needs `files:read` / `files:write`). `folder` is a project's
+  or folder's path, `"House"` the workspace's own (a project called so: `"House/"`); a video's folder (`video`), a
+  `kind`, a page's `cursor` are accepted, not announced. `list_files` answers the tree in short, or with `path` (a
+  folder inside) or `query` (part of a name) one line per file: `fl_… Music/bed.wav 48.2 MB audio V2 by agent:… (Mia) ·
+  2026-10-13T14:02`, and `· from House` for an inherited one. `get_file` over HTTP answers a signed URL (the media
+  host's, asking again on every request whether the one it was handed to may still read files; a bucket's; an hour for
+  a token) and its `curl -fLo` line, never a path on the server and never the bytes; on the machine a copy of its own
+  in `~/.cache/lampo/files/` (yours to change; the store's bytes are never handed out). `add_file` over HTTP takes the
+  file's `size` (and `sha256` when known: bytes the workspace holds are saved at once, nothing to send) and answers a
+  one-time URL (15 minutes) whose one `PUT` saves it and answers what it became; on the machine `file` is its path
+  there. `base` is the version it replaces; without it a path that is taken is refused, with who made the file there
+  (before any byte moves), and `copy: true` (accepted, not announced) keeps yours beside it. None is in the lean set.
 - **`review_frame`** is the card's own tool. Hosts that support tool visibility hide it from the model.
 
 **Resources:** `lampo://inbox` (the newest feedback from people, INBOX.md) and `lampo://review/{slug}` (one video's
@@ -746,8 +763,8 @@ and no more.
   `reply`, `mark_fixed`, `wont_fix`, `track_video` and `request_upload`. Ask for it with `LAMPO_MCP_TOOLS=lean` in the
   server's environment, or with the address `https://review.example.com/mcp?tools=lean`. A list of tool names,
   separated by commas, works too. `ask_options` is a tool of its own outside the lean set (286 tokens
-  more in the full list, none in the lean one); so are `draft_post` and `get_posts` (345 together) and `find_footage`
-  (325).
+  more in the full list, none in the lean one); so are `draft_post` and `get_posts` (345 together), `find_footage`
+  (325) and the project files' `list_files`, `get_file` and `add_file` (380 together).
 - **Pictures on demand:** only notes with a drawing come with a picture, cropped to the drawing. `get_note` and
   `get_frame` show anything else in full.
 - **Only what changed:** `wait_for_feedback` returns only new events, `get_open_notes` with `since` only changed notes,
