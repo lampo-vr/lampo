@@ -6,7 +6,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { archivedWords } from '../lib/archived.ts';
 import { isGated } from '../lib/auth.ts';
 import { archivedProjectOf } from '../lib/folderIds.ts';
-import { type Action, can } from '../lib/permissions.ts';
+import { type Action, can, READ_ACTIONS } from '../lib/permissions.ts';
 import { findComment, loadReview } from '../lib/store.ts';
 import type { Role } from '../lib/types.ts';
 import { suspensionOf } from '../lib/workspaces.ts';
@@ -414,8 +414,8 @@ export const SUSPENDED_ERROR =
  */
 function refuseIfSuspended(req: Request, rule: Rule | 'none' | 'module'): void {
   const method = req.method === 'HEAD' ? 'GET' : req.method;
-  // `files` is reading too: download URLs asked for many at once are a POST
-  if (!WRITES.has(method) || rule === 'self' || rule === 'public' || rule === 'view' || rule === 'files') return;
+  // `files` is reading too: download URLs asked for many at once are a POST (MCP's tools go by the same READ_ACTIONS)
+  if (!WRITES.has(method) || rule === 'self' || rule === 'public' || READ_ACTIONS.has(rule as Action)) return;
   const ws = req.auth?.workspace;
   if (ws && suspensionOf(ws)) throw fail(423, SUSPENDED_ERROR, { suspended: true });
 }

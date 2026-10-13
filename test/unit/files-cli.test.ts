@@ -12,6 +12,9 @@ import { isolatedEnv, tmpdir, VR, vr } from '../lib/helpers.ts';
 const { env } = isolatedEnv({ vars: { VR_REMOTE: '0', VR_BY: 'agent:spot-edit' } });
 const folders = await import('../../lib/folders.ts');
 const files = await import('../../lib/files.ts');
+const fileAreas = await import('../../lib/fileAreas.ts');
+const { commandArgs } = await import('../../lib/cli.ts');
+const { pullLine } = await import('../../lib/fileLines.ts');
 const { pullCommand, pushCommand } = await import('../../web/src/files/model.ts');
 folders.createFolder('Acme/Spring sale');
 folders.createFolder('House');
@@ -63,7 +66,7 @@ test('push: a folder by its name (as the app’s drop), what is in it with a sla
     ['.env', 'bed.wav'],
   );
   // the line the check sheet shows for a big folder names the same place
-  assert.equal(pushCommand('Acme/Spring sale', 'Footage', './Shoot'), "lampo files push ./Shoot --to 'Acme/Spring sale' --path Footage/");
+  assert.equal(pushCommand('Acme/Spring sale', 'Footage', './Shoot'), "lampo files push --to='Acme/Spring sale' --path=Footage/ -- ./Shoot");
 });
 
 test('ls: what applies in a project — its own, then the House’s (deepest wins) — and one folder’s files', () => {
@@ -73,7 +76,7 @@ test('ls: what applies in a project — its own, then the House’s (deepest win
   assert.match(lines[0] as string, /^files for Acme\/Spring sale · Acme\/Spring sale r\d+ · House r\d+ \(deepest wins\)$/);
   assert.ok(lines.includes('Acme/Spring sale  Footage/  3 files  25 B  audio, footage'), r.out);
   assert.ok(lines.includes('House  bed.wav  9 B  audio'), r.out);
-  assert.match(lines.at(-1) as string, /^pull: lampo files pull 'Acme\/Spring sale' --to <dir>/);
+  assert.match(lines.at(-1) as string, /^pull: lampo files pull --to='<dir>' --only='<glob>' -- 'Acme\/Spring sale' · /);
   const dir = vr(['files', 'ls', 'Acme/Spring sale', 'Footage/Shoot/Music'], env);
   assert.match(
     dir.out,
@@ -93,7 +96,7 @@ test('the line Copy for an agent hands out runs as it is: exactly those files, i
   const bin = tmpdir('vr-files-bin-');
   fs.writeFileSync(path.join(bin, 'lampo'), `#!/bin/sh\nexec "${process.execPath}" "${VR}" "$@"\n`, { mode: 0o755 });
   const line = pullCommand('Acme/Spring sale', ['Footage/Shoot/Day 1/A001C003.mov'], ['Footage/Shoot/Music']);
-  assert.equal(line, "lampo files pull 'Acme/Spring sale' --to public/ --only 'Footage/Shoot/Music/**' --only 'Footage/Shoot/Day 1/A001C003.mov'");
+  assert.equal(line, "lampo files pull --to=public/ --only='Footage/Shoot/Music/**' --only='Footage/Shoot/Day 1/A001C003.mov' -- 'Acme/Spring sale'");
   const out = execFileSync('/bin/sh', ['-c', line], { cwd: work, env: { ...env, PATH: `${bin}:${env.PATH}` }, encoding: 'utf8' });
   assert.match(out, /^pulled 2 of 2 files from Acme\/Spring sale into public\/ · 17 B · 0 already here · \d+ s$/m);
   assert.equal(fs.readFileSync(path.join(work, 'public', 'Footage/Shoot/Day 1/A001C003.mov'), 'utf8'), 'clip one');
@@ -101,11 +104,11 @@ test('the line Copy for an agent hands out runs as it is: exactly those files, i
   assert.ok(!fs.existsSync(path.join(work, 'public', 'Footage/Shoot/Day 1/A001C004.mov')), 'only what was picked');
   // the House's line, and an inherited file through the project's
   const house = pullCommand('', ['bed.wav']);
-  assert.equal(house, 'lampo files pull House --to public/ --only bed.wav');
+  assert.equal(house, 'lampo files pull --to=public/ --only=bed.wav -- House');
   execFileSync('/bin/sh', ['-c', house], { cwd: work, env: { ...env, PATH: `${bin}:${env.PATH}` } });
   assert.equal(fs.readFileSync(path.join(work, 'public', 'bed.wav'), 'utf8'), 'music bed');
   // a project called House is its own place in the line, never the House's
-  assert.equal(pullCommand('House', ['x.wav']), 'lampo files pull House/ --to public/ --only x.wav');
+  assert.equal(pullCommand('House', ['x.wav']), 'lampo files pull --to=public/ --only=x.wav -- House/');
 });
 
 test('round trip: pull, change here, status, push back as the next version; nobody overwritten', () => {
@@ -128,7 +131,7 @@ test('round trip: pull, change here, status, push back as the next version; nobo
   assert.match(st.out, /^public · pulled from 'Acme\/Spring sale' · /);
   assert.match(st.out, /^changed here {2}Footage\/Shoot\/Music\/bed\.wav$/m);
   assert.match(st.out, /^new here {6}Footage\/new\.txt$/m);
-  assert.match(st.out, /^push: lampo files push public\/ --to 'Acme\/Spring sale'$/m);
+  assert.match(st.out, /^push: lampo files push --to='Acme\/Spring sale' -- public\/$/m);
   // pushed back: the changed file its next version (based on V1, as pulled), the new one added, the rest unchanged —
   // the House's file, pulled through the project, is not copied into it
   const back = vr(['files', 'push', 'public/', '--to', 'Acme/Spring sale'], env, { cwd: work });
@@ -172,6 +175,98 @@ test('round trip: pull, change here, status, push back as the next version; nobo
     [3, 2, 1],
   );
 });
+
+/** The words a shell makes of a line: `lampo` there is a function that prints each one, NUL-separated. */
+function wordsOf(line: string, shell: string): string[] {
+  const printed = execFileSync(shell, ['-c', `lampo() { for a in "$@"; do printf '%s\\0' "$a"; done; }\n${line}`], { encoding: 'utf8' });
+  return printed.split('\0').slice(0, -1);
+}
+/** A line as `lampo` reads it: the words a real shell makes of it, then the CLI's own parser (lib/cli.ts main). */
+function asRead(line: string, shell: string) {
+  const [name, ...rest] = wordsOf(line, shell);
+  return { name, ...commandArgs(name as string, rest) };
+}
+const SHELLS = ['/bin/sh', '/bin/bash', '/bin/zsh'].filter((s) => fs.existsSync(s));
+/** The area as the line names it: `House` for the House's files, `House/` for a project called so. */
+const areaArg = (area: string) => (area ? (area === 'House' ? 'House/' : area) : 'House');
+
+test('the lines handed out say what they say whatever things are called: a name like an option stays a name', () => {
+  // other people's names: a file or folder (or a project) called like an option, or full of quotes
+  const dashed = ['--to=elsewhere', '--force', '--only', '--', '-', '-x.wav', '--path=../up', '--copy', '--replace', '--dry-run', '--help'];
+  const quoted = [`Mia's "cut" $HOME \`id\` !1.wav`, "it's", 'a=b c.wav', "'", '"', ' x '];
+  const dirs = ['--path=evil', '-- Day 1', "Mia's"];
+  const areas = ['', 'House', 'Acme/Spring sale', '--to=/tmp/elsewhere', '--force', `Mia's "Spring" $x`, '-x', 'Acme/--replace'];
+  assert.ok(SHELLS.length, 'a shell');
+  for (const shell of SHELLS)
+    for (const area of areas) {
+      const pulled = asRead(pullCommand(area, [...dashed, ...quoted], dirs), shell);
+      assert.equal(pulled.name, 'files');
+      assert.deepEqual(pulled.pos, ['pull', areaArg(area)], `${shell} ${area}: the area, and nothing else, is where it pulls from`);
+      assert.deepEqual({ ...pulled.opt }, { to: 'public/', only: [...dirs.map((d) => `${d}/**`), ...dashed, ...quoted] }, `${shell} ${area}: exactly these`);
+      // what `lampo files` and the tools say to run next: a folder of the agent's own called so too
+      const next = asRead(pullLine(area, '--force', ['--to=up']), shell);
+      assert.deepEqual([next.pos, { ...next.opt }], [['pull', areaArg(area)], { to: '--force', only: ['--to=up'] }]);
+      for (const source of ['--replace', "Mia's ./Shoot", './Shoot']) {
+        const pushed = asRead(pushCommand(area, '--copy', source), shell);
+        assert.deepEqual(pushed.pos, ['push', source], `${shell} ${area}: what goes up`);
+        assert.deepEqual({ ...pushed.opt }, { to: areaArg(area), path: '--copy/' }, `${shell} ${area}: where, and no other option`);
+      }
+    }
+  // `--` ends the options for every command; a value is the word attached, or the next one
+  assert.deepEqual(commandArgs('files', ['pull', '--to', 'a', '--only=--b', '--', '--force', '--to=x']), {
+    pos: ['pull', '--force', '--to=x'],
+    opt: { to: 'a', only: ['--b'] },
+  });
+});
+
+test('a copied line runs as it says when a file is called like an option: it lands in public/ by its name', () => {
+  folders.createFolder('Dash');
+  const src = tmpdir('vr-files-dash-');
+  fs.writeFileSync(path.join(src, 'bed.wav'), 'dash bed');
+  fs.writeFileSync(path.join(src, 'escape.txt'), 'not an option');
+  assert.equal(vr(['files', 'push', `${src}/`, '--to', 'Dash'], env).code, 0);
+  // a store from before new names were checked: a file called like an option (as its catalog held it)
+  const ref = files.areaRefOf('Dash') as { id: string };
+  fileAreas.withFilesLock(() => {
+    const a = fileAreas.areaForWrite(ref.id) as NonNullable<ReturnType<typeof fileAreas.areaForWrite>>;
+    (a.files.find((f) => f.path === 'escape.txt') as { path: string }).path = '--to=elsewhere';
+    fileAreas.saveArea(a);
+  });
+  // the line Copy for an agent hands out for it and another file: both land in public/, by their names
+  const work = tmpdir('vr-files-dash-pull-');
+  const line = pullCommand('Dash', ['--to=elsewhere', 'bed.wav']);
+  const out = execFileSync('/bin/sh', ['-c', line], { cwd: work, env: { ...env, PATH: `${lampoOnPath()}:${env.PATH}` }, encoding: 'utf8' });
+  assert.match(out, /^pulled 2 of 2 files from Dash into public\//m);
+  assert.equal(fs.readFileSync(path.join(work, 'public', '--to=elsewhere'), 'utf8'), 'not an option');
+  assert.equal(fs.readFileSync(path.join(work, 'public', 'bed.wav'), 'utf8'), 'dash bed');
+  assert.ok(!fs.existsSync(path.join(work, 'elsewhere')), 'nothing lands where a name says');
+});
+
+test('push: a new name that starts with "-" stays here, said with why; a file named so before takes its next version', () => {
+  const src = tmpdir('vr-files-dash-new-');
+  fs.writeFileSync(path.join(src, '--force.wav'), 'refused');
+  fs.mkdirSync(path.join(src, '-dir'));
+  fs.writeFileSync(path.join(src, '-dir', 'in.txt'), 'refused too');
+  fs.writeFileSync(path.join(src, 'ok.txt'), 'goes');
+  const up = vr(['files', 'push', '--to=Dash', '--', `${src}/`], env);
+  assert.equal(up.code, 0, up.err);
+  assert.match(up.out, /^pushed 1 file to Dash \(r\d+\): 1 added/m);
+  assert.match(up.out, /^left out: 2 with a name Lampo can't keep \(--force\.wav: a new name can’t start with "-" .*, -dir\/in\.txt: a new name/m);
+  assert.ok(!ownFiles('Dash').some((f) => f.path === '--force.wav' || f.path.startsWith('-dir')));
+  // the one the store held from before (the test above): its next version, under the name it has
+  const mine = tmpdir('vr-files-dash-mine-');
+  fs.writeFileSync(path.join(mine, '--to=elsewhere'), 'still not an option');
+  const back = vr(['files', 'push', '--to=Dash', '--replace', '--', path.join(mine, '--to=elsewhere')], env);
+  assert.equal(back.code, 0, back.err);
+  assert.match(back.out, /^version {2}--to=elsewhere V2$/m);
+});
+
+/** A folder with `lampo` in it, as an agent's shell has it on its PATH. */
+function lampoOnPath(): string {
+  const bin = tmpdir('vr-files-bin-');
+  fs.writeFileSync(path.join(bin, 'lampo'), `#!/bin/sh\nexec "${process.execPath}" "${VR}" "$@"\n`, { mode: 0o755 });
+  return bin;
+}
 
 test('usage: what is missing is said, with the command’s lines', () => {
   assert.match(vr(['files'], env).err, /say what to do:\nlampo files ls/);

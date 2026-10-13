@@ -72,11 +72,11 @@ test('list_files: the summary, then a folder’s files with their ids', async ()
     s,
     /^files for Acme\/Spring · Acme\/Spring r1 \(deepest wins\)\nAcme\/Spring {2}Music\/ {2}1 file {2}9 B {2}audio\nAcme\/Spring {2}logo\.svg {2}6 B {2}graphic\n/,
   );
-  assert.match(s, /lampo files pull Acme\/Spring --to <dir>/, 'a shell agent is told how to fetch many');
+  assert.match(s, /lampo files pull --to='<dir>' --only='<glob>' -- Acme\/Spring$/m, 'a shell agent is told how to fetch many');
   const dir = textOf(await call(c, 'list_files', { folder: 'Acme/Spring', path: 'Music' }));
   assert.match(dir, /^Acme\/Spring Music\/ · 1 file\nfl_[0-9a-f]{12} Music\/bed\.wav 9 B audio V1 by agent:vr \(tester\) · \S+$/);
   assert.match(textOf(await call(c, 'list_files', { folder: 'Acme/Spring', query: 'logo' })), /logo\.svg/);
-  assert.match(textOf(await call(c, 'list_files', { folder: 'House' })), /^no files for House yet: add_file, or lampo files push <folder> --to House$/);
+  assert.match(textOf(await call(c, 'list_files', { folder: 'House' })), /^no files for House yet: add_file, or lampo files push --to=House -- '<folder>'$/);
   const missing = await call(c, 'list_files', { folder: 'Nowhere' });
   assert.ok(missing.isError);
   assert.match(textOf(missing), /there is no folder "Nowhere"/);

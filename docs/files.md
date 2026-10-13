@@ -35,7 +35,10 @@ rewritten (only its Unicode form is made one: NFC, as a Mac's names read the sam
 - not junk a file system or tool leaves behind: `.DS_Store`, `Thumbs.db`, `._*`, anything under `.git/` or
   `__MACOSX/` (clients skip these and say so);
 - two paths that differ only in case are the same place (they would be on a Mac or on Windows): the second is a
-  conflict, not a new file.
+  conflict, not a new file;
+- a name given now — a new file or folder, a rename, the folders a new path makes — doesn't start with `-` (a command
+  line would read it as an option). Names kept from before stay: their files take new versions, their folders new
+  files, and a move keeps a name.
 
 The rules are in [`lib/fileText.ts`](../lib/fileText.ts), shared by the server, the CLI and the browser.
 
@@ -226,10 +229,10 @@ above it, deepest first, as in the app.
 ```sh
 lampo files ls 'Acme/Spring sale'                     # what applies there, in short
 lampo files ls 'Acme/Spring sale' Music               # one folder's files, with their ids
-lampo files pull 'Acme/Spring sale' --to public/ --only 'Music/**' --only 'Brand/logo.svg'
+lampo files pull --to=public/ --only='Music/**' --only=Brand/logo.svg -- 'Acme/Spring sale'
 lampo files status --to public/                       # what changed here and there since
-lampo files push public/ --to 'Acme/Spring sale'      # what changed here, as new versions
-lampo files push ./Shoot --to 'Acme/Spring sale' --path Footage/   # lands as Footage/Shoot/…
+lampo files push --to='Acme/Spring sale' -- public/   # what changed here, as new versions
+lampo files push --to='Acme/Spring sale' --path=Footage/ -- ./Shoot   # as Footage/Shoot/…
 ```
 
 ```
@@ -240,7 +243,10 @@ House  Fonts/  6 files  2.1 MB  font
 ```
 
 *Copy for an agent* in the Files tab copies exactly such a pull line, for the files and folders picked, with the
-`list_files` call under it.
+`list_files` call under it. The lines Lampo hands out (that one, and what `lampo files` and the tools say to run next)
+give every value attached to its option (`--only=<glob>`) and put the area, or what goes up, after `--`: `lampo` reads
+nothing after `--` as an option, so a file or folder whose name starts with dashes stays a name, and the line does
+what it says. Typed by hand, `--to <dir>` and `<area> --to <dir>` work as well.
 
 **`lampo files pull <area> [<path|glob>…] [--only <glob>]… --to <dir>`** fetches what applies there into `<dir>`, at
 the paths the area keeps (`Music/bed.wav` lands at `<dir>/Music/bed.wav`). Without a path or glob, everything that

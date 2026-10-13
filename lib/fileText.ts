@@ -129,6 +129,26 @@ export function cleanFilePath(raw: unknown): string {
   return p;
 }
 
+/** Why a name given now can't start with "-": wherever a command takes it, it would read as an option. */
+export const DASH_NAME = 'a new name can’t start with "-" (a command would read it as an option)';
+
+/**
+ * Why `path` — where a new file or folder goes, or where a rename or a move puts one — names something anew that
+ * can't be named so (DASH_NAME), or null. Only what is named now: a folder that is there already (`there`) and the name
+ * a moved file or folder keeps (`kept`) stay as they are, so what a store holds from before keeps working.
+ */
+export function newPathProblem(path: string, o: { there?: (dir: string) => boolean; kept?: string } = {}): string | null {
+  const names = path.split('/');
+  for (let i = 0; i < names.length; i++) {
+    const n = names[i] as string;
+    if (!n.startsWith('-')) continue;
+    const last = i === names.length - 1;
+    if (last ? n === o.kept : o.there?.(names.slice(0, i + 1).join('/'))) continue;
+    return DASH_NAME;
+  }
+  return null;
+}
+
 /** The same path for a file system that ignores case (macOS, Windows): two paths that meet there can't both be kept. */
 export const caseKey = (path: string): string => path.normalize('NFC').toLowerCase();
 

@@ -32,7 +32,7 @@ import {
   scopeOf,
   withFilesLock,
 } from './fileAreas.ts';
-import { caseKey, cleanFilePath, copyPath, dirOf, FILE_LIMITS, kindOf, nameOf } from './fileText.ts';
+import { caseKey, cleanFilePath, copyPath, dirOf, FILE_LIMITS, kindOf, nameOf, newPathProblem } from './fileText.ts';
 import { checkNotArchived, folderIdOf } from './folderIds.ts';
 import { allFolders, folderIdFor, folderName } from './folders.ts';
 import { isoLocal } from './paths.ts';
@@ -632,6 +632,35 @@ function ensureDirs(a: FileArea, paths: string[], stamp: FileStampIn, at: string
 }
 
 /**
+ * What `p` names anew in an area — a new file or folder, the folders its path makes, a renamed one's new name (`was`:
+ * its path before) — never starts with "-" (lib/fileText.ts newPathProblem). Throws 400. Names a store holds from
+ * before stay: its folders take new files, its files new versions, and a move keeps a name.
+ */
+function checkNewNames(a: FileArea, p: string, was?: string): void {
+  const dirs = dirsByCase(a);
+  const why = newPathProblem(p, { there: (d) => dirs.has(caseKey(d)), ...(was !== undefined ? { kept: nameOf(was) } : {}) });
+  if (why) throw new FileError(400, `${p}: ${why}`);
+}
+
+/**
+ * The paths of a push that would be new files with a name that can't be given now (checkNewNames), with why: refused
+ * before any byte moves. The commit checks again, with what is there then.
+ */
+export function newNamesRefused(folder: string, paths: string[]): { path: string; why: string }[] {
+  const ref = areaRefOf(folder);
+  const a = ref ? readArea(ref.id) : null;
+  const files = new Set((a?.files ?? []).map((e) => caseKey(e.path)));
+  const dirs = a ? dirsByCase(a) : new Map<string, FileDir>();
+  const out: { path: string; why: string }[] = [];
+  for (const p of paths) {
+    if (files.has(caseKey(p))) continue;
+    const why = newPathProblem(p, { there: (d) => dirs.has(caseKey(d)) });
+    if (why) out.push({ path: p, why });
+  }
+  return out;
+}
+
+/**
  * Whether a file may be at `p` in an area beside what is there: not where a folder is, and not under a path a file
  * has (a file system can't hold "Footage" as both). Throws 409.
  */
@@ -677,8 +706,10 @@ export function commitFiles(areaId: string, items: CommitItem[], o: { conflict?:
     for (const it of named) {
       const e = byPath.get(caseKey(it.path));
       const base = it.base ?? null;
-      if (!e) plan.push({ it, state: 'added' });
-      else if (e.hash === it.sha256 && e.path === it.path) plan.push({ it, e, state: 'same' });
+      if (!e) {
+        checkNewNames(a, it.path);
+        plan.push({ it, state: 'added' });
+      } else if (e.hash === it.sha256 && e.path === it.path) plan.push({ it, e, state: 'same' });
       else if (base && base === e.v && e.path === it.path) plan.push({ it, e, state: 'version' });
       else if (o.conflict === 'copy') plan.push({ it, state: 'copy', asked: it.path });
       else conflicts.push(conflictOf(e, base));
@@ -868,6 +899,7 @@ export function makeDir(areaId: string, rawPath: string, stamp: FileStampIn): Fi
     const there = dirsByCase(a).get(caseKey(p));
     if (there) return dirInfo(a, there, ref.scope);
     for (const d of ancestors(p)) if (files.has(caseKey(d))) throw new FileError(409, `${d} is a file here, so it can’t hold ${p}`);
+    checkNewNames(a, p);
     if ((a.dirs?.length ?? 0) + 1 > FILE_LIMITS.perArea) throw tooMany();
     const at = isoLocal();
     a.rev++;
@@ -921,6 +953,7 @@ export function moveDir(id: string, to: { path?: string; area?: AreaRef }, stamp
     const p = newPath ?? from;
     if (!dest && p === from) return dirInfo(src, d, fromScope);
     if (!dest && isUnder(p, from)) throw new FileError(400, 'a folder can’t move into itself');
+    checkNewNames(target, p, from);
     const files = src.files.filter((e) => isUnder(e.path, from));
     const dirs = (src.dirs ?? []).filter((x) => isUnder(x.path, from));
     const movingIds = new Set([...files.map((e) => e.id), ...dirs.map((x) => x.id)]);
@@ -1090,6 +1123,7 @@ export function moveFile(id: string, to: { path?: string; area?: AreaRef }, stam
     const twin = others.get(caseKey(p));
     if (twin) throw new FileConflictError([conflictOf(twin, null)]);
     checkPlace(target, p, others);
+    checkNewNames(target, p, e.path);
     if (dest && target.files.length + 1 > FILE_LIMITS.perArea) throw tooMany();
     const at = isoLocal();
     const from = e.path;

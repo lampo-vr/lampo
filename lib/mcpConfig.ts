@@ -320,8 +320,9 @@ export const filesOf = (area: string): string => {
  * The prompt an empty Files page copies for the person's agent: connect to this server unless its tools are there, ask
  * which folder of theirs goes up (or take the one they named), push it into these files with `lampo files push`, and
  * say what went up. Nothing in the folder is changed or moved; a chat app can't reach the person's folders and says
- * so. The area's name is data (filesOf); in the command it is the same name, one shell word. No token ever.
- * Agent-facing, so in English; held to a token budget by test/unit/files-prompt.test.ts.
+ * so. The area's name is data (filesOf); in the command it is the same name, one shell word, the value of `--to=` (a
+ * name starting with dashes is never read as an option: lib/fileLines.ts). No token ever. Agent-facing, so in English;
+ * held to a token budget by test/unit/files-prompt.test.ts.
  */
 export function filesPrompt({ url, root, area }: FilesPlace): string {
   const name = area ? quotedName(area) : '';
@@ -330,7 +331,7 @@ export function filesPrompt({ url, root, area }: FilesPlace): string {
   return `Put a folder of mine into ${filesOf(area)}, with me: footage, music, fonts or project files my team and its agents work from.
 ${connectStep({ url, root }, false)}
 2. Ask me which folder to put up, unless I named one. Read it only: change, move or delete nothing in it. A chat app can't reach my folders: say so.
-3. From a terminal: lampo files push '<the folder>' --to ${to}${root ? '' : ` (if lampo asks you to sign in: lampo login ${originOf(url)})`}. If your lampo has no files command yet, tell me and stop.
+3. From a terminal: lampo files push --to=${to} -- '<the folder>'${root ? '' : ` (if lampo asks you to sign in: lampo login ${originOf(url)})`}. If your lampo has no files command yet, tell me and stop.
 4. Tell me what went up and what was left out.`;
 }
 

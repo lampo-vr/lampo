@@ -4749,6 +4749,9 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   Subtitles: 'Untertitel',
   'SVG graphic': 'SVG-Grafik',
   'That name can’t be used here: {why}': 'Dieser Name geht hier nicht: {why}',
+  // a name that starts with "-" would be read as an option where an agent's command takes it (lib/fileText.ts)
+  'A new name can’t start with “-”': 'Ein neuer Name kann nicht mit „-“ beginnen',
+  'a new name can’t start with “-”': 'ein neuer Name kann nicht mit „-“ beginnen',
   'The files didn’t load': 'Die Dateien wurden nicht geladen',
   'The first 32 KB': 'Die ersten 32 KB',
   'The House’s files: the fonts, logos and music every project uses. Every project and folder inherits them.':

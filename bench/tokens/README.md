@@ -136,7 +136,10 @@ coding agents, chat apps; 1,769 / 1,752 / 1,698 characters), a few words cut els
 named, or that this work is for`, the two put-up lines). What it buys: an agent works from the team's footage, fonts
 and music on any machine instead of asking the person for them, and no file's bytes pass through the conversation
 (signed download URLs, one-time upload URLs, `lampo files` in a shell). SKILL.md stays 1548 (budget 1550): a bullet
-with the commands would cost about 46 tokens and waits for a decision.
+with the commands would cost about 46 tokens and waits for a decision. Decided (2026-10-13): the bullet, `lampo files
+pull` to work from the team's files and `push` to save back, in the shape Lampo hands out (`--to=…`, the project after
+`--`), +50; the budget stays, and words that said a thing twice go (the intro's own loop, `Hand back what an answer
+gave you`, a few phrases): SKILL.md 1549.
 
 The largest tools before: `add_note` 1605, `attach_preview` 657, `attach_reference` 598, `reply` 529,
 `propose_playbook_change` 484. After: `add_note` 796, `attach_preview` 431, `propose_playbook_change` 309,

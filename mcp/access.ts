@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Backend } from '../lib/backend/types.ts';
 import { slugify } from '../lib/paths.ts';
-import { type Action, can } from '../lib/permissions.ts';
+import { type Action, can, READ_ACTIONS } from '../lib/permissions.ts';
 import type { Audience } from '../lib/publicError.ts';
 import { SCOPE_LIST, type Scope, scopeAllows, scopeFor } from '../lib/scopes.ts';
 import type { Role } from '../lib/types.ts';
@@ -97,7 +97,7 @@ export function hintsFor(name: string): ToolHints {
   const access = TOOL_ACCESS[name];
   if (!access) throw new Error(`${name} is missing from TOOL_ACCESS`);
   // reading the project files changes nothing either (a copy on this disk is the caller's own)
-  const reads = access === 'view' || access === 'files';
+  const reads = READ_ACTIONS.has(access);
   return { readOnlyHint: reads, destructiveHint: !reads && OVERWRITES.has(name), openWorldHint: false };
 }
 

@@ -99,6 +99,50 @@ test('a path inside an area is kept as uploaded or refused, never rewritten — 
   assert.ok(!text.isJunkPath('.gitignore'));
 });
 
+test('a name given now never starts with "-" (a command would read it as an option); names a store holds from before stay', async () => {
+  // new: a file, the folders its path makes, an empty folder, a rename — refused before any byte moves, nothing made
+  const data = Buffer.from('dash\n');
+  for (const p of ['-x.txt', '--to=elsewhere', 'Docs/--force/a.txt', '--only/b.txt']) {
+    const r = await call('POST', '/api/files/uploads', { body: { folder: '', files: [{ path: p, size: data.length, sha256: sha(data) }] } });
+    assert.equal(r.status, 400, `${p}: ${r.body.toString()}`);
+    assert.match(r.json().error, /a new name can’t start with "-"/, p);
+  }
+  const dir = await call('POST', '/api/files/dirs', { body: { folder: '', path: 'Docs/-dir' } });
+  assert.equal(dir.status, 400, dir.body.toString());
+  const f = await put('Dash/plain.txt', data);
+  const renamed = await call('PATCH', `/api/files/${f.id}`, { body: { path: 'Dash/--replace.txt' } });
+  assert.equal(renamed.status, 400, renamed.body.toString());
+  const d = await call('POST', '/api/files/dirs', { body: { folder: '', path: 'Dash/Sub' } });
+  assert.equal(d.status, 200, d.body.toString());
+  assert.equal((await call('PATCH', `/api/files/${d.json().id}`, { body: { path: 'Dash/-Sub' } })).status, 400);
+  const listed = (await call('GET', '/api/files?deep=1')).json().files.map((x: { path: string }) => x.path);
+  assert.ok(!listed.some((p: string) => p.split('/').some((n) => n.startsWith('-'))), listed.join(', '));
+  // a store from before the rule: a file and a folder whose names start with "-" (written to its catalog as it held them)
+  const old = await put('Dash/old.txt', Buffer.from('old\n'));
+  assert.ok(await put('Dash/Older/in.txt', Buffer.from('in\n')));
+  inWorkspace('w1', () =>
+    fileAreas.withFilesLock(() => {
+      const a = fileAreas.areaForWrite(fileAreas.HOUSE_AREA) as NonNullable<ReturnType<typeof fileAreas.areaForWrite>>;
+      for (const x of [...a.files, ...(a.dirs ?? [])]) x.path = x.path.replace('Dash/old.txt', 'Dash/-old.txt').replace('Dash/Older', 'Dash/-Older');
+      fileAreas.saveArea(a);
+    }),
+  );
+  // it loads, takes new versions, gets new files in its folder, moves with its name
+  const next = Buffer.from('dash, louder\n');
+  const v2 = await call('POST', '/api/files/uploads', {
+    body: { folder: '', files: [{ path: 'Dash/-old.txt', size: next.length, sha256: sha(next), base: 1 }] },
+  });
+  assert.equal(v2.status, 200, v2.body.toString());
+  const slot = v2.json().uploads[0];
+  assert.equal((await call('PUT', new URL(slot.url).pathname, { body: next })).status, 200);
+  assert.equal((await put('Dash/-Older/new.txt', Buffer.from('new\n')))?.path, 'Dash/-Older/new.txt');
+  const moved = await call('PATCH', `/api/files/${old.id}`, { body: { path: 'Docs/-old.txt' } });
+  assert.equal(moved.status, 200, moved.body.toString());
+  assert.deepEqual([moved.json().path, moved.json().v], ['Docs/-old.txt', 2]);
+  // but its name changed is a name given now
+  assert.equal((await call('PATCH', `/api/files/${old.id}`, { body: { path: 'Docs/-older.txt' } })).status, 400);
+});
+
 test('kinds: a project file by its extension, else what the bytes say, else the name', () => {
   assert.equal(text.kindOf('spot.aep', 'application/octet-stream'), 'project');
   assert.equal(text.kindOf('spot.psd', 'image/vnd.adobe.photoshop'), 'project');

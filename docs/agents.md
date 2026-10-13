@@ -264,7 +264,7 @@ or `House` for the workspace's own. Over MCP: `list_files`, `get_file` and `add_
 | Command | Does |
 |---|---|
 | `lampo files ls [<area>] [<path>]` | what applies there: the summary (each area of the chain, deepest first, its top-level folders and files), or one folder's files with their ids |
-| `lampo files pull <area> [<path\|glob>…] [--only <glob>]… --to <dir> [--dry-run] [--force]` | the files into `<dir>` at their paths: only what changed, never over a file changed here (`--force` does), nothing outside `<dir>` or through a link in it; a name starting with a dot only when named exactly. The app's *Copy for an agent* hands out this line |
+| `lampo files pull <area> [<path\|glob>…] [--only <glob>]… --to <dir> [--dry-run] [--force]` | the files into `<dir>` at their paths: only what changed, never over a file changed here (`--force` does), nothing outside `<dir>` or through a link in it; a name starting with a dot only when named exactly. The app's *Copy for an agent* hands out such a line, each value attached (`--to=public/`, `--only=<path>`) and the area after `--`, so no name in it is read as an option |
 | `lampo files push <file\|folder>… --to <area> [--path <folder>] [--copy \| --replace] [--dry-run]` | saves them there as versions: a folder by its name (`folder/`: what is in it), never its hidden files or links; a file changed since you pulled it, or a taken path, is refused with who made the file there |
 | `lampo files status [--to <dir>]` | what changed here and there since a pull into `<dir>` |
 

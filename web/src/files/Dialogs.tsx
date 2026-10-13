@@ -2,7 +2,7 @@
 // of the area, or into another project's or folder's files). Each says what is wrong with a name before it is sent
 // (lib/fileText.ts: what a path can be; a name taken here), and the change shows at once (FilesPage.tsx).
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { caseKey, dirOf, filePathProblem } from '../../../lib/fileText.ts';
+import { caseKey, dirOf, filePathProblem, newPathProblem } from '../../../lib/fileText.ts';
 import { useLibrary } from '../api/queries.ts';
 import { t } from '../i18n/index.ts';
 import { crumbs } from '../lib/nav.ts';
@@ -53,9 +53,11 @@ export function NameDialog({
       ? t('A name has no “/” in it: Move to… puts it in another folder')
       : filePathProblem(path)
         ? t('That name can’t be used here: {why}', { why: filePathProblem(path) ?? '' })
-        : n !== was && taken(path)
-          ? t('“{name}” is here already', { name: n })
-          : null;
+        : n !== was && n.startsWith('-')
+          ? t('A new name can’t start with “-”')
+          : n !== was && taken(path)
+            ? t('“{name}” is here already', { name: n })
+            : null;
   const ready = !!n && !problem && n !== was;
   const go = () => ready && onDone(n);
   return (
@@ -137,7 +139,10 @@ export function MoveDialog({
   }, [to]);
   const areas = useMemo(() => ['', ...(library?.folders ?? [])], [library]);
   const clean = typed.trim().replace(/^\/+|\/+$/g, '');
-  const typedProblem = clean ? filePathProblem(`${clean}/x`) : null;
+  const known = useMemo(() => new Set((dirs ?? []).map(caseKey)), [dirs]);
+  const typedProblem = !clean
+    ? null
+    : (filePathProblem(`${clean}/x`) ?? (newPathProblem(clean, { there: (d) => known.has(caseKey(d)) }) ? t('A new name can’t start with “-”') : null));
   const target = clean && !typedProblem ? clean : dir;
   const same = to === area && (target ?? '') === from;
   const ready = target !== null && !same && !typedProblem;

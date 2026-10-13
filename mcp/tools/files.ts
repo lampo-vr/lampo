@@ -9,9 +9,9 @@ import path from 'node:path';
 import { z } from 'zod';
 import { cacheRoot } from '../../lib/backend/credentials.ts';
 import { FilesConflict } from '../../lib/backend/types.ts';
-import { areaName, fileLine, madeBy, summaryLines } from '../../lib/fileLines.ts';
+import { areaName, fileLine, madeBy, pullLine, pushLine, shellWord, summaryLines } from '../../lib/fileLines.ts';
 import { hashCache } from '../../lib/filesLocal.ts';
-import { areaOf, areaWord, copyOut } from '../../lib/filesSync.ts';
+import { areaOf, copyOut } from '../../lib/filesSync.ts';
 import { caseKey, FILE_KINDS, FILE_LIMITS, fileSize, nameOf } from '../../lib/fileText.ts';
 import { folderName, quiet } from '../../lib/inputs.ts';
 import { oneLine } from '../../lib/time.ts';
@@ -81,10 +81,10 @@ export function registerFileTools({ b, o, tool, author, byArg }: ToolKit): void 
       const area = await areaFor(folder, video);
       if (p === undefined && !query && !kind) {
         const lines = summaryLines(await b.filesSummary(area));
-        if (!lines) return ok(text(`no files for ${areaName(area)} yet${chat ? '' : `: add_file, or lampo files push <folder> --to ${areaWord(area)}`}`));
+        if (!lines) return ok(text(`no files for ${areaName(area)} yet${chat ? '' : `: add_file, or ${pushLine(area, ['<folder>'])}`}`));
         const how = chat
           ? 'list_files with path for a folder’s files; get_file for one'
-          : `list_files with path for a folder’s files; get_file for one; a shell fetches many with lampo files pull ${areaWord(area)} --to <dir> --only '<glob>'`;
+          : `list_files with path for a folder’s files; get_file for one; a shell fetches many with ${pullLine(area, '<dir>', ['<glob>'])}`;
         return ok(text([...lines, how].join('\n')));
       }
       const dir = p?.replace(/\/+$/, '') || undefined;
@@ -143,8 +143,8 @@ export function registerFileTools({ b, o, tool, author, byArg }: ToolKit): void 
         const fetch = chat
           ? ''
           : own
-            ? `\nThis server signs no links: the URL takes your Lampo token (Authorization: Bearer), or fetch it with lampo files pull ${areaWord(u.area)} --to <dir> --only '${u.path.replaceAll("'", "'\\''")}'`
-            : `\ncurl -fLo '${name.replaceAll("'", "'\\''")}' '${u.url}'`;
+            ? `\nThis server signs no links: the URL takes your Lampo token (Authorization: Bearer), or fetch it with ${pullLine(u.area, '<dir>', [u.path])}`
+            : `\ncurl -fLo ${shellWord(name)} ${shellWord(u.url)}`;
         return ok(text(`${oneLine(`${u.id} ${u.path} V${u.v} · ${fileSize(u.size)} · sha256 ${u.sha256}`)} · valid until ${u.expires}\n${u.url}${fetch}`));
       }
       const { sources } = await b.fileSources([fid], v);
@@ -154,7 +154,7 @@ export function registerFileTools({ b, o, tool, author, byArg }: ToolKit): void 
       if (src.url && !src.headers)
         return ok(
           text(
-            `${oneLine(`${src.id} ${src.path} V${src.v} · ${fileSize(src.size)}`)}\n${src.url}\ncurl -fLo '${nameOf(src.path).replaceAll("'", "'\\''")}' '${src.url}'`,
+            `${oneLine(`${src.id} ${src.path} V${src.v} · ${fileSize(src.size)}`)}\n${src.url}\ncurl -fLo ${shellWord(nameOf(src.path))} ${shellWord(src.url)}`,
           ),
         );
       const copy = await copyOut(src, path.join(cacheRoot(), 'files'), hashCache(path.join(cacheRoot(), 'hashes.json')));
@@ -209,7 +209,7 @@ export function registerFileTools({ b, o, tool, author, byArg }: ToolKit): void 
             throw c?.length ? Object.assign(new Error(conflictText(c)), { status: 409 }) : e;
           });
         if ('committed' in got) return ok(text(got.committed.files.map((f) => doneLine(f, got.committed.folder)).join('\n')));
-        const put = chat ? '' : `\ncurl -fT '${nameOf(a.path).replaceAll("'", "'\\''")}' '${got.url}'`;
+        const put = chat ? '' : `\ncurl -fT ${shellWord(nameOf(a.path))} ${shellWord(got.url)}`;
         return ok(text(`PUT the file's ${a.size} bytes to this URL once (valid until ${got.expires}); its answer says what it became:\n${got.url}${put}`));
       }
       // on this machine: the file is read here (only the one named), its bytes kept once, then committed

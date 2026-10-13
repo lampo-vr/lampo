@@ -97,11 +97,10 @@ encode of it); agents only draft (`draft_post`, `lampo post draft`, never "publi
     connecting a new one.
 
 - **The agents' file tools, next** (`lampo files` and MCP `list_files`, `get_file`, `add_file` are built:
-  [docs/files.md](docs/files.md#agents)): the Agent Skill's bullet with the commands (about 46 tokens over its budget:
-  a bench run to raise it, or room made elsewhere); `known` revisions for `list_files` as `get_playbook` has them; a
-  picture or a short text file returned as itself by `get_file`; Connect an agent's line for cloud sandboxes (the app
-  host and the media host to allow, `LAMPO_TOKEN` as a secret in the setup script); `lampo files rm`, `mv` and
-  `history`; a local cache of pulled bytes that several folders share.
+  [docs/files.md](docs/files.md#agents), the Agent Skill's bullet too): `known` revisions for `list_files` as
+  `get_playbook` has them; a picture or a short text file returned as itself by `get_file`; Connect an agent's line
+  for cloud sandboxes (the app host and the media host to allow, `LAMPO_TOKEN` as a secret in the setup script);
+  `lampo files rm`, `mv` and `history`; a local cache of pulled bytes that several folders share.
 
 - **Project files, phase 2**: the **Handover link**, a fourth kind of link (a project's videos and files with a
   generated `HANDOVER.md`, for whoever takes the project over), and **editing leases** (who has a project file open,
@@ -365,6 +364,21 @@ Findings of audit A13 (2026-10-05, `AUDITS.md`) and its verification rounds that
 - **A13 INV-1** (info): on the machine, `lampo post list --json` gives its owner the sentence, not the detail.
 - **A13 FILES, infos** (info): a ticket for a non-copy upload on a stale base gets 429 ("24 h") instead of 409 before
   any byte moves; a revert's 429 suggests `conflict: 'copy'`, which a restore ignores.
+
+## Deferred from the file tools' review
+
+The review of the agents' file tools before their deploy (2026-10-13, `AUDITS.md`): its fixes are in; these were
+there before, or are information, and wait.
+
+- **SRV-5** (info): bytes the workspace holds are saved under a new path by naming their sha256 and size (POST
+  `/api/files/commit`, `add_file`), within one workspace only, whether the caller has them or not. Commit held bytes
+  at once only when a live or trashed file of the workspace names them; otherwise hand out a ticket.
+- **SRV-6** (info): a `get_file` URL is bound to the bytes, the workspace and who asked, not to the file: it serves a
+  file trashed since until it expires (an hour for tokens and apps; a bucket's own URL can't be ended early). Put the
+  file's id in the media host's claim and ask that it is live.
+- **SRV-7** (info): a server without a media host hands an OAuth app `get_file`'s own download route, which takes an
+  API token or a session, not the app's token. Say there that this server hands apps no file URLs, or let the route
+  take the app's token for `files:read`.
 
 ## Open decisions
 

@@ -175,7 +175,8 @@ input is read, `403` for an API token. Every answer is `no-store`.
 **A suspended workspace** keeps its people signed in and readable: they read, watch and download, but every other write
 in it answers `423 {suspended: true, error}` (their own account and sessions, what they watched and what they put away
 in the inbox excepted), its review links answer `410` like an ended link (oEmbed `404`), and `MyWorkspace.suspended`
-says since when (never the reason).
+says since when (never the reason). Its project files read on, download URLs included; MCP's tools do the same (the
+reading ones, `list_files` and `get_file` among them, answer; the others say the workspace is suspended).
 
 ## Accounts
 
@@ -995,7 +996,8 @@ Details:
   bytes are hashed on arrival: a mismatch with the named `sha256` or `size` is `400`, nothing kept.
 - **Refusals before any byte**: `402` with the plan's refusal (`reason`, `needed`, `room`, `fits`: [plan
   limits](#workspaces-and-plan-limits)) for the bytes that would start counting, `507` when the server's disk is short,
-  `423` in an archived project, `429` past the open tickets one account may hold.
+  `423` in an archived project, `429` past the open tickets one account may hold, `400` for a path Lampo can't keep
+  ([files.md](files.md#paths)) — a new name that starts with `-` among them (`dirs` and `PATCH` say the same).
 - **Attribution.** `agent` (cleaned, ≤ 80 characters) and `agent_kind` are kept for callers who may write as agents;
   `via` (`vr`, `mcp`) and `machine` say how it came. Every version carries `by` and `by_id` of the account.
 - **Signed URLs** (`/media/f/…` on the media host) ask again on every request whether whoever they were handed to may
@@ -1170,7 +1172,8 @@ limit of a proxy in front of the app ([below](#the-media-host)).
 
 - The `PUT` answers like the last tus `PATCH`, or `202 {pending: true}` for a slow render; a `GET` on the same URL
   reports the outcome for an hour.
-- `410` when the URL was used or has expired, `411` without a `Content-Length`, `413` when the file is too big, `507`
+- `410` when the URL was used or has expired, `411` without a `Content-Length` (or with `0`, but for a project file
+  asked for with `size: 0`: its empty `PUT` saves it), `413` when the file is too big, `507`
   when the disk is short, `402` when the workspace's plan has no room for it (uploads under way count for both, as
   for tus), `422` when the render is refused.
 - Whoever asked for the URL is checked again when it is used, before the bytes and once more when they are all in:

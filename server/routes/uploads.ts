@@ -528,7 +528,10 @@ export function uploadRoutes(ctx: ServerContext): Router {
     // the one the URL was handed out in, like the work below — outside it, a server with two workspaces refuses it.
     if (t.check) inWorkspace(t.ws, t.check);
     const size = Number(req.headers['content-length']);
-    if (!Number.isSafeInteger(size) || size <= 0) throw fail(411, 'send the file with its length (curl -T file URL)');
+    // nothing sent is no upload, but for a project file named empty: its URL was asked for 0 bytes (an empty file
+    // over tus is the same), and `curl -T` sends one with its length, 0
+    const empty = t.target.kind === 'file' && t.target.file.size === 0;
+    if (!Number.isSafeInteger(size) || size < 0 || (size === 0 && !empty)) throw fail(411, 'send the file with its length (curl -T file URL)');
     const max =
       t.target.kind === 'preview'
         ? PREVIEW_LIMITS.uploadBytes

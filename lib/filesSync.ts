@@ -12,6 +12,7 @@ import path from 'node:path';
 import type { Backend, FileSource, PushFileInput } from './backend/types.ts';
 import { FilesConflict, StoppedError } from './backend/types.ts';
 import { globMatcher, isExactPattern } from './fileGlob.ts';
+import { HOUSE_WORD } from './fileLines.ts';
 import {
   contentsOf,
   findRecord,
@@ -33,21 +34,12 @@ import {
   readRecord,
   writeRecord,
 } from './filesLocal.ts';
-import { caseKey, cleanFilePath, FILE_LIMITS } from './fileText.ts';
+import { caseKey, cleanFilePath, dirOf, FILE_LIMITS, newPathProblem } from './fileText.ts';
 import { folderName } from './folders.ts';
 import type { FileConflict, FileInfo } from './types.ts';
 
-/** How agents name the workspace's own files: `House` (exactly). A project that is called so is `House/`. */
-export const HOUSE_WORD = 'House';
-
 /** The area an agent names ('' = the House): `House` or nothing is the House, anything else a folder's path. */
 export const areaOf = (arg: string | undefined | null): string => (!arg || arg === HOUSE_WORD ? '' : (folderName(arg) ?? ''));
-
-/** A word for a shell, quoted when it needs to be: in single quotes, where nothing is special (as web/src/files/model.ts). */
-export const shellWord = (w: string): string => (/^[\w./@:+-]+$/.test(w) ? w : `'${w.replaceAll("'", "'\\''")}'`);
-
-/** An area as a command names it, one shell word: `House`, a folder's path (`House/` for a project called so). */
-export const areaWord = (area: string): string => shellWord(area ? (area === HOUSE_WORD ? `${area}/` : area) : HOUSE_WORD);
 
 /** Which store files come from, the same however its account is named: what a record of pulls belongs to. */
 export const storeOf = (b: Pick<Backend, 'where'>): string => b.where.replace(/ \(as [^)]*\)$/, '');
@@ -535,7 +527,18 @@ function recordedAt(records: Map<string, { root: string; record: PullRecord }>, 
 
 export async function push(b: Backend, o: PushOptions): Promise<PushResult> {
   const into = o.into ? cleanFilePath(o.into.replace(/\/+$/, '')) : '';
-  const { files, left } = gatherPush(o.sources, { into });
+  const gathered = gatherPush(o.sources, { into });
+  const { left } = gathered;
+  const own = new Map((await allFiles(b, o.area, { own: true })).map((f) => [caseKey(f.path), f]));
+  // a new file whose name can't be given now (a name starting with "-", lib/fileText.ts newPathProblem) stays here,
+  // said with why, as any name Lampo can't keep; the area's folders (those its files are in) keep theirs
+  const dirs = new Set<string>();
+  for (const f of own.values()) for (let d = dirOf(f.path); d; d = dirOf(d)) dirs.add(caseKey(d));
+  const files = gathered.files.filter((f) => {
+    const why = own.has(caseKey(f.path)) ? null : newPathProblem(f.path, { there: (d) => dirs.has(caseKey(d)) });
+    if (why) left.bad.push({ path: f.path, why });
+    return !why;
+  });
   const store = storeOf(b);
   // what pulls wrote where these come from: each file's base, and whether it changed since
   const records = new Map<string, { root: string; record: PullRecord }>();
@@ -558,7 +561,6 @@ export async function push(b: Backend, o: PushOptions): Promise<PushResult> {
     );
   }
   o.hashes.save();
-  const own = new Map((await allFiles(b, o.area, { own: true })).map((f) => [caseKey(f.path), f]));
   const planned: PushPlanned[] = files.map((f, i) => {
     const sha256 = shas[i] as string;
     const at = recordedAt(records, f.abs);

@@ -77,6 +77,12 @@ export const ROLE_HINTS: Record<Role, string> = {
 
 export const can = (role: Role | null | undefined, action: Action): boolean => !!role && ROLE_ACTIONS[role]?.has(action) === true;
 
+/**
+ * The actions that only read: watching and reading (`view`), the project files and their download URLs (`files`). A
+ * suspended workspace keeps them on every way in (the API, MCP), and MCP tools that need them say they change nothing.
+ */
+export const READ_ACTIONS: ReadonlySet<Action> = new Set<Action>(['view', 'files']);
+
 /** Note statuses a role may set: reviewers confirm or reopen, the editor's side marks fixed or won't fix. */
 export function canSetStatus(role: Role | null | undefined, status: string): boolean {
   if (status === 'verified' || status === 'open') return can(role, 'verify');

@@ -537,6 +537,8 @@ export const EN = [
   'A new card',
   'A new card settles it now.',
   'A new folder',
+  'a new name can’t start with “-”',
+  'A new name can’t start with “-”',
   'A new password leaves these invites behind: if one was meant for you, ask for it again.',
   'a new version',
   'a new version {when}',

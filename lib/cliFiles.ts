@@ -6,9 +6,9 @@
 import path from 'node:path';
 import { cacheRoot } from './backend/credentials.ts';
 import type { Backend } from './backend/types.ts';
-import { areaName, fileLine, summaryLines } from './fileLines.ts';
+import { areaName, areaWord, fileLine, pullLine, pushLine, shellWord, summaryLines } from './fileLines.ts';
 import { hashCache, type LeftOut } from './filesLocal.ts';
-import { areaOf, areaWord, type PullResult, type PushResult, pull, push, RoomError, type StatusResult, shellWord, status } from './filesSync.ts';
+import { areaOf, type PullResult, type PushResult, pull, push, RoomError, type StatusResult, status } from './filesSync.ts';
 import { fileSize } from './fileText.ts';
 import { keepLines, oneLine } from './time.ts';
 
@@ -116,15 +116,15 @@ async function ls(b: Backend, [where, inside]: string[], opt: Opts, io: Io): Pro
     if (opt.json) return io.out(JSON.stringify(page, null, 2));
     io.out(`${areaName(area)} ${p ? `${oneLine(p.replace(/\/+$/, ''))}/ ` : ''}· ${page.total} file${page.total === 1 ? '' : 's'}`);
     for (const f of page.files) io.out(fileLine(f, area));
-    if (page.cursor) io.out(`more: lampo files ls ${areaWord(area)}${p ? ` ${shellWord(p)}` : ''} --cursor ${page.cursor}`);
+    if (page.cursor) io.out(`more: lampo files ls --cursor=${page.cursor} -- ${areaWord(area)}${p ? ` ${shellWord(p)}` : ''}`);
     return;
   }
   const s = await b.filesSummary(area);
   if (opt.json) return io.out(JSON.stringify(s, null, 2));
   const lines = summaryLines(s);
-  if (!lines) return io.out(`no files for ${areaName(area)} yet. Add some: lampo files push <folder> --to ${areaWord(area)}`);
+  if (!lines) return io.out(`no files for ${areaName(area)} yet. Add some: ${pushLine(area, ['<folder>'])}`);
   for (const l of lines) io.out(l);
-  io.out(`pull: lampo files pull ${areaWord(area)} --to <dir> --only '<glob>' · one folder's files: lampo files ls ${areaWord(area)} <path>`);
+  io.out(`pull: ${pullLine(area, '<dir>', ['<glob>'])} · one folder's files: lampo files ls -- ${areaWord(area)} '<path>'`);
 }
 
 function pullLines(r: PullResult, ms: number, dry: boolean): string[] {
@@ -141,7 +141,7 @@ function pullLines(r: PullResult, ms: number, dry: boolean): string[] {
       ];
   for (const x of r.refused.slice(0, 20)) lines.push(`left out: ${oneLine(x.path)} — ${oneLine(x.why)}`);
   if (r.refused.length > 20) lines.push(`left out: … ${r.refused.length - 20} more (--json lists all)`);
-  if (r.hidden.length) lines.push(`left out: ${r.hidden.length} hidden (${some(r.hidden)}): name one exactly to pull it (--only <its path>)`);
+  if (r.hidden.length) lines.push(`left out: ${r.hidden.length} hidden (${some(r.hidden)}): name one exactly to pull it (--only=<its path>)`);
   for (const x of r.failed.slice(0, 20)) lines.push(`failed: ${oneLine(x.path)} — ${oneLine(x.why)}`);
   if (r.failed.length > 20) lines.push(`failed: … ${r.failed.length - 20} more (run it again: it goes on where it stopped)`);
   for (const u of r.unmatched) lines.push(`no file matches ${oneLine(u)}`);
@@ -165,7 +165,7 @@ async function pullCmd(b: Backend, [where, ...patterns]: string[], opt: Opts, io
     const x = e.result;
     if (opt.json) io.out(JSON.stringify({ ...x, refused_for_room: true }, null, 2));
     return io.fail(
-      `needs ${fileSize(x.needed)}, ${fileSize(x.free ?? 0)} free in ${oneLine(to)}: pull only what this needs (--only '<glob>'; lampo files ls ${areaWord(area)} shows what is there), or make room. Nothing was fetched.`,
+      `needs ${fileSize(x.needed)}, ${fileSize(x.free ?? 0)} free in ${oneLine(to)}: pull only what this needs (--only='<glob>'; lampo files ls -- ${areaWord(area)} shows what is there), or make room. Nothing was fetched.`,
     );
   } finally {
     shown.done();
@@ -266,8 +266,8 @@ function statusLines(r: StatusResult): string[] {
   const here = r.lines.some((l) => l.state === 'changed here' || l.state === 'new here');
   const there = r.lines.some((l) => l.state === 'changed there' || l.state === 'missing here');
   const both = r.lines.some((l) => l.state === 'both changed');
-  if (here) lines.push(`push: lampo files push ${shellWord(r.to.endsWith('/') ? r.to : `${r.to}/`)} --to ${areaWord(r.areas[0] ?? '')}`);
-  if (there) lines.push(`pull: lampo files pull ${areaWord(r.areas[0] ?? '')} --to ${shellWord(r.to)}`);
+  if (here) lines.push(`push: ${pushLine(r.areas[0] ?? '', [r.to.endsWith('/') ? r.to : `${r.to}/`])}`);
+  if (there) lines.push(`pull: ${pullLine(r.areas[0] ?? '', r.to)}`);
   if (both) lines.push('both changed: push --copy keeps both, or pull --force takes theirs');
   return lines;
 }
@@ -275,7 +275,7 @@ function statusLines(r: StatusResult): string[] {
 async function statusCmd(b: Backend, opt: Opts, io: Io, hashes: ReturnType<typeof hashCache>): Promise<void> {
   const to = str(opt.to) ?? '.';
   const r = await status(b, { to, hashes });
-  if (!r) return io.fail(`nothing was pulled into ${oneLine(to)} yet: lampo files pull <project> --to ${oneLine(to)}`);
+  if (!r) return io.fail(`nothing was pulled into ${oneLine(to)} yet: lampo files pull --to=${shellWord(oneLine(to))} -- <project>`);
   if (opt.json) return io.out(JSON.stringify(r, null, 2));
   for (const l of statusLines(r)) io.out(keepLines(l));
 }

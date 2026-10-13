@@ -78,6 +78,42 @@ test('a name that differs only in case from a file there is refused, the same pa
   assert.equal(plan.clash.length, 1);
 });
 
+test('a new name that starts with "-" is left out with why; a file or folder there from before keeps its name', () => {
+  const existing = there([
+    ['-old.wav', 1, 'aa', 10],
+    ['-Old dir/in.wav', 1, 'bb', 10],
+  ]);
+  const plan = planDrop(
+    [
+      { file: f(1), rel: '-old.wav' },
+      { file: f(2), rel: '-Old dir/new.wav' },
+      { file: f(3), rel: '--force.wav' },
+      { file: f(4), rel: '-New dir/a.wav' },
+      { file: f(5), rel: 'ok.wav' },
+    ],
+    '',
+    existing,
+  );
+  assert.deepEqual(
+    plan.add.map((x) => [x.path, x.base]),
+    [
+      ['-old.wav', 1],
+      ['-Old dir/new.wav', null],
+      ['ok.wav', null],
+    ],
+  );
+  assert.deepEqual(
+    plan.bad.map((b) => b.path),
+    ['--force.wav', '-New dir/a.wav'],
+  );
+  assert.match(plan.bad[0]?.why ?? '', /can’t start with “-”/);
+  // dropped into a folder from before: only what the drop names is new
+  assert.deepEqual(
+    planDrop([{ file: f(1), rel: 'b.wav' }], '-Old dir', existing).add.map((x) => x.path),
+    ['-Old dir/b.wav'],
+  );
+});
+
 test('a Mac’s decomposed names go in as the server keeps them (NFC), so its answers find them', () => {
   const nfd = 'Fu\u0308ße.wav';
   const plan = planDrop([{ file: f(1), rel: nfd }], 'Musik', there([]));
@@ -116,11 +152,13 @@ test('what the plan comes to once hashes are known: the same bytes need nothing,
 test('what an agent gets: one pull with exactly these, the MCP call under it, the push for a big folder', () => {
   assert.equal(
     pullCommand('Acme/Spring sale', ['Footage/Day 1/A001C003.mov'], ['Music']),
-    "lampo files pull 'Acme/Spring sale' --to public/ --only 'Music/**' --only 'Footage/Day 1/A001C003.mov'",
+    "lampo files pull --to=public/ --only='Music/**' --only='Footage/Day 1/A001C003.mov' -- 'Acme/Spring sale'",
   );
-  assert.equal(pullCommand('', ['Fonts/Inter.ttf']), 'lampo files pull House --to public/ --only Fonts/Inter.ttf');
+  assert.equal(pullCommand('', ['Fonts/Inter.ttf']), 'lampo files pull --to=public/ --only=Fonts/Inter.ttf -- House');
   assert.equal(mcpCall('Acme', 'Brand'), 'list_files({folder: "Acme", path: "Brand"})');
-  assert.equal(pushCommand('Acme/Spring sale', 'Footage', './Shoot'), "lampo files push ./Shoot --to 'Acme/Spring sale' --path Footage/");
+  assert.equal(pushCommand('Acme/Spring sale', 'Footage', './Shoot'), "lampo files push --to='Acme/Spring sale' --path=Footage/ -- ./Shoot");
+  // a name like an option is a value, or comes after `--` (files-cli.test.ts reads them through a shell and lampo's parser)
+  assert.equal(pullCommand('--force', ['--to=x']), "lampo files pull --to=public/ --only='--to=x' -- --force");
   // single quotes: nothing inside is special — `$`, a backtick, `!` (history in an interactive zsh or bash)
   assert.equal(shellWord('a "b" $c `d` Hi!'), `'a "b" $c \`d\` Hi!'`);
   assert.equal(shellWord("Mia's cut"), `'Mia'\\''s cut'`);

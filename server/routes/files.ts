@@ -43,6 +43,7 @@ import {
   moveDir,
   moveFile,
   namedFolder,
+  newNamesRefused,
   purgeFiles,
   pushConflicts,
   readAreaRev,
@@ -231,7 +232,12 @@ function inert(res: Response, name: string, inline: boolean): void {
 /** The type a preview is served as (text with its charset), or null: it only ever downloads. */
 const shownAs = (type: string): string | null => (inlineType(type) ? (type === 'text/plain' ? 'text/plain; charset=utf-8' : type) : null);
 
-const urlName = (name: string): string => encodeURIComponent(name.replace(/[/\\\0]/g, '_').slice(0, 200) || 'file');
+/**
+ * A file's name as the last part of a URL: percent-encoded, `!'()*` too (encodeURIComponent leaves them), so the URL
+ * is one word wherever it is put, a shell's quotes among them.
+ */
+const urlName = (name: string): string =>
+  encodeURIComponent(name.replace(/[/\\\0]/g, '_').slice(0, 200) || 'file').replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
 
 /** Who writes: the account, the agent it says it is (only a role that may hand work to agents: `actor`'s rule), how. */
 export function fileStamp(
@@ -359,6 +365,10 @@ export async function offerPush(
     seen.add(it.path.toLowerCase());
   }
   const area = writeArea(b.folder);
+  // a new file's name (and the folders its path makes) as commitFiles takes it: refused before any byte moves
+  const paths = items.map((i) => i.path);
+  const [named] = newNamesRefused(area.scope, paths);
+  if (named) throw fail(400, `${named.path}: ${named.why}`);
   const conflict = b.conflict ?? 'refuse';
   if (conflict === 'refuse') {
     const conflicts = pushConflicts(area.scope, items);

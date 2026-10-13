@@ -12,6 +12,7 @@ import { endsWaitNow } from '../lib/handoff.ts';
 import { byName } from '../lib/inputs.ts';
 import { cleanAuthor, wellFormed } from '../lib/names.ts';
 import { isoLocal } from '../lib/paths.ts';
+import { READ_ACTIONS } from '../lib/permissions.ts';
 import { agentText } from '../lib/planWords.ts';
 import type { PreviewTarget } from '../lib/previews.ts';
 import { publicMessage } from '../lib/publicError.ts';
@@ -192,7 +193,8 @@ export function createToolKit(server: McpServer, o: ReviewServerOptions): ToolKi
     };
     const run = async (args: z.output<S>, ctx: ServerContext): Promise<CallToolResult> => {
       if (!allowed(o.principal, access)) return fail(`your role (${o.principal.role}) may not ${name.replace(/_/g, ' ')}`);
-      const frozen = access === 'view' ? null : (o.readOnly?.() ?? null);
+      // a suspended workspace reads on, as over the API: watching, notes, the project files and their download URLs
+      const frozen = READ_ACTIONS.has(access) ? null : (o.readOnly?.() ?? null);
       if (frozen) return fail(frozen);
       try {
         // as the HTTP API's bodies (server/http.ts parse): no lone surrogate goes into a name, a label or a note

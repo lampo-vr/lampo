@@ -3,7 +3,8 @@
 // an upload (what is new, what replaces what, what is left out, whether it fits), and the commands that hand files to an
 // agent. Words go through t().
 import { agentKindOf, agentShown } from '../../../lib/agentKind.ts';
-import { caseKey, dirOf, FILE_LIMITS, filePathProblem, nameOf } from '../../../lib/fileText.ts';
+import { pullLine, pushLine, shellWord } from '../../../lib/fileLines.ts';
+import { caseKey, dirOf, FILE_LIMITS, filePathProblem, nameOf, newPathProblem } from '../../../lib/fileText.ts';
 import type { AgentKind, FileInfo, FileKind, FileVersionInfo, TrashedFileInfo } from '../../../lib/types.ts';
 import { locale, t } from '../i18n/index.ts';
 
@@ -300,27 +301,12 @@ export function between(ids: string[], from: string, to: string): string[] {
 // ---------------------------------------------------------------- what agents get
 
 /**
- * A word for a shell, quoted when it needs to be ('Acme/Spring sale', 'Footage/**'): in single quotes, where nothing is
- * special (`$`, a backtick, and `!` in an interactive zsh or bash), a quote itself as `'\''`.
- */
-export function shellWord(s: string): string {
-  if (/^[\w./@:+-]+$/.test(s)) return s;
-  return `'${s.replaceAll("'", "'\\''")}'`;
-}
-
-/**
- * The area's name for `lampo files`: the folder's path, or "House" for the House's — a project that is called "House"
- * is `House/` there (lib/filesSync.ts areaOf reads it so), never the House.
- */
-const areaArg = (area: string) => (area ? shellWord(area === 'House' ? 'House/' : area) : 'House');
-
-/**
  * What an agent needs to fetch these, nothing more: one `lampo files pull` (files by their path, folders as a glob of
- * everything in them), and the MCP form under it.
+ * everything in them), and the MCP form under it. Every name in it is other people's: a value of its option, the area
+ * after `--` (lib/fileLines.ts), so the line does what it says whatever they are called.
  */
 export function pullCommand(area: string, files: string[], dirs: string[] = []): string {
-  const only = [...dirs.map((d) => `${d}/**`), ...files].map((p) => ` --only ${shellWord(p)}`).join('');
-  return `lampo files pull ${areaArg(area)} --to public/${only}`;
+  return pullLine(area, 'public/', [...dirs.map((d) => `${d}/**`), ...files]);
 }
 
 export function mcpCall(area: string, path: string): string {
@@ -330,7 +316,7 @@ export function mcpCall(area: string, path: string): string {
 
 /** The same upload from a terminal: `--path` is where in the area it goes. */
 export function pushCommand(area: string, dir: string, source: string): string {
-  return `lampo files push ${shellWord(source)} --to ${areaArg(area)}${dir ? ` --path ${shellWord(`${dir}/`)}` : ''}`;
+  return pushLine(area, [source], dir ? `${dir}/` : '');
 }
 
 // ---------------------------------------------------------------- the check before an upload
@@ -370,6 +356,10 @@ export type Existing = Map<string, { id: string; v: number; sha256: string; size
 export function planDrop<F extends { size: number }>(picked: { file: F; rel: string }[], dir: string, existing: Existing, junk: string[] = []): DropPlan<F> {
   const byCase = new Map<string, string>();
   for (const p of existing.keys()) byCase.set(caseKey(p), p);
+  // the folders there (the files' and the one dropped into): a new name starting with "-" can't go in, theirs stay
+  const dirs = new Set<string>();
+  for (const p of existing.keys()) for (let d = dirOf(p); d; d = dirOf(d)) dirs.add(caseKey(d));
+  for (let d = dir; d; d = dirOf(d)) dirs.add(caseKey(d));
   const add: Planned<F>[] = [];
   const bad: DropPlan['bad'] = [];
   const clash: DropPlan['clash'] = [];
@@ -390,6 +380,10 @@ export function planDrop<F extends { size: number }>(picked: { file: F; rel: str
     }
     const k = caseKey(path);
     const there = existing.get(path) ?? null;
+    if (!there && newPathProblem(path, { there: (d) => dirs.has(caseKey(d)) })) {
+      bad.push({ path: rel, why: t('a new name can’t start with “-”') });
+      continue;
+    }
     const other = byCase.get(k);
     if ((!there && other && other !== path) || seen.has(k)) {
       // the one it meets: another of this drop (its path from the drop), or a file there (its path in the area, less `dir`)
@@ -446,4 +440,4 @@ export function trayGroup(rel: string): string {
 /** A path's folder part for display: "Footage / Day 1". */
 export const spaced = (path: string) => path.split('/').join(' / ');
 
-export { dirOf, nameOf };
+export { dirOf, nameOf, shellWord };

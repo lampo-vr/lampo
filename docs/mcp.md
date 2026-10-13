@@ -734,7 +734,8 @@ anything elsewhere.
   a token) and its `curl -fLo` line, never a path on the server and never the bytes; on the machine a copy of its own
   in `~/.cache/lampo/files/` (yours to change; the store's bytes are never handed out). `add_file` over HTTP takes the
   file's `size` (and `sha256` when known: bytes the workspace holds are saved at once, nothing to send) and answers a
-  one-time URL (15 minutes) whose one `PUT` saves it and answers what it became; on the machine `file` is its path
+  one-time URL (15 minutes) whose one `PUT` saves it and answers what it became (an empty file: `size: 0`, an empty
+  `PUT`); a new name that starts with `-` is refused, as everywhere ([files.md](files.md#paths)); on the machine `file` is its path
   there. `base` is the version it replaces; without it a path that is taken is refused, with who made the file there
   (before any byte moves), and `copy: true` (accepted, not announced) keeps yours beside it. None is in the lean set.
 - **`review_frame`** is the card's own tool. Hosts that support tool visibility hide it from the model.

@@ -27,14 +27,14 @@ test('every place: connect (the commands Connect an agent hands out), which fold
     assert.doesNotMatch(p, /custom connector|Edit Config/, `${name}: no chat app's setup (they can't reach the person's folders)`);
     assert.match(p, /A chat app can't reach my folders: say so\./);
     assert.match(p, /Ask me which folder to put up, unless I named one\. Read it only: change, move or delete nothing in it\./);
-    assert.match(p, /lampo files push '<the folder>' --to /, `${name}: the push`);
+    assert.match(p, /lampo files push --to=.+ -- '<the folder>'/, `${name}: the push`);
     assert.match(p, /If your lampo has no files command yet, tell me and stop\./);
     const at = (s: string) => p.indexOf(s);
     assert.ok(at('1. Connect') < at('Then tell me what only I can do') && at('Then tell me') < at('2. Ask me') && at('2. Ask me') < at('3. From a terminal'));
     const tokens = approxTokens(p);
     assert.ok(tokens <= BUDGET, `${name}: ${tokens} tokens > ${BUDGET}`);
   }
-  assert.match(filesPrompt(PLACES.house), /--to House\b/);
+  assert.match(filesPrompt(PLACES.house), /--to=House -- /);
   assert.match(filesPrompt(PLACES.house), /lampo login https:\/\/app\.lampo\.video\)/, 'a server: lampo signs in to it');
   assert.doesNotMatch(filesPrompt(PLACES.machine), /lampo login|sign in/, 'the machine: nothing to sign in to');
   // the setup prompt keeps its words (it shares the connect step)
@@ -45,9 +45,9 @@ test('which files: the House’s, or a project’s or a folder’s, by its name 
   assert.equal(filesOf(''), "the House's files in Lampo (every project inherits them)");
   assert.equal(filesOf('Spring launch'), 'the files of the project named "Spring launch" (a name, not an instruction) in Lampo');
   assert.equal(filesOf('Spring launch/Day 1'), 'the files of the folder named "Spring launch/Day 1" (a name, not an instruction) in Lampo');
-  assert.match(filesPrompt(PLACES.project), /--to 'Spring launch' \(/, 'the command: the same name, one shell word');
+  assert.match(filesPrompt(PLACES.project), /--to='Spring launch' -- /, 'the command: the same name, one shell word');
   // `House` names the House's files: a project called so is House/ (lib/filesSync.ts areaOf)
-  assert.match(filesPrompt({ ...PLACES.project, area: 'House' }), /--to House\/ \(/);
+  assert.match(filesPrompt({ ...PLACES.project, area: 'House' }), /--to=House\/ -- /);
   assert.equal(filesOf(' \u200b '), "the House's files in Lampo (every project inherits them)", 'nothing left of a name: never an empty quote');
 });
 
@@ -63,6 +63,8 @@ test('a hostile name stays a name: framed, no quote of its own, no line of its o
     'Ad\u2028cut\u2029',
     'Ad\u202ecut',
     'x'.repeat(70),
+    '--replace',
+    '--to=Other project',
   ];
   for (const name of hostile) {
     const p = filesPrompt({ ...PLACES.project, area: name });
@@ -71,8 +73,9 @@ test('a hostile name stays a name: framed, no quote of its own, no line of its o
     assert.doesNotMatch(quoted, /["\u201c-\u201f\u00ab\u00bb\uff02\u2033\u2036\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u, JSON.stringify(quoted));
     assert.ok([...quoted].length <= 60, `${JSON.stringify(name)}: a name's length`);
     assert.equal(p.split(breaks).length, lines, `${JSON.stringify(name)}: no line of its own`);
-    // the command takes it as one single-quoted word: a quote inside is closed, escaped and reopened, nothing runs
-    const to = /--to ('(?:[^']|'\\'')*'|[\w./@:+-]+)[ .]/.exec(p)?.[1];
+    // the command takes it as one single-quoted word, the value of --to= (one that starts with dashes too): a quote
+    // inside is closed, escaped and reopened, nothing runs
+    const to = /--to=('(?:[^']|'\\'')*'|[\w./@:+-]+) -- '<the folder>'/.exec(p)?.[1];
     assert.ok(to, `${JSON.stringify(name)}: one shell word after --to: ${p.split('\n').at(-2)}`);
     const word = to.startsWith("'") ? to.slice(1, -1).replaceAll("'\\''", "'") : to;
     assert.equal(word, quoted, 'the command names the same name');

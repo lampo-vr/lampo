@@ -198,7 +198,7 @@ export function usageOf(name: string, text: string): string {
 type OptValue = string | true | string[];
 type Opts = Record<string, OptValue | undefined>;
 
-interface Args {
+export interface Args {
   pos: string[];
   opt: Opts;
   /** `lampo render`: everything after `--`, the command as given. */
@@ -209,11 +209,20 @@ const MULTI = new Set(['box', 'arrow', 'choice']);
 /** Options a command takes more than once beyond those (`lampo export --folder A --folder B`). */
 const MULTI_OF: Record<string, string[]> = { export: ['folder'], files: ['only'] };
 
+/**
+ * A command's words: `--name value`, `--name=value` and `--flag` are options (the last one given wins, but for those
+ * taken more than once), anything else is a position. After a bare `--` every word is a position, whatever it starts
+ * with: lines Lampo hands out put names there (lib/fileLines.ts), and give an option's value attached (`--to=<dir>`).
+ */
 function parseArgs(argv: string[], multi: ReadonlySet<string> = MULTI): Args {
   const pos: string[] = [];
   const opt: Opts = {};
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
+    if (a === '--') {
+      pos.push(...argv.slice(i + 1));
+      break;
+    }
     if (a.startsWith('--')) {
       const eq = a.indexOf('=');
       const key = (eq > 0 ? a.slice(2, eq) : a.slice(2)).replace(/-/g, '_');
@@ -226,6 +235,13 @@ function parseArgs(argv: string[], multi: ReadonlySet<string> = MULTI): Args {
     } else pos.push(a);
   }
   return { pos, opt };
+}
+
+/** The words after a command's name as that command reads them (its positions, its options; `render`'s command). */
+export function commandArgs(name: string, rest: string[]): Args {
+  // `lampo render … -- <command>`: what follows `--` is the agent's command, never lampo's options.
+  const split = name === 'render' ? rest.indexOf('--') : -1;
+  return split >= 0 ? { ...parseArgs(rest.slice(0, split)), cmd: rest.slice(split + 1) } : parseArgs(rest, new Set([...MULTI, ...(MULTI_OF[name] ?? [])]));
 }
 
 /** The option's value when it was given with a value (not as a bare flag). */
@@ -1500,10 +1516,7 @@ export async function main(argv: string[], { as = 'lampo' }: { as?: 'lampo' | 'v
     process.exitCode = 2;
     return;
   }
-  // `lampo render … -- <command>`: what follows `--` is the agent's command, never lampo's options.
-  const split = name === 'render' ? rest.indexOf('--') : -1;
-  const args: Args =
-    split >= 0 ? { ...parseArgs(rest.slice(0, split)), cmd: rest.slice(split + 1) } : parseArgs(rest, new Set([...MULTI, ...(MULTI_OF[name] ?? [])]));
+  const args = commandArgs(name, rest);
   // `lampo push --help`: the command's own lines of the help, on stdout (tools read what a command takes from it).
   if (args.opt.help === true && name !== 'help') {
     out(usageOf(name, help(openBackend().where)));
