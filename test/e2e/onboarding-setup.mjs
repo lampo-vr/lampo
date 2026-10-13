@@ -214,23 +214,40 @@ try {
     // a review link's chip in the picture wears the link's mark, never a made-up visitor's initials ("CL")
     const avatars = await ana.$$eval('[data-testid=ob-panel] .ob-av', (els) => els.map((e) => e.textContent.trim()));
     assert(!avatars.includes('CL'), `initials in the picture: ${avatars}`);
-    // the picture: a frame for each choice, their names on one line (the picked ones lit), something else a title card
-    const names = await ana.$$eval('[data-testid=ob-panel] .ob-pf-name', (els) =>
-      els.map((e) => ({ text: e.textContent, top: Math.round(e.getBoundingClientRect().top), on: e.classList.contains('ob-on') })),
-    );
-    assert(names.length === 4 && new Set(names.map((n) => n.top)).size === 1, `the four names on one line: ${JSON.stringify(names)}`);
-    assert(JSON.stringify(names.map((n) => n.on)) === '[false,true,false,true]', `lit: the picked ones: ${JSON.stringify(names)}`);
-    // one set on one shelf: the same height, standing on one line, the same clear gap between each two (none touching)
-    const set = await ana.$$eval('[data-testid=ob-panel] .ob-pf', (els) =>
-      els.map((e) => {
+    // the picture on a desk: a frame for each choice in a grid of two by two (the 16:9 pair above, the short and the
+    // something-else below, centred in their cells), the names on one line per row, the picked ones lit, something else
+    // a title card; it uses the panel
+    const grid = await ana.evaluate(() => {
+      const box = (e) => {
         const r = e.getBoundingClientRect();
-        return { left: r.left, right: r.right, top: r.top, height: r.height };
-      }),
+        return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, height: r.height, width: r.width, mid: r.left + r.width / 2 };
+      };
+      const frames = [...document.querySelectorAll('[data-testid=ob-panel] .ob-pf')].map(box);
+      const names = [...document.querySelectorAll('[data-testid=ob-panel] .ob-pf-name')].map((e) => ({ ...box(e), on: e.classList.contains('ob-on') }));
+      return { frames, names, panel: box(document.querySelector('[data-testid=ob-panel]')) };
+    });
+    const [a, b, c, d] = grid.frames;
+    const near = (x, y) => Math.abs(x - y) <= 1;
+    assert(grid.frames.length === 4 && grid.names.length === 4, JSON.stringify(grid));
+    assert(
+      near(a.top, b.top) && near(c.top, d.top) && c.top > grid.names[0].bottom,
+      `two rows, the second under the first's names: ${JSON.stringify(grid.frames)}`,
     );
-    const gaps = set.slice(1).map((f, i) => Math.round(f.left - set[i].right));
-    const spread = (k) => Math.max(...set.map((f) => f[k])) - Math.min(...set.map((f) => f[k]));
-    assert(set.length === 4 && spread('top') <= 1 && spread('height') <= 1, `one height, one line: ${JSON.stringify(set)}`);
-    assert(Math.min(...gaps) >= 12 && Math.max(...gaps) - Math.min(...gaps) <= 1, `even, clear gaps: ${gaps}`);
+    assert(
+      [b, c, d].every((f) => near(f.height, a.height)),
+      `one height for every frame: ${JSON.stringify(grid.frames)}`,
+    );
+    assert(
+      near(c.mid, a.mid) && near(d.mid, b.mid) && b.left - a.right >= 24,
+      `two columns, the short and the square centred in theirs: ${JSON.stringify(grid.frames)}`,
+    );
+    assert(
+      near(grid.names[0].top, grid.names[1].top) && near(grid.names[2].top, grid.names[3].top),
+      `one line of names per row: ${JSON.stringify(grid.names)}`,
+    );
+    assert(JSON.stringify(grid.names.map((n) => n.on)) === '[false,true,false,true]', `lit: the picked ones: ${JSON.stringify(grid.names)}`);
+    const used = (b.right - a.left) / grid.panel.width;
+    assert(used > 0.6, `the grid uses the panel: ${Math.round(used * 100)}% of its width`);
     const card = await ana.$eval('[data-testid=ob-persona-else]', (e) => e.textContent);
     assert(card.includes('Trade fair loops'), `something else, as typed: ${card}`);
     await shot(ana, '03-persona');
@@ -687,6 +704,29 @@ try {
     await mia.waitForSelector('[data-testid=ob-gs] [data-testid=ob-step]', { timeout: 15000 });
     const steps = await mia.$$eval('[data-testid=ob-step]', (els) => els.map((e) => e.dataset.step));
     assert(JSON.stringify(steps) === '["project","agent","agent_video","invite","share"]', `a server's order: ${steps}`);
+  });
+
+  await check('German on a desk: beside the five steps Skip takes its short word, clear of the track', async () => {
+    const p = await fresh();
+    await p.evaluateOnNewDocument(() => localStorage.setItem('vr.lang', 'de'));
+    const c = (await ana.cookies(cloud.base)).find((x) => x.name.includes('vr_session'));
+    await p.setCookie({ name: c.name, value: c.value, url: cloud.base });
+    const off = [];
+    for (const width of [1024, 1440, 1920]) {
+      await p.setViewport({ width, height: 900 });
+      await p.goto(`${cloud.base}/#/welcome/persona`, { waitUntil: 'domcontentloaded' });
+      await atStep(p, 'persona');
+      await p.waitForFunction(() => document.documentElement.lang === 'de');
+      const m = await p.evaluate(() => {
+        const track = document.querySelector('.ob-su-top .ob-track').getBoundingClientRect();
+        const words = [...document.querySelectorAll('[data-testid=ob-skip] span')].find((s) => s.getBoundingClientRect().width > 0);
+        const r = words.getBoundingClientRect();
+        return { words: words.textContent, gap: Math.round(r.left - track.right) };
+      });
+      if (m.words !== 'Überspringen' || m.gap < 8) off.push(`@${width}: “${m.words}” ${m.gap} px right of the track`);
+    }
+    await p.browserContext().close();
+    assert(!off.length, off.join('\n        '));
   });
 
   await check('a wide screen (1920, 2560): the column stands in the pane’s middle, Back · track · Skip line up with it', async () => {

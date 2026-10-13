@@ -148,7 +148,8 @@ format stays backwards compatible throughout.
   playhead through the note's frame. Beside it only the headline, its sentence and the way on; the list of the steps
   ahead is gone (the line under the button still counts them).
 - "Who are the videos for?" draws a frame for each choice, Something else too (it turns into a title card of what you
-  type), and names all four on one line. With Something else picked too it reads "Review links lead.", not "leads".
+  type), large in a grid of two by two that uses the panel (one row on a phone), each named under it. With Something
+  else picked too it reads "Review links lead.", not "leads".
 - The team step's picture shows the people it asks for (your editor, your producer, whoever approves), each place taken
   by an invite as you type it, beside a frame with everyone's pins.
 - The chosen item of a segmented control and of tabs sits concentric in its track: its corners follow the track's
@@ -220,6 +221,8 @@ format stays backwards compatible throughout.
   you list your server's MCP connector there.
 
 ### Fixed
+- The setup in German: on a hosted server's five steps, "Überspringen" stands clear of the step track; the whole
+  phrase ran into it on a desk.
 - Review links: tighter checks on what a link may change, video by video.
 - A link for several videos answers faster in a workspace with many videos: each request looks its videos up once.
 - The marks on a paused frame read on any picture. "Changed since V2" and Auto-check's label sit on a dark chip

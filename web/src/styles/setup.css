@@ -151,6 +151,14 @@
 .ob-su-top .ob-show-s {
   display: none;
 }
+/* German's "Einrichtung überspringen" fits beside three steps, not beside a hosted setup's five (the columns either side
+   of the track are equal, so it ran into the track at every desk width): there German takes its short word */
+:lang(de) .ob-su-top:has(.ob-track > :nth-child(4)) .ob-hide-s {
+  display: none;
+}
+:lang(de) .ob-su-top:has(.ob-track > :nth-child(4)) .ob-show-s {
+  display: inline;
+}
 .ob-su-main {
   display: grid;
   align-content: center;

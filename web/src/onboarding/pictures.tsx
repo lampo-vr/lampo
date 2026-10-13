@@ -49,15 +49,22 @@ function fit(pnl: HTMLElement) {
   }
   if (R <= L) return;
   const band = r.height < 360;
-  // Welcome's picture is the first thing anyone sees, and the persona shelf is one long row: they take a little more of
-  // the panel's width
-  const availW = band ? r.width - 24 : r.width * (pic.querySelector('.ob-hl, .ob-pf-name') ? 0.9 : 0.84);
-  // (the shelf of names keeps air above and below in the band too: on a tablet it fills it by height)
-  const availH = band ? r.height - (pic.querySelector('.ob-pf-name') ? 48 : 20) : r.height * 0.7;
+  // the persona's frames: one row in a band, a grid of two by two that uses the panel on a desk
+  const persona = !!pic.querySelector('.ob-pf-name');
+  // Welcome's picture is the first thing anyone sees: it takes a little more of the panel's width; the persona grid
+  // takes about four fifths of it
+  const availW = band ? r.width - 24 : r.width * (persona ? 0.8 : pic.querySelector('.ob-hl') ? 0.9 : 0.84);
+  // (the row of names keeps air above and below in the band too: on a tablet it fills it by height)
+  const availH = band ? r.height - (persona ? 48 : 20) : r.height * 0.7;
   // the caps keep a picture from looming on a laptop; a wide panel (1920 and up) lets it grow with the room
   // Welcome's picture stands beside the headline as one composition: on a wide screen it grows less, so the words keep
-  // their weight beside it
-  const cap = pic.querySelector('.ob-hl') ? 1.15 * Math.max(1, r.width / 1200) : (pic.querySelector('.ob-wscard') ? 1.2 : 1.5) * Math.max(1, r.width / 1000);
+  // their weight beside it; the persona grid is drawn small and meant to fill its share of the panel
+  const cap =
+    persona && !band
+      ? 3
+      : pic.querySelector('.ob-hl')
+        ? 1.15 * Math.max(1, r.width / 1200)
+        : (pic.querySelector('.ob-wscard') ? 1.2 : 1.5) * Math.max(1, r.width / 1000);
   const s = Math.max(0.3, Math.min(cap, availW / (R - L), availH / (B - T)));
   pnl.style.setProperty('--s', s.toFixed(3));
   pnl.style.setProperty('--dx', `${((320 - (L + R) / 2) * s).toFixed(1)}px`);
@@ -553,31 +560,68 @@ export function Switcher({ name, sub }: { name: string; sub: string }) {
 }
 
 /**
- * Who the videos are for: a frame for each of the four choices on one shelf — a review link's, a team's approval, a
- * short in 9:16, and a slot for something else that, once picked, becomes a title card of the words typed — their
- * names on one line under them. One set: every picture the same height, each as wide as its format (16:9, 16:9, 9:16,
- * a square for "any other"), the same gap between all of them, standing on one line. A pick lights its frame and its
- * name and the others step back; nothing moves or grows into its neighbour.
+ * Who the videos are for: a frame for each of the four choices — a review link's, a team's approval, a short in 9:16,
+ * and a slot for something else that, once picked, becomes a title card of the words typed — each with its name under
+ * it. One set: every picture the same height, each as wide as its format (16:9, 16:9, 9:16, a square for "any other").
+ * On a desk they stand as a grid of two by two that uses the panel: the two 16:9 frames above, the short and the
+ * something-else below, each centred in a cell as wide as a 16:9 frame, one gutter across and one between the rows,
+ * the names on one line per row. In a phone's band they stand in one row, one gap between each two. The layouts are
+ * the container's (lighttable.css picks `--g*` or `--r*`), so the panel's fit measures whichever shows. A pick lights
+ * its frame and its name and the others step back; nothing moves.
  */
 export function ScenePersona({ picked, other }: { picked: string[]; other: string | null }) {
-  const on = (k: string) => (k === 'other' ? other !== null : picked.includes(k));
+  type K = 'agency' | 'inhouse' | 'creator' | 'other';
+  const on = (k: K) => (k === 'other' ? other !== null : picked.includes(k));
   const any = picked.length > 0 || other !== null;
-  const cls = (k: string) => `ob-pf ${any ? (on(k) ? 'ob-on' : 'ob-dim') : ''}`;
-  // the set: one picture height, widths by format, one gap; the mat adds 20 across and 33 down (Frame)
+  const cls = (k: K) => `ob-pf ${any ? (on(k) ? 'ob-on' : 'ob-dim') : ''}`;
+  // one picture height, widths by format; the mat adds 20 across and 33 down (Frame)
   const H = 96;
+  const widths: Record<K, number> = { agency: Math.round((H * 16) / 9), inhouse: Math.round((H * 16) / 9), creator: Math.round((H * 9) / 16), other: H };
+  const mat = (k: K) => widths[k] + 20;
+  // the row (a phone's band): side by side, one gap
   const GAP = 24;
-  const widths = { agency: Math.round((H * 16) / 9), inhouse: Math.round((H * 16) / 9), creator: Math.round((H * 9) / 16), other: H };
-  const keys = ['agency', 'inhouse', 'creator', 'other'] as const;
-  const x: Record<(typeof keys)[number], number> = { agency: 0, inhouse: 0, creator: 0, other: 0 };
-  keys.reduce((at, k) => {
-    x[k] = at;
-    return at + widths[k] + 20 + GAP;
+  const rx = { agency: 0, inhouse: 0, creator: 0, other: 0 } as Record<K, number>;
+  (['agency', 'inhouse', 'creator', 'other'] as K[]).reduce((at, k) => {
+    rx[k] = at;
+    return at + mat(k) + GAP;
   }, 0);
-  // the shelf: frames standing on one line, their names on one line under it
   const shelf = 330;
-  const top = shelf - (H + 33);
-  const tag = (k: (typeof keys)[number], words: string) => (
-    <span className={`ob-pf-name ${on(k) ? 'ob-on' : ''}`} style={{ left: x[k] - GAP / 2, width: widths[k] + 20 + GAP, top: shelf + 18 }}>
+  // the grid (a desk): two cells across, each as wide as a 16:9 frame, a frame centred in its cell
+  const cell = mat('agency');
+  const COL = 32;
+  const ROW = H + 33 + 18 + 10 + 36;
+  const gx0 = Math.round((640 - (2 * cell + COL)) / 2);
+  const gy0 = Math.round((520 - (2 * ROW - 36)) / 2);
+  const at: Record<K, [number, number]> = { agency: [0, 0], inhouse: [1, 0], creator: [0, 1], other: [1, 1] };
+  const cellX = (k: K) => gx0 + at[k][0] * (cell + COL);
+  const cellY = (k: K) => gy0 + at[k][1] * ROW;
+  const px = (n: number) => `${Math.round(n)}px`;
+  const place = (k: K) =>
+    ({
+      left: 'var(--px)',
+      top: 'var(--py)',
+      '--gx': px(cellX(k) + (cell - mat(k)) / 2),
+      '--gy': px(cellY(k)),
+      '--rx': px(rx[k]),
+      '--ry': px(shelf - (H + 33)),
+    }) as CSSProperties;
+  const tag = (k: K, words: string) => (
+    <span
+      className={`ob-pf-name ${on(k) ? 'ob-on' : ''}`}
+      style={
+        {
+          left: 'var(--px)',
+          top: 'var(--py)',
+          width: 'var(--pw)',
+          '--gx': px(cellX(k) - COL / 2),
+          '--gy': px(cellY(k) + H + 33 + 18),
+          '--gw': px(cell + COL),
+          '--rx': px(rx[k] - GAP / 2),
+          '--ry': px(shelf + 18),
+          '--rw': px(mat(k) + GAP),
+        } as CSSProperties
+      }
+    >
       {words}
     </span>
   );
@@ -585,7 +629,7 @@ export function ScenePersona({ picked, other }: { picked: string[]; other: strin
   return (
     <>
       <Glow />
-      <Frame x={x.agency} y={top} w={widths.agency} h={H} f={295} className={cls('agency')} lit={on('agency')}>
+      <Frame x={0} y={0} w={widths.agency} h={H} f={295} className={cls('agency')} lit={on('agency')} style={place('agency')}>
         <span className="ob-ov-chip" style={{ left: 6, bottom: 6 }}>
           <span className="ob-av" aria-hidden="true">
             <I name="link" size={10} />
@@ -593,18 +637,18 @@ export function ScenePersona({ picked, other }: { picked: string[]; other: strin
           {t('Review link · 2 notes')}
         </span>
       </Frame>
-      <Frame x={x.inhouse} y={top} w={widths.inhouse} h={H} f={311} className={cls('inhouse')} lit={on('inhouse')}>
+      <Frame x={0} y={0} w={widths.inhouse} h={H} f={311} className={cls('inhouse')} lit={on('inhouse')} style={place('inhouse')}>
         <span className="ob-ov-chip" style={{ left: 6, bottom: 6 }}>
           <KeyGlyph shape="diamond" className="ob-t-ok" />
           {t('Approved · Legal')}
         </span>
       </Frame>
-      <Frame x={x.creator} y={top} w={widths.creator} h={H} f={281} fx={47} short className={cls('creator')} lit={on('creator')}>
+      <Frame x={0} y={0} w={widths.creator} h={H} f={281} fx={47} short className={cls('creator')} lit={on('creator')} style={place('creator')}>
         <span className="ob-safe" />
       </Frame>
       <div
         className={`ob-fr ob-pf ob-pf-else ${other !== null ? '' : 'ob-dashed'} ${any ? (on('other') ? 'ob-on' : 'ob-dim') : ''}`}
-        style={{ left: x.other, top, width: widths.other + 20, height: H + 33 }}
+        style={{ ...place('other'), width: mat('other'), height: H + 33 }}
         data-testid="ob-persona-else"
       >
         {other === null ? (

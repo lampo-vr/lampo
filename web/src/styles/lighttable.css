@@ -347,7 +347,23 @@
 .ob-pf.ob-on {
   z-index: 3;
 }
-/* the frames' names, one line under the shelf: a picked frame comes forward, its name lights where it stands */
+/* where each frame and name stands (pictures.tsx ScenePersona sets both places): the grid of two by two on a desk,
+   one row in a phone's or a tablet's band */
+.ob-pf,
+.ob-pf-name {
+  --px: var(--gx);
+  --py: var(--gy);
+  --pw: var(--gw);
+}
+@container ob (max-width: 820px) {
+  .ob-pf,
+  .ob-pf-name {
+    --px: var(--rx);
+    --py: var(--ry);
+    --pw: var(--rw);
+  }
+}
+/* the frames' names, one line under each row: a pick lights its name where it stands */
 .ob-pf-name {
   position: absolute;
   text-align: center;
