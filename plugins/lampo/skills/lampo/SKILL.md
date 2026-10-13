@@ -7,7 +7,7 @@ description: Run Lampo's review loop for a video you render — put it up, read 
 
 People pin notes (with drawings) to exact frames of your renders. You put the render up, fix what they note, put up
 the next version and answer, until they approve. Everything goes through the `lampo` MCP tools (`video-review` in
-older setups); renders go through `lampo render`, so the person sees them progress.
+older setups); with a shell, renders go through `lampo render`, so the person sees them progress.
 
 ## The loop: "use Lampo" means run it to the end
 

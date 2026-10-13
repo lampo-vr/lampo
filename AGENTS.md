@@ -145,7 +145,7 @@ here.
 | [workspaces.md](.claude/rules/workspaces.md) | Workspaces | `lib/**` `server/**` `mcp/**` `scripts/**` `test/unit/workspace-isolation.test.ts` |
 | [permissions.md](.claude/rules/permissions.md) | Permissions and accounts | `lib/**` `server/**` `mcp/**` `test/unit/access-ends.test.ts` |
 | [hosted-server.md](.claude/rules/hosted-server.md) | Hosted server | `lib/**` `server/**` `mcp/**` `deploy/**` |
-| [agent-text.md](.claude/rules/agent-text.md) | What agents read | `lib/**` `server/**` `mcp/**` `bin/**` `skills/**` `docs/**` `README.md` `bench/tokens/**` `test/unit/token-budget.test.ts` |
+| [agent-text.md](.claude/rules/agent-text.md) | What agents read | `lib/**` `server/**` `mcp/**` `bin/**` `skills/**` `plugins/**` `.claude-plugin/**` `docs/**` `README.md` `bench/tokens/**` `test/unit/token-budget.test.ts` |
 | [ui-speed.md](.claude/rules/ui-speed.md) | UI: speed | `web/**` |
 | [ui-look.md](.claude/rules/ui-look.md) | UI: look and layout | `web/**` |
 | [ui-words.md](.claude/rules/ui-words.md) | UI: words and state | `web/**` |

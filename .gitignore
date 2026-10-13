@@ -3,6 +3,8 @@ cache/
 versions/
 web/dist/
 web/dist-mcp/
+# the plugin packages scripts/plugin-zip.ts builds
+/dist/
 .venv/
 .venv-stt/
 __pycache__/

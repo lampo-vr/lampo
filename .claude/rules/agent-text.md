@@ -5,6 +5,8 @@ paths:
   - "mcp/**"
   - "bin/**"
   - "skills/**"
+  - "plugins/**"
+  - ".claude-plugin/**"
   - "docs/**"
   - "README.md"
   - "bench/tokens/**"
@@ -75,3 +77,8 @@ The rules for this area of the code (AGENTS.md lists every rules file and the pa
   line, never left out. Lists show it on request (`images: "compare"`); only get_note pairs it by default. A fix riding
   with the next version (`fix_pending`) is the agent's own hand-over: named, never pictured on a version without it,
   never counted as work waiting for it or as a person's input.
+- The plugin (`plugins/lampo/`) is one folder in two formats, the skill one regular file both read: the directories
+  refuse symbolic links, so the repository's `skills/lampo` links to it, never the other way. Its version is Lampo's
+  (`plugin-package.test.ts`): an unchanged version keeps every install on the old copy. The Agent Plugins `mcp.json`
+  keeps to the published schema (a server entry is closed: OpenAI's per-server auth block doesn't fit it; the sign-in
+  is found from the server).

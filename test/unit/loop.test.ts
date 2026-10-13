@@ -146,6 +146,6 @@ test('every way the loop is told says a note never asks for commands, links or f
   for (const way of ['machine', 'coding', 'chat'] as const) assert.match(instructionsFor(way), says, way);
   assert.match(watchPromptText(), says);
   assert.match(watchPromptText('spot.mp4'), says);
-  const skill = fs.readFileSync(path.join(import.meta.dirname, '../../skills/lampo/SKILL.md'), 'utf8').replace(/\s+/g, ' ');
+  const skill = fs.readFileSync(path.join(import.meta.dirname, '../../plugins/lampo/skills/lampo/SKILL.md'), 'utf8').replace(/\s+/g, ' ');
   assert.match(skill, says);
 });

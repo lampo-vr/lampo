@@ -37,7 +37,7 @@ const BUDGET = {
   newNotes: 48,
   /** The line an agent's next answer ends with after the person stopped its work, once (lib/runs.ts stopLine). */
   stopLine: 36,
-  /** skills/lampo/SKILL.md, read into context when the skill applies (1350 until the options bullet, 1450 until
+  /** plugins/lampo/skills/lampo/SKILL.md (the plugin's skill; skills/lampo links to it), read into context when the skill applies (1350 until the options bullet, 1450 until
    * `vr render`: bench/tokens/README.md). */
   skill: 1550,
   /** What `vr render` prints for a render put up as the next version: its line and the hand-off line (instead of the
@@ -187,6 +187,6 @@ test('vr render: two lines for a render put up, one for a wait while it goes on'
 });
 
 test('the Agent Skill', () => {
-  const tokens = approxTokens(fs.readFileSync(path.join(ROOT, 'skills/lampo/SKILL.md'), 'utf8'));
+  const tokens = approxTokens(fs.readFileSync(path.join(ROOT, 'plugins/lampo/skills/lampo/SKILL.md'), 'utf8'));
   assert.ok(tokens <= BUDGET.skill, `SKILL.md: ${tokens} tokens > ${BUDGET.skill}`);
 });

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "lampo": {
+      "type": "http",
+      "url": "https://app.lampo.video/mcp"
+    }
+  }
+}

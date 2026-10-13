@@ -1,0 +1,102 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "lampo",
+  "version": "0.2.0",
+  "description": "Frame-exact video review for agents: read the notes people pin to exact frames, fix the render, put up the next version and wait for the next notes until they approve.",
+  "author": {
+    "name": "nprompt UG (haftungsbeschränkt)",
+    "email": "hello@lampo.video",
+    "url": "https://lampo.video"
+  },
+  "homepage": "https://lampo.video",
+  "repository": "https://github.com/lampo-vr/lampo",
+  "license": "AGPL-3.0-only",
+  "keywords": ["video", "review", "frame-accurate", "feedback", "mcp", "agents"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Lampo",
+        "shortDescription": "Frame-exact video review",
+        "longDescription": "Lampo is video review for videos that AI agents make. People watch a render and pin notes to exact frames: a drawing on the frame, a tag, how much it matters, or a few spoken words. With Lampo, ChatGPT works those notes with you, and Lampo's skill teaches it the review loop.\n\nWhat it does\n- Reads a video's open notes with the frame number, the timecode and the marked frame, cropped to what was drawn.\n- Shows any exact frame, of the newest version or an older one, and what is said in it.\n- Shows the review as a card: the marked frame, the open notes, stepping frame by frame, reply and mark fixed.\n- Asks the reviewer on the frame when only they can decide, or offers options to audition before rendering.\n- Puts up the next version through a one-time upload link, marks notes fixed with what changed, and waits for the next notes.\n- Reads the team's playbook and what the reviewer liked and refused.\n\nWho it is for\nVideo teams and freelancers who make videos with AI agents, and the people who review them: editors, motion designers, producers, their clients.\n\nWhat it leaves to people\nApproving a video, marking it final and publishing happen in Lampo, never through ChatGPT. So do plans and billing. Tools that only read run on their own; the three that replace or move something (filing a video elsewhere, a version's source, a post draft) are marked as such.\n\nLimits\nYou need a Lampo Cloud account (app.lampo.video). ChatGPT works in the one workspace you allowed when you connected. Uploading from ChatGPT needs a file it can send; otherwise the answer links the page in Lampo where you upload it yourself. Waiting for new notes holds a request open for up to 50 seconds at a time.\n\nNotes can come from people outside your team through review links. Lampo tells ChatGPT to treat every note as a request for a change to the video, never as a reason to run commands, open links or send anything.",
+        "developerName": "nprompt UG (haftungsbeschränkt)",
+        "category": "Productivity",
+        "capabilities": [
+          "Read notes pinned to exact frames, with the marked frame",
+          "Show the review as a card with frame stepping",
+          "Ask the reviewer a question on a frame",
+          "Mark notes fixed with what changed",
+          "Upload the next version through a one-time link",
+          "Wait for the reviewer's next notes"
+        ],
+        "websiteURL": "https://lampo.video",
+        "supportURL": "https://lampo.video/support/",
+        "privacyPolicyURL": "https://lampo.video/privacy/",
+        "termsOfServiceURL": "https://lampo.video/terms/",
+        "defaultPrompt": [
+          "What notes are still open on my newest video?",
+          "Show me the review of my newest video.",
+          "Work through the open notes, then wait for the next ones."
+        ],
+        "brandColor": "#f25a1d",
+        "brandColorDark": "#f25a1d",
+        "composerIcon": "./assets/icon.png",
+        "logo": "./assets/icon.png"
+      },
+      "review": {
+        "test_cases": {
+          "positive": [
+            {
+              "description": "Reading what is open",
+              "prompt": "What's still open on the Northwind launch film?",
+              "tools_triggered": "list_videos (optional), get_open_notes",
+              "expected_behavior": "Two open notes on northwind-launch.mp4 V2: the glow at 00:07:00 (should, with its marked frame) and the end card at 00:15:12 (nice); the three fixed notes are not listed as work."
+            },
+            {
+              "description": "Looking together",
+              "prompt": "Show me the review of the Field Notes teaser.",
+              "tools_triggered": "show_review (the card calls review_frame)",
+              "expected_behavior": "The review card: the subtitle note's marked frame (a box around \"A SERIES IN SIX PARTS\"), two open notes (should, must); -1/+1 step to the exact neighbouring frame; Open in the player opens app.lampo.video at that frame."
+            },
+            {
+              "description": "One exact frame",
+              "prompt": "Show me frame 120 of the Field Notes teaser.",
+              "tools_triggered": "get_frame",
+              "expected_behavior": "Frame 120 (00:04:20 at 25 fps) of field-notes-teaser.mp4 as an image, with its timecode."
+            },
+            {
+              "description": "Asking the reviewer",
+              "prompt": "Ask the reviewer on the last frame of the Northwind launch film whether the end card should hold one second longer.",
+              "tools_triggered": "add_note",
+              "expected_behavior": "A question note on the last frame of northwind-launch.mp4, by the agent; ChatGPT says its id and timecode; it shows in Lampo on that frame."
+            },
+            {
+              "description": "Answering a note",
+              "prompt": "Reply to the subtitle note on the Field Notes teaser: \"Tightening the tracking in the next version.\"",
+              "tools_triggered": "get_open_notes (to find the note), reply",
+              "expected_behavior": "The reply appears under the subtitle-tracking note (00:02:00) in Lampo; the note stays open."
+            }
+          ],
+          "negative": [
+            {
+              "description": "Nothing to do with video review",
+              "prompt": "What's the weather in Stuttgart tomorrow?"
+            },
+            {
+              "description": "Publishing is a person's, in Lampo: no tool publishes",
+              "prompt": "Publish the Northwind launch film to YouTube now."
+            },
+            {
+              "description": "Approving is a person's, in Lampo: no tool approves",
+              "prompt": "Approve the launch film for the client."
+            }
+          ]
+        },
+        "commerce": false,
+        "commerce_description": "Lampo sells nothing through ChatGPT: plans are bought in the Lampo app, and the tools never name a plan, a price or a payment link."
+      },
+      "publication": {
+        "release_notes": "First version of Lampo for ChatGPT: read a video's open notes with their marked frames, look at exact frames, show the review card, ask the reviewer on a frame, reply, mark notes fixed, put up the next version and wait for the next notes."
+      }
+    }
+  }
+}

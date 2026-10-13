@@ -171,6 +171,10 @@ format stays backwards compatible throughout.
 - A review link's ⋯ menu says *Edit link* (German *Link bearbeiten*) for its settings, instead of *Change link*.
 
 ### Added
+- **Lampo as a plugin** for Claude Code, claude.ai, Cowork, ChatGPT and Codex: Lampo Cloud's connector and the Lampo
+  skill in one install, so your agent knows the review loop from its first call. In Claude Code:
+  `claude plugin install lampo --marketplace lampo-vr/lampo`; elsewhere from the plugin directories once Lampo is
+  listed there. The skill now lives in `plugins/lampo/`; `skills/lampo` still leads to it.
 - Several videos at once in the library's List and Grid. A box shows at a video's start under the pointer, and on
   every one once one is ticked; ⌘-click (Ctrl-click) ticks one, ⇧-click the run from the last one, ⌘A every video in
   view and Esc none. A bar at the window's foot says how many and moves them all with one "Move to…" or archives them

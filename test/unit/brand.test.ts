@@ -40,11 +40,13 @@ test('the name is Lampo, from one place', () => {
   assert.match(read('web/public/offline.html'), /<title>Lampo · offline<\/title>/);
 });
 
-test('agents know it as lampo: the MCP name and the Agent Skill; the skill’s old path still leads to it', () => {
+test('agents know it as lampo: the MCP name and the Agent Skill; the skill’s old paths still lead to it', () => {
   assert.equal(MCP_NAME, 'lampo');
-  const skill = read('skills/lampo/SKILL.md');
+  const skill = read('plugins/lampo/skills/lampo/SKILL.md');
   assert.match(skill, /^---\nname: lampo\n/, 'the frontmatter names the folder');
-  // Anything that loads the skill from skills/video-review (a link made before the rename) gets the same file.
+  // Anything that loads the skill from skills/lampo (before it moved into the plugin) or skills/video-review (a link
+  // made before the rename) gets the same file.
+  assert.equal(read('skills/lampo/SKILL.md'), skill);
   assert.equal(read('skills/video-review/SKILL.md'), skill);
 });
 

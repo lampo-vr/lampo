@@ -1,0 +1,20 @@
+{
+  "name": "lampo",
+  "displayName": "Lampo",
+  "version": "0.2.0",
+  "description": "Frame-exact video review for agents: read the notes people pin to exact frames, fix the render, put up the next version and wait for the next notes until they approve.",
+  "author": {
+    "name": "nprompt UG (haftungsbeschränkt)",
+    "email": "hello@lampo.video",
+    "url": "https://lampo.video"
+  },
+  "homepage": "https://lampo.video",
+  "repository": "https://github.com/lampo-vr/lampo",
+  "license": "AGPL-3.0-only",
+  "keywords": ["video", "review", "frame-accurate", "feedback", "mcp", "agents"],
+  "icon": "./assets/icon.png",
+  "documentationUrl": "https://lampo.video/docs/mcp/",
+  "supportUrl": "https://lampo.video/support/",
+  "privacyPolicyUrl": "https://lampo.video/privacy/",
+  "termsOfServiceUrl": "https://lampo.video/terms/"
+}

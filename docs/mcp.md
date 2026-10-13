@@ -61,6 +61,28 @@ as one JSON object instead (`client`, `label`, `where`, `language`, `text` and, 
 Claude Code, `--with-token` prints a command with the token in it, which your shell keeps in its history: `lampo` warns
 about it, and the default (`$LAMPO_TOKEN`) avoids it. A config made before, with the key `video-review`, keeps working.
 
+## Install as a plugin
+
+For Lampo Cloud, the Lampo plugin ([plugins/lampo/](../plugins/lampo/)) brings the connector, `https://app.lampo.video/mcp`
+(Streamable HTTP, signed in through the browser), and the [Agent Skill](../plugins/lampo/skills/lampo/SKILL.md) that
+teaches the loop, in one install:
+
+- **Claude Code** (2.1.292 or later), from the shell:
+
+  ```sh
+  claude plugin install lampo --marketplace lampo-vr/lampo
+  ```
+
+  In a session: `/plugin install lampo --marketplace lampo-vr/lampo`. Or in two steps, `claude plugin marketplace add
+  lampo-vr/lampo`, then `claude plugin install lampo@lampo`. Sign in when the connector asks (`/mcp`). Updates come with
+  `claude plugin update lampo@lampo`, when the plugin's version has changed (it follows Lampo's releases).
+- **claude.ai and Cowork:** Customize → Plugins → the directory, Lampo; then connect it on the plugin's **Connectors**
+  tab. A plugin added there reaches Claude Code too.
+- **ChatGPT and Codex:** add Lampo from the plugin directory.
+
+The directory listings come once the stores have reviewed the plugin. A server of your own isn't in the plugin: connect
+it by its address (below, or [Claude and ChatGPT](#claude-and-chatgpt) for the chat apps).
+
 ## Two ways to connect
 
 | | Through the app (HTTP) | Its own server (stdio) |
@@ -368,7 +390,7 @@ on tracks its renders where they are.
    `Nothing waiting for you: put up any version you have, then call wait_for_feedback with since "<cursor>".`
 5. Back to the notes with `get_open_notes` and `since`: only what changed.
 
-People check the fixes; agents never mark a note verified. The [Agent Skill](../skills/lampo/SKILL.md) teaches
+People check the fixes; agents never mark a note verified. The [Agent Skill](../plugins/lampo/skills/lampo/SKILL.md) teaches
 this loop to agents that load skills.
 
 ## Start your agent: it hears notes only while it listens

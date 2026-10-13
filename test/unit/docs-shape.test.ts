@@ -11,10 +11,15 @@ import { ROOT } from '../lib/helpers.ts';
 const WIDTH = 96;
 
 const pages = fs.readdirSync(path.join(ROOT, 'docs')).sort();
-// the documents that are read as pages: the README, the docs and the governance files
-const DOCS = ['README.md', 'CONTRIBUTING.md', 'SECURITY.md', 'CODE_OF_CONDUCT.md', ...pages.filter((f) => f.endsWith('.md')).map((f) => `docs/${f}`)].filter(
-  (f) => fs.existsSync(path.join(ROOT, f)),
-);
+// the documents that are read as pages: the README, the docs, the governance files and the plugin's README (its listing)
+const DOCS = [
+  'README.md',
+  'CONTRIBUTING.md',
+  'SECURITY.md',
+  'CODE_OF_CONDUCT.md',
+  'plugins/lampo/README.md',
+  ...pages.filter((f) => f.endsWith('.md')).map((f) => `docs/${f}`),
+].filter((f) => fs.existsSync(path.join(ROOT, f)));
 
 /** The lines inside fenced code blocks, numbered from 1. A fence is three or more backticks or tildes, indented or not
  * (a block in a list item is indented); it closes at a bare fence of the same character at least as long, or at the

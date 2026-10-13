@@ -1,0 +1,17 @@
+{
+  "name": "lampo",
+  "description": "Lampo's plugin for Claude Code: frame-exact video review for the videos your agent makes.",
+  "owner": {
+    "name": "nprompt UG (haftungsbeschränkt)",
+    "email": "hello@lampo.video",
+    "url": "https://lampo.video"
+  },
+  "plugins": [
+    {
+      "name": "lampo",
+      "source": "./plugins/lampo",
+      "description": "Frame-exact video review for agents: read the notes people pin to exact frames, fix the render, put up the next version and wait for the next notes until they approve.",
+      "category": "productivity"
+    }
+  ]
+}

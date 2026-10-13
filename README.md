@@ -246,6 +246,17 @@ to check a running instance.
 server tells every agent that connects what to do, in its first read. The full reference is
 [docs/agents.md](docs/agents.md) (every command, the MCP tools, the data format).
 
+### Install as a plugin
+
+With Lampo Cloud, the [Lampo plugin](plugins/lampo/) brings both pieces at once: the connector
+(`https://app.lampo.video/mcp`) and the [Agent Skill](plugins/lampo/skills/lampo/SKILL.md) that teaches the loop.
+
+- **Claude Code:** `claude plugin install lampo --marketplace lampo-vr/lampo` (or `/plugin install lampo
+  --marketplace lampo-vr/lampo` in a session), then sign in when the connector asks.
+- **claude.ai, Cowork, ChatGPT and Codex:** add Lampo from the app's plugin directory once it is listed there.
+
+With a Lampo server of your own, connect it by its address instead ([docs/mcp.md](docs/mcp.md)).
+
 ### The loop
 
 1. **The project**: `list_folders`, the one the person named or the work belongs to (none: a new name becomes the
@@ -284,7 +295,7 @@ next Lampo answer says so, once: it stops there. Claude Code's `/lampo:watch` is
 - **Few tokens:** pictures only for notes with a drawing, cropped to it; only what changed when an agent hands back
   what it was told (`since`, `known`); a lean tool set on request (`LAMPO_MCP_TOOLS=lean`). Measured in
   [bench/tokens](bench/tokens/README.md).
-- **An [Agent Skill](skills/lampo/SKILL.md)** teaches the same loop to agents that load skills.
+- **An [Agent Skill](plugins/lampo/skills/lampo/SKILL.md)** teaches the same loop to agents that load skills.
 - **A hosted server:** `lampo login <url>` once, then every `lampo` command and the stdio MCP server work against it.
   Screenshots are downloaded, so the printed paths still open like local files. `show_review` shows the review inline
   in hosts that render MCP Apps.

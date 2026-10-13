@@ -1016,7 +1016,7 @@ cropped to the drawing, so the model sees exactly what was drawn. It runs over s
   you read only what changed.
 
 How to connect each client, the tools, what they cost in tokens and who writes: [mcp.md](mcp.md). The
-[Agent Skill](../skills/lampo/SKILL.md) teaches the loop to agents that load skills.
+[Agent Skill](../plugins/lampo/skills/lampo/SKILL.md) teaches the loop to agents that load skills.
 
 ## What not to do
 
