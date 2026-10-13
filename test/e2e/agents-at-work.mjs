@@ -108,6 +108,16 @@ try {
       return [others[k], { ...f, id: `${f.id}_${k}`, slug: others[k], plan: f.plan.map((p, i) => ({ ...p, id: `${k}${i}` })) }];
     }),
   );
+  // the teaser's agent asks a question that offers its answers to pick: its run waits on that note
+  const pickQ = await api(`/api/review/${enc(others.teaser)}/comments`, 'POST', {
+    v: 1,
+    frame: 30,
+    kind: 'question',
+    text: 'Keep the logo sting at the end?',
+    choices: ['Keep it', 'Cut it'],
+    by: 'agent:claude-code',
+  });
+  otherRuns[others.teaser] = { ...otherRuns[others.teaser], needs: { kind: 'question', note: pickQ.id } };
   const state = { [slug]: null };
   let role = null;
   const listening = true;
@@ -321,6 +331,35 @@ try {
         })
         .map((b) => b.dataset.testid || b.textContent.trim()),
     );
+
+  await check(
+    'asked with answers to pick: the line says so, repeats nothing and raises nothing, a press brings the question up; it stands open in the notes with its picks — the card is the door',
+    async () => {
+      // a page of its own: the checks around this one keep theirs on the launch video
+      const p = await browser.newPage();
+      await intercept(p);
+      await p.setViewport({ width: 1440, height: 900 });
+      await openPlayer(p, others.teaser);
+      await p.waitForSelector('[data-testid=run-strip][data-phase=needs_you]', { timeout: 20000 });
+      await until(
+        async () => /asks you to pick one/.test(await text(p, '[data-testid=run-words]')),
+        async () => `the line: ${await text(p, '[data-testid=run-words]')}`,
+      );
+      assert(!(await p.$('[data-testid=run-strip] [data-testid=run-answer]')), 'no Answer on the line: the picks are right there');
+      await p.waitForSelector(`.side-scroll [data-testid=ask-card][data-note="${pickQ.id}"] [data-testid=ask-pick]`, { timeout: 20000 });
+      await settle(p);
+      const up = await raisedIn(p);
+      assert(!up.length, `nothing raised beside the card (+ Note steps down while the agent asks): ${JSON.stringify(up)}`);
+      // the card says the question right under the line: the line repeats nothing of it
+      assert(!(await p.$('[data-testid=run-strip] [data-testid=run-fold]')), 'no folded line repeating the question');
+      await shot(p, '01-asks-with-picks');
+      // the line is a quiet way to the card: pressing it brings the question up, no Agent view
+      await p.click('[data-testid=run-open]');
+      await p.waitForSelector(`.side-scroll [data-testid=ask-card][data-note="${pickQ.id}"].active`, { timeout: 10000 });
+      assert(!(await p.$('[data-testid=agent-panel]')), 'the notes stay: the Agent view did not open');
+      await p.close();
+    },
+  );
 
   await check('the line says each state in a sentence and a folded line, with one action, and one raised button in the view', async () => {
     // [the sentence, the folded line and the figure, as the line's title says them whole; its one action; the view's one

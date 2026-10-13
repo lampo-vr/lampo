@@ -736,20 +736,12 @@ try {
     // the player's card: the choices under the question, a timecode in its words seeks the player
     await page.goto('about:blank');
     await page.goto(`${BASE}/#/v/${encodeURIComponent(teaser)}`, { waitUntil: 'domcontentloaded' });
-    // a row until it is opened: its card holds the choices and the words with their timecodes
-    await page.waitForFunction(() => [...document.querySelectorAll('.side-scroll .note-row')].some((n) => n.textContent.includes('calmer cut')), {
-      timeout: 20000,
-    });
-    await page.evaluate(() =>
-      [...document.querySelectorAll('.side-scroll .note-row')]
-        .find((n) => n.textContent.includes('calmer cut'))
-        ?.querySelector('.nr')
-        ?.click(),
-    );
-    await page.waitForSelector('.c-text .tc-link[data-frame="80"]', { timeout: 20000 });
-    const cardChoices = await page.$$eval('[data-testid="choices"] button', (bs) => bs.map((b) => b.textContent));
+    // a question with answers to pick stands open (AskCard.tsx): the choices and the words with their timecodes, no
+    // click to open it first
+    await page.waitForSelector('.side-scroll [data-testid=ask-card] .ask-q .tc-link[data-frame="80"]', { timeout: 20000 });
+    const cardChoices = await page.$$eval('.side-scroll [data-testid=ask-card] [data-testid="choices"] .ask-pick-words', (bs) => bs.map((b) => b.textContent));
     assert(JSON.stringify(cardChoices) === JSON.stringify(['Keep this music', 'Try the calmer cut']), `the card offers the choices: ${cardChoices}`);
-    await page.click('.c-text .tc-link[data-frame="80"]');
+    await page.click('.side-scroll [data-testid=ask-card] .ask-q .tc-link[data-frame="80"]');
     await until(async () => (await playerFrame()) === 80, `the player on the link's frame 80 (${await playerFrame()})`);
     // the inbox: a note about the whole video opens on the first moment it names (00:02:10 = frame 60), not frame 0
     await page.goto('about:blank');

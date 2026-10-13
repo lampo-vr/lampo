@@ -112,7 +112,9 @@ try {
           text: st(c?.querySelector('.c-text'), 'fontSize', 'lineHeight'),
           thumbW: thumb ? Math.round(thumb.width) : null,
           stub: st(c?.querySelector('.reply-stub'), 'height', 'fontSize'),
-          row: r ? Math.round(r.getBoundingClientRect().height) : null,
+          // a row's first line: its words start as far in (the app's row says who · V2 · replies on a second line under
+          // them, the link's keeps its marks at the end of its one line, so their heights differ)
+          rowWords: r ? Math.round(r.querySelector('.nr-text').getBoundingClientRect().left - r.querySelector('.nr').getBoundingClientRect().left) : null,
           rowTc: st(r?.querySelector('.nr-tc'), 'fontFamily', 'fontSize'),
           rowText: st(r?.querySelector('.nr-text'), 'fontSize'),
         };

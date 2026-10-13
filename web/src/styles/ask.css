@@ -1,0 +1,160 @@
+/* A question with answers to pick (player/AskCard.tsx): open in the notes list, the agent's tone on its surface and a
+   hairline of it around — one edge all round, never a stripe —, who asks, the question in the reading size, its
+   answers as rows a tap sends, a field for anything else under them, quieter. */
+.ask-card {
+  display: grid;
+  gap: var(--sp-3);
+  margin: var(--sp-1) var(--sp-2) var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid color-mix(in srgb, var(--agent) 32%, transparent);
+  border-radius: var(--radius);
+  background: var(--agent-bg);
+  cursor: pointer;
+}
+.ask-card.active {
+  border-color: color-mix(in srgb, var(--agent) 55%, transparent);
+}
+.ask-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  min-height: var(--h-sm);
+  font: var(--fw-ui) var(--fs-sm) / var(--lh-ui) var(--ui);
+  color: var(--fg-2);
+}
+.ask-mark {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  color: var(--agent-2);
+}
+.ask-who {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--fw-strong);
+  color: var(--agent-2);
+}
+.ask-tc {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: var(--fw-ui) var(--fs-xs) var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  cursor: pointer;
+}
+.ask-tc.overall {
+  font-family: var(--ui);
+}
+.ask-tc:hover:where(:not(:disabled)) {
+  color: var(--fg);
+}
+.ask-tools {
+  display: flex;
+  margin-left: auto;
+  margin-right: calc(-1 * var(--sp-1));
+}
+/* the question: words a person reads first, in the reading size */
+.ask-q {
+  margin: 0;
+  font: var(--fw-text) var(--fs-lg) / var(--lh-body) var(--ui);
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+/* its answers: rows a tap sends, the whole width, the key that sends each at its start */
+.ask-picks {
+  display: grid;
+  gap: var(--sp-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.ask-pick {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  min-height: var(--h-lg);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid color-mix(in srgb, var(--agent) 38%, transparent);
+  border-radius: var(--r);
+  background: var(--ink-3);
+  color: var(--fg);
+  font: var(--fw-ui) var(--fs-md) / var(--lh-ui) var(--ui);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+.ask-pick:hover:where(:not(:disabled)) {
+  border-color: var(--agent);
+  background: color-mix(in srgb, var(--agent) 10%, var(--ink-3));
+}
+.ask-pick:focus-visible {
+  outline: var(--focus-width) solid var(--fg);
+  outline-offset: var(--focus-offset);
+}
+.ask-pick:disabled {
+  cursor: default;
+  opacity: var(--disabled-o);
+}
+.ask-pick-words {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ask-key {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+/* anything else, in words: quieter, under the answers */
+.ask-write {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.ask-write .autotext {
+  flex: 1;
+  min-width: 0;
+}
+/* options to audition: what is offered, then the way into the audition as wide as an answer's row */
+.ask-options .opt-ask {
+  display: grid;
+  gap: var(--sp-2);
+}
+.ask-options .opt-group-chip {
+  height: var(--h-sm);
+  font-size: var(--fs-md);
+  border-color: color-mix(in srgb, var(--agent) 28%, transparent);
+}
+.ask-options .btn.opt-open {
+  justify-content: flex-start;
+  width: 100%;
+  min-height: var(--h-lg);
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-color: color-mix(in srgb, var(--agent) 38%, transparent);
+  font-size: var(--fs-md);
+}
+.ask-options .btn.opt-open:hover:where(:not(:disabled)) {
+  border-color: var(--agent);
+  background: color-mix(in srgb, var(--agent) 10%, var(--ink-3));
+}
+.ask-thread {
+  min-width: 0;
+}
+/* a finger: no key hints, each answer a thumb's height */
+@media (hover: none) and (pointer: coarse) {
+  .ask-key {
+    display: none;
+  }
+  .ask-pick {
+    min-height: var(--h-touch);
+  }
+}

@@ -41,6 +41,7 @@ import { useWakeChoice } from '../sessions/Wake.tsx';
 import { ShareModal } from '../share/ShareModal.tsx';
 import { I } from '../ui/icons.tsx';
 import { Button, EmptyState } from '../ui/system.tsx';
+import { asksWithPicks } from './AskCard.tsx';
 import { AutoCheck, FINDING } from './AutoCheck.tsx';
 import { type RangePlay, showSampleAgentAs } from './CommentCard.tsx';
 import { CompareBar } from './CompareBar.tsx';
@@ -55,7 +56,7 @@ import { HelpModal } from './HelpModal.tsx';
 import { MicButton } from './MicButton.tsx';
 import { frameMarks } from './marks.ts';
 import { type Filter, NotesPanel, type PanelView, type SheetState } from './NotesPanel.tsx';
-import { grouped } from './noteGroups.ts';
+import { grouped, groupOf } from './noteGroups.ts';
 import { noteAt, stepNote, tagCounts, withTag } from './noteRows.ts';
 import { PhoneTools, PhoneTransport } from './PhoneDock.tsx';
 import { PlayerLoading } from './PlayerLoading.tsx';
@@ -124,6 +125,12 @@ interface PlayerProps {
 
 /** The sample's "That's the loop" (onboarding/LoopDone.tsx): loaded only while the sample is open. */
 const loopDoneCode = loader(() => import('../onboarding/LoopDone.tsx'));
+
+/** What a phone's notes show by default: what needs the person and what is open (noteGroups.ts). */
+const phoneShows = (c: PlacedComment) => {
+  const g = groupOf(c);
+  return g === 'needs' || g === 'open';
+};
 
 export default function Player({ slug, focus, startFrame, startV = null, verifyAt = null, atAgent = false, pending = false }: PlayerProps) {
   const { data, error } = useReview(pending ? null : slug);
@@ -472,11 +479,26 @@ function PlayerView({
     const closed = placed.filter((c) => c.status === 'verified' || c.status === 'wontfix');
     const questions = placed.filter((c) => c.status === 'open' && isQuestion(c));
     const mine = active.filter((c) => (me ? isOwner(c.author, c.author_id, me) : !isAgent(c.author) && !c.author.startsWith('guest:')));
-    return { active, questions, mine, closed, all: placed };
+    const check = placed.filter((c) => groupOf(c) === 'check');
+    const current = placed.filter(phoneShows);
+    return { active, questions, mine, closed, check, current, all: placed };
   }, [placed, me]);
   // What the list holds: every note in its group by default (the done ones folded at the end), or one of the filter's
-  // lists. Its tags with their counts; the picked one stays offered even where none has it, so it can be put down again.
-  const shownBase = filter === 'active' ? placed : byStatus[filter];
+  // lists. A phone's default is what needs the person and what is open: the fixes waiting for a check and the done
+  // notes come when picked in its selector (NotesPanel.tsx). A note opened from elsewhere (the timeline, a link) shows in
+  // its group, and stays while that view does: the playhead moving on, or another note picked, never takes a card that
+  // is being answered away with its words.
+  const [kept, setKept] = useState<ReadonlySet<string>>(() => new Set());
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a view picked, or another video, starts from what it shows
+  useEffect(() => setKept(new Set()), [filter, slug]);
+  useEffect(() => {
+    if (selected) setKept((k) => (k.has(selected) ? k : new Set(k).add(selected)));
+  }, [selected]);
+  const shownBase = useMemo(
+    () => (filter !== 'active' ? byStatus[filter] : phone ? placed.filter((c) => c.id === selected || kept.has(c.id) || phoneShows(c)) : placed),
+    [filter, phone, placed, selected, kept, byStatus],
+  );
+  // Its tags with their counts; the picked one stays offered even where none has it, so it can be put down again.
   const tags = useMemo(() => {
     const counted = tagCounts(shownBase);
     return tag && !counted.some(([x]) => x === tag) ? [...counted, [tag, 0] as [string, number]] : counted;
@@ -516,13 +538,16 @@ function PlayerView({
       closed: byStatus.closed.length,
       all: placed.length,
       questions: byStatus.questions.length,
+      check: byStatus.check.length,
+      current: byStatus.current.length,
     }),
     [placed, byStatus],
   );
-  // The last question answered: back to the open notes (the Questions tab only exists while there are some).
+  // The last question answered: back to the open notes (the Questions tab only exists while there are some). The fixes
+  // to check as a list of their own are a phone's (its selector); a desk shows them in their group.
   useEffect(() => {
-    if (filter === 'questions' && !counts.questions) setFilter('active');
-  }, [filter, counts.questions]);
+    if ((filter === 'questions' && !counts.questions) || (filter === 'check' && !phone)) setFilter('active');
+  }, [filter, counts.questions, phone]);
   const seg = segments?.find((x) => frame >= x.in && frame < x.out);
   const srcMap =
     seg && Number.isFinite(seg.src)
@@ -713,9 +738,13 @@ function PlayerView({
       'ok',
     );
   };
+  // A note picked on purpose (in the list, on the timeline, by N or a link), not reached by the playhead: a phone's
+  // sheet brings its card into view whole (NotesPanel.tsx)
+  const [pickedNote, setPickedNote] = useState<{ id: string; n: number } | null>(null);
   const selectComment = useCallback(
     (c: PlacedComment) => {
       setSelected(c.id);
+      setPickedNote((x) => ({ id: c.id, n: (x?.n ?? 0) + 1 }));
       seek(c.frameHere);
     },
     [seek],
@@ -1380,6 +1409,12 @@ function PlayerView({
   // run done) where the top bar doesn't offer it — one raised door per view —, quiet while it still works or waits on
   // the person (+ Note is the view's one then), never while check mode runs (the card's Looks right is).
   const checkPrimary = !goOn && !topChecks && !frozen && canCheck && verify.queue.length > 0 && !verify.active && !stripPrimary && stripRun?.state === 'done';
+  // A question with answers or options to pick stands open as its card in the list (AskCard.tsx): the card is the view's
+  // door, nothing in it raised, so + Note steps down while it waits, an agent at work or not
+  const askDoor = !frozen && allowed('comment') && list.some((c) => isQuestion(c) && asksWithPicks(c));
+  // the question the agent asks offers answers or options to pick: they stand open on its card in the notes (AskCard.tsx)
+  const askedNote = stripRun?.state === 'needs_you' && stripRun.needs?.note ? placed.find((c) => c.id === stripRun.needs?.note) : null;
+  const askPicks = askedNote && asksWithPicks(askedNote) ? (askedNote.options?.length ? 'options' : 'one') : null;
   const strip = showStrip ? (
     <RunStrip
       slug={slug}
@@ -1390,6 +1425,7 @@ function PlayerView({
       // a finished run's line stays while its fixes wait to be checked (the doors to checking are the top bar's and the
       // notes' "To check" header's)
       toCheck={verify.queue.length}
+      askPicks={askPicks}
       nextV={latestV + 1}
       canSteer={canSteer}
       say={sayRun}
@@ -1525,8 +1561,8 @@ function PlayerView({
               onWake={bar.wake}
               notes={{
                 word: t('Notes'),
-                n: counts.active || null,
-                label: counts.active ? `${t('Show notes')} · ${t('{n} open', { n: counts.active })}` : t('Show notes'),
+                n: counts.current || null,
+                label: counts.current ? `${t('Show notes')} · ${t('{n} open', { n: counts.current })}` : t('Show notes'),
               }}
               onNotes={() => scrollToNotes(mainRef.current?.querySelector(':scope > .side'))}
             />
@@ -1705,6 +1741,7 @@ function PlayerView({
           counts={counts}
           list={list}
           selected={selected}
+          picked={pickedNote}
           onSelect={selectComment}
           playing={pb.playing}
           tags={tags}
@@ -1716,7 +1753,9 @@ function PlayerView({
           rangeLoop={pb.rangeLoop}
           canCompose={!composer && !!m?.ready && !recorder.active}
           readOnly={frozen}
-          quietNew={(unsentShown && unsent.count > 0) || stripPrimary || checkPrimary || (topChecks && canCheck && verify.queue.length > 0) || verify.active}
+          quietNew={
+            (unsentShown && unsent.count > 0) || stripPrimary || askDoor || checkPrimary || (topChecks && canCheck && verify.queue.length > 0) || verify.active
+          }
           strip={phone ? null : strip}
           agentTab={showStrip || runs?.length ? { live: !!stripRun && isOpen(stripRun) && stripRun.state !== 'needs_you' && stripRun.state !== 'lost' } : null}
           agentView={agentView}
@@ -1727,7 +1766,8 @@ function PlayerView({
           groupCounts={groups.counts}
           doneOpen={doneOpen || filter === 'all' || filter === 'closed'}
           setDoneOpen={setDoneOpen}
-          checkPrimary={checkPrimary}
+          // a phone's open sheet hides the row under the bar, its Check with it: the sheet's door is the raised one then
+          checkPrimary={checkPrimary || (phone && topChecks && canCheck)}
           showAuthor={authors > 1}
           transcriptTab={transcriptTab}
           autoCheckFound={autoCheckFound}

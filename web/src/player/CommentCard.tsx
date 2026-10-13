@@ -1,11 +1,11 @@
-// One note in the sidebar. At rest a row — its timecode, its severity as a keyframe glyph, the first line, and a picture
-// only under the pointer — under a group header when someone else wrote it, or in another sitting (noteRows.ts). The
+// One note in the sidebar. At rest a row — its timecode, its severity as a keyframe glyph and the first line, then under
+// the words, quieter, who · V2 · replies and at the end where it stands (a label), when there is something. The
 // selected note opens in place into the card: who wrote it and when, what it is, the thread under it (replies as
 // messages, status changes as activity lines) and the actions that move it through open → fixed → verified. The same
 // <article> either way, so what holds it (a suite, the focus) keeps holding it as it opens.
 
 import { useQueryClient } from '@tanstack/react-query';
-import { memo, type ReactNode, useEffect, useId, useState } from 'react';
+import { Fragment, memo, type ReactNode, useEffect, useId, useState } from 'react';
 import { agentShown } from '../../../lib/agentKind.ts';
 import { optionsSeen } from '../../../lib/options.ts';
 import { changeableReply, isOwner } from '../../../lib/ownership.ts';
@@ -41,6 +41,7 @@ import { KeyGlyph, SevMark } from '../ui/KeyGlyph.tsx';
 import { ContextMenu, IconButton, Menu, type MenuEntry } from '../ui/primitives.tsx';
 import { TimecodeText } from '../ui/TimecodeText.tsx';
 import { SayButton, withSaid } from '../ui/VoiceButton.tsx';
+import { AskCard, asksWithPicks } from './AskCard.tsx';
 import { CheckDecision, ClientReads } from './CheckDecision.tsx';
 import { checkVerdict, waitsForCheck } from './fixCheck.ts';
 import { firstLine } from './noteRows.ts';
@@ -384,7 +385,7 @@ interface CommentCardProps {
   here: boolean;
   /** The selected note: open as the card (one at a time); every other note is a row. */
   selected: boolean;
-  /** More than one person wrote this video's notes: the row ends with its author's avatar (who and when in its title). */
+  /** More than one person wrote this video's notes: the row's second line names its author. */
   showAuthor?: boolean;
   onSelect: (c: PlacedComment) => void;
   onLightbox: (src: string) => void;
@@ -402,6 +403,13 @@ interface CommentCardProps {
   /** An open note from an earlier version where the version on screen changed (its diff): a quiet hint, no fix. */
   changedIn?: number;
 }
+
+/** The quiet dot between the parts of a row's second line (decoration: the words say it). */
+const Dot = () => (
+  <span className="nr-dot" aria-hidden="true">
+    {' · '}
+  </span>
+);
 
 // Memoised: the player re-renders on every frame during playback, the cards only when their own props change.
 /** A recorded note's clip, in seconds (the stretch the server cut for it). */
@@ -430,8 +438,6 @@ export const CommentCard = memo(function CommentCard({
 }: CommentCardProps) {
   useLang(); // memo'd: renders again on a language switch by itself
   const [mode, setMode] = useState<Mode | null>(null);
-  // the row's picture: asked for only once the pointer (or the focus) is on the row
-  const [peek, setPeek] = useState(false);
   const avatarOf = usePeople();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -635,6 +641,46 @@ export const CommentCard = memo(function CommentCard({
       </button>
     ) : null;
 
+  // A question with answers or options to pick stands open as its own card while it waits, the picks right there
+  // (AskCard.tsx); a reply or an edit being written on it opens the whole card instead.
+  if (asks && asksWithPicks(c) && may && !mode && !editing && !reopening && !replyDraft) {
+    const askItems: MenuEntry[] = [{ label: t('Close without answer'), icon: 'x', onClick: () => patch({ status: 'verified' }, t('Closed')) }, ...items];
+    return (
+      <AskCard
+        c={c}
+        slug={slug}
+        name={displayName(c.author)}
+        avatar={avatarOf(c.author)}
+        here={here}
+        selected={selected}
+        fps={fps}
+        busy={busy}
+        items={askItems}
+        onSelect={onSelect}
+        onAnswer={(a) => patch({ status: 'verified', note: a }, t('Answered — {name} gets it', { name: displayName(c.author) }))}
+      >
+        {c.replies?.length > 0 && (
+          <Thread
+            noteId={c.id}
+            rights={replyRights}
+            editing={null}
+            editor={null}
+            onEdit={editReply}
+            onDelete={deleteReply}
+            replies={c.replies}
+            asks={asks}
+            previews={c.previews}
+            slug={slug}
+            onLightbox={onLightbox}
+            refsOf={byReply}
+            onOpenRef={setViewing}
+            options={c.options}
+          />
+        )}
+      </AskCard>
+    );
+  }
+
   // A reply, an edit or an answer being written keeps its card open: picking another note never throws words away.
   const opened = selected || !!mode || editing || reopening || !!replyDraft || !!answer.trim() || pending.refs.length > 0;
   if (!opened) {
@@ -643,9 +689,9 @@ export const CommentCard = memo(function CommentCard({
     ) : (
       <KeyGlyph shape={KIND_SHAPE[look as keyof typeof KIND_SHAPE]} size={10} className={`nr-kind nr-${look}`} />
     );
-    // where it stands, as a small label at the row's end (the system's Badge: the glyph carries the hue, the words stay
-    // in the body colour) — only when that is news: fixed, riding with the next version, to check again, a question, the
-    // agent on it, done, or changed here
+    // where it stands, as a small label at the end of the row's second line (the system's Badge: the glyph carries the
+    // hue, the words stay in the body colour) — only when that is news: fixed, riding with the next version, to check
+    // again, a question, the agent on it, done, or changed here
     const doing = plan?.state === 'doing' && c.status === 'open';
     const label: [string, Tone] | null =
       c.status === 'fixed'
@@ -668,14 +714,21 @@ export const CommentCard = memo(function CommentCard({
     const ghost = c.rangeHere && c.scope !== 'video' ? c.rangeHere : null;
     // its replies (a status change is no reply): counted on the row, read in the card
     const said = (c.replies || []).filter((r) => !r.status).length;
-    const show = () => {
-      setPeek(true);
+    // The second line, under the words: on its left, quietly and in words, only what applies — who wrote it (where
+    // several people wrote this video's notes), the version when another is on screen, a section's length, the replies;
+    // at its end where it stands, as the system's label, so the labels stand in one column down the list's edge. A row
+    // with nothing to say stays one line. No picture: the card shows the marked frame, and a click puts it on stage.
+    const sub: [string, string][] = [];
+    if (showAuthor) sub.push(['who', displayName(c.author)]);
+    if (c.v !== currentV) sub.push(['v', `V${c.v}`]);
+    if (ghost && fps) sub.push(['len', formatSeconds(rangeSeconds(ghost, fps))]);
+    if (said > 0) sub.push(['said', t('{n} reply|{n} replies', { n: said })]);
+    const showHint = () => {
       if (ghost) setRangeHint({ ghost });
     };
-    const hide = () => {
+    const hideHint = () => {
       if (ghost) setRangeHint({ ghost: null });
     };
-    const who = `${displayName(c.author)} · ${ago(c.created)}`;
     return (
       <ContextMenu items={items}>
         {/* biome-ignore lint/a11y/useKeyWithClickEvents: the row's button is the keyboard's way in; a click anywhere on the row picks it too */}
@@ -687,17 +740,15 @@ export const CommentCard = memo(function CommentCard({
           data-note={c.id}
           aria-label={t('{kindLabel} note at {timecodeHere}', { kindLabel, timecodeHere: c.timecodeHere })}
         >
-          <div className="nr-line">
+          <div className="nr-line" data-acts={may ? 2 : 1}>
             <button
               type="button"
-              className="nr"
+              className="nr nr-stack"
               onClick={() => onSelect(c)}
-              onPointerEnter={show}
-              onPointerLeave={hide}
-              onFocus={() => setPeek(true)}
+              onPointerEnter={showHint}
+              onPointerLeave={hideHint}
               onBlur={() => clearRangeHint()}
               aria-expanded={false}
-              title={who}
               data-testid="note-row"
             >
               <span className="c-id" hidden>
@@ -711,27 +762,25 @@ export const CommentCard = memo(function CommentCard({
               <span className="nr-text">
                 {c.text_edit ? <WordsChange edit={c.text_edit} inline /> : c.text ? firstLine(c.text) : <span className="muted">{t('(marked frame)')}</span>}
               </span>
-              {(ghost || said > 0 || c.v !== currentV) && (
-                <span className="nr-meta">
-                  {ghost && fps && <span className="nr-len">{formatSeconds(rangeSeconds(ghost, fps))}</span>}
-                  {c.v !== currentV && <span className="nr-v">V{c.v}</span>}
-                  {said > 0 && (
-                    <span className="nr-said" title={t('{n} reply|{n} replies', { n: said })}>
-                      <I name="reply" size={12} />
-                      {said}
-                    </span>
+              {(sub.length > 0 || label) && (
+                <span className="nr-sub" data-testid="note-sub">
+                  <span className="nr-about" data-testid="note-about">
+                    {sub.map(([k, words], i) => (
+                      <Fragment key={k}>
+                        {i > 0 && <Dot />}
+                        <span className={`nr-${k}`}>{words}</span>
+                      </Fragment>
+                    ))}
+                  </span>
+                  {label && (
+                    <Badge size="sm" tone={label[1]} className="nr-state" testId="note-state">
+                      {label[0]}
+                    </Badge>
                   )}
                 </span>
               )}
-              {label && (
-                <Badge size="sm" tone={label[1]} className="nr-state" testId="note-state">
-                  {label[0]}
-                </Badge>
-              )}
-              {showAuthor && <Avatar name={c.author} size={18} src={avatarOf(c.author)} />}
-              {peek && marked && <img className="nr-thumb" src={shot(marked)} alt="" decoding="async" />}
             </button>
-            {/* what a row does, there on hover or focus: reply, and the rest under ⋯ */}
+            {/* what a row does, there on hover or focus, inside the row's end: reply, and the rest under ⋯ */}
             <span className="nr-acts">
               {may && (
                 <IconButton

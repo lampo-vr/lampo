@@ -224,7 +224,7 @@ function AgentAtWork() {
           <span className="run-edge" style={{ '--edge': 0.42 } as CSSProperties} />
         </div>
       </Row>
-      <Row label="note states" note="On a note row's right, one small label: never green words, the green is the mark's.">
+      <Row label="note states" note="At the end of a note row's second line, one small label: never green words, the green is the mark's.">
         {NOTE_STATES.map(([words, tone]) => (
           <Badge key={words} tone={tone} size="sm" className="nr-state">
             {words}

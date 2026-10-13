@@ -32,9 +32,12 @@ export interface OptionsAskProps {
   size?: 'sm' | 'md';
   /** Say what is offered (the groups' line); without, the way in alone (a folder's tabs line). */
   chips?: boolean;
+  /** The way in as a plain button: where the question's own card is the place to answer (player/AskCard.tsx), not a
+   * second raised door beside the view's one. */
+  quiet?: boolean;
 }
 
-export function OptionsAsk({ id, text, by, groups, answered = false, onSent, size = 'sm', chips = true }: OptionsAskProps) {
+export function OptionsAsk({ id, text, by, groups, answered = false, onSent, size = 'sm', chips = true, quiet = false }: OptionsAskProps) {
   const [open, setOpen] = useState(false);
   const code = useLoaded(auditionCode, open);
   return (
@@ -53,7 +56,7 @@ export function OptionsAsk({ id, text, by, groups, answered = false, onSent, siz
       )}
       <button
         type="button"
-        className={`btn ${size === 'sm' ? 'sm' : ''} ${answered ? '' : 'primary'} opt-open`}
+        className={`btn ${size === 'sm' ? 'sm' : ''} ${answered || quiet ? '' : 'primary'} opt-open`}
         onClick={() => setOpen(true)}
         onPointerEnter={() => void auditionCode.load().catch(() => {})}
         onFocus={() => void auditionCode.load().catch(() => {})}

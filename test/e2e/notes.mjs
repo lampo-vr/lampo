@@ -3,15 +3,21 @@
 // covers: web/src/player/findingWords.ts web/src/player/hashtags.ts web/src/styles/notes.css
 // covers: web/src/styles/autocheck.css server/routes/analysis.ts lib/qa.ts lib/findings.ts lib/text/
 // Browser suite of the notes panel with many notes (local mode, temp store, headless Chrome): 30 notes are 30 rows —
-// timecode, the severity's keyframe glyph, the first line, no pill and no coloured outline — in the groups of where each
-// stands (all open here: one "Open" header), each ending with its author's avatar since two people wrote them; the
+// timecode, the severity's keyframe glyph and the first line with nothing after it, no pill and no coloured outline —
+// in the groups of where each stands (all open here: one "Open" header), each naming its author on a second line under
+// the words since two people wrote them, no avatar and no tooltip; that second line says who · V1 · 2 replies and, at
+// its end, where it stands as a label (the labels one column), and hovering a row shows Reply and ⋯ inside the end of
+// its first line on its flat fill (no ground or shadow of their own, clear of the label), the words fading out under
+// them, as the keyboard's focus does; the
 // selected note (a click, ↑ / ↓) opens in place into its card while every other stays a row; the filter menu holds the
 // lists and the notes' tags with their counts, a tag picked narrows the list and shows as a chip that takes it off, the
 // done ones fold into "Done" at the end; while playing the note at the playhead is marked and the list follows it, until
 // the person scrolls it. Auto-check is one chip in the head once it found something — minor findings only, problems,
 // and while a Run again it started runs — whose popover lists the problems first, folds the minor ones, runs again,
 // turns a finding into a note or puts it away, and names the spelling language only when it was checked in it. A phone
-// has the same rows at a finger's height and the chip on the line under its head.
+// has the same rows at a finger's height and the chip on the line under its head; it shows what needs you and what is
+// open, the fixes to check and the done ones behind a selector at the start of that line (its door to checking stays
+// on the line), and a note picked from the list, a link or going through the notes comes to the sheet's top, whole.
 import fs from 'node:fs';
 import path from 'node:path';
 import { tagCounts } from '../../web/src/player/noteRows.ts';
@@ -75,6 +81,79 @@ try {
   const review = async () => (await api(`/api/review/${enc(slug)}`)).review;
   await until(async () => (await review()).comments.some((c) => c.author === 'Mia Lang'), 'the store is read again');
 
+  // teaser.mp4: V1 and V2, notes with more to say — Mia's on V1, fixed in V2 (to check); Sam's on V2 with two replies;
+  // Sam's on V2 with nothing more to say than who wrote it; the agent's question
+  const tfile = makeVideo(path.join(dir, 'Acme/export/teaser.mp4'), { w: 320, h: 180, fps: FPS, dur: 4, pattern: 'testsrc2' });
+  age(tfile);
+  const teaser = (await api('/api/library', 'POST', { path: tfile, folder: 'Acme' })).video.slug;
+  const tnote = (v, frame, text) => api(`/api/review/${enc(teaser)}/comments`, 'POST', { v, frame, text, severity: 'should' });
+  const carried = await tnote(1, 10, 'The title card needs more air above the logo, it feels cramped against the top edge');
+  makeVideo(tfile, { w: 320, h: 180, fps: FPS, dur: 4, pattern: 'smptebars' });
+  age(tfile);
+  await api(`/api/review/${enc(teaser)}/sync`, 'POST', {});
+  await api(`/api/comments/${carried.id}`, 'PATCH', { status: 'fixed', fixed_in_v: 2, note: 'More air above the logo', by: 'agent:promo-edit' });
+  const talked = await tnote(2, 40, 'Music too loud under the voice-over');
+  await api(`/api/comments/${talked.id}`, 'PATCH', { note: 'Duck it by 3 dB' });
+  await api(`/api/comments/${talked.id}`, 'PATCH', { note: 'Or 4' });
+  const plain = await tnote(2, 70, 'Logo a touch smaller');
+  const asked = await api(`/api/review/${enc(teaser)}/comments`, 'POST', {
+    v: 2,
+    frame: 90,
+    kind: 'question',
+    text: 'Website or app badge on the end card?',
+    by: 'agent:promo-edit',
+  });
+  const settled = await tnote(2, 100, 'Typo in the end card');
+  await api(`/api/comments/${settled.id}`, 'PATCH', { status: 'verified' });
+  const teaserFile = path.join(dir, 'data', teaser, 'review.json');
+  const tstored = JSON.parse(fs.readFileSync(teaserFile, 'utf8'));
+  const mias = tstored.comments.find((c) => c.id === carried.id);
+  mias.author = 'Mia Lang';
+  delete mias.author_id;
+  writeJsonAtomic(teaserFile, tstored);
+  await until(async () => (await api(`/api/review/${enc(teaser)}`)).review.comments.some((c) => c.author === 'Mia Lang'), 'the teaser’s store is read again');
+
+  // picks.mp4: an agent's questions that offer answers to pick (one for the desk's keys, one for a click, one for the
+  // phone), and an open note
+  const pfile = makeVideo(path.join(dir, 'Acme/export/picks.mp4'), { w: 320, h: 180, fps: FPS, dur: 4, pattern: 'testsrc2' });
+  age(pfile);
+  const picks = (await api('/api/library', 'POST', { path: pfile, folder: 'Acme' })).video.slug;
+  const ask = (frame, text, choices) =>
+    api(`/api/review/${enc(picks)}/comments`, 'POST', { v: 1, frame, kind: 'question', text, choices, by: 'agent:claude-ai' });
+  const byClick = await ask(20, 'End card: the website or the app badge?', ['The website', 'The app badge']);
+  const byKey = await ask(40, 'Music under the title: keep it, cut it or lower it?', ['Keep it', 'Cut it', 'Lower it']);
+  const onPhone = await ask(60, 'Hold the last shot a beat longer?', ['Yes, a beat longer', 'No, as it is']);
+  await api(`/api/review/${enc(picks)}/comments`, 'POST', { v: 1, frame: 80, text: 'Logo a touch smaller', severity: 'should' });
+  const pickNote = async (id) => (await api(`/api/review/${enc(picks)}`)).review.comments.find((c) => c.id === id);
+  // opts.mp4: the agent's question with options to audition, and an open note
+  const ofile = makeVideo(path.join(dir, 'Acme/export/opts.mp4'), { w: 320, h: 180, fps: FPS, dur: 4, pattern: 'smptebars' });
+  age(ofile);
+  const opts = (await api('/api/library', 'POST', { path: ofile, folder: 'Acme' })).video.slug;
+  await api('/api/asks', 'POST', {
+    video: opts,
+    text: 'Which voice and which closing line?',
+    options: [
+      {
+        id: 'voice',
+        label: 'Voice',
+        items: [
+          { id: 'v1', label: 'Warm' },
+          { id: 'v2', label: 'Bright' },
+        ],
+      },
+      {
+        id: 'close',
+        label: 'Closing line',
+        items: [
+          { id: 'c1', label: 'See you there' },
+          { id: 'c2', label: 'Made for the weekend' },
+        ],
+      },
+    ],
+    by: 'agent:claude-ai',
+  });
+  await api(`/api/review/${enc(opts)}/comments`, 'POST', { v: 1, frame: 30, text: 'Logo a touch later', severity: 'should' });
+
   browser = await launch();
   page = await browser.newPage();
   screenshotFailures(() => page, 'notes');
@@ -94,7 +173,7 @@ try {
     );
   const tcShown = () => page.$eval('.transport .tc .main', (e) => e.textContent.trim());
 
-  await check('30 notes are 30 rows: timecode, the severity’s glyph and the first line; no pill, no outline', async () => {
+  await check('30 notes are 30 rows: timecode, the severity’s glyph and the first line with nothing after it; no pill, no outline', async () => {
     await openPlayer();
     const all = await rows();
     assert(all.length === 30 && all.every((r) => r.row && !r.open), `30 rows, none open: ${JSON.stringify(all.slice(0, 3))}…`);
@@ -102,18 +181,30 @@ try {
       els.map((e) => {
         const nr = e.querySelector('.nr');
         const s = getComputedStyle(nr);
+        const words = e.querySelector('.nr-text');
+        const w = words.getBoundingClientRect();
+        // what else stands on the words' line, after them (the row's content ends at its padding)
+        const after = [...nr.children].filter((c) => {
+          if (c === words || !c.getClientRects().length) return false;
+          const r = c.getBoundingClientRect();
+          return r.left >= w.left && r.top < w.bottom - 1 && r.bottom > w.top + 1;
+        });
         return {
           h: nr.getBoundingClientRect().height,
           tc: e.querySelector('.nr-tc')?.textContent,
           glyph: !!e.querySelector('.nr-kg .kg'),
-          text: e.querySelector('.nr-text')?.textContent,
-          oneLine: e.querySelector('.nr-text').scrollHeight <= e.querySelector('.nr-text').clientHeight + 1,
-          pills: e.querySelectorAll('.badge').length,
+          text: words.textContent,
+          oneLine: words.scrollHeight <= words.clientHeight + 1,
+          toEnd: Math.abs(w.right - (nr.getBoundingClientRect().right - parseFloat(s.paddingRight))) <= 1,
+          after: after.map((c) => c.className),
+          pills: e.querySelectorAll('.badge, .sbadge, .avatar').length,
           border: parseFloat(s.borderTopWidth) + parseFloat(getComputedStyle(e).borderTopWidth),
         };
       }),
     );
-    const odd = look.filter((l) => l.h < 28 || l.h > 40 || !l.glyph || !l.oneLine || l.pills || l.border || !/^\d\d:\d\d:\d\d$/.test(l.tc));
+    const odd = look.filter(
+      (l) => l.h < 28 || l.h > 60 || !l.glyph || !l.oneLine || !l.toEnd || l.after.length || l.pills || l.border || !/^\d\d:\d\d:\d\d$/.test(l.tc),
+    );
     assert(!odd.length, `rows: ${JSON.stringify(odd.slice(0, 3))}`);
     assert(look[1].text === 'Hold the hero shot longer', `the first line only: ${look[1].text}`);
     // the timecodes stand in one column: the words start together
@@ -122,7 +213,7 @@ try {
     await shot('rows-1440');
   });
 
-  await check('grouped where each note stands: one Open header over the 30; two people wrote them, so each row ends with its author', async () => {
+  await check('grouped where each note stands: one Open header over the 30; two people wrote them, so each row names its author under its words', async () => {
     const heads = await page.$$eval('.side-scroll .note-sect', (els) => els.map((e) => [e.dataset.group, e.querySelector('.n')?.textContent]));
     assert(JSON.stringify(heads) === JSON.stringify([['open', '30']]), `one group, its count: ${JSON.stringify(heads)}`);
     // the header goes with its group's first note (the windowed list measures one element a note)
@@ -131,16 +222,153 @@ try {
       note: e.querySelector('.note')?.dataset.note,
     }));
     assert(first.head && first.note === made[0].id, `the header with its first note: ${JSON.stringify(first)}`);
-    const who = await page.$$eval('.side-scroll .note-row .nr', (els) => els.map((e) => ({ avatar: !!e.querySelector(':scope > .avatar'), title: e.title })));
-    assert(
-      who.every((w) => w.avatar),
-      'every row ends with its author’s avatar',
+    const who = await page.$$eval('.side-scroll .note-row', (els) =>
+      els.map((e) => ({
+        sub: e.querySelector('.nr-sub')?.textContent ?? null,
+        // the second line starts where the words do
+        under:
+          Math.round(e.querySelector('.nr-sub')?.getBoundingClientRect().left ?? -1) === Math.round(e.querySelector('.nr-text').getBoundingClientRect().left),
+        avatar: !!e.querySelector('.avatar'),
+        titles: [...e.querySelectorAll('[title]')].length + (e.hasAttribute('title') ? 1 : 0),
+      })),
     );
     assert(
-      who[0].title.startsWith('Sam · ') && who[10].title.startsWith('Mia Lang · ') && /ago|now/.test(who[0].title),
-      `who and when in the row’s title: ${who[0].title} · ${who[10].title}`,
+      who.every((w) => w.under && !w.avatar && !w.titles),
+      `each row's second line under its words, no avatar, no tooltip: ${JSON.stringify(who.filter((w) => !w.under || w.avatar || w.titles).slice(0, 2))}`,
     );
+    assert(who[0].sub === 'Sam' && who[10].sub === 'Mia Lang', `who wrote it, in words: ${who[0].sub} · ${who[10].sub}`);
   });
+
+  await check(
+    'a row says the rest under its words — who · V1 · replies, then where it stands as a label —; hovered, Reply and ⋯ come inside its end, flat',
+    async () => {
+      await page.setViewport({ width: 1440, height: 900 });
+      await page.goto('about:blank');
+      await page.goto(`${BASE}/#/v/${enc(teaser)}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector(`.side-scroll [data-note="${plain.id}"].note-row`);
+      await page.evaluate(() => document.activeElement?.blur());
+      await page.mouse.move(5, 5);
+      const about = (id) => page.$eval(`.side-scroll [data-note="${id}"] .nr-about`, (e) => e.textContent).catch(() => null);
+      const label = (id) => page.$eval(`.side-scroll [data-note="${id}"] [data-testid=note-state]`, (e) => e.textContent.trim()).catch(() => null);
+      // Mia's note, written on V1 and fixed in V2 (on screen); Sam's with two replies; Sam's with only who wrote it; the
+      // agent's question (an agent is named by its kind's name where it gave none of the client ids)
+      await until(
+        async () => (await about(carried.id)) === 'Mia Lang · V1',
+        async () => `Mia's row: ${await about(carried.id)}`,
+      );
+      const said = {
+        carried: [await about(carried.id), await label(carried.id)],
+        talked: [await about(talked.id), await label(talked.id)],
+        plain: [await about(plain.id), await label(plain.id)],
+        asked: [await about(asked.id), await label(asked.id)],
+      };
+      assert(
+        JSON.stringify(said) ===
+          JSON.stringify({
+            carried: ['Mia Lang · V1', 'Fixed in V2'],
+            talked: ['Sam · 2 replies', null],
+            plain: ['Sam', null],
+            asked: ['promo-edit', 'Question'],
+          }),
+        `who · version · replies on the left, where it stands as a label: ${JSON.stringify(said)}`,
+      );
+      // the labels: the system's Badge (its glyph, no green surface) at the end of the second line, one column down the list
+      const labels = await page.$$eval('.side-scroll [data-testid=note-state]', (els) =>
+        els.map((e) => {
+          const nr = e.closest('.nr');
+          const end = nr.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(nr).paddingRight);
+          const r = e.getBoundingClientRect();
+          return {
+            badge: e.classList.contains('sbadge') && !!e.querySelector(':scope > .kg'),
+            right: Math.round(r.right),
+            atEnd: Math.abs(r.right - end) <= 1,
+            line2: r.top >= nr.querySelector('.nr-text').getBoundingClientRect().bottom,
+          };
+        }),
+      );
+      assert(
+        labels.length === 2 && labels.every((l) => l.badge && l.atEnd && l.line2) && labels[0].right === labels[1].right,
+        `labels at line 2's end, in one column: ${JSON.stringify(labels)}`,
+      );
+
+      /** The row of `id` as it is now: its box, its words, its actions and what floats over it. */
+      const measure = (id) =>
+        page.$eval(`.side-scroll [data-note="${id}"]`, (note) => {
+          const line = note.querySelector('.nr-line');
+          const nr = note.querySelector('.nr');
+          const words = note.querySelector('.nr-text');
+          const box = nr.getBoundingClientRect();
+          const w = words.getBoundingClientRect();
+          const acts = note.querySelector('.nr-acts');
+          const tag = note.querySelector('[data-testid=note-state]')?.getBoundingClientRect();
+          const buttons = [...acts.querySelectorAll('button')].map((b) => {
+            const r = b.getBoundingClientRect();
+            const icon = b.querySelector('svg')?.getBoundingClientRect();
+            const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+            return {
+              // its icon clear of the label, its box at most a hairline over it
+              clear: !tag || (!!icon && (icon.bottom <= tag.top || icon.left >= tag.right || icon.right <= tag.left) && r.bottom - tag.top <= 1),
+              label: b.getAttribute('aria-label'),
+              inside: r.left >= box.left - 0.5 && r.right <= box.right + 0.5 && r.top >= box.top - 0.5 && r.bottom <= box.bottom + 0.5,
+              onLine1: Math.abs(r.top + r.height / 2 - (w.top + w.height / 2)) <= 1.5,
+              reachable: !!hit && b.contains(hit),
+            };
+          });
+          // anything with a shadow over the row's box: its own parts, or something floating over it
+          const shadows = [...document.querySelectorAll('body *')]
+            .filter((e) => (e === nr || !e.contains(nr)) && !e.closest('.nr-state') && getComputedStyle(e).boxShadow !== 'none')
+            .filter((e) => {
+              const r = e.getBoundingClientRect();
+              return r.width && r.height && r.left < box.right - 1 && r.right > box.left + 1 && r.top < box.bottom - 1 && r.bottom > box.top + 1;
+            })
+            .map((e) => e.className || e.tagName);
+          return {
+            shown: getComputedStyle(acts).opacity === '1',
+            // the actions lie on the row's own fill: no ground of their own
+            ground: `${getComputedStyle(acts).backgroundColor} ${getComputedStyle(acts).backgroundImage}`,
+            fill: getComputedStyle(nr).backgroundColor,
+            fade: getComputedStyle(words).maskImage,
+            buttons,
+            shadows,
+            titles: [line, nr, note].filter((e) => e.hasAttribute('title')).length,
+          };
+        });
+      const rest = await measure(carried.id);
+      assert(
+        !rest.shown && rest.fade === 'none' && rest.fill === 'rgba(0, 0, 0, 0)' && !rest.titles,
+        `at rest: words alone, no actions, no tooltip: ${JSON.stringify(rest)}`,
+      );
+      await shot('teaser-rows');
+      // the pointer on the row's words: the flat fill, Reply and ⋯ inside its end on line 1, the words fading under them
+      const words = await (await page.$(`.side-scroll [data-note="${carried.id}"] .nr-text`)).boundingBox();
+      await page.mouse.move(words.x + 40, words.y + words.height / 2);
+      await until(async () => (await measure(carried.id)).shown, 'the actions show on hover');
+      const hovered = await measure(carried.id);
+      assert(
+        hovered.buttons.length === 2 && hovered.buttons.every((b) => b.inside && b.onLine1 && b.reachable && b.clear),
+        `Reply and ⋯ inside the row's box, on its first line, clear of its label: ${JSON.stringify(hovered.buttons)}`,
+      );
+      assert(
+        !hovered.shadows.length && hovered.ground === 'rgba(0, 0, 0, 0) none',
+        `no ground, no shadow over the row: ${hovered.ground} ${hovered.shadows.join(', ')}`,
+      );
+      assert(hovered.fill !== 'rgba(0, 0, 0, 0)' && hovered.fade !== 'none', `the row's flat fill, the words fading out: ${JSON.stringify(hovered)}`);
+      await shot('teaser-hover');
+      // on Reply itself the row keeps its fill and its actions
+      const reply = await (await page.$(`.side-scroll [data-note="${carried.id}"] .nr-acts button`)).boundingBox();
+      await page.mouse.move(reply.x + reply.width / 2, reply.y + reply.height / 2);
+      await sleep(150);
+      const onReply = await measure(carried.id);
+      assert(onReply.shown && onReply.fill === hovered.fill, `on Reply the row stays lit: ${JSON.stringify(onReply)}`);
+      // the keyboard's focus shows them too
+      await page.mouse.move(5, 5);
+      await until(async () => !(await measure(carried.id)).shown, 'the actions go with the pointer');
+      await page.$eval(`.side-scroll [data-note="${carried.id}"] .nr`, (b) => b.focus());
+      await until(async () => (await measure(carried.id)).shown, 'the actions show on focus');
+      await page.evaluate(() => document.activeElement?.blur());
+      await openPlayer();
+    },
+  );
 
   await check('the selected note opens in place into its card, every other stays a row; ↑ ↓ move it, Esc closes it', async () => {
     const id = made[9].id;
@@ -187,6 +415,91 @@ try {
     await page.keyboard.press('ArrowRight');
     await page.waitForSelector(`.side-scroll [data-note="${target.id}"].active`);
   });
+
+  /** The raised buttons in view: one door per view. */
+  const raisedNow = () =>
+    page.$$eval('.btn.primary', (bs) =>
+      bs.filter((b) => b.getClientRects().length && getComputedStyle(b).visibility !== 'hidden').map((b) => b.textContent.trim()),
+    );
+
+  await check(
+    'an agent’s question with answers to pick stands open in Needs you — who asks, the question, the picks —; a click or its number answers, and it folds',
+    async () => {
+      await page.setViewport({ width: 1440, height: 900 });
+      await page.goto('about:blank');
+      await page.goto(`${BASE}/#/v/${enc(picks)}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector(`.side-scroll [data-testid=ask-card][data-note="${byClick.id}"] [data-testid=ask-pick]`, { timeout: 20000 });
+      await page.evaluate(() => document.activeElement?.blur());
+      const card = await page.$eval(`.side-scroll [data-testid=ask-card][data-note="${byClick.id}"]`, (e) => {
+        const q = e.querySelector('.ask-q');
+        const group = e.querySelector('[data-testid=choices]');
+        return {
+          who: e.querySelector('.ask-who')?.textContent,
+          q: q?.textContent,
+          size: getComputedStyle(q).fontSize,
+          picks: [...e.querySelectorAll('[data-testid=ask-pick] .ask-pick-words')].map((b) => b.textContent),
+          // screen readers hear the picks as one group named by the question
+          named: group?.getAttribute('aria-labelledby') === q?.id,
+          raisedInside: e.querySelectorAll('.btn.primary').length,
+          row: !!document.querySelector(`.note-row[data-note="${e.dataset.note}"]`),
+        };
+      });
+      assert(
+        card.who === 'Claude asks' &&
+          card.q === 'End card: the website or the app badge?' &&
+          card.size === '15px' &&
+          JSON.stringify(card.picks) === JSON.stringify(['The website', 'The app badge']) &&
+          card.named &&
+          !card.raisedInside &&
+          !card.row,
+        `the question open, its picks there: ${JSON.stringify(card)}`,
+      );
+      const heads = await page.$$eval('.side-scroll .note-sect', (els) => els.map((e) => e.dataset.group));
+      assert(heads[0] === 'needs', `Needs you first: ${heads}`);
+      // the card is the view's one door, nothing in it orange: + Note steps down while it waits (an agent at work or not)
+      const raised = await raisedNow();
+      assert(!raised.length && (await page.$('[data-testid=new-note]:not(.primary)')), `nothing raised beside the card: ${JSON.stringify(raised)}`);
+      await shot('picks');
+      // the keys: Tab reaches the picks, 3 answers with the third while the card has the focus
+      await page.$eval(`[data-testid=ask-card][data-note="${byKey.id}"] [data-testid=ask-pick]`, (b) => b.focus());
+      await page.keyboard.press('3');
+      await until(async () => (await pickNote(byKey.id)).status === 'verified', 'the third answer sent by its key');
+      assert((await pickNote(byKey.id)).replies.at(-1)?.text === 'Lower it', `the answer: ${JSON.stringify((await pickNote(byKey.id)).replies.at(-1))}`);
+      // a click: the answer as typing it would send, and the card folds
+      await page.$$eval(`[data-testid=ask-card][data-note="${byClick.id}"] [data-testid=ask-pick]`, (bs) =>
+        bs.find((b) => b.textContent.includes('The app badge'))?.click(),
+      );
+      await until(async () => (await pickNote(byClick.id)).status === 'verified', 'the clicked answer sent');
+      assert((await pickNote(byClick.id)).replies.at(-1)?.text === 'The app badge', 'the picked words are the answer');
+      await page.waitForFunction((id) => !document.querySelector(`[data-testid=ask-card][data-note="${id}"]`), { timeout: 10000 }, byClick.id);
+      // answered, a row again: in Done, saying so
+      await page.click('[data-testid=group-done]');
+      await page.waitForSelector(`.side-scroll .note-row[data-note="${byClick.id}"] [data-testid=note-state]`);
+      const label = await page.$eval(`.side-scroll .note-row[data-note="${byClick.id}"] [data-testid=note-state]`, (e) => e.textContent.trim());
+      assert(label === 'Answered', `the row says it was answered: ${label}`);
+      await shot('picks-answered');
+    },
+  );
+
+  await check(
+    'a question with options to audition stands open the same way: the groups and the way into the audition; the card is the door, + Note steps down',
+    async () => {
+      await page.setViewport({ width: 1440, height: 900 });
+      await page.goto('about:blank');
+      await page.goto(`${BASE}/#/v/${enc(opts)}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('.side-scroll [data-testid=ask-card] [data-testid=options-ask] [data-testid=options-open]', { timeout: 20000 });
+      await page.evaluate(() => document.activeElement?.blur());
+      const card = await page.$eval('.side-scroll [data-testid=ask-card]', (e) => ({
+        who: e.querySelector('.ask-who')?.textContent,
+        groups: [...e.querySelectorAll('.opt-group-chip')].map((g) => g.textContent.replace(/\s+/g, ' ').trim()),
+        raisedInside: e.querySelectorAll('.btn.primary').length,
+      }));
+      assert(card.who === 'Claude asks' && card.groups.length === 2 && !card.raisedInside, `the options open on the card: ${JSON.stringify(card)}`);
+      const raised = await raisedNow();
+      assert(!raised.length && (await page.$('[data-testid=new-note]:not(.primary)')), `nothing raised beside the card: ${JSON.stringify(raised)}`);
+      await shot('picks-options');
+    },
+  );
 
   // the filter menu's items, as they read
   const filterMenu = async () => {
@@ -481,6 +794,221 @@ try {
     const sheet = await page.$eval('.ac-pop', (e) => e.getBoundingClientRect().toJSON());
     assert(sheet.left <= 1 && sheet.right >= 389 && sheet.bottom >= 843, `a sheet from the bottom edge: ${JSON.stringify(sheet)}`);
     await shot('phone-autocheck');
+  });
+
+  // ---------------------------------------------------------------- a phone's notes (still the phone emulated above)
+  /** What a phone's sheet shows: its groups, its notes, and what its selector says (its words without the hidden ones). */
+  const sheetShows = () =>
+    page.evaluate(() => {
+      const pick = document.querySelector('[data-testid=notes-view]');
+      return {
+        groups: [...document.querySelectorAll('.nsheet .side-scroll .note-sect')].map((e) => e.dataset.group),
+        notes: [...document.querySelectorAll('.nsheet .side-scroll .note')].map((e) => e.dataset.note),
+        pick: pick
+          ? [...pick.childNodes]
+              .filter((n) => !n.classList?.contains('sr-only'))
+              .map((n) => n.textContent)
+              .join(' ')
+              .replace(/\s+/g, ' ')
+              .trim()
+          : null,
+        door: document.querySelector('.nsheet [data-testid=check-sheet]')?.textContent.trim() ?? null,
+        header: !!document.querySelector('.nsheet [data-testid=check-group]'),
+      };
+    });
+  const openSheet = async (hash = '') => {
+    await page.goto('about:blank');
+    await page.goto(`${BASE}/#/v/${enc(teaser)}${hash}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.nsheet .note-row:not(.pending)');
+    if (!(await page.$('.nsheet-half, .nsheet-full'))) {
+      await page.tap('.nsheet-handle');
+      await page.waitForSelector('.nsheet-half');
+    }
+  };
+  /** Taps `sel` once it holds still (the sheet moves to its height first: a tap aimed while it moves lands elsewhere). */
+  const tapStill = async (sel) => {
+    await page.waitForFunction(
+      (sel) =>
+        new Promise((done) => {
+          const at = () => JSON.stringify(document.querySelector(sel)?.getBoundingClientRect() ?? null);
+          const a = at();
+          requestAnimationFrame(() => requestAnimationFrame(() => done(a !== 'null' && a === at())));
+        }),
+      { timeout: 10000 },
+      sel,
+    );
+    await page.tap(sel);
+  };
+  const pickView = async (words) => {
+    await tapStill('[data-testid=notes-view]');
+    await page.waitForSelector('.menu[data-state=open] [role=menuitemcheckbox]');
+    await page.evaluate(
+      (w) =>
+        [...document.querySelectorAll('.menu[data-state=open] [role=menuitemcheckbox]')]
+          .find((e) => e.textContent.replace(/\s+/g, ' ').trim().startsWith(w))
+          ?.click(),
+      words,
+    );
+    await page.waitForFunction(() => !document.querySelector('.menu[data-state=open]'), { timeout: 5000 });
+  };
+
+  await check(
+    'a phone shows what needs you and what is open; the selector on the left brings the fixes to check, the done ones or all, and a door to checking stays',
+    async () => {
+      await openSheet();
+      let now = await sheetShows();
+      assert(
+        JSON.stringify(now.groups) === JSON.stringify(['needs', 'open']) &&
+          JSON.stringify(now.notes) === JSON.stringify([asked.id, talked.id, plain.id]) &&
+          now.pick === 'Open 3' &&
+          !now.header,
+        `what is open and what needs you, no fixes and no done ones: ${JSON.stringify(now)}`,
+      );
+      assert(now.door === 'Check 1 fix', `the door to checking the fix the list leaves out: ${JSON.stringify(now)}`);
+      // the selector at the line's start, ⋯ at its end, both a finger's size
+      const line = await page.$eval('.nsheet .np-chips', (l) => {
+        const box = l.getBoundingClientRect();
+        const start = box.left + Number.parseFloat(getComputedStyle(l).paddingLeft);
+        const end = box.right - Number.parseFloat(getComputedStyle(l).paddingRight);
+        const pick = l.querySelector('[data-testid=notes-view]').getBoundingClientRect();
+        const more = l.querySelector('[data-testid=notes-more]').getBoundingClientRect();
+        const reaches = (r, sel) =>
+          [r.top + r.height / 2 - 21, r.top + r.height / 2 + 21].every((y) => document.elementFromPoint(r.left + r.width / 2, y)?.closest(sel));
+        return {
+          atStart: Math.abs(pick.left - start) <= 1,
+          atEnd: Math.abs(more.right - end) <= 1,
+          pickTap: reaches(pick, '[data-testid=notes-view]'),
+          moreTap: reaches(more, '[data-testid=notes-more]'),
+          noFilterButton: !l.querySelector('[data-testid=notes-filter]'),
+        };
+      });
+      assert(Object.values(line).every(Boolean), `the selector on the left, ⋯ on the right, 44 px to a finger: ${JSON.stringify(line)}`);
+      await shot('phone-default');
+      // To check: the fix in its group, the header's Check its door (the line's steps aside)
+      await pickView('To check');
+      now = await sheetShows();
+      assert(
+        JSON.stringify(now.groups) === JSON.stringify(['check']) &&
+          JSON.stringify(now.notes) === JSON.stringify([carried.id]) &&
+          now.pick === 'To check 1' &&
+          now.header &&
+          now.door === null,
+        `the fix to check, its header's Check: ${JSON.stringify(now)}`,
+      );
+      await pickView('Done');
+      now = await sheetShows();
+      assert(JSON.stringify(now.notes) === JSON.stringify([settled.id]) && now.pick === 'Done 1', `the done note: ${JSON.stringify(now)}`);
+      await pickView('All');
+      now = await sheetShows();
+      assert(
+        JSON.stringify(now.groups) === JSON.stringify(['needs', 'check', 'open', 'done']) && now.notes.length === 5 && now.pick === 'All 5',
+        `all: ${JSON.stringify(now)}`,
+      );
+      await pickView('Open');
+      assert((await sheetShows()).pick === 'Open 3', 'back to what is open');
+    },
+  );
+
+  await check(
+    'a phone: an agent’s question with answers to pick opens the sheet by itself, its question and first answer in view; again when the sheet is raised',
+    async () => {
+      /** The question's card against the sheet's list: its top, whether its words and first answer are in view. */
+      const askAt = () =>
+        page.evaluate((id) => {
+          const e = document.querySelector(`.nsheet [data-testid=ask-card][data-note="${id}"]`);
+          if (!e) return null;
+          const box = e.closest('.side-scroll').getBoundingClientRect();
+          const first = e.querySelector('[data-testid=ask-pick]').getBoundingClientRect();
+          const pick = document.querySelector('[data-testid=notes-view]');
+          const picture = document.querySelector('.phone-player .vbox video')?.getBoundingClientRect();
+          return {
+            top: Math.round(e.getBoundingClientRect().top - box.top),
+            inView: e.getBoundingClientRect().top >= box.top - 1 && first.bottom <= box.bottom + 1 && first.bottom <= innerHeight,
+            sheet: document.querySelector('.nsheet').className.match(/nsheet-(peek|half|full)/)?.[1],
+            picture: picture ? Math.round(picture.height) : 0,
+            view: [...pick.childNodes]
+              .filter((n) => !n.classList?.contains('sr-only'))
+              .map((n) => n.textContent)
+              .join(' ')
+              .replace(/\s+/g, ' ')
+              .trim(),
+          };
+        }, onPhone.id);
+      const ok = (at) => !!at && at.sheet !== 'peek' && at.inView && at.top >= 0 && at.top <= 60 && at.picture > 40 && at.view.startsWith('Open');
+      await page.goto('about:blank');
+      await page.goto(`${BASE}/#/v/${enc(picks)}`, { waitUntil: 'domcontentloaded' });
+      // the notes arrive: the sheet opens to the question by itself, the picture still above it
+      await until(
+        async () => ok(await askAt()),
+        async () => `the question in view on load: ${JSON.stringify(await askAt())}`,
+      );
+      await shot('phone-picks');
+      // put away, then raised again: the question comes up again
+      await tapStill('.nsheet-handle');
+      await page.waitForSelector('.nsheet-peek');
+      await page.$eval('.nsheet .side-scroll', (e) => e.scrollTo(0, e.scrollHeight));
+      await tapStill('.nsheet-handle');
+      await until(
+        async () => ok(await askAt()),
+        async () => `the question in view once raised: ${JSON.stringify(await askAt())}`,
+      );
+    },
+  );
+
+  /** Where the opened card stands in the sheet's list: its top and its reply's bottom against the list's box. */
+  const placeOf = (id) =>
+    page.evaluate((id) => {
+      const sc = document.querySelector('.nsheet .side-scroll');
+      const card = document.querySelector(`.nsheet [data-note="${id}"].active`);
+      if (!sc || !card) return null;
+      const box = sc.getBoundingClientRect();
+      const r = card.getBoundingClientRect();
+      const last = [...card.querySelectorAll('.reply-stub, .c-actions, .check-decision, .note-answer')].at(-1)?.getBoundingClientRect() ?? r;
+      return {
+        top: Math.round(r.top - box.top),
+        bottom: Math.round(last.bottom - box.top),
+        room: Math.round(box.height),
+        atEnd: sc.scrollTop >= sc.scrollHeight - sc.clientHeight - 1,
+        sheet: document.querySelector('.nsheet').className.match(/nsheet-(peek|half|full)/)?.[1],
+      };
+    }, id);
+  const whole = (at) => !!at && at.top >= 0 && at.bottom <= at.room && (at.top <= 24 || at.atEnd);
+
+  await check('a phone: a note picked comes to the sheet’s top, whole — from the list, by a link, going through the notes', async () => {
+    // the long list: a note well down it, picked with a finger
+    await page.goto('about:blank');
+    await page.goto(`${BASE}/#/v/${enc(slug)}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.nsheet .note-row:not(.pending)');
+    await page.tap('.nsheet-handle');
+    await page.waitForSelector('.nsheet-half');
+    const id = made[13].id;
+    await page.$eval(`.nsheet [data-note="${id}"] .nr`, (e) => e.scrollIntoView({ block: 'end' }));
+    await tapStill(`.nsheet [data-note="${id}"] .nr`);
+    await until(
+      async () => whole(await placeOf(id)),
+      async () => `the picked card at the top, its reply in view: ${JSON.stringify(await placeOf(id))}`,
+    );
+    await shot('phone-opened');
+    // by a link: the sheet at rest opens to it
+    const linked = made[22].id;
+    await page.goto('about:blank');
+    await page.goto(`${BASE}/#/v/${enc(slug)}?c=${linked}`, { waitUntil: 'domcontentloaded' });
+    await until(
+      async () => whole(await placeOf(linked)),
+      async () => `the linked card: ${JSON.stringify(await placeOf(linked))}`,
+    );
+    assert((await placeOf(linked)).sheet !== 'peek', 'the sheet opened to it');
+    // going through the open notes (⋯): each one comes up whole
+    await tapStill('[data-testid=notes-more]');
+    await page.waitForSelector('.menu[data-state=open] [role=menuitemcheckbox], .menu[data-state=open] [role=menuitem]');
+    await page.evaluate(() =>
+      [...document.querySelectorAll('.menu[data-state=open] [role^=menuitem]')].find((e) => e.textContent.includes('Go through the open notes'))?.click(),
+    );
+    const first = await until(() => page.$eval('.nsheet .comment.active', (e) => e.dataset.note).catch(() => null), 'review mode opens a note');
+    await until(
+      async () => whole(await placeOf(first)),
+      async () => `the note review mode opened: ${JSON.stringify(await placeOf(first))}`,
+    );
   });
 
   await check('no page errors along the way', async () => {

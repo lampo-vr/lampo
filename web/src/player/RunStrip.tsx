@@ -49,6 +49,9 @@ export interface RunStripProps {
   say?: Say;
   onOpen: () => void;
   onAnswer: (note: string | null) => void;
+  /** The question it asks offers its answers to pick (`one`) or options to audition (`options`): they stand open on its
+   * card in the notes (AskCard.tsx), the view's door, so the line says so and offers no Answer of its own. */
+  askPicks?: 'one' | 'options' | null;
   /** Phones: above the dock, a thumb's height; pressing it opens the Agent view in the sheet. */
   phone?: boolean;
   /** The view it opens is showing (the line is its head then). */
@@ -118,9 +121,11 @@ export const RunStrip = memo(function RunStrip(p: RunStripProps) {
   // waiting on it, or done with nothing of its left to check)
   if (!said || (said.phase === 'done' && !p.toCheck)) return null;
   const phase = said.phase;
-  const action = ONE.find((a) => said.actions.includes(a) && allowedFor(a, p.canSteer)) ?? null;
-  const busy = p.act.busy;
   const asked = phase === 'needs_you' && (run?.needs?.kind === 'question' || run?.needs?.kind === 'options' || !run?.needs);
+  // asked with answers to pick, the card in the notes is where to answer: no Answer here, nothing raised on the line
+  const picks = asked ? (p.askPicks ?? null) : null;
+  const action = ONE.find((a) => said.actions.includes(a) && allowedFor(a, p.canSteer) && !(a === 'answer' && picks)) ?? null;
+  const busy = p.act.busy;
   const working = phase === 'working' || phase === 'rendering' || phase === 'uploading' || phase === 'checking';
   // The line's words are the strip's (runWords.ts), split in two: where it stands is the sentence, after the agent's
   // name ("Claude Code is fixing 3 of 7", "… needs permission"), and the rest is the folded line under it (its latest
@@ -133,16 +138,31 @@ export const RunStrip = memo(function RunStrip(p: RunStripProps) {
       ? [doing, ...(said.words === doing ? [] : [said.words.slice(doing.length + 3)])]
       : said.words.split(' · ');
   const what =
-    phase === 'not_listening' ? t('stopped listening') : asked ? t('asked you') : said.name ? (working ? t('is {doing}', { doing: head }) : head) : null;
+    phase === 'not_listening'
+      ? t('stopped listening')
+      : picks === 'one'
+        ? t('asks you to pick one')
+        : picks === 'options'
+          ? t('asks you to pick')
+          : asked
+            ? t('asked you')
+            : said.name
+              ? working
+                ? t('is {doing}', { doing: head })
+                : head
+              : null;
   // the folded line: what to tell it, the question in its words, or the rest of the strip's words
   const fold =
     phase === 'not_listening' && p.session
       ? ['mcp', 'api', 'cli'].includes(agentKindOfRef(p.session))
         ? t('Tell it “go on”: your notes are waiting for it.')
         : t('Tell it “go on” in {app}: your notes are waiting for it.', { app: AGENT_KIND_LABELS[agentKindOfRef(p.session)] })
-      : asked && run?.needs?.text
-        ? t('“{quote}”', { quote: p.say ? p.say(run.needs.text) : run.needs.text.text })
-        : rest.join(' · ') || null;
+      : picks
+        ? // the question and its answers stand on the card right under the line: nothing to repeat here
+          null
+        : asked && run?.needs?.text
+          ? t('“{quote}”', { quote: p.say ? p.say(run.needs.text) : run.needs.text.text })
+          : rest.join(' · ') || null;
   // how far, beside the folded words and never cut ("42%")
   const figure = working ? said.figure : null;
   // the line whole, as it is cut where it doesn't fit: in its title, and pressing opens all of it
@@ -172,8 +192,10 @@ export const RunStrip = memo(function RunStrip(p: RunStripProps) {
         <button
           type="button"
           className="run-main"
-          onClick={p.onOpen}
-          aria-label={p.open ? full : t('{line} · show what the agent is doing', { line: full })}
+          // asking with answers to pick, the line is a quiet way to the card (never a second door): it brings the
+          // question into view; otherwise it opens what the agent is doing
+          onClick={picks ? () => p.onAnswer(run?.needs?.note ?? null) : p.onOpen}
+          aria-label={picks ? t('{line} · show the question', { line: full }) : p.open ? full : t('{line} · show what the agent is doing', { line: full })}
           title={full}
           aria-expanded={p.phone ? undefined : p.open}
           data-testid="run-open"
@@ -210,7 +232,8 @@ export const RunStrip = memo(function RunStrip(p: RunStripProps) {
           </button>
         )}
       </div>
-      {/* the folded line keeps its room whatever the state, so the notes under it never move */}
+      {/* the folded line keeps its room whatever the state, so the notes under it never move — but while the agent asks
+          with answers to pick, the question's card stands right under the line and the line is its one line */}
       {fold || figure ? (
         <button type="button" className="al-fold" onClick={p.onOpen} title={[fold, figure].filter(Boolean).join(' · ')} data-testid="run-fold">
           {asked || phase === 'not_listening' ? null : <span aria-hidden="true">›</span>}
@@ -222,7 +245,7 @@ export const RunStrip = memo(function RunStrip(p: RunStripProps) {
             </span>
           )}
         </button>
-      ) : (
+      ) : picks ? null : (
         <span className="al-fold" aria-hidden="true" />
       )}
       {said.edge !== null && <span className="run-edge" data-testid="run-edge" style={{ '--edge': said.edge } as CSSProperties} aria-hidden="true" />}

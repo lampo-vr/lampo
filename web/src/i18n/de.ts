@@ -2264,6 +2264,11 @@ const owner: Record<Exclude<Key, ClientKey>, string> = {
   'New versions and fixes to check land here.': 'Neue Versionen und Korrekturen zum Prüfen landen hier.',
   'No agent on {name} now': '{name} hat jetzt keinen Agenten',
   'No fixes to check': 'Keine Korrekturen zu prüfen',
+  'Notes shown:': 'Angezeigt:',
+  'Or write an answer…': 'Oder schreib eine Antwort …',
+  'asks you to pick one': 'bittet dich, eine zu wählen',
+  'asks you to pick': 'bittet dich um eine Auswahl',
+  '{line} · show the question': '{line} · die Frage zeigen',
   'No version has the fix yet: the next one is checked against the preview':
     'Noch keine Version enthält die Korrektur: Die nächste wird mit der Vorschau abgeglichen',
   'Notes and approval': 'Notizen und Freigabe',

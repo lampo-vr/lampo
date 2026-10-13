@@ -280,6 +280,13 @@ try {
       await page.mouse.move(h.x, h.y - 120, { steps: 4 });
       await page.mouse.up();
       await page.waitForSelector('.nsheet-full');
+      // a phone's notes show what is open: the fixes to check are the selector's "To check"
+      await page.click('[data-testid=notes-view]');
+      await page.waitForSelector('.menu[data-state=open] [role=menuitemcheckbox]');
+      await page.evaluate(() =>
+        [...document.querySelectorAll('.menu[data-state=open] [role=menuitemcheckbox]')].find((e) => e.textContent.trim().startsWith('To check'))?.click(),
+      );
+      await page.waitForSelector(`${c} .nr, ${c}.active`);
       await openCard(layoutFix.id);
       await page.$eval(c, (el) => el.scrollIntoView({ block: 'start' }));
       await settle(page);

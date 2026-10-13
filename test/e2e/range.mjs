@@ -339,10 +339,10 @@ try {
     await page.waitForFunction(() => document.querySelector('[data-testid=tl-hover]')?.textContent.includes('Musik'), { timeout: 5000 });
     const hover = await page.$eval('[data-testid=tl-hover]', (e) => e.textContent);
     assert(hover.startsWith('00:01:00 → 00:02:00 · 1.0 s · Musik zu laut'), hover);
-    // its row: where it starts and, at the end, how long it is
+    // its row: where it starts and, on its second line, how long it is
     const row = await page.evaluate(() => {
       const n = [...document.querySelectorAll('.side-scroll .note-row')].find((e) => e.textContent.includes('Musik zu laut'));
-      return n ? { tc: n.querySelector('.nr-tc')?.textContent, len: n.querySelector('.nr-len')?.textContent } : null;
+      return n ? { tc: n.querySelector('.nr-tc')?.textContent, len: n.querySelector('.nr-sub .nr-len')?.textContent } : null;
     });
     assert(row?.tc === '00:01:00' && row.len === '1.0 s', `the row: ${JSON.stringify(row)}`);
     await openNote('Musik zu laut');

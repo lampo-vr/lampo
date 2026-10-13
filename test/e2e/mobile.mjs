@@ -18,6 +18,7 @@
 // VR_SHOTS=<dir> keeps screenshots (and one of the page for each failed check).
 import path from 'node:path';
 import { timecode } from '../../lib/time.ts';
+import { groupOf } from '../../web/src/player/noteGroups.ts';
 import { age, makeVideo, sleep, until } from '../lib/helpers.ts';
 import { bentEdges, clippedText, cutLabels, dataTheme, grainOnScrollers, settle, sideways } from './layout.mjs';
 import { launch, requireChrome, shotsDir } from './lib/browser.mjs';
@@ -407,8 +408,10 @@ try {
   await check('verify on a phone: before and after stacked, a swipe switches, "Looks right" closes the fix', async () => {
     await tap('.nsheet-handle');
     await page.waitForSelector('.nsheet-half');
-    // the notes' To check header's Check (the bar's row says it too)
-    await tap('.nsheet [data-testid=check-group]');
+    // a phone's notes show what is open: the fixes wait behind the selector, and the sheet's own "Check 1 fix" on the
+    // line under its head is the way in (the bar's row says it too, while the sheet is at rest)
+    assert(!(await page.$('.nsheet [data-testid=group-check]')), 'no To check group in the sheet by default');
+    await tap('.nsheet [data-testid=check-sheet]');
     await page.waitForSelector('.nsheet .verify');
     await page.waitForSelector('.stage.stacked');
     await settled();
@@ -842,7 +845,8 @@ try {
     await page.waitForSelector('.nsheet-peek [data-testid=notes-open]');
     await settle(page);
     const { review } = await api(`/api/review/${encodeURIComponent(slug)}`);
-    const open = review.comments.filter((c) => c.status === 'open' || c.status === 'fixed').length;
+    // what a phone's notes show: what needs you and what is open (the fixes to check and the done ones wait in its selector)
+    const open = review.comments.filter((c) => groupOf(c) === 'needs' || groupOf(c) === 'open').length;
     const row = await page.evaluate(() => {
       const b = document.querySelector('[data-testid=notes-open]');
       const r = b.getBoundingClientRect();
@@ -865,8 +869,8 @@ try {
     await tap('[data-testid=notes-open]');
     await page.waitForSelector('.nsheet-half .nr');
     assert(
-      (await page.$('.nsheet-half [data-testid=notes-filter]')) && (await page.$('.nsheet-half [data-testid=notes-more]')),
-      'open, the head’s tools are back',
+      (await page.$('.nsheet-half [data-testid=notes-view]')) && (await page.$('.nsheet-half [data-testid=notes-more]')),
+      'open, the head’s tools are back: the selector of which notes it shows, and ⋯',
     );
     await shot('11-notes-open');
     await tap('.nsheet-handle');

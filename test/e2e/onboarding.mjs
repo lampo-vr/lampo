@@ -103,12 +103,6 @@ try {
     await p.keyboard.press('Escape');
     await p.waitForFunction(() => !document.querySelector('.menu[data-state=open]'), { timeout: 5000 });
   };
-  /** Opens the note whose row says `words` into its card (notes rest as one-line rows). */
-  const openNote = async (p, words) => {
-    await p.waitForFunction((w) => [...document.querySelectorAll('.note-row .nr')].some((b) => b.textContent.includes(w)), { timeout: 15000 }, words);
-    await p.evaluate((w) => [...document.querySelectorAll('.note-row .nr')].find((b) => b.textContent.includes(w))?.click(), words);
-    await p.waitForFunction((w) => document.querySelector('.comment.note.active')?.textContent.includes(w), { timeout: 10000 }, words);
-  };
   // The column's left edge, read off each step's heading at a width: it never moves sideways on Continue or Back.
   const movesAt = async (base, steps, cookie = null) => {
     const p = await fresh();
@@ -261,9 +255,9 @@ try {
     await a.goto(`${BASE}/#/v/${encodeURIComponent(sample.slug)}?verify=${encodeURIComponent(sample.check)}`, { waitUntil: 'domcontentloaded' });
     await a.waitForSelector('[data-testid=check-decision] button', { timeout: 15000 });
     await clickText(a, '[data-testid=check-decision] button', 'Looks right');
-    await openNote(a, 'Should the title fade out');
-    await a.waitForSelector('.comment.note.active [data-testid=choices] button', { timeout: 10000 });
-    await clickText(a, '.comment.note.active [data-testid=choices] button', 'Hold it');
+    // the agent's question offers its answers on its own card, open in the list: one tap answers
+    await a.waitForFunction(() => document.querySelector('[data-testid=ask-card]')?.textContent.includes('Should the title fade out'), { timeout: 15000 });
+    await clickText(a, '[data-testid=ask-card] [data-testid=choices] button', 'Hold it');
     await a.waitForSelector('[data-testid=ob-loop-done]', { timeout: 15000 });
     const card = await textOf(a, '[data-testid=ob-loop-done]');
     assert(card.includes('That’s the loop') && card.includes('Claude Code’s fix in V2'), card);
@@ -491,11 +485,11 @@ try {
     assert((await p.$eval('[data-testid=ob-sample-make]', (e) => e.textContent)).includes('Mit einem Beispiel ausprobieren'), 'offered again');
     await p.click('.ob-gs-pane [data-testid=ob-sample-make]');
     await p.waitForFunction(() => location.hash.startsWith('#/v/'), { timeout: 30000 });
-    await openNote(p, 'Soll der Titel');
     await p.waitForFunction(
       () =>
         document.body.textContent.includes('Lampo-Beispiel.mp4') &&
-        document.querySelector('.comment.note.active [data-testid=choices]')?.textContent.includes('Stehen lassen'),
+        document.querySelector('[data-testid=ask-card]')?.textContent.includes('Soll der Titel') &&
+        document.querySelector('[data-testid=ask-card] [data-testid=choices]')?.textContent.includes('Stehen lassen'),
       { timeout: 15000 },
     );
     await shot(p, '08-german-sample');

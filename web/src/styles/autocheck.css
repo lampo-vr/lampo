@@ -62,7 +62,8 @@
   height: var(--ic-sm);
 }
 /* A narrower head says less, never wraps or pushes + Note away: the name goes first (it is in the chip's label), then
-   the words, leaving the glyph and the number. A phone's sheet has it on the line under its head, where there is room. */
+   the words, leaving the glyph and the number. A phone's sheet has it on the line under its head, with the selector,
+   the door to checking fixes and ⋯: what it found in words, without its name (one line). */
 @container notes-head (max-width: 380px) {
   .ac-chip-name,
   .ac-chip-sep {
@@ -77,8 +78,11 @@
     display: inline;
   }
 }
-.nsheet :is(.ac-chip-name, .ac-chip-sep, .ac-chip-n) {
+.nsheet .ac-chip-n {
   display: inline;
+}
+.nsheet :is(.ac-chip-name, .ac-chip-sep) {
+  display: none;
 }
 .nsheet .ac-chip-num {
   display: none;

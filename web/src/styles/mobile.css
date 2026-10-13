@@ -98,6 +98,8 @@
     .topbar.bare .user-chip,
     .ac-chip,
     .np-chip,
+    .np-pick,
+    .np-tools .btn,
     .arch-banner-act,
     button.c-tc
   ) {
@@ -129,6 +131,8 @@
     .topbar.bare .user-chip,
     .ac-chip,
     .np-chip,
+    .np-pick,
+    .np-tools .btn,
     .arch-banner-act,
     button.c-tc
   )::after {
@@ -948,7 +952,7 @@
     padding: 0 var(--sp-3);
     gap: var(--sp-2);
   }
-  /* the line under the sheet's head: Auto-check, a filter on, and the filter and ⋯ at its end */
+  /* the line under the sheet's head: the selector, Auto-check, the door to checking fixes and ⋯ at its end */
   .nsheet .np-chips {
     padding: 0 var(--sp-3) var(--sp-2);
   }
@@ -1170,10 +1174,13 @@
     grid-template-rows: 100dvh auto auto auto auto auto;
     grid-template-areas: 'stage' 'top' 'strip' 'run' 'dock' 'side';
   }
-  /* the notes keep clear of the notch and the rounded corners, as the bars do */
+  /* the notes keep clear of the notch and the rounded corners, as the bars do; they are a screen of their own, so Notes
+     brings them to the top however few they are (a phone's list leaves the fixes to check and the done ones to its
+     selector) */
   .phone-player .side.nsheet,
   .phone-player .side.nsheet.nsheet-peek {
     height: auto;
+    min-height: 100dvh;
     max-height: none;
     border-radius: 0;
     box-shadow: none;
@@ -1188,6 +1195,10 @@
   .phone-player .nsheet-peek .tr-tools,
   .phone-player .nsheet-peek .side-scroll {
     visibility: visible;
+  }
+  /* held sideways the sheet never opens: the line with the selector, Check and ⋯ is there at rest */
+  .phone-player .nsheet-peek .np-chips {
+    display: flex;
   }
   .phone-player.ps-half .p-strip,
   .phone-player.ps-half .ptools,
@@ -1225,10 +1236,11 @@
   .tabs button {
     min-height: 40px;
   }
-  /* the notes' head (+ Note, Record, the mic), the filter and ⋯ on the line under it, the composer's foot (both
-     players') and the To check group's Check */
+  /* the notes' head (+ Note, Record, the mic), the selector, Check and ⋯ on the line under it, the composer's foot
+     (both players') and the To check group's Check */
   .side-title .btn.sm,
   .np-tools .btn.sm,
+  .np-pick.btn.sm,
   .composer-foot .btn.sm,
   .note-sect .btn.sm {
     min-height: var(--h-lg);

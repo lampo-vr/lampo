@@ -117,6 +117,17 @@ button.np-tab[aria-selected='true'] {
   gap: var(--sp-1);
   margin-left: auto;
 }
+/* a phone's selector of which notes the sheet shows, at the start of that line: its words, its count a step quieter */
+.np-pick {
+  gap: var(--sp-1);
+}
+.np-pick > .n {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.np-pick > .icon {
+  color: var(--muted);
+}
 .np-chip {
   gap: var(--sp-1);
   padding-right: var(--sp-1);
@@ -204,9 +215,11 @@ button.note-sect:hover {
 }
 
 /* ---------------------------------------------------------------- a note as a row
-   Timecode · severity glyph · the first line · where it stands (a small Badge), one line at a control's height; its
-   author's avatar at the end only where several people wrote notes (who and when in its title). Colour sits in the
-   glyph and the badge's mark; hover changes the ground and shows the row's actions (reply, ⋯) over its end. */
+   The player's row (.nr-stack, CommentCard.tsx): line 1 its timecode, its kind's glyph and its words, to the row's end;
+   line 2 under the words, smaller and quieter, what there is to say about it in words — who · V2 · 1.0 s · 2 replies —
+   and at its end where it stands, a small label; a row with nothing to say is one line. Colour sits in the glyphs.
+   Hover is the list's flat fill; Reply and ⋯ come inside the end of line 1, over no label, the words fading out under
+   them. A review link's row (guest/GuestNotes.tsx) is the plain .nr: one line, its marks at the end. */
 .note-row {
   display: grid;
   min-width: 0;
@@ -232,30 +245,43 @@ button.note-sect:hover {
   color: var(--faint);
 }
 .nr-line {
+  /* the actions' width (Reply and ⋯, or ⋯ alone): the words fade out before it */
+  --nr-acts-w: calc(2 * var(--h-sm) + var(--sp-0_5));
   position: relative;
   min-width: 0;
 }
-/* the row's actions: over its end while the pointer or the focus is on it */
+.nr-line[data-acts='1'] {
+  --nr-acts-w: var(--h-sm);
+}
+/* the row's actions: flat ghosts inside its end, centred on line 1, while the pointer or the focus is on the row or its
+   menu is open — no ground, edge or shadow of their own */
 .nr-acts {
   position: absolute;
-  top: 50%;
+  /* the row's room above line 1 (.nr-stack's padding), then half the line */
+  top: calc(var(--sp-1) + var(--sp-0_5) + var(--fs-md) * var(--lh-ui) / 2);
   right: var(--sp-1);
   display: flex;
   align-items: center;
   gap: var(--sp-0_5);
-  padding-left: var(--sp-2);
-  /* its buttons sit flush at its end: the same corner as theirs (concentric) */
-  border-radius: var(--r);
-  /* the hovered row's own ground, opaque, so the badge under it doesn't show through */
-  background: linear-gradient(var(--sel), var(--sel)), var(--ink-2);
   transform: translateY(-50%);
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--dur-fast) var(--ease-out);
 }
-.nr-line:is(:hover, :focus-within) .nr-acts {
+/* a one-line row: its middle (a phone's row is a finger's height, its line centred in it) */
+.nr-line:not(:has(.nr-sub)) > .nr-acts {
+  top: 50%;
+}
+.nr-line:is(:hover, :focus-within, :has([data-state='open'])) > .nr-acts {
   opacity: 1;
   pointer-events: auto;
+}
+.nr-acts .btn.ghost:hover:where(:not(:disabled, .on)) {
+  background: var(--sel);
+}
+/* the words fade out under the actions instead of running under them */
+.nr-line:is(:hover, :focus-within, :has([data-state='open'])) .nr-text {
+  mask-image: linear-gradient(to left, transparent var(--nr-acts-w), #000 calc(var(--nr-acts-w) + var(--sp-6)));
 }
 .nr {
   position: relative;
@@ -285,6 +311,29 @@ button.note-sect:hover {
 .nr:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
+}
+/* the player's row in two lines: the second under the words, tight under the first */
+.nr.nr-stack {
+  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-template-areas:
+    'tc kg text'
+    '. . sub';
+  grid-auto-flow: row;
+  align-content: center;
+  row-gap: 0;
+  padding: calc(var(--sp-1) + var(--sp-0_5)) var(--sp-2);
+}
+.nr-stack > .nr-tc {
+  grid-area: tc;
+}
+.nr-stack > .nr-kg {
+  grid-area: kg;
+}
+.nr-stack > .nr-text {
+  grid-area: text;
+}
+.nr-stack > .nr-sub {
+  grid-area: sub;
 }
 /* the timecodes in one column of one width, so the words start together (a section's length is at the row's end) */
 .nr-tc {
@@ -358,19 +407,65 @@ button.note-sect:hover {
 .nr-state.nr-open:not(.again) {
   color: var(--agent-2);
 }
-/* a player row's state is a Badge: it lies on the row's end, the actions over it on hover. A fix's green is its mark
-   alone, never the label's surface or ring (green marks a state) */
-.nr > .sbadge.nr-state {
-  justify-self: end;
+/* line 2: on its left what there is to say about the note, in words, quiet (a long name gives way first); at its end
+   where the note stands, the system's label, so the labels stand in one column down the list. As tall as a label
+   whether one is there or not, so two-line rows are one height. */
+.nr-sub {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  min-height: var(--h-xs);
+  margin-top: var(--sp-1);
+  font: var(--fw-text) var(--fs-sm) / var(--lh-ui) var(--ui);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.nr-about {
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+.nr-about > * {
+  flex: none;
+}
+.nr-about > .nr-who {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nr-about > :is(.nr-v, .nr-len) {
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.nr-dot {
+  margin: 0 var(--sp-1);
+  color: var(--faint);
+}
+/* the label at the line's end: a fix's green is its mark alone, never the label's surface or ring (green marks a
+   state) */
+.nr-sub > .sbadge.nr-state {
+  flex: none;
+  margin-left: auto;
 }
 .sbadge.nr-state[data-tone='ok'] {
   background: color-mix(in srgb, var(--fg-2) 9%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg-2) 17%, transparent);
 }
-.nr > .avatar {
-  flex: none;
+/* A phone sets its two smallest type steps a step up (mobile.css): line 2 takes the smaller one, so it stays a step
+   under the words, and the timecodes' column holds "Whole video" whole */
+@media (max-width: 639px), (max-height: 480px) and (hover: none) and (pointer: coarse) {
+  .phone-player .nr-sub {
+    font-size: var(--fs-xs);
+  }
+  .phone-player .nr-stack > .nr-tc {
+    width: calc(var(--sp-16) + var(--sp-3));
+  }
 }
-/* the picture, only while the pointer (or the focus) is on the row: over its end, so the row keeps its shape */
+/* a review link's row: the picture, only while the pointer (or the focus) is on the row, over its end */
 .nr-thumb {
   position: absolute;
   top: 50%;
@@ -396,6 +491,10 @@ button.note-sect:hover {
 }
 .note-row.here .nr-tc {
   color: var(--fg);
+}
+/* under the pointer the row's ground, also while the pointer is on its actions */
+.nr-line:hover > .nr {
+  background: var(--sel);
 }
 .note-row.closed .nr-text,
 .note-row.closed .nr-tc {

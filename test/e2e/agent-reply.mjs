@@ -71,14 +71,15 @@ try {
     }, id);
     await page.waitForSelector(`[data-note="${id}"].active`);
   };
-  /** What a note shows of its thread now: the replies' words when open, the row's count when closed. */
+  /** What a note shows of its thread now: the replies' words when open, the row's count when closed (on its second
+   * line, in words: "2 replies"). */
   const shown = (page, id) =>
     page.evaluate((id) => {
       const n = document.querySelector(`[data-note="${id}"]`);
       return {
         open: !!n?.classList.contains('active'),
         replies: [...(n?.querySelectorAll('.msg p') || [])].map((p) => p.textContent),
-        count: n?.querySelector('.nr-said')?.textContent ?? null,
+        count: /^(\d+) repl(?:y|ies)$/.exec(n?.querySelector('.nr-sub .nr-said')?.textContent ?? '')?.[1] ?? null,
       };
     }, id);
   // No reload in between: whatever the page shows came to it live.

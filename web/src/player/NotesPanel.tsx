@@ -16,6 +16,7 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
+import { isQuestion } from '../../../lib/time.ts';
 import type { FrameRange, PlacedComment, RunPlanItem } from '../api/types.ts';
 import { perLang, t } from '../i18n/index.ts';
 import { T } from '../i18n/T.tsx';
@@ -27,13 +28,15 @@ import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { IconButton, Kbd, Menu, type MenuEntry, Tip } from '../ui/primitives.tsx';
 import { Skeleton, SkeletonRegion, SkLine } from '../ui/Skeleton.tsx';
 import { Button, EmptyState } from '../ui/system.tsx';
+import { asksWithPicks } from './AskCard.tsx';
 import { CommentCard, type RangePlay } from './CommentCard.tsx';
 import type { FrameStore } from './frameStore.ts';
 import type { GroupId } from './noteGroups.ts';
 import { noteAt } from './noteRows.ts';
 import { NO_FIND, type TranscriptFind, TranscriptMeta, TranscriptTools, TranscriptView, type TranscriptViewProps } from './Transcript.tsx';
 
-export type Filter = 'active' | 'questions' | 'mine' | 'closed' | 'all';
+/** `active`: every note in its group (a phone: what needs you and what is open); `check`: the fixes waiting for a check. */
+export type Filter = 'active' | 'questions' | 'mine' | 'closed' | 'all' | 'check';
 /** The panel shows the notes, what is said in the render (Transcript.tsx), or the agent's work (AgentView.tsx). */
 export type PanelView = 'notes' | 'transcript' | 'agent';
 const VIEWS = perLang((): { id: PanelView; label: string }[] => [
@@ -54,17 +57,38 @@ export interface SheetProps {
 }
 const SHEET_ORDER: SheetState[] = ['peek', 'half', 'full'];
 
-/** open = feedback to act on (ideas and questions are not work items); the rest are the lengths of the lists. */
-type Counts = { open: number; fixed: number; active: number; mine: number; closed: number; all: number; questions: number };
+/** open = feedback to act on (ideas and questions are not work items); the rest are the lengths of the lists (`current`:
+ * what needs the person and what is open, a phone's default; `check`: the fixes waiting for a check). */
+type Counts = {
+  open: number;
+  fixed: number;
+  active: number;
+  mine: number;
+  closed: number;
+  all: number;
+  questions: number;
+  check: number;
+  current: number;
+};
 
-/** What a phone's peeking sheet says it holds: the open notes, else how many there are, else that there are none. */
-const peekCount = (n: Counts): string => (n.active ? t('{n} open', { n: n.active }) : n.all ? t('{n} note|{n} notes', { n: n.all }) : t('No notes yet'));
+/** What a phone's peeking sheet says it holds: what it shows when opened (what needs you and what is open), else how
+ * many notes there are, else that there are none. */
+const peekCount = (n: Counts): string => (n.current ? t('{n} open', { n: n.current }) : n.all ? t('{n} note|{n} notes', { n: n.all }) : t('No notes yet'));
 
 const FILTERS = perLang((): { id: Exclude<Filter, 'active'>; label: string; count: keyof Counts }[] => [
   { id: 'questions', label: t('Questions'), count: 'questions' },
   { id: 'mine', label: t('Mine'), count: 'mine' },
   { id: 'closed', label: t('Closed'), count: 'closed' },
   { id: 'all', label: t('All'), count: 'all' },
+]);
+/** A phone's selector (`viewPick`): which notes the sheet shows, then the filter menu's lists. */
+const PHONE_VIEWS = perLang((): { id: Filter; label: string; count: keyof Counts }[] => [
+  { id: 'active', label: t('Open'), count: 'current' },
+  { id: 'check', label: t('To check'), count: 'check' },
+  { id: 'closed', label: t('Done'), count: 'closed' },
+  { id: 'all', label: t('All'), count: 'all' },
+  { id: 'mine', label: t('Mine'), count: 'mine' },
+  { id: 'questions', label: t('Questions'), count: 'questions' },
 ]);
 const GROUP_LABEL = perLang((): Record<GroupId, string> => ({ needs: t('Needs you'), check: t('To check'), open: t('Open'), done: t('Done') }));
 const EMPTY = perLang(
@@ -74,6 +98,7 @@ const EMPTY = perLang(
     mine: { art: 'clear', title: t('Nothing open from you') },
     closed: { art: 'list', title: t('Nothing closed yet') },
     all: { art: 'note', title: t('No notes yet') },
+    check: { art: 'clear', title: t('No fixes to check') },
   }),
 );
 
@@ -92,6 +117,9 @@ interface NotesPanelProps {
   counts: Counts | null;
   list: PlacedComment[];
   selected: string | null;
+  /** A note picked on purpose (the list, the timeline, N, a link) rather than reached by the playhead: on a phone the
+   * sheet brings its card into view whole. `n` tells two picks of one note apart. */
+  picked?: { id: string; n: number } | null;
   onSelect: (c: PlacedComment) => void;
   /** Playing: the note at the playhead stays marked a moment past its frame and the list follows it. */
   playing?: boolean;
@@ -153,7 +181,7 @@ interface NotesPanelProps {
   autoCheckFound?: boolean;
   /** The "To check" header's Check is the view's raised door (the top bar doesn't offer it). */
   checkPrimary?: boolean;
-  /** More than one person wrote the notes: each row ends with its author's avatar. */
+  /** More than one person wrote the notes: each row names its author on its second line. */
   showAuthor?: boolean;
   /** The video has speech, or a transcript is on its way or there: the head offers the Transcript beside the Notes. */
   transcriptTab?: boolean;
@@ -164,14 +192,15 @@ interface NotesPanelProps {
 // Drag the handle to resize the sheet; on release it snaps to the nearest position (a flick moves one step). The
 // positions are mobile.css's: half 44 % of the screen, full all but 190 px and the top inset. While it moves, the
 // picture keeps its minimum (mobile.css: the sheet is held to its grid row), as it does with the sheet half open.
+const full = () => {
+  const bar = document.querySelector('.phone-player > .topbar');
+  return window.innerHeight - 190 - (bar ? Number.parseFloat(getComputedStyle(bar).paddingTop) || 0 : 0);
+};
+const snaps = () => ({ peek: 0, half: window.innerHeight * 0.44, full: full() }) as Record<SheetState, number>;
+
 function useSheetDrag(sheet: SheetProps | undefined) {
   const drag = useRef<{ y: number; h: number; id: number; lastY: number; lastT: number; v: number } | null>(null);
   const [live, setLive] = useState<number | null>(null);
-  const full = () => {
-    const bar = document.querySelector('.phone-player > .topbar');
-    return window.innerHeight - 190 - (bar ? Number.parseFloat(getComputedStyle(bar).paddingTop) || 0 : 0);
-  };
-  const snaps = () => ({ peek: 0, half: window.innerHeight * 0.44, full: full() }) as Record<SheetState, number>;
   // a drag ends with its release; the click that may follow it is not a tap
   const dragged = useRef(false);
   if (!sheet) return { live: null, handle: {} };
@@ -254,7 +283,7 @@ function NoteRows({ list, note, reveal }: { list: PlacedComment[]; note: (c: Pla
 function NoteRowsPending() {
   const row = (w: string) => (
     <div key={w} className="note note-row pending">
-      <div className="nr">
+      <div className="nr nr-stack">
         <span className="nr-tc">
           <SkLine w="5.5em" />
         </span>
@@ -349,6 +378,69 @@ export function NotesPanel(p: NotesPanelProps) {
     const row = selected && el ? rowOf(el, selected) : null;
     if (el && row) bringIntoView(el, row, false);
   }, [selected]);
+  // Phones: a note picked on purpose (the list, the timeline, N, a link) comes to the sheet's top, whole — its Reply and
+  // its decision in reach without scrolling: a peeking sheet opens, and grows to full where the card needs the room
+  // (measured against the sheet's own heights, as the drag snaps to them, not a height still on its way). A question
+  // with answers to pick (AskCard.tsx) comes up so too when the notes arrive and whenever the sheet is raised: its
+  // question and first answer in view, the picture shrinking above as for an opened note. Not while typing (the
+  // keyboard has the screen: phoneSheet.ts useKeyboard), writing a note or checking fixes.
+  const reveal = useRef<{ id: string; ask: boolean } | null>(null);
+  const lastPick = useRef(0);
+  const askSeen = useRef<string | null>(null);
+  // where the head ended when a question last came up: the line under it can grow a moment later (Auto-check's chip
+  // arriving), and the question goes up again with it — not once the sheet is put away
+  const askDone = useRef<{ id: string; head: number; at: number } | null>(null);
+  const sheetWas = useRef<SheetState | undefined>(sheet?.state);
+  const askId = sheet && p.view === 'notes' && !p.readOnly ? (p.list.find((c) => isQuestion(c) && asksWithPicks(c))?.id ?? null) : null;
+  useLayoutEffect(() => {
+    const pick = p.picked;
+    if (pick && pick.n !== lastPick.current) {
+      lastPick.current = pick.n;
+      reveal.current = sheet ? { id: pick.id, ask: false } : null;
+    }
+    const raised = sheetWas.current === 'peek' && !!sheet && sheet.state !== 'peek';
+    sheetWas.current = sheet?.state;
+    if (askId && !reveal.current && (askSeen.current !== askId || raised)) reveal.current = { id: askId, ask: true };
+    askSeen.current = askId;
+    const el = scroller.current;
+    const headNow = () => {
+      const box = el?.closest('.nsheet')?.getBoundingClientRect();
+      return el && box ? el.getBoundingClientRect().top - box.top : 0;
+    };
+    const done = askDone.current;
+    if (!reveal.current && sheet?.state !== 'peek' && done && done.id === askId && performance.now() - done.at < 3000 && Math.abs(headNow() - done.head) > 1)
+      reveal.current = { id: done.id, ask: true };
+    const want = reveal.current;
+    if (!sheet || !el || !want) return;
+    const typing = document.activeElement?.matches('input, textarea, select, [contenteditable="true"]');
+    if ((!want.ask && p.selected !== want.id) || composing || p.verifying || typing) {
+      reveal.current = null;
+      return;
+    }
+    // held sideways the notes are a part of the page, no sheet to move (its handle is gone): the page is theirs
+    if (!(el.closest('.nsheet')?.querySelector('.nsheet-handle') as HTMLElement | null)?.offsetParent) {
+      reveal.current = null;
+      return;
+    }
+    const card = rowOf(el, want.id);
+    // a picked note's card opens with this render or the next; a question that can't be answered here is a row
+    if (!card || (want.ask ? !card.matches('[data-testid=ask-card]') : !card.classList.contains('active'))) {
+      if (want.ask) reveal.current = null;
+      return;
+    }
+    if (sheet.state === 'peek') return sheet.setState('half');
+    const pad = 12;
+    const top = card.getBoundingClientRect().top;
+    // what must be in view: the whole card, or a question's words and its first answer
+    const need = want.ask ? (card.querySelector('[data-testid=ask-pick], .opt-ask')?.getBoundingClientRect().bottom ?? top) - top : card.offsetHeight;
+    const sheetBox = el.closest('.nsheet')?.getBoundingClientRect();
+    const head = sheetBox ? el.getBoundingClientRect().top - sheetBox.top : 0;
+    const room = snaps()[sheet.state] - head - Number.parseFloat(getComputedStyle(el).paddingBottom) - pad;
+    if (sheet.state === 'half' && need > room) return sheet.setState('full');
+    el.scrollTop += top - el.getBoundingClientRect().top - pad;
+    reveal.current = null;
+    if (want.ask) askDone.current = { id: want.id, head, at: performance.now() };
+  });
   const style: CSSProperties | undefined = sheet && live !== null ? { height: live, transition: 'none' } : undefined;
   const words = p.view === 'transcript';
   // a phone in check mode: the sheet is check mode's card (p.top) and nothing else; on a desk the card floats on the stage
@@ -449,6 +541,47 @@ export function NotesPanel(p: NotesPanelProps) {
         onClick: p.onReview,
       },
   ];
+  // A phone's selector, at the start of the line under the head: which notes the sheet shows — what is open (with what
+  // needs you; its default), the fixes to check, the done ones, all — then the filter menu's lists and the tags. It says
+  // the one shown, with its count.
+  const pickItem = (v: ReturnType<typeof PHONE_VIEWS>[number]): MenuEntry => ({
+    label: n ? `${v.label} · ${n[v.count]}` : v.label,
+    checked: filter === v.id,
+    onClick: () => p.setFilter(v.id),
+  });
+  const views = PHONE_VIEWS().filter((v) => v.id !== 'questions' || (n && n.questions > 0) || filter === 'questions');
+  const shownView = PHONE_VIEWS().find((v) => v.id === filter) ?? PHONE_VIEWS()[0];
+  const viewPick = sheet && notesView && (
+    <Menu
+      align="start"
+      trigger={
+        <button type="button" className={`btn sm np-pick${filter !== 'active' || p.tag ? ' on' : ''}`} data-testid="notes-view">
+          <span className="sr-only">{t('Notes shown:')} </span>
+          {shownView.label}
+          <span className="n">{n ? n[shownView.count] : <SkLine w="1em" />}</span>
+          <I name="down" size={14} />
+        </button>
+      }
+      items={[
+        ...views.slice(0, 4).map(pickItem),
+        'sep',
+        ...views.slice(4).map(pickItem),
+        !!p.tags?.length && { heading: t('Tags') },
+        ...(p.tags ?? []).map(([tag, count]) => ({
+          label: `${tagLabel(tag)} · ${count}`,
+          checked: p.tag === tag,
+          onClick: () => p.setTag?.(p.tag === tag ? null : tag),
+        })),
+      ]}
+    />
+  );
+  // A phone's door to checking the fixes while its list doesn't show their group (the selector's To check does): on the
+  // line under the head, beside ⋯, raised as the To check header's would be
+  const sheetCheck = sheet && notesView && p.verifyCount > 0 && !p.verifying && !p.readOnly && !p.groupCounts?.check && (
+    <Button size="sm" variant={p.checkPrimary ? 'primary' : 'ghost'} onClick={p.onVerify} data-testid="check-sheet">
+      {t('Check {n} fix|Check {n} fixes', { n: p.verifyCount })}
+    </Button>
+  );
   const filterButton = notesView && (
     <Menu
       align="end"
@@ -578,12 +711,14 @@ export function NotesPanel(p: NotesPanelProps) {
             </Tip>
           )}
         </div>
-        {/* The line under the head: a filter that is on (a chip that takes it off); on a phone also what Auto-check
-            found, the filter and ⋯, so its head keeps room for the views, the mic, Record and + Note */}
+        {/* The line under the head: a filter that is on (a chip that takes it off); on a phone the selector of which
+            notes it shows, what Auto-check found, the door to checking fixes and ⋯, so its head keeps room for the
+            views, the mic, Record and + Note */}
         {notesView && !checking && (sheet || listFilter || p.tag) && (
           <div className="np-chips" data-testid="notes-filters-on">
+            {viewPick}
             {sheet && p.autoCheckFound && p.autoCheck}
-            {listFilter && (
+            {listFilter && !sheet && (
               <button type="button" className="chip np-chip" onClick={() => p.setFilter('active')} data-filter={listFilter.id}>
                 {listFilter.label}
                 <I name="x" size={12} />
@@ -599,7 +734,7 @@ export function NotesPanel(p: NotesPanelProps) {
             )}
             {sheet && (
               <span className="np-tools">
-                {filterButton}
+                {sheetCheck}
                 {moreButton}
               </span>
             )}

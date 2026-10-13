@@ -14,15 +14,32 @@ format stays backwards compatible throughout.
   ahead quieter but readable, then short facts one a line ("4 fixes to check", "1 note open") and the next step as quiet
   words ("Next: Assign an agent"). The History dialog says where the video stands in the same lines (in German too,
   where it used to fall back to English), and long German step names no longer run into each other.
+- A note's row in the notes panel says what it is in two calm lines. Its words get the whole first line after its time
+  and mark; under them, quieter, it says in words only what applies — who wrote it (where more than one person wrote
+  the notes), the version when another one is on screen, a section's length, "2 replies" — and at the end of that line
+  where it stands, as a small label ("Fixed in V3", "Question", "Check again"), so the labels stand in one column. A
+  row with nothing more to say stays one line. On hover the row lights up flat, Reply and ⋯ sit inside the end of its
+  first line and the words fade out under them; no tooltip covers the row below, and no picture comes over the row
+  (the opened note shows it).
+- An agent's question that offers answers to pick no longer waits behind Answer: it stands open at the top of the
+  notes, under "Needs you", as a card in the agent's colour — who asks, the question in the reading size, its answers
+  as rows one tap sends (or their number, 1–9, while the card has the focus), and "Or write an answer…" under them.
+  Options to audition open from the same card. The agent's line then says "Claude asks you to pick one", repeats
+  nothing and leads to the card when pressed. On a phone the notes open to the question by themselves, its answers in
+  view. Answered, the question is a row again, "Answered".
+- On a phone the notes show what needs you and what is open. The fixes waiting for your check and the done notes are
+  one tap away in the selector on the left of the line under the notes' head ("Open 8 ⌄": Open, To check, Done, All,
+  Mine, Questions and the tags), and "Check 2 fixes" stays on that line while the list leaves them out. A note you
+  open — in the list, on the timeline, from a link or going through the notes — comes to the top of the sheet whole,
+  the sheet growing where it needs the room, so its Reply and its decision are there without scrolling.
 - The notes panel reads like a list, not a dashboard. Its head is two quiet text tabs, "Notes 6 · Transcript" (the
   Transcript where the video has speech), then a filter button, ⋯, Record as its own round button and "+ Note"; where
   the panel is narrow it says less rather than crowd. The notes come in groups of where they stand: "Needs you" (an
   agent's questions), "To check" with its "Check ⇧V", "Open", and "Done" folded at the end. Mine, Closed, All,
   Questions and the tags are in the filter menu, and a filter that is on shows as a chip that takes it off; the Agent
-  view and going through the open notes (N) are in ⋯. Each note is one line: its time, its mark, its words, a
-  section's length, how many replies it has, and a small label of where it stands ("Fixed in V2", "Question", "Agent
-  on it", "Fixed · waiting for V3"), with Reply and ⋯ on hover. The author shows only when more than one person wrote the notes. Auto-check shows in the head only
-  once it found something; on a phone it stands on the line under the head, with the filter and ⋯.
+  view and going through the open notes (N) are in ⋯. Each note is a row with its time, its mark and its words.
+  Auto-check shows in the head only once it found something; on a phone it stands on the line under the head, with the
+  filter and ⋯.
 - An agent at work is one line under the notes' head: "Claude Code is fixing 1 of 3", "asked you" or "stopped
   listening", with one action (Stop, Answer, Copy "go on") and a folded line with its latest step, the question or what
   to tell it. There is no line while the agent is only ready. Answer is the view's one raised button while the agent

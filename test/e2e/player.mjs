@@ -414,7 +414,8 @@ try {
     );
     const order = await page.$$eval('.side-scroll .note', (els) => els.map((e) => e.dataset.note));
     assert(JSON.stringify(order) === JSON.stringify([question.id, fixed.id, open.id]), `the question, the fix, the open note: ${JSON.stringify(order)}`);
-    // each row's state, a small label on its end: the fix's green is its mark alone, never its words or its surface
+    // each row's state, a small label at the end of its second line: the fix's green is its mark alone, never its words
+    // or its surface
     const states = await page.$$eval('.side-scroll [data-testid=note-state]', (els) =>
       els.map((e) => {
         const probe = document.createElement('i');
@@ -439,7 +440,7 @@ try {
     assert(q?.words === 'Question' && f?.words === 'Fixed in V2', `the rows say where they stand: ${JSON.stringify(states)}`);
     assert(f.mark && !f.green, `Fixed in V2: a green mark, no green words or surface: ${JSON.stringify(f)}`);
     // one person wrote them (the agent's question aside): no author on the rows
-    assert(!(await page.$('.side-scroll .nr > .avatar')), 'no author on the rows');
+    assert(!(await page.$('.side-scroll :is(.nr .avatar, .nr-who)')), 'no author on the rows');
     // the To check header is the panel's door to check mode: quiet while + Note is the view's raised one
     const doors = await page.evaluate(() => ({
       check: document.querySelector('[data-testid=group-check] [data-testid=check-group]')?.className ?? null,
@@ -1255,18 +1256,27 @@ try {
   await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
 
   await check(
-    'on a phone too one raised door to checking (the row under the bar’s Check); in check mode the card is the notes sheet’s content, its decision within reach',
+    'on a phone too one raised door to checking (the row under the bar’s Check; the sheet’s own once it is open); in check mode the card is the notes sheet’s content, its decision within reach',
     async () => {
       await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
       await page.goto('about:blank');
-      // the phone's row under its bar says "Check" (the stage's next step); the notes' To check header says it quietly
+      // the phone's row under its bar says "Check" (the stage's next step) while the sheet is at rest; its notes show
+      // what is open, the fixes behind the selector, so no To check header
       await page.goto(`${BASE}/#/v/${enc(card)}`, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('[data-testid=run-strip][data-phase=done]', { timeout: 20000 });
       await page.waitForSelector('[data-testid=stage-next][data-kind=verify]', { timeout: 20000 });
-      const door = await page.$eval('[data-testid=check-group]', (b) => b.className);
-      assert(!/\bprimary\b/.test(door), `the To check header's Check is quiet beside the bar's Check: ${door}`);
-      const up = await raised();
+      assert(!(await page.$('.nsheet [data-testid=check-group]')), 'the fixes wait behind the selector: no To check group');
+      let up = await raised();
       assert(up.length === 1 && /^Check$/.test(up[0]), `one raised door on a phone: ${JSON.stringify(up)}`);
+      // the sheet open, the bar's row steps aside: the sheet's "Check 2 fixes" is the one raised door
+      await page.tap('.nsheet-handle');
+      await page.waitForSelector('.nsheet-half');
+      await until(
+        async () => (await raised()).length === 1 && /^Check 2 fixes$/.test((await raised())[0]),
+        async () => `the sheet's door: ${JSON.stringify(await raised())}`,
+      );
+      up = await raised();
+      assert(up.length === 1, `one raised door with the sheet open: ${JSON.stringify(up)}`);
       await page.goto('about:blank');
       await page.goto(`${BASE}/#/v/${enc(card)}?verify=${longFix}`, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('.nsheet .verify [data-testid=check-right]', { timeout: 20000 });
