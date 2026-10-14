@@ -754,7 +754,7 @@ builds it from what it sees anyway:
   ("Editing src/Logo.tsx", "Running npm run render"), and the tokens and cost only when Claude Code reports them,
   never estimated. Files show relative to the session's folder; their contents never do.
 
-![The player while the agent renders V3 through lampo render: the run strip under the panel's head (“launch-edit · rendering V3 · about 1 min left”, 42 %, Stop) and the Agent view below it, with the two notes it was sent (on it), Now at 170 of 408 frames, its steps (reading each note, what it said, rendering) and its earlier work](assets/agent-view.webp)
+![The player while the agent renders V3 through lampo render: the run strip under the panel's head (“launch-edit is rendering V3”, “about 1 min left · 42%” under it, Stop) and the Agent view below it, with the two notes it was sent (on it), Now at 170 of 408 frames, its steps (reading each note, what it said, rendering) and its earlier work](assets/agent-view.webp)
 
 None of it costs you a token or asks anything of you, and none of it is written into the review: it lives in the app's
 memory and a small rolling file in the cache, and the spine of it is kept with the video as a run (below). So `lampo status` and `set_status` are optional: use them for what Lampo

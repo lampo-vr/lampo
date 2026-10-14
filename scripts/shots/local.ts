@@ -135,7 +135,11 @@ export async function localPictures(s: LocalScene): Promise<void> {
   await tipsSeen(page);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  const until = (fn: string, timeout = 30_000, p: Page = page) => p.waitForFunction(fn, { polling: 100, timeout });
+  // a wait that runs out says what it waited for (puppeteer's own words don't)
+  const until = (fn: string, timeout = 30_000, p: Page = page) =>
+    p.waitForFunction(fn, { polling: 100, timeout }).catch((e: Error) => {
+      throw new Error(`waited ${timeout / 1000} s for ${fn}: ${e.message}`);
+    });
   const open = async (hash: string, p: Page = page) => {
     await p.goto('about:blank');
     await p.goto(`${BASE}/${hash}`, { waitUntil: 'domcontentloaded' });
@@ -172,8 +176,13 @@ export async function localPictures(s: LocalScene): Promise<void> {
   await sleep(800);
   await camera.shoot(page, 'library', { full: true }, { ready: () => imagesLoaded('.film img') });
 
+  // The film's agent goes on with the two notes still open: it says what it is doing (a write, so its work on the film
+  // begins) and reads the glow's note. The player says so in the agent's line under the notes' head.
+  lampo('launch-edit', 'status', 'northwind-launch.mp4', 'Pulling the glow back in the project, then the end card');
+  lampo('launch-edit', 'show', glow);
   await open(`#/v/${enc(demo.film)}?c=${glow}`);
   await videoReady();
+  await page.waitForSelector('[data-testid=run-strip][data-phase=working] [data-testid=run-open]', { timeout: 15_000 });
   await sleep(1500);
   await rest();
   await camera.shoot(page, 'player', { full: true }, { ready: () => videoReady() });
@@ -317,8 +326,10 @@ export async function localPictures(s: LocalScene): Promise<void> {
   console.log('a playbook…');
   await writePlaybooks(call, demo, s.work);
   await open(`#/playbook/${enc('Northwind')}`);
-  await page.waitForSelector('.pb-page, [data-testid=playbook]', { timeout: 20_000 }).catch(() => {});
-  await sleep(2500);
+  // the tab once its playbook is in: the layers' line and what agents read
+  await page.waitForSelector('[data-testid=playbook]:not([aria-busy=true]) [data-testid=pb-layer-here]', { timeout: 20_000 });
+  await page.waitForSelector('[data-testid=pb-agent-md]', { timeout: 20_000 });
+  await sleep(1200);
   await camera.shoot(page, 'playbook-folder', { full: true });
 
   // ================================================================ B. an agent at work
@@ -563,11 +574,13 @@ export async function localPictures(s: LocalScene): Promise<void> {
   // the player: the run strip and the Agent view
   await open(`#/v/${enc(demo.film)}`);
   await videoReady();
-  await page.waitForSelector('[data-testid=run-strip]');
+  // the line once it speaks of the render (its loading state is a strip too)
+  await page.waitForSelector('[data-testid=run-strip][data-phase=rendering] [data-testid=run-open]', { timeout: 20_000 });
   // the line on screen, as someone checking in on the agent would leave it
   await goto(demo.film, 2, 180);
   await videoReady();
-  await page.click('[data-testid=panel-agent]');
+  // the Agent view opens from the run strip (its tab is there only while the view is open)
+  await page.click('[data-testid=run-strip] [data-testid=run-open]');
   await page.waitForSelector('[data-testid=agent-view] [data-testid=agent-plan]', { timeout: 15_000 });
   await until("document.querySelector('[data-testid=run-strip]')?.textContent.includes('%')");
   await sleep(1200);
@@ -580,6 +593,8 @@ export async function localPictures(s: LocalScene): Promise<void> {
   const claudeAgain = new Client({ name: 'claude-code', version: '2.1.0' }, { versionNegotiation: { mode: 'auto' } });
   await claudeAgain.connect(new StreamableHTTPClientTransport(new URL(`${server.url}/mcp`)));
   await claudeAgain.listTools();
+  // a window tall enough for Being fixed's third card, whose line says Codex hasn't been heard from
+  await page.setViewport({ width: 1440, height: 1080, deviceScaleFactor: 2 });
   await open('#/status');
   await until("document.querySelectorAll('.bcard').length >= 5");
   await imagesLoaded('.bcard img');
@@ -589,6 +604,7 @@ export async function localPictures(s: LocalScene): Promise<void> {
   await rest();
   await camera.shoot(page, 'board', { full: true }, { ready: () => imagesLoaded('.bcard img') });
   await camera.shoot(page, 'sidebar-agents', { around: ['[data-testid=nav-agents]'], pad: [12, 12, 12, 12] });
+  await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
 
   // the inbox by kind: an agent that stopped (the teaser's render), picked; one gone quiet under Stalled
   await open('#/inbox');

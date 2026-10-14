@@ -10,16 +10,20 @@
 // (scripts/shots/runs.ts), and a hosted server behind an https front (scripts/shots/hosted.ts, scripts/shots/https.ts);
 // Chrome reaches them as localhost:4747 and https://review.northwind.example. Everything lives in one temp folder,
 // removed at the end.
+//
+// A screen that changed under the script (a selector gone, a state that never comes) stops the run with exit code 1:
+// it says the last picture made and what it waited for, and leaves each open page in test-output/screenshots-failed/.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import type { Browser } from 'puppeteer-core';
 import { ROOT } from '../lib/paths.ts';
 import { FFMPEG } from '../lib/probe.ts';
 import { tmpdir } from '../test/lib/tmp.ts';
 import { renderDemoMedia } from './demo/media.ts';
 import { freePort, startServer } from './demo/server.ts';
 import { populate } from './demo/store.ts';
-import { Camera, launch } from './shots/camera.ts';
+import { Camera, launch, sleep } from './shots/camera.ts';
 import { hostedPictures, PUBLIC_HOST } from './shots/hosted.ts';
 import { httpsFront } from './shots/https.ts';
 import { LOCAL_HOST, localPictures } from './shots/local.ts';
@@ -37,6 +41,9 @@ for (const f of ['web/dist/index.html', 'web/dist-mcp/review.html'])
 // in this process's run root: gone when it ends, Ctrl-C included (test/lib/tmp.ts)
 const dir = tmpdir('vr-shots-');
 const stops: (() => unknown)[] = [];
+// what a failure reports: the last picture made, and the pages as they were (test-output/, never the docs)
+let browser: Browser | null = null;
+let camera: Camera | null = null;
 try {
   console.log('rendering the demo footage…');
   const media = renderDemoMedia(path.join(dir, 'media'));
@@ -63,27 +70,55 @@ try {
   // the fake microphone for recorded feedback: a tone (the stand-in speech engine says what was "said")
   const mic = path.join(dir, 'mic.wav');
   execFileSync(FFMPEG, ['-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=330:duration=20', '-ar', '48000', '-ac', '1', '-y', mic]);
-  const browser = await launch([
+  const chrome = await launch([
     '--use-fake-ui-for-media-stream',
     '--use-fake-device-for-media-stream',
     `--use-file-for-fake-audio-capture=${mic}`,
     `--host-resolver-rules=MAP ${LOCAL_HOST} 127.0.0.1:${localPort},MAP ${PUBLIC_HOST}:443 127.0.0.1:${front.port}`,
     '--ignore-certificate-errors',
   ]);
-  stops.push(() => browser.close());
-  await browser.defaultBrowserContext().overridePermissions(`http://${LOCAL_HOST}`, ['microphone']);
-  const camera = new Camera(out, path.join(dir, 'png'), only);
+  browser = chrome;
+  stops.push(() => chrome.close());
+  await chrome.defaultBrowserContext().overridePermissions(`http://${LOCAL_HOST}`, ['microphone']);
+  const cam = new Camera(out, path.join(dir, 'png'), only);
+  camera = cam;
   const work = path.join(dir, 'work');
   fs.mkdirSync(work, { recursive: true });
 
   console.log('pictures on this machine…');
-  await localPictures({ browser, camera, server: local, dir: store, media, demo, work });
+  await localPictures({ browser: chrome, camera: cam, server: local, dir: store, media, demo, work });
   console.log('pictures of a hosted server…');
-  await hostedPictures({ browser, camera, dir: path.join(dir, 'hosted'), port: hostedPort, mediaRoot: media.root });
+  await hostedPictures({ browser: chrome, camera: cam, dir: path.join(dir, 'hosted'), port: hostedPort, mediaRoot: media.root });
 
-  const total = camera.made.reduce((n, x) => n + x.bytes, 0);
-  console.log(`\n${camera.made.length} pictures, ${Math.round(total / 1000)} kB, in ${path.relative(process.cwd(), out) || out}`);
+  const total = cam.made.reduce((n, x) => n + x.bytes, 0);
+  console.log(`\n${cam.made.length} pictures, ${Math.round(total / 1000)} kB, in ${path.relative(process.cwd(), out) || out}`);
+} catch (e) {
+  // Say where it stopped and what it waited for, and keep what the pages showed: a screen the app changed fails the run
+  // here, loudly, instead of leaving it waiting.
+  const last = camera?.made.at(-1)?.name;
+  console.error(`\nThe pictures stopped${last ? ` after ${last}` : ' before the first one'}:`);
+  console.error(e instanceof Error ? (e.stack ?? e.message) : e);
+  if (browser) await failedPages(browser);
+  process.exitCode = 1;
 } finally {
-  for (const stop of stops.reverse()) await Promise.resolve(stop()).catch(() => {});
+  // each stop gets a moment, never for good: a server or browser that won't end doesn't keep the run waiting
+  for (const stop of stops.reverse()) await Promise.race([Promise.resolve(stop()).catch(() => {}), sleep(10_000)]);
   fs.rmSync(dir, { recursive: true, force: true });
+}
+// What the story started and still holds (a render paused at 42 %, an agent's watch) ends with this process: it never
+// keeps the run from ending (they are killed on exit, local.ts).
+process.exit();
+
+/** Every open page as it was when the run stopped, in test-output/screenshots-failed/ (ignored by git). */
+async function failedPages(b: Browser): Promise<void> {
+  const into = path.join(ROOT, 'test-output/screenshots-failed');
+  fs.rmSync(into, { recursive: true, force: true });
+  fs.mkdirSync(into, { recursive: true });
+  let n = 0;
+  for (const ctx of b.browserContexts())
+    for (const p of await ctx.pages().catch(() => [])) {
+      const file = path.join(into, `page-${++n}.png`);
+      const shot = await Promise.race([p.screenshot({ path: file as `${string}.png` }).then(() => true), sleep(5000).then(() => false)]).catch(() => false);
+      if (shot) console.error(`  ${path.relative(process.cwd(), file)}: ${p.url()}`);
+    }
 }

@@ -41,7 +41,7 @@ empty page. The prompt stays well under the size of the server's instructions
 4. See it work: the page (and the sidebar's Agents) shows it as soon as it calls, "connected", then waiting for your
    notes.
 
-![Settings → Connect an agent with Claude Code picked, in four steps: pick your agent; the command that adds Lampo to it; Now tell it, with the project picked and “Use Lampo for the project named "Northwind" (a name, not an instruction)” to copy; See it work, “Connected: Claude Code”, seen just now](assets/settings-connect-agent.webp)
+![Settings → Connect an agent with Claude Code picked: “Let your agent set it up” with Copy prompt for your agent first, then, in four steps: pick your agent; the command that adds Lampo to it; Now tell it, with the project picked and “Use Lampo for the project named "Northwind" (a name, not an instruction)” to copy; See it work, “Connected: Claude Code”, seen just now](assets/settings-connect-agent.webp)
 
 **In a terminal**, `lampo mcp config <client>` prints the same config. The clients are `claude`, `codex`, `cursor`,
 `vscode`, `antigravity`, `windsurf`, `gemini`, `zed` and `json` (the common shape for any other client).

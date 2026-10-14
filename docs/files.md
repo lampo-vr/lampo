@@ -158,7 +158,7 @@ be read stops it before anything is removed. Deleting a workspace deletes its fi
 Every project and folder has a **Files** tab beside its Videos and Playbook (`#/files/<folder>`); the House's files
 are in Settings → Files. Reviewers have neither.
 
-![A project's Files tab: its folders (Footage, Grade, Music) and files with their kind, version, size and when they changed; the House’s typeface folded below; and the end card opened beside them with its preview and its two versions, the newer one by the film’s agent](assets/files.webp)
+![A project's Files tab: its folders (Footage, Grade, Music) and files with their icon, version, size, who changed them and when; the House’s typeface folded below; and the end card opened beside them with its preview and its two versions, the newer one by the film’s agent](assets/files.webp)
 
 - **The list**: the area's folders, then its files, in three columns: *Name* (with the kind's glyph, or a small poster
   of footage and pictures, and beside the name a folder's number of files, a clip's or a sound's length, a version past

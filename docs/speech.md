@@ -40,7 +40,8 @@ device, and for an admin where to change them. A workspace on a hosted server ca
    said, on the frame that was on screen (a range when the video played meanwhile), with a ring where the pointer
    rested or clicked and the shapes you drew. Edit their text, listen to each one's stretch, join one with the one
    before, delete one, set its severity, or *Discard* the whole recording.
-5. *Send all* sends them, with your other notes not sent yet, as one batch. They become ordinary notes, each with its
+5. *Send* ("Send 3 to launch-edit" on a video with an agent) sends them, with your other notes not sent yet, as
+   one batch. They become ordinary notes, each with its
    own clip of your voice.
 
 ![The player right after a recording: three drafts under “Not sent yet” with their timecodes, words and severity, Send 3 to launch-edit, and the draft looked at shown on its frame with its ring](assets/recorded-feedback.webp)
