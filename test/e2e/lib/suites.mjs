@@ -67,7 +67,7 @@ const SECONDS = {
   takedown: 45,
   conversion: 45,
   checkout: 16,
-  options: 21,
+  options: 30,
   partial: 21,
   notes: 20,
   publish: 19,

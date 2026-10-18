@@ -3,14 +3,18 @@
 // while they play; the files stay as sent), pictures and clips as tiles (clips play together), links and plain lines as
 // rows —, a pick per group (or several), the person's own words, and one "Send picks": an ordinary answer the agent's
 // wait wakes on (`PICKED voice=v3 … · note: "…"`).
-// Pictures and clips open large in the dialog itself (a click on one, or its Expand): one at most of the dialog's
-// width with its own controls and its pick under it, ←/→ to the next of its group at the same moment, Esc or Back to
-// all of them. Where they can, the dialog takes the room it has: wide, as tall as a dialog may be, the list and the
-// large view in one cell, so switching moves nothing.
+// Pictures and clips are tiles of one box per group (the shape most of them have; one of another shape contained in
+// it, on the picture's dark ground), their words, key and pick on the tile under the picture, never on it. They open
+// large in the dialog itself (a click on one, or its Expand): as large as the dialog's box allows, with its own
+// controls and its pick and whole label under it, ←/→ to the next of its group at the same moment, Esc or Back to all
+// of them. The dialog is as wide as it may be and as tall as what it shows, up to the window, then the list scrolls;
+// the list and the large view share one cell, so switching moves nothing.
 // Keys: 1–9 pick in the group in focus, ↑/↓ between groups, ←/→ between items, Space plays or stops, A (or B) swaps
 // between the last two played at the same position, ⌘↵ sends. Its code is a chunk of its own (code.ts).
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { lastAnswer, levelGains, volumesOf } from '../../../lib/options.ts';
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
+import { agentShown } from '../../../lib/agentKind.ts';
+import { groupAspect, lastAnswer, levelGains, volumesOf } from '../../../lib/options.ts';
+import { isAgent } from '../../../lib/time.ts';
 import type { AskView, NoteRef, OptionGroup, OptionItem, OptionSeen } from '../api/types.ts';
 import { t } from '../i18n/index.ts';
 import { ago } from '../lib/format.ts';
@@ -19,15 +23,22 @@ import { I } from '../ui/icons.tsx';
 import { Modal } from '../ui/primitives.tsx';
 import { SkLine } from '../ui/Skeleton.tsx';
 import { Button } from '../ui/system.tsx';
-import { IconButton } from '../ui/tip.tsx';
+import { IconButton, Tip } from '../ui/tip.tsx';
 import { useAnswer, useAsk } from './api.ts';
 import { createDeck, type Deck, type Track, useDeck } from './sound.ts';
 import '../styles/options.css';
 
 type Picks = Record<string, string[]>;
-const who = (by: string) => by.replace(/^agent:/, '');
+/** Who asked or answered, as the rest of the UI names them: an agent's client id by its kind's name ("claude-code" →
+ * "Claude Code", lib/agentKind.ts agentShown), a person by their name. */
+const who = (by: string) => {
+  const name = by.replace(/^(guest|agent):/, '');
+  return isAgent(by) ? agentShown(name) : name;
+};
 const keyOf = (g: string, i: string) => `${g}/${i}`;
 const TILES = new Set<OptionSeen['kind']>(['image', 'clip', 'frame']);
+/** The box a group's tiles share (its pictures' shape, else 16:9), handed to the stylesheet as a number. */
+const boxOf = (aspect: number | undefined): CSSProperties => ({ '--aud-ar': aspect && Number.isFinite(aspect) ? aspect : 16 / 9 }) as CSSProperties;
 /** How a group lays out: tiles for pictures and clips, rows for sounds, links, lines and a mix. */
 function layoutOf(g: OptionGroup): OptionSeen['kind'] {
   const kinds = new Set(g.items.map((it) => it.ref?.kind ?? 'text'));
@@ -391,23 +402,41 @@ function Group({ g, gi, view, picked, focus, cursor, deck, tracks, onPick, onPla
   // Clips with sound play level too, through their volume (lowered only): the same balance as the sounds.
   const clipVolumes = useMemo(() => clipVolumesOf(view, g), [g, view]);
   const clips = clipVolumes.size;
-  // how many of the group's clips play: Play together becomes Pause while they do
-  const [running, setRunning] = useState(0);
-  const vids = () => [...(section.current?.querySelectorAll<HTMLVideoElement>('video.aud-video') ?? [])];
-  const recount = () => setRunning(vids().filter((v) => !v.paused && !v.ended).length);
+  const aspect = useMemo(() => groupAspect(g.items), [g]);
+  // which of the group's clips play (Play together becomes Pause while they do), and the one heard
+  const [runs, setRuns] = useState<ReadonlySet<string>>(() => new Set());
+  const [heard, setHeard] = useState<string | null>(null);
+  const running = runs.size;
+  const vids = () =>
+    [...(section.current?.querySelectorAll<HTMLVideoElement>('video.aud-video') ?? [])].map((v) => ({
+      v,
+      id: v.closest<HTMLElement>('[data-item]')?.dataset.item ?? '',
+    }));
+  const recount = () => setRuns(new Set(vids().flatMap(({ v, id }) => (!v.paused && !v.ended ? [id] : []))));
+  const hear = (id: string | undefined) => {
+    if (!id) return;
+    setHeard(id);
+    for (const { v, id: at } of vids()) v.muted = at !== id;
+  };
   // Side by side, in sync: every clip of the group from its start together, the one in focus heard.
   const together = () => {
     deck.stop();
     if (running) {
-      for (const v of vids()) v.pause();
+      for (const { v } of vids()) v.pause();
       return;
     }
-    vids().forEach((v, n) => {
-      v.muted = n !== Math.max(0, cursor);
+    hear(g.items[Math.max(0, cursor)]?.id);
+    for (const { v } of vids()) {
       v.currentTime = 0;
       void v.play().catch(() => {});
-    });
+    }
   };
+  // the sound follows the clip in focus (←/→, 1–9, a click): while they play, and for the next time they do
+  const focusedId = cursor >= 0 ? g.items[cursor]?.id : undefined;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: hear() reads the videos as they are now; it follows the focus alone
+  useEffect(() => {
+    if (focusedId && clipVolumes.has(focusedId)) hear(focusedId);
+  }, [focusedId]);
   return (
     <section ref={section} className={`aud-group ${focus ? 'focus' : ''}`} data-group={gi} data-testid="audition-group" aria-labelledby={head}>
       <header className="aud-ghead">
@@ -416,9 +445,11 @@ function Group({ g, gi, view, picked, focus, cursor, deck, tracks, onPick, onPla
         </h4>
         <span className="aud-rule">{g.pick === 'many' ? t('Pick any') : t('Pick one')}</span>
         {sounds.length > 1 && (
-          <span className="aud-level" title={t('Every take plays at the same loudness; the files stay as they were sent')}>
-            <I name="wave" size={13} /> {t('Level')}
-          </span>
+          <Tip content={t('Every take plays at the same loudness; the files stay as they were sent')}>
+            <span className="aud-level">
+              <I name="wave" size={13} /> {t('Level')}
+            </span>
+          </Tip>
         )}
         <span className="grow" />
         {clips > 1 && (
@@ -433,7 +464,12 @@ function Group({ g, gi, view, picked, focus, cursor, deck, tracks, onPick, onPla
         )}
         <span className={`aud-chosen ellipsis ${chosen.length ? 'on' : ''}`}>{chosen.length ? chosen.join(', ') : t('Not picked yet')}</span>
       </header>
-      <Items one={g.pick === 'one'} className={`aud-items ${TILES.has(kind) ? 'tiles' : 'rows'}`} labelledBy={head}>
+      <Items
+        one={g.pick === 'one'}
+        className={`aud-items ${TILES.has(kind) ? 'tiles' : 'rows'}`}
+        labelledBy={head}
+        style={TILES.has(kind) ? boxOf(aspect) : undefined}
+      >
         {g.items.map((it, i) => {
           const k = keyOf(g.id, it.id);
           const track = tracks.get(k);
@@ -445,7 +481,8 @@ function Group({ g, gi, view, picked, focus, cursor, deck, tracks, onPick, onPla
             view,
             on: picked.includes(it.id),
             here: focus && cursor === i,
-            playing: s.playing === k,
+            playing: s.playing === k || runs.has(it.id),
+            heard: runs.has(it.id) && heard === it.id,
             progress: at?.d ? at.t / at.d : 0,
             time: at ? clock(at.d - at.t > 0 && s.playing === k ? at.t : at.d) : it.ref?.duration ? clock(it.ref.duration) : '',
             gain: track?.mode === 'gain' ? track.gain : null,
@@ -471,6 +508,8 @@ interface ItemProps {
   on: boolean;
   here: boolean;
   playing: boolean;
+  /** A clip playing with the others whose sound is the one heard. */
+  heard?: boolean;
   progress: number;
   time: string;
   gain: number | null;
@@ -484,7 +523,8 @@ interface ItemProps {
   onRun?: () => void;
 }
 
-/** The pick itself: a radio (one per group) or a checkbox (several), its key, the item's words. */
+/** The pick itself: a radio (one per group) or a checkbox (several), its key, the item's words (two lines at most and
+ * then cut, whole in the large view and in its name), what it shows of its state, its check. */
 function PickButton({
   g,
   it,
@@ -493,12 +533,13 @@ function PickButton({
   onPick,
   onFocus,
   children,
+  full = false,
   testId = 'audition-pick',
-}: Pick<ItemProps, 'g' | 'it' | 'n' | 'on' | 'onPick' | 'onFocus'> & { children?: React.ReactNode; testId?: string }) {
+}: Pick<ItemProps, 'g' | 'it' | 'n' | 'on' | 'onPick' | 'onFocus'> & { children?: React.ReactNode; full?: boolean; testId?: string }) {
   const inside = (
     <>
       {n <= 9 && <kbd className="aud-key">{n}</kbd>}
-      <span className="aud-label ellipsis">{it.label}</span>
+      <span className={`aud-label ${full ? 'full' : ''}`}>{it.label}</span>
       {children}
       <span className="aud-check" aria-hidden="true">
         <I name="check" size={13} />
@@ -521,14 +562,26 @@ function PickButton({
 }
 
 /** A group's items: one pick (a radio group) or several (a group of checkboxes). */
-function Items({ one, className, labelledBy, children }: { one: boolean; className: string; labelledBy: string; children: React.ReactNode }) {
+function Items({
+  one,
+  className,
+  labelledBy,
+  style,
+  children,
+}: {
+  one: boolean;
+  className: string;
+  labelledBy: string;
+  style?: CSSProperties;
+  children: React.ReactNode;
+}) {
   return one ? (
-    <div className={className} role="radiogroup" aria-labelledby={labelledBy}>
+    <div className={className} role="radiogroup" aria-labelledby={labelledBy} style={style}>
       {children}
     </div>
   ) : (
     // biome-ignore lint/a11y/useSemanticElements: a fieldset would bring its own box into the list's grid
-    <div className={className} role="group" aria-labelledby={labelledBy}>
+    <div className={className} role="group" aria-labelledby={labelledBy} style={style}>
       {children}
     </div>
   );
@@ -590,10 +643,22 @@ function Tile(p: ItemProps) {
   const f = ref ? view.files[ref.id] : null;
   const clip = ref?.kind === 'clip' && f?.src;
   const look = t('Look at {label}', { label: it.label });
+  // how far its clip is while the group plays together: a line under the picture, moved by the clip, not by a render
+  const run = useRef<HTMLSpanElement>(null);
+  const follow = (v: HTMLVideoElement) => {
+    if (run.current) run.current.style.transform = `scaleX(${v.duration ? Math.min(1, v.currentTime / v.duration) : 0})`;
+  };
   // A clip shows its first moments here and plays only together with the others: a click opens it large, where it has
-  // its own controls (and the others are a key away).
+  // its own controls (and the others are a key away). Nothing is written on the picture: its words, key and pick are on
+  // the tile under it, and only the way to see it large sits on its corner, a chip in the picture's material.
   return (
-    <div className={`aud-item aud-tile ${p.on ? 'on' : ''} ${p.here ? 'here' : ''}`} data-testid="audition-item">
+    <div
+      className={`aud-item aud-tile ${p.on ? 'on' : ''} ${p.here ? 'here' : ''} ${p.playing ? 'playing' : ''}`}
+      data-testid="audition-item"
+      data-item={it.id}
+      data-playing={p.playing || undefined}
+      data-heard={p.heard || undefined}
+    >
       <div className="aud-media">
         {clip ? (
           <button type="button" className="aud-shot" onClick={p.onLarge} aria-label={look} data-testid="audition-shot">
@@ -610,6 +675,8 @@ function Tile(p: ItemProps) {
               onPlay={p.onRun}
               onPause={p.onRun}
               onEnded={p.onRun}
+              onTimeUpdate={(e) => follow(e.currentTarget)}
+              onSeeked={(e) => follow(e.currentTarget)}
             />
           </button>
         ) : f?.still ? (
@@ -621,9 +688,6 @@ function Tile(p: ItemProps) {
             <I name="image" size={18} />
           </span>
         )}
-      </div>
-      <div className="aud-tile-foot">
-        <PickButton {...p} />
         {f?.still && (
           <IconButton
             className="btn ghost sm icon-only aud-expand"
@@ -636,6 +700,18 @@ function Tile(p: ItemProps) {
           />
         )}
       </div>
+      <PickButton {...p}>
+        {clip && (
+          <>
+            <span className="aud-run" aria-hidden="true">
+              <span ref={run} />
+            </span>
+            <span className="aud-heard" aria-hidden="true">
+              {p.heard && <I name="volume" size={14} />}
+            </span>
+          </>
+        )}
+      </PickButton>
     </div>
   );
 }
@@ -651,7 +727,7 @@ function GroupPending({ g }: { g: OptionSeen }) {
           <SkLine w="4em" />
         </span>
       </header>
-      <div className={`aud-items ${tiles ? 'tiles' : 'rows'}`}>
+      <div className={`aud-items ${tiles ? 'tiles' : 'rows'}`} style={tiles ? boxOf(g.aspect) : undefined}>
         {Array.from({ length: g.n }, (_, i) =>
           tiles ? (
             // biome-ignore lint/suspicious/noArrayIndexKey: placeholders
@@ -659,18 +735,20 @@ function GroupPending({ g }: { g: OptionSeen }) {
               <div className="aud-media">
                 <span className="aud-shot aud-noshot" />
               </div>
-              <div className="aud-tile-foot">
-                <span className="aud-pick">
-                  <SkLine w="6em" />
-                </span>
-              </div>
+              <span className="aud-pick">
+                <SkLine w="6em" />
+              </span>
             </div>
           ) : (
             // biome-ignore lint/suspicious/noArrayIndexKey: placeholders
             <div key={i} className="aud-item aud-row">
               <span className="aud-dot" />
+              {/* a sound's row holds its track too: a narrow list puts it on a line of its own (options.css) */}
               <span className="aud-pick">
-                <SkLine w="8em" />
+                <span className="aud-label">
+                  <SkLine w="8em" />
+                </span>
+                {g.kind === 'audio' && <span className="aud-bar" />}
               </span>
             </div>
           ),
@@ -716,6 +794,7 @@ function Large({
   const self = useRef<HTMLElement>(null);
   useEffect(() => self.current?.focus({ preventScroll: true }), []);
   const volumes = useMemo(() => clipVolumesOf(view, g), [view, g]);
+  const aspect = useMemo(() => groupAspect(g.items), [g]);
   if (!cur) return null;
   const ref = cur.it.ref as NoteRef;
   const files = view.files[ref.id];
@@ -745,7 +824,7 @@ function Large({
           </>
         )}
       </div>
-      <div className="aud-big-room">
+      <div className="aud-big-room" style={boxOf(aspect)}>
         <div className={`aud-item aud-tile aud-big-tile ${picked(g.id, cur.it.id) ? 'on' : ''}`}>
           <div className="aud-media">
             {clip ? (
@@ -775,17 +854,16 @@ function Large({
               <img key={cur.it.id} src={(ref.kind === 'image' ? files?.src : files?.still) ?? files?.still ?? ''} alt={cur.it.label} />
             )}
           </div>
-          <div className="aud-tile-foot">
-            <PickButton
-              g={g}
-              it={cur.it}
-              n={cur.i + 1}
-              on={picked(g.id, cur.it.id)}
-              onPick={() => onPick(g, cur.it)}
-              onFocus={() => {}}
-              testId="audition-large-pick"
-            />
-          </div>
+          <PickButton
+            g={g}
+            it={cur.it}
+            n={cur.i + 1}
+            on={picked(g.id, cur.it.id)}
+            onPick={() => onPick(g, cur.it)}
+            onFocus={() => {}}
+            full
+            testId="audition-large-pick"
+          />
         </div>
       </div>
     </section>

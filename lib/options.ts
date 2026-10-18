@@ -5,7 +5,7 @@
 // Browser-safe (no Node imports): the store and the routes check with these rules, the UI levels and shows with them.
 import { cutChars } from './names.ts';
 import { compareTime, instant, oneLine } from './time.ts';
-import type { Comment, NoteRef, OptionAnswer, OptionGroup, OptionSeen, RefLoudness, Reply } from './types.ts';
+import type { Comment, NoteRef, OptionAnswer, OptionGroup, OptionItem, OptionSeen, RefLoudness, Reply } from './types.ts';
 
 export const OPTION_LIMITS = {
   /** Groups in one question. */
@@ -190,12 +190,37 @@ export function levelGains(loud: readonly (RefLoudness | null | undefined)[]): (
   return loud.map((l) => (usable(l) ? Math.round((target - l.i) * 10) / 10 : null));
 }
 
+/**
+ * The one box a group's pictures and clips are shown in (width / height): the shape most of them have, the first of
+ * those on a tie, undefined when none says its size. One of another shape sits in the same box, contained, so the
+ * tiles read as one set (a 16:9 among 9:16 reels).
+ */
+export function groupAspect(items: readonly OptionItem[]): number | undefined {
+  const seen = new Map<number, { aspect: number; n: number }>();
+  for (const it of items) {
+    const w = it.ref?.width;
+    const h = it.ref?.height;
+    if (!w || !h || w <= 0 || h <= 0) continue;
+    const aspect = w / h;
+    const key = Math.round(aspect * 100);
+    const at = seen.get(key);
+    if (at) at.n++;
+    else seen.set(key, { aspect, n: 1 });
+  }
+  let best: { aspect: number; n: number } | undefined;
+  for (const s of seen.values()) if (!best || s.n > best.n) best = s;
+  return best && Math.round(best.aspect * 10000) / 10000;
+}
+
+const TILE_KINDS = new Set<OptionSeen['kind']>(['image', 'clip', 'frame']);
+
 /** A group as lists name it before it is opened (the inbox, the folder's pill): its label, size and kind of items. */
 export function optionsSeen(groups: readonly OptionGroup[]): OptionSeen[] {
   return groups.map((g) => {
     const kinds = new Set(g.items.map((it) => it.ref?.kind ?? 'text'));
     const kind = kinds.size === 1 ? ([...kinds][0] as OptionSeen['kind']) : 'mixed';
-    return { label: g.label, n: g.items.length, kind };
+    const aspect = TILE_KINDS.has(kind) ? groupAspect(g.items) : undefined;
+    return { label: g.label, n: g.items.length, kind, ...(aspect ? { aspect } : {}) };
   });
 }
 

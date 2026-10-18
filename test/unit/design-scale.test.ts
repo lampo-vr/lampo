@@ -210,6 +210,13 @@ const NESTED: { file: string; outer: string; inner: string; inset: () => number;
   // a toast's action and its ×: inset by the toast body's padding (the toast's edge is a ring, it takes no room)
   { file: 'toasts.css', outer: '.toast', inner: '.toast-act', inset: () => firstOf(decl('toasts.css', '.toast-body', 'padding')) },
   { file: 'toasts.css', outer: '.toast', inner: '.toast-x', inset: () => firstOf(decl('toasts.css', '.toast-body', 'padding')) },
+  // Compare and pick: Larger, a chip on the picture's top corner, the tile's (its edge is a ring, it takes no room)
+  {
+    file: 'options.css',
+    outer: '.aud-tile',
+    inner: '.aud-media > .aud-expand.btn',
+    inset: () => px(decl('options.css', '.aud-media > .aud-expand.btn', 'top') ?? 'NaN'),
+  },
   // billing's switch: one raised thumb that slides in the segmented track
   {
     file: 'billing.css',

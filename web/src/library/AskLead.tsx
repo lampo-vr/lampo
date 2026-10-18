@@ -4,6 +4,7 @@
 // (the bell asks for it on every page and this browser keeps it), so the block is there with the library, not after it;
 // the audition's code arrives when the button is pointed at or pressed (options/code.ts).
 import { useMemo, useState } from 'react';
+import { agentShown } from '../../../lib/agentKind.ts';
 import { compareTime } from '../../../lib/time.ts';
 import type { ForYouItem, OptionSeen } from '../api/types.ts';
 import { t } from '../i18n/index.ts';
@@ -17,7 +18,8 @@ import type { IconName } from '../ui/icons.tsx';
 import { KeyGlyph } from '../ui/KeyGlyph.tsx';
 import { Button, Chip, Panel } from '../ui/system.tsx';
 
-const who = (by: string | null | undefined) => (by ? by.replace(/^agent:/, '') : '');
+/** Who asks, as people read it: an agent's client id by its kind's name ("agent:claude-code" → "Claude Code"). */
+const who = (by: string | null | undefined) => (by ? agentShown(by.replace(/^agent:/, '')) : '');
 const prefetch = () => void auditionCode.load().catch(() => {});
 
 export interface FolderAsk {

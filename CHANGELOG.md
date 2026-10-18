@@ -8,6 +8,14 @@ format stays backwards compatible throughout.
 ## [Unreleased]
 
 ### Changed
+- Compare and pick reads calmly: each group's pictures and clips share one box (a 16:9 among vertical clips sits in it
+  on the dark ground, no longer framed apart), their words, number and pick sit under the picture in two readable
+  lines (whole in the large view) instead of over it, and only Larger sits on its corner. A pick is the list's flat
+  selection with a filled check, for clips and sounds alike; playing together shows a line under each clip and which
+  one you hear, and the sound follows the clip in focus. On a phone a sound's progress has a line of its own under its
+  words, with its play button level with them. The dialog is as tall as what it shows, so a short question no longer
+  stands over an empty half with its free text at the foot. The agent is named as everywhere else ("Claude Code
+  asks"), in the inbox and on a folder's question too.
 - Toasts stack. The newest stands in front with the two before it tucked in behind, a step smaller, so a few at once
   take the room of one; hovering or focusing the stack fans it out into a list you can read, and every toast waits
   while it is open. A new toast springs in, a closed one slides out and the others close the gap; with reduced motion

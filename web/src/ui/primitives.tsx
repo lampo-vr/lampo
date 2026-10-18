@@ -43,8 +43,9 @@ export interface ModalProps {
   foot?: ReactNode;
   width?: number;
   head?: ReactNode;
-  /** A room to look at things in (the audition's clips): the screen's height whatever it shows, so what switches inside
-   * never resizes it; the content lays itself out in the body, with the gutters, and scrolls itself. */
+  /** A room to look at things in (the audition's clips): as tall as what it shows, up to the screen's height; the
+   * content lays itself out in the body (a column), with the gutters, scrolls itself and keeps one box for what switches
+   * inside it. */
   fill?: boolean;
   /**
    * A dialog to write in (a skill's instructions): its body is a column, and the part marked `.modal-grow` takes the

@@ -78,13 +78,13 @@
   grid-template-columns: minmax(0, 1fr);
   gap: var(--sp-4);
 }
-/* A room to look at things in (Modal `fill`: the audition's clips): as tall as a dialog may be whatever it shows, so
-   what switches inside never resizes it; the content takes the body, gutters and scrolling included. */
-.modal.fill {
-  height: calc(100dvh - 64px);
-}
+/* A room to look at things in (Modal `fill`: the audition's clips): as tall as what it shows, up to what a dialog may
+   be; the content takes the body as a column (gutters and scrolling included) and keeps one box for what switches
+   inside it. Held to the full height, a short question stood over an empty half and its last field at the foot. */
 .modal.fill > .modal-body {
-  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
   min-height: 0;
   padding: 0;
   overflow: hidden;

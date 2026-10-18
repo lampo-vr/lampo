@@ -1,7 +1,7 @@
 /* Options before a render (web/src/options/): the line that says what a question offers (a note card, the inbox)
    and the audition — one section per group, sounds as rows with a player each, pictures and clips as tiles (one of
-   them large in its place), one pick per group. Calm like a list: hairlines, one ink for what is picked, the raised
-   material for a pick. */
+   them large in its place), one pick per group. Calm like a list: hairlines, the list's flat selection and one ink
+   for what is picked, nothing written on a picture. */
 
 /* ---------------------------------------------------------------- what a question offers */
 .opt-ask {
@@ -66,13 +66,15 @@
   gap: var(--sp-6);
   min-width: 0;
 }
-/* The room (Modal `fill`: pictures or clips to look at): the list and the large view in one cell as tall as the dialog,
-   each with the dialog's gutters; the list scrolls itself and keeps its place while one is large, and the free text
-   sits at its foot, by Send. */
+/* The room (Modal `fill`: pictures or clips to look at): the list and the large view in one cell, each with the
+   dialog's gutters. The cell is as tall as the list, up to what the window leaves the dialog; past that the list
+   scrolls itself, and it keeps its place while one is large in the same box. The free text follows the last group, at
+   the list's own gap: no room is held under it. */
 .aud.room {
   display: grid;
   grid-template: minmax(0, 1fr) / minmax(0, 1fr);
-  height: 100%;
+  flex: 0 1 auto;
+  min-height: 0;
 }
 .aud.room > * {
   grid-area: 1 / 1;
@@ -83,9 +85,6 @@
   flex-direction: column;
   overflow: auto;
   padding: var(--sp-4) var(--sp-dialog) var(--sp-dialog);
-}
-.aud.room > .aud-list > .aud-note {
-  margin-top: auto;
 }
 .aud.room[data-view='large'] > .aud-list {
   visibility: hidden;
@@ -169,14 +168,15 @@
   color: var(--muted);
 }
 .aud-chosen.on {
-  color: var(--fg-2);
+  color: var(--fg);
 }
 .aud-ab {
   font-variant-numeric: tabular-nums;
 }
 
-/* rows: sounds, links, plain lines, a mix */
+/* rows: sounds, links, plain lines, a mix (the list is the query container of its rows' narrow layout) */
 .aud-items.rows {
+  container: aud-rows / inline-size;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   border: 1px solid var(--line);
@@ -196,21 +196,8 @@
 .aud-row + .aud-row {
   border-top: 1px solid var(--line);
 }
-.aud-row:hover {
+.aud-row:hover:where(:not(.on)) {
   background: var(--sel);
-}
-/* where the keys are (1–9, Space), only where there is a keyboard to use them: the row lights up as under the pointer.
-   A ring would sit on the list's own border and square off its rounded corners. */
-@media (hover: hover) {
-  .aud-row.here {
-    background: var(--sel);
-  }
-  .aud-tile.here {
-    border-color: var(--line-3);
-  }
-}
-.aud-row.on {
-  background: var(--float-sel);
 }
 .aud-dot,
 .aud-play {
@@ -233,7 +220,7 @@
   object-fit: cover;
 }
 
-/* the pick: the item's key, its words and a check that fills when picked */
+/* the pick: the item's key, its words, what it shows of its state, and a check that fills when picked */
 .aud-pick {
   display: flex;
   align-items: center;
@@ -244,27 +231,38 @@
   padding: 0;
   border: 0;
   background: none;
-  color: var(--fg-2);
+  color: var(--fg);
   font: var(--fw-text) var(--fs-md) / var(--lh-ui) var(--ui);
   text-align: left;
   cursor: pointer;
 }
+/* a row clips its corners: the ring inside its edge */
 .aud-pick:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-  border-radius: var(--r-sm);
-}
-.aud-pick[aria-checked='true'] {
-  color: var(--fg);
+  outline: var(--focus-width) solid var(--fg);
+  outline-offset: var(--focus-inset);
 }
 .aud-key {
   flex: none;
   min-width: 1.6em;
   text-align: center;
 }
+/* the item's words in the reading size: two lines at most, then cut (whole in the large view, and in the pick's name) */
 .aud-label {
+  display: -webkit-box;
   flex: 1 1 40%;
   min-width: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: break-word;
+  text-wrap: pretty;
+}
+.aud-label.full {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: none;
+  line-clamp: none;
 }
 .aud-site {
   flex: none;
@@ -286,11 +284,11 @@
 .aud-pick[role='checkbox'] .aud-check {
   border-radius: var(--r-sm);
 }
+/* picked: the check filled flat in the ink, as the checkbox's (ui.css), never raised and never the orange */
 .aud-pick[aria-checked='true'] .aud-check {
-  background: var(--raise-sheen), var(--fg);
+  background: var(--fg);
   border-color: var(--fg);
   color: var(--on-fg);
-  box-shadow: var(--raise);
 }
 .aud-bar {
   position: relative;
@@ -298,7 +296,8 @@
   min-width: var(--sp-12);
   height: 2px;
   border-radius: var(--r-full);
-  background: var(--line-2);
+  /* thin and quiet at rest; a step firmer while its sound plays, the progress in the ink */
+  background: color-mix(in srgb, var(--line-2) 60%, transparent);
   overflow: hidden;
 }
 .aud-bar > span {
@@ -308,6 +307,9 @@
   transform: scaleX(0);
   transform-origin: left;
   transition: transform 0.25s linear;
+}
+.aud-row.playing .aud-bar {
+  background: var(--line-2);
 }
 .aud-row.playing .aud-bar > span {
   background: var(--fg);
@@ -325,9 +327,71 @@
   box-shadow: var(--raise);
   color: var(--fg);
 }
+/* A narrow list of sounds (a phone, a tablet's dialog): the words take the row's width, two lines at most; the track
+   takes a line of its own under them, a gap away, so it reads as progress and never as an underline; the play button,
+   the time and the check stand level with the words (the pick is a subgrid of the row: the button sits in the words'
+   row). Even room above the words and below the track. A wide list keeps its one line. */
+@container aud-rows (width < 720px) {
+  .aud-row:has(> .aud-pick > .aud-bar) {
+    grid-template-rows: auto auto;
+    row-gap: var(--sp-2);
+    padding-block: var(--sp-3);
+  }
+  /* the button may stand taller than one line of words: it reaches into the row's room instead of making it taller */
+  .aud-row:has(> .aud-pick > .aud-bar) > .aud-play {
+    margin-block: calc(-1 * var(--sp-1));
+  }
+  .aud-row > .aud-pick:has(> .aud-bar) {
+    display: grid;
+    grid-row: span 2;
+    grid-template-rows: subgrid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'key label time check'
+      '. bar bar bar';
+    align-items: center;
+    column-gap: 0;
+    min-height: 0;
+  }
+  /* spaced by margins, not the grid's gap: without its key (touch) the key's column takes no room at all */
+  .aud-pick:has(> .aud-bar) > .aud-key {
+    grid-area: key;
+    margin-right: var(--sp-2);
+  }
+  .aud-pick:has(> .aud-bar) > .aud-label {
+    grid-area: label;
+  }
+  .aud-pick:has(> .aud-bar) > .aud-bar {
+    grid-area: bar;
+  }
+  .aud-pick:has(> .aud-bar) > .aud-time {
+    grid-area: time;
+    margin-left: var(--sp-2);
+  }
+  .aud-pick:has(> .aud-bar) > .aud-check {
+    grid-area: check;
+    margin-left: var(--sp-2);
+  }
+}
+/* a finger's size without the room of one: the phone's buttons grow to 44 px, the play button keeps its size beside
+   the words and reaches round it */
+@media (max-width: 639px), (pointer: coarse) {
+  .aud-row > .aud-play.btn {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+  }
+  .aud-row > .aud-play.btn::after {
+    content: '';
+    position: absolute;
+    inset: calc((var(--h-sm) - var(--h-touch)) / 2);
+  }
+}
 
 /* tiles: pictures, clips, moments of renders — as large as the dialog's width allows: up to four a row, each at least
-   240 px, a group of three across the whole row (a lone one takes half of it) */
+   240 px, a group of three across the whole row (a lone one takes half of it). The picture on top, its words, key and
+   pick under it on the tile's own surface (two lines held for the words, so the tiles of a row and the loading state
+   are one height), nothing on the picture but the way to see it large. */
 .aud-items.tiles {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(max(min(100%, 240px), calc((100% - 3 * var(--sp-3)) / 4)), 1fr));
@@ -337,27 +401,35 @@
   max-width: calc((100% - var(--sp-3)) / 2);
 }
 .aud-tile {
+  /* the words' two lines and the room around them */
+  --aud-foot: calc(2 * var(--fs-md) * var(--lh-ui) + 2 * var(--sp-2));
+  /* the tallest a tile's picture stands: a portrait reel gets a wider box, on the picture's dark ground, and its words
+     still come into view under it on a laptop's height */
+  --aud-tall: min(40dvh, 400px);
+  /* the tile is the query container of its picture's box (100cqw: the tile's width) */
+  container: aud-tile / inline-size;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
-  border: 1px solid var(--line);
   border-radius: var(--r-lg);
   overflow: hidden;
   background: var(--float-bg);
+  box-shadow: 0 0 0 1px var(--line);
 }
-.aud-tile.on {
-  border-color: var(--fg-2);
-  box-shadow: 0 0 0 1px var(--fg-2);
-}
+/* One box per group (--aud-ar: the shape most of its pictures have, set on the group's items): as wide as the tile, as
+   tall as that shape makes it up to --aud-tall. What it shows is contained in it, one of another shape too, on the dark
+   ground (a dark island: base.css). */
 .aud-media {
-  aspect-ratio: 16 / 9;
+  position: relative;
+  height: min(var(--aud-tall), calc(100cqw / var(--aud-ar, 1.7778)));
+  overflow: hidden;
   background: var(--ink-0);
 }
-.aud-shot,
-.aud-video {
+.aud-shot {
+  position: absolute;
+  inset: 0;
   display: grid;
   place-items: center;
-  width: 100%;
-  height: 100%;
   padding: 0;
   border: 0;
   background: none;
@@ -366,8 +438,11 @@
 button.aud-shot {
   cursor: zoom-in;
 }
+/* the picture never sizes its box: out of the flow, contained in it */
 .aud-shot img,
-.aud-video {
+.aud-shot .aud-video {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: contain;
@@ -376,21 +451,115 @@ button.aud-shot {
 button.aud-shot .aud-video {
   pointer-events: none;
 }
-/* a tile's foot: the pick across it, then the way to see it large */
-.aud-tile-foot {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  border-top: 1px solid var(--line);
+/* the picture clips its corners: the ring inside its edge, in the picture's ink */
+button.aud-shot:focus-visible {
+  outline: var(--focus-width) solid var(--fg);
+  outline-offset: var(--focus-inset);
 }
-.aud-tile .aud-pick {
-  padding: 0 var(--sp-3) 0 var(--sp-2);
+/* the way to see it large: a chip in the picture's material (the stage's: --ink-2 at 90 %, a --line-2 ring) on its top
+   corner, concentric with the tile's */
+.aud-media > .aud-expand.btn {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  border-radius: calc(var(--r-lg) - var(--sp-2));
+  background: color-mix(in srgb, var(--ink-2) 90%, transparent);
+  box-shadow: 0 0 0 1px var(--line-2);
+  color: var(--fg);
 }
-.aud-tile:hover .aud-pick {
+.aud-media > .aud-expand.btn:hover:where(:not(:disabled)) {
+  background: var(--ink-4);
+  color: var(--fg);
+}
+/* a finger's size without a bigger chip: the phone's buttons grow to 44 px, this one keeps its size and reaches round it */
+@media (max-width: 639px), (pointer: coarse) {
+  .aud-media > .aud-expand.btn {
+    min-width: 0;
+    min-height: 0;
+  }
+  .aud-media > .aud-expand.btn::after {
+    content: '';
+    position: absolute;
+    inset: calc((var(--h-sm) - var(--h-touch)) / 2);
+  }
+}
+/* the tile's foot: the pick across it */
+.aud-tile > .aud-pick {
+  position: relative;
+  min-height: var(--aud-foot);
+  padding: var(--sp-2) var(--sp-3);
+}
+/* a narrow tile (two across a phone) gives its words the room */
+@container aud-tile (width < 240px) {
+  .aud-tile > .aud-pick {
+    padding-inline: var(--sp-2);
+  }
+}
+/* the keys' focus rings the whole tile (its foot clips at the tile's corners) */
+.aud-tile > .aud-pick:focus-visible {
+  outline: none;
+}
+.aud-tile:has(> .aud-pick:focus-visible) {
+  outline: var(--focus-width) solid var(--fg);
+  outline-offset: var(--focus-offset);
+}
+.aud-tile:hover:where(:not(.on)) > .aud-pick {
   background: var(--sel);
 }
-.aud-expand {
-  margin-right: var(--sp-1);
+/* playing (Play together): how far its clip is, a line along the picture's foot; the one heard says so beside its words */
+.aud-run {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: var(--line-2);
+  visibility: hidden;
+}
+.aud-run > span {
+  position: absolute;
+  inset: 0;
+  background: var(--fg-2);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.aud-tile.playing .aud-run {
+  visibility: visible;
+}
+.aud-tile[data-heard] .aud-run > span {
+  background: var(--fg);
+}
+.aud-heard {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--ic-sm);
+  color: var(--fg-2);
+}
+/* only the one heard takes the room: the others' words keep it (their height is held either way) */
+.aud-heard:empty {
+  display: none;
+}
+
+/* where the keys are (1–9, Space), only where there is a keyboard to use them: a row lights up as under the pointer, a
+   tile draws its edge a step darker. A ring on a row would sit on the list's own border and square off its corners. */
+@media (hover: hover) {
+  .aud-row.here {
+    background: var(--sel);
+  }
+  .aud-tile.here {
+    box-shadow: 0 0 0 1px var(--line-3);
+  }
+}
+/* picked: the list's selection — a flat fill, a drawn edge on a tile, the filled check; never raised, never orange */
+.aud-row.on {
+  background: var(--sel-on);
+}
+.aud-tile.on {
+  box-shadow: 0 0 0 2px var(--fg-2);
+}
+.aud-tile.on > .aud-pick {
+  background: var(--sel-on);
 }
 
 /* the free text */
@@ -428,12 +597,13 @@ button.aud-shot .aud-video {
 
 /* loading: the same rows and tiles, their words waiting */
 .aud-group.pending .aud-row:hover,
-.aud-group.pending .aud-tile:hover .aud-pick {
+.aud-group.pending .aud-tile:hover > .aud-pick {
   background: none;
 }
 
-/* One large, in the list's cell: its group and where it is in it, then the tile itself as big as fits at 16:9 under
-   that line (its room is a size container: the width follows from the height left once its pick is under it). */
+/* One large, in the list's cell: its group and where it is in it, then the tile itself as big as the box allows under
+   that line (its room is a size container: the width follows from the height left once its pick is under it), at the
+   group's shape; a portrait one keeps a tile wide enough for its words, the clip contained on the dark ground. */
 .aud-big:focus {
   outline: none;
 }
@@ -472,13 +642,16 @@ button.aud-shot .aud-video {
   container-type: size;
 }
 .aud-big-tile {
-  width: min(100cqw, calc((100cqh - var(--h-lg) - 3px) * 16 / 9));
+  width: min(100cqw, max(min(100cqw, 480px), calc((100cqh - var(--aud-foot)) * var(--aud-ar, 1.7778))));
 }
-.aud-big-tile .aud-pick {
-  min-height: var(--h-lg);
+/* cqh: the room's height; cqw: the tile's width */
+.aud-big-tile .aud-media {
+  height: min(calc(100cqh - var(--aud-foot)), calc(100cqw / var(--aud-ar, 1.7778)));
 }
 .aud-big-video,
 .aud-big-tile .aud-media > img {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
@@ -489,16 +662,6 @@ button.aud-shot .aud-video {
   /* a phone's large view stands under its line, not in the middle of the sheet */
   .aud-big-room {
     place-items: start center;
-  }
-  /* the progress under the words, across the row */
-  .aud-row .aud-pick {
-    flex-wrap: wrap;
-    row-gap: 0;
-  }
-  .aud-row .aud-bar {
-    order: 9;
-    flex: 1 1 100%;
-    margin-bottom: var(--sp-2);
   }
   .aud-items.tiles {
     grid-template-columns: repeat(2, minmax(0, 1fr));

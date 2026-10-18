@@ -8,9 +8,13 @@
 // The question leads its project's page (library/AskLead.tsx), above the videos — on an empty project the one orange is
 // its Compare and pick, the bell counts it —; the loading state has the loaded layout (nothing moves, as
 // quality-load.mjs asks of every screen); a phone in German does the same; the note card in the player opens it too and
-// shows the picks. Clips open large inside the dialog (a click or Expand): most of its width at 16:9, ←/→ to the next at
-// the same moment, A back to the one before, its pick under it, Esc or All options back to the grid in the same box;
-// Play together still plays them all. Synthetic media only: sines at three levels, ffmpeg test patterns.
+// shows the picks. Clips open large inside the dialog (a click or Expand): as large as its box allows at 16:9, ←/→ to the
+// next at the same moment, A back to the one before, its pick under it, Esc or All options back to the grid in the same
+// box; Play together still plays them all. A long German question with two 9:16 reels and a 16:9 clip reads as one set:
+// one box per group with every picture inside it, the words (two lines, then cut, whole in the large view), key and
+// pick under the picture and nothing on it but Larger, the pick a flat fill and never orange, sound rows alike; a short
+// question's dialog is as tall as what it shows, its free text right under the last group. Synthetic media only: sines
+// at three levels, ffmpeg test patterns.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -44,14 +48,86 @@ const look = (name, src) => {
   execFileSync(FFMPEG, ['-v', 'error', '-f', 'lavfi', '-i', `${src}=size=640x360:rate=1`, '-frames:v', '1', '-y', f]);
   return f;
 };
-/** A 4-second test of an idea: a moving pattern with a tone (an option's clip). */
-const idea = (name, src, freq) => {
+/** A 4-second test of an idea: a moving pattern with a tone (an option's clip); `size` 360x640 for a reel. */
+const idea = (name, src, freq, size = '640x360') => {
   const f = path.join(media, `${name}.mp4`);
   execFileSync(FFMPEG, [
-    ...['-v', 'error', '-f', 'lavfi', '-i', `${src}=size=640x360:rate=25`, '-f', 'lavfi', '-i', `sine=frequency=${freq}:duration=4`],
+    ...['-v', 'error', '-f', 'lavfi', '-i', `${src}${src.includes('=') ? ':' : '='}size=${size}:rate=25`],
+    ...['-f', 'lavfi', '-i', `sine=frequency=${freq}:duration=4`],
     ...['-t', '4', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', '-y', f],
   ]);
   return f;
+};
+/** Whether a computed colour is the brand's orange family (hue 10–50°, saturated): a pick never wears it. Computed
+ * colours come as rgb()/rgba() (0–255) or, from a color-mix(), as color(srgb r g b / a) (0–1). */
+const orange = (css) =>
+  [
+    ...[...String(css).matchAll(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?\)/g)].map(([, r, g, b, a]) => [r / 255, g / 255, b / 255, a]),
+    ...[...String(css).matchAll(/color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)(?: \/ ([\d.]+))?\)/g)].map(([, r, g, b, a]) => [Number(r), Number(g), Number(b), a]),
+  ].some(([R, G, B, a]) => {
+    if (a !== undefined && Number(a) === 0) return false;
+    const max = Math.max(R, G, B);
+    const min = Math.min(R, G, B);
+    const l = (max + min) / 2;
+    const s = max === min ? 0 : (max - min) / (1 - Math.abs(2 * l - 1));
+    if (s < 0.4 || l < 0.2 || l > 0.85) return false;
+    const h = max === R ? (60 * ((G - B) / (max - min)) + 360) % 360 : max === G ? 60 * ((B - R) / (max - min)) + 120 : 60 * ((R - G) / (max - min)) + 240;
+    return h >= 10 && h <= 50;
+  });
+/** A group's sound rows as laid out: each row's box, its words, progress track, play button, time and check. */
+const soundRows = (page, group) =>
+  page.$$eval(`${group} .aud-row`, (rows) =>
+    rows.map((row) => {
+      const box = (el) => {
+        if (!el) return null;
+        const b = el.getBoundingClientRect();
+        return { t: b.top, b: b.bottom, l: b.left, r: b.right, c: (b.top + b.bottom) / 2, m: (b.left + b.right) / 2 };
+      };
+      const play = row.querySelector('[data-testid=audition-play]');
+      const p = box(play);
+      // the play button's reach: points round its middle land on it, well past what it draws
+      const reach = p
+        ? [-20, 20].every((dx) => document.elementFromPoint(p.m + dx, p.c)?.closest('[data-testid=audition-play]') === play) &&
+          [-17, 17].every((dy) => document.elementFromPoint(p.m, p.c + dy)?.closest('[data-testid=audition-play]') === play)
+        : false;
+      const label = row.querySelector('.aud-label');
+      return {
+        row: box(row),
+        label: box(label),
+        lines: Math.round(label.getBoundingClientRect().height / parseFloat(getComputedStyle(label).lineHeight)),
+        bar: box(row.querySelector('.aud-bar')),
+        play: p,
+        // what the play button draws (its glyph), and where the pick (key, words) starts
+        glyph: box(play?.querySelector('svg')),
+        pick: box(row.querySelector('.aud-pick')),
+        reach,
+        time: box(row.querySelector('.aud-time')),
+        check: box(row.querySelector('.aud-check')),
+      };
+    }),
+  );
+/** What is off in narrow sound rows: the track on a line of its own under the words, the play button, time and check
+ * beside the words, even room above and below. */
+const narrowRowsOff = (rows) => {
+  const off = [];
+  for (const [i, r] of rows.entries()) {
+    const at = `sound row ${i + 1}`;
+    if (r.bar.t < r.label.b + 6) off.push(`${at}: the track ${Math.round(r.bar.t - r.label.b)}px under the words`);
+    if (r.play.c < r.label.t || r.play.c > r.label.b)
+      off.push(`${at}: the play button's middle (${Math.round(r.play.c)}) is beside no words (${Math.round(r.label.t)}–${Math.round(r.label.b)})`);
+    for (const [name, b] of [
+      ['time', r.time],
+      ['check', r.check],
+    ])
+      if (Math.abs(b.c - r.label.c) > 2) off.push(`${at}: its ${name} is not level with the words (${Math.round(b.c - r.label.c)}px)`);
+    const above = r.label.t - r.row.t;
+    const below = r.row.b - r.bar.b;
+    if (Math.abs(above - below) > 2 || above < 8) off.push(`${at}: room above ${Math.round(above)}px, below ${Math.round(below)}px`);
+    if (r.glyph.l - r.row.l > 16) off.push(`${at}: the play glyph stands ${Math.round(r.glyph.l - r.row.l)}px in`);
+    if (r.pick.l - r.glyph.r > 20) off.push(`${at}: ${Math.round(r.pick.l - r.glyph.r)}px between the play glyph and the words`);
+    if (!r.reach) off.push(`${at}: the play button can't be reached round its middle (a finger's size)`);
+  }
+  return off;
 };
 const IPHONE = {
   viewport: { width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
@@ -316,6 +392,10 @@ try {
       assert(words.includes(w), `“${w}” in ${words.slice(0, 400)}`);
     const wide = [...(await sideways(p)), ...(await clippedText(p))];
     assert(!wide.length, wide.join('\n'));
+    // the takes by touch: the track on a line of its own under the words, the play button level with them, a finger's reach
+    await p.waitForFunction(() => !document.querySelector('.modal')?.getAnimations().length, { polling: 'raf', timeout: 10000 });
+    const takes = narrowRowsOff(await soundRows(p, '[data-testid=audition-group]:first-of-type'));
+    assert(!takes.length, takes.join('\n'));
     // a look large on the phone: across the sheet, and back
     await p.tap('[data-testid=audition-group]:nth-of-type(2) [data-testid=audition-item]:nth-child(1) [data-testid=audition-expand]');
     await p.waitForSelector('[data-testid=audition-large][data-item=l1] img');
@@ -414,7 +494,7 @@ try {
   });
 
   await check(
-    'a clip opens large in the dialog: most of its width at 16:9, ←/→ at the same moment, A back, picked, Esc and All options to the grid',
+    'a clip opens large in the dialog: as large as its box allows at 16:9, ←/→ at the same moment, A back, picked, Esc and All options to the grid',
     async () => {
       const p = run;
       // The dialog's box once it holds still: no animation of its own left (it comes in scaled and lifted, and on a
@@ -449,18 +529,22 @@ try {
       assert(tile > 400, `a tile is ${Math.round(tile)}px wide`);
       await p.click('[data-testid=audition-item]:nth-child(1) [data-testid=audition-shot]');
       await p.waitForSelector('[data-testid=audition-large][data-item=a] [data-testid=audition-large-video]');
+      // The dialog is as tall as its list (a short question: one row of clips): the large one takes all of that box —
+      // its height or its width, whichever it meets first — well over a tile's size.
       const big = await p.evaluate(() => {
         const m = document.querySelector('.aud-big-tile .aud-media').getBoundingClientRect();
-        const d = document.querySelector('.modal').getBoundingClientRect();
+        const tile = document.querySelector('.aud-big-tile').getBoundingClientRect();
+        const room = document.querySelector('.aud-big-room').getBoundingClientRect();
         const v = document.querySelector('[data-testid=audition-large-video]');
         return {
-          share: m.width / d.width,
+          width: Math.round(m.width),
+          fills: Math.abs(tile.height - room.height) < 3 || Math.abs(tile.width - room.width) < 3,
           ratio: m.width / m.height,
           controls: v.controls,
           list: getComputedStyle(document.querySelector('.aud-list')).visibility,
         };
       });
-      assert(big.share > 0.7 && Math.abs(big.ratio - 16 / 9) < 0.02 && big.controls, `large: ${JSON.stringify(big)}`);
+      assert(big.fills && big.width > 1.6 * tile && Math.abs(big.ratio - 16 / 9) < 0.02 && big.controls, `large: ${JSON.stringify(big)}, a tile ${tile}px`);
       assert(big.list === 'hidden', 'the grid waits under it');
       await sameBox('grid and large view in one box: the dialog did not move');
       // it plays; → goes to the next one at the same moment
@@ -492,15 +576,323 @@ try {
       await p.waitForSelector('[data-testid=audition-large][data-item=c]');
       await p.click('[data-testid=audition-back]');
       await p.waitForFunction(() => !document.querySelector('[data-testid=audition-large]'));
-      // Play together still plays them all, and stops them
+      // Play together still plays them all, and stops them; each tile says it plays, the one in focus (the third, its
+      // Expand pressed last) is the one heard, and the sound follows the focus
       await p.click('[data-testid=audition-together]');
       await p.waitForFunction(() => [...document.querySelectorAll('.aud-list video')].every((v) => !v.paused && v.currentTime > 0), { timeout: 15000 });
-      await p.click('[data-testid=audition-together]');
+      await p.waitForFunction(() => document.querySelectorAll('[data-testid=audition-item][data-playing]').length === 3, { timeout: 5000 }).catch(() => {});
+      const marks = await p.evaluate(() => ({
+        playing: document.querySelectorAll('[data-testid=audition-item][data-playing]').length,
+        heard: [...document.querySelectorAll('[data-testid=audition-item][data-heard]')].map((el) => el.dataset.item),
+        loud: [...document.querySelectorAll('.aud-list video')].map((v) => !v.muted),
+      }));
+      assert(marks.playing === 3 && marks.heard.join() === 'c' && marks.loud.join() === 'false,false,true', `while they play: ${JSON.stringify(marks)}`);
+      await p.keyboard.press('ArrowLeft');
+      await p.waitForFunction(() => [...document.querySelectorAll('.aud-list video')].map((v) => !v.muted).join() === 'false,true,false', { timeout: 5000 });
+      // Pause (unless the 4-second clips ended meanwhile: then Play together would start them again)
+      if (await p.$('[data-testid=audition-together][data-playing]')) await p.click('[data-testid=audition-together]');
       await p.waitForFunction(() => [...document.querySelectorAll('.aud-list video')].every((v) => v.paused));
+      // stopped: no tile says it plays
+      await p.waitForFunction(() => !document.querySelector('[data-testid=audition-item][data-playing]'), { timeout: 5000 });
       await p.keyboard.press('Escape');
       await p.browserContext().close();
     },
   );
+
+  // A person's case, synthetic: an agent's long German question before the first version, three looks as clips — two
+  // 9:16 reels and one 16:9 — with long German labels, three piano takes, the agent's own prompt.
+  const REELS = [
+    { id: 'calm', label: 'Ruhig & edel: Vollbild, langsame Pushes, weiche Überblendungen', src: 'gradients=c0=white:c1=0xe8dcc8', size: '360x640' },
+    { id: 'beat', label: 'Rhythmus: Schnitt auf jeden Klavierschlag, das Rotlicht als harter Wechsel', src: 'testsrc2', size: '360x640' },
+    { id: 'prints', label: 'Fotobuch: die Fotos als Abzüge, die auf den Tisch fallen, dann läuft das Video', src: 'mandelbrot', size: '640x360' },
+  ];
+  const REELS_Q =
+    'Aftermovie Frühlingsfest: Bevor ich den ganzen Film baue, wähl bitte einen Look und einen Klavier-Track. Die Clips zeigen jeweils 4 s um den Schlüsselmoment: der leere Saal im warmen Licht, dann geht das Rotlicht an. Danach geht es chronologisch weiter, am Ende die Figur als Übergang.';
+  let reels;
+  await check(
+    'reels and a 16:9 read as one set: one box per group, every picture inside it, words, key and pick under it, nothing on it but Larger; the loading state has the box',
+    async () => {
+      await api('/api/folders', 'POST', { path: 'Frühlingsfest/Reels' });
+      const made = await api('/api/asks', 'POST', {
+        folder: 'Frühlingsfest/Reels',
+        text: REELS_Q,
+        by: 'agent:claude-code',
+        answer_prompt: 'Noch etwas zum Film? (z. B. Länge, Endkarten-Zeile, Momente, die unbedingt rein sollen)',
+        options: [
+          {
+            id: 'look',
+            label: 'Look',
+            items: REELS.map((r, i) => ({ id: r.id, label: r.label, ref: { kind: 'file', data: b64(idea(`reel-${r.id}`, r.src, 330 + 110 * i, r.size)) } })),
+          },
+          {
+            id: 'track',
+            label: 'Klavier-Track (synthetisch, ~45 s)',
+            items: [
+              {
+                id: 'a',
+                label: 'A: neoklassisch, ruhiger Anfang, großer Aufbau mit Streichern ab ~21 s',
+                ref: { kind: 'file', data: b64(tone('pa', 0.5, 262)) },
+              },
+              { id: 'b', label: 'B: nur Flügel, durchgehendes Ostinato, steigert sich in Wellen', ref: { kind: 'file', data: b64(tone('pb', 0.1, 330)) } },
+              { id: 'c', label: 'C: Klavier mit weichem House-Groove, am meisten Energie', ref: { kind: 'file', data: b64(tone('pc', 0.9, 392)) } },
+            ],
+          },
+        ],
+      });
+      const fresh = await browser.createBrowserContext();
+      reels = await open(`/#/folder/${encodeURIComponent('Frühlingsfest/Reels')}`, { ctx: fresh, theme: 'light' });
+      const p = reels;
+      await p.waitForSelector('[data-testid=ask-lead] [data-testid=ask-lead-open]', { timeout: 15000 });
+      // the folder's question names the agent as people read it, never by its client's id
+      const lead = await p.$eval('[data-testid=ask-lead]', (el) => el.innerText);
+      assert(lead.includes('Claude Code asks') && !lead.includes('claude-code'), `the question's line: ${lead.slice(0, 120)}`);
+      // the question's own data held back: its loading state shows the group's box (the list names its shape)
+      await p.setRequestInterception(true);
+      let release;
+      const held = new Promise((r) => {
+        release = r;
+      });
+      p.on('request', (req) => {
+        if (req.method() === 'GET' && new URL(req.url()).pathname === `/api/asks/${made.id}`) held.then(() => req.continue().catch(() => {}));
+        else req.continue().catch(() => {});
+      });
+      await p.click('[data-testid=ask-lead-open]');
+      await p.waitForSelector('[data-testid=audition][data-loaded=false] .aud-group.pending .aud-media');
+      // measured once the dialog holds still: it comes in scaled
+      await p.waitForFunction(() => !document.querySelector('.modal')?.getAnimations().length, { polling: 'raf', timeout: 10000 });
+      const boxOf = (sel) => p.$eval(sel, (el) => [el.getBoundingClientRect().width, el.getBoundingClientRect().height].map(Math.round));
+      const pending = await boxOf('.aud-group.pending .aud-media');
+      release();
+      await p.waitForSelector('[data-testid=audition][data-loaded=true]', { timeout: 15000 });
+      await p.waitForFunction(() => [...document.querySelectorAll('.aud-list video')].every((v) => v.readyState >= 1 && v.videoWidth > 0), { timeout: 15000 });
+      await p.mouse.move(1, 1);
+      await settle(p);
+      const loaded = await boxOf('[data-testid=audition-group] .aud-media');
+      assert(
+        pending.every((v, i) => Math.abs(v - loaded[i]) <= 2),
+        `the loading state's box ${pending} is the loaded one's ${loaded}`,
+      );
+      const tiles = await p.evaluate(() => {
+        const box = (el) => {
+          const b = el.getBoundingClientRect();
+          return { l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height };
+        };
+        const group = document.querySelector('[data-testid=audition-group]');
+        return [...group.querySelectorAll('[data-testid=audition-item]')].map((tile) => {
+          const t = box(tile);
+          const m = box(tile.querySelector('.aud-media'));
+          const pic = tile.querySelector('.aud-shot video, .aud-shot img');
+          const v = box(pic);
+          const label = tile.querySelector('.aud-label');
+          const lb = box(label);
+          // the picture as it is drawn: its element's box, as far as the tile (which clips) shows it
+          const drawn = { l: Math.max(v.l, t.l), t: Math.max(v.t, t.t), r: Math.min(v.r, t.r), b: Math.min(v.b, t.b) };
+          // what is on top of it, across a grid of points: the picture (its button) or the Larger chip, nothing else
+          const over = new Set();
+          for (let i = 1; i < 10; i++)
+            for (let j = 1; j < 10; j++) {
+              const el = document.elementFromPoint(drawn.l + ((drawn.r - drawn.l) * i) / 10, drawn.t + ((drawn.b - drawn.t) * j) / 10);
+              if (!el || el === pic || el.closest('[data-testid=audition-shot], [data-testid=audition-expand]')) continue;
+              over.add(`${el.tagName.toLowerCase()}.${String(el.className).trim().split(/\s+/).join('.')}`);
+            }
+          return {
+            media: [m.w, m.h].map(Math.round),
+            inside: v.l >= m.l - 1 && v.t >= m.t - 1 && v.r <= m.r + 1 && v.b <= m.b + 1,
+            below: lb.t >= drawn.b - 0.5 && lb.t >= m.b - 0.5,
+            over: [...over],
+            lines: Math.round(lb.h / parseFloat(getComputedStyle(label).lineHeight)),
+            text: label.textContent,
+            name: tile.querySelector('[data-testid=audition-pick]').textContent,
+            titles: [...tile.querySelectorAll('[title]')].map((e) => e.getAttribute('title')),
+            expand: !!tile.querySelector('.aud-media [data-testid=audition-expand]'),
+          };
+        });
+      });
+      await shot(p, 'reels-1440-light');
+      assert(tiles.length === 3, `${tiles.length} tiles`);
+      const off = [];
+      for (const [i, x] of tiles.entries()) {
+        const at = `tile ${i + 1}`;
+        if (x.media.some((v, k) => Math.abs(v - tiles[0].media[k]) > 1)) off.push(`${at}: its box ${x.media} is not the group's ${tiles[0].media}`);
+        if (!x.inside) off.push(`${at}: its picture reaches out of its box`);
+        if (!x.below) off.push(`${at}: its words are on the picture`);
+        if (x.over.length) off.push(`${at}: on the picture: ${x.over.join(', ')}`);
+        if (!x.expand) off.push(`${at}: no Larger on the picture's corner`);
+        if (x.lines > 2) off.push(`${at}: its words take ${x.lines} lines`);
+        if (x.text !== REELS[i].label || !x.name.includes(REELS[i].label)) off.push(`${at}: its words aren't whole in the page: "${x.text}"`);
+        if (x.titles.length) off.push(`${at}: a native title covers things: ${x.titles.join(', ')}`);
+      }
+      // a long label takes its two lines before it is cut, rather than one line cut short
+      if (tiles[2].lines !== 2) off.push(`the longest words take ${tiles[2].lines} line(s), not two`);
+      assert(!off.length, off.join('\n'));
+      // the agent by the name people read, in the free text's hint too
+      const meta = await p.$eval('.aud-meta b', (b) => b.textContent);
+      const hint = await p.$eval('[data-testid=audition-note]', (t) => t.placeholder);
+      assert(meta === 'Claude Code' && hint.includes('Claude Code') && !hint.includes('claude-code'), `the agent: ${meta} · ${hint}`);
+    },
+  );
+
+  await check('a pick is the list’s selection: a flat fill and the filled check, never raised, never orange; sound rows alike; whole words large', async () => {
+    const p = reels;
+    // nothing hovered: the keys pick (1 in the looks, ↓ 2 in the takes)
+    await p.mouse.move(1, 1);
+    await p.keyboard.press('1');
+    await p.keyboard.press('ArrowDown');
+    await p.keyboard.press('2');
+    await settle(p);
+    const look = await p.evaluate(() => {
+      const cs = (el) => getComputedStyle(el);
+      const [tile, other] = document.querySelectorAll('[data-testid=audition-group]:first-of-type [data-testid=audition-item]');
+      const rows = document.querySelectorAll('[data-testid=audition-group]:nth-of-type(2) [data-testid=audition-item]');
+      const of = (el) => {
+        const pick = el.querySelector('[data-testid=audition-pick]');
+        const check = el.querySelector('.aud-check');
+        return {
+          on: pick.getAttribute('aria-checked'),
+          edge: cs(el).boxShadow,
+          fill: el.classList.contains('aud-row') ? cs(el).backgroundColor : cs(pick).backgroundColor,
+          check: [cs(check).backgroundColor, cs(check).backgroundImage, cs(check).boxShadow, cs(check).borderColor],
+        };
+      };
+      return { tile: of(tile), other: of(other), row: of(rows[1]), otherRow: of(rows[0]) };
+    });
+    const clear = 'rgba(0, 0, 0, 0)';
+    const off = [];
+    for (const [name, on, off_] of [
+      ['tile', look.tile, look.other],
+      ['sound row', look.row, look.otherRow],
+    ]) {
+      if (on.on !== 'true' || off_.on !== 'false') off.push(`${name}: picked ${on.on}, the other ${off_.on}`);
+      if (on.fill === clear || on.fill === off_.fill) off.push(`${name}: no fill of its own when picked (${on.fill} / ${off_.fill})`);
+      if (on.check[0] === clear || on.check[0] === off_.check[0]) off.push(`${name}: the check doesn't fill (${on.check[0]})`);
+      if (on.check[1] !== 'none' || on.check[2] !== 'none') off.push(`${name}: the check is raised (${on.check[1]} · ${on.check[2]})`);
+      for (const c of [on.edge, on.fill, ...on.check]) if (orange(c)) off.push(`${name}: orange in its picked look: ${c}`);
+    }
+    if (look.tile.edge === look.other.edge) off.push(`the picked tile's edge is the others' (${look.tile.edge})`);
+    assert(!off.length, `${off.join('\n')}\n${JSON.stringify(look)}`);
+    await shot(p, 'reels-picked-1440-light');
+    // the 16:9 one large: in the group's box (the reels'), its words whole under it
+    await p.click('[data-testid=audition-group]:first-of-type [data-testid=audition-item]:nth-child(1) [data-testid=audition-shot]');
+    await p.waitForSelector('[data-testid=audition-large][data-item=calm]');
+    const first = await p.$eval('.aud-big-tile .aud-media', (el) => [el.getBoundingClientRect().width, el.getBoundingClientRect().height].map(Math.round));
+    await p.keyboard.press('ArrowLeft');
+    await p.waitForSelector('[data-testid=audition-large][data-item=prints]');
+    const large = await p.evaluate(() => {
+      const m = document.querySelector('.aud-big-tile .aud-media').getBoundingClientRect();
+      const v = document.querySelector('[data-testid=audition-large-video]').getBoundingClientRect();
+      const label = document.querySelector('[data-testid=audition-large-pick] .aud-label');
+      return {
+        box: [m.width, m.height].map(Math.round),
+        inside: v.left >= m.left - 1 && v.top >= m.top - 1 && v.right <= m.right + 1 && v.bottom <= m.bottom + 1,
+        whole: label.scrollHeight <= label.clientHeight + 1 && label.scrollWidth <= label.clientWidth + 1,
+        text: label.textContent,
+      };
+    });
+    assert(
+      large.box.every((v, i) => Math.abs(v - first[i]) <= 1) && large.inside,
+      `the 16:9 one large in the reels' box: ${JSON.stringify(large)} vs ${first}`,
+    );
+    assert(large.whole && large.text === REELS[2].label, `its words whole in the large view: ${JSON.stringify(large)}`);
+    await p.keyboard.press('Escape');
+    await p.waitForFunction(() => !document.querySelector('[data-testid=audition-large]'));
+    // a laptop's width: a sound is one line — its words, then the track beside them, the time and the check
+    const takes = '[data-testid=audition-group]:nth-of-type(2)';
+    await p.setViewport({ width: 1024, height: 768 });
+    await settle(p);
+    await p.$eval(takes, (el) => el.scrollIntoView({ block: 'center' }));
+    const wide = await soundRows(p, takes);
+    assert(
+      wide.every((r) => r.lines === 1 && r.bar.c >= r.label.t && r.bar.c <= r.label.b && r.bar.l > r.label.r),
+      `the sounds at 1024, one line each: ${JSON.stringify(wide.map((r) => ({ lines: r.lines, bar: Math.round(r.bar.c), label: [r.label.t, r.label.b].map(Math.round) })))}`,
+    );
+    // two across a phone's width: the long words in two lines, cut, still whole in the page
+    await p.setViewport({ width: 390, height: 844 });
+    await settle(p);
+    const narrow = await p.evaluate(() =>
+      [...document.querySelectorAll('[data-testid=audition-group]:first-of-type .aud-label')].map((l) => ({
+        lines: Math.round(l.getBoundingClientRect().height / parseFloat(getComputedStyle(l).lineHeight)),
+        cut: l.scrollHeight > l.clientHeight + 1,
+        text: l.textContent,
+      })),
+    );
+    assert(
+      narrow.every((l, i) => l.lines <= 2 && l.text === REELS[i].label) && narrow[2].lines === 2 && narrow[2].cut,
+      `the words on a narrow tile: ${JSON.stringify(narrow)}`,
+    );
+    // …and the sounds there: their words in two lines, the track on a line of its own under them, the play button,
+    // time and check level with the words
+    await p.$eval(takes, (el) => el.scrollIntoView({ block: 'center' }));
+    const tight = await soundRows(p, takes);
+    const tightOff = narrowRowsOff(tight);
+    if (!tight.some((r) => r.lines === 2)) tightOff.push(`no sound's words take two lines at 390: ${tight.map((r) => r.lines).join(', ')}`);
+    assert(!tightOff.length, tightOff.join('\n'));
+    await shot(p, 'reels-390-light');
+    await p.keyboard.press('Escape');
+    await p.browserContext().close();
+  });
+
+  await check('a short question’s dialog is as tall as what it shows: the free text right under the last group, Send at the foot', async () => {
+    await api('/api/folders', 'POST', { path: 'Frühlingsfest/Teaser' });
+    const teaser = await api('/api/asks', 'POST', {
+      folder: 'Frühlingsfest/Teaser',
+      text: 'Welcher Einstieg für den Teaser?',
+      by: 'agent:claude-code',
+      options: [
+        {
+          id: 'open',
+          label: 'Einstieg',
+          items: [
+            { id: 'o1', label: 'Ruhig', ref: { kind: 'file', data: b64(idea('t1', 'testsrc2', 330)) } },
+            { id: 'o2', label: 'Rhythmus', ref: { kind: 'file', data: b64(idea('t2', 'smptehdbars', 440)) } },
+            { id: 'o3', label: 'Fotobuch', ref: { kind: 'file', data: b64(idea('t3', 'mandelbrot', 550)) } },
+          ],
+        },
+      ],
+    });
+    const fresh = await browser.createBrowserContext();
+    // the inbox names the agent as people read it too: its row and its preview
+    const inbox = await open('/#/inbox', { ctx: fresh, theme: 'dark', lang: 'de-DE' });
+    const row = `[data-key="q:${teaser.id}"]`;
+    await inbox.waitForSelector(row, { timeout: 15000 });
+    await inbox.click(row);
+    await inbox.waitForFunction(() => /Welcher Einstieg/.test(document.querySelector('[data-testid=inbox-preview]')?.textContent || ''), {
+      polling: 100,
+      timeout: 15000,
+    });
+    const said = [await inbox.$eval(row, (el) => el.innerText), await inbox.$eval('[data-testid=inbox-preview]', (el) => el.innerText)];
+    assert(
+      said.every((s) => s.includes('Claude Code fragt') && !s.includes('claude-code')),
+      `the inbox's row and preview: ${said.map((s) => s.slice(0, 120)).join(' | ')}`,
+    );
+    await inbox.close();
+    const p = await open(`/#/folder/${encodeURIComponent('Frühlingsfest/Teaser')}`, { ctx: fresh, theme: 'dark', lang: 'de-DE' });
+    await p.waitForSelector('[data-testid=ask-lead] [data-testid=ask-lead-open]', { timeout: 15000 });
+    await p.click('[data-testid=ask-lead-open]');
+    await p.waitForSelector('[data-testid=audition][data-loaded=true]', { timeout: 15000 });
+    await settle(p);
+    const room = await p.evaluate(() => {
+      const r = (sel) => document.querySelector(sel).getBoundingClientRect();
+      const last = [...document.querySelectorAll('.aud-list > .aud-group')].at(-1).getBoundingClientRect();
+      const note = r('.aud-note');
+      const list = r('.aud-list');
+      const modal = r('.modal');
+      return {
+        gap: Math.round(note.top - last.bottom),
+        under: Math.round(list.bottom - note.bottom),
+        foot: Math.round(r('.modal-foot').top - list.bottom),
+        modal: Math.round(modal.height),
+        room: window.innerHeight - 64,
+        space: parseFloat(getComputedStyle(document.querySelector('.aud-list')).rowGap),
+        pad: parseFloat(getComputedStyle(document.querySelector('.aud-list')).paddingBottom),
+      };
+    });
+    assert(room.gap <= room.space + 1, `the free text follows the last group: ${room.gap}px between them (the list's gap ${room.space})`);
+    assert(room.under <= room.pad + 1 && room.foot <= 1, `nothing held under the free text: ${room.under}px, then the foot ${room.foot}px`);
+    assert(room.modal < room.room - 40, `the dialog fits what it shows: ${room.modal}px of ${room.room}`);
+    await shot(p, 'short-1440-dark-de');
+    await p.keyboard.press('Escape');
+    await fresh.close();
+  });
 
   await check('the note card in the player: a question on the video opens the audition, and shows the picks once sent', async () => {
     const made = await api('/api/asks', 'POST', {

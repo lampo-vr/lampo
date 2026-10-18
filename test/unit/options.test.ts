@@ -9,9 +9,8 @@ import type { OptionGroup, RefLoudness } from '../../lib/types.ts';
 import { FFMPEG, isolatedEnv, must } from '../lib/helpers.ts';
 
 const { dir } = isolatedEnv();
-const { checkPicks, cleanOptions, levelGains, optionLines, optionsSummary, picksLine, picksToRender, volumesOf, PEAK_CEILING } = await import(
-  '../../lib/options.ts'
-);
+const { checkPicks, cleanOptions, groupAspect, levelGains, optionLines, optionsSeen, optionsSummary, picksLine, picksToRender, volumesOf, PEAK_CEILING } =
+  await import('../../lib/options.ts');
 const { measureLoudness } = await import('../../lib/refs.ts');
 const { eventLine, shortEventLine } = await import('../../lib/eventLine.ts');
 
@@ -146,6 +145,27 @@ test('a question keeps listing its picks until a render arrives after them', () 
   assert.equal(picksToRender(c, '2026-10-02T13:00:00+02:00'), false);
   assert.equal(picksToRender({ options: groups, replies: [] }, undefined), false);
   assert.equal(picksToRender({ replies: [reply] }, undefined), false, 'only questions with options');
+});
+
+test('a group’s pictures share one box: the shape most of them have, the first on a tie; lists carry it for the loading state', () => {
+  const at = (id: string, w?: number, h?: number) => ({
+    id,
+    label: id,
+    ref: { id: `r_${id}`, kind: 'clip' as const, by: 'agent:a', at: '2026-10-19T12:00:00+02:00', ...(w ? { width: w, height: h } : {}) },
+  });
+  // two 9:16 reels and a 16:9: the reels' box, the odd one contained in it
+  assert.equal(groupAspect([at('a', 1080, 1920), at('b', 1920, 1080), at('c', 720, 1280)]), 0.5625);
+  assert.equal(groupAspect([at('a', 1920, 1080), at('b', 1080, 1080)]), 1.7778, 'a tie: the first');
+  assert.equal(groupAspect([at('a'), at('b')]), undefined, 'no sizes: the UI’s 16:9');
+  assert.equal(groupAspect([{ id: 't', label: 'Calm' }]), undefined);
+  const seen = optionsSeen([
+    { id: 'look', label: 'Look', pick: 'one', items: [at('a', 1080, 1920), at('b', 1080, 1920)] },
+    { id: 'voice', label: 'Narrator', pick: 'one', items: [{ id: 'v1', label: 'Calm' }] },
+  ]);
+  assert.deepEqual(seen, [
+    { label: 'Look', n: 2, kind: 'clip', aspect: 0.5625 },
+    { label: 'Narrator', n: 1, kind: 'text' },
+  ]);
 });
 
 // A sine of a given peak amplitude (0–1), two seconds, as a speech engine might hand one over.

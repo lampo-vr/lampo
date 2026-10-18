@@ -305,8 +305,7 @@
   .modal[data-state='closed'] {
     animation: sheet-down var(--dur) var(--ease-in) forwards;
   }
-  /* a room to look at things in, and one to write in, is the sheet at its tallest */
-  .modal.fill,
+  /* a room to write in is the sheet at its tallest (one to look at things in is as tall as what it shows) */
   .modal.writing {
     height: calc(100dvh - 24px - env(safe-area-inset-top));
   }

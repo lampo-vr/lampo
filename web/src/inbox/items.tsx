@@ -3,6 +3,7 @@
 // nudge) with the optimistic removal from the list.
 import { useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, useState } from 'react';
+import { agentShown } from '../../../lib/agentKind.ts';
 import { useAuthStatus, useCan } from '../api/auth.ts';
 import { api, enc } from '../api/client.ts';
 import { playbookHref } from '../api/playbooks.ts';
@@ -45,7 +46,11 @@ export const ordered = (items: ForYouItem[]): ForYouItem[] => GROUPS().flatMap((
 
 export { OPEN_PLAYER } from './nav.tsx';
 
-export const who = (by: string | null | undefined) => (by ? by.replace(/^agent:/, '') : '');
+/** The name as stored ("agent:promo-edit" → "promo-edit"): to compare with a session's name, never to show. */
+export const named = (by: string | null | undefined) => (by ? by.replace(/^agent:/, '') : '');
+/** Who, as people read it everywhere: an agent's client id by its kind's name ("agent:claude-code" → "Claude Code",
+ * lib/agentKind.ts agentShown), a name someone gave ("promo-edit") as it is. */
+export const who = (by: string | null | undefined) => (by ? agentShown(named(by)) : '');
 
 /** Kinds that are a conversation — a question, an answer to your note, a client's note: the preview puts what was said
  * first and where you answer right under it, the picture beside it (Preview.tsx). */

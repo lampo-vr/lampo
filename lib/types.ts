@@ -508,6 +508,8 @@ export interface OptionSeen {
   n: number;
   /** What its items are (`text`: labels only, `mixed`: more than one kind). */
   kind: 'audio' | 'image' | 'clip' | 'link' | 'frame' | 'text' | 'mixed';
+  /** Pictures and clips: the shape their tiles share (width / height, lib/options.ts `groupAspect`), when known. */
+  aspect?: number;
 }
 
 /** GET /api/asks: questions with options waiting on folders (none of them on a video yet), newest first. */

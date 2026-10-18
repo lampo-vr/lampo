@@ -48,6 +48,7 @@ import {
   type InboxActions,
   isTalk,
   itemText,
+  named,
   OPEN_PLAYER,
   openHref,
   PostRetry,
@@ -276,7 +277,7 @@ function Loaded(props: PreviewProps & { review: Review; media: ReviewResponse['m
     <TimecodeText text={text} fps={ver.fps} frames={ver.frames} href={(f) => openHref(item, { v: ver.v, f, newest })} onSeek={pv.seek} />
   ) : null;
   // Whether the agent that asks gets an answer now: known when it is the video's assigned agent.
-  const agent = item.kind === 'question' && review.session && who(item.by) === review.session.name ? (summary?.sessionActive ? 'running' : 'waiting') : null;
+  const agent = item.kind === 'question' && review.session && named(item.by) === review.session.name ? (summary?.sessionActive ? 'running' : 'waiting') : null;
   // …and whether answering can start it on this machine (Settings → Connect an agent says whether to ask first).
   const home = useInfo()?.home;
   const wake = useWakeChoice(agent === 'waiting' ? review.session : null, summary?.sessionActive ?? null, home);
